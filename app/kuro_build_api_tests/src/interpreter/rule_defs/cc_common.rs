@@ -118,6 +118,361 @@ fn cc_common_compile_variables_carry_toolchain_target_identity() -> kuro_error::
 }
 
 #[test]
+fn cc_common_feature_env_sets_expand_for_matching_action() -> kuro_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            feature = struct(
+                name = "musl_env",
+                enabled = False,
+                env_sets = [
+                    struct(
+                        actions = ["c++-compile"],
+                        with_features = [
+                            struct(features = ["musl_env"], not_features = ["blocked"]),
+                        ],
+                        env_entries = [
+                            struct(
+                                key = "CC",
+                                value = "clang --target=%{target_system_name}",
+                                expand_if_available = "target_system_name",
+                            ),
+                            struct(
+                                key = "CFLAGS",
+                                value = "--libc=%{target_libc}",
+                                expand_if_available = "target_libc",
+                            ),
+                            struct(
+                                key = "SKIP_ME",
+                                value = "%{missing}",
+                                expand_if_available = "missing",
+                            ),
+                        ],
+                    ),
+                    struct(
+                        actions = ["c++-link-executable"],
+                        with_features = [],
+                        env_entries = [
+                            struct(key = "LINK_ONLY", value = "1", expand_if_available = None),
+                        ],
+                    ),
+                ],
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    _features_DO_NOT_USE = [feature],
+                    _action_configs_DO_NOT_USE = [],
+                ),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = ["musl_env"])
+            variables = cc_common.create_compile_variables(
+                feature_configuration = fc,
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-musl",
+                    libc = "musl",
+                ),
+            )
+            env = cc_common.get_environment_variables(
+                feature_configuration = fc,
+                action_name = "c++-compile",
+                variables = variables,
+            )
+
+            assert_eq("clang --target=x86_64-linux-musl", env["CC"])
+            assert_eq("--libc=musl", env["CFLAGS"])
+            assert_eq(False, "SKIP_ME" in env)
+            assert_eq(False, "LINK_ONLY" in env)
+
+            blocked = features.configure_features(requested_features = ["musl_env", "blocked"])
+            blocked_env = cc_common.get_environment_variables(
+                feature_configuration = blocked,
+                action_name = "c++-compile",
+                variables = variables,
+            )
+            assert_eq(False, "CC" in blocked_env)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_flag_sets_expand_action_configs_before_features() -> kuro_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            action_config = struct(
+                action_name = "c++-link-executable",
+                flag_sets = [
+                    struct(
+                        actions = [],
+                        with_features = [],
+                        flag_groups = [
+                            struct(
+                                flags = ["-resource-dir", "bazel-out/resource_directory"],
+                                flag_groups = [],
+                                iterate_over = None,
+                                expand_if_available = None,
+                                expand_if_not_available = None,
+                                expand_if_true = None,
+                                expand_if_false = None,
+                                expand_if_equal = None,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+            feature = struct(
+                name = "runtime_paths",
+                enabled = True,
+                env_sets = [],
+                flag_sets = [
+                    struct(
+                        actions = ["c++-link-executable"],
+                        with_features = [
+                            struct(features = ["runtime_paths"], not_features = ["blocked"]),
+                        ],
+                        flag_groups = [
+                            struct(
+                                flags = ["-target", "%{target_system_name}"],
+                                flag_groups = [],
+                                iterate_over = None,
+                                expand_if_available = "target_system_name",
+                                expand_if_not_available = None,
+                                expand_if_true = None,
+                                expand_if_false = None,
+                                expand_if_equal = None,
+                            ),
+                            struct(
+                                flags = ["-L%{library_search_directories}"],
+                                flag_groups = [],
+                                iterate_over = "library_search_directories",
+                                expand_if_available = "library_search_directories",
+                                expand_if_not_available = None,
+                                expand_if_true = None,
+                                expand_if_false = None,
+                                expand_if_equal = None,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    _features_DO_NOT_USE = [feature],
+                    _action_configs_DO_NOT_USE = [action_config],
+                ),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = ["runtime_paths"])
+            variables = cc_common.create_link_variables(
+                feature_configuration = fc,
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                output_file = "out",
+                library_search_directories = ["bazel-out/lib/a", "bazel-out/lib/b"],
+            )
+            cmd = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = fc,
+                action_name = "c++-link-executable",
+                variables = variables,
+            )
+
+            assert_eq([
+                "-o",
+                "out",
+                "-resource-dir",
+                "bazel-out/resource_directory",
+                "-target",
+                "x86_64-linux-gnu",
+                "-Lbazel-out/lib/a",
+                "-Lbazel-out/lib/b",
+            ], cmd)
+
+            blocked = features.configure_features(requested_features = ["runtime_paths", "blocked"])
+            blocked_cmd = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = blocked,
+                action_name = "c++-link-executable",
+                variables = variables,
+            )
+            assert_eq([
+                "-o",
+                "out",
+                "-resource-dir",
+                "bazel-out/resource_directory",
+            ], blocked_cmd)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_toolchain_features_configure_honors_pre_filtered_requested_features() -> kuro_error::Result<()>
+{
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            unsupported_default = struct(
+                name = "module_maps",
+                enabled = True,
+                env_sets = [],
+                flag_sets = [],
+            )
+            supported_default = struct(
+                name = "supports_pic",
+                enabled = True,
+                env_sets = [],
+                flag_sets = [],
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    _features_DO_NOT_USE = [unsupported_default, supported_default],
+                    _action_configs_DO_NOT_USE = [],
+                ),
+                tools_directory = "",
+            )
+
+            assert_eq(["module_maps", "supports_pic"], features.default_features_and_action_configs())
+
+            fc = features.configure_features(requested_features = ["supports_pic"])
+            assert_eq(False, fc.is_enabled("module_maps"))
+            assert_eq(True, fc.is_enabled("supports_pic"))
+
+            public_fc = cc_common.configure_features(
+                ctx = struct(features = [], disabled_features = []),
+                cc_toolchain = struct(_toolchain_features = features),
+                requested_features = [],
+                unsupported_features = ["module_maps"],
+            )
+            assert_eq(False, public_fc.is_enabled("module_maps"))
+            assert_eq(True, public_fc.is_enabled("supports_pic"))
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_modern_toolchain_args_expand_for_link_action() -> kuro_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            action = struct(name = "c++-link-executable")
+            nested = struct(
+                legacy_flag_group = struct(
+                    flags = ["-resource-dir", "bazel-out/resource_directory"],
+                    flag_groups = [],
+                    iterate_over = None,
+                    expand_if_available = None,
+                    expand_if_not_available = None,
+                    expand_if_true = None,
+                    expand_if_false = None,
+                    expand_if_equal = None,
+                ),
+            )
+            args_info = struct(
+                actions = depset([action]),
+                requires_any_of = [],
+                nested = nested,
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    features = [],
+                    enabled_features = [],
+                    args = struct(
+                        by_action = [
+                            struct(action = action, args = [args_info]),
+                        ],
+                    ),
+                ),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = [])
+            variables = cc_common.create_link_variables(
+                feature_configuration = fc,
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                output_file = "out",
+            )
+            cmd = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = fc,
+                action_name = "c++-link-executable",
+                variables = variables,
+            )
+            assert_eq(["-o", "out", "-resource-dir", "bazel-out/resource_directory"], cmd)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_public_configure_features_preserves_toolchain_flag_sets() -> kuro_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            action_config = struct(
+                action_name = "c++-link-executable",
+                flag_sets = [
+                    struct(
+                        actions = [],
+                        with_features = [],
+                        flag_groups = [
+                            struct(
+                                flags = ["-resource-dir", "bazel-out/resource_directory"],
+                                flag_groups = [],
+                                iterate_over = None,
+                                expand_if_available = None,
+                                expand_if_not_available = None,
+                                expand_if_true = None,
+                                expand_if_false = None,
+                                expand_if_equal = None,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    features = [],
+                    enabled_features = [],
+                    action_configs = [action_config],
+                ),
+                tools_directory = "",
+            )
+            fc = cc_common.configure_features(
+                ctx = struct(features = [], disabled_features = []),
+                cc_toolchain = struct(_toolchain_features = features),
+                requested_features = [],
+                unsupported_features = [],
+            )
+            variables = cc_common.create_link_variables(
+                feature_configuration = fc,
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                output_file = "out",
+            )
+            cmd = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = fc,
+                action_name = "c++-link-executable",
+                variables = variables,
+            )
+            assert_eq(["-o", "out", "-resource-dir", "bazel-out/resource_directory"], cmd)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
 fn cc_info_values_are_depset_eligible_inside_rust_dep_variant_shape() -> kuro_error::Result<()> {
     let mut positive_tester = tester()?;
     positive_tester.run_starlark_bzl_test(indoc!(

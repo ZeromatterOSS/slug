@@ -502,8 +502,56 @@ pub fn set_executable<P: AsRef<AbsPath>>(path: P, executable: bool) -> kuro_erro
 
 pub fn remove_dir_all<P: AsRef<AbsPath>>(path: P) -> Result<(), IoError> {
     let _guard = IoCounterKey::RmDirAll.guard();
-    with_retries(|| fs::remove_dir_all(path.as_ref().as_maybe_relativized()))
-        .map_err(|e| IoError::new_with_path("remove_dir_all", path, e))
+    let path = path.as_ref();
+    match with_retries(|| fs::remove_dir_all(path.as_maybe_relativized())) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+            make_tree_writable_for_removal(path)?;
+            with_retries(|| fs::remove_dir_all(path.as_maybe_relativized()))
+                .map_err(|e| IoError::new_with_path("remove_dir_all", path, e))
+        }
+        Err(e) => Err(IoError::new_with_path("remove_dir_all", path, e)),
+    }
+}
+
+#[cfg(unix)]
+fn make_tree_writable_for_removal(path: &AbsPath) -> Result<(), IoError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let metadata = symlink_metadata(path)?;
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+
+    let mut permissions = metadata.permissions();
+    let mode = permissions.mode();
+    if metadata.is_dir() {
+        permissions.set_mode(mode | 0o700);
+        set_permissions(path, permissions)?;
+        for entry in with_retries(|| fs::read_dir(path.as_maybe_relativized()))
+            .map_err(|e| IoError::new_with_path("read_dir", path, e))?
+        {
+            let entry = entry.map_err(|e| IoError::new_with_path("read_dir entry", path, e))?;
+            let child_path = entry.path();
+            let child = AbsPath::new(&child_path).map_err(|e| {
+                IoError::new(
+                    "absolute path conversion".to_owned(),
+                    io::Error::other(e.to_string()),
+                )
+            })?;
+            make_tree_writable_for_removal(child)?;
+        }
+    } else {
+        permissions.set_mode(mode | 0o600);
+        set_permissions(path, permissions)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn make_tree_writable_for_removal(_path: &AbsPath) -> Result<(), IoError> {
+    Ok(())
 }
 
 /// `None` if file does not exist.
@@ -797,6 +845,7 @@ mod tests {
     use crate::fs_util::remove_all;
     use crate::fs_util::remove_dir_all;
     use crate::fs_util::remove_file;
+    use crate::fs_util::set_permissions;
     use crate::fs_util::symlink;
     use crate::fs_util::symlink_metadata;
     use crate::fs_util::with_retries;
@@ -1151,6 +1200,31 @@ mod tests {
         fs::create_dir(&path)?;
         fs::write(path.join("file"), b"regular file in a dir")?;
         remove_all(&path)?;
+        assert!(!path.try_exists()?);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn remove_all_readonly_dir() -> kuro_error::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tempdir = tempfile::tempdir()?;
+        let root = AbsPath::new(tempdir.path())?;
+        let path = root.join("dir");
+        let child = path.join("file");
+        create_dir_all(&path)?;
+        write(&child, b"regular file in a readonly dir")?;
+
+        let mut child_perms = metadata(&child)?.permissions();
+        child_perms.set_mode(0o444);
+        set_permissions(&child, child_perms)?;
+        let mut dir_perms = metadata(&path)?.permissions();
+        dir_perms.set_mode(0o555);
+        set_permissions(&path, dir_perms)?;
+
+        remove_all(&path)?;
+
         assert!(!path.try_exists()?);
         Ok(())
     }

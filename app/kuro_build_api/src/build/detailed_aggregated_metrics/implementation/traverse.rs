@@ -129,6 +129,7 @@ impl<'a> Graph<'a> {
                 .action_key()
                 .map(|key| Key::Action(key.dupe()))),
             ArtifactGroup::Depset(_) => Ok(None),
+            ArtifactGroup::TargetDefaultOutputs(_) => Ok(None),
         }
     }
 

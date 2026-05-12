@@ -45,6 +45,7 @@ use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
 use starlark::typing::Ty;
 use starlark::values::AllocValue;
+use starlark::values::Demand;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
@@ -70,13 +71,22 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
+use crate::artifact_groups::ArtifactGroup;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::cc_common::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::cc_common::CcToolchainVariablesGen;
+use crate::interpreter::rule_defs::cc_common::CtxCheatArtifactStub;
+use crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
+use crate::interpreter::rule_defs::cmd_args::CommandLineArgLike;
+use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
+use crate::interpreter::rule_defs::cmd_args::CommandLineBuilder;
+use crate::interpreter::rule_defs::cmd_args::CommandLineContext;
+use crate::interpreter::rule_defs::cmd_args::command_line_arg_like_type::command_line_arg_like_impl;
 use crate::interpreter::rule_defs::depset::Depset;
+use crate::interpreter::rule_defs::depset::make_depset_from_lists;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::fragments::CppFragment;
 use crate::interpreter::rule_defs::platform_common::ToolchainInfoInstanceGen;
@@ -1929,7 +1939,9 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 // ============================================================================
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct CcInfoNativeShim;
+struct CcInfoNativeShim {
+    module_map_path: Option<String>,
+}
 
 impl std::fmt::Display for CcInfoNativeShim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1947,7 +1959,9 @@ impl<'v> StarlarkValue<'v> for CcInfoNativeShim {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "compilation_context" => Some(heap.alloc(EmptyCompilationContext)),
+            "compilation_context" => Some(heap.alloc(EmptyCompilationContext {
+                module_map_path: self.module_map_path.clone(),
+            })),
             "linking_context" => Some(heap.alloc(EmptyLinkingContext)),
             _ => None,
         }
@@ -1955,6 +1969,7 @@ impl<'v> StarlarkValue<'v> for CcInfoNativeShim {
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "CcInfoNativeShim".hash(hasher);
+        self.module_map_path.hash(hasher);
         Ok(())
     }
 }
@@ -1969,6 +1984,10 @@ impl<'v> StarlarkValue<'v> for CcInfoNativeShim {
 struct CcToolchainInfoNativeShim {
     toolchain_label: String,
     target_platform: String,
+    toolchain_config_info: Option<FrozenValue>,
+    toolchain_features: Option<CcToolchainFeatures>,
+    module_map_path: Option<String>,
+    toolchain_files: Option<Arc<[ToolchainInputFile]>>,
 }
 
 const CC_TOOLCHAIN_NATIVE_SHIM_ATTRS: &[&str] = &[
@@ -2158,6 +2177,10 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
                 let shim = CcToolchainInfoNativeShim {
                     toolchain_label: "@bazel_tools//tools/cpp:current_cc_toolchain".to_owned(),
                     target_platform: self.target_platform.clone(),
+                    toolchain_config_info: None,
+                    toolchain_features: None,
+                    module_map_path: None,
+                    toolchain_files: None,
                 };
                 shim.get_attr(attribute, heap)
             })
@@ -2220,6 +2243,238 @@ fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
     candidates.into_iter().next()
 }
 
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct ToolchainInputRootStub {
+    path: String,
+}
+
+impl fmt::Display for ToolchainInputRootStub {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<root {}>", self.path)
+    }
+}
+
+starlark::starlark_simple_value!(ToolchainInputRootStub);
+
+unsafe impl<'v> Trace<'v> for ToolchainInputRootStub {
+    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {}
+}
+
+#[starlark::values::starlark_value(type = "root")]
+impl<'v> StarlarkValue<'v> for ToolchainInputRootStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        attribute == "path"
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "path" => Some(heap.alloc_str(&self.path).to_value()),
+            _ => None,
+        }
+    }
+}
+
+/// Stable-backed `File` value used only by the native C++ toolchain shim.
+///
+/// These values live inside a frozen provider collection that is returned as a
+/// cycle breaker during toolchain analysis. Keep the payload pointer-stable and
+/// convert to Kuro artifact groups only when command-line inputs are visited.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct ToolchainInputFileStub {
+    path: &'static str,
+    input_target: &'static ConfiguredTargetLabel,
+}
+
+impl fmt::Display for ToolchainInputFileStub {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<artifact {}>", self.path)
+    }
+}
+
+starlark::starlark_simple_value!(ToolchainInputFileStub);
+
+unsafe impl<'v> Trace<'v> for ToolchainInputFileStub {
+    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {}
+}
+
+#[starlark::values::starlark_value(type = "File")]
+impl<'v> StarlarkValue<'v> for ToolchainInputFileStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "path"
+                | "short_path"
+                | "basename"
+                | "extension"
+                | "is_source"
+                | "root"
+                | "is_directory"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "path" | "short_path" => Some(heap.alloc_str(self.path).to_value()),
+            "basename" => {
+                let basename = self.path.rsplit('/').next().unwrap_or(self.path);
+                Some(heap.alloc_str(basename).to_value())
+            }
+            "extension" => {
+                let ext = self.path.rsplit('.').next().unwrap_or("");
+                Some(heap.alloc_str(ext).to_value())
+            }
+            "is_source" | "is_directory" => Some(Value::new_bool(false)),
+            "root" => {
+                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                Some(heap.alloc(ToolchainInputRootStub {
+                    path: format!("bazel-out/{}-{}/bin", host_target_cpu(), m),
+                }))
+            }
+            _ => None,
+        }
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        match ToolchainInputFileStub::from_value(other) {
+            Some(other) => Ok(self.path == other.path),
+            None => Ok(false),
+        }
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.path.hash(hasher);
+        Ok(())
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn CommandLineArgLike>(self);
+    }
+}
+
+impl<'v> CommandLineArgLike<'v> for ToolchainInputFileStub {
+    fn register_me(&self) {
+        command_line_arg_like_impl!(ToolchainInputFileStub::starlark_type_repr());
+    }
+
+    fn add_to_command_line(
+        &self,
+        cli: &mut dyn CommandLineBuilder,
+        _context: &mut dyn CommandLineContext,
+        _artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        cli.push_arg(self.path.to_owned());
+        Ok(())
+    }
+
+    fn visit_artifacts(
+        &self,
+        visitor: &mut dyn CommandLineArtifactVisitor<'v>,
+    ) -> kuro_error::Result<()> {
+        visitor.visit_input(
+            ArtifactGroup::TargetDefaultOutputs(Arc::new(self.input_target.dupe())),
+            vec![],
+        );
+        Ok(())
+    }
+
+    fn contains_arg_attr(&self) -> bool {
+        false
+    }
+
+    fn visit_write_to_file_macros(
+        &self,
+        _visitor: &mut dyn crate::interpreter::rule_defs::cmd_args::WriteToFileMacroVisitor,
+        _artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Allocative)]
+struct ToolchainInputFile {
+    path: &'static str,
+    input_target: &'static ConfiguredTargetLabel,
+}
+
+/// Hidden action input carrier for native C++ toolchain files.
+///
+/// This is stored as the single direct element of the `cc_toolchain.all_files`
+/// depset. It reports Starlark type `File` so public depset type validation can
+/// compose it with real file depsets, but it avoids exposing fake per-file
+/// artifacts through Starlark. Kuro only needs these records as hidden action
+/// inputs when rules pass toolchain files through `ctx.actions.run(tools=...)`.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct ToolchainInputFilesArg {
+    files: Arc<[ToolchainInputFile]>,
+}
+
+impl fmt::Display for ToolchainInputFilesArg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<toolchain files>")
+    }
+}
+
+starlark::starlark_simple_value!(ToolchainInputFilesArg);
+
+unsafe impl<'v> Trace<'v> for ToolchainInputFilesArg {
+    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {}
+}
+
+#[starlark::values::starlark_value(type = "File")]
+impl<'v> StarlarkValue<'v> for ToolchainInputFilesArg {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "ToolchainInputFilesArg".hash(hasher);
+        for file in self.files.iter() {
+            file.path.hash(hasher);
+        }
+        Ok(())
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn CommandLineArgLike>(self);
+    }
+}
+
+impl<'v> CommandLineArgLike<'v> for ToolchainInputFilesArg {
+    fn register_me(&self) {
+        command_line_arg_like_impl!(ToolchainInputFilesArg::starlark_type_repr());
+    }
+
+    fn add_to_command_line(
+        &self,
+        _cli: &mut dyn CommandLineBuilder,
+        _context: &mut dyn CommandLineContext,
+        _artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        Ok(())
+    }
+
+    fn visit_artifacts(
+        &self,
+        visitor: &mut dyn CommandLineArtifactVisitor<'v>,
+    ) -> kuro_error::Result<()> {
+        for file in self.files.iter() {
+            visitor.visit_input(
+                ArtifactGroup::TargetDefaultOutputs(Arc::new(file.input_target.dupe())),
+                vec![],
+            );
+        }
+        Ok(())
+    }
+
+    fn contains_arg_attr(&self) -> bool {
+        false
+    }
+
+    fn visit_write_to_file_macros(
+        &self,
+        _visitor: &mut dyn crate::interpreter::rule_defs::cmd_args::WriteToFileMacroVisitor,
+        _artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        Ok(())
+    }
+}
+
 impl std::fmt::Display for CcToolchainInfoNativeShim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "CcToolchainInfo({})", self.toolchain_label)
@@ -2263,6 +2518,22 @@ impl CcToolchainInfoNativeShim {
             ),
         ])));
         heap.alloc(CcToolchainVariablesGen { vars })
+    }
+
+    fn toolchain_files_depset<'v>(&self, heap: Heap<'v>) -> Value<'v> {
+        if std::env::var_os("KURO_DISABLE_CC_TOOLCHAIN_FILE_SHIM").is_some() {
+            return heap.alloc(Depset::empty());
+        }
+        self.toolchain_files
+            .as_ref()
+            .map(|files| {
+                let carrier = heap.alloc(ToolchainInputFilesArg {
+                    files: Arc::clone(files),
+                });
+                make_depset_from_lists(heap, vec![carrier], vec![], "default")
+                    .expect("toolchain file carrier depset should be valid")
+            })
+            .unwrap_or_else(|| heap.alloc(Depset::empty()))
     }
 }
 
@@ -2338,8 +2609,8 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             "toolchain_id" => Some(empty_string()),
             "dynamic_runtime_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
             "built_in_include_directories" => Some(empty_list()),
-            "all_files"
-            | "_as_files"
+            "all_files" => Some(self.toolchain_files_depset(heap)),
+            "_as_files"
             | "_ar_files"
             | "_strip_files"
             | "_linker_files"
@@ -2375,14 +2646,30 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             | "_crosstool_top_path" => Some(empty_string()),
             "_build_variables" => Some(self.build_variables(heap)),
             "_supports_header_parsing" | "_supports_param_files" => Some(Value::new_bool(true)),
-            "_toolchain_features" => Some(heap.alloc(CcToolchainFeatures::empty())),
+            "_toolchain_features" => Some(if let Some(features) = &self.toolchain_features {
+                heap.alloc(features.clone())
+            } else {
+                self.toolchain_config_info
+                        .map(|toolchain_config_info| {
+                            heap.alloc(
+                                crate::interpreter::rule_defs::cc_common::cc_toolchain_features_from_config_info(
+                                    toolchain_config_info.to_value(),
+                                    "",
+                                    heap,
+                                ),
+                            )
+                        })
+                        .unwrap_or_else(|| heap.alloc(CcToolchainFeatures::empty()))
+            }),
             "_toolchain_label" => Some(heap.alloc_str(&self.toolchain_label).to_value()),
             "_cpp_configuration" => Some(heap.alloc(CppFragment::default())),
             "_is_tool_configuration"
             | "_is_sibling_repository_layout"
             | "_stamp_binaries"
             | "_force_layering_check_features" => Some(Value::new_bool(false)),
-            "_cc_info" => Some(heap.alloc(CcInfoNativeShim)),
+            "_cc_info" => Some(heap.alloc(CcInfoNativeShim {
+                module_map_path: self.module_map_path.clone(),
+            })),
             "_extra_allowlisted_feature_layering_check_macros" => Some(empty_list()),
             _ => None,
         }
@@ -2397,6 +2684,11 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
         "CcToolchainInfoNativeShim".hash(hasher);
         self.toolchain_label.hash(hasher);
         self.target_platform.hash(hasher);
+        if let Some(toolchain_files) = &self.toolchain_files {
+            for file in toolchain_files.iter() {
+                file.path.hash(hasher);
+            }
+        }
         Ok(())
     }
 }
@@ -2404,11 +2696,27 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
 pub fn cc_toolchain_native_shim_provider_collection(
     toolchain_label: &str,
     target_platform: &str,
+    toolchain_config_info: Option<FrozenValue>,
+    toolchain_features: Option<CcToolchainFeatures>,
+    module_map_path: Option<String>,
+    toolchain_data: Vec<(ConfiguredTargetLabel, Arc<str>)>,
 ) -> FrozenProviderCollectionValue {
     let heap = FrozenHeap::new();
+    let toolchain_files: Arc<[ToolchainInputFile]> = toolchain_data
+        .into_iter()
+        .map(|(target, path)| {
+            let path = Box::leak(path.to_string().into_boxed_str());
+            let input_target = Box::leak(Box::new(target));
+            ToolchainInputFile { path, input_target }
+        })
+        .collect();
     let cc = heap.alloc(CcToolchainInfoNativeShim {
         toolchain_label: toolchain_label.to_owned(),
         target_platform: target_platform.to_owned(),
+        toolchain_config_info,
+        toolchain_features,
+        module_map_path,
+        toolchain_files: Some(toolchain_files),
     });
     let cc_provider_in_toolchain = heap.alloc(true);
     let fields = heap.alloc(AllocDict([
@@ -2588,7 +2896,14 @@ fn alloc_cc_toolchain_info_shim<'v>(
     toolchain_label: &str,
     target_platform: &str,
 ) -> Value<'v> {
-    let providers = cc_toolchain_native_shim_provider_collection(toolchain_label, target_platform);
+    let providers = cc_toolchain_native_shim_provider_collection(
+        toolchain_label,
+        target_platform,
+        None,
+        None,
+        None,
+        Vec::new(),
+    );
     let cc_toolchain_info_id =
         crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider::provider_id();
     let cc = providers
@@ -2661,7 +2976,9 @@ mod resolved_toolchains_tests {
 
 /// A stub for CompilationContext.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct EmptyCompilationContext;
+pub struct EmptyCompilationContext {
+    pub(crate) module_map_path: Option<String>,
+}
 
 impl std::fmt::Display for EmptyCompilationContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2709,7 +3026,14 @@ impl<'v> StarlarkValue<'v> for EmptyCompilationContext {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "_module_map" => Some(Value::new_none()),
+            "_module_map" => Some(if let Some(path) = &self.module_map_path {
+                heap.alloc(ModuleMapNativeShim {
+                    name: "toolchain_module_map".to_owned(),
+                    file_path: path.clone(),
+                })
+            } else {
+                Value::new_none()
+            }),
             "headers" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
             "system_includes" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
@@ -2758,7 +3082,9 @@ impl<'v> StarlarkValue<'v> for EmptyCompilationContext {
             "_direct_module_maps" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
-            "_exporting_module_maps" => Some(heap.alloc(Vec::<Value>::new())),
+            "_exporting_module_maps" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "direct_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_public_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_private_headers" => Some(heap.alloc(Vec::<Value>::new())),
@@ -2775,6 +3101,45 @@ impl<'v> StarlarkValue<'v> for EmptyCompilationContext {
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "CompilationContext".hash(hasher);
         "empty".hash(hasher);
+        self.module_map_path.hash(hasher);
+        Ok(())
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct ModuleMapNativeShim {
+    name: String,
+    file_path: String,
+}
+
+impl std::fmt::Display for ModuleMapNativeShim {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "struct(file = <file>, name = {:?})", self.name)
+    }
+}
+
+starlark::starlark_simple_value!(ModuleMapNativeShim);
+
+#[starlark::values::starlark_value(type = "struct")]
+impl<'v> StarlarkValue<'v> for ModuleMapNativeShim {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "name" | "file")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "name" => Some(heap.alloc_str(&self.name).to_value()),
+            "file" => Some(heap.alloc(CtxCheatArtifactStub {
+                path: Arc::<str>::from(self.file_path.as_str()),
+                input_target: None,
+            })),
+            _ => None,
+        }
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.name.hash(hasher);
+        self.file_path.hash(hasher);
         Ok(())
     }
 }

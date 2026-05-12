@@ -65,6 +65,10 @@ pub struct ResolvedToolchain {
     pub toolchain_target: String,
     /// The actual toolchain implementation target (the `toolchain` attr value)
     pub toolchain_impl: String,
+    /// For rule-based C++ toolchains, the generated cc_toolchain_config target.
+    pub cc_toolchain_config: Option<String>,
+    /// For rule-based C++ toolchains, the configured module map target, if any.
+    pub cc_toolchain_module_map: Option<String>,
     /// The toolchain_type this satisfies
     pub toolchain_type: String,
 }
@@ -334,6 +338,8 @@ pub fn resolve_toolchains(
                 found = Some(ResolvedToolchain {
                     toolchain_target: tc_label.clone(),
                     toolchain_impl: tc_info.toolchain_impl.clone(),
+                    cc_toolchain_config: tc_info.cc_toolchain_config.clone(),
+                    cc_toolchain_module_map: tc_info.cc_toolchain_module_map.clone(),
                     toolchain_type: tc_info.toolchain_type.clone(),
                 });
                 break;

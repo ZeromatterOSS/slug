@@ -470,6 +470,7 @@ pub(crate) async fn get_from_template_placeholder_info<'x>(
                     artifacts.push_back((target.dupe(), input));
                 }
             }
+            ResolvedArtifactGroup::TargetDefaultOutputs(_) => {}
         }
     }
     Ok(label_to_artifact)

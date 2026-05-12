@@ -200,6 +200,29 @@ fn map_each_sequence_returns_expand_as_items() -> kuro_error::Result<()> {
 }
 
 #[test]
+fn map_each_accepts_tree_expander_parameter() -> kuro_error::Result<()> {
+    let mut tester = tester()?;
+    tester.run_starlark_bzl_test(indoc!(
+        r#"
+        def map_value(value, tree_expander):
+            assert_eq("<tree_expander>", str(tree_expander))
+            assert_eq([], tree_expander.expand(value))
+            return value + "-mapped"
+
+        def test():
+            add_all_args = cmd_args()
+            add_all_args.add_all(["one", "two"], map_each = map_value)
+            assert_eq(["one-mapped", "two-mapped"], get_args(add_all_args))
+
+            joined_args = cmd_args()
+            joined_args.add_joined(["one", "two"], join_with = ":", map_each = map_value)
+            assert_eq(["one-mapped:two-mapped"], get_args(joined_args))
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
 fn command_line_builder() -> kuro_error::Result<()> {
     let mut tester = tester()?;
     let content = indoc!(

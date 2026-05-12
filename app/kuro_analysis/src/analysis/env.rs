@@ -11,6 +11,7 @@
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::atomic::AtomicBool;
@@ -22,10 +23,17 @@ use dice::CancellationContext;
 use dice::DiceComputations;
 use dupe::Dupe;
 use futures::Future;
+use futures::FutureExt;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::anon_promises_dyn::RunAnonPromisesAccessorPair;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::analysis::registry::AnalysisRegistry;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcExpandIfEqual;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcFeatureFlagSets;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcFlagGroup;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcFlagSet;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcToolchainFeatures;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcWithFeatureSet;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
 use kuro_build_api::interpreter::rule_defs::context::ResolvedToolchains;
@@ -72,10 +80,12 @@ use kuro_interpreter::types::rule::FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL;
 use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
 use kuro_interpreter_for_build::rule::FrozenStarlarkRuleCallable;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
+use kuro_node::attrs::coerced_attr::CoercedSelectorKeyRef;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::execution::GetExecutionPlatforms;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
+use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_node::rule_type::NativeRuleKind;
 use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
@@ -1119,6 +1129,38 @@ async fn load_and_register_toolchain_packages(
                             let label = target_node.label().to_string();
                             info.toolchain_impl =
                                 canonicalize_extension_sibling_label(&label, &info.toolchain_impl);
+                            for (_impl_name, impl_node) in eval_result.targets().iter() {
+                                if impl_node.label().to_string() == info.toolchain_impl {
+                                    for attr in impl_node.attrs(AttrInspectOptions::All) {
+                                        match attr.name {
+                                            "toolchain_config" => {
+                                                let config =
+                                                    extract_label_from_coerced_attr(&attr.value);
+                                                if !config.is_empty() {
+                                                    info.cc_toolchain_config =
+                                                        Some(canonicalize_extension_sibling_label(
+                                                            &info.toolchain_impl,
+                                                            &config,
+                                                        ));
+                                                }
+                                            }
+                                            "module_map" => {
+                                                let module_map =
+                                                    extract_label_from_coerced_attr(&attr.value);
+                                                if !module_map.is_empty() {
+                                                    info.cc_toolchain_module_map =
+                                                        Some(canonicalize_extension_sibling_label(
+                                                            &info.toolchain_impl,
+                                                            &module_map,
+                                                        ));
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
                             let canonical = canonicalize_toolchain_type_label(
                                 ctx,
                                 &info.toolchain_type,
@@ -1438,6 +1480,8 @@ fn extract_toolchain_info_from_node(
     Some(DeclaredToolchainInfo {
         toolchain_type,
         toolchain_impl,
+        cc_toolchain_config: None,
+        cc_toolchain_module_map: None,
         exec_compatible_with: exec_compat,
         target_compatible_with: target_compat,
     })
@@ -1454,8 +1498,19 @@ fn extract_label_from_coerced_attr(attr: &CoercedAttr) -> String {
     match attr {
         CoercedAttr::Dep(providers_label) => providers_label.target().to_string(),
         CoercedAttr::Label(providers_label) => providers_label.target().to_string(),
+        CoercedAttr::SourceLabel(providers_label) => providers_label.target().to_string(),
         CoercedAttr::ConfigurationDep(providers_label) => providers_label.target().to_string(),
+        CoercedAttr::SplitTransitionDep(providers_label) => providers_label.target().to_string(),
+        CoercedAttr::PluginDep(label) => label.to_string(),
         CoercedAttr::String(s) => s.0.as_str().to_owned(),
+        CoercedAttr::OneOf(inner, _) => extract_label_from_coerced_attr(inner),
+        CoercedAttr::Selector(selector) => selector
+            .all_entries()
+            .find_map(|(_key, value)| {
+                let label = extract_label_from_coerced_attr(value);
+                (!label.is_empty()).then_some(label)
+            })
+            .unwrap_or_default(),
         _ => String::new(),
     }
 }
@@ -1612,6 +1667,749 @@ async fn canonicalize_toolchain_type_label(
 
     cache.insert(label_str.to_owned(), current.clone());
     current
+}
+
+struct CcToolchainFeaturesMetadata {
+    features: CcToolchainFeatures,
+    data_labels: Vec<CcToolchainDataLabelMetadata>,
+}
+
+struct CcToolchainDataLabelMetadata {
+    actions: Vec<String>,
+    label: TargetLabel,
+}
+
+async fn extract_cc_toolchain_features_metadata(
+    ctx: &mut DiceComputations<'_>,
+    toolchain_config_label: &str,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> Option<CcToolchainFeaturesMetadata> {
+    let config_target = parse_impl_label_to_target_label(toolchain_config_label)?;
+    let config_node = target_node_for_metadata(ctx, &config_target).await?;
+
+    let mut feature_names = Vec::new();
+    let mut default_enabled_features = Vec::new();
+    let mut feature_flag_sets = Vec::new();
+    let mut seen_features = HashSet::new();
+    let mut data_labels = Vec::new();
+
+    let mut action_config_flag_sets = Vec::new();
+    if let Some(args_attr) = config_node.attr_or_none("args", AttrInspectOptions::All) {
+        for args_label in labels_from_coerced_attr(&args_attr.value, target_cfg) {
+            action_config_flag_sets.extend(
+                metadata_flag_sets_for_args_label(
+                    ctx,
+                    args_label,
+                    target_cfg,
+                    &mut HashSet::new(),
+                    &mut data_labels,
+                )
+                .await,
+            );
+        }
+    }
+
+    for attr_name in ["known_features", "enabled_features"] {
+        if let Some(features_attr) = config_node.attr_or_none(attr_name, AttrInspectOptions::All) {
+            for feature_set_label in labels_from_coerced_attr(&features_attr.value, target_cfg) {
+                for feature_label in metadata_feature_labels_for_set(
+                    ctx,
+                    feature_set_label,
+                    target_cfg,
+                    &mut HashSet::new(),
+                )
+                .await
+                {
+                    let Some(feature_name) = metadata_feature_name(ctx, feature_label.dupe()).await
+                    else {
+                        continue;
+                    };
+                    if seen_features.insert(feature_name.clone()) {
+                        feature_names.push(feature_name.clone());
+                        let flag_sets = metadata_feature_flag_sets(
+                            ctx,
+                            feature_label,
+                            target_cfg,
+                            &mut HashSet::new(),
+                            &mut data_labels,
+                        )
+                        .await;
+                        if !flag_sets.is_empty() {
+                            feature_flag_sets
+                                .push(CcFeatureFlagSets::new(feature_name.clone(), flag_sets));
+                        }
+                    }
+                    if attr_name == "enabled_features"
+                        && !default_enabled_features.iter().any(|f| f == &feature_name)
+                    {
+                        default_enabled_features.push(feature_name);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut seen_data = HashSet::new();
+    data_labels.retain(|data| seen_data.insert(metadata_label_key(&data.label)));
+
+    Some(CcToolchainFeaturesMetadata {
+        features: CcToolchainFeatures::new(
+            feature_names,
+            default_enabled_features,
+            action_config_flag_sets,
+            feature_flag_sets,
+            Vec::new(),
+            String::new(),
+        ),
+        data_labels,
+    })
+}
+
+async fn target_node_for_metadata(
+    ctx: &mut DiceComputations<'_>,
+    label: &TargetLabel,
+) -> Option<TargetNode> {
+    ctx.get_target_node(label).await.ok()
+}
+
+fn labels_from_coerced_attr(
+    attr: &CoercedAttr,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> Vec<TargetLabel> {
+    fn push_one(
+        labels: &mut Vec<TargetLabel>,
+        item: &CoercedAttr,
+        target_cfg: &kuro_core::configuration::data::ConfigurationData,
+    ) {
+        match item {
+            CoercedAttr::Selector(selector) => {
+                if let Some(value) = metadata_selected_attr(selector.all_entries(), target_cfg) {
+                    push_one(labels, value, target_cfg);
+                }
+            }
+            CoercedAttr::Concat(items) => {
+                for item in items.iter() {
+                    push_one(labels, item, target_cfg);
+                }
+            }
+            CoercedAttr::Dep(label)
+            | CoercedAttr::Label(label)
+            | CoercedAttr::SourceLabel(label)
+            | CoercedAttr::ConfigurationDep(label)
+            | CoercedAttr::SplitTransitionDep(label) => labels.push(label.target().dupe()),
+            CoercedAttr::PluginDep(label) => labels.push(label.dupe()),
+            CoercedAttr::List(list) => {
+                for item in list.iter() {
+                    push_one(labels, item, target_cfg);
+                }
+            }
+            CoercedAttr::Tuple(list) => {
+                for item in list.iter() {
+                    push_one(labels, item, target_cfg);
+                }
+            }
+            CoercedAttr::Dict(dict) => {
+                for (key, value) in dict.iter() {
+                    push_one(labels, key, target_cfg);
+                    push_one(labels, value, target_cfg);
+                }
+            }
+            CoercedAttr::OneOf(inner, _) => push_one(labels, inner, target_cfg),
+            _ => {}
+        }
+    }
+    let mut labels = Vec::new();
+    push_one(&mut labels, attr, target_cfg);
+    labels
+}
+
+fn metadata_selected_attr<'a>(
+    entries: impl IntoIterator<Item = (CoercedSelectorKeyRef<'a>, &'a CoercedAttr)>,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> Option<&'a CoercedAttr> {
+    let mut default = None;
+    for (key, value) in entries {
+        match key {
+            CoercedSelectorKeyRef::Default => default = Some(value),
+            CoercedSelectorKeyRef::Target(key) => {
+                if metadata_select_key_matches(&key.to_string(), target_cfg) {
+                    return Some(value);
+                }
+            }
+        }
+    }
+    default
+}
+
+fn metadata_select_key_matches(
+    key: &str,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> bool {
+    let short_name = target_cfg.short_name();
+    if (key.contains("@platforms//os:linux") || key.contains("platforms//os:linux"))
+        && short_name.contains("linux")
+    {
+        return true;
+    }
+    if (key.contains("@platforms//cpu:x86_64") || key.contains("platforms//cpu:x86_64"))
+        && (short_name.contains("x86_64") || short_name.contains("amd64"))
+    {
+        return true;
+    }
+
+    let Ok(data) = target_cfg.data() else {
+        return false;
+    };
+    let key_without_at = key.trim_start_matches('@');
+    data.constraints.values().any(|value| {
+        let value = value.to_string();
+        value == key
+            || value.trim_start_matches('@') == key_without_at
+            || key_without_at.ends_with(value.trim_start_matches('@'))
+    }) || metadata_composite_config_setting_name_matches(key, target_cfg)
+}
+
+fn metadata_composite_config_setting_name_matches(
+    key: &str,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> bool {
+    let config_setting_name = key.rsplit(':').next().unwrap_or(key);
+    if config_setting_name.is_empty() {
+        return false;
+    }
+
+    let mut platform_tokens = HashSet::new();
+    metadata_add_platform_tokens(&mut platform_tokens, target_cfg.short_name());
+    let Ok(data) = target_cfg.data() else {
+        return false;
+    };
+    for value in data.constraints.values() {
+        let value = value.to_string();
+        let value_name = value.rsplit(':').next().unwrap_or(&value);
+        metadata_add_platform_tokens(&mut platform_tokens, value_name);
+    }
+
+    let required_tokens = metadata_platform_tokens(config_setting_name);
+    !required_tokens.is_empty()
+        && required_tokens
+            .iter()
+            .all(|token| platform_tokens.contains(token))
+}
+
+fn metadata_add_platform_tokens(tokens: &mut HashSet<String>, value: &str) {
+    for token in metadata_platform_tokens(value) {
+        if token.starts_with("gnu.") {
+            tokens.insert("gnu".to_owned());
+        }
+        tokens.insert(token);
+    }
+}
+
+fn metadata_platform_tokens(value: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() {
+            current.push(ch.to_ascii_lowercase());
+        } else if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    if value.contains("x86_64") || value.contains("x86-64") {
+        tokens.push("x86_64".to_owned());
+    }
+    tokens
+}
+
+fn string_from_coerced_attr(attr: &CoercedAttr) -> Option<String> {
+    match attr {
+        CoercedAttr::String(s) | CoercedAttr::EnumVariant(s) => Some(s.as_str().to_owned()),
+        CoercedAttr::OneOf(inner, _) => string_from_coerced_attr(inner),
+        _ => None,
+    }
+}
+
+fn strings_from_coerced_attr(
+    attr: &CoercedAttr,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> Vec<String> {
+    match attr {
+        CoercedAttr::Selector(selector) => {
+            metadata_selected_attr(selector.all_entries(), target_cfg)
+                .into_iter()
+                .flat_map(|value| strings_from_coerced_attr(value, target_cfg))
+                .collect()
+        }
+        CoercedAttr::Concat(items) => items
+            .iter()
+            .flat_map(|item| strings_from_coerced_attr(item, target_cfg))
+            .collect(),
+        CoercedAttr::List(list) => list
+            .iter()
+            .flat_map(|item| strings_from_coerced_attr(item, target_cfg))
+            .collect(),
+        CoercedAttr::Tuple(list) => list
+            .iter()
+            .flat_map(|item| strings_from_coerced_attr(item, target_cfg))
+            .collect(),
+        CoercedAttr::OneOf(inner, _) => strings_from_coerced_attr(inner, target_cfg),
+        _ => string_from_coerced_attr(attr).into_iter().collect(),
+    }
+}
+
+fn metadata_rule_name(node: &TargetNode) -> Option<&str> {
+    match node.rule_type() {
+        RuleType::Starlark(rule_type) => Some(rule_type.name.as_str()),
+        _ => None,
+    }
+}
+
+fn metadata_label_key(label: &TargetLabel) -> String {
+    label.to_string()
+}
+
+fn metadata_path_for_label(
+    label: &TargetLabel,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> String {
+    let buck_out_root = kuro_execute::path::artifact_path::get_artifact_path_buck_out_root();
+    let cell_name = label.pkg().cell_name().as_str();
+    let external_cell_name = kuro_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+        .unwrap_or_else(|| cell_name.to_owned());
+    let cfg_hash = target_cfg.output_hash().as_str();
+    let cell_relative_path = label.pkg().cell_relative_path().as_str();
+    let target_name = label.name().as_str();
+    if kuro_core::cells::is_root_cell_name(cell_name) {
+        if cell_relative_path.is_empty() {
+            format!(
+                "{}/gen/{}/{}/{}",
+                buck_out_root, external_cell_name, cfg_hash, target_name
+            )
+        } else {
+            format!(
+                "{}/gen/{}/{}/{}/{}",
+                buck_out_root, external_cell_name, cfg_hash, cell_relative_path, target_name
+            )
+        }
+    } else if cell_relative_path.is_empty() {
+        format!(
+            "{}/gen/{}/{}/external/{}/{}",
+            buck_out_root, external_cell_name, cfg_hash, external_cell_name, target_name
+        )
+    } else {
+        format!(
+            "{}/gen/{}/{}/external/{}/{}/{}",
+            buck_out_root,
+            external_cell_name,
+            cfg_hash,
+            external_cell_name,
+            cell_relative_path,
+            target_name
+        )
+    }
+}
+
+fn metadata_variable_name_for_label(label: &TargetLabel) -> String {
+    label.name().as_str().to_owned()
+}
+
+enum MetadataFormatSubstitution {
+    Variable(String),
+    Literal(String),
+}
+
+async fn metadata_format_substitution_for_label(
+    ctx: &mut DiceComputations<'_>,
+    label: TargetLabel,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> MetadataFormatSubstitution {
+    let key = metadata_label_key(&label);
+    if key.contains("/variables:") {
+        return MetadataFormatSubstitution::Variable(metadata_variable_name_for_label(&label));
+    }
+    if let Some(node) = target_node_for_metadata(ctx, &label).await {
+        if matches!(
+            metadata_rule_name(&node),
+            Some("cc_variable") | Some("_cc_variable")
+        ) {
+            return MetadataFormatSubstitution::Variable(metadata_variable_name_for_label(&label));
+        }
+    }
+    MetadataFormatSubstitution::Literal(metadata_path_for_label(&label, target_cfg))
+}
+
+fn metadata_format_map_from_attr(
+    attr: &CoercedAttr,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> Vec<(String, TargetLabel)> {
+    let mut result = Vec::new();
+    let CoercedAttr::Dict(dict) = attr else {
+        return result;
+    };
+    for (key, value) in dict.iter() {
+        let key_string = string_from_coerced_attr(key);
+        let value_string = string_from_coerced_attr(value);
+        let key_label = labels_from_coerced_attr(key, target_cfg).into_iter().next();
+        let value_label = labels_from_coerced_attr(value, target_cfg)
+            .into_iter()
+            .next();
+        match (key_string, value_string, key_label, value_label) {
+            (Some(name), _, _, Some(label)) => result.push((name, label)),
+            (_, Some(name), Some(label), _) => result.push((name, label)),
+            _ => {}
+        }
+    }
+    result
+}
+
+fn metadata_apply_format(
+    arg: &str,
+    substitutions: &[(String, MetadataFormatSubstitution)],
+) -> String {
+    let mut rendered = arg.to_owned();
+    for (placeholder, substitution) in substitutions {
+        let value = match substitution {
+            MetadataFormatSubstitution::Variable(name) => format!("%{{{name}}}"),
+            MetadataFormatSubstitution::Literal(value) => value.clone(),
+        };
+        rendered = rendered.replace(&format!("{{{placeholder}}}"), &value);
+    }
+    rendered
+}
+
+fn metadata_attr_label(
+    node: &TargetNode,
+    attr_name: &str,
+    target_cfg: &kuro_core::configuration::data::ConfigurationData,
+) -> Option<TargetLabel> {
+    node.attr_or_none(attr_name, AttrInspectOptions::All)
+        .and_then(|attr| {
+            labels_from_coerced_attr(&attr.value, target_cfg)
+                .into_iter()
+                .next()
+        })
+}
+
+fn metadata_attr_string(node: &TargetNode, attr_name: &str) -> Option<String> {
+    node.attr_or_none(attr_name, AttrInspectOptions::All)
+        .and_then(|attr| string_from_coerced_attr(&attr.value))
+}
+
+fn metadata_feature_name_from_node(node: &TargetNode) -> Option<String> {
+    metadata_attr_string(node, "feature_name").or_else(|| {
+        let label = node
+            .attr_or_none("overrides", AttrInspectOptions::All)
+            .map(|attr| extract_label_from_coerced_attr(&attr.value))?;
+        if label.is_empty() {
+            None
+        } else {
+            label.rsplit(':').next().map(str::to_owned)
+        }
+    })
+}
+
+fn metadata_feature_name<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    feature_label: TargetLabel,
+) -> futures::future::BoxFuture<'a, Option<String>> {
+    async move {
+        let node = target_node_for_metadata(ctx, &feature_label).await?;
+        metadata_feature_name_from_node(&node)
+            .or_else(|| Some(feature_label.name().as_str().to_owned()))
+    }
+    .boxed()
+}
+
+fn metadata_feature_labels_for_set<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    feature_set_label: TargetLabel,
+    target_cfg: &'a kuro_core::configuration::data::ConfigurationData,
+    seen: &'a mut HashSet<String>,
+) -> futures::future::BoxFuture<'a, Vec<TargetLabel>> {
+    async move {
+        let key = metadata_label_key(&feature_set_label);
+        if !seen.insert(key) {
+            return Vec::new();
+        }
+        let Some(node) = target_node_for_metadata(ctx, &feature_set_label).await else {
+            return Vec::new();
+        };
+        match metadata_rule_name(&node) {
+            Some("cc_feature") | Some("_cc_feature") => vec![feature_set_label],
+            Some("cc_feature_set") | Some("_cc_feature_set") => {
+                let mut features = Vec::new();
+                if let Some(all_of) = node.attr_or_none("all_of", AttrInspectOptions::All) {
+                    for label in labels_from_coerced_attr(&all_of.value, target_cfg) {
+                        features.extend(
+                            metadata_feature_labels_for_set(ctx, label, target_cfg, seen).await,
+                        );
+                    }
+                }
+                features
+            }
+            _ => vec![feature_set_label],
+        }
+    }
+    .boxed()
+}
+
+fn metadata_with_features_for_constraints<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    labels: Vec<TargetLabel>,
+    target_cfg: &'a kuro_core::configuration::data::ConfigurationData,
+) -> futures::future::BoxFuture<'a, Vec<CcWithFeatureSet>> {
+    async move {
+        let mut result = Vec::new();
+        for label in labels {
+            let features =
+                metadata_feature_labels_for_set(ctx, label, target_cfg, &mut HashSet::new()).await;
+            let mut names = Vec::new();
+            for feature in features {
+                if let Some(name) = metadata_feature_name(ctx, feature).await {
+                    names.push(name);
+                }
+            }
+            if !names.is_empty() {
+                result.push(CcWithFeatureSet::new(names, Vec::new()));
+            }
+        }
+        result
+    }
+    .boxed()
+}
+
+fn metadata_action_names_for_label<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    action_label: TargetLabel,
+    target_cfg: &'a kuro_core::configuration::data::ConfigurationData,
+    seen: &'a mut HashSet<String>,
+) -> futures::future::BoxFuture<'a, Vec<String>> {
+    async move {
+        let key = metadata_label_key(&action_label);
+        if !seen.insert(key) {
+            return Vec::new();
+        }
+        let Some(node) = target_node_for_metadata(ctx, &action_label).await else {
+            return Vec::new();
+        };
+        match metadata_rule_name(&node) {
+            Some("cc_action_type") | Some("_cc_action_type") => {
+                metadata_attr_string(&node, "action_name")
+                    .into_iter()
+                    .collect()
+            }
+            Some("cc_action_type_set") | Some("_cc_action_type_set") => {
+                let mut names = Vec::new();
+                if let Some(actions_attr) = node.attr_or_none("actions", AttrInspectOptions::All) {
+                    for label in labels_from_coerced_attr(&actions_attr.value, target_cfg) {
+                        names.extend(
+                            metadata_action_names_for_label(ctx, label, target_cfg, seen).await,
+                        );
+                    }
+                }
+                names
+            }
+            _ => Vec::new(),
+        }
+    }
+    .boxed()
+}
+
+fn metadata_actions_include_link(actions: &[String]) -> bool {
+    actions.iter().any(|action| {
+        action == "c++-link-executable"
+            || action == "c++-link-dynamic-library"
+            || action == "c++-link-nodeps-dynamic-library"
+            || action == "c++-link-static-library"
+            || action.contains("cpp_link")
+            || action.contains("link-executable")
+            || action.contains("link-dynamic-library")
+            || action.contains("link-nodeps-dynamic-library")
+            || action.contains("link-static-library")
+    })
+}
+
+fn metadata_flag_sets_for_args_label<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    args_label: TargetLabel,
+    target_cfg: &'a kuro_core::configuration::data::ConfigurationData,
+    seen: &'a mut HashSet<String>,
+    data_labels: &'a mut Vec<CcToolchainDataLabelMetadata>,
+) -> futures::future::BoxFuture<'a, Vec<CcFlagSet>> {
+    async move {
+        let key = metadata_label_key(&args_label);
+        if !seen.insert(key) {
+            return Vec::new();
+        }
+        let Some(node) = target_node_for_metadata(ctx, &args_label).await else {
+            return Vec::new();
+        };
+        match metadata_rule_name(&node) {
+            Some("cc_args_list") | Some("_cc_args_list") => {
+                let mut flag_sets = Vec::new();
+                if let Some(args_attr) = node.attr_or_none("args", AttrInspectOptions::All) {
+                    for label in labels_from_coerced_attr(&args_attr.value, target_cfg) {
+                        flag_sets.extend(
+                            metadata_flag_sets_for_args_label(
+                                ctx,
+                                label,
+                                target_cfg,
+                                seen,
+                                data_labels,
+                            )
+                            .await,
+                        );
+                    }
+                }
+                flag_sets
+            }
+            Some("cc_args")
+            | Some("_cc_args")
+            | Some("cc_nested_args")
+            | Some("_cc_nested_args") => {
+                let mut actions = Vec::new();
+                if let Some(actions_attr) = node.attr_or_none("actions", AttrInspectOptions::All) {
+                    for action_label in labels_from_coerced_attr(&actions_attr.value, target_cfg) {
+                        actions.extend(
+                            metadata_action_names_for_label(
+                                ctx,
+                                action_label,
+                                target_cfg,
+                                &mut HashSet::new(),
+                            )
+                            .await,
+                        );
+                    }
+                }
+
+                let mut substitutions = Vec::new();
+                if let Some(format_attr) = node.attr_or_none("format", AttrInspectOptions::All) {
+                    for (placeholder, label) in
+                        metadata_format_map_from_attr(&format_attr.value, target_cfg)
+                    {
+                        let substitution =
+                            metadata_format_substitution_for_label(ctx, label, target_cfg).await;
+                        substitutions.push((placeholder, substitution));
+                    }
+                }
+
+                if let Some(data_attr) = node.attr_or_none("data", AttrInspectOptions::All) {
+                    for label in labels_from_coerced_attr(&data_attr.value, target_cfg) {
+                        data_labels.push(CcToolchainDataLabelMetadata {
+                            actions: actions.clone(),
+                            label,
+                        });
+                    }
+                }
+
+                let mut flags = Vec::new();
+                if let Some(args_attr) = node.attr_or_none("args", AttrInspectOptions::All) {
+                    for arg in strings_from_coerced_attr(&args_attr.value, target_cfg) {
+                        flags.push(metadata_apply_format(&arg, &substitutions));
+                    }
+                }
+
+                let mut nested_groups = Vec::new();
+                if let Some(nested_attr) = node.attr_or_none("nested", AttrInspectOptions::All) {
+                    for nested_label in labels_from_coerced_attr(&nested_attr.value, target_cfg) {
+                        for nested_set in metadata_flag_sets_for_args_label(
+                            ctx,
+                            nested_label,
+                            target_cfg,
+                            &mut HashSet::new(),
+                            data_labels,
+                        )
+                        .await
+                        {
+                            nested_groups.extend(nested_set.into_flag_groups());
+                        }
+                    }
+                }
+
+                let iterate_over = metadata_attr_label(&node, "iterate_over", target_cfg)
+                    .map(|label| metadata_variable_name_for_label(&label));
+                let expand_if_available =
+                    metadata_attr_label(&node, "requires_not_none", target_cfg)
+                        .map(|label| metadata_variable_name_for_label(&label));
+                let expand_if_not_available =
+                    metadata_attr_label(&node, "requires_none", target_cfg)
+                        .map(|label| metadata_variable_name_for_label(&label));
+                let expand_if_true = metadata_attr_label(&node, "requires_true", target_cfg)
+                    .map(|label| metadata_variable_name_for_label(&label));
+                let expand_if_false = metadata_attr_label(&node, "requires_false", target_cfg)
+                    .map(|label| metadata_variable_name_for_label(&label));
+                let expand_if_equal = metadata_attr_label(&node, "requires_equal", target_cfg)
+                    .and_then(|label| {
+                        metadata_attr_string(&node, "requires_equal_value").map(|value| {
+                            CcExpandIfEqual::new(metadata_variable_name_for_label(&label), value)
+                        })
+                    });
+                let group = CcFlagGroup::new(
+                    flags,
+                    nested_groups,
+                    iterate_over,
+                    expand_if_available,
+                    expand_if_not_available,
+                    expand_if_true,
+                    expand_if_false,
+                    expand_if_equal,
+                );
+                let with_features = if let Some(attr) =
+                    node.attr_or_none("requires_any_of", AttrInspectOptions::All)
+                {
+                    metadata_with_features_for_constraints(
+                        ctx,
+                        labels_from_coerced_attr(&attr.value, target_cfg),
+                        target_cfg,
+                    )
+                    .await
+                } else {
+                    Vec::new()
+                };
+                vec![CcFlagSet::new(actions, vec![group], with_features)]
+            }
+            _ => Vec::new(),
+        }
+    }
+    .boxed()
+}
+
+fn metadata_feature_flag_sets<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    feature_label: TargetLabel,
+    target_cfg: &'a kuro_core::configuration::data::ConfigurationData,
+    seen: &'a mut HashSet<String>,
+    data_labels: &'a mut Vec<CcToolchainDataLabelMetadata>,
+) -> futures::future::BoxFuture<'a, Vec<CcFlagSet>> {
+    async move {
+        let key = metadata_label_key(&feature_label);
+        if !seen.insert(key) {
+            return Vec::new();
+        }
+        let Some(node) = target_node_for_metadata(ctx, &feature_label).await else {
+            return Vec::new();
+        };
+        let mut flag_sets = Vec::new();
+        if let Some(args_attr) = node.attr_or_none("args", AttrInspectOptions::All) {
+            for args_label in labels_from_coerced_attr(&args_attr.value, target_cfg) {
+                flag_sets.extend(
+                    metadata_flag_sets_for_args_label(
+                        ctx,
+                        args_label,
+                        target_cfg,
+                        &mut HashSet::new(),
+                        data_labels,
+                    )
+                    .await,
+                );
+            }
+        }
+        flag_sets
+    }
+    .boxed()
 }
 
 // Used to express that the impl Future below captures multiple named lifetimes.
@@ -1907,6 +2705,49 @@ async fn run_analysis_with_env_underlying(
                                     let use_cpp_native_shim =
                                         is_cpp_toolchain_type_label(type_label);
                                     if use_cpp_native_shim {
+                                        let toolchain_config_info = None;
+                                        let toolchain_metadata =
+                                            if let Some(toolchain_config) = &tc.cc_toolchain_config {
+                                                extract_cc_toolchain_features_metadata(
+                                                    dice,
+                                                    toolchain_config,
+                                                    &target_cfg,
+                                                )
+                                                .await
+                                            } else {
+                                                None
+                                            };
+                                        let toolchain_features = toolchain_metadata
+                                            .as_ref()
+                                            .map(|metadata| metadata.features.clone());
+                                        let toolchain_data = toolchain_metadata
+                                            .as_ref()
+                                            .map(|metadata| {
+                                                metadata
+                                                    .data_labels
+                                                    .iter()
+                                                    .filter(|data| {
+                                                        metadata_actions_include_link(&data.actions)
+                                                    })
+                                                    .map(|data| {
+                                                        let label = &data.label;
+                                                        (
+                                                            label.configure(target_cfg.dupe()),
+                                                            metadata_path_for_label(
+                                                                label,
+                                                                &target_cfg,
+                                                            )
+                                                            .into(),
+                                                        )
+                                                    })
+                                                    .collect()
+                                            })
+                                            .unwrap_or_default();
+                                        let module_map_path = tc
+                                            .cc_toolchain_module_map
+                                            .as_deref()
+                                            .and_then(parse_impl_label_to_target_label)
+                                            .map(|label| metadata_path_for_label(&label, &target_cfg));
                                         analysis_ctx_toolchain_provider_checkpoint(
                                             &analysis_env.label,
                                             type_label,
@@ -1923,6 +2764,10 @@ async fn run_analysis_with_env_underlying(
                                         Some(cc_toolchain_native_shim_provider_collection(
                                             &tc.toolchain_impl,
                                             target_cfg.short_name(),
+                                            toolchain_config_info,
+                                            toolchain_features,
+                                            module_map_path,
+                                            toolchain_data,
                                         ))
                                     } else {
                                         let analysis_result =
@@ -3086,6 +3931,8 @@ mod tests {
         ResolvedToolchain {
             toolchain_target: format!("{label}_target"),
             toolchain_impl: format!("{label}_impl"),
+            cc_toolchain_config: None,
+            cc_toolchain_module_map: None,
             toolchain_type: label.to_owned(),
         }
     }

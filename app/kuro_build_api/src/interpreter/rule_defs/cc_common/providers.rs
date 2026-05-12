@@ -854,7 +854,9 @@ where
             "compilation_context" => {
                 if self.compilation_context.to_value().is_none() {
                     use crate::interpreter::rule_defs::context::EmptyCompilationContext;
-                    Some(heap.alloc(EmptyCompilationContext))
+                    Some(heap.alloc(EmptyCompilationContext {
+                        module_map_path: None,
+                    }))
                 } else {
                     Some(self.compilation_context.to_value())
                 }
@@ -930,7 +932,9 @@ impl<'v> StarlarkValue<'v> for CcInfoInstanceStub {
         use crate::interpreter::rule_defs::context::EmptyCompilationContext;
         use crate::interpreter::rule_defs::context::EmptyLinkingContext;
         match attribute {
-            "compilation_context" => Some(heap.alloc(EmptyCompilationContext)),
+            "compilation_context" => Some(heap.alloc(EmptyCompilationContext {
+                module_map_path: None,
+            })),
             "linking_context" => Some(heap.alloc(EmptyLinkingContext)),
             "_legacy_transitive_native_libraries" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))

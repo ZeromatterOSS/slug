@@ -54,11 +54,13 @@ use sorted_vector_map::SortedVectorMap;
 use crate::actions::artifact::get_artifact_fs::GetArtifactFs;
 use crate::actions::calculation::ActionCalculation;
 use crate::actions::execute::action_executor::ActionOutputs;
+use crate::analysis::calculation::RuleAnalysisCalculation;
 use crate::artifact_groups::ArtifactGroup;
 use crate::artifact_groups::ArtifactGroupValues;
 use crate::artifact_groups::ResolvedArtifactGroup;
 use crate::artifact_groups::TransitiveSetProjectionKey;
 use crate::interpreter::rule_defs::depset::depset_to_artifact_group_inputs;
+use crate::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use crate::keep_going::KeepGoing;
 
 #[async_trait]
@@ -107,18 +109,23 @@ pub(crate) fn ensure_artifact_group_staged<'a, 'd>(
     ctx: &'a mut DiceComputations<'d>,
     input: ResolvedArtifactGroup<'a>,
 ) -> impl Future<Output = kuro_error::Result<EnsureArtifactGroupReady>> + use<'a, 'd> {
-    match input {
-        ResolvedArtifactGroup::Artifact(artifact) => {
-            ensure_artifact_staged(ctx, artifact.clone()).left_future()
+    async move {
+        match input {
+            ResolvedArtifactGroup::Artifact(artifact) => {
+                ensure_artifact_staged(ctx, artifact).await
+            }
+            ResolvedArtifactGroup::TransitiveSetProjection(key) => {
+                ctx.compute(EnsureTransitiveSetProjectionKey::ref_cast(key))
+                    .map(|v| Ok(EnsureArtifactGroupReady::TransitiveSet(v??)))
+                    .await
+            }
+            ResolvedArtifactGroup::Depset(depset) => {
+                ensure_depset_artifact_group_staged(ctx, depset).await
+            }
+            ResolvedArtifactGroup::TargetDefaultOutputs(label) => {
+                ensure_target_default_outputs_staged(ctx, label).await
+            }
         }
-        ResolvedArtifactGroup::TransitiveSetProjection(key) => ctx
-            .compute(EnsureTransitiveSetProjectionKey::ref_cast(key))
-            .map(|v| Ok(EnsureArtifactGroupReady::TransitiveSet(v??)))
-            .left_future()
-            .right_future(),
-        ResolvedArtifactGroup::Depset(depset) => ensure_depset_artifact_group_staged(ctx, depset)
-            .right_future()
-            .right_future(),
     }
 }
 
@@ -235,6 +242,9 @@ impl EnsureArtifactGroupReady {
                 ResolvedArtifactGroup::Depset(_) => {
                     Err(EnsureArtifactStagedError::ExpectedTransitiveSet.into())
                 }
+                ResolvedArtifactGroup::TargetDefaultOutputs(_) => {
+                    Err(EnsureArtifactStagedError::ExpectedTransitiveSet.into())
+                }
             },
         }
     }
@@ -250,6 +260,61 @@ impl EnsureArtifactGroupReady {
 }
 
 static_assertions::assert_eq_size!(EnsureArtifactGroupReady, [usize; 4]);
+
+fn ensure_target_default_outputs_staged<'a, 'd>(
+    ctx: &'a mut DiceComputations<'d>,
+    label: &'a kuro_core::target::configured_target_label::ConfiguredTargetLabel,
+) -> impl Future<Output = kuro_error::Result<EnsureArtifactGroupReady>> + use<'a, 'd> {
+    async move {
+        let analysis = ctx.get_analysis_result(label).await?.require_compatible()?;
+        let providers = analysis.providers()?;
+        let mut sub_inputs: Vec<ArtifactGroup> = Vec::new();
+        if let Some(default_info) = providers.value().builtin_provider::<FrozenDefaultInfo>() {
+            default_info
+                .for_each_output(&mut |artifact: ArtifactGroup| sub_inputs.push(artifact))?;
+        }
+
+        let mut resolved_inputs: Vec<ResolvedArtifactGroup<'_>> =
+            Vec::with_capacity(sub_inputs.len());
+        for input in sub_inputs.iter() {
+            resolved_inputs.push(input.resolved_artifact(ctx).await?);
+        }
+
+        let mut ready_inputs = Vec::with_capacity(resolved_inputs.len());
+        for input in resolved_inputs.iter() {
+            ready_inputs.push(Box::pin(ensure_artifact_group_staged(ctx, input.clone())).await?);
+        }
+
+        let mut values_count = 0;
+        for input in resolved_inputs.iter() {
+            if let ResolvedArtifactGroup::Artifact(..) = input {
+                values_count += 1;
+            }
+        }
+
+        let artifact_fs = ctx.get_artifact_fs().await?;
+        let mut values = SmallVec::<[_; 1]>::with_capacity(values_count);
+        let mut children = Vec::with_capacity(resolved_inputs.len() - values_count);
+
+        for (group, ready) in zip(resolved_inputs.iter(), ready_inputs) {
+            match group {
+                ResolvedArtifactGroup::Artifact(artifact) => {
+                    values.push((artifact.dupe(), ready.unpack_single()?))
+                }
+                ResolvedArtifactGroup::TransitiveSetProjection(..)
+                | ResolvedArtifactGroup::Depset(..)
+                | ResolvedArtifactGroup::TargetDefaultOutputs(..) => {
+                    children.push(ready.to_group_values(group)?)
+                }
+            }
+        }
+
+        let digest_config = ctx.global_data().get_digest_config();
+        let values = ArtifactGroupValues::new(values, children, &artifact_fs, digest_config)
+            .buck_error_context("Failed to construct target default output ArtifactGroupValues")?;
+        Ok(EnsureArtifactGroupReady::TransitiveSet(values))
+    }
+}
 
 fn ensure_depset_artifact_group_staged<'a, 'd>(
     ctx: &'a mut DiceComputations<'d>,
@@ -285,7 +350,10 @@ fn ensure_depset_artifact_group_staged<'a, 'd>(
                     values.push((artifact.dupe(), ready.unpack_single()?))
                 }
                 ResolvedArtifactGroup::TransitiveSetProjection(..)
-                | ResolvedArtifactGroup::Depset(..) => children.push(ready.to_group_values(group)?),
+                | ResolvedArtifactGroup::Depset(..)
+                | ResolvedArtifactGroup::TargetDefaultOutputs(..) => {
+                    children.push(ready.to_group_values(group)?)
+                }
             }
         }
 
@@ -309,7 +377,7 @@ fn _assert_ensure_artifact_group_future_size() {
     static_assertions::assert_eq_size_ptr!(&v, &e);
 
     let v = ensure_artifact_group_staged(&mut ctx, panic!());
-    let e = [0u8; 1600 / 8];
+    let e = [0u8; 2048 / 8];
     static_assertions::assert_eq_size_ptr!(&v, &e);
 
     // The rest of these are to help understand how changes are impacting the important ones above. Regressing these
@@ -727,6 +795,9 @@ impl Key for EnsureTransitiveSetProjectionKey {
                         children.push(ready.to_group_values(group)?)
                     }
                     ResolvedArtifactGroup::Depset(..) => {
+                        children.push(ready.to_group_values(group)?)
+                    }
+                    ResolvedArtifactGroup::TargetDefaultOutputs(..) => {
                         children.push(ready.to_group_values(group)?)
                     }
                 }

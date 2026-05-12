@@ -1091,6 +1091,13 @@ impl LocalExecutor {
                 )?
                 .into_path();
             let abspath = self.root.join(&path);
+            let permission_path = abspath.clone();
+            self.blocking_executor
+                .execute_io_inline(move || normalize_local_output_permissions(&permission_path))
+                .await
+                .with_buck_error_context(|| {
+                    format!("normalizing output permissions for {path:?}")
+                })?;
             let (entry, hashing_info) = build_entry_from_disk(
                 abspath,
                 FileDigestConfig::build(digest_config.cas_digest_config()),
@@ -1442,6 +1449,35 @@ impl LocalExecutor {
 
         Ok(())
     }
+}
+
+#[cfg(unix)]
+fn normalize_local_output_permissions(path: &AbsNormPathBuf) -> kuro_error::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let Some(metadata) = fs_util::symlink_metadata_if_exists(path)? else {
+        return Ok(());
+    };
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+
+    if metadata.is_dir() {
+        for entry in fs_util::read_dir(path)? {
+            let entry = entry?;
+            normalize_local_output_permissions(&entry.path())?;
+        }
+    }
+
+    let mut permissions = metadata.permissions();
+    permissions.set_mode((permissions.mode() & !0o777) | 0o555);
+    fs_util::set_permissions(path, permissions)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn normalize_local_output_permissions(_path: &AbsNormPathBuf) -> kuro_error::Result<()> {
+    Ok(())
 }
 
 #[async_trait]
@@ -2027,6 +2063,34 @@ mod tests {
         );
 
         Ok((executor, temp.path().root().to_buf(), temp))
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_normalize_local_output_permissions_sets_bazel_output_mode() -> kuro_error::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir()?;
+        let dir = AbsNormPathBuf::new(temp.path().join("out"))?;
+        let file = AbsNormPathBuf::new(temp.path().join("out/data.txt"))?;
+        let executable = AbsNormPathBuf::new(temp.path().join("out/tool"))?;
+        fs_util::create_dir_all(&dir)?;
+        fs_util::write(&file, b"data")?;
+        fs_util::write(&executable, b"tool")?;
+        fs_util::set_executable(&file, false)?;
+        fs_util::set_executable(&executable, true)?;
+
+        normalize_local_output_permissions(&dir)?;
+
+        let dir_mode = fs_util::metadata(&dir)?.permissions().mode() & 0o777;
+        let file_mode = fs_util::metadata(&file)?.permissions().mode() & 0o777;
+        let executable_mode = fs_util::metadata(&executable)?.permissions().mode() & 0o777;
+
+        assert_eq!(dir_mode, 0o555);
+        assert_eq!(file_mode, 0o555);
+        assert_eq!(executable_mode, 0o555);
+
+        Ok(())
     }
 
     #[tokio::test]

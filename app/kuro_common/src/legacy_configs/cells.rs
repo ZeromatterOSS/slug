@@ -1153,6 +1153,15 @@ impl BuckConfigBasedCells {
             }
             let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
             let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
+            if let Some((owner_module, _, _)) =
+                kuro_bzlmod::parse_canonical_name(canonical_name.as_str())
+            {
+                kuro_core::cells::register_scoped_bzlmod_repo_alias(
+                    owner_module.to_owned(),
+                    apparent_name.as_str().to_owned(),
+                    canonical_name.as_str().to_owned(),
+                );
+            }
             kuro_core::cells::register_dynamic_extension_cell_alias(
                 apparent_name.as_str().to_owned(),
                 canonical_name.as_str().to_owned(),

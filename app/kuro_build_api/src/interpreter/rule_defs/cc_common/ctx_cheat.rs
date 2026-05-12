@@ -14,14 +14,18 @@
 use std::fmt;
 use std::fmt::Display;
 use std::hash::Hash;
+use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Demand;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
@@ -30,7 +34,16 @@ use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::type_repr::StarlarkTypeRepr;
 
+use crate::artifact_groups::ArtifactGroup;
+use crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
+use crate::interpreter::rule_defs::cmd_args::CommandLineArgLike;
+use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
+use crate::interpreter::rule_defs::cmd_args::CommandLineBuilder;
+use crate::interpreter::rule_defs::cmd_args::CommandLineContext;
+use crate::interpreter::rule_defs::cmd_args::WriteToFileMacroVisitor;
+use crate::interpreter::rule_defs::cmd_args::command_line_arg_like_type::command_line_arg_like_impl;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 
 // ============================================================================
@@ -264,7 +277,8 @@ fn ctx_cheat_actions_stub_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         // Return a stub artifact
         Ok(heap.alloc(CtxCheatArtifactStub {
-            path: filename.to_owned(),
+            path: Arc::<str>::from(filename),
+            input_target: None,
         }))
     }
 
@@ -277,7 +291,8 @@ fn ctx_cheat_actions_stub_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         Ok(heap.alloc(CtxCheatArtifactStub {
-            path: filename.to_owned(),
+            path: Arc::<str>::from(filename),
+            input_target: None,
         }))
     }
 
@@ -338,7 +353,8 @@ impl<'v> StarlarkValue<'v> for CtxCheatArtifactRootStub {
 /// A stub for artifact from ctx.actions.declare_file.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CtxCheatArtifactStub {
-    pub(crate) path: String,
+    pub(crate) path: Arc<str>,
+    pub(crate) input_target: Option<ConfiguredTargetLabel>,
 }
 
 impl Display for CtxCheatArtifactStub {
@@ -401,6 +417,52 @@ impl<'v> StarlarkValue<'v> for CtxCheatArtifactStub {
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         self.path.hash(hasher);
+        self.input_target.hash(hasher);
+        Ok(())
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn CommandLineArgLike>(self);
+    }
+}
+
+impl<'v> CommandLineArgLike<'v> for CtxCheatArtifactStub {
+    fn register_me(&self) {
+        command_line_arg_like_impl!(CtxCheatArtifactStub::starlark_type_repr());
+    }
+
+    fn add_to_command_line(
+        &self,
+        cli: &mut dyn CommandLineBuilder,
+        _context: &mut dyn CommandLineContext,
+        _artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        cli.push_arg(self.path.to_string());
+        Ok(())
+    }
+
+    fn visit_artifacts(
+        &self,
+        visitor: &mut dyn CommandLineArtifactVisitor<'v>,
+    ) -> kuro_error::Result<()> {
+        if let Some(target) = &self.input_target {
+            visitor.visit_input(
+                ArtifactGroup::TargetDefaultOutputs(Arc::new(target.dupe())),
+                vec![],
+            );
+        }
+        Ok(())
+    }
+
+    fn contains_arg_attr(&self) -> bool {
+        false
+    }
+
+    fn visit_write_to_file_macros(
+        &self,
+        _visitor: &mut dyn WriteToFileMacroVisitor,
+        _artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
         Ok(())
     }
 }

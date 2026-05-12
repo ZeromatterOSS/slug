@@ -50,7 +50,15 @@ use starlark::values::tuple::TupleRef;
 
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatArtifactStub;
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatWithActions;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcEnvEntry;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcEnvSet;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcExpandIfEqual;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcFeatureEnvSets;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcFeatureFlagSets;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcFlagGroup;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcFlagSet;
 use crate::interpreter::rule_defs::cc_common::feature_config::CcToolchainFeatures;
+use crate::interpreter::rule_defs::cc_common::feature_config::CcWithFeatureSet;
 use crate::interpreter::rule_defs::cc_common::feature_config::FeatureConfiguration;
 use crate::interpreter::rule_defs::cc_common::host::include_flag_for_dir_impl;
 use crate::interpreter::rule_defs::cc_common::host::is_msvc_compiler;
@@ -109,6 +117,12 @@ fn compilation_mode_from_features(feature_configuration: Value<'_>) -> String {
         }
     }
     crate::interpreter::rule_defs::build_config::get_compilation_mode()
+}
+
+fn action_category_from_bazel_action_name(action_name: &str) -> String {
+    normalize_action_name(action_name)
+        .replace("c++", "cpp")
+        .replace('-', "_")
 }
 
 fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
@@ -645,6 +659,627 @@ fn insert_if_set<'v>(
     }
 }
 
+fn cc_attr<'v>(value: Value<'v>, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+    value.get_attr(name, heap).ok().flatten()
+}
+
+fn cc_string_list<'v>(value: Value<'v>, heap: Heap<'v>) -> Vec<String> {
+    if value.is_none() {
+        return Vec::new();
+    }
+    value
+        .iterate(heap)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| item.unpack_str().map(str::to_owned))
+        .collect()
+}
+
+fn parse_cc_with_feature_set<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<CcWithFeatureSet> {
+    Some(CcWithFeatureSet {
+        features: cc_attr(value, "features", heap)
+            .map(|features| cc_string_list(features, heap))
+            .unwrap_or_default(),
+        not_features: cc_attr(value, "not_features", heap)
+            .map(|features| cc_string_list(features, heap))
+            .unwrap_or_default(),
+    })
+}
+
+fn parse_cc_env_entry<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<CcEnvEntry> {
+    let key = cc_attr(value, "key", heap)?.unpack_str()?.to_owned();
+    let env_value = cc_attr(value, "value", heap)?.unpack_str()?.to_owned();
+    let expand_if_available = cc_attr(value, "expand_if_available", heap)
+        .and_then(|value| value.unpack_str().map(str::to_owned));
+    Some(CcEnvEntry {
+        key,
+        value: env_value,
+        expand_if_available,
+    })
+}
+
+fn parse_cc_env_set<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<CcEnvSet> {
+    let actions = cc_attr(value, "actions", heap)
+        .map(|actions| {
+            cc_string_list(actions, heap)
+                .into_iter()
+                .map(|action| normalize_action_name(&action))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if actions.is_empty() {
+        return None;
+    }
+    let env_entries = cc_attr(value, "env_entries", heap)
+        .and_then(|entries| entries.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| parse_cc_env_entry(entry, heap))
+        .collect::<Vec<_>>();
+    let with_features = cc_attr(value, "with_features", heap)
+        .and_then(|sets| sets.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|set| parse_cc_with_feature_set(set, heap))
+        .collect::<Vec<_>>();
+    Some(CcEnvSet {
+        actions,
+        env_entries,
+        with_features,
+    })
+}
+
+fn parse_cc_feature_env_sets<'v>(
+    feature_name: &str,
+    feature: Value<'v>,
+    heap: Heap<'v>,
+) -> Option<CcFeatureEnvSets> {
+    let env_sets = cc_attr(feature, "env_sets", heap)
+        .and_then(|env_sets| env_sets.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|env_set| parse_cc_env_set(env_set, heap))
+        .collect::<Vec<_>>();
+    if env_sets.is_empty() {
+        return None;
+    }
+    Some(CcFeatureEnvSets {
+        feature_name: feature_name.to_owned(),
+        env_sets,
+    })
+}
+
+fn parse_cc_expand_if_equal<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<CcExpandIfEqual> {
+    Some(CcExpandIfEqual {
+        variable: cc_attr(value, "name", heap)?.unpack_str()?.to_owned(),
+        value: cc_attr(value, "value", heap)?.unpack_str()?.to_owned(),
+    })
+}
+
+fn parse_cc_flag_group<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<CcFlagGroup> {
+    let flags = cc_attr(value, "flags", heap)
+        .map(|flags| cc_string_list(flags, heap))
+        .unwrap_or_default();
+    let flag_groups = cc_attr(value, "flag_groups", heap)
+        .and_then(|groups| groups.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|group| parse_cc_flag_group(group, heap))
+        .collect::<Vec<_>>();
+    Some(CcFlagGroup {
+        flags,
+        flag_groups,
+        iterate_over: cc_attr(value, "iterate_over", heap)
+            .and_then(|value| value.unpack_str().map(str::to_owned)),
+        expand_if_available: cc_attr(value, "expand_if_available", heap)
+            .and_then(|value| value.unpack_str().map(str::to_owned)),
+        expand_if_not_available: cc_attr(value, "expand_if_not_available", heap)
+            .and_then(|value| value.unpack_str().map(str::to_owned)),
+        expand_if_true: cc_attr(value, "expand_if_true", heap)
+            .and_then(|value| value.unpack_str().map(str::to_owned)),
+        expand_if_false: cc_attr(value, "expand_if_false", heap)
+            .and_then(|value| value.unpack_str().map(str::to_owned)),
+        expand_if_equal: cc_attr(value, "expand_if_equal", heap)
+            .and_then(|value| parse_cc_expand_if_equal(value, heap)),
+    })
+}
+
+fn parse_cc_flag_set<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+    default_action: Option<&str>,
+) -> Option<CcFlagSet> {
+    let mut actions = cc_attr(value, "actions", heap)
+        .map(|actions| {
+            cc_string_list(actions, heap)
+                .into_iter()
+                .map(|action| normalize_action_name(&action))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if actions.is_empty() {
+        if let Some(default_action) = default_action {
+            actions.push(normalize_action_name(default_action));
+        }
+    }
+    let flag_groups = cc_attr(value, "flag_groups", heap)
+        .and_then(|groups| groups.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|group| parse_cc_flag_group(group, heap))
+        .collect::<Vec<_>>();
+    if flag_groups.is_empty() {
+        return None;
+    }
+    let with_features = cc_attr(value, "with_features", heap)
+        .and_then(|sets| sets.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|set| parse_cc_with_feature_set(set, heap))
+        .collect::<Vec<_>>();
+    Some(CcFlagSet {
+        actions,
+        flag_groups,
+        with_features,
+    })
+}
+
+fn parse_cc_feature_flag_sets<'v>(
+    feature_name: &str,
+    feature: Value<'v>,
+    heap: Heap<'v>,
+) -> Option<CcFeatureFlagSets> {
+    let flag_sets = cc_attr(feature, "flag_sets", heap)
+        .and_then(|flag_sets| flag_sets.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|flag_set| parse_cc_flag_set(flag_set, heap, None))
+        .collect::<Vec<_>>();
+    if flag_sets.is_empty() {
+        return None;
+    }
+    Some(CcFeatureFlagSets {
+        feature_name: feature_name.to_owned(),
+        flag_sets,
+    })
+}
+
+fn cc_action_names<'v>(value: Value<'v>, heap: Heap<'v>) -> Vec<String> {
+    depset_or_iterable_values(value, heap)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|action| {
+            action.unpack_str().map(str::to_owned).or_else(|| {
+                cc_attr(action, "name", heap)?
+                    .unpack_str()
+                    .map(str::to_owned)
+            })
+        })
+        .map(|action| normalize_action_name(&action))
+        .collect()
+}
+
+fn parse_cc_modern_feature_constraint<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+) -> Option<CcWithFeatureSet> {
+    let feature_names = |features: Value<'v>| {
+        depset_or_iterable_values(features, heap)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|feature| {
+                cc_attr(feature, "name", heap)?
+                    .unpack_str()
+                    .map(str::to_owned)
+            })
+            .collect::<Vec<_>>()
+    };
+    Some(CcWithFeatureSet {
+        features: cc_attr(value, "all_of", heap)
+            .map(feature_names)
+            .unwrap_or_default(),
+        not_features: cc_attr(value, "none_of", heap)
+            .map(feature_names)
+            .unwrap_or_default(),
+    })
+}
+
+fn parse_cc_modern_args_flag_set<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+    default_action: Option<&str>,
+) -> Option<CcFlagSet> {
+    let nested = cc_attr(value, "nested", heap)?;
+    if nested.is_none() {
+        return None;
+    }
+    let legacy_flag_group = cc_attr(nested, "legacy_flag_group", heap)?;
+    let mut actions = cc_attr(value, "actions", heap)
+        .map(|actions| cc_action_names(actions, heap))
+        .unwrap_or_default();
+    if actions.is_empty()
+        && let Some(default_action) = default_action
+    {
+        actions.push(normalize_action_name(default_action));
+    }
+    if actions.is_empty() {
+        return None;
+    }
+    let with_features = cc_attr(value, "requires_any_of", heap)
+        .and_then(|sets| sets.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|set| parse_cc_modern_feature_constraint(set, heap))
+        .collect::<Vec<_>>();
+    Some(CcFlagSet {
+        actions,
+        flag_groups: vec![parse_cc_flag_group(legacy_flag_group, heap)?],
+        with_features,
+    })
+}
+
+fn parse_cc_modern_feature_flag_sets<'v>(
+    feature_name: &str,
+    feature: Value<'v>,
+    heap: Heap<'v>,
+) -> Option<CcFeatureFlagSets> {
+    let args_list = cc_attr(feature, "args", heap)?;
+    let flag_sets = cc_attr(args_list, "args", heap)
+        .and_then(|args| args.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|args| parse_cc_modern_args_flag_set(args, heap, None))
+        .collect::<Vec<_>>();
+    if flag_sets.is_empty() {
+        return None;
+    }
+    Some(CcFeatureFlagSets {
+        feature_name: feature_name.to_owned(),
+        flag_sets,
+    })
+}
+
+fn parse_cc_modern_toolchain_arg_flag_sets<'v>(
+    toolchain_config_info: Value<'v>,
+    heap: Heap<'v>,
+) -> Vec<CcFlagSet> {
+    let Some(args_list) = cc_attr(toolchain_config_info, "args", heap) else {
+        return Vec::new();
+    };
+    cc_attr(args_list, "by_action", heap)
+        .and_then(|by_action| by_action.iterate(heap).ok())
+        .into_iter()
+        .flatten()
+        .flat_map(|by_action| {
+            let action_name = cc_attr(by_action, "action", heap)
+                .and_then(|action| cc_attr(action, "name", heap))
+                .and_then(|name| name.unpack_str().map(str::to_owned));
+            cc_attr(by_action, "args", heap)
+                .and_then(|args| args.iterate(heap).ok())
+                .into_iter()
+                .flatten()
+                .filter_map(move |args| {
+                    parse_cc_modern_args_flag_set(args, heap, action_name.as_deref())
+                })
+        })
+        .collect()
+}
+
+fn cc_variable_to_string<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<String> {
+    if value.is_none() {
+        return None;
+    }
+    if let Some(s) = value.unpack_str() {
+        return Some(s.to_owned());
+    }
+    if let Some(b) = value.unpack_bool() {
+        return Some(if b { "1" } else { "0" }.to_owned());
+    }
+    cc_attr(value, "path", heap).and_then(|path| path.unpack_str().map(str::to_owned))
+}
+
+fn expand_cc_scalar_template<'v>(
+    template: &str,
+    heap: Heap<'v>,
+    get_var: impl Fn(&str) -> Option<Value<'v>>,
+) -> starlark::Result<String> {
+    let mut expanded = String::new();
+    let mut rest = template;
+    while let Some(start) = rest.find("%{") {
+        expanded.push_str(&rest[..start]);
+        let after_start = &rest[start + 2..];
+        let Some(end) = after_start.find('}') else {
+            expanded.push_str(&rest[start..]);
+            return Ok(expanded);
+        };
+        let name = &after_start[..end];
+        let Some(value) = get_var(name).and_then(|value| cc_variable_to_string(value, heap)) else {
+            return Err(starlark::Error::new_other(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Cannot expand C++ toolchain variable '{}'", name),
+            )));
+        };
+        expanded.push_str(&value);
+        rest = &after_start[end + 1..];
+    }
+    expanded.push_str(rest);
+    Ok(expanded)
+}
+
+fn cc_variable_available<'v>(value: Option<Value<'v>>, heap: Heap<'v>) -> bool {
+    let Some(value) = value else {
+        return false;
+    };
+    if value.is_none() {
+        return false;
+    }
+    if is_depset_value(value) {
+        return depset_to_list(value, heap)
+            .map(|values| !values.is_empty())
+            .unwrap_or(false);
+    }
+    if let Ok(mut iter) = value.iterate(heap) {
+        return iter.next().is_some();
+    }
+    true
+}
+
+fn cc_variable_truthy<'v>(value: Option<Value<'v>>, heap: Heap<'v>) -> bool {
+    let Some(value) = value else {
+        return false;
+    };
+    if value.is_none() {
+        return false;
+    }
+    if let Some(b) = value.unpack_bool() {
+        return b;
+    }
+    if let Some(s) = value.unpack_str() {
+        return !s.is_empty();
+    }
+    if is_depset_value(value) {
+        return depset_to_list(value, heap)
+            .map(|values| !values.is_empty())
+            .unwrap_or(false);
+    }
+    if let Ok(mut iter) = value.iterate(heap) {
+        return iter.next().is_some();
+    }
+    true
+}
+
+fn cc_flag_group_conditions_match<'v>(
+    group: &CcFlagGroup,
+    heap: Heap<'v>,
+    get_var: &impl Fn(&str) -> Option<Value<'v>>,
+) -> bool {
+    if let Some(name) = &group.expand_if_available {
+        if !cc_variable_available(get_var(name), heap) {
+            return false;
+        }
+    }
+    if let Some(name) = &group.expand_if_not_available {
+        if cc_variable_available(get_var(name), heap) {
+            return false;
+        }
+    }
+    if let Some(name) = &group.expand_if_true {
+        if !cc_variable_truthy(get_var(name), heap) {
+            return false;
+        }
+    }
+    if let Some(name) = &group.expand_if_false {
+        if cc_variable_truthy(get_var(name), heap) {
+            return false;
+        }
+    }
+    if let Some(equal) = &group.expand_if_equal {
+        if get_var(&equal.variable)
+            .and_then(|value| cc_variable_to_string(value, heap))
+            .as_deref()
+            != Some(equal.value.as_str())
+        {
+            return false;
+        }
+    }
+    true
+}
+
+fn expand_cc_flag_group<'v>(
+    group: &CcFlagGroup,
+    args: &mut Vec<Value<'v>>,
+    heap: Heap<'v>,
+    get_var: &impl Fn(&str) -> Option<Value<'v>>,
+    iteration: Option<(&str, Value<'v>)>,
+) -> starlark::Result<()> {
+    let get_scoped_var = |key: &str| -> Option<Value<'v>> {
+        if let Some((iteration_key, iteration_value)) = iteration {
+            if key == iteration_key {
+                return Some(iteration_value);
+            }
+        }
+        get_var(key)
+    };
+
+    if !cc_flag_group_conditions_match(group, heap, &get_scoped_var) {
+        return Ok(());
+    }
+
+    if let Some(iterate_over) = &group.iterate_over
+        && iteration.map(|(key, _)| key != iterate_over.as_str()) != Some(false)
+    {
+        if let Some(value) = get_var(iterate_over) {
+            for item in depset_or_iterable_values(value, heap)? {
+                expand_cc_flag_group(group, args, heap, get_var, Some((iterate_over, item)))?;
+            }
+        }
+        return Ok(());
+    }
+
+    for nested in &group.flag_groups {
+        expand_cc_flag_group(nested, args, heap, get_var, iteration)?;
+    }
+    for flag in &group.flags {
+        let expanded = expand_cc_scalar_template(flag, heap, get_scoped_var)?;
+        args.push(heap.alloc_str(&expanded).to_value());
+    }
+    Ok(())
+}
+
+fn expand_cc_flag_sets<'v>(
+    feature_configuration: &FeatureConfiguration,
+    action_name: &str,
+    variables: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Vec<Value<'v>>> {
+    let get_var = |key: &str| -> Option<Value<'v>> {
+        if let Ok(Some(v)) = variables.get_attr(key, heap) {
+            return Some(v);
+        }
+        if let Some(dict_ref) = DictRef::from_value(variables) {
+            return dict_ref.get_str(key);
+        }
+        None
+    };
+
+    let mut args = Vec::new();
+    for flag_set in feature_configuration
+        .action_config_flag_sets
+        .iter()
+        .chain(feature_configuration.feature_flag_sets.iter())
+    {
+        if !flag_set.applies_to_action(action_name)
+            || !flag_set.with_features_match(feature_configuration)
+        {
+            continue;
+        }
+        for group in &flag_set.flag_groups {
+            expand_cc_flag_group(group, &mut args, heap, &get_var, None)?;
+        }
+    }
+    Ok(args)
+}
+
+pub(crate) fn cc_toolchain_features_from_config_info<'v>(
+    toolchain_config_info: Value<'v>,
+    tools_directory: &str,
+    heap: Heap<'v>,
+) -> CcToolchainFeatures {
+    let mut feature_names = Vec::new();
+    let mut default_enabled_features = Vec::new();
+    let mut feature_env_sets = Vec::new();
+    let mut feature_flag_sets = Vec::new();
+    let mut action_config_flag_sets = Vec::new();
+    let mut action_config_names = Vec::new();
+
+    // Extract feature names from toolchain_config_info. Kuro's native
+    // constructor uses `features`; rules_cc's Starlark wrapper stores the
+    // Bazel-shaped provider field as `_features_DO_NOT_USE`.
+    let legacy_features_val = toolchain_config_info
+        .get_attr("_features_DO_NOT_USE", heap)
+        .ok()
+        .flatten();
+    let features_val = legacy_features_val.or_else(|| {
+        toolchain_config_info
+            .get_attr("features", heap)
+            .ok()
+            .flatten()
+    });
+    if let Some(features_val) = features_val {
+        if !features_val.is_none()
+            && let Ok(iter) = features_val.iterate(heap)
+        {
+            for feature in iter {
+                if let Ok(Some(name_val)) = feature.get_attr("name", heap)
+                    && let Some(name) = name_val.unpack_str()
+                {
+                    feature_names.push(name.to_owned());
+                    if let Some(env_sets) = parse_cc_feature_env_sets(name, feature, heap) {
+                        feature_env_sets.push(env_sets);
+                    }
+                    if let Some(flag_sets) = parse_cc_feature_flag_sets(name, feature, heap)
+                        .or_else(|| parse_cc_modern_feature_flag_sets(name, feature, heap))
+                    {
+                        feature_flag_sets.push(flag_sets);
+                    }
+                    if let Ok(Some(enabled_val)) = feature.get_attr("enabled", heap)
+                        && enabled_val.unpack_bool() == Some(true)
+                    {
+                        default_enabled_features.push(name.to_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    if let Ok(Some(enabled_features_val)) = toolchain_config_info.get_attr("enabled_features", heap)
+    {
+        if !enabled_features_val.is_none()
+            && let Ok(iter) = enabled_features_val.iterate(heap)
+        {
+            for feature in iter {
+                if let Some(name) =
+                    cc_attr(feature, "name", heap).and_then(|name| name.unpack_str())
+                    && !default_enabled_features
+                        .iter()
+                        .any(|feature| feature == name)
+                {
+                    default_enabled_features.push(name.to_owned());
+                }
+            }
+        }
+    }
+
+    let configs_val = toolchain_config_info
+        .get_attr("_action_configs_DO_NOT_USE", heap)
+        .ok()
+        .flatten()
+        .or_else(|| {
+            toolchain_config_info
+                .get_attr("action_configs", heap)
+                .ok()
+                .flatten()
+        });
+    if let Some(configs_val) = configs_val {
+        if !configs_val.is_none()
+            && let Ok(iter) = configs_val.iterate(heap)
+        {
+            for config in iter {
+                if let Ok(Some(name_val)) = config.get_attr("action_name", heap)
+                    && let Some(name) = name_val.unpack_str()
+                {
+                    action_config_names.push(name.to_owned());
+                    if let Some(flag_sets) = cc_attr(config, "flag_sets", heap)
+                        .and_then(|flag_sets| flag_sets.iterate(heap).ok())
+                    {
+                        for flag_set in flag_sets {
+                            if let Some(flag_set) = parse_cc_flag_set(flag_set, heap, Some(name)) {
+                                action_config_flag_sets.push(flag_set);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let modern_action_config_flag_sets =
+        parse_cc_modern_toolchain_arg_flag_sets(toolchain_config_info, heap);
+    if !modern_action_config_flag_sets.is_empty() {
+        action_config_flag_sets = modern_action_config_flag_sets;
+    }
+
+    CcToolchainFeatures {
+        feature_names,
+        default_enabled_features,
+        feature_env_sets,
+        action_config_flag_sets,
+        feature_flag_sets,
+        action_config_names,
+        tools_directory: tools_directory.to_owned(),
+    }
+}
+
 /// Helper: push a path string or its corresponding artifact to the args list.
 fn push_path_or_artifact<'v>(
     path_str: &str,
@@ -762,7 +1397,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Get the action name for mnemonic/category
         // Convert Bazel action names (with hyphens) to Kuro categories (snake_case)
         let action_name_raw = action_name.into_option().unwrap_or("c-compile");
-        let action_name_str = action_name_raw.replace("-", "_");
+        let action_name_str = action_category_from_bazel_action_name(action_name_raw);
 
         // Determine if this is a C++ compile action (vs plain C)
         let is_cpp = action_name_raw.contains("c++") || action_name_raw.contains("cpp");
@@ -856,7 +1491,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             args_vec.push(heap.alloc_str("-c").to_value());
             args_vec.push(source);
             args_vec.push(heap.alloc_str("-o").to_value());
-            args_vec.push(output_artifact);
+            args_vec.push(heap.alloc_str(&output_path_str).to_value());
             // -fPIC for position-independent code (not applicable to MSVC)
             args_vec.push(heap.alloc_str("-fPIC").to_value());
 
@@ -1111,10 +1746,13 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 // GCC/Clang: -MMD -MF <depfile>
                 args_vec.push(heap.alloc_str("-MMD").to_value());
                 args_vec.push(heap.alloc_str("-MF").to_value());
-                if let Ok(Some(path_method)) = dotd_file.get_attr("as_output", heap) {
-                    if let Ok(dotd_output) = eval.eval_function(path_method, &[], &[]) {
-                        args_vec.push(dotd_output);
-                    }
+                if let Some(dotd_path) = dotd_file
+                    .get_attr("path", heap)
+                    .ok()
+                    .flatten()
+                    .and_then(|v| v.unpack_str().map(str::to_owned))
+                {
+                    args_vec.push(heap.alloc_str(&dotd_path).to_value());
                 }
             }
         }
@@ -1201,7 +1839,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Invoke actions.run() using Starlark's function evaluation
         // This properly registers the action through Kuro's infrastructure
-        let run_result = eval.eval_function(run_method, &[arguments], &named_args);
+        let _run_result = eval.eval_function(run_method, &[arguments], &named_args)?;
 
         Ok(NoneType)
     }
@@ -1972,7 +2610,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             _ => {
                 // Fallback to stub if no real actions available
                 return Ok(heap.alloc(CtxCheatArtifactStub {
-                    path: output_name.to_owned(),
+                    path: output_name.into(),
+                    input_target: None,
                 }));
             }
         };
@@ -1983,7 +2622,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             _ => {
                 // Fallback to stub if declare_file not available
                 return Ok(heap.alloc(CtxCheatArtifactStub {
-                    path: output_name.to_owned(),
+                    path: output_name.into(),
+                    input_target: None,
                 }));
             }
         };
@@ -1995,7 +2635,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             Err(_) => {
                 // Fallback to stub on error
                 Ok(heap.alloc(CtxCheatArtifactStub {
-                    path: output_name.to_owned(),
+                    path: output_name.into(),
+                    input_target: None,
                 }))
             }
         }
@@ -2180,54 +2821,12 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] tools_directory: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<CcToolchainFeatures> {
-        let heap = eval.heap();
-        let mut feature_names = Vec::new();
-        let mut default_enabled_features = Vec::new();
-        let mut action_config_names = Vec::new();
-
-        // Extract feature names from toolchain_config_info.features
-        if let Ok(Some(features_val)) = toolchain_config_info.get_attr("features", heap) {
-            if !features_val.is_none() {
-                if let Ok(iter) = features_val.iterate(heap) {
-                    for feature in iter {
-                        // Each feature is a struct with .name and .enabled fields
-                        if let Ok(Some(name_val)) = feature.get_attr("name", heap) {
-                            if let Some(name) = name_val.unpack_str() {
-                                feature_names.push(name.to_owned());
-                                // Check if enabled by default
-                                if let Ok(Some(enabled_val)) = feature.get_attr("enabled", heap) {
-                                    if enabled_val.unpack_bool() == Some(true) {
-                                        default_enabled_features.push(name.to_owned());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Extract action_config names from toolchain_config_info.action_configs
-        if let Ok(Some(configs_val)) = toolchain_config_info.get_attr("action_configs", heap) {
-            if !configs_val.is_none() {
-                if let Ok(iter) = configs_val.iterate(heap) {
-                    for config in iter {
-                        if let Ok(Some(name_val)) = config.get_attr("action_name", heap) {
-                            if let Some(name) = name_val.unpack_str() {
-                                action_config_names.push(name.to_owned());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(CcToolchainFeatures {
-            feature_names,
-            default_enabled_features,
-            action_config_names,
-            tools_directory: tools_directory.to_owned(),
-        })
+        let _ = this;
+        Ok(cc_toolchain_features_from_config_info(
+            toolchain_config_info,
+            tools_directory,
+            eval.heap(),
+        ))
     }
 
     /// Creates a solib symlink for a shared library artifact.
@@ -2448,6 +3047,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                         unsup.push(s.to_owned());
                     }
                 }
+            }
+        }
+
+        if let Ok(Some(toolchain_features)) = cc_toolchain.get_attr("_toolchain_features", heap) {
+            if let Some(features) = toolchain_features.downcast_ref::<CcToolchainFeatures>() {
+                return Ok(features.configure(req, unsup));
             }
         }
 
@@ -3616,7 +4221,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // --- Link/Archive actions ---
         if is_link {
             let output_path = get_var("output_execpath").and_then(|v| get_str_val(v));
+            let feature_args = feature_configuration
+                .downcast_ref::<FeatureConfiguration>()
+                .map(|fc| expand_cc_flag_sets(fc, action_name, variables, heap))
+                .transpose()?
+                .unwrap_or_default();
+            let has_feature_args = !feature_args.is_empty();
             let use_llvm_linux_link_defaults = !msvc
+                && !has_feature_args
                 && has_host_llvm_toolchain()
                 && is_musl_cc_toolchain_target(
                     target_system_name.as_deref(),
@@ -3688,8 +4300,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
             }
 
+            args.extend(feature_args);
+
             // User link flags
-            if let Some(user_flags) = get_var("user_link_flags") {
+            if !has_feature_args && let Some(user_flags) = get_var("user_link_flags") {
                 if !user_flags.is_none() {
                     for flag in iterate_value(user_flags, eval) {
                         if let Some(s) = flag.unpack_str() {
@@ -3994,9 +4608,18 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] variables: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = (this, feature_configuration, action_name, variables);
+        let _ = this;
         let heap = eval.heap();
         let mut map: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
+        let get_var = |key: &str| -> Option<Value<'v>> {
+            if let Ok(Some(v)) = variables.get_attr(key, heap) {
+                return Some(v);
+            }
+            if let Some(dict_ref) = DictRef::from_value(variables) {
+                return dict_ref.get_str(key);
+            }
+            None
+        };
 
         // On Windows, provide MSVC environment variables for compilation/linking
         #[cfg(target_os = "windows")]
@@ -4015,6 +4638,27 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 heap.alloc_str("LIB").to_value().get_hashed().unwrap(),
                 heap.alloc_str(&lib_val).to_value(),
             );
+        }
+
+        if let Some(fc) = feature_configuration.downcast_ref::<FeatureConfiguration>() {
+            let action_name = normalize_action_name(action_name);
+            for env_set in &fc.env_sets {
+                if !env_set.applies_to_action(&action_name) || !env_set.with_features_match(fc) {
+                    continue;
+                }
+                for entry in &env_set.env_entries {
+                    if let Some(gate) = &entry.expand_if_available {
+                        if get_var(gate).is_none_or(|value| value.is_none()) {
+                            continue;
+                        }
+                    }
+                    let value = expand_cc_scalar_template(&entry.value, heap, get_var)?;
+                    map.insert_hashed(
+                        heap.alloc_str(&entry.key).to_value().get_hashed().unwrap(),
+                        heap.alloc_str(&value).to_value(),
+                    );
+                }
+            }
         }
 
         Ok(heap.alloc(Dict::new(map)))
