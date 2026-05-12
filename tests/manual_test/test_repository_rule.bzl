@@ -1,5 +1,5 @@
 # Test repository_rule() and repository_ctx built-in functions
-# Plan Reference: thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod.md Phase 5
+# Plan Reference: thoughts/shared/plans/slug-bazel-subplans/02-bzlmod.md Phase 5
 
 def _test_repo_impl(ctx):
     """Test implementation - just a stub for now."""

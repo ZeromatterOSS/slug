@@ -1,9 +1,9 @@
 ---
 id: interactive_console
-title: Kuro Consoles
+title: Slug Consoles
 ---
 
-Kuro offers several console types for build-like commands (e.g. `build`,
+Slug offers several console types for build-like commands (e.g. `build`,
 `install`, `test`, etc.). The console is always written to stderr.
 
 The console can be specified via the `--console` flag, or the `BUCK_CONSOLE` env
@@ -28,7 +28,7 @@ All console options will output the build result, whether succeeded or not, to
 stdout. Note that action execution stderr is hidden if the build succeeded.
 
 The simple and superconsole will also print metadata about the build itself,
-such as the Kuro UUID, the percentage of cache hits, and the number of action
+such as the Slug UUID, the percentage of cache hits, and the number of action
 commands ran. In addition, they will print the event spans detected within the
 build.
 
@@ -46,7 +46,7 @@ line. There is no resource usage telemetry emitted.
 The superconsole uses the
 [superconsole](https://github.com/facebookincubator/superconsole) library to
 provide an interactive console which shows the event spans going on within
-Kuro.
+Slug.
 
 ### Demo
 
@@ -54,12 +54,12 @@ Kuro.
 
 ### Toggles
 
-The superconsole also provides several toggles to inspect ongoing Kuro
+The superconsole also provides several toggles to inspect ongoing Slug
 telemetry.
 
 To see what's available you can press `?` or `h`. This will work as long as
 stdin is a TTY, which will be true most of the time if you're not piping
-anything into Kuro. To disable to allow alternate use of stdin, or for follow
+anything into Slug. To disable to allow alternate use of stdin, or for follow
 up pasted commands to not get swallowed, you can set the
 `BUCK_NO_INTERACTIVE_CONSOLE` environment variable, or use the flag
 `--no-interactive-console`.
@@ -80,5 +80,5 @@ We support the following toggles:
 
 ## No console
 
-When specifying the `none` console type, Kuro will only print if the build
+When specifying the `none` console type, Slug will only print if the build
 succeeded, or the error if the build failed.

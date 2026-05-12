@@ -24,7 +24,7 @@ async def test_ctx_bin_dir_path(buck: Buck) -> None:
 
 @buck_test(data_dir="test_ctx_attributes_data")
 async def test_ctx_genfiles_dir_path(buck: Buck) -> None:
-    """ctx.genfiles_dir.path returns a path rooted under buck-out (same as bin_dir in Kuro)."""
+    """ctx.genfiles_dir.path returns a path rooted under buck-out (same as bin_dir in Slug)."""
     result = await buck.build("//:genfiles_dir")
     output = result.get_build_report().output_for_target("//:genfiles_dir")
     path = output.read_text().strip()
@@ -117,7 +117,7 @@ async def test_ctx_actions_expand_template(buck: Buck) -> None:
     result = await buck.build("//:expand_template")
     output = result.get_build_report().output_for_target("//:expand_template")
     content = output.read_text().strip()
-    assert content == "Hello Kuro version 9.0.0!"
+    assert content == "Hello Slug version 9.0.0!"
 
 
 @buck_test(data_dir="test_ctx_attributes_data")

@@ -55,7 +55,7 @@ async def test_action_error(buck: Buck, tmp_path: Path) -> None:
     # stable. Feel free to delete it if it becomes a problem.
     assert (
         errors[0]["source_location"]
-        == "kuro_build_api/src/actions/error.rs::ActionError"
+        == "slug_build_api/src/actions/error.rs::ActionError"
     )
 
 
@@ -92,7 +92,7 @@ async def test_bad_url(buck: Buck, tmp_path: Path) -> None:
     assert len(errors) == 1
     # Also liable to break as a result of refactorings, feel free to update
     # FIXME(minglunli): This is a regression from before, the commented line is better and we should fix this
-    assert "kuro_http/src/lib.rs" in errors[0]["source_location"]
+    assert "slug_http/src/lib.rs" in errors[0]["source_location"]
     # assert errors[0]["source_location"] == "buck2_http/src/lib.rs::HttpError::SendRequest"
 
 
@@ -151,7 +151,7 @@ async def test_starlark_fail_error_categorization(buck: Buck, tmp_path: Path) ->
     errors = record["errors"]
     assert len(errors) == 1
     assert errors[0]["source_location"].endswith("StarlarkError::Fail")
-    assert errors[0]["source_area"] == "KURO"
+    assert errors[0]["source_area"] == "SLUG"
     assert errors[0]["category"] == "USER"
 
 
@@ -172,7 +172,7 @@ async def test_starlark_parse_error_categorization(buck: Buck, tmp_path: Path) -
     assert len(errors) == 1
     assert errors[0]["source_location"].endswith("StarlarkError::Parser")
     assert errors[0]["tags"] == ["STARLARK_PARSER"]
-    assert errors[0]["source_area"] == "KURO"
+    assert errors[0]["source_area"] == "SLUG"
     assert errors[0]["category"] == "USER"
 
 
@@ -193,7 +193,7 @@ async def test_starlark_scope_error_categorization(buck: Buck, tmp_path: Path) -
     assert len(errors) == 1
     assert errors[0]["source_location"].endswith("StarlarkError::Scope")
     assert errors[0]["tags"] == ["STARLARK_SCOPE"]
-    assert errors[0]["source_area"] == "KURO"
+    assert errors[0]["source_area"] == "SLUG"
     assert errors[0]["category"] == "USER"
 
 
@@ -429,7 +429,7 @@ async def test_local_incompatible(buck: Buck, tmp_path: Path) -> None:
 
     error = read_single_error(record_path)
     assert error["category"] == "USER"
-    # Input tag is "hidden" in kuro's error system, so category_key uses the type name
+    # Input tag is "hidden" in slug's error system, so category_key uses the type name
     assert error["category_key"] == "IncompatibleExecutorPreferences"
 
 

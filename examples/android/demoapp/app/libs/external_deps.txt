@@ -2,18 +2,18 @@
 # A list of Maven coordinates for external dependencies used in the project.
 
 # = How is this used? =
-# Unlike Gradle, kuro does not have native support for external dependency management.
+# Unlike Gradle, slug does not have native support for external dependency management.
 # For Java/Android projects at Meta we use a tool called Artificer to resolve the dependency tree
 # and generate BUCK files with targets that other modules can depend on.
 #
 # Artificer code is not open-sourced yet, but we plan to do so. A runnable jar is available for
 # download on the GitHub releases page:
-# https://github.com/facebook/kuro/releases/tag/androidToolchain%2F2025-04-03
+# https://github.com/facebook/slug/releases/tag/androidToolchain%2F2025-04-03
 
 # = How to update dependencies? =
 # First download the Artificer jar from GitHub.
 # Run:
-# `cd kuro/examples/demoapp`
+# `cd slug/examples/demoapp`
 # `java -jar ~/artificer-0.0.1.jar download --log=DEBUG --depth=FULL @app/libs/external_deps.txt`
 
 # See the `.artificer_configs` file for additional information.

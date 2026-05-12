@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-// Copy-paste from `kuro_util`.
+// Copy-paste from `slug_util`.
 
 use std::future::Future;
 use std::iter;
@@ -17,7 +17,7 @@ use futures::FutureExt;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 
-// patternlint-disable-next-line kuro-no-futures-try-join-all
+// patternlint-disable-next-line slug-no-futures-try-join-all
 /// Semantically the same as `futures::future::try_join_all`, but bug free.
 ///
 /// <https://github.com/rust-lang/futures-rs/issues/2866>

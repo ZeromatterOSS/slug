@@ -120,7 +120,7 @@ pub(crate) struct TargetInfo {
     pub(crate) deps: Vec<Target>,
     #[serde(rename = "tests")]
     pub(crate) test_deps: Vec<Target>,
-    // Optional set of renamed crates. in kuro, these are not unified with
+    // Optional set of renamed crates. in slug, these are not unified with
     // `buck.direct_dependencies` and are instead a separate entry.
     #[serde(deserialize_with = "deserialize_named_deps")]
     pub(crate) named_deps: FxHashMap<String, Target>,

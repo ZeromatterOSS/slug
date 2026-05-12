@@ -57,8 +57,8 @@ use crate::vec_map::VecMap;
 mod iter;
 
 /// Max size of a map when we do not create an index.
-/// 32 is the value where `kuro cquery some-target` is the fastest and consumes the least memory.
-/// Note the test was performed for kuro-specific patterns.
+/// 32 is the value where `slug cquery some-target` is the fastest and consumes the least memory.
+/// Note the test was performed for slug-specific patterns.
 /// On nightly we use SIMD to speed up the search, so use 16 on stable to be safe.
 #[cfg(rust_nightly)]
 const NO_INDEX_THRESHOLD: usize = 32;

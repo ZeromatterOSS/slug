@@ -7,9 +7,9 @@ title: PACKAGE Files
 Starlark rules/macros. It supports things like per-directory properties, reading
 parent `PACKAGE` values (`read_parent_package_value()`), writing `PACKAGE`
 values (`write_package_value()`), loading helper `bzl` files, and you can also
-inspect `PACKAGE` values via `kuro audit package-values`.
+inspect `PACKAGE` values via `slug audit package-values`.
 
-Before evaluating `BUCK` file, kuro will evaluate all `PACKAGE` files in the
+Before evaluating `BUCK` file, slug will evaluate all `PACKAGE` files in the
 same directory and all parent directories. Absent `PACKAGE` files are treated as
 empty files.
 

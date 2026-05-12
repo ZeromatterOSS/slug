@@ -180,7 +180,7 @@ def _expand_template_rule_impl(ctx):
         template = template,
         output = out,
         substitutions = {
-            "{NAME}": "Kuro",
+            "{NAME}": "Slug",
             "{VERSION}": "9.0.0",
         },
     )

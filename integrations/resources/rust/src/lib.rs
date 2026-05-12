@@ -29,7 +29,7 @@ pub enum BuckResourcesError {
 
     #[error(
         "Failed to read manifest file: `{manifest_path}`. \
-        Are you maybe running `buck1`? `rust_binary` only supports `resources` under `kuro`!"
+        Are you maybe running `buck1`? `rust_binary` only supports `resources` under `slug`!"
     )]
     ReadFailed {
         manifest_path: PathBuf,

@@ -7,11 +7,11 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug kuro",
+            "name": "Debug slug",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=kuro",
+                    "--bin=slug",
                     "--package=cli"
                 ],
                 "env": {
@@ -20,20 +20,20 @@
                     "CARGO_PROFILE_DEV_DEBUG": "true"
                 },
                 "filter": {
-                    "name": "kuro",
+                    "name": "slug",
                     "kind": "bin"
                 }
             },
             "args": [
                 "build",
-                "fbcode//kuro:kuro"
+                "fbcode//slug:slug"
             ],
             "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "attach",
-            "name": "Debug kurod",
+            "name": "Debug slugd",
             "cwd": "${workspaceFolder}",
             "pid": "${command:pickMyProcess}",
         },

@@ -20,7 +20,7 @@ For Bazel 9.0+:
 - **Rules are pure Starlark**: `cc_library`, `cc_binary`, `cc_test` are implemented in `cc/private/rules_impl/*.bzl`
 - **Native builtins still required**: The native `cc_common` module is needed for low-level action creation
 
-## What Kuro Must Provide
+## What Slug Must Provide
 
 ### 1. Native `cc_common` Builtin Module
 
@@ -133,7 +133,7 @@ Returned by the Starlark `configure_features()`, the `feature_configuration` obj
 
 The feature configuration is created by `cc_toolchain._toolchain_features.configure_features()` which is also pure Starlark.
 
-## What Kuro Does NOT Need to Provide (Bazel 9.0+)
+## What Slug Does NOT Need to Provide (Bazel 9.0+)
 
 ### Native Providers
 
@@ -145,7 +145,7 @@ For Bazel 9.0+, these providers are **pure Starlark** in rules_cc:
 - `DebugPackageInfo` - Defined in `cc/private/debug_package_info.bzl`
 - `CcSharedLibraryInfo` - Defined in `cc/private/rules_impl/cc_shared_library.bzl`
 
-Kuro does NOT need native implementations of these providers.
+Slug does NOT need native implementations of these providers.
 
 ### Native Rules
 
@@ -239,7 +239,7 @@ In Bazel, `File.path` returns the full execution path like `bazel-out/k8-fastbui
 buck-out/v2/gen/<cell_name>/<cfg_hash>[/<cell_rel_pkg>]/__<target>__/<artifact_path>
 ```
 
-**File:** `app/kuro_execute/src/path/artifact_path.rs`
+**File:** `app/slug_execute/src/path/artifact_path.rs`
 
 ### Action Dependencies: String Paths vs Artifact References
 
@@ -247,7 +247,7 @@ Buck2's action dependency tracking works by visiting artifacts in command lines 
 - An **artifact** is added to cmd_args → Buck2 tracks it as a dependency and resolves it to full path
 - A **string** is added to cmd_args → Buck2 uses it verbatim with no dependency tracking
 
-Since rules_cc passes string paths (from `.path`) through providers, Kuro needed to either:
+Since rules_cc passes string paths (from `.path`) through providers, Slug needed to either:
 1. Make `.path` return the full execution path ✓ (implemented)
 2. Or maintain an artifact registry to resolve strings back to artifacts
 

@@ -19,13 +19,13 @@
 
 ## Section 2: Bucket A — Delete With Test
 
-**Rationale summary**: fixture belongs to a test that is either in `collect_ignore` (already excluded from CI), exercises a buckconfig knob being retired in Plan 35 (e.g. `[alias]`, `[kuro] starlark_max_callstack_size`, `[deprecated_config]`, `read_root_config`, `create_unhashed_links`, `representative_config_flags`), or exercises Buck2-specific modifier syntax.
+**Rationale summary**: fixture belongs to a test that is either in `collect_ignore` (already excluded from CI), exercises a buckconfig knob being retired in Plan 35 (e.g. `[alias]`, `[slug] starlark_max_callstack_size`, `[deprecated_config]`, `read_root_config`, `create_unhashed_links`, `representative_config_flags`), or exercises Buck2-specific modifier syntax.
 
 ### tests/core/audit/
 
 | Fixture path | Owning test | Reason |
 |---|---|---|
-| `tests/core/audit/test_audit_config_data/.buckconfig` | `test_audit_config.py` | Test exists to verify `kuro audit config` reads buckconfig; uses `[foo]`, `[test]` custom sections as test data |
+| `tests/core/audit/test_audit_config_data/.buckconfig` | `test_audit_config.py` | Test exists to verify `slug audit config` reads buckconfig; uses `[foo]`, `[test]` custom sections as test data |
 | `tests/core/audit/test_audit_config_data/code/.buckconfig` | `test_audit_config.py` | Subcell fixture for same test |
 | `tests/core/audit/test_audit_config_data/source/.buckconfig` | `test_audit_config.py` | Subcell fixture for same test |
 
@@ -37,7 +37,7 @@
 | `tests/core/build/test_build_modifiers_report_data/.buckconfig` | `test_build_modifiers_report.py` | Buck2-specific modifier syntax |
 | `tests/core/build/test_paranoid_data/execution_platforms/.buckconfig` | `test_paranoid.py` | Buck2-specific paranoid execution mode; most tests already in SKIP\_TESTS |
 | `tests/core/build/test_target_aliases_data/.buckconfig` | `test_target_aliases.py` | Uses `[alias]` buckconfig section being retired |
-| `tests/core/build/test_unhashed_outputs_data/.buckconfig` | `test_unhashed_outputs.py` | Uses `[kuro] create_unhashed_links` knob being retired |
+| `tests/core/build/test_unhashed_outputs_data/.buckconfig` | `test_unhashed_outputs.py` | Uses `[slug] create_unhashed_links` knob being retired |
 
 ### tests/core/completion/
 
@@ -78,12 +78,12 @@
 
 | Fixture path | Owning test | Reason |
 |---|---|---|
-| `tests/core/interpreter/test_callstack_size_data/.buckconfig` | `test_callstack_size.py` | Uses `[kuro] starlark_max_callstack_size` knob being retired |
+| `tests/core/interpreter/test_callstack_size_data/.buckconfig` | `test_callstack_size.py` | Uses `[slug] starlark_max_callstack_size` knob being retired |
 | `tests/core/interpreter/test_callstack_size_data/bad/.buckconfig` | `test_callstack_size.py` | Subcell of above |
 | `tests/core/interpreter/test_callstack_size_data/good/.buckconfig` | `test_callstack_size.py` | Subcell of above |
 | `tests/core/interpreter/test_deprecated_config_data/.buckconfig` | `test_deprecated_config.py` | Uses `[deprecated_config]` buckconfig section being retired; also `[unlike]`, `[some]`, `[other]` custom sections |
 | `tests/core/interpreter/test_deprecated_config_data/cell/.buckconfig` | `test_deprecated_config.py` | Subcell fixture for same test |
-| `tests/core/interpreter/test_peak_allocated_bytes_data/.buckconfig` | `test_peak_allocated_bytes.py` | In `collect_ignore`: Meta-internal peak alloc tracking; uses `[kuro] check_starlark_peak_memory` |
+| `tests/core/interpreter/test_peak_allocated_bytes_data/.buckconfig` | `test_peak_allocated_bytes.py` | In `collect_ignore`: Meta-internal peak alloc tracking; uses `[slug] check_starlark_peak_memory` |
 | `tests/core/interpreter/test_peak_allocated_bytes_exceeds_limit_data/.buckconfig` | `test_peak_allocated_bytes_exceeds_limit.py` | In `collect_ignore`: same |
 | `tests/core/interpreter/test_prelude_typecheck_data/.buckconfig` | `test_prelude_typecheck.py` | In `collect_ignore`: Meta-internal typecheck infra |
 | `tests/core/interpreter/test_read_root_config_data/.buckconfig` | `test_read_root_config.py` | Test specifically exercises `read_root_config()`; uses custom `[unlike]` section as config data |
@@ -95,18 +95,18 @@
 | Fixture path | Owning test | Reason |
 |---|---|---|
 | `tests/core/io/test_allow_eden_data/.buckconfig` | `test_allow_eden.py` | io/ directory; exercises Eden-specific IO |
-| `tests/core/io/test_compare_providers_data/.buckconfig` | `test_compare_providers.py` | io/ directory; uses `[kuro] digest_algorithms = BLAKE3-KEYED,SHA1` |
+| `tests/core/io/test_compare_providers_data/.buckconfig` | `test_compare_providers.py` | io/ directory; uses `[slug] digest_algorithms = BLAKE3-KEYED,SHA1` |
 | `tests/core/io/test_compare_providers_data/test_large_action_input/.buckconfig` | `test_compare_providers.py` | Subcell of above |
-| `tests/core/io/test_edenfs_aba_data/.buckconfig` | `test_edenfs_aba.py` | In `collect_ignore`: requires Eden; uses `[kuro] file_watcher = edenfs` |
+| `tests/core/io/test_edenfs_aba_data/.buckconfig` | `test_edenfs_aba.py` | In `collect_ignore`: requires Eden; uses `[slug] file_watcher = edenfs` |
 | `tests/core/io/test_edenfs_data/.buckconfig` | `test_edenfs.py` | In `collect_ignore`: requires Eden |
 | `tests/core/io/test_edenfs_data/subproject/.buckconfig` | `test_edenfs.py` | Subcell of above |
-| `tests/core/io/test_eden_mismatched_root_data/subdir/.buckconfig` | `test_eden_mismatched_root.py` | io/ directory; uses `[kuro] allow_eden_io = true` |
+| `tests/core/io/test_eden_mismatched_root_data/subdir/.buckconfig` | `test_eden_mismatched_root.py` | io/ directory; uses `[slug] allow_eden_io = true` |
 | `tests/core/io/test_file_watcher_data/.buckconfig` | `test_file_watcher.py` | In `collect_ignore`: requires Watchman |
-| `tests/core/io/test_fs_hash_crawler_data/.buckconfig` | `test_fs_hash_crawler.py` | In `collect_ignore`: requires Buck2 fs\_hash\_crawler; uses `[kuro] file_watcher = fs_hash_crawler` |
+| `tests/core/io/test_fs_hash_crawler_data/.buckconfig` | `test_fs_hash_crawler.py` | In `collect_ignore`: requires Buck2 fs\_hash\_crawler; uses `[slug] file_watcher = fs_hash_crawler` |
 | `tests/core/io/test_modify_eden_data/.buckconfig` | `test_modify_eden.py` | io/ directory; Eden-specific |
-| `tests/core/io/test_notify_data/.buckconfig` | `test_notify.py` | In `collect_ignore`: requires Buck2.tests.core; uses `[kuro] file_watcher = notify` |
-| `tests/core/io/test_watchman_aba_data/.buckconfig` | `test_watchman_aba.py` | In `collect_ignore`: requires Buck2.tests.core; uses `[kuro] file_watcher = watchman` |
-| `tests/core/io/test_watchman_data/.buckconfig` | `test_watchman.py` | In `collect_ignore`: requires Buck2.tests.core; uses `[kuro] file_watcher = watchman` |
+| `tests/core/io/test_notify_data/.buckconfig` | `test_notify.py` | In `collect_ignore`: requires Buck2.tests.core; uses `[slug] file_watcher = notify` |
+| `tests/core/io/test_watchman_aba_data/.buckconfig` | `test_watchman_aba.py` | In `collect_ignore`: requires Buck2.tests.core; uses `[slug] file_watcher = watchman` |
+| `tests/core/io/test_watchman_data/.buckconfig` | `test_watchman.py` | In `collect_ignore`: requires Buck2.tests.core; uses `[slug] file_watcher = watchman` |
 
 ### tests/core/log/
 
@@ -136,11 +136,11 @@
 
 | Fixture path | Owning test | Reason |
 |---|---|---|
-| `tests/core/resource_control/test_action_suspension_data/.buckconfig` | `test_action_suspension.py` | In `collect_ignore`: requires cgroup; uses `[kuro_resource_control]` section |
+| `tests/core/resource_control/test_action_suspension_data/.buckconfig` | `test_action_suspension.py` | In `collect_ignore`: requires cgroup; uses `[slug_resource_control]` section |
 | `tests/core/resource_control/test_daemon_memory_metrics_data/.buckconfig` | `test_daemon_memory_metrics.py` | In `collect_ignore`: requires cgroup memory metrics |
-| `tests/core/resource_control/test_hybrid_execution_resource_control_data/.buckconfig` | `test_hybrid_execution_resource_control.py` | In `collect_ignore`: requires cgroup + RE; uses `[kuro_resource_control]` |
+| `tests/core/resource_control/test_hybrid_execution_resource_control_data/.buckconfig` | `test_hybrid_execution_resource_control.py` | In `collect_ignore`: requires cgroup + RE; uses `[slug_resource_control]` |
 | `tests/core/resource_control/test_instruction_count_data/.buckconfig` | `test_instruction_count.py` | In `collect_ignore`: requires cgroup instruction counting |
-| `tests/core/resource_control/test_memory_reporting_data/.buckconfig` | `test_memory_reporting.py` | In `collect_ignore`: requires cgroup; uses `[kuro_resource_control]` |
+| `tests/core/resource_control/test_memory_reporting_data/.buckconfig` | `test_memory_reporting.py` | In `collect_ignore`: requires cgroup; uses `[slug_resource_control]` |
 
 ### tests/core/run/
 
@@ -452,7 +452,7 @@ tests/core/validation/test_target_validation_data/.buckconfig
 **Notes on non-obvious bucket-B inclusions**:
 
 - `test_external_buckconfigs_data` — the fixture itself is trivial `[cells]+[cell_aliases]+[external_cells]+[buildfile]`; all 4 tests pass per conftest comments (the test exercises the `--config-file` flag mechanism, not the fixture's own buckconfig).
-- `test_build_modify_data/modify` — minimal `[cells]+[buildfile]` only; the actual modify test with `[kuro] materializations = deferred` is in bucket C (`modify_file_during_build`).
+- `test_build_modify_data/modify` — minimal `[cells]+[buildfile]` only; the actual modify test with `[slug] materializations = deferred` is in bucket C (`modify_file_during_build`).
 - `test_docs_data` — large multi-cell setup but all sections are `[repositories]`, `[project] ignore`, `[buildfile]` — no legacy knobs.
 - `test_complete_command_data` (not `test_completion_data`) — the test is NOT in collect\_ignore (only `test_completion.py` is); the complete\_command test exercises tab completion command logic, not buckconfig parsing.
 - `test_audit_cells_data` — uses `[cells]` + `[cell_aliases]` only; the test exercises `audit cells` output, not buckconfig reading per se.
@@ -466,40 +466,40 @@ These 33 fixtures use buckconfig keys that are either: (a) not yet migrated to a
 
 | Fixture path | Owning test | Special key(s) | Rationale |
 |---|---|---|---|
-| `tests/core/audit/test_audit_deferred_materializer_data/.buckconfig` | `test_audit_deferred_materializer.py` | `[kuro] materializations = deferred` | Test specifically exercises deferred materializer audit command; knob not yet promoted to CLI flag |
-| `tests/core/build/test_uncategorized_data/artifact_consistency/.buckconfig` | `test_uncategorized.py` | `[kuro] allow_eden_io = false`, `[kuro] dice = modern` | Two `[kuro]` knobs still in flux; `dice = modern` controls DICE mode selection, not yet a CLI flag |
+| `tests/core/audit/test_audit_deferred_materializer_data/.buckconfig` | `test_audit_deferred_materializer.py` | `[slug] materializations = deferred` | Test specifically exercises deferred materializer audit command; knob not yet promoted to CLI flag |
+| `tests/core/build/test_uncategorized_data/artifact_consistency/.buckconfig` | `test_uncategorized.py` | `[slug] allow_eden_io = false`, `[slug] dice = modern` | Two `[slug]` knobs still in flux; `dice = modern` controls DICE mode selection, not yet a CLI flag |
 | `tests/core/build/test_uncategorized_data/buckroot/.buckconfig` | `test_uncategorized.py::test_buckroot` | intentionally malformed `[ BROKEN` header | Fixture must be non-parseable; tests that `.buckroot` file overrides `.buckconfig` for workspace root detection — cannot be expressed as MODULE.bazel |
 | `tests/core/build/test_uncategorized_data/prelude_import/.buckconfig` | `test_uncategorized.py::test_prelude_imported_once` | `[project] ignore` | Multi-cell with ignore; OK, but subcells (below) are C |
 | `tests/core/build/test_uncategorized_data/prelude_import/cell1/.buckconfig` | `test_uncategorized.py::test_prelude_imported_once` | `[test] config = cell1` | `[test]` section is buckconfig data read by `read_config("test","config")` in prelude.bzl; the test verifies prelude reads its own cell's config, not another cell's |
 | `tests/core/build/test_uncategorized_data/prelude_import/cell2/.buckconfig` | `test_uncategorized.py::test_prelude_imported_once` | `[test] config = cell2` | Same; subcell for above |
 | `tests/core/build/test_uncategorized_data/prelude_import/prelude/.buckconfig` | `test_uncategorized.py::test_prelude_imported_once` | `[test] config = prelude` | Same; prelude cell buckconfig data consumed by `read_config()` in rule implementation |
-| `tests/core/build/test_uncategorized_data/projected_artifacts/.buckconfig` | `test_uncategorized.py` | `[kuro] materializations = deferred` | Deferred materialization knob not yet promoted to CLI flag |
-| `tests/core/bxl/test_actions_data/.buckconfig` | `test_actions.py` | `[kuro] materializations=deferred`, `enable_local_caching_of_re_artifacts`, `sqlite_materializer_state*`, `defer_write_actions` | Five `[kuro]` RE/materializer knobs not yet CLI flags; test exercises BXL action execution with deferred materializer |
-| `tests/core/bxl/test_build_data/.buckconfig` | `test_build.py` | `[kuro] materializations = deferred` | Deferred materializer knob |
-| `tests/core/bxl/test_dynamic_data/.buckconfig` | `test_dynamic.py` | `[kuro] materializations=deferred`, `enable_local_caching_of_re_artifacts`, `sqlite_materializer_state*`, `defer_write_actions` | Same RE/materializer cluster as test\_actions |
+| `tests/core/build/test_uncategorized_data/projected_artifacts/.buckconfig` | `test_uncategorized.py` | `[slug] materializations = deferred` | Deferred materialization knob not yet promoted to CLI flag |
+| `tests/core/bxl/test_actions_data/.buckconfig` | `test_actions.py` | `[slug] materializations=deferred`, `enable_local_caching_of_re_artifacts`, `sqlite_materializer_state*`, `defer_write_actions` | Five `[slug]` RE/materializer knobs not yet CLI flags; test exercises BXL action execution with deferred materializer |
+| `tests/core/bxl/test_build_data/.buckconfig` | `test_build.py` | `[slug] materializations = deferred` | Deferred materializer knob |
+| `tests/core/bxl/test_dynamic_data/.buckconfig` | `test_dynamic.py` | `[slug] materializations=deferred`, `enable_local_caching_of_re_artifacts`, `sqlite_materializer_state*`, `defer_write_actions` | Same RE/materializer cluster as test\_actions |
 | `tests/core/client/test_argfiles_data/.buckconfig` | `test_argfiles.py` | `[foo] bar = 0` | Custom `[foo]` section is baseline buckconfig data that argfile tests override via `--config=foo.bar=1`; the test verifies argfile override semantics; section name is opaque to the parser but the test logic depends on this value |
-| `tests/core/configurations/test_target_incompatible_data/.buckconfig` | `test_target_incompatible.py` | `[kuro] error_on_dep_only_incompatible = <targets>` | Knob controls incompatible-target error behaviour; sets a multi-line target list that the test verifies causes specific errors; not yet a CLI flag |
-| `tests/core/cycle_detection/test_cycle_detection_data/.buckconfig` | `test_cycle_detection.py` | `[build] lazy_cycle_detector = true`, `[kuro] detect_cycles = disabled` | Two non-standard knobs: `lazy_cycle_detector` is a `[build]` key not in standard Bazel; `detect_cycles = disabled` is a `[kuro]` knob; test exercises cycle detection behaviour variants |
-| `tests/core/digest/test_digest_data/.buckconfig` | `test_digest.py` | `[kuro] digest_algorithms = BLAKE3-KEYED,SHA1` | `digest_algorithms` selects hash algorithm; not yet a CLI flag; test specifically validates BLAKE3-KEYED digest behaviour |
-| `tests/core/errors/test_errors_data/.buckconfig` | `test_errors.py` | `[kuro] allow_eden_io = false`, `[project] ignore = package_listing/*red/**` | `allow_eden_io` is a `[kuro]` knob; `project.ignore` with a regex glob pattern is not MODULE.bazel `.bazelignore` syntax (`.bazelignore` uses simple prefixes, not glob patterns with `/`) |
-| `tests/core/executor/test_content_based_paths_data/.buckconfig` | `test_content_based_paths.py` | `[kuro] create_unhashed_links = true` | Same `create_unhashed_links` knob as test\_unhashed\_outputs; but this test is NOT bucket A because it tests executor content-based paths, not the unhashed-outputs feature itself — the knob is incidental scaffolding |
-| `tests/core/executor/test_dep_files_data/dep_files/.buckconfig` | `test_dep_files.py` | `[kuro] materializations = deferred` | Deferred materializer knob |
-| `tests/core/executor/test_dep_files_data/invalid_dep_files/.buckconfig` | `test_dep_files.py` | `[kuro] materializations = deferred` | Same |
-| `tests/core/executor/test_dep_files_data/mismatched_outputs_dep_files/.buckconfig` | `test_dep_files.py` | `[kuro] materializations=deferred`, `[kuro] hash_all_commands=true` | Two `[kuro]` knobs |
-| `tests/core/executor/test_hash_all_commands_data/.buckconfig` | `test_hash_all_commands.py` | `[kuro] materializations=deferred`, `hash_all_commands=true`, `declare_match_in_depfiles=true`, `declare_in_local_executor=true` | Four `[kuro]` knobs related to dep-file hashing behaviour; test exercises hash\_all\_commands feature |
-| `tests/core/interpreter/test_relative_paths_data/.buckconfig` | `test_relative_paths.py` | `[kuro] directories_to_allow_relative_paths = //foo` | Knob controls which directories permit relative-path imports; not yet a CLI flag |
-| `tests/core/invocation_record/test_build_count_data/.buckconfig` | `test_build_count.py` | `[kuro] file_watcher = edenfs`, `[project] watchman_merge_base = main` | `file_watcher` and `watchman_merge_base` are io-subsystem knobs; this test is not in collect\_ignore (it records build counts, not Eden-specific behaviour), but these knobs are not yet CLI flags |
-| `tests/core/invocation_record/test_invocation_record_data/.buckconfig` | `test_invocation_record.py` | `[kuro] materializations = deferred` | Deferred materializer knob |
-| `tests/core/materializer/test_clean_stale_bxl_data/.buckconfig` | `test_clean_stale_bxl.py` | `[kuro] materializations=deferred`, `enable_local_caching_of_re_artifacts`, `sqlite_materializer_state*`, `defer_write_actions` | RE/materializer cluster knobs |
-| `tests/core/materializer/test_clean_stale_data/.buckconfig` | `test_clean_stale.py` | `[kuro]` full RE cluster + `update_access_times = full` | `update_access_times` is an additional knob not yet in CLI |
-| `tests/core/materializer/test_materializer_data/deferred_materializer_matching_artifact_optimization/.buckconfig` | `test_materializer.py` | `[kuro] materializations=deferred`, RE cluster (4 knobs) | Materializer RE knobs |
-| `tests/core/materializer/test_materializer_data/modify_deferred_materialization/.buckconfig` | `test_materializer.py` | `[kuro] materializations = deferred` | Deferred materializer knob |
-| `tests/core/materializer/test_materializer_data/modify_deferred_materialization_deps/.buckconfig` | `test_materializer.py` | `[kuro] materializations = deferred` | Deferred materializer knob |
-| `tests/core/materializer/test_symlink_local_remote_bug_data/.buckconfig` | `test_symlink_local_remote_bug.py` | `[kuro] materializations = deferred` | Deferred materializer knob |
-| `tests/core/materializer/test_symlink_to_parent_bug_data/.buckconfig` | `test_symlink_to_parent_bug.py` | `[kuro] materializations = deferred` | Deferred materializer knob |
-| `tests/core/restart/test_restart_data/.buckconfig` | `test_restart.py` | `[kuro] materializations=deferred`, `sqlite_materializer_state*`, `restarter=true` | Three `[kuro]` knobs; `restarter=true` is an active restart-on-state-change knob not yet a CLI flag |
-| `tests/core/test/test_content_based_paths_data/.buckconfig` | `test_content_based_paths.py` | `[kuro] create_unhashed_links = true` | Same as executor/test\_content\_based\_paths; knob is incidental scaffolding, not the feature under test |
-| `tests/core/build/test_modify_data/modify_file_during_build/.buckconfig` | `test_modify.py` | `[kuro] materializations = deferred` | Deferred materializer knob; test exercises file-change detection during an active build |
+| `tests/core/configurations/test_target_incompatible_data/.buckconfig` | `test_target_incompatible.py` | `[slug] error_on_dep_only_incompatible = <targets>` | Knob controls incompatible-target error behaviour; sets a multi-line target list that the test verifies causes specific errors; not yet a CLI flag |
+| `tests/core/cycle_detection/test_cycle_detection_data/.buckconfig` | `test_cycle_detection.py` | `[build] lazy_cycle_detector = true`, `[slug] detect_cycles = disabled` | Two non-standard knobs: `lazy_cycle_detector` is a `[build]` key not in standard Bazel; `detect_cycles = disabled` is a `[slug]` knob; test exercises cycle detection behaviour variants |
+| `tests/core/digest/test_digest_data/.buckconfig` | `test_digest.py` | `[slug] digest_algorithms = BLAKE3-KEYED,SHA1` | `digest_algorithms` selects hash algorithm; not yet a CLI flag; test specifically validates BLAKE3-KEYED digest behaviour |
+| `tests/core/errors/test_errors_data/.buckconfig` | `test_errors.py` | `[slug] allow_eden_io = false`, `[project] ignore = package_listing/*red/**` | `allow_eden_io` is a `[slug]` knob; `project.ignore` with a regex glob pattern is not MODULE.bazel `.bazelignore` syntax (`.bazelignore` uses simple prefixes, not glob patterns with `/`) |
+| `tests/core/executor/test_content_based_paths_data/.buckconfig` | `test_content_based_paths.py` | `[slug] create_unhashed_links = true` | Same `create_unhashed_links` knob as test\_unhashed\_outputs; but this test is NOT bucket A because it tests executor content-based paths, not the unhashed-outputs feature itself — the knob is incidental scaffolding |
+| `tests/core/executor/test_dep_files_data/dep_files/.buckconfig` | `test_dep_files.py` | `[slug] materializations = deferred` | Deferred materializer knob |
+| `tests/core/executor/test_dep_files_data/invalid_dep_files/.buckconfig` | `test_dep_files.py` | `[slug] materializations = deferred` | Same |
+| `tests/core/executor/test_dep_files_data/mismatched_outputs_dep_files/.buckconfig` | `test_dep_files.py` | `[slug] materializations=deferred`, `[slug] hash_all_commands=true` | Two `[slug]` knobs |
+| `tests/core/executor/test_hash_all_commands_data/.buckconfig` | `test_hash_all_commands.py` | `[slug] materializations=deferred`, `hash_all_commands=true`, `declare_match_in_depfiles=true`, `declare_in_local_executor=true` | Four `[slug]` knobs related to dep-file hashing behaviour; test exercises hash\_all\_commands feature |
+| `tests/core/interpreter/test_relative_paths_data/.buckconfig` | `test_relative_paths.py` | `[slug] directories_to_allow_relative_paths = //foo` | Knob controls which directories permit relative-path imports; not yet a CLI flag |
+| `tests/core/invocation_record/test_build_count_data/.buckconfig` | `test_build_count.py` | `[slug] file_watcher = edenfs`, `[project] watchman_merge_base = main` | `file_watcher` and `watchman_merge_base` are io-subsystem knobs; this test is not in collect\_ignore (it records build counts, not Eden-specific behaviour), but these knobs are not yet CLI flags |
+| `tests/core/invocation_record/test_invocation_record_data/.buckconfig` | `test_invocation_record.py` | `[slug] materializations = deferred` | Deferred materializer knob |
+| `tests/core/materializer/test_clean_stale_bxl_data/.buckconfig` | `test_clean_stale_bxl.py` | `[slug] materializations=deferred`, `enable_local_caching_of_re_artifacts`, `sqlite_materializer_state*`, `defer_write_actions` | RE/materializer cluster knobs |
+| `tests/core/materializer/test_clean_stale_data/.buckconfig` | `test_clean_stale.py` | `[slug]` full RE cluster + `update_access_times = full` | `update_access_times` is an additional knob not yet in CLI |
+| `tests/core/materializer/test_materializer_data/deferred_materializer_matching_artifact_optimization/.buckconfig` | `test_materializer.py` | `[slug] materializations=deferred`, RE cluster (4 knobs) | Materializer RE knobs |
+| `tests/core/materializer/test_materializer_data/modify_deferred_materialization/.buckconfig` | `test_materializer.py` | `[slug] materializations = deferred` | Deferred materializer knob |
+| `tests/core/materializer/test_materializer_data/modify_deferred_materialization_deps/.buckconfig` | `test_materializer.py` | `[slug] materializations = deferred` | Deferred materializer knob |
+| `tests/core/materializer/test_symlink_local_remote_bug_data/.buckconfig` | `test_symlink_local_remote_bug.py` | `[slug] materializations = deferred` | Deferred materializer knob |
+| `tests/core/materializer/test_symlink_to_parent_bug_data/.buckconfig` | `test_symlink_to_parent_bug.py` | `[slug] materializations = deferred` | Deferred materializer knob |
+| `tests/core/restart/test_restart_data/.buckconfig` | `test_restart.py` | `[slug] materializations=deferred`, `sqlite_materializer_state*`, `restarter=true` | Three `[slug]` knobs; `restarter=true` is an active restart-on-state-change knob not yet a CLI flag |
+| `tests/core/test/test_content_based_paths_data/.buckconfig` | `test_content_based_paths.py` | `[slug] create_unhashed_links = true` | Same as executor/test\_content\_based\_paths; knob is incidental scaffolding, not the feature under test |
+| `tests/core/build/test_modify_data/modify_file_during_build/.buckconfig` | `test_modify.py` | `[slug] materializations = deferred` | Deferred materializer knob; test exercises file-change detection during an active build |
 
 ---
 
@@ -529,7 +529,7 @@ All `(section, key)` pairs across all 358 fixtures, descending by count.
 | 6 | `[build]` | `execution_platforms` | Execution platform target label |
 | 6 | `[cell_aliases]` | `config` | Config cell alias |
 | 6 | `[cell_aliases]` | `buck` | Buck cell alias |
-| 5 | `[kuro]` | `materializations` | Deferred/eager materializer mode |
+| 5 | `[slug]` | `materializations` | Deferred/eager materializer mode |
 | 5 | `[repositories]` | `buck` | Legacy buck cell |
 | 5 | `[project]` | `package_boundary_exceptions` | Package boundary override |
 | 4 | `[repositories]` | `nano_prelude` | Legacy nano\_prelude cell |
@@ -544,35 +544,35 @@ All `(section, key)` pairs across all 358 fixtures, descending by count.
 | 3 | `[cells]` | `fbcode` | Modern fbcode cell |
 | 3 | `[cells]` | `config` | Modern config cell |
 | 3 | `[cells]` | `buck` | Modern buck cell |
-| 2 | `[kuro]` | `sqlite_materializer_state_version` | Materializer SQLite state version |
-| 2 | `[kuro]` | `sqlite_materializer_state` | Materializer SQLite state toggle |
-| 2 | `[kuro]` | `enable_local_caching_of_re_artifacts` | Local RE artifact cache |
-| 2 | `[kuro]` | `defer_write_actions` | Defer write actions in materializer |
-| 2 | `[kuro]` | `check_starlark_peak_memory` | Peak memory tracking (bucket A only) |
-| 2 | `[kuro]` | `allow_eden_io` | Eden IO permission toggle |
+| 2 | `[slug]` | `sqlite_materializer_state_version` | Materializer SQLite state version |
+| 2 | `[slug]` | `sqlite_materializer_state` | Materializer SQLite state toggle |
+| 2 | `[slug]` | `enable_local_caching_of_re_artifacts` | Local RE artifact cache |
+| 2 | `[slug]` | `defer_write_actions` | Defer write actions in materializer |
+| 2 | `[slug]` | `check_starlark_peak_memory` | Peak memory tracking (bucket A only) |
+| 2 | `[slug]` | `allow_eden_io` | Eden IO permission toggle |
 | 2 | `[cells]` | `special` | Special cell |
 | 2 | `[cells]` | `local_lib` | Local library cell |
 | 2 | `[cells]` | `lib_b` | Library B cell |
 | 2 | `[cells]` | `lib_a` | Library A cell |
-| 1 | `[kuro]` | `dice` | DICE mode (modern vs legacy) |
-| 1 | `[kuro]` | `file_watcher` | File watcher backend (edenfs/watchman/notify/fs\_hash\_crawler) |
-| 1 | `[kuro]` | `starlark_max_callstack_size` | Max callstack depth (bucket A — retiring) |
-| 1 | `[kuro]` | `create_unhashed_links` | Unhashed symlink creation |
-| 1 | `[kuro]` | `error_on_dep_only_incompatible` | Error on dep-only incompatible targets |
-| 1 | `[kuro]` | `detect_cycles` | Cycle detection mode |
-| 1 | `[kuro]` | `digest_algorithms` | Hash algorithm selection (BLAKE3-KEYED,SHA1) |
-| 1 | `[kuro]` | `directories_to_allow_relative_paths` | Allow relative .bzl imports in dirs |
-| 1 | `[kuro]` | `hash_all_commands` | Hash all action commands for dep files |
-| 1 | `[kuro]` | `declare_match_in_depfiles` | Dep file declaration matching |
-| 1 | `[kuro]` | `declare_in_local_executor` | Dep file declaration in local executor |
-| 1 | `[kuro]` | `restarter` | Restart daemon on state change |
-| 1 | `[kuro]` | `update_access_times` | Access time update mode |
+| 1 | `[slug]` | `dice` | DICE mode (modern vs legacy) |
+| 1 | `[slug]` | `file_watcher` | File watcher backend (edenfs/watchman/notify/fs\_hash\_crawler) |
+| 1 | `[slug]` | `starlark_max_callstack_size` | Max callstack depth (bucket A — retiring) |
+| 1 | `[slug]` | `create_unhashed_links` | Unhashed symlink creation |
+| 1 | `[slug]` | `error_on_dep_only_incompatible` | Error on dep-only incompatible targets |
+| 1 | `[slug]` | `detect_cycles` | Cycle detection mode |
+| 1 | `[slug]` | `digest_algorithms` | Hash algorithm selection (BLAKE3-KEYED,SHA1) |
+| 1 | `[slug]` | `directories_to_allow_relative_paths` | Allow relative .bzl imports in dirs |
+| 1 | `[slug]` | `hash_all_commands` | Hash all action commands for dep files |
+| 1 | `[slug]` | `declare_match_in_depfiles` | Dep file declaration matching |
+| 1 | `[slug]` | `declare_in_local_executor` | Dep file declaration in local executor |
+| 1 | `[slug]` | `restarter` | Restart daemon on state change |
+| 1 | `[slug]` | `update_access_times` | Access time update mode |
 | 1 | `[build]` | `lazy_cycle_detector` | Lazy cycle detection (not standard Bazel) |
 | 1 | `[build]` | `threads` | Thread count (resource\_control, bucket A) |
-| 1 | `[kuro_resource_control]` | `status` | Resource control status |
-| 1 | `[kuro_resource_control]` | `enable_suspension` | Cgroup suspension |
-| 1 | `[kuro_resource_control]` | `memory_high_action_cgroup_pool` | Cgroup memory high limit |
-| 1 | `[kuro_resource_control]` | `enable_action_cgroup_pool_v2` | Action cgroup pool v2 |
+| 1 | `[slug_resource_control]` | `status` | Resource control status |
+| 1 | `[slug_resource_control]` | `enable_suspension` | Cgroup suspension |
+| 1 | `[slug_resource_control]` | `memory_high_action_cgroup_pool` | Cgroup memory high limit |
+| 1 | `[slug_resource_control]` | `enable_action_cgroup_pool_v2` | Action cgroup pool v2 |
 | 1 | `[deprecated_config]` | `some.config1` | Deprecated config deprecation notice (bucket A) |
 | 1 | `[deprecated_config]` | `other.config1` | Deprecated config deprecation notice (bucket A) |
 | 1 | `[deprecated_config]` | `other.config2` | Same, subcell (bucket A) |

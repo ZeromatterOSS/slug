@@ -1,0 +1,82 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use dice::DiceComputations;
+use either::Either;
+use futures::FutureExt;
+use gazebo::prelude::*;
+use slug_build_api::analysis::calculation::RuleAnalysisCalculation;
+use slug_core::configuration::compatibility::IncompatiblePlatformReason;
+use slug_core::configuration::compatibility::MaybeCompatible;
+use slug_core::provider::label::ConfiguredProvidersLabel;
+
+use crate::bxl::starlark_defs::analysis_result::StarlarkAnalysisResult;
+use crate::bxl::starlark_defs::context::BxlContext;
+use crate::bxl::starlark_defs::context::ErrorPrinter;
+use crate::bxl::starlark_defs::providers_expr::ProvidersExpr;
+
+pub(crate) async fn analysis<'v>(
+    dice: &mut DiceComputations<'_>,
+    ctx: &BxlContext<'v>,
+    expr: ProvidersExpr<ConfiguredProvidersLabel>,
+    skip_incompatible: bool,
+) -> slug_error::Result<
+    Either<Option<StarlarkAnalysisResult>, Vec<(ConfiguredProvidersLabel, StarlarkAnalysisResult)>>,
+> {
+    let analysis = dice
+        .compute_join(expr.labels(), |dice, label| {
+            async move {
+                let maybe_result = dice.get_analysis_result(label.target()).await?;
+                slug_error::Ok((label, maybe_result))
+            }
+            .boxed()
+        })
+        .await
+        .into_iter()
+        .map(|res| {
+            let (label, maybe_result) = res?;
+            match maybe_result {
+                MaybeCompatible::Incompatible(reason) => {
+                    if skip_incompatible {
+                        ctx.print_to_error_stream(IncompatiblePlatformReason::skipping_message(
+                            &reason,
+                            label.target(),
+                        ))?;
+                        Ok(None)
+                    } else {
+                        Err(reason.to_err())
+                    }
+                }
+                MaybeCompatible::Compatible(result) => Ok(Some((
+                    label.clone(),
+                    StarlarkAnalysisResult::new(result, label.clone())?,
+                ))),
+            }
+        })
+        .filter_map(|r| match r {
+            Ok(r) => r.map(Ok),
+            Err(e) => Some(Err(e)),
+        })
+        .collect::<slug_error::Result<Vec<_>>>()?;
+
+    match expr {
+        ProvidersExpr::Literal(_) => {
+            if analysis.is_empty() {
+                // If empty, then it is because we skipped an incompatible target
+                Ok(Either::Left(None))
+            } else {
+                Ok(Either::Left(Some(
+                    analysis.into_iter().into_singleton().unwrap().1,
+                )))
+            }
+        }
+        ProvidersExpr::Iterable(_) => Ok(Either::Right(analysis)),
+    }
+}

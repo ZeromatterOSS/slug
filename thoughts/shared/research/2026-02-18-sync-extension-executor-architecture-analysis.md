@@ -3,7 +3,7 @@ date: 2026-02-18T19:43:25-08:00
 researcher: wgray
 git_commit: 71c5e7af83dccfb2f14669ea16ca86ffcdf93bbf
 branch: stable-rust-migration
-repository: kuro
+repository: slug
 topic: "Compare sync_extension_executor to Bazel's .bzl loading, Buck2's repository_rules equivalent, identify inconsistencies, and analyze alternatives"
 tags: [research, codebase, bzlmod, sync-extension-executor, bazel-comparison, buck2-comparison, architecture]
 status: complete
@@ -17,7 +17,7 @@ last_updated_by: wgray
 **Researcher**: wgray
 **Git Commit**: 71c5e7af83dccfb2f14669ea16ca86ffcdf93bbf
 **Branch**: stable-rust-migration
-**Repository**: kuro
+**Repository**: slug
 
 ## Research Question
 
@@ -25,9 +25,9 @@ Compare the `sync_extension_executor`'s implementation to Bazel's .bzl file load
 
 ## Summary
 
-Kuro's `SyncExtensionExecutor` exists to solve a **bootstrapping problem**: cell aliases from `use_repo()` must be registered before DICE starts, but module extension execution normally requires DICE to load `.bzl` files. This creates a chicken-and-egg situation that Bazel solves entirely differently: through **deterministic pre-computed canonical names** and a **lockfile cache** within its Skyframe DAG. Buck2 has **no equivalent to bzlmod or repository_rule()** at all—its cell system is static, declared in `.buckconfig` files.
+Slug's `SyncExtensionExecutor` exists to solve a **bootstrapping problem**: cell aliases from `use_repo()` must be registered before DICE starts, but module extension execution normally requires DICE to load `.bzl` files. This creates a chicken-and-egg situation that Bazel solves entirely differently: through **deterministic pre-computed canonical names** and a **lockfile cache** within its Skyframe DAG. Buck2 has **no equivalent to bzlmod or repository_rule()** at all—its cell system is static, declared in `.buckconfig` files.
 
-The key architectural inconsistency is that Kuro's sync executor is a **parallel Starlark evaluation environment** with a subset of globals, separate path resolution, no cell awareness, and a `Mutex<HashMap>` module cache—diverging from the normal DICE-backed path in multiple dimensions. This approach works for root-project extensions but will fail for any extension that `load()`s from an external cell.
+The key architectural inconsistency is that Slug's sync executor is a **parallel Starlark evaluation environment** with a subset of globals, separate path resolution, no cell awareness, and a `Mutex<HashMap>` module cache—diverging from the normal DICE-backed path in multiple dimensions. This approach works for root-project extensions but will fail for any extension that `load()`s from an external cell.
 
 ---
 
@@ -83,7 +83,7 @@ When a `repository_rule()` is invoked from a module extension:
 
 Buck2 has **no equivalent** to Bazel's bzlmod, MODULE.bazel, WORKSPACE, `repository_rule()`, or module extensions.
 
-| Feature | Bazel | Buck2 | Kuro |
+| Feature | Bazel | Buck2 | Slug |
 |---|---|---|---|
 | External dep declaration | `MODULE.bazel` + `bazel_dep()` | `.buckconfig [cells]` | `MODULE.bazel` (added) |
 | Custom fetch logic | `repository_rule()` in Starlark | None | `repository_rule()` (added) |
@@ -110,9 +110,9 @@ No chicken-and-egg problem because cell names are always statically known.
 
 ---
 
-### 3. Kuro's Four .bzl Loading Paths
+### 3. Slug's Four .bzl Loading Paths
 
-Kuro has **four** distinct mechanisms for loading and evaluating `.bzl` files, each with different capabilities:
+Slug has **four** distinct mechanisms for loading and evaluating `.bzl` files, each with different capabilities:
 
 #### Path 1: Normal DICE-Based Loading (BUILD files, regular .bzl)
 
@@ -226,7 +226,7 @@ Bazel's architecture avoids a sync executor because:
 
 4. **The lockfile provides a fast path**: On subsequent builds, `SingleExtensionEvalFunction` short-circuits using cached `generatedRepoSpecs` without loading any `.bzl` files.
 
-The critical difference: Bazel **does not need repo names before Skyframe starts** because Skyframe can lazily compute them. Kuro needs repo names before DICE starts because Buck2's cell system was designed around static `.buckconfig` declarations.
+The critical difference: Bazel **does not need repo names before Skyframe starts** because Skyframe can lazily compute them. Slug needs repo names before DICE starts because Buck2's cell system was designed around static `.buckconfig` declarations.
 
 ---
 
@@ -256,7 +256,7 @@ Keep the sync executor but add the missing globals and improve load resolution:
 
 - Add all stdlib extensions (`Json`, `Map`, `Filter`, etc.) to `build_extension_globals()`
 - Add `select()`, `host_info()`, `struct()`, etc.
-- Add support for `@cell//...` loads by reading already-fetched external cells from `bazel-external/` or `~/.cache/kuro/registry/`
+- Add support for `@cell//...` loads by reading already-fetched external cells from `bazel-external/` or `~/.cache/slug/registry/`
 
 **Trade-off**: Creates and maintains two parallel Starlark environments. Every new global added to the normal path must also be added to the sync path. This is the current trajectory and has scaling concerns.
 
@@ -274,7 +274,7 @@ Keep the sync executor but add the missing globals and improve load resolution:
 
 ## Architecture Documentation
 
-### Current Kuro Extension Execution Pipeline
+### Current Slug Extension Execution Pipeline
 
 ```
 MODULE.bazel parsed
@@ -354,22 +354,22 @@ RepositoryDelegatorFunction: Lazy repo materialization
 
 ## Code References
 
-- `app/kuro_interpreter_for_build/src/sync_extension_executor_impl.rs` — Sync executor with `DiskFileLoader`
-- `app/kuro_bzlmod/src/sync_extension_executor.rs` — `SyncExtensionExecutorImpl` trait + `LateBinding`
-- `app/kuro_common/src/legacy_configs/cells.rs:1618` — `try_execute_extension_sync()` call site
-- `app/kuro_common/src/legacy_configs/cells.rs:1125` — `resolve_extension_repos_from_lockfile()`
-- `app/kuro_interpreter_for_build/src/module_extension_executor_impl.rs` — DICE-based async executor
-- `app/kuro_interpreter_for_build/src/starlark_repo_rule_executor_impl.rs` — DICE-based repo rule executor
-- `app/kuro_bzlmod/src/repository_execution.rs` — `ExtensionRepoExecutionKey::compute()`
-- `app/kuro_bzlmod/src/repo_spec.rs:126` — `CURRENT_BZL_CONTEXT` thread-local
-- `app/kuro_interpreter_for_build/src/interpreter/global_interpreter_state.rs:49` — Normal path globals
-- `app/kuro_interpreter_for_build/src/interpreter/calculation.rs:172` — DICE-based module loading
+- `app/slug_interpreter_for_build/src/sync_extension_executor_impl.rs` — Sync executor with `DiskFileLoader`
+- `app/slug_bzlmod/src/sync_extension_executor.rs` — `SyncExtensionExecutorImpl` trait + `LateBinding`
+- `app/slug_common/src/legacy_configs/cells.rs:1618` — `try_execute_extension_sync()` call site
+- `app/slug_common/src/legacy_configs/cells.rs:1125` — `resolve_extension_repos_from_lockfile()`
+- `app/slug_interpreter_for_build/src/module_extension_executor_impl.rs` — DICE-based async executor
+- `app/slug_interpreter_for_build/src/starlark_repo_rule_executor_impl.rs` — DICE-based repo rule executor
+- `app/slug_bzlmod/src/repository_execution.rs` — `ExtensionRepoExecutionKey::compute()`
+- `app/slug_bzlmod/src/repo_spec.rs:126` — `CURRENT_BZL_CONTEXT` thread-local
+- `app/slug_interpreter_for_build/src/interpreter/global_interpreter_state.rs:49` — Normal path globals
+- `app/slug_interpreter_for_build/src/interpreter/calculation.rs:172` — DICE-based module loading
 
 ## Historical Context (from thoughts/)
 
-- `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod-phase-5e.md` — Original deferred execution model design. Documented the `module_ctx` vs `repository_ctx` lifecycle difference. The sync executor was NOT part of the original design — it was added later to handle the first-build lockfile-miss case.
-- `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod-phase-5b.md` — Cell system integration design, where the `CellResolver` injection happens before DICE.
-- `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod-phase-5d.md` — DICE key design for repository execution.
+- `thoughts/shared/plans/slug-bazel-subplans/02-bzlmod-phase-5e.md` — Original deferred execution model design. Documented the `module_ctx` vs `repository_ctx` lifecycle difference. The sync executor was NOT part of the original design — it was added later to handle the first-build lockfile-miss case.
+- `thoughts/shared/plans/slug-bazel-subplans/02-bzlmod-phase-5b.md` — Cell system integration design, where the `CellResolver` injection happens before DICE.
+- `thoughts/shared/plans/slug-bazel-subplans/02-bzlmod-phase-5d.md` — DICE key design for repository execution.
 - `thoughts/shared/research/2026-01-29-dice-incremental-computation-engine.md` — DICE architecture including `InjectedKey` bootstrapping.
 - `thoughts/shared/research/2026-01-30-legacy-configs-naming-rationale.md` — Why cells.rs is in "legacy_configs" and its pre-DICE role.
 
@@ -384,7 +384,7 @@ RepositoryDelegatorFunction: Lazy repo materialization
 
 ## Open Questions
 
-1. **Should Kuro adopt Bazel's pre-computed canonical naming?** This would let us register placeholder cells from `use_repo()` declarations alone, eliminating the need for sync execution entirely. Requires that `use_repo()` names match what extensions generate (Bazel enforces this via `SingleExtensionFunction` validation).
+1. **Should Slug adopt Bazel's pre-computed canonical naming?** This would let us register placeholder cells from `use_repo()` declarations alone, eliminating the need for sync execution entirely. Requires that `use_repo()` names match what extensions generate (Bazel enforces this via `SingleExtensionFunction` validation).
 
 2. **Can the `CellResolver` be updated inside DICE?** Buck2's `CellResolverKey` is an `InjectedKey` that can be updated via `changed_to()`. If extension execution happens inside DICE and updates the resolver, downstream nodes would be invalidated and recomputed. Is this practical with DICE's invalidation model?
 

@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use slug_cli_proto::new_generic::MaterializeRequest;
+use slug_cli_proto::new_generic::MaterializeResponse;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_error::BuckErrorContext;
+use slug_events::dispatch::span_async;
+use slug_server_ctx::commands::command_end;
+use slug_server_ctx::ctx::ServerCommandContextTrait;
+
+use crate::ctx::BaseServerCommandContext;
+use crate::ctx::ServerCommandContext;
+
+pub(crate) async fn materialize_command(
+    context: &ServerCommandContext<'_>,
+    req: MaterializeRequest,
+) -> slug_error::Result<MaterializeResponse> {
+    let start_event = context
+        .command_start_event(slug_data::MaterializeCommandStart {}.into())
+        .await?;
+    span_async(start_event, async move {
+        let result = materialize(&context.base_context, req.paths)
+            .await
+            .map(|()| MaterializeResponse {})
+            .buck_error_context("Failed to materialize paths")
+            .map_err(Into::into);
+        let end_event = command_end(&result, slug_data::MaterializeCommandEnd {});
+        (result.map_err(Into::into), end_event)
+    })
+    .await
+}
+
+async fn materialize(
+    server_ctx: &BaseServerCommandContext,
+    paths: Vec<String>,
+) -> slug_error::Result<()> {
+    let mut project_paths = Vec::new();
+    for path in paths {
+        project_paths.push(ProjectRelativePath::new(&path)?.to_owned())
+    }
+    server_ctx
+        .daemon
+        .materializer
+        .ensure_materialized(project_paths)
+        .await
+}

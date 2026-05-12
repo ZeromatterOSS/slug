@@ -1,0 +1,18 @@
+[package]
+description = "common utitilies of slug profile"
+edition = "2024"
+license = { workspace = true }
+name = "slug_profile"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+inferno = { workspace = true }
+
+starlark = { workspace = true }
+
+slug_cli_proto = { workspace = true }
+slug_core = { workspace = true }
+slug_error = { workspace = true }
+slug_fs = { workspace = true }
+slug_interpreter = { workspace = true }

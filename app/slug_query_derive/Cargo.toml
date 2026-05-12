@@ -1,0 +1,18 @@
+[package]
+authors = ["Facebook"]
+description = "Proc macros for Buck's buck_query crate"
+edition = "2024"
+license = { workspace = true }
+name = "slug_query_derive"
+repository = { workspace = true }
+version = "0.4.1"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+itertools = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+textwrap = { workspace = true }

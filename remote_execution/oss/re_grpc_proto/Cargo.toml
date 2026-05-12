@@ -12,7 +12,7 @@ prost-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tonic = { workspace = true }
 
-kuro_data = { workspace = true }
+slug_data = { workspace = true }
 
 [build-dependencies]
-kuro_protoc_dev = { workspace = true }
+slug_protoc_dev = { workspace = true }

@@ -20,8 +20,8 @@ jobs:
     - name: Build the 'example/with_prelude' project
       run: |-
         cd examples/with_prelude
-        $RUNNER_TEMP/artifacts/kuro build //... -v 2
-        $RUNNER_TEMP/artifacts/kuro test //... -v 2
+        $RUNNER_TEMP/artifacts/slug build //... -v 2
+        $RUNNER_TEMP/artifacts/slug test //... -v 2
     - uses: ./.github/actions/build_example_no_prelude
     - uses: ./.github/actions/build_example_toolchain
       with:
@@ -50,8 +50,8 @@ jobs:
     - name: Build the 'example/with_prelude' project
       run: |-
         cd examples/with_prelude
-        $RUNNER_TEMP/artifacts/kuro build //... -v 2
-        $RUNNER_TEMP/artifacts/kuro test //... -v 2
+        $RUNNER_TEMP/artifacts/slug build //... -v 2
+        $RUNNER_TEMP/artifacts/slug test //... -v 2
     - uses: ./.github/actions/build_example_conan
     - uses: ./.github/actions/build_example_no_prelude
     - uses: ./.github/actions/build_example_toolchain
@@ -81,8 +81,8 @@ jobs:
       - name: Build example/prelude directory
         run: |-
           cd examples/with_prelude
-          & $Env:RUNNER_TEMP/artifacts/kuro build //... -v 2
-          & $Env:RUNNER_TEMP/artifacts/kuro test //... -v 2
+          & $Env:RUNNER_TEMP/artifacts/slug build //... -v 2
+          & $Env:RUNNER_TEMP/artifacts/slug test //... -v 2
       - uses: ./.github/actions/build_example_no_prelude
       - uses: ./.github/actions/build_example_toolchain
         with:

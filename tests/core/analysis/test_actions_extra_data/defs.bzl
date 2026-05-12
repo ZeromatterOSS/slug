@@ -15,7 +15,7 @@ write_json_dict_rule = rule(
 )
 
 def _write_json_struct_impl(ctx):
-    data = struct(name = "kuro", version = 1, active = True)
+    data = struct(name = "slug", version = 1, active = True)
     out = ctx.actions.declare_file("struct.json")
     ctx.actions.write_json(out, data)
     return [DefaultInfo(default_outputs = [out])]

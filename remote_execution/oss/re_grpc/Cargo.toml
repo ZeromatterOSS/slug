@@ -30,8 +30,8 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 zstd = { workspace = true }
 
-kuro_re_configuration = { workspace = true }
-kuro_util = { workspace = true }
+slug_re_configuration = { workspace = true }
+slug_util = { workspace = true }
 re_grpc_proto = { path = "../re_grpc_proto" }
 
 [dev-dependencies]

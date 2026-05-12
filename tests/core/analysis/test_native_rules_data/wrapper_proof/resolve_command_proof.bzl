@@ -1,6 +1,6 @@
 # Plan 28.4 Stage 12 acceptance fixture for `ctx.resolve_command`.
-# The Rust impl was deleted; `_kuro_resolve_command` in
-# `@kuro_builtins//:exports.bzl` (bound as `_resolve_command_bound`
+# The Rust impl was deleted; `_slug_resolve_command` in
+# `@slug_builtins//:exports.bzl` (bound as `_resolve_command_bound`
 # inside `_make_rule_facade`) now serves the call.
 #
 # The probe uses two deps to verify input collection from both `tools`

@@ -6,7 +6,7 @@ title: Dynamic Dependencies
 import { FbInternalOnly } from 'docusaurus-plugin-internaldocs-fb/internal';
 
 Dynamic dependencies allow a rule to use information that was not available when
-the rule was first run at analysis time. Dynamic dependencies in Kuro are
+the rule was first run at analysis time. Dynamic dependencies in Slug are
 implemented using `dynamic_output` and are restricted in their power compared to
 fully generic dynamic dependencies.
 
@@ -37,7 +37,7 @@ The original design document with discussion is available
 
 ## Implementation
 
-Kuro provides the following function:
+Slug provides the following function:
 
 ```python
 ctx.actions.dynamic_output(dynamic, inputs, outputs, lambda ctx: …)
@@ -52,7 +52,7 @@ The arguments are:
   - These inputs must include all the inputs that are referenced by the body of
     the function argument, apart from those listed in `dynamic` and `outputs`:
     extra inputs may be passed that are not used.
-  - The inputs are used for `kuro aquery` functionality, but do not cause
+  - The inputs are used for `slug aquery` functionality, but do not cause
     speculative building. In fact, these inputs may form a cycle with other
     `dynamic_output` actions if they were all required.
   - In the future, it may be possible to not pass all the inputs if the repo is

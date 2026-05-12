@@ -352,7 +352,7 @@ async def test_build_offline(buck: Buck) -> None:
     out = await read_what_ran(buck)
 
     executors = {line["identity"]: line["reproducer"]["executor"] for line in out}
-    # Kuro auto-generates action identifiers from the first output path when
+    # Slug auto-generates action identifiers from the first output path when
     # no explicit identifier is provided, so actions show "(head)" / "(cp)"
     expected = {
         "root//executor_threshold_tests:big (<unspecified>) (head)": "Local",

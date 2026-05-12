@@ -1,0 +1,156 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+//! Contains the internal support within the attribute framework for `select()`.
+
+use slug_error::BuckErrorContext;
+use slug_error::internal_error;
+use slug_node::attrs::attr_type::AttrType;
+use slug_node::attrs::coerced_attr::CoercedAttr;
+use slug_node::attrs::coerced_attr::CoercedConcat;
+use slug_node::attrs::coerced_attr::CoercedSelector;
+use slug_node::attrs::coercion_context::AttrCoercionContext;
+use slug_node::attrs::configurable::AttrIsConfigurable;
+use slug_node::configuration::resolved::ConfigurationSettingKey;
+use starlark::values::Value;
+use starlark::values::dict::DictRef;
+
+use crate::attrs::coerce::attr_type::AttrTypeExt;
+use crate::interpreter::selector::StarlarkSelector;
+use crate::interpreter::selector::StarlarkSelectorGen;
+
+#[derive(slug_error::Error, Debug)]
+#[slug(input)]
+enum SelectError {
+    #[error("select() condition was not a string, got `{0}`.")]
+    KeyNotString(String),
+    #[error("select() value was not a dict, got `{0}`.")]
+    ValueNotDict(String),
+    #[error("addition not supported for this attribute type `{0}`, got `{1}`.")]
+    ConcatNotSupported(String, String),
+    #[error("select() cannot be used in non-configurable attribute")]
+    SelectCannotBeUsedForNonConfigurableAttr,
+}
+
+pub trait CoercedAttrExr: Sized {
+    fn coerce(
+        attr: &AttrType,
+        configurable: AttrIsConfigurable,
+        ctx: &dyn AttrCoercionContext,
+        value: Value,
+        default_attr: Option<&Self>,
+    ) -> slug_error::Result<Self>;
+}
+
+impl CoercedAttrExr for CoercedAttr {
+    fn coerce(
+        attr: &AttrType,
+        configurable: AttrIsConfigurable,
+        ctx: &dyn AttrCoercionContext,
+        value: Value,
+        default_attr: Option<&Self>,
+    ) -> slug_error::Result<Self> {
+        // A Selector in starlark is currently implemented as simply a Value (holding a
+        // dict if valid).
+        //
+        // TODO(cjhopman): the select() function itself should
+        // perform the conversion of its case arguments to configuration labels.
+        //
+        // TODO(cjhopman): Selectable addition (__ladd__ and __radd__) should perform
+        // verification that the two sides of the addition have the same type.
+        // Even if it did, we still need to verify that the two sides
+        // are actually compatible (i.e. selectable can ensure that both sides are
+        // lists, we can ensure that  both sides are List<T>)
+        if let Some(selector) = StarlarkSelector::from_value(value) {
+            if let AttrIsConfigurable::No = configurable {
+                return Err(SelectError::SelectCannotBeUsedForNonConfigurableAttr.into());
+            }
+
+            match *selector {
+                StarlarkSelectorGen::Primary(v, ref no_match_error) => {
+                    if let Some(dict) = DictRef::from_value(v.get()) {
+                        let has_default = dict.get_str("DEFAULT").is_some()
+                            || dict.get_str("//conditions:default").is_some();
+                        let mut entries =
+                            Vec::with_capacity(dict.len().saturating_sub(has_default as usize));
+
+                        let mut default = None;
+                        for (k, v) in dict.iter() {
+                            // Accept both string keys and Label() objects as select() keys.
+                            // BazelLabel objects (type "Label") display as the full label string.
+                            let k_buf;
+                            let k = if let Some(s) = k.unpack_str() {
+                                s
+                            } else if k.get_type() == "Label" {
+                                k_buf = format!("{}", k);
+                                &k_buf
+                            } else {
+                                return Err(SelectError::KeyNotString(k.to_repr()).into());
+                            };
+                            let v = match default_attr {
+                                Some(default_attr) if v.is_none() => default_attr.clone(),
+                                _ => CoercedAttr::coerce(attr, configurable, ctx, v, default_attr)?,
+                            };
+                            if k == "DEFAULT" || k == "//conditions:default" {
+                                if default.is_some() {
+                                    return Err(internal_error!(
+                                        "duplicate `\"DEFAULT\"` key in `select()`"
+                                    ));
+                                }
+                                default = Some(v);
+                            } else {
+                                let label = ctx.coerce_providers_label(k)?;
+                                entries.push((ConfigurationSettingKey(label), v));
+                            }
+                        }
+
+                        assert_eq!(entries.capacity(), entries.len());
+
+                        Ok(CoercedAttr::Selector(Box::new(
+                            CoercedSelector::new_with_no_match_error(
+                                ctx.intern_select(entries),
+                                default,
+                                no_match_error.clone(),
+                            )?,
+                        )))
+                    } else {
+                        Err(SelectError::ValueNotDict(v.get().to_repr()).into())
+                    }
+                }
+                StarlarkSelectorGen::Sum(l, r) => {
+                    if !attr.supports_concat() {
+                        return Err(SelectError::ConcatNotSupported(
+                            attr.to_string(),
+                            format!("{l} + {r}"),
+                        )
+                        .into());
+                    }
+                    let l = CoercedAttr::coerce(attr, configurable, ctx, l, None)?;
+                    let mut l = match l {
+                        CoercedAttr::Concat(l) => l.0.into_vec(),
+                        l => vec![l],
+                    };
+                    let r = CoercedAttr::coerce(attr, configurable, ctx, r, None)?;
+                    let r = match r {
+                        CoercedAttr::Concat(r) => r.0.into_vec(),
+                        r => vec![r],
+                    };
+
+                    l.extend(r);
+                    Ok(CoercedAttr::Concat(CoercedConcat(l.into_boxed_slice())))
+                }
+            }
+        } else {
+            Ok(attr
+                .coerce_item(configurable, ctx, value)
+                .with_buck_error_context(|| format!("Error coercing {value}"))?)
+        }
+    }
+}

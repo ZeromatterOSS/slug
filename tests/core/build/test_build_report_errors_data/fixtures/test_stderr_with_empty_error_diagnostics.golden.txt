@@ -1,11 +1,11 @@
 # This file is @generated, regenerate by re-running test with `-- --env BUCK2_UPDATE_GOLDEN=1` appended to the test command
 
-[<TIMESTAMP>] Starting new kuro daemon...
-[<TIMESTAMP>] Connected to new kuro daemon.
+[<TIMESTAMP>] Starting new slug daemon...
+[<TIMESTAMP>] Connected to new slug daemon.
 [<TIMESTAMP>] Build ID: <UUID>
 [<TIMESTAMP>] Action failed: root//fail_action:fail_one_with_error_handler_no_op (<unspecified>) (fail_one_with_error_handler_no_op fail_one_with_error_handler_no_op)
 [<TIMESTAMP>] Local command returned non-zero exit code 1
-[<TIMESTAMP>] Local command: env --chdir="$(kuro root --kind project)" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_one_with_error_handler_no_op/fail_one_with_error_handler_no_op' false
+[<TIMESTAMP>] Local command: env --chdir="$(slug root --kind project)" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_one_with_error_handler_no_op/fail_one_with_error_handler_no_op' false
 [<TIMESTAMP>] Stdout: <empty>
 [<TIMESTAMP>] Stderr: <empty>
 
@@ -16,7 +16,7 @@
 [<TIMESTAMP>] The following actions failed during the execution of this command:
 [<TIMESTAMP>] Action failed: root//fail_action:fail_one_with_error_handler_no_op (<unspecified>) (fail_one_with_error_handler_no_op fail_one_with_error_handler_no_op)
 [<TIMESTAMP>] Local command returned non-zero exit code 1
-[<TIMESTAMP>] Local command: env --chdir="$(kuro root --kind project)" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_one_with_error_handler_no_op/fail_one_with_error_handler_no_op' false
+[<TIMESTAMP>] Local command: env --chdir="$(slug root --kind project)" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_one_with_error_handler_no_op/fail_one_with_error_handler_no_op' false
 [<TIMESTAMP>] Stdout: <empty>
 [<TIMESTAMP>] Stderr: <empty>
 

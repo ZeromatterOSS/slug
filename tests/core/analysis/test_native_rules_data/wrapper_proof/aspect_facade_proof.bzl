@@ -2,8 +2,8 @@
 # (Stage 3) but for the aspect dispatch path. Two checks fold into one
 # build:
 #
-#   1. Inside the aspect impl, `ctx.kuro_facade_active == True` and
-#      `ctx.kuro_facade_kind == "aspect"`. The kind disambiguator
+#   1. Inside the aspect impl, `ctx.slug_facade_active == True` and
+#      `ctx.slug_facade_kind == "aspect"`. The kind disambiguator
 #      proves the aspect-side wrapper (`_invoke_aspect`) ran rather
 #      than the rule-side wrapper.
 #
@@ -34,8 +34,8 @@ def _facade_aspect_impl(target, ctx):
         constraint_setting = "@platforms//os:os",
     )
     return [FacadeAspectInfo(
-        facade_active = getattr(ctx, "kuro_facade_active", False),
-        facade_kind = getattr(ctx, "kuro_facade_kind", ""),
+        facade_active = getattr(ctx, "slug_facade_active", False),
+        facade_kind = getattr(ctx, "slug_facade_kind", ""),
         matched_host = ctx.target_platform_has_constraint(matching),
         matched_non_host = ctx.target_platform_has_constraint(non_matching),
     )]
@@ -58,9 +58,9 @@ def _aspect_facade_collector_impl(ctx):
             fail("Plan 28.4 Stage 4: aspect did not run on dep %s" % d.label)
         info = d[FacadeAspectInfo]
         if not info.facade_active:
-            fail("Plan 28.4 Stage 4: ctx.kuro_facade_active missing inside aspect impl on %s" % d.label)
+            fail("Plan 28.4 Stage 4: ctx.slug_facade_active missing inside aspect impl on %s" % d.label)
         if info.facade_kind != "aspect":
-            fail("Plan 28.4 Stage 4: ctx.kuro_facade_kind = %r (want \"aspect\") on %s" % (info.facade_kind, d.label))
+            fail("Plan 28.4 Stage 4: ctx.slug_facade_kind = %r (want \"aspect\") on %s" % (info.facade_kind, d.label))
         if not info.matched_host:
             fail("Plan 28.4 Stage 4: aspect target_platform_has_constraint returned False for host OS %s" % _HOST_OS_LABEL)
         if info.matched_non_host:

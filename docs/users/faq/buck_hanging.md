@@ -1,26 +1,26 @@
 ---
 id: buck_hanging
-title: Why is Kuro hanging?
+title: Why is Slug hanging?
 ---
 
 import { FbInternalOnly, OssOnly } from
 'docusaurus-plugin-internaldocs-fb/internal';
 
-Let's look at how to troubleshoot when kuro hangs, i.e. it just sits there
+Let's look at how to troubleshoot when slug hangs, i.e. it just sits there
 saying "Jobs: In progress: 0, ..." but it’s not finishing...
 
-When kuro hangs, there are two possibilities: It’s either hanging doing
+When slug hangs, there are two possibilities: It’s either hanging doing
 _something_, or it’s hanging doing _nothing_. The first thing you should do is
 figure out which of those is happening. That’s because the tools to debug either
 of those are _very_ different! We will mainly focus on the first in this case.
 
-To figure out which hang you have on your hands, just look at how much CPU kuro
+To figure out which hang you have on your hands, just look at how much CPU slug
 is using when the hang occurs using your favorite activity monitor (e.g. `top`,
-`htop`). Remember that you can find the kuro daemon’s PID using `kuro status`.
+`htop`). Remember that you can find the slug daemon’s PID using `slug status`.
 Ideally, break the utilization down by threads (in top, that’s `top -Hp $PID`).
 
 If any thread is using 100% CPU for some period of time, then you probably have
-a busy hang (kuro is doing “something”) which are usually easier to debug.
+a busy hang (slug is doing “something”) which are usually easier to debug.
 
 ## How to debug a “busy” hang
 
@@ -43,29 +43,29 @@ this is exactly what a sampling profiler does, albeit at a higher frequency.
 ### Interpreting the stack trace
 
 Let's consider an example user report <FbInternalOnly>( see
-[here](https://fb.workplace.com/groups/kurousers/permalink/3232782826978076/))</FbInternalOnly>
+[here](https://fb.workplace.com/groups/slugusers/permalink/3232782826978076/))</FbInternalOnly>
 with the following stack trace:
 
 ```
-#01  0x0000000005b1ec26 in <kuro_build_api::artifact_groups::artifact_group_values::TransitiveSetIterator<kuro_build_api::artifact_groups::artifact_group_values::ArtifactGroupValues, (kuro_build_api::actions::artifact::Artifact, kuro_execute::artifact_value::ArtifactValue), kuro_build_api::artifact_groups::artifact_group_values::ArtifactValueIdentity> as core::iter::traits::iterator::Iterator>::next () from ...
-#02  0x0000000005b23998 in <kuro_build_api::artifact_groups::artifact_group_values::TransitiveSetIterator<kuro_build_api::artifact_groups::artifact_group_values::ArtifactGroupValues, (kuro_build_api::actions::artifact::Artifact, kuro_execute::artifact_value::ArtifactValue), kuro_build_api::artifact_groups::artifact_group_values::ArtifactValueIdentity> as itertools::Itertools>::exactly_one () from ...
-#03  0x00000000059dbb2c in kuro_server_commands::commands::build::create_unhashed_outputs () from ...
-#04  0x0000000005c3c677 in <core::future::from_generator::GenFuture<<kuro_server_commands::commands::build::BuildServerCommand as kuro_server_ctx::template::ServerCommandTemplate>::command::{closure#0}> as core::future::future::Future>::poll () from ...
-#05  0x00000000054c58a3 in <core::future::from_generator::GenFuture<<alloc::boxed::Box<dyn kuro_server_ctx::ctx::ServerCommandContextTrait> as kuro_server_ctx::ctx::ServerCommandDiceContext>::with_dice_ctx<kuro_server_ctx::template::run_server_command<kuro_server_commands::commands::build::BuildServerCommand>::{closure#0}::{closure#0}::{closure#0}, core::pin::Pin<alloc::boxed::Box<dyn core::future::future::Future<Output = core::result::Result<cli_proto::BuildResponse, anyhow::Error>> + core::marker::Send>>, cli_proto::BuildResponse>::{closure#0}> as core::future::future::Future>::poll () from ...
-#06  0x00000000054c7ae3 in <core::future::from_generator::GenFuture<kuro_server_ctx::template::run_server_command<kuro_server_commands::commands::build::BuildServerCommand>::{closure#0}::{closure#0}> as core::future::future::Future>::poll () from ...
-#07  0x0000000005370df8 in <kuro_events::dispatch::Span>::call_in_span::<core::task::poll::Poll<(core::result::Result<cli_proto::BuildResponse, anyhow::Error>, kuro_data::CommandEnd)>, <kuro_events::dispatch::EventDispatcher>::span_async<kuro_data::CommandStart, kuro_data::CommandEnd, core::future::from_generator::GenFuture<kuro_server_ctx::template::run_server_command<kuro_server_commands::commands::build::BuildServerCommand>::{closure#0}::{closure#0}>, core::result::Result<cli_proto::BuildResponse, anyhow::Error>>::{closure#0}::{closure#0}::{closure#0}> () from ...
-#08  0x00000000054f7288 in <core::future::from_generator::GenFuture<<cli::commands::daemon::BuckdServerDependenciesImpl as kuro_server::daemon::server::BuckdServerDependencies>::build::{closure#0}> as core::future::future::Future>::poll () from...
+#01  0x0000000005b1ec26 in <slug_build_api::artifact_groups::artifact_group_values::TransitiveSetIterator<slug_build_api::artifact_groups::artifact_group_values::ArtifactGroupValues, (slug_build_api::actions::artifact::Artifact, slug_execute::artifact_value::ArtifactValue), slug_build_api::artifact_groups::artifact_group_values::ArtifactValueIdentity> as core::iter::traits::iterator::Iterator>::next () from ...
+#02  0x0000000005b23998 in <slug_build_api::artifact_groups::artifact_group_values::TransitiveSetIterator<slug_build_api::artifact_groups::artifact_group_values::ArtifactGroupValues, (slug_build_api::actions::artifact::Artifact, slug_execute::artifact_value::ArtifactValue), slug_build_api::artifact_groups::artifact_group_values::ArtifactValueIdentity> as itertools::Itertools>::exactly_one () from ...
+#03  0x00000000059dbb2c in slug_server_commands::commands::build::create_unhashed_outputs () from ...
+#04  0x0000000005c3c677 in <core::future::from_generator::GenFuture<<slug_server_commands::commands::build::BuildServerCommand as slug_server_ctx::template::ServerCommandTemplate>::command::{closure#0}> as core::future::future::Future>::poll () from ...
+#05  0x00000000054c58a3 in <core::future::from_generator::GenFuture<<alloc::boxed::Box<dyn slug_server_ctx::ctx::ServerCommandContextTrait> as slug_server_ctx::ctx::ServerCommandDiceContext>::with_dice_ctx<slug_server_ctx::template::run_server_command<slug_server_commands::commands::build::BuildServerCommand>::{closure#0}::{closure#0}::{closure#0}, core::pin::Pin<alloc::boxed::Box<dyn core::future::future::Future<Output = core::result::Result<cli_proto::BuildResponse, anyhow::Error>> + core::marker::Send>>, cli_proto::BuildResponse>::{closure#0}> as core::future::future::Future>::poll () from ...
+#06  0x00000000054c7ae3 in <core::future::from_generator::GenFuture<slug_server_ctx::template::run_server_command<slug_server_commands::commands::build::BuildServerCommand>::{closure#0}::{closure#0}> as core::future::future::Future>::poll () from ...
+#07  0x0000000005370df8 in <slug_events::dispatch::Span>::call_in_span::<core::task::poll::Poll<(core::result::Result<cli_proto::BuildResponse, anyhow::Error>, slug_data::CommandEnd)>, <slug_events::dispatch::EventDispatcher>::span_async<slug_data::CommandStart, slug_data::CommandEnd, core::future::from_generator::GenFuture<slug_server_ctx::template::run_server_command<slug_server_commands::commands::build::BuildServerCommand>::{closure#0}::{closure#0}>, core::result::Result<cli_proto::BuildResponse, anyhow::Error>>::{closure#0}::{closure#0}::{closure#0}> () from ...
+#08  0x00000000054f7288 in <core::future::from_generator::GenFuture<<cli::commands::daemon::BuckdServerDependenciesImpl as slug_server::daemon::server::BuckdServerDependencies>::build::{closure#0}> as core::future::future::Future>::poll () from...
  ...
 ```
 
 At this point, you can look at the code, and note that there is no span around
 the output symlink creation function (`create_unhashed_outputs`). This suggests
-you’ve found your culprit: there is indeed a kuro bug and we’re spending ages
+you’ve found your culprit: there is indeed a slug bug and we’re spending ages
 creating unhashed output symlinks, and since you need a span to get any console
 feedback, the console says nothing is happening.
 
 **An easy fix**: In this particular instance, Thomas spotted
-[an easy optimization](https://github.com/ZeromatterOSS/kuro/commit/d677e41253b73a31aafa1255a532c38992482efd)
+[an easy optimization](https://github.com/ZeromatterOSS/slug/commit/d677e41253b73a31aafa1255a532c38992482efd)
 which resolved the issue. But, of course, that’s not always possible. If the
 easy fix hadn't been available, we’d be at a dead end, so what do we do next?
 
@@ -79,8 +79,8 @@ breakage, investigate what caused the issue.
 
 ## How to debug a “doing nothing” hang
 
-**Cycle in dependencies**: If kuro seems to be doing nothing (e.g. CPU usage is
+**Cycle in dependencies**: If slug seems to be doing nothing (e.g. CPU usage is
 0%), one of the reasons could be a cycle in your dependencies, which may cause
-kuro to hang (kuro does implement a form of cycle detection, but it
+slug to hang (slug does implement a form of cycle detection, but it
 unfortunately has false negatives). You can confirm this by running buck1, which
 will report cycles properly.

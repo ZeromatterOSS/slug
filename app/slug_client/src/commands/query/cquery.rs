@@ -1,0 +1,162 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use async_trait::async_trait;
+use slug_cli_proto::CqueryRequest;
+use slug_cli_proto::CqueryResponse;
+use slug_client_ctx::client_ctx::ClientCommandContext;
+use slug_client_ctx::common::BuckArgMatches;
+use slug_client_ctx::common::CommonBuildConfigurationOptions;
+use slug_client_ctx::common::CommonCommandOptions;
+use slug_client_ctx::common::CommonEventLogOptions;
+use slug_client_ctx::common::CommonStarlarkOptions;
+use slug_client_ctx::common::target_cfg::TargetCfgWithUniverseOptions;
+use slug_client_ctx::common::ui::CommonConsoleOptions;
+use slug_client_ctx::daemon::client::BuckdClientConnector;
+use slug_client_ctx::daemon::client::StdoutPartialResultHandler;
+use slug_client_ctx::events_ctx::EventsCtx;
+use slug_client_ctx::exit_result::ExitResult;
+use slug_client_ctx::streaming::StreamingCommand;
+use slug_core::if_else_opensource;
+
+use crate::commands::query::common::CommonQueryOptions;
+use crate::commands::query::profile::QueryProfileOptions;
+
+fn help() -> &'static str {
+    concat!(
+        r#"Perform queries on the configured target graph
+
+The configured target graph includes information about the configuration
+(platforms) and transitions involved in building targets. In the
+configured graph, `selects` are fully resolved. The same target may
+appear in multiple different configurations (when printed, the
+configuration is after the target in parentheses).
+
+A user can specify a `--target-universe` flag to control how literals
+are resolved. When provided, any literals will resolve to all
+matching targets within the universe (which includes the targets
+passed as the universe and all transitive deps of them).  When not
+provided, we implicitly set the universe to be rooted at every
+target literal in the `cquery`.
+
+Run `slug docs cquery` or
+"#,
+        if_else_opensource!(
+            "https://slug.build/docs/users/query/cquery/",
+            "https://www.internalfb.com/intern/staticdocs/slug/docs/users/query/cquery/",
+        ),
+        r#"
+for more documentation about the functions available in cquery
+expressions.
+
+Examples:
+
+Print all the attributes of a target
+
+`slug cquery //java/com/example/app:amazing --output-all-attributes`
+
+List the deps of a target (special characters in a target will
+require quotes):
+
+`slug cquery 'deps("//java/com/example/app:amazing+more")'`
+"#
+    )
+}
+
+#[derive(Debug, clap::Parser)]
+#[clap(
+    name = "cquery",
+    about = "Perform queries on the configured target graph",
+    long_about = help(),
+    verbatim_doc_comment,
+)]
+pub struct CqueryCommand {
+    #[clap(flatten)]
+    query_common: CommonQueryOptions,
+
+    #[clap(
+        long,
+        help = "Show the providers of the query result instead of the attributes and labels"
+    )]
+    show_providers: bool,
+
+    #[clap(flatten)]
+    target_cfg: TargetCfgWithUniverseOptions,
+
+    #[clap(flatten)]
+    common_opts: CommonCommandOptions,
+
+    #[clap(flatten)]
+    profile_options: QueryProfileOptions,
+}
+
+#[async_trait(?Send)]
+impl StreamingCommand for CqueryCommand {
+    const COMMAND_NAME: &'static str = "cquery";
+
+    async fn exec_impl(
+        self,
+        buckd: &mut BuckdClientConnector,
+        matches: BuckArgMatches<'_>,
+        ctx: &mut ClientCommandContext<'_>,
+        events_ctx: &mut EventsCtx,
+    ) -> ExitResult {
+        let (query, query_args) = self.query_common.get_query();
+        let unstable_output_format = self.query_common.output_format() as i32;
+        let output_attributes = self.query_common.attributes.get()?;
+        let context = ctx.client_context(matches, &self)?;
+
+        let CqueryResponse {} = buckd
+            .with_flushing()
+            .cquery(
+                CqueryRequest {
+                    query,
+                    query_args,
+                    context: Some(context),
+                    output_attributes,
+                    target_universe: self.target_cfg.target_universe,
+                    target_cfg: Some(self.target_cfg.target_cfg.target_cfg_with_host_fallback(
+                        self.common_opts.config_opts.host_platform.as_deref(),
+                    )),
+                    show_providers: self.show_providers,
+                    unstable_output_format,
+                    profile_mode: self.profile_options.profile_mode_proto().map(|m| m as i32),
+                    profile_output: self
+                        .profile_options
+                        .profile_output
+                        .as_ref()
+                        .map(|p| slug_error::Ok(p.resolve(&ctx.working_dir).to_str()?.to_owned()))
+                        .transpose()?,
+                },
+                events_ctx,
+                ctx.console_interaction_stream(&self.common_opts.console_opts),
+                &mut StdoutPartialResultHandler,
+            )
+            .await??;
+
+        ExitResult::success()
+    }
+
+    fn console_opts(&self) -> &CommonConsoleOptions {
+        &self.common_opts.console_opts
+    }
+
+    fn event_log_opts(&self) -> &CommonEventLogOptions {
+        &self.common_opts.event_log_opts
+    }
+
+    fn build_config_opts(&self) -> &CommonBuildConfigurationOptions {
+        &self.common_opts.config_opts
+    }
+
+    fn starlark_opts(&self) -> &CommonStarlarkOptions {
+        &self.common_opts.starlark_opts
+    }
+}

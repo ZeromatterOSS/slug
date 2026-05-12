@@ -28,7 +28,7 @@ def _platforms(ctx):
                 "nonroot-workspace": True,
                 "recycle-runner": True,  # required for remote persistent workers
             },
-            remote_execution_use_case = "kuro-default",
+            remote_execution_use_case = "slug-default",
             remote_output_paths = "output_paths",
         ),
     )

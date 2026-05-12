@@ -71,7 +71,7 @@ def _json_encode_impl(ctx):
     """Tests json.encode() with various types."""
     out = ctx.actions.declare_file("json_encode.txt")
     # Encode a dict with string/int/bool/list
-    data = {"name": "kuro", "version": 9, "stable": True, "tags": ["fast", "hermetic"]}
+    data = {"name": "slug", "version": 9, "stable": True, "tags": ["fast", "hermetic"]}
     encoded = json.encode(data)
     ctx.actions.write(out, encoded)
     return [DefaultInfo(default_output = out)]

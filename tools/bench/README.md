@@ -1,18 +1,18 @@
-# Kuro benchmark harness
+# Slug benchmark harness
 
 Plan 16.8 tooling. Drives repeatable cold / warm measurements and
-pairs them with `kuro log diff summary` for before / after analysis.
+pairs them with `slug log diff summary` for before / after analysis.
 
 ## Quick start
 
 ```bash
 # Cold + warm × 3 runs against the large canary target. Requires
-# /var/mnt/dev/llvm-project/utils/bazel to be set up as a Kuro workspace.
+# /var/mnt/dev/llvm-project/utils/bazel to be set up as a Slug workspace.
 #
 # BUCKD_STARTUP_TIMEOUT=180 is required on cold daemons — the 10s
-# default is too tight when bundled-cell init has to run. Kuro cold
+# default is too tight when bundled-cell init has to run. Slug cold
 # start takes 20–30s in practice.
-BUCKD_STARTUP_TIMEOUT=180 KURO=$(pwd)/target/debug/kuro tools/bench/run.sh \
+BUCKD_STARTUP_TIMEOUT=180 SLUG=$(pwd)/target/debug/slug tools/bench/run.sh \
     --target '@llvm-project//clang:clang' --runs 3 --both \
     --workspace /var/mnt/dev/llvm-project/utils/bazel
 
@@ -42,7 +42,7 @@ commit.
 
 ## Modes
 
-- `--cold` — invoke `kuro kill` before each run to force a fresh
+- `--cold` — invoke `slug kill` before each run to force a fresh
   daemon. Combine with `--drop-caches` (requires sudo/root) to also
   flush the OS page cache. This is the most reproducible mode but
   slowest.
@@ -62,16 +62,16 @@ benchmarks/
         wall.txt                 # wall time in seconds
         build.log                # captured build stdout+stderr
         build.pb.zst             # copy of the event log
-        summary.json             # `kuro log summary --format=json`
+        summary.json             # `slug log summary --format=json`
       cold-02/...
       warm-01/...
 ```
 
 `summary.json` shape is stable — see `BuildSummary` in
-`app/kuro_event_observer/src/build_summary.rs`.
+`app/slug_event_observer/src/build_summary.rs`.
 
 ## Plan references
 
-- Harness spec: `thoughts/shared/plans/kuro-bazel-subplans/16-benchmark-telemetry.md` §16.8
+- Harness spec: `thoughts/shared/plans/slug-bazel-subplans/16-benchmark-telemetry.md` §16.8
 - Optimization phases gated on this harness:
-  `thoughts/shared/plans/kuro-bazel-subplans/17-optimization.md`
+  `thoughts/shared/plans/slug-bazel-subplans/17-optimization.md`

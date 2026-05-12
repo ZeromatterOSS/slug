@@ -1,7 +1,7 @@
 # Plan 28.4 Stage 9 acceptance fixture for the `ctx.var` migration.
-# The Rust impl was deleted; `_kuro_var` in
-# `@kuro_builtins//:exports.bzl` (sharing the substitution table
-# with `_kuro_expand_make_variables` via `_kuro_make_substitutions`)
+# The Rust impl was deleted; `_slug_var` in
+# `@slug_builtins//:exports.bzl` (sharing the substitution table
+# with `_slug_expand_make_variables` via `_slug_make_substitutions`)
 # now serves the field. The 13 builtin keys must remain present and
 # string-typed; values that derive from the cfg / host are pinned
 # loosely (string non-empty, or matches a known set) because exact

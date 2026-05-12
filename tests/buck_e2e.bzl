@@ -6,7 +6,7 @@
 # of this source tree. You may select, at your option, one of the
 # above-listed licenses.
 
-load("@fbcode//kuro/app:modifier.bzl", "kuro_modifiers")
+load("@fbcode//slug/app:modifier.bzl", "slug_modifiers")
 load("@fbcode_macros//build_defs:native_rules.bzl", "buck_filegroup")
 load("@fbcode_macros//build_defs:python_pytest.bzl", "python_pytest")
 load("@fbsource//tools/target_determinator/macros:ci.bzl", "ci")
@@ -37,7 +37,7 @@ def buck_e2e_test(
         ci_deps = [],
         compatible_with = None):
     """
-    Custom macro for kuro/buckaemon end-to-end tests using pytest.
+    Custom macro for slug/buckaemon end-to-end tests using pytest.
     """
     srcs = srcs or []
     labels = labels or []
@@ -64,7 +64,7 @@ def buck_e2e_test(
 
     # For autodeps
     read_package_value = getattr(native, "read_package_value", None)
-    e2e_flavor = read_package_value and read_package_value("kuro_e2e_test.flavor")
+    e2e_flavor = read_package_value and read_package_value("slug_e2e_test.flavor")
     if e2e_flavor == "isolated":
         env["BUCK2_E2E_TEST_FLAVOR"] = "isolated"
         serialize_test_cases = serialize_test_cases or False
@@ -109,21 +109,21 @@ def buck_e2e_test(
     if require_nano_prelude == None:
         require_nano_prelude = data_dir != None
     if require_nano_prelude:
-        env["NANO_PRELUDE"] = "$(location fbcode//kuro/tests/e2e_util/nano_prelude:nano_prelude)"
+        env["NANO_PRELUDE"] = "$(location fbcode//slug/tests/e2e_util/nano_prelude:nano_prelude)"
 
     deps += [
         "fbsource//third-party/pypi/pytest:pytest",
         "fbsource//third-party/pypi/pytest-asyncio:pytest-asyncio",
-        "fbcode//kuro/tests/e2e_util:utilities",
+        "fbcode//slug/tests/e2e_util:utilities",
     ]
     if use_buck_api:
-        deps.append("fbcode//kuro/tests/e2e_util/api:api")
+        deps.append("fbcode//slug/tests/e2e_util/api:api")
     resources = resources or {}
 
     # Let users of the macro define their own configuration for pytest. This allow for reusing all
     # the fixture code for tools building e2e tests that also need a working buck environment.
     if not "conftest.py" in resources.values():
-        resources["fbcode//kuro/tests/e2e_util:conftest.py"] = "conftest.py"
+        resources["fbcode//slug/tests/e2e_util:conftest.py"] = "conftest.py"
 
     if "darwin" in skip_for_os:
         labels += ci.remove_labels(ci.mac(ci.aarch64(ci.opt())))
@@ -149,19 +149,19 @@ def buck_e2e_test(
         compatible_with = compatible_with,
     )
 
-    if e2e_flavor == "kuro_non_isolated":
-        # These are kuro's own non-isolated e2e tests. Add a ci hint indicating
+    if e2e_flavor == "slug_non_isolated":
+        # These are slug's own non-isolated e2e tests. Add a ci hint indicating
         # that they depend on many of the macros in the repo. Intentionally
-        # don't do this for other users of `kuro_e2e_test` in the repo
+        # don't do this for other users of `slug_e2e_test` in the repo
         BUCK2_E2E_TEST_CI_SRCS = [
-            "fbandroid/kuro/**",
-            "fbcode/kuro/cfg/**",
-            "fbcode/kuro/prelude/**",
-            "fbcode/kuro/platform/**",
-            "fbcode/kuro/toolchains/**",
-            "fbcode/kuro/tests/targets/**",
-            "fbobjc/kuro/**",
-            "xplat/kuro/**",
+            "fbandroid/slug/**",
+            "fbcode/slug/cfg/**",
+            "fbcode/slug/prelude/**",
+            "fbcode/slug/platform/**",
+            "fbcode/slug/toolchains/**",
+            "fbcode/slug/tests/targets/**",
+            "fbobjc/slug/**",
+            "xplat/slug/**",
             "xplat/toolchains/**",
             "fbcode/hermetic_infra/fdb/**",
             "tools/build_defs/**",
@@ -174,18 +174,18 @@ def buck_e2e_test(
         ci_hint(
             ci_srcs = ci_srcs,
             ci_deps = ci_deps,
-            reason = "Non isolated kuro e2e tests depend heavily on macros",
+            reason = "Non isolated slug e2e tests depend heavily on macros",
             target = name,
             compatible_with = compatible_with,
         )
 
-def kuro_e2e_test(
+def slug_e2e_test(
         name,
-        test_with_compiled_kuro = True,
-        test_with_deployed_kuro = False,
-        test_with_reverted_kuro = False,
-        use_compiled_kuro_client_and_tpx = False,
-        skip_deployed_kuro_version_dep = False,
+        test_with_compiled_slug = True,
+        test_with_deployed_slug = False,
+        test_with_reverted_slug = False,
+        use_compiled_slug_client_and_tpx = False,
+        skip_deployed_slug_version_dep = False,
         deps = (),
         env = None,
         skip_for_os = (),
@@ -207,27 +207,27 @@ def kuro_e2e_test(
         ci_deps = [],
         compatible_with = None):
     """
-    Custom macro for kuro end-to-end tests using pytest. All tests are run against kuro compiled in-repo (compiled kuro).
+    Custom macro for slug end-to-end tests using pytest. All tests are run against slug compiled in-repo (compiled slug).
 
-    test_with_compiled_kuro:
-        A boolean for whether to run tests with the compiled kuro.
+    test_with_compiled_slug:
+        A boolean for whether to run tests with the compiled slug.
         Default is True.
         Should typically be unset when testing things that are not expected to be disproportionately
-        sensitive to kuro core changes. Unsetting this also simplifies the CI setup, as testing
-        with kuro core requires always using opt mode.
-    test_with_deployed_kuro:
-        A boolean for whether to run tests with the deployed kuro.
+        sensitive to slug core changes. Unsetting this also simplifies the CI setup, as testing
+        with slug core requires always using opt mode.
+    test_with_deployed_slug:
+        A boolean for whether to run tests with the deployed slug.
         Default is False.
-        Should typically be set for tests of UDRs and other things that are not "core kuro functionality"
-    test_with_reverted_kuro:
-        Like `test_with_deployed_kuro`, but for the previous version
-    use_compiled_kuro_client_and_tpx:
-        A full prod archive is distinct from a normal build of kuro in that it uses a client-only
+        Should typically be set for tests of UDRs and other things that are not "core slug functionality"
+    test_with_reverted_slug:
+        Like `test_with_deployed_slug`, but for the previous version
+    use_compiled_slug_client_and_tpx:
+        A full prod archive is distinct from a normal build of slug in that it uses a client-only
         binary and additionally makes TPX available. Needed if you want to be able to `buck.test`
         Default is False.
-    skip_deployed_kuro_version_dep:
-        A boolean for whether to skip adding the dependency on tools/kuro-versions:stable when
-        test_with_deployed_kuro is True. This is useful for tests that don't need the version
+    skip_deployed_slug_version_dep:
+        A boolean for whether to skip adding the dependency on tools/slug-versions:stable when
+        test_with_deployed_slug is True. This is useful for tests that don't need the version
         dependency for Target Determinator purposes (e.g., bxl tests that test Starlark logic).
         Default is False.
     """
@@ -252,78 +252,78 @@ def kuro_e2e_test(
     }
 
     env = env or {}
-    if not test_with_compiled_kuro and not test_with_deployed_kuro:
-        fail("Must set one of `test_with_compiled_kuro` or `test_with_deployed_kuro` for " + name)
+    if not test_with_compiled_slug and not test_with_deployed_slug:
+        fail("Must set one of `test_with_compiled_slug` or `test_with_deployed_slug` for " + name)
 
-    # soft errors should always be allowed on tests with deployed kuro, or with reverted buck
+    # soft errors should always be allowed on tests with deployed slug, or with reverted buck
     deployed_env = dict(env)
     deployed_env["BUCK2_HARD_ERROR"] = "false"
 
-    if test_with_compiled_kuro:
+    if test_with_compiled_slug:
         compiled_env = dict(env)
 
         # TODO(ctolliday) use BUCK2_HARD_ERROR=panic
         compiled_env["BUCK2_HARD_ERROR"] = "true"
-        compiled_env["BUCK2_TPX"] = "$BUCK2_BINARY_DIR/kuro-tpx"
+        compiled_env["BUCK2_TPX"] = "$BUCK2_BINARY_DIR/slug-tpx"
 
-        if use_compiled_kuro_client_and_tpx:
-            base_exe = "$(location fbcode//kuro:symlinked_kuro_and_tpx)/kuro"
+        if use_compiled_slug_client_and_tpx:
+            base_exe = "$(location fbcode//slug:symlinked_slug_and_tpx)/slug"
             exe = select({
                 "DEFAULT": base_exe,
                 "ovr_config//os:windows": base_exe + ".exe",
             })
         else:
-            exe = "$(location fbcode//kuro:kuro)"
+            exe = "$(location fbcode//slug:slug)"
 
         buck_e2e_test(
-            # deployed kuro test target retains the original target name so that when user runs `buck test <test target>`,
-            # it only runs the deployed kuro tests and not the compiled kuro tests.
+            # deployed slug test target retains the original target name so that when user runs `buck test <test target>`,
+            # it only runs the deployed slug tests and not the compiled slug tests.
             # This will make it much quicker for rule writers to run their tests locally.
-            name = name + ("_with_compiled_kuro" if test_with_deployed_kuro else ""),
+            name = name + ("_with_compiled_slug" if test_with_deployed_slug else ""),
             env = compiled_env,
             executable = exe,
             skip_for_os = skip_for_os,
             deps = deps,
-            cfg_modifiers = kuro_modifiers() + [
+            cfg_modifiers = slug_modifiers() + [
                 # Always run these tests under rust opt build
                 "ovr_config//build_mode:opt",
             ],
             **kwargs
         )
 
-    if test_with_deployed_kuro:
+    if test_with_deployed_slug:
         deps = deps or []
 
-        # Add a kuro version file as dep so we can run deployed kuro tests on version bumps.
-        # Skip this dependency if skip_deployed_kuro_version_dep is True (e.g., for bxl tests).
-        if not skip_deployed_kuro_version_dep:
-            deps += ["fbsource//tools/kuro-versions:stable"]
+        # Add a slug version file as dep so we can run deployed slug tests on version bumps.
+        # Skip this dependency if skip_deployed_slug_version_dep is True (e.g., for bxl tests).
+        if not skip_deployed_slug_version_dep:
+            deps += ["fbsource//tools/slug-versions:stable"]
         buck_e2e_test(
             name = name,
             env = deployed_env,
-            executable = "kuro",
+            executable = "slug",
             skip_for_os = skip_for_os,
             deps = deps,
             **kwargs
         )
 
-    if test_with_reverted_kuro:
+    if test_with_reverted_slug:
         previous_env = dict(deployed_env)
         previous_env["BUCK2_CHANNEL"] = "previous"
         buck_e2e_test(
-            name = name + "_with_reverted_kuro",
+            name = name + "_with_reverted_slug",
             env = previous_env,
-            executable = "kuro",
+            executable = "slug",
             skip_for_os = skip_for_os,
             deps = deps,
             **kwargs
         )
 
-def kuro_core_tests(
+def slug_core_tests(
         extra_attrs = {},
         target_extra_attrs = {}):
     """
-    A little wrapper that generates `kuro_e2e_test`s for core tests.
+    A little wrapper that generates `slug_e2e_test`s for core tests.
 
     extra_attrs:
         Extra attributes that are applied to all generated targets.
@@ -364,13 +364,13 @@ def kuro_core_tests(
                 attrs["srcs"] = [item]
 
             IMPLICIT_DEPS = [
-                "//kuro/tests/e2e_util:utils",
-                "//kuro/tests/e2e_util:golden",
+                "//slug/tests/e2e_util:utils",
+                "//slug/tests/e2e_util:golden",
             ]
             attrs["deps"] = list(attrs.get("deps") or [])
             attrs["deps"].extend(IMPLICIT_DEPS)
 
-            kuro_e2e_test(
+            slug_e2e_test(
                 name = target,
                 **attrs
             )

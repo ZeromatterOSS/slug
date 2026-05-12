@@ -1,15 +1,15 @@
-## Build kuro with Cargo
+## Build slug with Cargo
 
-From kuro project root, run the following to build kuro with cargo
+From slug project root, run the following to build slug with cargo
 
 ```sh
-cargo install --path=app/kuro --root=/tmp
-export BUCK2="/tmp/bin/kuro"
+cargo install --path=app/slug --root=/tmp
+export BUCK2="/tmp/bin/slug"
 ```
 
-## Run `kuro init --git`
+## Run `slug init --git`
 
-Run `kuro init` to initialize the prelude directory.
+Run `slug init` to initialize the prelude directory.
 
 Now all targets aside from OCaml related ones are ready to be built.
 

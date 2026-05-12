@@ -4,21 +4,21 @@
 
 This document compares Buck2's BXL (Build Extension Language) with Aspect's AXL (Aspect Extension Language) for build graph introspection and developer tooling.
 
-**Goal**: Understand how AXL approaches similar problems to BXL and identify features/patterns that could improve Kuro's developer experience.
+**Goal**: Understand how AXL approaches similar problems to BXL and identify features/patterns that could improve Slug's developer experience.
 
 ## Resources
 
 - **AXL**: https://www.aspect.build/axl
 - **BXL Documentation**: https://buck2.build/docs/bxl/
-- **Kuro BXL**: `app/kuro_bxl/` in Kuro codebase
+- **Slug BXL**: `app/slug_bxl/` in Slug codebase
 
 ## Status
 
 - [ ] Research AXL capabilities and API
-- [ ] Document BXL current capabilities in Kuro
+- [ ] Document BXL current capabilities in Slug
 - [ ] Compare feature sets
 - [ ] Identify gaps and opportunities
-- [ ] Recommend improvements for Kuro's BXL
+- [ ] Recommend improvements for Slug's BXL
 
 ---
 
@@ -40,7 +40,7 @@ This document compares Buck2's BXL (Build Extension Language) with Aspect's AXL 
 
 ---
 
-## BXL Overview (Kuro/Buck2)
+## BXL Overview (Slug/Buck2)
 
 ### Current Capabilities
 
@@ -68,7 +68,7 @@ BXL allows self-introspection of the build graph for:
 
 ## Feature Comparison
 
-| Feature | BXL (Kuro) | AXL (Aspect) | Notes |
+| Feature | BXL (Slug) | AXL (Aspect) | Notes |
 |---------|------------|--------------|-------|
 | Language | Starlark | *TBD* | |
 | Build graph access | Yes | *TBD* | |

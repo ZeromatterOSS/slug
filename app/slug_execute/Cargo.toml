@@ -1,0 +1,73 @@
+[package]
+description = "Remote-execution support for Buck"
+edition = "2024"
+license = { workspace = true }
+name = "slug_execute"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+anyhow = { workspace = true }
+async-recursion = { workspace = true }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+crossbeam-channel = { workspace = true }
+derivative = { workspace = true }
+derive_more = { workspace = true }
+digest = { workspace = true }
+either = { workspace = true }
+faccess = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+http = { workspace = true }
+hyper = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+pathdiff = { workspace = true }
+prost = { workspace = true }
+ref-cast = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+smallvec = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+fbinit = { workspace = true }
+gazebo = { workspace = true }
+host_sharing = { workspace = true }
+remote_execution = { workspace = true }
+sorted_vector_map = { workspace = true }
+starlark_map = { workspace = true }
+strong_hash = { workspace = true }
+
+slug_action_metadata_proto = { workspace = true }
+slug_build_info = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_directory = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_fs = { workspace = true }
+slug_http = { workspace = true }
+slug_miniperf_proto = { workspace = true }
+slug_re_configuration = { workspace = true }
+slug_util = { workspace = true }
+slug_wrapper_common = { workspace = true }
+dice_futures = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+prost-types = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

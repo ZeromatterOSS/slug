@@ -1,4 +1,4 @@
-# Bucket-C fixture (Plan 35.6a). Uses kuro-specific knobs not yet
+# Bucket-C fixture (Plan 35.6a). Uses slug-specific knobs not yet
 # migrated to CLI flags. See thoughts/shared/research/2026-05-04-fixture-bucket-classification.md
 
 [project]
@@ -8,7 +8,7 @@ ignore=ignored
 root = .
 prelude = prelude
 
-[kuro]
+[slug]
 materializations = deferred
 enable_local_caching_of_re_artifacts = true
 sqlite_materializer_state = true

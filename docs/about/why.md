@@ -1,21 +1,21 @@
 ---
 id: why
-title: Why Kuro
+title: Why Slug
 ---
 
-Kuro is a Bazel-compatible build tool from Zeromatter Inc, with primary
+Slug is a Bazel-compatible build tool from Zeromatter Inc, with primary
 authorship by Walter Gray. It is derived from Buck2, originally developed by Meta
 Platforms, Inc., and preserves attribution to Buck2 and Meta for inherited code,
 documentation, and architecture.
 
-Kuro is provided for educational and research purposes and is in large part an
+Slug is provided for educational and research purposes and is in large part an
 exercise in experimenting with agentic programming on a substantial systems
 codebase. This page answers the questions:
-[why does Kuro exist](#why-does-kuro-exist),
-[what's different about Kuro](#whats-different-about-kuro), and
-[why use Kuro](#why-use-kuro).
+[why does Slug exist](#why-does-slug-exist),
+[what's different about Slug](#whats-different-about-slug), and
+[why use Slug](#why-use-slug).
 
-## Why does Kuro exist?
+## Why does Slug exist?
 
 Meta employs a very large monorepo, consisting of a variety of programming
 languages, including C++, Python, Rust, Kotlin, Swift, Objective-C, Haskell,
@@ -29,7 +29,7 @@ was started first (also known as Blaze), Buck was open sourced first (back in
 March 2013), followed by Bazel a few years later (March 2015).
 
 The retroactively named Buck1 was a capable build system, but had significant
-limitations and has been entirely phased out at Meta today. Kuro is a rewrite
+limitations and has been entirely phased out at Meta today. Slug is a rewrite
 that aims to keep the best bits of Buck1 (with a high degree of target
 compatibility) but also borrows ideas from
 [academic](https://ndmitchell.com/#shake_10_sep_2012)
@@ -37,7 +37,7 @@ compatibility) but also borrows ideas from
 including [Bazel](https://bazel.build/), [Pants](https://www.pantsbuild.org/),
 [Shake](https://shakebuild.com/), [Tup](https://gittup.org/tup/), and more.
 
-Following are aspects common to Buck1 and Kuro (and in most cases, Bazel):
+Following are aspects common to Buck1 and Slug (and in most cases, Bazel):
 
 - **Targets that can be queried** - the build is defined as a series of targets,
   specified in `BUCK` files, that depend on other targets. This graph of targets
@@ -58,23 +58,23 @@ Following are aspects common to Buck1 and Kuro (and in most cases, Bazel):
   specify the targets, enabling the definition of targets as literals and more
   advanced manipulation/sharing.
 
-## What's different about Kuro?
+## What's different about Slug?
 
-Kuro has several major differences (as well as many minor differences) from
+Slug has several major differences (as well as many minor differences) from
 Buck1. Of particular note, there are a number that give new efficiency or
 expressiveness (most of these are also different from Bazel).
 
-- **Kuro is written in Rust** - Buck1 was written in Java. One of the
+- **Slug is written in Rust** - Buck1 was written in Java. One of the
   advantages of using Rust is the absence of GC pauses, However, Java also has
   advantages, such as better memory profiling tools.
-- **Kuro is remote execution first** - local execution is considered a special
+- **Slug is remote execution first** - local execution is considered a special
   case of remote execution, in contrast to Buck1 where it was added after. That
   means that things such as directory hashes can be pre-computed ready to send
   to remote execution, giving efficiency benefits.
-- **All Kuro rules are written in Starlark** - whereas, in Buck1, they were
+- **All Slug rules are written in Starlark** - whereas, in Buck1, they were
   written in Java as part of the binary, which makes iteration on rules much
   faster.
-- **The Kuro binary is entirely language agnostic** - as a consequence of
+- **The Slug binary is entirely language agnostic** - as a consequence of
   having all the rules external to the binary, the most important and complex
   rule (such as in C++), don't have access to magic internal features. As a
   result, features have been made available to all rules, including:
@@ -83,7 +83,7 @@ expressiveness (most of these are also different from Bazel).
     changes within them.
   - [Incremental actions](../rule_authors/incremental_actions.md) - the ability
     to have the action short-circuit some subset of the work if run again.
-- **Kuro uses a dynamic (aka monadic) graph as its underlying computation
+- **Slug uses a dynamic (aka monadic) graph as its underlying computation
   engine** - while most dependencies are specified statically, there are two
   particular features that expose dynamic power to rule authors:
   - [Dynamic dependencies](../rule_authors/dynamic_dependencies.md) - enable
@@ -101,42 +101,42 @@ expressiveness (most of these are also different from Bazel).
   to Bazel's [depset](https://bazel.build/rules/lib/depset). But, instead of
   being just a memory optimization, are also wired into the dependency graph,
   providing a reduction in the size of the dependency graph.
-- **Kuro is not phased** - there are no target graph/action graph phases, just
+- **Slug is not phased** - there are no target graph/action graph phases, just
   a series of dependencies in a
-  [single graph on DICE](https://github.com/ZeromatterOSS/kuro/blob/main/dice/dice/docs/index.md)
-  that result in whatever the user requested. That means that Kuro can
+  [single graph on DICE](https://github.com/ZeromatterOSS/slug/blob/main/dice/dice/docs/index.md)
+  that result in whatever the user requested. That means that Slug can
   sometimes parallelise different phases and track changes very precisely.
-- **Kuro can integrate with the virtual filesystem
+- **Slug can integrate with the virtual filesystem
   [Eden](https://github.com/facebook/sapling)** - this provides good
   performance, even when the file system is backed by source control fetches.
   However, Eden is not required, and a normal file system will also work well.
-- **The Kuro Starlark implementation is available
+- **The Slug Starlark implementation is available
   [as a standalone library](https://developers.facebook.com/blog/post/2021/04/08/rust-starlark-library/)** -
   this provides features such as IDE integration (both LSP and DAP bindings),
-  linters, typecheckers, and more. These features are integrated into Kuro to
+  linters, typecheckers, and more. These features are integrated into Slug to
   give a better developer experience (which is still evolving).
-- **Kuro supports configurations** - (such as `select`) to provide
+- **Slug supports configurations** - (such as `select`) to provide
   multi-platform/architecture builds, which are heavily inspired by Bazel.
   Within that space, there is a number of small differences, such as
   `toolchain_deps`.
-- **Kuro is fast** - in our internal tests, we observed that Kuro completed
+- **Slug is fast** - in our internal tests, we observed that Slug completed
   builds 2x as fast as Buck1.
 
 For a comprehensive list of benefits, see
 [Benefits Compared to Buck1](benefits/compared_to_buck1.md).
 
-## Why use Kuro?
+## Why use Slug?
 
-Kuro is early-stage software, so users may run into unexpected issues. If you
+Slug is early-stage software, so users may run into unexpected issues. If you
 encounter an issue, you may report it via
-[Github issues](https://github.com/ZeromatterOSS/kuro/issues), but issue and pull
+[Github issues](https://github.com/ZeromatterOSS/slug/issues), but issue and pull
 request review is not guaranteed.
 
-Kuro is available as open source for educational and research use.
+Slug is available as open source for educational and research use.
 
-Kuro inherits a substantial amount of Buck2 documentation. Some pages still
+Slug inherits a substantial amount of Buck2 documentation. Some pages still
 describe Buck2-era concepts or Meta-internal workflows. Those references should
-be treated as inherited context unless a page explicitly describes current Kuro
+be treated as inherited context unless a page explicitly describes current Slug
 behavior.
 
 There are also some things that aren't quite yet finished:
@@ -146,4 +146,4 @@ There are also some things that aren't quite yet finished:
 - Windows/Mac builds are still in progress; open-source code is mostly tested on
   Linux.
 
-If none of that puts you off, [give Kuro a go](../getting_started/index.md)!
+If none of that puts you off, [give Slug a go](../getting_started/index.md)!

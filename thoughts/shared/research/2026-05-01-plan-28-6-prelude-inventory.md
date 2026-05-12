@@ -5,7 +5,7 @@ Cross-cutting summary of the four sub-inventories:
 - [`2026-05-01-plan-28-6-prelude-inventory-root-user-decls.md`](./2026-05-01-plan-28-6-prelude-inventory-root-user-decls.md) — root `*.bzl` (33 files), `user/`, `decls/`.
 - [`2026-05-01-plan-28-6-prelude-inventory-helpers-bxl.md`](./2026-05-01-plan-28-6-prelude-inventory-helpers-bxl.md) — `utils/`, `bxl/`, `toolchains/`, `tests/`, `playground/`, `docs/`, `debugging/`, `validation/`.
 - [`2026-05-01-plan-28-6-prelude-inventory-configurations.md`](./2026-05-01-plan-28-6-prelude-inventory-configurations.md) — `configurations/`, `platforms/`, `transitions/`, `cfg/`, `cpu/`, `os/`, `os_lookup/`, `build_mode/`.
-- [`2026-05-01-plan-28-6-prelude-inventory-misc-rust.md`](./2026-05-01-plan-28-6-prelude-inventory-misc-rust.md) — remaining language/build subtrees + Rust loaders + `__kuro_builtins__`.
+- [`2026-05-01-plan-28-6-prelude-inventory-misc-rust.md`](./2026-05-01-plan-28-6-prelude-inventory-misc-rust.md) — remaining language/build subtrees + Rust loaders + `__slug_builtins__`.
 
 ## Top-level findings
 
@@ -15,7 +15,7 @@ Cross-cutting summary of the four sub-inventories:
 
 1. **Drop dead weight** — Meta-internal predicates (`is_full_meta_repo`, `cache_mode`, `genrule_local_labels`, etc.), Apple platform stubs (`package_runs_on_*`), tombstones (`attributes.bzl`), and empty placeholder dirs (`playground/`, `docs/`, `debugging/`, `validation/`).
 2. **Integrate Bazel-shaped rule impls into the bundled cell** — alias, filegroup, genrule, sh_*, test_suite, http_file, remote_file, http_archive, zip_file, etc.
-3. **Cut the prelude-driven BUILD-global path** — remove `prelude/native.bzl`, `prelude/prelude.bzl`, `prelude_path.rs`, `extra_globals_from_prelude_for_buck_files`. Final state: `@kuro_builtins//:exports.bzl` is the *only* source of BUILD/.bzl globals.
+3. **Cut the prelude-driven BUILD-global path** — remove `prelude/native.bzl`, `prelude/prelude.bzl`, `prelude_path.rs`, `extra_globals_from_prelude_for_buck_files`. Final state: `@slug_builtins//:exports.bzl` is the *only* source of BUILD/.bzl globals.
 
 ## Removal-order graph
 
@@ -66,7 +66,7 @@ These can be deleted in a single PR with no other prerequisites:
 
 ## Tier-2: integrate (move into bundled cell)
 
-These are Bazel-shaped and should land as Starlark exports in `kuro_builtins/exports.bzl` or as bundled-cell rule registrations:
+These are Bazel-shaped and should land as Starlark exports in `slug_builtins/exports.bzl` or as bundled-cell rule registrations:
 
 **Helpers:**
 - `prelude/utils/utils.bzl`, `expect.bzl`, `type_defs.bzl`, `arglike.bzl`, `selects.bzl`
@@ -88,7 +88,7 @@ These are Bazel-shaped and should land as Starlark exports in `kuro_builtins/exp
 
 | Path | Deletion condition |
 |------|--------------------|
-| prelude/native.bzl | All surviving native names listed in `kuro_builtins/exports.bzl::exported_native`. |
+| prelude/native.bzl | All surviving native names listed in `slug_builtins/exports.bzl::exported_native`. |
 | prelude/prelude.bzl | bazel_builtins_autoload fully replaces the prelude entry point. |
 | prelude/rules.bzl + rules_impl.bzl | All rule impls migrated to bundled cell registry. |
 | prelude/decls/common.bzl, core_rules.bzl, shell_rules.bzl | Rule specs become Rust-native metadata or move to bundled cell. |
@@ -98,24 +98,24 @@ These are Bazel-shaped and should land as Starlark exports in `kuro_builtins/exp
 
 ## Tier-4: extension-only (keep but isolate)
 
-These survive but should move behind a `_kuro_*` naming or `@kuro_internal` cell so they're not visible to user BUILD/.bzl files:
+These survive but should move behind a `_slug_*` naming or `@slug_internal` cell so they're not visible to user BUILD/.bzl files:
 
-- `prelude/bxl/` (entire subtree) — BXL is Kuro-only.
+- `prelude/bxl/` (entire subtree) — BXL is Slug-only.
 - `prelude/asserts.bzl` (test-only, if not chosen as `integrate`).
-- `prelude/is_buck2.bzl`, `is_kuro_internal.bzl` — feature flags.
+- `prelude/is_buck2.bzl`, `is_slug_internal.bzl` — feature flags.
 - `prelude/dist/dist_info.bzl` — runtime artifact tracking.
 - `prelude/tests/*` — TestToolchainInfo, RemoteTestExecutionToolchainInfo, re_utils.
 - `prelude/test/inject_test_run_info.bzl` — test injection helper.
-- `prelude/utils/materialization_test.bzl` — Kuro-specific test helper.
+- `prelude/utils/materialization_test.bzl` — Slug-specific test helper.
 - `prelude/decls/` non-core helpers — test_common, genrule_common, remote_common, re_test_common, toolchains_common.
 - `prelude/user/rule_spec.bzl` — RuleRegistrationSpec record.
 - `prelude/http_archive/exec_deps.bzl`, `prelude/zip_file/zip_file_toolchain.bzl` — internal toolchain slots.
 
 ## Rust loader cleanup
 
-- `app/kuro_interpreter/src/prelude_path.rs` — remove after `prelude/prelude.bzl` deletion.
-- `app/kuro_interpreter/src/file_loader.rs::extra_globals_from_prelude_for_buck_files` — remove after `prelude/native.bzl` deletion.
-- `__kuro_builtins__` namespace in `globals.rs::base_globals` — restrict (rename `__kuro_internal__` or remove `register_all_natives` from the namespace) once internal tests stop reading from it. Tests in `kuro_interpreter_for_build_tests::interpreter` use `__kuro_builtins__.json.encode(...)` etc. — migrate those references first.
+- `app/slug_interpreter/src/prelude_path.rs` — remove after `prelude/prelude.bzl` deletion.
+- `app/slug_interpreter/src/file_loader.rs::extra_globals_from_prelude_for_buck_files` — remove after `prelude/native.bzl` deletion.
+- `__slug_builtins__` namespace in `globals.rs::base_globals` — restrict (rename `__slug_internal__` or remove `register_all_natives` from the namespace) once internal tests stop reading from it. Tests in `slug_interpreter_for_build_tests::interpreter` use `__slug_builtins__.json.encode(...)` etc. — migrate those references first.
 - `interpreter_for_dir.rs::create_env` lines 391-404 (prelude scrape + extra_globals call) — delete after both files above are gone.
 
 ## Suggested PR sequencing (≈4 PRs)
@@ -124,7 +124,7 @@ These survive but should move behind a `_kuro_*` naming or `@kuro_internal` cell
 Delete all the placeholder dirs + Meta-internal predicates + tombstones in one shot. ~10-15 files removed. No behavior change beyond removing dead code. Should be a clean diff.
 
 ### PR 2 — move helpers and providers into bundled cell
-- `paths.bzl` → exported via `kuro_builtins`. Bazel users gain `paths.basename` etc.
+- `paths.bzl` → exported via `slug_builtins`. Bazel users gain `paths.basename` etc.
 - `utils/utils.bzl`, `utils/expect.bzl`, `utils/type_defs.bzl`, `utils/arglike.bzl`, `utils/selects.bzl` → exported similarly.
 - `artifacts.bzl::ArtifactGroupInfo` → exported provider.
 - `configurations/rules.bzl` → bundled cell native rule analysis (or kept as Starlark, exported via `exported_native`).
@@ -146,25 +146,25 @@ Once Tier 1-3 done and `exported_native` covers all needed names:
 2. Delete `prelude/prelude.bzl`.
 3. Delete `prelude/rules.bzl` + `rules_impl.bzl` (if all rule impls migrated).
 4. Delete `prelude/decls/{common,core_rules,shell_rules}.bzl` (if rule specs no longer needed in Starlark).
-5. Delete `app/kuro_interpreter/src/prelude_path.rs`.
+5. Delete `app/slug_interpreter/src/prelude_path.rs`.
 6. Delete `extra_globals_from_prelude_for_buck_files` in `file_loader.rs`.
 7. Strip the prelude-scrape block at `interpreter_for_dir.rs:391-404`.
-8. Rename `__kuro_builtins__` namespace (after migrating tests).
+8. Rename `__slug_builtins__` namespace (after migrating tests).
 
-After PR 4, BUILD-global construction is purely `@kuro_builtins//:exports.bzl` driven, and Phase 28.6 is complete.
+After PR 4, BUILD-global construction is purely `@slug_builtins//:exports.bzl` driven, and Phase 28.6 is complete.
 
 ## Acceptance criteria (Phase 28.6)
 
 Per the plan doc:
 
-- ✅ Ordinary `kuro build` does not need to evaluate `prelude/prelude.bzl` to construct BUILD globals.
+- ✅ Ordinary `slug build` does not need to evaluate `prelude/prelude.bzl` to construct BUILD globals.
 - ✅ `prelude/native.bzl`, if still present, is a temporary shim with a deletion condition and no unique symbol ownership. → After PR 4, both files are gone.
 - ✅ Every remaining file under `prelude/` has an owner: `bazel_builtins`, `bxl`, `test fixture`, or `delete`.
-- ✅ `@prelude//...` loads in user BUILD/.bzl files are either unsupported with a clear Kuro/Bazel-compatibility error or explicitly documented as Kuro extension APIs.
+- ✅ `@prelude//...` loads in user BUILD/.bzl files are either unsupported with a clear Slug/Bazel-compatibility error or explicitly documented as Slug extension APIs.
 - ✅ No Buck2 language/toolchain prelude directories are reachable from Bazel-compatible BUILD loading.
 
 ## Out-of-scope (later phases)
 
 - Performance benchmarking of the new injection path vs the old prelude scrape.
-- Deprecating `__kuro_builtins__` namespace fully (test migration is its own task).
-- Documenting the user-facing migration story (a single load shim that maps `@prelude//paths.bzl` → `@kuro_builtins//paths.bzl` for backwards compat, if desired).
+- Deprecating `__slug_builtins__` namespace fully (test migration is its own task).
+- Documenting the user-facing migration story (a single load shim that maps `@prelude//paths.bzl` → `@slug_builtins//paths.bzl` for backwards compat, if desired).

@@ -5,7 +5,7 @@ title: Writing Rules
 
 import { FbInternalOnly } from 'docusaurus-plugin-internaldocs-fb/internal';
 
-This page describes how to write rules for Kuro and explains the flow for
+This page describes how to write rules for Slug and explains the flow for
 implementing rules that are already defined in Buck1.
 
 For a list of the API functions available, see the
@@ -15,20 +15,20 @@ For a list of the API functions available, see the
 
 Rules such as `@fbcode_macros//build_defs:native_rules.bzl buck_genrule` are not
 actually rules, they are _macros_ (Starlark functions that eventually call out
-the underlying `genrule` _rule_). Macros in Kuro are mostly compatible with
+the underlying `genrule` _rule_). Macros in Slug are mostly compatible with
 Buck1 and should be written in the same way.
 
 :::
 
 ## Workflow by example
 
-The built-in Kuro rules are stored in the `prelude` folder in the kuro repo.
+The built-in Slug rules are stored in the `prelude` folder in the slug repo.
 To add a rule for a language, say `pascal`:
 
 1. Look at
-   [prelude/decls](https://github.com/ZeromatterOSS/kuro/blob/main/prelude/decls/)
+   [prelude/decls](https://github.com/ZeromatterOSS/slug/blob/main/prelude/decls/)
    to see the attributes that are supported in Buck1 and are mirrored into
-   Kuro. If `pascal` was an existing rule, you would see what attributes it
+   Slug. If `pascal` was an existing rule, you would see what attributes it
    takes (often it will be `pascal_library` and `pascal_binary`).
 
 2. Create a file `pascal.bzl` that will contain your rule implementations. The
@@ -39,12 +39,12 @@ To add a rule for a language, say `pascal`:
        return [DefaultInfo()]
    ```
 
-3. Create a directory in `fbcode/kuro/tests/targets/rules/pascal` with
+3. Create a directory in `fbcode/slug/tests/targets/rules/pascal` with
    `TARGETS` and whatever source files and test targets you need to test your
    project. Note, Apple tests are currently located at
-   `xplat/kuro/tests/apple/...`.
+   `xplat/slug/tests/apple/...`.
 
-4. Test your code with `kuro build fbcode//kuro/tests/targets/rules/pascal:`.
+4. Test your code with `slug build fbcode//slug/tests/targets/rules/pascal:`.
    They should succeed with no actual output produced.
 
 5. Now implement the rules (see the rest of this page).
@@ -52,9 +52,9 @@ To add a rule for a language, say `pascal`:
 :::note
 
 Before merging a diff, it's important that all your Starlark is warning free (if
-you don't want to set up Kuro for local development, test it in CI).
+you don't want to set up Slug for local development, test it in CI).
 <FbInternalOnly>If you do set it up locally, see the `README.md` in the root of
-`fbcode/kuro`. Running `./test.py --lint-only` will confirm your Starlark code
+`fbcode/slug`. Running `./test.py --lint-only` will confirm your Starlark code
 is warning free.</FbInternalOnly>
 
 :::
@@ -86,13 +86,13 @@ In the above snippet:
 - **Rule** is `pascal_binary`, which is implemented by `pascal_binary_impl`. The
   rule says how to build things.
 - **Target** will be something like
-  `fbcode//kuro/tests/targets/rules/pascal:my_binary`. The rule implementation
+  `fbcode//slug/tests/targets/rules/pascal:my_binary`. The rule implementation
   `pascal_binary_impl` will be called once per target.
 - **Attributes** are the fields on the target (for example, you might have
   `out`, which can be accessed via `ctx.attrs.out`).
 - **Actions** are declared by the rule with things like `ctx.actions.run`, which
   takes a command line. Note that the actions are not run by the rule, but
-  declared, so that Kuro can run them later.
+  declared, so that Slug can run them later.
 - **Artifacts** represent files on disk, which could be source or build outputs
   (`binary` in the above example).
   - For build outputs, the artifact is produced by an action, and the existence
@@ -121,7 +121,7 @@ either `RunInfo` (because they are executable) or some custom provider (because
 they are incorporated into something that is ultimately executable).
 
 The `DefaultInfo` provider has a field `default_output`, which is the file that
-will be built when someone executes a `kuro build` on this particular target,
+will be built when someone executes a `slug build` on this particular target,
 and the file that will be used when someone runs `$(location target)` or uses it
 as a source file (such as `srcs = [":my_target"]`.)
 
@@ -249,30 +249,30 @@ are used instead of shell scripts as they have better cross-platform
 compatibility and fewer hidden corners (especially in error paths).
 
 As an example of a Python helper, see
-[make_comp_db.py](https://github.com/ZeromatterOSS/kuro/blob/main/prelude/cxx/tools/make_comp_db.py).
+[make_comp_db.py](https://github.com/ZeromatterOSS/slug/blob/main/prelude/cxx/tools/make_comp_db.py).
 
 A further advantage of using Python is that these commands can be tested in
-isolation, outside of Kuro.
+isolation, outside of Slug.
 
 ## Debugging
 
 The functions `fail`, `print` and `pprint` are your friends. To get started, a
-`kuro build fbcode//kuro/tests/targets/rules/pascal:` builds everything or
-`kuro run fbcode//kuro/tests/targets/rules/pascal:my_binary` runs a specific
+`slug build fbcode//slug/tests/targets/rules/pascal:` builds everything or
+`slug run fbcode//slug/tests/targets/rules/pascal:my_binary` runs a specific
 binary that returns a `RunInfo`.
 
 ## Testing Rules
 
 A common way to test is to use `genrule` to cause the produced binary to run and
-assert some properties from it. If your rule is in Buck1 and Kuro, use a
+assert some properties from it. If your rule is in Buck1 and Slug, use a
 `TARGETS` file so you can test with both. If your tests are incompatible with
 Buck1 (such as if it is a new rule), use `TARGETS.v2`, which will only be seen
-by Kuro and won't cause errors with Buck1.
+by Slug and won't cause errors with Buck1.
 
 ## New rules
 
 If your rule is **not** already in Buck1, then you can define it wherever you
-like, with a preference for it not being in `fbcode/kuro/prelude`.
+like, with a preference for it not being in `fbcode/slug/prelude`.
 
 The only advantage of the `prelude` is that rules can be used without a
 corresponding `load`, which is generally considered a misfeature. The attributes

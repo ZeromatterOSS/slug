@@ -251,7 +251,7 @@ async def test_download_file(buck: Buck) -> None:
 
     await runner.cleanup()
 
-    # Kuro uses SHA256 digest by default in OSS builds; when only SHA1 is provided,
+    # Slug uses SHA256 digest by default in OSS builds; when only SHA1 is provided,
     # the HEAD request optimization is skipped and the file is downloaded directly.
     # This results in 3 total GET requests (429, 500, success) instead of 4 (3 HEAD + 1 GET).
     assert attempt == 3
@@ -355,7 +355,7 @@ async def test_invalid_command(buck: Buck) -> None:
         buck.build("//run_bad:run_invalid_command_local"),
         stderr_regex="non-zero exit code.*no exit code",
     )
-    # kuro runs commands locally even when local_only=False (no RE support)
+    # slug runs commands locally even when local_only=False (no RE support)
     # so the error message matches the local failure pattern on all platforms
     await expect_failure(
         buck.build("//run_bad:run_invalid_command_remote"),

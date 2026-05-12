@@ -2,7 +2,7 @@
 
 Print this message or the help of the given subcommand(s)
 
-Usage: kuro log help [COMMAND]...
+Usage: slug log help [COMMAND]...
 
 Arguments:
   [COMMAND]...  Print help for the subcommand(s)

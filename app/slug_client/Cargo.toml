@@ -1,0 +1,56 @@
+[package]
+description = "Some parts of Buck client"
+edition = "2024"
+license = { workspace = true }
+name = "slug_client"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-recursion = { workspace = true }
+async-trait = { workspace = true }
+bytesize = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+dupe = { workspace = true }
+futures = { workspace = true }
+gazebo = { workspace = true }
+humantime = { workspace = true }
+libc = { workspace = true }
+lsp-server = { workspace = true }
+maplit = { workspace = true }
+multimap = { workspace = true }
+once_cell = { workspace = true }
+prost = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+shlex = { workspace = true }
+superconsole = { version = "0.2.0", path = "../../superconsole" }
+threadpool = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+walkdir = { workspace = true }
+
+# Please do not add dependency on `slug_build_api`.
+slug_cli_proto = { workspace = true }
+slug_client_ctx = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_event_log = { workspace = true }
+slug_event_observer = { workspace = true }
+slug_events = { workspace = true }
+slug_fs = { workspace = true }
+slug_query_parser = { workspace = true }
+slug_subscription_proto = { workspace = true }
+slug_util = { workspace = true }
+slug_wrapper_common = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+tempfile = { workspace = true }

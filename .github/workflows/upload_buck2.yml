@@ -1,4 +1,4 @@
-name: Build, upload, and tag `kuro`
+name: Build, upload, and tag `slug`
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     name: Define the version info for this release
     runs-on: ubuntu-latest
     outputs:
-      kuro_version: ${{ steps.define_version_info.outputs.kuro_version }}
+      slug_version: ${{ steps.define_version_info.outputs.slug_version }}
     steps:
       - name: Define version info
         id: define_version_info
@@ -18,9 +18,9 @@ jobs:
           # Specify the release version information
           commit_date=$(echo "${{ github.event.repository.updated_at }}" | sed 's/T.*//')
 
-          echo "kuro_version=$commit_date-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "slug_version=$commit_date-${{ github.sha }}" >> "$GITHUB_OUTPUT"
       - name: Display version info
-        run: echo ${{ steps.define_version_info.outputs.kuro_version }}
+        run: echo ${{ steps.define_version_info.outputs.slug_version }}
 
   get_prelude_hash:
     name: Get the latest prelude hash
@@ -28,13 +28,13 @@ jobs:
     outputs:
       prelude_hash: ${{ steps.get_latest_prelude_hash.outputs.prelude_hash }}
     steps:
-      - name: Shallow clone kuro-prelude
-        run: git clone --depth=1 https://github.com/facebook/kuro-prelude
+      - name: Shallow clone slug-prelude
+        run: git clone --depth=1 https://github.com/facebook/slug-prelude
       - name: Get latest commit hash into prelude_hash
         id: get_latest_prelude_hash
         run: |
           mkdir artifacts/
-          cd kuro-prelude/
+          cd slug-prelude/
           git rev-parse HEAD > ../artifacts/prelude_hash
           echo "prelude_hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Upload prelude_hash
@@ -93,7 +93,7 @@ jobs:
           targets: ${{ matrix.target.triple }}
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: kuro-upload
+          prefix-key: slug-upload
           key: ${{ matrix.target.triple }}
       - uses: actions-rs/install@v0.1
         if: matrix.target.cross
@@ -105,23 +105,23 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ matrix.target.is_windows }}" ]; then
-            echo "kuro_out=target/${{ matrix.target.triple }}/release/kuro.exe" >> "$GITHUB_OUTPUT"
-            echo "kuro_zst=artifacts/kuro-${{ matrix.target.triple }}.exe.zst" >> "$GITHUB_OUTPUT"
-            echo "kuro_rust_project_out=target/${{ matrix.target.triple }}/release/rust-project.exe" >> "$GITHUB_OUTPUT"
-            echo "kuro_rust_project_zst=artifacts/rust-project-${{ matrix.target.triple }}.exe.zst" >> "$GITHUB_OUTPUT"
+            echo "slug_out=target/${{ matrix.target.triple }}/release/slug.exe" >> "$GITHUB_OUTPUT"
+            echo "slug_zst=artifacts/slug-${{ matrix.target.triple }}.exe.zst" >> "$GITHUB_OUTPUT"
+            echo "slug_rust_project_out=target/${{ matrix.target.triple }}/release/rust-project.exe" >> "$GITHUB_OUTPUT"
+            echo "slug_rust_project_zst=artifacts/rust-project-${{ matrix.target.triple }}.exe.zst" >> "$GITHUB_OUTPUT"
           else
-            echo "kuro_out=target/${{ matrix.target.triple }}/release/kuro" >> "$GITHUB_OUTPUT"
-            echo "kuro_zst=artifacts/kuro-${{ matrix.target.triple }}.zst" >> "$GITHUB_OUTPUT"
-            echo "kuro_rust_project_out=target/${{ matrix.target.triple }}/release/rust-project" >> "$GITHUB_OUTPUT"
-            echo "kuro_rust_project_zst=artifacts/rust-project-${{ matrix.target.triple }}.zst" >> "$GITHUB_OUTPUT"
+            echo "slug_out=target/${{ matrix.target.triple }}/release/slug" >> "$GITHUB_OUTPUT"
+            echo "slug_zst=artifacts/slug-${{ matrix.target.triple }}.zst" >> "$GITHUB_OUTPUT"
+            echo "slug_rust_project_out=target/${{ matrix.target.triple }}/release/rust-project" >> "$GITHUB_OUTPUT"
+            echo "slug_rust_project_zst=artifacts/rust-project-${{ matrix.target.triple }}.zst" >> "$GITHUB_OUTPUT"
           fi
       - name: Build
         shell: bash
         env:
           # BUCK2 prefixed variables used within the build to stamp in a version information
-          # BUCK2_SET_EXPLICIT_VERSION will populate the kuro --version string
+          # BUCK2_SET_EXPLICIT_VERSION will populate the slug --version string
           BUCK2_RELEASE_TIMESTAMP: ${{ github.event.repository.updated_at }}
-          BUCK2_SET_EXPLICIT_VERSION: ${{ needs.set_version_info.outputs.kuro_version }}
+          BUCK2_SET_EXPLICIT_VERSION: ${{ needs.set_version_info.outputs.slug_version }}
           RUSTFLAGS: "--cfg tokio_unstable -C strip=debuginfo -C codegen-units=1"
         run: |
           # aarch64-linux builds need JEMALLOC_SYS_WITH_LG_PAGE=16
@@ -135,12 +135,12 @@ jobs:
           else
             CARGO=cargo
           fi
-          $CARGO build --release --bin kuro --bin rust-project --target ${{ matrix.target.triple }}
+          $CARGO build --release --bin slug --bin rust-project --target ${{ matrix.target.triple }}
       - name: Sanity check with examples/with_prelude
         if: ${{ !matrix.target.cross }}
         shell: bash
         run: |
-          BUCK2="$(pwd)/${{ steps.set_variables.outputs.kuro_out }}"
+          BUCK2="$(pwd)/${{ steps.set_variables.outputs.slug_out }}"
           cd examples/with_prelude
           # TODO: rust examples don't work on windows + arm64
           if [[ "${{ matrix.target.triple }}" == "aarch64-pc-windows-msvc" ]]; then
@@ -157,12 +157,12 @@ jobs:
         shell: bash
         run: |
           mkdir artifacts
-          zstd -z ${{ steps.set_variables.outputs.kuro_out }} -o ${{ steps.set_variables.outputs.kuro_zst }}
-          zstd -z ${{ steps.set_variables.outputs.kuro_rust_project_out }} -o ${{ steps.set_variables.outputs.kuro_rust_project_zst }}
+          zstd -z ${{ steps.set_variables.outputs.slug_out }} -o ${{ steps.set_variables.outputs.slug_zst }}
+          zstd -z ${{ steps.set_variables.outputs.slug_rust_project_out }} -o ${{ steps.set_variables.outputs.slug_rust_project_zst }}
       - name: Upload
         uses: actions/upload-artifact@v6
         with:
-          name: kuro-${{ matrix.target.triple }}
+          name: slug-${{ matrix.target.triple }}
           path: artifacts/
 
   release_latest:
@@ -249,22 +249,22 @@ jobs:
           tag: ${{ needs.check_for_bi_monthly_release.outputs.tag }}
 
   build_docs_job:
-    name: Publish kuro.build
+    name: Publish slug.build
     runs-on: ubuntu-latest
     needs:
       - build
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-    - name: Download Kuro
+    - name: Download Slug
       uses: actions/download-artifact@v7
       with:
-        name: kuro-x86_64-unknown-linux-gnu
+        name: slug-x86_64-unknown-linux-gnu
         path: artifacts
-    - name: Decompress Kuro
+    - name: Decompress Slug
       run: |
-        zstd -d artifacts/kuro-x86_64-unknown-linux-gnu.zst -o artifacts/kuro-release
-        chmod +x artifacts/kuro-release
+        zstd -d artifacts/slug-x86_64-unknown-linux-gnu.zst -o artifacts/slug-release
+        chmod +x artifacts/slug-release
     - name: Install dependencies
       run: |
         sudo apt-get install -y yarn
@@ -273,7 +273,7 @@ jobs:
       run: |
         cd website
         yarn
-        BUCK2_BIN="$GITHUB_WORKSPACE/artifacts/kuro-release" yarn build_prebuilt
+        BUCK2_BIN="$GITHUB_WORKSPACE/artifacts/slug-release" yarn build_prebuilt
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@v4
       with:

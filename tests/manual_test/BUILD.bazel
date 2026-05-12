@@ -204,7 +204,7 @@ platform(
 )
 
 # select() test: uses config_setting + platform for conditional deps.
-# Test with: kuro build //:select_test --target-platforms=//:linux_platform
+# Test with: slug build //:select_test --target-platforms=//:linux_platform
 # Expected: on linux_platform, selects hello.c; on macos_platform, selects lib.rs
 # The "//conditions:default" arm enables building without a specific platform.
 filegroup(
@@ -353,18 +353,18 @@ sh_library(
 # =============================================================================
 # Phase 16: sandbox write isolation test
 # This genrule writes outside its declared outputs. With --sandbox enabled,
-# the write to /tmp/kuro_sandbox_write_test.txt should be isolated (not visible
+# the write to /tmp/slug_sandbox_write_test.txt should be isolated (not visible
 # on the host filesystem after the build, because /tmp is a fresh tmpfs).
 # Without --sandbox (--nosandbox), the file IS created on the host.
 # =============================================================================
 genrule(
     name = "sandbox_write_test",
     outs = ["sandbox_write_out.txt"],
-    cmd = "echo 'hello' > /tmp/kuro_sandbox_write_test.txt && echo 'done' > $@",
+    cmd = "echo 'hello' > /tmp/slug_sandbox_write_test.txt && echo 'done' > $@",
 )
 
 # =============================================================================
-# test_suite: groups tests for expansion by kuro test
+# test_suite: groups tests for expansion by slug test
 # =============================================================================
 test_suite(
     name = "all_cc_tests",

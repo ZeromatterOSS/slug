@@ -5,7 +5,7 @@ title: Language / Ecosystem Support
 
 # Language / Ecosystem Support
 
-This page provides an overview of the programming languages supported by Kuro.
+This page provides an overview of the programming languages supported by Slug.
 
 | Language / Ecosystem | Prelude Available | Usability     | Documented | Maintainers                   |
 | -------------------- | ----------------- | ------------- | ---------- | ----------------------------- |
@@ -27,7 +27,7 @@ This page provides an overview of the programming languages supported by Kuro.
 
 ## Understanding the Table
 
-- **Prelude Available**: Indicates whether Kuro's prelude includes built-in
+- **Prelude Available**: Indicates whether Slug's prelude includes built-in
   rules for this language.
 - **Usability**: Indicates whether this language is possible or degree of setup
   required.
@@ -36,18 +36,18 @@ This page provides an overview of the programming languages supported by Kuro.
   - **Complex Setup**: Requires additional setup beyond simply installation
   - **Unavailable**: Rules are using tools that are not available
 - **Documented**: Indicates the level of documentation available for using this
-  language with Kuro.
+  language with Slug.
 - **Maintainers**: Teams or individuals responsible for maintaining support for
   this language.
 
 ## Adding Support for New Languages
 
-Kuro is designed to be extensible, allowing you to add support for additional
+Slug is designed to be extensible, allowing you to add support for additional
 programming languages. To add support for a new language, you typically need to:
 
 1. Define appropriate build rules in a `.bzl` file
 2. Create toolchain definitions for the language
-3. Write documentation for how to use the language with Kuro
+3. Write documentation for how to use the language with Slug
 
 For more information on creating custom rules and toolchains, see:
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Starlark implementation of filegroup rule for Kuro.
+"""Starlark implementation of filegroup rule for Slug.
 
 This provides a filegroup rule that groups files together and makes them
 available to other rules as dependencies.

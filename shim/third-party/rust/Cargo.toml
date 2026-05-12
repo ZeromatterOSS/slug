@@ -5,8 +5,8 @@
 # License, Version 2.0 found in the LICENSE-APACHE file in the root directory
 # of this source tree.
 
-# Definitions of third-party libraries used for kuro build of kuro.
-# This file is **not** used by cargo build of kuro.
+# Definitions of third-party libraries used for slug build of slug.
+# This file is **not** used by cargo build of slug.
 # See the <project_root>/docs/bootstrapping.md for more details.
 
 [workspace]

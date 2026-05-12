@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-//! This type is a copy-paste of `kuro_util::thin_box::ThinBoxSlice`, with some mild adjustments.
+//! This type is a copy-paste of `slug_util::thin_box::ThinBoxSlice`, with some mild adjustments.
 //!
 //! Specifically:
 //!  1. This type guarantees that it's always a pointer with the bottom bit zero.

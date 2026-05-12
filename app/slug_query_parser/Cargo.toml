@@ -1,0 +1,19 @@
+[package]
+description = "Slug query language parser"
+edition = "2024"
+license = { workspace = true }
+name = "slug_query_parser"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+derive_more = { workspace = true }
+enum-map = { workspace = true }
+nom = { workspace = true }
+nom-language = { workspace = true }
+
+dupe = { workspace = true }
+gazebo = { workspace = true }
+
+slug_error = { workspace = true }
+slug_util = { workspace = true }

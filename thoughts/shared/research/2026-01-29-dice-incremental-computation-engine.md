@@ -3,7 +3,7 @@ date: 2026-01-29T12:00:00-05:00
 researcher: Claude
 git_commit: de9665bc5ecc3112da78c9b975bd97a9ad1f8267
 branch: main
-repository: kuro
+repository: slug
 topic: "DICE Incremental Computation Engine - Algorithm, Design, and Comparison to Bazel Skyframe"
 tags: [research, codebase, dice, incremental-computation, skyframe, bazel, build-systems]
 status: complete
@@ -18,7 +18,7 @@ last_updated_note: "Added follow-up research comparing DICE to Bazel 9.0.0 with 
 **Researcher**: Claude
 **Git Commit**: de9665bc5ecc3112da78c9b975bd97a9ad1f8267
 **Branch**: main
-**Repository**: kuro
+**Repository**: slug
 
 ## Research Question
 
@@ -26,7 +26,7 @@ Conduct an in-depth exploration of the DICE portion of the codebase. Explain the
 
 ## Summary
 
-DICE (Dynamic Incremental Computation Engine) is Kuro's core incremental caching computation engine, providing the foundation for efficient incremental builds. It implements a sophisticated multi-version dependency tracking system that achieves **O(changed subset) recomputations** with only **O(invalidated subset) graph traversals**. DICE draws inspiration from systems like Adapton and Salsa but extends them with multi-version concurrency control (MVCC) for safe concurrent reads and writes.
+DICE (Dynamic Incremental Computation Engine) is Slug's core incremental caching computation engine, providing the foundation for efficient incremental builds. It implements a sophisticated multi-version dependency tracking system that achieves **O(changed subset) recomputations** with only **O(invalidated subset) graph traversals**. DICE draws inspiration from systems like Adapton and Salsa but extends them with multi-version concurrency control (MVCC) for safe concurrent reads and writes.
 
 Key differentiators from Bazel's Skyframe:
 - **Rust async/await model** vs Java's restart-based concurrency
@@ -248,9 +248,9 @@ If a recomputed value equals the previous value, dependents can reuse their cach
 
 ---
 
-### 5. DICE Usage in Kuro
+### 5. DICE Usage in Slug
 
-DICE powers all incremental computation in Kuro's build system:
+DICE powers all incremental computation in Slug's build system:
 
 #### Build Graph Layers
 
@@ -268,24 +268,24 @@ ActionKey                         // Action execution → outputs
 
 #### Key Implementations
 
-**InterpreterResultsKey** (`app/kuro_interpreter_for_build/src/interpreter/calculation.rs`):
+**InterpreterResultsKey** (`app/slug_interpreter_for_build/src/interpreter/calculation.rs`):
 ```rust
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
 pub struct InterpreterResultsKey(pub PackageLabel);
 
 impl Key for InterpreterResultsKey {
-    type Value = kuro_error::Result<Arc<EvaluationResult>>;
+    type Value = slug_error::Result<Arc<EvaluationResult>>;
     // Evaluates BUILD files → TargetNodes
 }
 ```
 
-**AnalysisKey** (`app/kuro_analysis/src/analysis/calculation.rs`):
+**AnalysisKey** (`app/slug_analysis/src/analysis/calculation.rs`):
 ```rust
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
 pub struct AnalysisKey(pub ConfiguredTargetLabel);
 
 impl Key for AnalysisKey {
-    type Value = kuro_error::Result<MaybeCompatible<AnalysisResult>>;
+    type Value = slug_error::Result<MaybeCompatible<AnalysisResult>>;
     // Runs rule implementation → providers + actions
 }
 ```
@@ -301,7 +301,7 @@ impl Key for AnalysisKey {
 
 ### 6. Comparison to Bazel Skyframe
 
-| Aspect | DICE (Kuro) | Skyframe (Bazel) |
+| Aspect | DICE (Slug) | Skyframe (Bazel) |
 |--------|-------------|------------------|
 | **Language** | Rust | Java |
 | **Concurrency Model** | Async/await with Tokio | Restart-based (null return → reinvoke) |
@@ -382,11 +382,11 @@ From DICE documentation benchmarks (word count on 1M files):
 - `dice/dice/src/api/transaction.rs` - Transaction semantics
 - `dice/dice/src/api/injected.rs` - InjectedKey for external values
 
-### Kuro Integration
-- `app/kuro_interpreter_for_build/src/interpreter/calculation.rs` - BUILD file parsing
-- `app/kuro_analysis/src/analysis/calculation.rs` - Target analysis
-- `app/kuro_build_api/src/actions/calculation.rs` - Action execution
-- `app/kuro_build_api/src/configure_dice.rs` - DICE initialization
+### Slug Integration
+- `app/slug_interpreter_for_build/src/interpreter/calculation.rs` - BUILD file parsing
+- `app/slug_analysis/src/analysis/calculation.rs` - Target analysis
+- `app/slug_build_api/src/actions/calculation.rs` - Action execution
+- `app/slug_build_api/src/configure_dice.rs` - DICE initialization
 
 ### Documentation
 - `dice/dice/docs/incrementality.md` - Incrementality overview

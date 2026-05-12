@@ -8,10 +8,10 @@ genrule(
 
 normal_nested_invocation(
     name = "nested_normal",
-    kuro_path = read_root_config("nested", "buck2_path"),
+    slug_path = read_root_config("nested", "buck2_path"),
 )
 
 trace_nested_invocation(
     name = "nested_trace",
-    kuro_path = read_root_config("nested", "buck2_path"),
+    slug_path = read_root_config("nested", "buck2_path"),
 )

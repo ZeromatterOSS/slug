@@ -1,6 +1,6 @@
 // Protocol Buffers - protoc with Python generator only
 // Minimal protoc that includes the Python code generator.
-// Used by py_proto_library in the Kuro test environment.
+// Used by py_proto_library in the Slug test environment.
 
 #include "absl/log/initialize.h"
 #include "google/protobuf/compiler/command_line_interface.h"

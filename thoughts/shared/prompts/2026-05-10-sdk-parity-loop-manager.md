@@ -1,14 +1,14 @@
-# Kuro SDK Bazel 9 Parity Loop Manager
+# Slug SDK Bazel 9 Parity Loop Manager
 
-Use this prompt for a new agent taking over the ongoing Kuro SDK parity loop.
+Use this prompt for a new agent taking over the ongoing Slug SDK parity loop.
 The agent is responsible for managing the full iterative process, not merely
 implementing one blocker-sized slice.
 
 ## Workspace
 
-- Kuro source repo: `/var/mnt/dev/kuro`
+- Slug source repo: `/var/mnt/dev/slug`
 - ZeroMatter SDK repro repo: `/var/mnt/dev/zeromatter`
-- Target goal: make Kuro build `//sdk:sdk_contents` in the zeromatter repo and
+- Target goal: make Slug build `//sdk:sdk_contents` in the zeromatter repo and
   produce output identical to the equivalent Bazel 9 invocation, with
   equivalent or better performance and memory behavior.
 
@@ -19,7 +19,7 @@ You own the loop overall.
 Do not stop after one local implementation slice just because that slice is
 committed. Continue until one of these is true:
 
-1. `//sdk:sdk_contents` builds under Kuro and output parity has been checked
+1. `//sdk:sdk_contents` builds under Slug and output parity has been checked
    against Bazel 9.
 2. A real blocker prevents forward progress and you leave a clean, explicit
    resume prompt with the exact next action, commands, logs, and state.
@@ -64,50 +64,50 @@ pasting log bodies into the manager thread.
 
 ## Required Reading Before Acting
 
-Read these first from `/var/mnt/dev/kuro`:
+Read these first from `/var/mnt/dev/slug`:
 
 - `AGENTS.md`
-- `thoughts/shared/plans/kuro-bazel-subplans/15-bazel-9-parity.md`
-- `thoughts/shared/plans/kuro-bazel-subplans/54-depset-transitive-set-shared-core.md`
-- `thoughts/shared/plans/kuro-bazel-subplans/55-symbolic-macro-inherit-attrs.md`
-- `thoughts/shared/plans/kuro-bazel-subplans/56-native-intrinsic-provider-shims.md`
+- `thoughts/shared/plans/slug-bazel-subplans/15-bazel-9-parity.md`
+- `thoughts/shared/plans/slug-bazel-subplans/54-depset-transitive-set-shared-core.md`
+- `thoughts/shared/plans/slug-bazel-subplans/55-symbolic-macro-inherit-attrs.md`
+- `thoughts/shared/plans/slug-bazel-subplans/56-native-intrinsic-provider-shims.md`
 - Any other plan referenced by the newest SDK failure.
 
 Then rediscover current state instead of trusting stale prompt details:
 
 ```sh
-cd /var/mnt/dev/kuro
+cd /var/mnt/dev/slug
 git status --short
 git log --oneline -8
-ps -eo pid,ppid,stat,etime,rss,args | rg 'kurod\[' || true
+ps -eo pid,ppid,stat,etime,rss,args | rg 'slugd\[' || true
 ```
 
 If the worktree is dirty, inspect the diff and preserve unrelated/user changes.
 Never revert work you did not make unless explicitly asked.
 
-## Standing Kurod Cleanup Rule
+## Standing Slugd Cleanup Rule
 
-There may be many idle `kurod` processes. Clean them up before and after every
-Kuro smoke or focused Kuro build. At minimum, use a targeted cleanup like:
+There may be many idle `slugd` processes. Clean them up before and after every
+Slug smoke or focused Slug build. At minimum, use a targeted cleanup like:
 
 ```sh
-cleanup_kurod() {
-  ps -eo pid=,args= | awk '/kurod\[/ {print $1}' | xargs -r kill -TERM
+cleanup_slugd() {
+  ps -eo pid=,args= | awk '/slugd\[/ {print $1}' | xargs -r kill -TERM
   sleep 2
-  ps -eo pid=,args= | awk '/kurod\[/ {print $1}' | xargs -r kill -KILL
+  ps -eo pid=,args= | awk '/slugd\[/ {print $1}' | xargs -r kill -KILL
 }
 
-cleanup_kurod
-ps -eo pid,ppid,stat,etime,rss,args | rg 'kurod\[' || true
+cleanup_slugd
+ps -eo pid,ppid,stat,etime,rss,args | rg 'slugd\[' || true
 ```
 
-Always report final daemon state. Do not leave long-running Kuro, smoke, or
+Always report final daemon state. Do not leave long-running Slug, smoke, or
 daemon sessions alive when handing off.
 
 ## Parity Rules
 
 - Bazel 9 parity only. No Bazel 8 compatibility and no WORKSPACE support.
-- Do not mask Bazel failures. If Bazel 9 fails, Kuro should fail in the same
+- Do not mask Bazel failures. If Bazel 9 fails, Slug should fail in the same
   shape.
 - Do not fix SDK blockers with one-off target or label workarounds.
 - Do not optimize for the smallest patch that advances the current smoke.
@@ -116,7 +116,7 @@ daemon sessions alive when handing off.
 - Do not weaken depset mutable-value validation.
 - Preserve TransitiveSet streaming, projection, reduction, and action-input
   behavior.
-- Do not make Bazel depset a public alias for Kuro/Buck TransitiveSet.
+- Do not make Bazel depset a public alias for Slug/Buck TransitiveSet.
 - Do not special-case a label or target unless Bazel itself has that exact
   intrinsic boundary.
 - Prefer `Native`, `Intrinsic`, or `NativeShim` terminology. Do not introduce
@@ -134,7 +134,7 @@ Before editing code for a new failure, write down the class boundary in the
 active plan or subplan:
 
 - What Bazel semantic is missing or wrong?
-- Which Kuro subsystem owns that semantic?
+- Which Slug subsystem owns that semantic?
 - What other targets, rules, features, or toolchains would fail for the same
   reason?
 - What would count as a one-off workaround for this failure?
@@ -199,34 +199,34 @@ For every new SDK failure or stall:
 
 ## Recommended SDK Smoke
 
-Run from `/var/mnt/dev/zeromatter`, using the Kuro binary built from
-`/var/mnt/dev/kuro`:
+Run from `/var/mnt/dev/zeromatter`, using the Slug binary built from
+`/var/mnt/dev/slug`:
 
 ```sh
 cd /var/mnt/dev/zeromatter
 
-cleanup_kurod() {
-  ps -eo pid=,args= | awk '/kurod\[/ {print $1}' | xargs -r kill -TERM
+cleanup_slugd() {
+  ps -eo pid=,args= | awk '/slugd\[/ {print $1}' | xargs -r kill -TERM
   sleep 2
-  ps -eo pid=,args= | awk '/kurod\[/ {print $1}' | xargs -r kill -KILL
+  ps -eo pid=,args= | awk '/slugd\[/ {print $1}' | xargs -r kill -KILL
 }
 
 isolation="sdk-parity-$(date +%Y%m%d-%H%M%S)"
 log="/tmp/${isolation}.log"
 
-cleanup_kurod
+cleanup_slugd
 set +e
-timeout 900s env KURO_MEMORY_CHECKPOINTS=1 \
-  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+timeout 900s env SLUG_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/slug/scripts/memory_smoke.sh \
     --interval 5 \
-    --include-pgrep "kurod\\[zeromatter\\].*${isolation}" \
+    --include-pgrep "slugd\\[zeromatter\\].*${isolation}" \
     -- \
-    /var/mnt/dev/kuro/target/debug/kuro \
+    /var/mnt/dev/slug/target/debug/slug \
       --isolation-dir "${isolation}" \
       build //sdk:sdk_contents > "${log}" 2>&1
 status=$?
-cleanup_kurod
-ps -eo pid,ppid,stat,etime,rss,args | rg 'kurod\[' || true
+cleanup_slugd
+ps -eo pid,ppid,stat,etime,rss,args | rg 'slugd\[' || true
 tail -220 "${log}"
 exit "${status}"
 ```
@@ -249,16 +249,16 @@ above options.
 Use the narrowest useful checks first, then broaden:
 
 ```sh
-cd /var/mnt/dev/kuro
+cd /var/mnt/dev/slug
 cargo fmt
 cargo test -p <touched-crate> <focused-test> -- --nocapture
-cargo check -p kuro
-cargo build -p kuro
+cargo check -p slug
+cargo build -p slug
 git diff --check
 ```
 
 Run relevant pytest fixtures under `tests/core/...` when pytest is available.
-If pytest is unavailable, state that and use direct Kuro fixture builds where
+If pytest is unavailable, state that and use direct Slug fixture builds where
 practical.
 
 Always rerun a bounded zeromatter SDK smoke after meaningful changes.
@@ -291,6 +291,6 @@ When ending a turn, leave the next agent or user with:
 - New blocker classification and linked plan section.
 - What was implemented and verified.
 - Whether Bazel 9 output parity has been checked.
-- Final `kurod[...]` process status.
+- Final `slugd[...]` process status.
 
 If you cannot complete the overall goal, make the next action unambiguous.

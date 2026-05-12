@@ -1,0 +1,18 @@
+[package]
+description = "Supporting code and utilities for manipulating offline build archives"
+edition = "2024"
+license = { workspace = true }
+name = "slug_offline_archive"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+serde = { workspace = true }
+
+slug_core = { workspace = true }
+slug_error = { workspace = true }
+slug_fs = { workspace = true }
+slug_util = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+tempfile = { workspace = true }

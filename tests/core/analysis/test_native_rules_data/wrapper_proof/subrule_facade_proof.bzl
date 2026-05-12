@@ -2,13 +2,13 @@
 # (Stage 3) but for the subrule dispatch path. The rule impl invokes
 # a `subrule()` defined in this file; the subrule's `ctx` should be
 # the Stage-5-tagged facade installed by `_invoke_subrule` in
-# `@kuro_builtins//:exports.bzl`.
+# `@slug_builtins//:exports.bzl`.
 #
 # The subrule impl checks:
 #
-#   1. `ctx.kuro_facade_active == True` — proves the subrule wrapper
+#   1. `ctx.slug_facade_active == True` — proves the subrule wrapper
 #      replaced raw_ctx with a struct facade.
-#   2. `ctx.kuro_facade_kind == "subrule"` — proves the SUBRULE
+#   2. `ctx.slug_facade_kind == "subrule"` — proves the SUBRULE
 #      wrapper produced the facade, not the rule wrapper. (Without
 #      this distinction, the Stage 3 facade leaking through TLS would
 #      silently pass the active-marker check.)
@@ -23,11 +23,11 @@ _HOST_OS_LABEL = "@platforms//os:linux"
 _NON_HOST_OS_LABEL = "@platforms//os:windows"
 
 def _facade_subrule_impl(ctx, *, sentinel):
-    if not getattr(ctx, "kuro_facade_active", False):
-        fail("Plan 28.4 Stage 5: ctx.kuro_facade_active missing inside subrule")
-    kind = getattr(ctx, "kuro_facade_kind", "")
+    if not getattr(ctx, "slug_facade_active", False):
+        fail("Plan 28.4 Stage 5: ctx.slug_facade_active missing inside subrule")
+    kind = getattr(ctx, "slug_facade_kind", "")
     if kind != "subrule":
-        fail("Plan 28.4 Stage 5: ctx.kuro_facade_kind = %r (want \"subrule\")" % kind)
+        fail("Plan 28.4 Stage 5: ctx.slug_facade_kind = %r (want \"subrule\")" % kind)
     if sentinel != "kwarg-from-rule":
         fail("Plan 28.4 Stage 5: subrule kwarg sentinel was %r, expected \"kwarg-from-rule\"" % sentinel)
 

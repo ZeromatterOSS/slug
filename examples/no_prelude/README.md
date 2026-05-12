@@ -1,7 +1,7 @@
 ## No-prelude example
 
 This is an example project that does not rely on
-https://github.com/facebook/kuro-prelude. Instead the prelude cell points to a
+https://github.com/facebook/slug-prelude. Instead the prelude cell points to a
 `prelude` directory with an empty `prelude.bzl` file, like so:
 
 ```
@@ -16,13 +16,13 @@ All rules and toolchains are defined manually within each of the subdirectories.
 
 ## Sample commands
 
-Install Kuro, cd into a project, and run
+Install Slug, cd into a project, and run
 
 ```bash
 # List all targets
-kuro targets //...
+slug targets //...
 # Build all targets
-kuro build //...
+slug build //...
 # Run C++ hello_world main
-kuro run //cpp/hello_world:main
+slug run //cpp/hello_world:main
 ```

@@ -1,9 +1,9 @@
 # APIs
 
-A lot of Kuro is driven by Starlark APIs. While there is a
+A lot of Slug is driven by Starlark APIs. While there is a
 [Starlark specification](https://github.com/bazelbuild/starlark/blob/master/spec.md),
 for most purposes it can be considered a subset of Python. There are three main
-places you can write Starlark in Kuro:
+places you can write Starlark in Slug:
 
 - In `BUCK` files, where you can define the rules. The most interesting
   functions are [the rules themselves](../prelude/rules/), but you will often

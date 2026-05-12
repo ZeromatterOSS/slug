@@ -20,9 +20,9 @@ on a fresh tree — look at the `load_wall_us` slice of the resulting
 `summary.json`. If load wall >> analyze wall on first daemon start,
 module hashing is likely dominant.
 
-Code sites: `app/kuro_external_cells/src/*.rs`,
-`app/kuro_bzlmod/src/resolution.rs` (registry + source fetch),
-`app/kuro_bzlmod/src/source_fetcher.rs`.
+Code sites: `app/slug_external_cells/src/*.rs`,
+`app/slug_bzlmod/src/resolution.rs` (registry + source fetch),
+`app/slug_bzlmod/src/source_fetcher.rs`.
 
 ### 17.8 DICE key granularity review
 
@@ -40,10 +40,10 @@ How to measure: extend Plan 16.8 harness with an `--incremental`
 mode that touches one `.cc` and measures the rebuild scope. Plan 17
 open question already flagged this.
 
-### 17.9 kuro_error allocation sites
+### 17.9 slug_error allocation sites
 
 Low priority until a flame graph from the Plan 16 harness surfaces
-`kuro_error::Error::new` / backtrace capture as a hot-path frame.
+`slug_error::Error::new` / backtrace capture as a hot-path frame.
 Documented in the plan as "Low priority unless plan-16 flame graphs
 surface it." Leaving parked.
 
@@ -52,7 +52,7 @@ surface it." Leaving parked.
 Run the Plan 16 harness on the current tree to establish a baseline:
 
 ```bash
-KURO=$(pwd)/target/debug/kuro tools/bench/run.sh \
+SLUG=$(pwd)/target/debug/slug tools/bench/run.sh \
     --target '@llvm-project//clang:clang' --runs 3 --cold \
     --workspace /var/mnt/dev/llvm-project/utils/bazel \
     --out benchmarks/baseline-post-plan-16

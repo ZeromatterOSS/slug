@@ -7,7 +7,7 @@ import { FbInternalOnly } from 'docusaurus-plugin-internaldocs-fb/internal';
 
 ## Why is stdin being swallowed?
 
-Kuro offers an interactive console by default.
+Slug offers an interactive console by default.
 
 To disable either use an env var: `BUCK_NO_INTERACTIVE_CONSOLE` or a flag:
 `--no-interactive-console`
@@ -15,11 +15,11 @@ To disable either use an env var: `BUCK_NO_INTERACTIVE_CONSOLE` or a flag:
 ## Where is my output file?
 
 To find the location of output for a target, use
-`kuro build //foo:bar --show-output`. This will print the output corresponding
+`slug build //foo:bar --show-output`. This will print the output corresponding
 to each built target, in this case `//foo:bar output_path`.
 
 To only get the output path (without the target beforehand) you want to use
-`kuro build //foo:bar --show-simple-output`.
+`slug build //foo:bar --show-simple-output`.
 
 The resultant path is relative to the root of the repo (such as
 `~/repo_root/...`). For the full path use `--show-full-output` or
@@ -32,17 +32,17 @@ Note: in Buck1, the path is relative to the enclosing cell (such as
 For Meta, repo_root = fbsource, cell = fbcode/fbobjc/...
 </FbInternalOnly>
 
-## Why is Kuro hanging?
+## Why is Slug hanging?
 
-If Kuro seems to be doing nothing, it could be caused be a cycle in your
-dependencies, which may cause Kuro to hang (Kuro does implement a form of
+If Slug seems to be doing nothing, it could be caused be a cycle in your
+dependencies, which may cause Slug to hang (Slug does implement a form of
 cycle detection, but it unfortunately has false negatives). You can confirm this
 by running Buck1, which will report cycles properly.
 
-## How do I get the commands Kuro executed so I can reproduce them in isolation?
+## How do I get the commands Slug executed so I can reproduce them in isolation?
 
 For information, see
-[Finding Commands that Kuro Ran](../../developers/what-ran.md).
+[Finding Commands that Slug Ran](../../developers/what-ran.md).
 
 ## Are multiple concurrent commands supported?
 
@@ -53,31 +53,31 @@ invocations, and 2) recursive invocations.
 
 If the state of all the commands are the same, then they will run at the same
 time. "State" is referring to the same configs and source files. If the state is
-different amongst the commands, then kuro will block the commands properly such
+different amongst the commands, then slug will block the commands properly such
 that the states do not interfere with each other. Different states are caused by
 source file changes or config changes (ex: using a different mode).
 
 **Recursive invocations:**
 
-A recursive invocation is when an outer kuro command ends up calling another
-kuro command as it's running. Recursive invocations are most commonly seen with
+A recursive invocation is when an outer slug command ends up calling another
+slug command as it's running. Recursive invocations are most commonly seen with
 genrules and tests. For example:
 
-- If you have a `genrule` where the command contains a `kuro cquery`, and you
-  build the genrule with `kuro build`, you have a recursive invocation where
-  the outer command is `kuro build` and the inner command is `kuro cquery`
-- If you have a test which contains `kuro build`, and you run your test with
-  `kuro test`, you have a recursive invocation where the outer command is
-  `kuro test` and the inner command is `kuro build`
+- If you have a `genrule` where the command contains a `slug cquery`, and you
+  build the genrule with `slug build`, you have a recursive invocation where
+  the outer command is `slug build` and the inner command is `slug cquery`
+- If you have a test which contains `slug build`, and you run your test with
+  `slug test`, you have a recursive invocation where the outer command is
+  `slug test` and the inner command is `slug build`
 
 Recursive invocations should specify an
-[`--isolation-dir`](../../concepts/isolation_dir.md), or else kuro will return
+[`--isolation-dir`](../../concepts/isolation_dir.md), or else slug will return
 an error.
 
 ## Why did my build OOM?
 
 If your build OOMs, you can check the last actions running by using
-`kuro log whatup`. This will print the superconsole state at the moment the
+`slug log whatup`. This will print the superconsole state at the moment the
 event log ended, which will indicate what actions were being run (and consuming
 memory) when your machine ran out of memory.
 

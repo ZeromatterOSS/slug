@@ -14,7 +14,7 @@ It is injected as a global in BUILD files via the bootstrap mechanism.
 
 The cc_common module has two types of methods:
 
-1. ACTION PRIMITIVES - Create/manipulate build actions. Since Kuro only supports
+1. ACTION PRIMITIVES - Create/manipulate build actions. Since Slug only supports
    Bazel 9.0 and these are all stubs, they return None.
    - create_cc_compile_action, create_cc_compile_action_template
    - wrap_link_actions, declare_compile_output_file, declare_other_output_file

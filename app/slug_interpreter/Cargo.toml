@@ -1,0 +1,40 @@
+[package]
+description = "Interprets build files and handles loading and interpreting extension files, and communicating this information to DICE"
+edition = "2024"
+license = { workspace = true }
+name = "slug_interpreter"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+derivative = { workspace = true }
+derive_more = { workspace = true }
+either = { workspace = true }
+fancy-regex = { workspace = true }
+itertools = { workspace = true }
+plist = { workspace = true }
+ref-cast = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+triomphe = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+pagable = { workspace = true }
+starlark = { workspace = true }
+starlark_map = { workspace = true }
+
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_fs = { workspace = true }
+slug_util = { workspace = true }
+dice_futures = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -6,26 +6,26 @@ title: Observability and Optimization
 import { FbInternalOnly } from 'docusaurus-plugin-internaldocs-fb/internal';
 
 Optimization involves the use of techniques for determining and improving the
-performance of Kuro and specific actions performed by Kuro. This page covers
-the internals for developers of Kuro and provides details of Starlark that are
+performance of Slug and specific actions performed by Slug. This page covers
+the internals for developers of Slug and provides details of Starlark that are
 likely to be relevant to end users.
 
 ## Starlark profiling
 
-`kuro` supports profiling of the evaluation of specific `BUCK` files and
+`slug` supports profiling of the evaluation of specific `BUCK` files and
 profiling of the analysis of specific targets.
 
-There are three `kuro` profiling commands:
+There are three `slug` profiling commands:
 
-- `kuro profile loading`
-- `kuro profile analysis`
-- `kuro profile bxl`
+- `slug profile loading`
+- `slug profile analysis`
+- `slug profile bxl`
 
 For example:
 
 ```shell
-kuro profile loading --mode=heap-summary-allocated -o heap-summary.csv //some/package:
-kuro profile analysis --mode=heap-summary-allocated -o heap-summary.csv //some/package:target
+slug profile loading --mode=heap-summary-allocated -o heap-summary.csv //some/package:
+slug profile analysis --mode=heap-summary-allocated -o heap-summary.csv //some/package:target
 ```
 
 Possible values for profiling modes are as follows:
@@ -144,9 +144,9 @@ can download an example [here](https://www.internalfb.com/intern/px/p/1Mz2W)).
 
 - Profiling on Linux can be done with
   `perf record -g --call-graph=dwarf,20000 ...` and `perf report --call-graph`
-  - Don't profile the `kuro` process directly unless you are interested in
-    profiling the CLI; you likely want to profile the `kuro` daemon process.
-    You can find the pid with `kuro status` and attach `perf` to that PID.
+  - Don't profile the `slug` process directly unless you are interested in
+    profiling the CLI; you likely want to profile the `slug` daemon process.
+    You can find the pid with `slug status` and attach `perf` to that PID.
 - Profiling on Mac can be done with `Instruments`<FbInternalOnly> (for details,
   see the Wiki article
   [Running and Testing Builds](https://www.internalfb.com/intern/wiki/GraphQL/Build_Infra/Running_and_Testing_Builds/#profiling-the-rust-code))</FbInternalOnly>.

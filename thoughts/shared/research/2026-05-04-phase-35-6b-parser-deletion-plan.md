@@ -7,7 +7,7 @@ files; keep `LegacyBuckConfig` struct + lookup API.
 
 ---
 
-## Section 1: Inventory of `app/kuro_common/src/legacy_configs/`
+## Section 1: Inventory of `app/slug_common/src/legacy_configs/`
 
 | File | LOC | Role | Disposition |
 |------|-----|------|-------------|
@@ -48,9 +48,9 @@ The large legacy-only `.buckconfig [cells]` / `[external_cells]` path (lines 537
 
 ### How prelude/.buckconfig and bazel_tools/.buckconfig are used
 
-`app/kuro_external_cells_bundled/build.rs` walks `prelude/` and `bazel_tools/` at **compile time** and emits `prelude_include.rs` / `bazel_tools_include.rs` as `include!()` data arrays. These arrays contain every file in the directory, including `.buckconfig`. The files are embedded as raw bytes into the binary.
+`app/slug_external_cells_bundled/build.rs` walks `prelude/` and `bazel_tools/` at **compile time** and emits `prelude_include.rs` / `bazel_tools_include.rs` as `include!()` data arrays. These arrays contain every file in the directory, including `.buckconfig`. The files are embedded as raw bytes into the binary.
 
-At **runtime**, `ExternalCellsImpl::materialize_cell_files()` (in `app/kuro_common/src/external_cells.rs`) writes these byte arrays to disk. The `.buckconfig` bytes are written to the materialized cell directory as a real file.
+At **runtime**, `ExternalCellsImpl::materialize_cell_files()` (in `app/slug_common/src/external_cells.rs`) writes these byte arrays to disk. The `.buckconfig` bytes are written to the materialized cell directory as a real file.
 
 **The runtime parser is then invoked** via `parse_single_cell_with_dice()` (in `dice.rs`, line 195), which calls `BuckConfigBasedCells::parse_single_cell_with_dice()` → `parse_single_cell_with_file_ops_inner()` → reads `.buckconfig` from the cell directory and parses it with `LegacyConfigParser`.
 
@@ -77,13 +77,13 @@ If any non-bzlmod code path must survive (e.g., `CellAliasResolverKey` on DICE w
 
 ### Step A — Add `LegacyBuckConfig::from_overrides_only(args: &[ConfigOverride])` constructor
 
-**Files:** `app/kuro_common/src/legacy_configs/configs.rs`
+**Files:** `app/slug_common/src/legacy_configs/configs.rs`
 
 New constructor in `configs.rs`:
 
 ```rust
-pub fn from_overrides_only(args: &[kuro_cli_proto::ConfigOverride]) -> kuro_error::Result<Self> {
-    use kuro_cli_proto::config_override::ConfigType;
+pub fn from_overrides_only(args: &[slug_cli_proto::ConfigOverride]) -> slug_error::Result<Self> {
+    use slug_cli_proto::config_override::ConfigType;
     let mut sections: std::collections::BTreeMap<String, SortedMap<String, ConfigValue>> =
         std::collections::BTreeMap::new();
     for arg in args {
@@ -121,7 +121,7 @@ Note: `ConfigValue::new_raw_arg` already exists and sets `resolved_value = Unkno
 
 ### Step B — Replace `ExternalBuckconfigData` with a CLI-args-only version
 
-**Files:** `app/kuro_common/src/legacy_configs/cells.rs`, `app/kuro_common/src/legacy_configs/args.rs`
+**Files:** `app/slug_common/src/legacy_configs/cells.rs`, `app/slug_common/src/legacy_configs/args.rs`
 
 Currently `ExternalBuckconfigData` holds:
 - `external_path_configs: Vec<ExternalPathBuckconfigData>` — parsed external files
@@ -148,7 +148,7 @@ The `get_buckconfig_components()` proto serialization method still works — it 
 
 ### Step C — Simplify `parse_single_cell_with_dice` (DICE side)
 
-**Files:** `app/kuro_common/src/legacy_configs/dice.rs` (line 195 `LegacyBuckConfigForCellKey::compute`)
+**Files:** `app/slug_common/src/legacy_configs/dice.rs` (line 195 `LegacyBuckConfigForCellKey::compute`)
 
 The `compute` function currently calls `BuckConfigBasedCells::parse_single_cell_with_dice()` which reads the cell's `.buckconfig`. After Step B, that becomes `from_overrides_only(external_data.args)` for every cell — all cells see the same CLI-derived KV store.
 
@@ -160,13 +160,13 @@ The `filter_values(is_config_invisible_to_dice)` call at line 200 is still corre
 
 **No API change.** `HasLegacyConfigs`, `SetLegacyConfigs`, `OpaqueLegacyBuckConfigOnDice`, projections — all unchanged.
 
-**Validation:** `kuro audit config section.key` returns values set via `-c section.key=value` but not from `.buckconfig` files. The existing DICE equality test in `dice.rs` still passes.
+**Validation:** `slug audit config section.key` returns values set via `-c section.key=value` but not from `.buckconfig` files. The existing DICE equality test in `dice.rs` still passes.
 
 ---
 
 ### Step D — Gut `buildfiles.rs` fallback to hardcoded defaults
 
-**Files:** `app/kuro_common/src/buildfiles.rs`
+**Files:** `app/slug_common/src/buildfiles.rs`
 
 `parse_buildfile_name` currently reads `[buildfile] name` and `[buildfile] extra_for_test` from buckconfig. With Q1=B and no `.buckconfig` files, these keys will never be set unless passed via `-c buildfile.name=...`. That behavior is actually correct and should be kept as-is: the KV store supports CLI overrides for these keys, and `parse_buildfile_name` does the right thing by returning the defaults (`BUILD.bazel`, `BUILD`) when the keys are absent.
 
@@ -176,7 +176,7 @@ The `filter_values(is_config_invisible_to_dice)` call at line 200 is still corre
 
 ### Step E — Handle bundled-cell `.buckconfig` in `dice/cells.rs`
 
-**Files:** `app/kuro_common/src/dice/cells.rs` (line 143 `CellAliasResolverKey::compute`)
+**Files:** `app/slug_common/src/dice/cells.rs` (line 143 `CellAliasResolverKey::compute`)
 
 This DICE key calls `ctx.get_legacy_config_for_cell(self.0)` and then calls `BuckConfigBasedCells::get_cell_aliases_from_config(&config)` — but only when `!is_bzlmod`. For all bzlmod projects, this branch is already skipped (line 160). The fallback path reads cell aliases from per-cell `.buckconfig`, which is the legacy path.
 
@@ -191,17 +191,17 @@ The bundled-cell `.buckconfig` files (`prelude/.buckconfig`, `bazel_tools/.buckc
 ### Step F — Delete file-parser modules
 
 **Files to delete:**
-- `app/kuro_common/src/legacy_configs/parser.rs`
-- `app/kuro_common/src/legacy_configs/parser/` directory (contains `resolver.rs`)
-- `app/kuro_common/src/legacy_configs/file_ops.rs`
-- `app/kuro_common/src/legacy_configs/path.rs`
+- `app/slug_common/src/legacy_configs/parser.rs`
+- `app/slug_common/src/legacy_configs/parser/` directory (contains `resolver.rs`)
+- `app/slug_common/src/legacy_configs/file_ops.rs`
+- `app/slug_common/src/legacy_configs/path.rs`
 
 Also delete or inline into Step B:
 - `ExternalPathBuckconfigData` struct
 - `ExternalConfigFile` struct
 - `LegacyConfigParser` usage in `args.rs`
 
-**Validation:** `cargo build -p kuro_common` compiles without errors. Remove or rewrite unit tests in `configs.rs` that use `TestConfigParserFileOps` and `testing::parse`.
+**Validation:** `cargo build -p slug_common` compiles without errors. Remove or rewrite unit tests in `configs.rs` that use `TestConfigParserFileOps` and `testing::parse`.
 
 ---
 
@@ -212,14 +212,14 @@ Also delete or inline into Step B:
 These fixtures are used by tests that do NOT have `MODULE.bazel`. They currently rely on `.buckconfig` for cell resolution. Two options:
 
 1. **Add `MODULE.bazel`** to each test fixture directory (replacing the `[repositories]` section). This is the correct long-term fix and enables these tests to pass without the legacy parser.
-2. **Mark affected tests as skipped** if they are already in the "Bucket-C" category (tests that require kuro-specific knobs not yet CLI-flag-addressable).
+2. **Mark affected tests as skipped** if they are already in the "Bucket-C" category (tests that require slug-specific knobs not yet CLI-flag-addressable).
 
-Given the test infrastructure comment "current test status: 861 pass, 152 skip" and the Bucket-C classification in the `.buckconfig` headers, most of these fixtures belong to tests that are already skipped or use kuro-specific config that hasn't been migrated. A complete audit of these 30 fixtures against the skip list is required before deletion.
+Given the test infrastructure comment "current test status: 861 pass, 152 skip" and the Bucket-C classification in the `.buckconfig` headers, most of these fixtures belong to tests that are already skipped or use slug-specific config that hasn't been migrated. A complete audit of these 30 fixtures against the skip list is required before deletion.
 
 **Active `.buckconfigs` that may be load-bearing:**
 - `tests/core/errors/test_errors_data/.buckconfig` — no MODULE.bazel; uses `[repositories]` for multi-cell setup
-- `tests/core/cycle_detection/test_cycle_detection_data/.buckconfig` — `[kuro] detect_cycles = disabled`, a kuro-specific flag
-- `tests/core/bxl/test_build_data/.buckconfig` + `test_actions_data/.buckconfig` — `[external_cells] nano_prelude = bundled`; these tests are Bucket-C (RE-dependent or kuro-specific)
+- `tests/core/cycle_detection/test_cycle_detection_data/.buckconfig` — `[slug] detect_cycles = disabled`, a slug-specific flag
+- `tests/core/bxl/test_build_data/.buckconfig` + `test_actions_data/.buckconfig` — `[external_cells] nano_prelude = bundled`; these tests are Bucket-C (RE-dependent or slug-specific)
 - `tests/manual_test/.buckconfig` — already empty (just a comment); deletable
 
 ---
@@ -228,13 +228,13 @@ Given the test infrastructure comment "current test status: 861 pass, 152 skip" 
 
 ### R1: `audit config` iterates all sections via `all_sections()` + `iter()`
 
-`kuro_cmd_audit_server/src/config.rs` line 288 calls `cell_config.all_sections()` to dump all config keys. After this plan, `audit config` will only show values set via `-c`. This is correct behavior. No code change needed, but it is a user-visible behavior change that should be documented.
+`slug_cmd_audit_server/src/config.rs` line 288 calls `cell_config.all_sections()` to dump all config keys. After this plan, `audit config` will only show values set via `-c`. This is correct behavior. No code change needed, but it is a user-visible behavior change that should be documented.
 
 ### R2: `--config-file` arg support
 
 The `File` variant of `ResolvedLegacyConfigArg` (reading an external `.buckconfig`-format file via `--config-file`) currently invokes the full file parser. With Q1=B, this feature is effectively dropped. Before removing `ExternalConfigFile`, check whether any CI or user invocations use `--config-file`. If yes, either keep a minimal parser for this case or return an error with a deprecation message.
 
-The `resolve_config_file_arg` function in `args.rs` would need to be removed or made to return an error/warning. The proto field `ConfigType::File` in `kuro_cli_proto` may still be sent by old clients — returning an error is safer than silently ignoring.
+The `resolve_config_file_arg` function in `args.rs` would need to be removed or made to return an error/warning. The proto field `ConfigType::File` in `slug_cli_proto` may still be sent by old clients — returning an error is safer than silently ignoring.
 
 ### R3: `$(config section.key)` variable interpolation in config values
 
@@ -242,13 +242,13 @@ The `parser/resolver.rs` implements `$(config ...)` reference expansion. This is
 
 ### R4: Bucket-C test fixtures still need a cell-resolution story
 
-The ~28 `tests/core/**/.buckconfig` files without `MODULE.bazel` are all in skipped or kuro-specific tests. They are not immediately blocking for parser deletion, but they are technical debt. The safest approach is to leave the legacy `!has_module_bazel` code path in `cells.rs` compiling (even if the parser is hollowed out — an empty `from_overrides_only` result is returned for these cells, meaning their `[repositories]` stanzas are silently ignored). This will break those tests' cell resolution, but since they are already skipped, it's not a regression.
+The ~28 `tests/core/**/.buckconfig` files without `MODULE.bazel` are all in skipped or slug-specific tests. They are not immediately blocking for parser deletion, but they are technical debt. The safest approach is to leave the legacy `!has_module_bazel` code path in `cells.rs` compiling (even if the parser is hollowed out — an empty `from_overrides_only` result is returned for these cells, meaning their `[repositories]` stanzas are silently ignored). This will break those tests' cell resolution, but since they are already skipped, it's not a regression.
 
 If any Bucket-C test is passing today via `.buckconfig` cell resolution, it will break. The test audit (task #11) should identify these.
 
-### R5: `kuro_re_client` and `scuba` in `CONFIGS_INVISIBLE_TO_DICE`
+### R5: `slug_re_client` and `scuba` in `CONFIGS_INVISIBLE_TO_DICE`
 
-These two keys in `dice.rs` are referenced in `CONFIGS_INVISIBLE_TO_DICE`. After the parser deletion, these keys can only come from `-c kuro_re_client.address=...` CLI flags (which does happen — see `common.rs:1251`). The `is_config_invisible_to_dice` filter is still correct: these RE-client knobs should not cause DICE invalidations. No change needed.
+These two keys in `dice.rs` are referenced in `CONFIGS_INVISIBLE_TO_DICE`. After the parser deletion, these keys can only come from `-c slug_re_client.address=...` CLI flags (which does happen — see `common.rs:1251`). The `is_config_invisible_to_dice` filter is still correct: these RE-client knobs should not cause DICE invalidations. No change needed.
 
 ### R6: `LegacyBuckConfig::compare()` in DICE equality checks
 
@@ -274,14 +274,14 @@ Searching `nodes.rs` for `BuckconfigKeyRef` returns no results. The `ConfigPatte
 - Remove `get_project_buckconfig_paths()` call
 - Remove `file_ops` parameter from `parse_single_cell_with_file_ops_inner`
 - In `parse_with_file_ops_and_options_inner`: remove `get_external_buckconfig_paths()` and `start_parse_for_external_files()` calls; set `started_parse = Vec::new()`
-- Verify: `cargo test -p kuro_common`; fix any test that provided inline `.buckconfig` data for config values (most should work since defaults are unchanged)
+- Verify: `cargo test -p slug_common`; fix any test that provided inline `.buckconfig` data for config values (most should work since defaults are unchanged)
 
 ### Commit 3 — Remove `ExternalPathBuckconfigData` + `ExternalConfigFile` + `File` arm of `resolve_config_args`
 
 - In `cells.rs`: `ExternalBuckconfigData.external_path_configs` field becomes `Vec<ResolvedConfigFlag>` or is removed entirely; `get_buckconfig_components` simplified
 - In `args.rs`: `ExternalConfigFile` struct removed; `ResolvedConfigFile` and `ResolvedLegacyConfigArg::File` variant: either removed or emits a warning and is skipped
 - Delete `LegacyConfigParser::combine()` call in `args.rs`
-- Verify: build + run `kuro audit config buck2.log_to_json` — still works since it reads from DICE which now has the CLI-flag config
+- Verify: build + run `slug audit config buck2.log_to_json` — still works since it reads from DICE which now has the CLI-flag config
 
 ### Commit 4 — Delete `file_ops.rs`, `path.rs`, `parser.rs`, `parser/resolver.rs`
 
@@ -289,7 +289,7 @@ Searching `nodes.rs` for `BuckconfigKeyRef` returns no results. The `ConfigPatte
 - Remove all `use crate::legacy_configs::file_ops::*` / `parser::*` / `path::*` imports from `cells.rs`, `args.rs`, `configs.rs`
 - Remove `DefaultConfigParserFileOps` and `DiceConfigFileOps` from `file_ops.rs` (they were only needed for `parse_*_with_file_ops` entry points)
 - Remove `ConfigParserFileOps` trait (used as function parameters in now-deleted functions)
-- Verify: `cargo build -p kuro_common --all-targets`
+- Verify: `cargo build -p slug_common --all-targets`
 
 ### Commit 5 — Clean up test helpers and update unit tests
 
@@ -312,13 +312,13 @@ Searching `nodes.rs` for `BuckconfigKeyRef` returns no results. The `ConfigPatte
 
 | File | How config is obtained | After plan |
 |------|----------------------|------------|
-| `kuro_client_ctx/src/immediate_config.rs:47` | `BuckConfigBasedCells::parse_with_config_args(project_fs, args)` | Still calls this; gets CLI-only config |
-| `kuro_server/src/ctx.rs:535` | `BuckConfigBasedCells::parse_with_config_args(project_fs, args)` | Same |
-| `kuro_server/src/daemon/state.rs:292` | `parse_with_config_args(&fs, &[])` | Returns `LegacyBuckConfig::empty()` effectively |
-| `kuro_cmd_completion_client` (3 sites) | `parse_with_config_args(...)` | Same |
+| `slug_client_ctx/src/immediate_config.rs:47` | `BuckConfigBasedCells::parse_with_config_args(project_fs, args)` | Still calls this; gets CLI-only config |
+| `slug_server/src/ctx.rs:535` | `BuckConfigBasedCells::parse_with_config_args(project_fs, args)` | Same |
+| `slug_server/src/daemon/state.rs:292` | `parse_with_config_args(&fs, &[])` | Returns `LegacyBuckConfig::empty()` effectively |
+| `slug_cmd_completion_client` (3 sites) | `parse_with_config_args(...)` | Same |
 | DICE (`dice.rs:195`) | `parse_single_cell_with_dice` → `from_overrides_only` | Changed in Commit 2 |
 | `buildfiles.rs:86` | `get_legacy_config_on_dice` → projection | Unchanged; reads CLI-flag config via DICE |
 | `interpreter/buckconfig.rs` | `OpaqueLegacyBuckConfigOnDice.lookup()` | Unchanged; reads CLI-flag config via DICE |
-| `kuro_configured/src/configuration.rs:104` | `get_legacy_config_property` via DICE | Unchanged |
-| `kuro_analysis/src/analysis/calculation.rs:466` | `get_legacy_config_property` via DICE | Unchanged |
-| `kuro_cmd_audit_server/src/config.rs:343,352,368` | `get_legacy_config_for_cell` via DICE | Unchanged; `all_sections()` returns only CLI-set keys |
+| `slug_configured/src/configuration.rs:104` | `get_legacy_config_property` via DICE | Unchanged |
+| `slug_analysis/src/analysis/calculation.rs:466` | `get_legacy_config_property` via DICE | Unchanged |
+| `slug_cmd_audit_server/src/config.rs:343,352,368` | `get_legacy_config_for_cell` via DICE | Unchanged; `all_sections()` returns only CLI-set keys |

@@ -1,0 +1,41 @@
+[package]
+description = "Anonymous targets"
+edition = "2024"
+license = { workspace = true }
+name = "slug_anon_target"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+derive_more = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+fxhash = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+allocative = { workspace = true }
+cmp_any = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+starlark = { workspace = true }
+starlark_map = { workspace = true }
+strong_hash = { workspace = true }
+
+slug_analysis = { workspace = true }
+slug_artifact = { workspace = true }
+slug_build_api = { workspace = true }
+slug_configured = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_execute = { workspace = true }
+slug_fs = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_interpreter_for_build = { workspace = true }
+slug_node = { workspace = true }
+slug_util = { workspace = true }
+dice_futures = { workspace = true }

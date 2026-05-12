@@ -4,7 +4,7 @@ title: Add configuration modifiers to a specific target
 ---
 
 Modifiers can be added to individual targets via the `modifiers` attribute which
-is exposed by all rules (this is handled by Kuro itself, so rule authors do not
+is exposed by all rules (this is handled by Slug itself, so rule authors do not
 have to add it themselves).
 
 For example, lets assume that we have a `release_package` rule that references

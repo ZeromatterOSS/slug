@@ -5,19 +5,19 @@ title: Java/Kotlin ABIs
 
 # Java/Kotlin ABIs
 
-This topic pertains to building Java code with Kuro.
+This topic pertains to building Java code with Slug.
 
-When compiling a Kotlin or Java rule, Kuro creates an **Application Binary
+When compiling a Kotlin or Java rule, Slug creates an **Application Binary
 Interface (ABI) JAR**, which contains only resources and class interfaces—the
-public interface for your module. Kuro creates this ABI JAR in addition to the
+public interface for your module. Slug creates this ABI JAR in addition to the
 **library JAR**, which contains all of the compiled classes and resources for
 the rule.
 
 Since ABI JARs do not contain method bodies or private members, they are smaller
-and change less frequently than library JARs. This enables Kuro to use ABI JARs
+and change less frequently than library JARs. This enables Slug to use ABI JARs
 in two important ways:
 
-1. **Incremental builds** - ABI JARs help Kuro more accurately determine which
+1. **Incremental builds** - ABI JARs help Slug more accurately determine which
    rules need to be rebuilt during an incremental build. A Java/Kotlin library
    rule does not necessarily need to be rebuilt if one of its dependencies
    changes, _provided that the public interface of that dependency did not
@@ -30,7 +30,7 @@ in two important ways:
 
 ## ABI Generation Modes
 
-Kuro can create ABI JARs in three different ways, depending on the
+Slug can create ABI JARs in three different ways, depending on the
 `abi_generation_mode` configuration. You can set this globally in `.buckconfig`
 or override it per-rule using the `abi_generation_mode` attribute.
 
@@ -67,18 +67,18 @@ that can normally be determined only by looking at dependencies.
 
 ## Requirements for Source-Only ABI Generation
 
-Kuro generates source-only ABI JARs using only the text of the source code for
+Slug generates source-only ABI JARs using only the text of the source code for
 a rule, without first compiling most of the rule's dependencies. Some details of
-an ABI JAR cannot be known for certain from just the source, so Kuro uses
+an ABI JAR cannot be known for certain from just the source, so Slug uses
 heuristics to infer those details.
 
-When compiling the library JAR, Kuro verifies whether the heuristics used for
-the ABI JAR were correct. If they were not, Kuro fails the build with an error.
+When compiling the library JAR, Slug verifies whether the heuristics used for
+the ABI JAR were correct. If they were not, Slug fails the build with an error.
 
 ### Special Attributes
 
 To handle cases where source-only ABI generation needs additional information,
-Kuro provides two attributes:
+Slug provides two attributes:
 
 #### `source_only_abi_deps`
 
@@ -98,7 +98,7 @@ java_library(
 )
 ```
 
-**Important**: Having `source_only_abi_deps` prevents Kuro from completely
+**Important**: Having `source_only_abi_deps` prevents Slug from completely
 flattening the build graph, reducing the performance win from source-only ABI
 generation. These should be avoided when possible. Often only a small code
 change is needed to avoid them.
@@ -122,7 +122,7 @@ java_library(
 ```
 
 **Important**: Having rules marked with `required_for_source_only_abi=True`
-prevents Kuro from completely flattening the build graph. These rules should be
+prevents Slug from completely flattening the build graph. These rules should be
 kept small (ideally just containing annotations, constants, enums, and
 interfaces) and with minimal dependencies.
 
@@ -137,7 +137,7 @@ To get the best performance from source-only ABI generation:
 
 2. **Follow Java naming conventions**: Packages should have names beginning with
    a lowercase letter. Top-level classes should have names beginning with an
-   uppercase letter. Kuro uses these conventions to infer which types might not
+   uppercase letter. Slug uses these conventions to infer which types might not
    be available during ABI generation.
 
 3. **Reference member types canonically**: When referencing member types (nested
@@ -180,7 +180,7 @@ java_library(
 
 ## Verification
 
-Kuro supports verification modes to ensure source-only ABIs are generated
+Slug supports verification modes to ensure source-only ABIs are generated
 correctly:
 
 ```python

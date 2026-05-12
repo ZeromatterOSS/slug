@@ -1,0 +1,115 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use allocative::Allocative;
+use async_trait::async_trait;
+use dice::DiceTransactionUpdater;
+use slug_common::ignores::ignore_set::IgnoreSet;
+use slug_common::legacy_configs::configs::LegacyBuckConfig;
+use slug_core::cells::CellResolver;
+use slug_core::cells::name::CellName;
+use slug_core::fs::project::ProjectRoot;
+#[cfg(fbcode_build)]
+use slug_core::soft_error;
+use slug_error::BuckErrorContext;
+use slug_error::slug_error;
+
+#[cfg(fbcode_build)]
+use crate::edenfs::interface::EdenFsFileWatcher;
+#[cfg(fbcode_build)]
+use crate::edenfs::interface::EdenFsWatcherError;
+use crate::fs_hash_crawler::FsHashCrawler;
+use crate::mergebase::Mergebase;
+use crate::notify::NotifyFileWatcher;
+use crate::watchman::interface::WatchmanFileWatcher;
+
+#[async_trait]
+pub trait FileWatcher: Allocative + Send + Sync + 'static {
+    async fn sync(
+        &self,
+        dice: DiceTransactionUpdater,
+    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase)>;
+}
+
+impl dyn FileWatcher {
+    /// Create a new FileWatcher. Note that this is not async, since it's called during daemon
+    /// startup and shouldn't be doing any work that could warrant suspending.
+    pub fn new(
+        fb: fbinit::FacebookInit,
+        project_root: &ProjectRoot,
+        root_config: &LegacyBuckConfig,
+        cells: CellResolver,
+        ignore_specs: HashMap<CellName, IgnoreSet>,
+        watcher_override: Option<&str>,
+    ) -> slug_error::Result<Arc<dyn FileWatcher>> {
+        #[cfg(fbcode_build)]
+        let default = if detect_eden::is_eden(project_root.root().to_path_buf())? {
+            "edenfs"
+        } else {
+            "watchman"
+        };
+
+        #[cfg(not(fbcode_build))]
+        let default = "notify";
+
+        let _allow_unused = fb;
+
+        // `--slug_file_watcher` (threaded through
+        // `DaemonStartupConfig::file_watcher`) wins; otherwise use the
+        // host default.
+        let watcher_conf = watcher_override.unwrap_or(default);
+
+        let watcher_conf = if let "edenfs" = watcher_conf {
+            #[cfg(fbcode_build)]
+            match EdenFsFileWatcher::new(
+                fb,
+                project_root,
+                root_config,
+                cells.clone(),
+                ignore_specs.clone(),
+            ) {
+                Ok(edenfs) => return Ok(Arc::new(edenfs)),
+                Err(EdenFsWatcherError::EdenConnectionError(e)) => {
+                    soft_error!("edenfs_watcher_creation_failure", e)?;
+                    // fallback to watchman if failed to create edenfs watcher
+                    "watchman"
+                }
+                Err(e) => return Err(e.into()),
+            }
+            #[cfg(not(fbcode_build))]
+            default
+        } else {
+            watcher_conf
+        };
+
+        match watcher_conf {
+            "watchman" => Ok(Arc::new(
+                WatchmanFileWatcher::new(project_root.root(), root_config, cells, ignore_specs)
+                    .buck_error_context("Creating watchman file watcher")?,
+            )),
+            "notify" => Ok(Arc::new(
+                NotifyFileWatcher::new(project_root, cells, ignore_specs)
+                    .buck_error_context("Creating notify file watcher")?,
+            )),
+            "fs_hash_crawler" => Ok(Arc::new(
+                FsHashCrawler::new(project_root, cells, ignore_specs)
+                    .buck_error_context("Creating fs_crawler file watcher")?,
+            )),
+            other => Err(slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "Invalid slug.file_watcher: {}",
+                other
+            )),
+        }
+    }
+}

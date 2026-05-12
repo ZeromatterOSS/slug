@@ -1,0 +1,72 @@
+Showing summary from: /var/mnt/dev/slug/target/debug/slug --nobazelrc build --local-only --event-log /var/mnt/dev/slug/benchmarks/2026-04-30-support-profile/llvm-project_llvm_Support/slug-nobazelrc-warm-01/build.pb.zst @llvm-project//llvm:Support
+build ID: f8566898-0443-4240-b152-6c9f9f0a62a3
+
+Build Summary
+- Duration: 1.4s
+- Targets Analyzed: 18
+- Has Local Changes: unknown
+
+Actions
+- Local actions: 0
+- Remote actions: 0
+- Cached actions: 0
+- Other actions: 193
+
+File & Data
+  (Network transfer uses compression, file materialized shows uncompressed sizes)
+- Files materialized: 0
+- Total materialized: 0B
+- Total uploaded: 0B
+- Total downloaded: 0B
+  - RE downloaded: 0B
+  - HTTP downloaded: 0B
+
+Network
+
+Resource Usage
+- Peak process memory: 1.4GiB /  62GiB
+- Peak used disk space: 1665GiB / 1833GiB
+
+
+Build Rollup
+- Load: 0s
+- Analyze: 189ms
+- Execute: 198ms
+- Materialize: 0ms
+- Total wall: 1.4s
+- Critical path: 1.1s
+- Slowest path: 1.0s
+- Peak in-flight actions: 97
+- Action count: 193
+- Graph: 286 nodes, 3027 edges, 3 action-graph
+
+By mnemonic
+  category                    count   cached       exec      queue       crit        p50        p95        p99
+  c_compile                     181        0         0s       5.5s       88ms         0s         0s         0s
+  cpp_link                        1        0         0s        4ms        4ms         0s         0s         0s
+  cpp_archive                     1        0         0s        3ms         0s         0s         0s         0s
+
+Slowest actions
+          0s  c_compile  external/llvm-project/llvm/lib/Support/CSKYAttributes.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/AArch64BuildAttributes.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/TrieRawHashMap.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/Twine.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/DAGDeltaAlgorithm.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/CSKYAttributeParser.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/ELFAttrParserExtended.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/Signposts.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/CommandLine.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/NativeFormatting.cpp.pic
+
+Slowest analyses
+       138ms  //llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)
+        31ms  //llvm-project//third-party/siphash:siphash (local_config_platform//:host#ffb6fe5c7480b5e7)
+        24ms  //llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)
+        10ms  //llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)
+         9ms  //llvm-project//third-party:zstd (local_config_platform//:host#ffb6fe5c7480b5e7)
+         8ms  //llvm-project//llvm:target_mca_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         8ms  //llvm-project//llvm:targets_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         8ms  //llvm-project//llvm:target_exegesis_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         8ms  //llvm-project//llvm:asm_parsers_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         8ms  //llvm-project//llvm:abi_breaking_h_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+

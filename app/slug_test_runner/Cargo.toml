@@ -1,0 +1,19 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "slug_test_runner"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+parking_lot = { workspace = true }
+tokio = { workspace = true }
+
+slug_error = { workspace = true }
+slug_grpc = { workspace = true }
+slug_test_api = { workspace = true }
+host_sharing = { workspace = true }
+sorted_vector_map = { workspace = true }

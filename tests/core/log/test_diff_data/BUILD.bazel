@@ -4,5 +4,5 @@ trivial_build(
 
 non_det_build(
     name = "non_det",
-    kuro_output = read_root_config("test", "buck2_output"),
+    slug_output = read_root_config("test", "buck2_output"),
 )

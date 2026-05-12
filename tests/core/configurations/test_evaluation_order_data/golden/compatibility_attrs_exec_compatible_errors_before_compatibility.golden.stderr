@@ -40,6 +40,6 @@ Caused by:
          root//:with_broken_dtp
        
        To see all 33 targets, run:
-         kuro uquery --reuse-current-config root//:
+         slug uquery --reuse-current-config root//:
        
        

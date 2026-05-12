@@ -17,5 +17,5 @@
 #endif
 
 DLLEXPORT void print_hello() {
-  std::cout << "Hello from a C++ Kuro program!" << std::endl;
+  std::cout << "Hello from a C++ Slug program!" << std::endl;
 }

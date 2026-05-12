@@ -1,0 +1,36 @@
+[package]
+authors = ["Meta"]
+description = "Capture build signals during a build to produce a critical path"
+edition = "2024"
+license = { workspace = true }
+name = "slug_build_signals_impl"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+slug_analysis = { workspace = true }
+slug_artifact = { workspace = true }
+slug_build_api = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_critical_path = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_interpreter_for_build = { workspace = true }
+slug_node = { workspace = true }
+slug_util = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+itertools = { workspace = true }
+prost-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+smallvec = { workspace = true }
+static_assertions = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }

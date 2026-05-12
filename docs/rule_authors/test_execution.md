@@ -6,18 +6,18 @@ title: Test Execution
 import { FbInternalOnly, OssOnly } from
 'docusaurus-plugin-internaldocs-fb/internal';
 
-Test execution in Kuro is a collaboration with a separate test runner process.
+Test execution in Slug is a collaboration with a separate test runner process.
 
 <OssOnly>
 
-In its open-source build, Kuro ships with a built-in simplistic test runner.
+In its open-source build, Slug ships with a built-in simplistic test runner.
 
 This test runner receives the commands defined by `ExternalRunnerTestInfo` and
 simply executes them. Exit code zero means the test passed, and one means it
 failed.
 
 Users can of course develop their own test runners. Look at
-`fbcode/kuro/app/kuro_test_runner` as a sample. For comparison, here's how
+`fbcode/slug/app/slug_test_runner` as a sample. For comparison, here's how
 it's used at Meta:
 
 </OssOnly>
@@ -25,7 +25,7 @@ it's used at Meta:
 At Meta, this test runner is <OssOnly>Tpx</OssOnly>
 <FbInternalOnly>[Tpx](https://www.internalfb.com/intern/wiki/TAE/tpx/)</FbInternalOnly>.
 
-Tpx has a large number of responsibilities when used with Kuro, which can be
+Tpx has a large number of responsibilities when used with Slug, which can be
 grouped as follows:
 
 - **Translation**:
@@ -42,21 +42,21 @@ grouped as follows:
     choose to bundle multiple tests in a single execution (or not).
   - Reports test results to Test Infra as well.
 
-In Kuro, rules interact with the test runner via a provider called
+In Slug, rules interact with the test runner via a provider called
 `ExternalRunnerTestInfo`.
 
 ## Anatomy of a test run
 
-When a user runs `kuro test $targets`:
+When a user runs `slug test $targets`:
 
-- Kuro identifies all matching targets that have an `ExternalRunnerTestInfo`.
-- Kuro builds all the artifacts referenced by those targets (this will likely
+- Slug identifies all matching targets that have an `ExternalRunnerTestInfo`.
+- Slug builds all the artifacts referenced by those targets (this will likely
   change eventually to build them only if they are used).
-- Kuro then notifies the test runner that those tests exist. Currently, the
+- Slug then notifies the test runner that those tests exist. Currently, the
   test runner receives a subset of `ExternalRunnerTestInfo`.
-- The test runner can request command execution from Kuro to list and execute
+- The test runner can request command execution from Slug to list and execute
   tests.
-- When it receives command results from Kuro, the test runner may fire off
+- When it receives command results from Slug, the test runner may fire off
   events that the end-user will see (such as test results), upload logs
   externally, request further executions, and so on.
 
@@ -89,11 +89,11 @@ which the test runner can interact:
   details, see
   [Verbatim arguments and handles](#verbatim-arguments-and-handles), below).
 - `labels` - a set of string labels to pass to the test runner. <FbInternalOnly>
-  They have no meaning to Kuro, but some labels have impact on translation in
+  They have no meaning to Slug, but some labels have impact on translation in
   Tpx. </FbInternalOnly>
 - `contacts` - a list of contacts for the tests; usually oncalls.
 - `executor_overrides` - a key-value mapping of executor configurations that the
-  test runner can use when requesting execution from Kuro.
+  test runner can use when requesting execution from Slug.
 - `local_resources` - a key-value mapping from resource type to optional
   `LocalResourceInfo` provider. Provider is used for initialization of that
   resource type. If the value is `None` resource type is ignored even though
@@ -106,14 +106,14 @@ For compatibility with Remote Execution (RE), there are two fields that rules
 should set in their `ExternalRunnerTestInfo` if they should be run on RE:
 
 - `use_project_relative_paths` - if `true` (the default is
-  <FbInternalOnly>`false`</FbInternalOnly> <OssOnly>`true`</OssOnly>), Kuro
+  <FbInternalOnly>`false`</FbInternalOnly> <OssOnly>`true`</OssOnly>), Slug
   will produce relative paths. If not, it'll produce absolute paths.
 - `run_from_project_root` - if `true` (the default is
   <FbInternalOnly>`false`</FbInternalOnly> <OssOnly>`true`</OssOnly>), tests
   will run from the project root (their `cwd` will be the project root, which is
   the same as all build commands). If `false`, it'll be the cell root.
 
-Note that passing `--unstable-allow-all-tests-on-re` to `kuro test` will
+Note that passing `--unstable-allow-all-tests-on-re` to `slug test` will
 override those fields and set them to `true`, since they are a pre-requisite to
 run on RE. In contrast, passing `--unstable-allow-compatible-tests-on-re` will
 only allow tests that already set both those fields to `true` to execute on RE.
@@ -127,7 +127,7 @@ are provided.
 
 As noted above, the test runner only interacts with a subset of arguments
 provided by rules in `ExternalRunnerTestInfo`. The reason for this is that the
-test runner doesn't get to access, for example, artifacts, that Kuro knows
+test runner doesn't get to access, for example, artifacts, that Slug knows
 about.
 
 Consider the following example:
@@ -137,9 +137,9 @@ binary = ctx.attrs.dep[RunInfo]
 test_info = ExternalRunnerTestInfo(command = [binary, "run-tests"], ...)
 ```
 
-When Kuro actually runs this command, `binary` is expanded to a path (and
-possibly to more args). Kuro would also account for any hidden arguments and
-make those available where the command is executed. It is important for Kuro to
+When Slug actually runs this command, `binary` is expanded to a path (and
+possibly to more args). Slug would also account for any hidden arguments and
+make those available where the command is executed. It is important for Slug to
 retain this capability when running with the test runner.
 
 To that end, all non-trivial arguments present in `command` (and in the values
@@ -152,8 +152,8 @@ This means that the test runner would see the command described above as:
 [ArgHandle(index = 0), Verbatim("foobar")]
 ```
 
-When requesting execution from Kuro, the test runner can use the `ArgHandle`
-and Kuro will swap it back for the underlying value that was set on the
+When requesting execution from Slug, the test runner can use the `ArgHandle`
+and Slug will swap it back for the underlying value that was set on the
 provider.
 
 This allows the test runner to introspect and modify parts of the command lines
@@ -184,7 +184,7 @@ For example:
 
 To support this, `ExternalRunnerTestInfo` allows specifying override platforms,
 which are given a name. The test runner can request execution on them by passing
-their name when it sends execution requests to Kuro, as shown in the following
+their name when it sends execution requests to Slug, as shown in the following
 code:
 
 ```python

@@ -1,0 +1,89 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+pub enum LastCommandExecutionKind {
+    Local,
+    LocalWorker,
+    Remote,
+    Cached,
+    RemoteDepFileCached,
+    NoCommand,
+}
+
+/// Returns what the execution kind of the last command was in the given action.
+/// It tells the execution kind of the commands that actually produced a result
+/// or an error, but not the commands that fell back and were retried.
+pub fn get_last_command_execution_kind(
+    action: &slug_data::ActionExecutionEnd,
+) -> LastCommandExecutionKind {
+    let last_command_kind = action
+        .commands
+        .last()
+        .and_then(|c| c.details.as_ref())
+        .and_then(|c| c.command_kind.as_ref());
+
+    if let Some(command_kind) = last_command_kind {
+        use slug_data::command_execution_kind::Command;
+        match command_kind.command.as_ref() {
+            Some(Command::LocalCommand(..)) | Some(Command::OmittedLocalCommand(..)) => {
+                LastCommandExecutionKind::Local
+            }
+            Some(Command::WorkerCommand(_)) | Some(Command::WorkerInitCommand(_)) => {
+                LastCommandExecutionKind::LocalWorker
+            }
+            Some(Command::RemoteCommand(slug_data::RemoteCommand {
+                cache_hit: true,
+                cache_hit_type,
+                ..
+            })) => {
+                match slug_data::CacheHitType::try_from(*cache_hit_type).unwrap() {
+                    // ActionCache is 0, so this should be backwards compatible
+                    slug_data::CacheHitType::ActionCache => LastCommandExecutionKind::Cached,
+                    slug_data::CacheHitType::RemoteDepFileCache => {
+                        LastCommandExecutionKind::RemoteDepFileCached
+                    }
+                    slug_data::CacheHitType::Executed => LastCommandExecutionKind::Remote,
+                }
+            }
+            Some(Command::RemoteCommand(slug_data::RemoteCommand {
+                cache_hit: false, ..
+            })) => LastCommandExecutionKind::Remote,
+            None => LastCommandExecutionKind::NoCommand,
+        }
+    } else {
+        LastCommandExecutionKind::NoCommand
+    }
+}
+
+pub struct ExecTime {
+    pub exec_time_ms: u64,
+    pub(crate) cached_exec_time_ms: u64,
+}
+
+pub fn get_last_command_execution_time(action: &slug_data::ActionExecutionEnd) -> ExecTime {
+    let exec_time_ms = action
+        .commands
+        .last()
+        .and_then(|c| c.details.as_ref())
+        .and_then(|c| c.metadata.as_ref())
+        .and_then(|c| c.execution_time.as_ref())
+        .map(|c| c.seconds as u64 * 1000 + c.nanos as u64 / 1000000)
+        .unwrap_or(0);
+
+    ExecTime {
+        exec_time_ms,
+        cached_exec_time_ms: match get_last_command_execution_kind(action) {
+            LastCommandExecutionKind::Cached | LastCommandExecutionKind::RemoteDepFileCached => {
+                exec_time_ms
+            }
+            _ => 0,
+        },
+    }
+}

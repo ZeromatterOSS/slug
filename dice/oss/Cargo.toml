@@ -10,7 +10,7 @@ resolver = "2"
 
 [workspace.package]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/facebook/kuro"
+repository = "https://github.com/facebook/slug"
 
 [workspace.dependencies]
 allocative = { version = "0.3.4" }

@@ -8,10 +8,10 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import { FbInternalOnly } from 'docusaurus-plugin-internaldocs-fb/internal';
 
 The Concept Map provides an at-a-glance overview of the relationships between
-widely used Kuro concepts. It is meant to be a tool to help those onboarding to
-Kuro to quickly gain an understanding of the Kuro environment.
+widely used Slug concepts. It is meant to be a tool to help those onboarding to
+Slug to quickly gain an understanding of the Slug environment.
 
-<img src={useBaseUrl('/img/kuro_conceptmap.png')} alt='justifyContent'/>
+<img src={useBaseUrl('/img/slug_conceptmap.png')} alt='justifyContent'/>
 
 :::note
 
@@ -21,7 +21,7 @@ nor complete.
 <FbInternalOnly>
 
 The version above was created in LucidChart and is located in the
-[Kuro team folder](https://lucid.app/folder/invitations/accept/inv_c5c89718-b1cd-4b22-ae76-a47616719948).
+[Slug team folder](https://lucid.app/folder/invitations/accept/inv_c5c89718-b1cd-4b22-ae76-a47616719948).
 To login into Lucidcharts, do `bunnylol lucidchart`
 
 </FbInternalOnly>

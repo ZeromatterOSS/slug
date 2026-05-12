@@ -10,11 +10,11 @@ def _normal_impl(ctx):
     out = ctx.actions.declare_output("out.txt")
 
     cmd = cmd_args(
-        ctx.attrs.kuro_path,
+        ctx.attrs.slug_path,
         "build",
         "root//:trivial",
         "-c",
-        "nested.buck2_path=" + ctx.attrs.kuro_path,
+        "nested.buck2_path=" + ctx.attrs.slug_path,
         "--out",
         out.as_output(),
     )
@@ -44,7 +44,7 @@ subprocess.run([buck_path, "debug", "trace-io", "enable"])
         [
             "python3",
             script,
-            ctx.attrs.kuro_path,
+            ctx.attrs.slug_path,
             trace_out.as_output(),
         ],
         local_only = True,
@@ -52,11 +52,11 @@ subprocess.run([buck_path, "debug", "trace-io", "enable"])
     )
 
     nested_cmd = cmd_args(
-        ctx.attrs.kuro_path,
+        ctx.attrs.slug_path,
         "build",
         "root//:trivial",
         "-c",
-        "nested.buck2_path=" + ctx.attrs.kuro_path,
+        "nested.buck2_path=" + ctx.attrs.slug_path,
         "--out",
         nested_out.as_output(),
         hidden = trace_out,
@@ -71,13 +71,13 @@ subprocess.run([buck_path, "debug", "trace-io", "enable"])
 normal_nested_invocation = rule(
     impl = _normal_impl,
     attrs = {
-        "kuro_path": attrs.string(),
+        "slug_path": attrs.string(),
     },
 )
 
 trace_nested_invocation = rule(
     impl = _trace_impl,
     attrs = {
-        "kuro_path": attrs.string(),
+        "slug_path": attrs.string(),
     },
 )

@@ -11,14 +11,14 @@
 | prelude/utils/expect.bzl | 147 | Assertion/validation macros | **integrate** | expect(), expect_string(), expect_list_of_strings(); validation library. |
 | prelude/utils/type_defs.bzl | 168 | Type-checking utilities | **integrate** | is_string, is_list, is_dict, is_select. |
 | prelude/utils/arglike.bzl | 16 | ArgLike type alias | **integrate** | Pure type def. |
-| prelude/utils/materialization_test.bzl | 30 | Test materialization helper | **extension-only** | ExternalRunnerTestInfo for materialization tests; Kuro-specific. |
+| prelude/utils/materialization_test.bzl | 30 | Test materialization helper | **extension-only** | ExternalRunnerTestInfo for materialization tests; Slug-specific. |
 | prelude/utils/selects.bzl | ~50 | select() utilities | **integrate** | Configuration selection helpers; Bazel-compatible. |
 | **Test infrastructure** | | | | |
-| prelude/tests/test_toolchain.bzl | 30 | Test execution toolchain (TestToolchainInfo) | **extension-only** | Kuro test infra. |
+| prelude/tests/test_toolchain.bzl | 30 | Test execution toolchain (TestToolchainInfo) | **extension-only** | Slug test infra. |
 | prelude/tests/remote_test_execution_toolchain.bzl | 22 | RE config (RemoteTestExecutionToolchainInfo) | **extension-only** | Internal RE orchestration. |
-| prelude/tests/re_utils.bzl | 100 | RE utilities (run_as_bundle, test env setup) | **extension-only** | Kuro-specific RE integration. |
+| prelude/tests/re_utils.bzl | 100 | RE utilities (run_as_bundle, test env setup) | **extension-only** | Slug-specific RE integration. |
 | **Empty / placeholder directories** | | | | |
-| prelude/bxl/ | 0 | BXL support (Kuro extension) | **extension-only** | Empty currently. BXL is Kuro-only; reserve namespace. |
+| prelude/bxl/ | 0 | BXL support (Slug extension) | **extension-only** | Empty currently. BXL is Slug-only; reserve namespace. |
 | prelude/toolchains/ | 0 | Toolchain configuration | **extension-only** | Empty; toolchain logic scattered into decls/ and language rules (which are gone post-Phase-7). |
 | prelude/playground/ | 0 | Example/demo scripts | **remove** | Empty. |
 | prelude/docs/ | 0 | Documentation | **remove** | Empty. |
@@ -33,7 +33,7 @@
 
 ## Notes
 
-1. **utils/** is the cleanest "integrate" target. The five core files (utils, expect, type_defs, arglike, selects) are pure Starlark helpers with no Buck2-specific dependencies and obvious Bazel parity. Move to `kuro_builtins/` or a new `prelude/bazel_builtins/utils/` module.
+1. **utils/** is the cleanest "integrate" target. The five core files (utils, expect, type_defs, arglike, selects) are pure Starlark helpers with no Buck2-specific dependencies and obvious Bazel parity. Move to `slug_builtins/` or a new `prelude/bazel_builtins/utils/` module.
 2. **bxl/** and **toolchains/** are empty today but reserve namespaces. Keep as `extension-only`.
-3. **tests/** is Kuro-specific test orchestration; move behind a `_kuro_test_*` extension boundary.
+3. **tests/** is Slug-specific test orchestration; move behind a `_slug_test_*` extension boundary.
 4. **playground/**, **docs/**, **debugging/**, **validation/** are empty placeholders from Buck2 days; delete.

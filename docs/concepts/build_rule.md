@@ -10,15 +10,15 @@ files in the context of a specified build configuration. Build rules are
 specified in [build files](build_file.md)—typically named BUCK.
 
 > **Note:** A build rule must explicitly specify, in its arguments, all of its
-> required inputs in order for Kuro to be able to build the rule's output in a
+> required inputs in order for Slug to be able to build the rule's output in a
 > way that is deterministic and reproducible.
 
-## Kuro's collection of build rules
+## Slug's collection of build rules
 
-Kuro comes with a collection of built-in build rules for many common build
+Slug comes with a collection of built-in build rules for many common build
 procedures. For example:
 
-- Compiling Java code against the Android SDK is a common procedure, so Kuro
+- Compiling Java code against the Android SDK is a common procedure, so Slug
   provides the [`android_library`](../../prelude/rules/android/android_library)
   build rule
 - The final product of most Android development is an APK, so you can use the
@@ -41,7 +41,7 @@ To support specifying these files:
 
 ### Package Boundaries and Source File Access
 
-In Kuro, source files are organized within _packages_:
+In Slug, source files are organized within _packages_:
 
 - A **package** is defined by a BUCK file and includes:
   - The directory containing that BUCK file
@@ -50,7 +50,7 @@ In Kuro, source files are organized within _packages_:
 
 #### Package Access Rules
 
-Kuro enforces these rules regarding source file access:
+Slug enforces these rules regarding source file access:
 
 1. **Basic Rule**: A build rule can only use source files from its own package
    - A rule in a BUCK file cannot specify source files from outside its package
@@ -115,8 +115,8 @@ closure_.
 
 ### Required dependencies are always built first
 
-Kuro guarantees that any dependencies that a rule lists that are required to
-build that rule are built successfully _before_ Kuro builds the rule itself.
+Slug guarantees that any dependencies that a rule lists that are required to
+build that rule are built successfully _before_ Slug builds the rule itself.
 
 Note that there can be special cases—such as
 [`apple_bundle`](../../prelude/rules/apple/apple_bundle)—where a rule's listed
@@ -131,22 +131,22 @@ the dependency.
 A build rule's `visibility` argument is a list of
 [build target pattern](target_pattern.md)s that specify the rules that can take
 that rule as a dependency. For more information about the concept of visibility
-in Kuro, see the [Visibility](visibility.md) topic.
+in Slug, see the [Visibility](visibility.md) topic.
 
 ### Dependencies define a graph
 
-Build rules and their dependencies define a directed acyclic graph (DAG). Kuro
+Build rules and their dependencies define a directed acyclic graph (DAG). Slug
 requires this graph to be acyclic to make it possible to build independent
 subgraphs in parallel.
 
 ## How to handle special cases: genrules and macros
 
-Although Kuro provides a rich set of built-in build rules for developers, it is
-not able to address all possible needs. As an "escape hatch," Kuro provides a
+Although Slug provides a rich set of built-in build rules for developers, it is
+not able to address all possible needs. As an "escape hatch," Slug provides a
 category of generic build rules called _genrules_.
 
 With genrules, you can perform arbitrary operations using shell scripts. The
-genrules supported by Kuro are:
+genrules supported by Slug are:
 
 - [`genrule`](../../prelude/rules/core/genrule)
 - [`apk_genrule`](../../prelude/rules/android/apk_genrule)
@@ -164,7 +164,7 @@ that directory.
 
 You can define functions that generate build rules. In general, this should not
 be something that you need to do, but taking advantage of this option might help
-you add needed functionality to Kuro without editing its source code.
+you add needed functionality to Slug without editing its source code.
 
 ## String parameter macros
 

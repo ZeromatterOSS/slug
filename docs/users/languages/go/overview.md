@@ -5,31 +5,31 @@ title: Overview
 
 # Overview
 
-This is an overview of using Kuro to build Go projects. It assumes you have a
-basic understanding of Kuro and Go. If you are completely new to Kuro, see the
-[Kuro Getting Started](../../../getting_started/index.md) to learn the basic
+This is an overview of using Slug to build Go projects. It assumes you have a
+basic understanding of Slug and Go. If you are completely new to Slug, see the
+[Slug Getting Started](../../../getting_started/index.md) to learn the basic
 concepts.
 
 ## Just need an example?
 
 Check out the
-**[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/kuro/tree/main/examples/toolchains/go_toolchain)**
-project for an example of a Go project using Kuro. This example supports
+**[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/slug/tree/main/examples/toolchains/go_toolchain)**
+project for an example of a Go project using Slug. This example supports
 hermetic toolchains, third-party dependency management, cross-compilation, and
 multiple execution platforms.
 
-## The UX differences between Kuro and `go build`
+## The UX differences between Slug and `go build`
 
-Kuro is a general-purpose build system, so you need to provide more information
+Slug is a general-purpose build system, so you need to provide more information
 about your project:
 
-- You need to tell Kuro that specific code is Go code. This is done by
+- You need to tell Slug that specific code is Go code. This is done by
   declaring targets like `go_binary` in `BUCK` files.
-- You need to tell Kuro where dependencies of a particular target are. This is
+- You need to tell Slug where dependencies of a particular target are. This is
   done by adding `deps` to the target definition.
-- You need to configure Kuro where to find the Go compiler and other tools by
+- You need to configure Slug where to find the Go compiler and other tools by
   adding `go_toolchain` to the `toolchains` cell. You also need to map some
-  Kuro configuration options to Go options like GOOS/GOARCH.
+  Slug configuration options to Go options like GOOS/GOARCH.
 
 ## The types of targets
 
@@ -41,7 +41,7 @@ about your project:
 
 ## How to write Go targets
 
-Kuro offers lots of flexibility in how you can write your targets, but it makes
+Slug offers lots of flexibility in how you can write your targets, but it makes
 sense to stick to the following conventions for better compatibility with the
 rest of the Go ecosystem:
 
@@ -72,12 +72,12 @@ go_test(
 )
 ```
 
-## How to pass options to `kuro` commands
+## How to pass options to `slug` commands
 
 ### Envs GOOS and GOARCH
 
 Compilation for different platforms is done by passing `--target-platforms` or
-`-m` (`--modifier`) flags to `kuro` commands.
+`-m` (`--modifier`) flags to `slug` commands.
 
 You need to specify what target platforms you support by declaring them with the
 `platform()` rule, or you can avoid pre-declaring them by using configuration
@@ -85,26 +85,26 @@ modifiers.
 
 For example, to build for linux/amd64, the following commands are equivalent
 (assuming your project confugured similary to
-[this example](https://github.com/ZeromatterOSS/kuro/tree/main/examples/toolchains/go_toolchain)):
+[this example](https://github.com/ZeromatterOSS/slug/tree/main/examples/toolchains/go_toolchain)):
 
 ```sh
 $ GOOS=linux GOARCH=amd64 go build example.com/foo/bar
-$ kuro build --target-platforms root//platforms:linux_x86_64 root//foo/bar:bar
-$ kuro build -m config//os:linux -m config//arch:x86_64 root//foo/bar:bar
+$ slug build --target-platforms root//platforms:linux_x86_64 root//foo/bar:bar
+$ slug build -m config//os:linux -m config//arch:x86_64 root//foo/bar:bar
 ```
 
 ### Test options like `-test.bench`
 
-To pass test options, use `--` to separate kuro options from test options:
+To pass test options, use `--` to separate slug options from test options:
 
 <OssOnly>
 ```sh
-$ kuro test root//foo/bar:bar -- -test.bench=.
+$ slug test root//foo/bar:bar -- -test.bench=.
 ```
 </OssOnly>
 <FbInternalOnly>
 > **Note:** You need to use `run` instead of `test` otherwise you'll be passing options to TPX
 ```sh
-$ kuro run root//foo/bar:bar -- -test.bench=.
+$ slug run root//foo/bar:bar -- -test.bench=.
 ```
 </FbInternalOnly>

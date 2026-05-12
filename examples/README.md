@@ -1,6 +1,6 @@
-# kuro examples
+# slug examples
 
-In these folders are some examples on how to get kuro working with your
+In these folders are some examples on how to get slug working with your
 favorite languages and tools.
 
 ## with_prelude
@@ -14,7 +14,7 @@ folder.
 
 ## no_prelude
 
-Preludeless examples for those wanting to use kuro with their own rules and
+Preludeless examples for those wanting to use slug with their own rules and
 toolchains. In here you can learn about how BUILD files interact with rules, and
 how the provider abstraction can be used to encapsulate build logic.
 

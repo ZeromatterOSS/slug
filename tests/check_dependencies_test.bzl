@@ -6,7 +6,7 @@
 # of this source tree. You may select, at your option, one of the
 # above-listed licenses.
 
-load("@fbcode//kuro/tests:buck_e2e.bzl", "kuro_e2e_test")
+load("@fbcode//slug/tests:buck_e2e.bzl", "slug_e2e_test")
 load("@fbcode_macros//build_defs:native_rules.bzl", "buck_genrule")
 load("@fbsource//tools/build_defs/windows:powershell.bzl", "powershell_cmd_exe")
 load("@fbsource//tools/target_determinator/macros:ci.bzl", "ci")
@@ -23,14 +23,14 @@ def _check_dependencies_test(
         deps,
         compatible_with = None,
         **kwargs):
-    kuro_e2e_test(
+    slug_e2e_test(
         contacts = contacts,
         name = name,
-        srcs = {"fbcode//kuro/tests/e2e_util:test_bxl_check_dependencies_template.py": "test_bxl_check_dependencies_template.py"},
+        srcs = {"fbcode//slug/tests/e2e_util:test_bxl_check_dependencies_template.py": "test_bxl_check_dependencies_template.py"},
         env = env,
         labels = labels,
-        test_with_compiled_kuro = False,
-        test_with_deployed_kuro = True,
+        test_with_compiled_slug = False,
+        test_with_deployed_slug = True,
         use_buck_api = False,
         # In order for target determinator to trigger this test when the `target` specified has changed, we need to introduce a dep on `target`.
         # However, we cannot introduce a configured dep, because the `target` may not be compatible with platform of dependencies test.
@@ -59,7 +59,7 @@ def check_dependencies_test(
         target_deps = True,
         **kwargs):
     """
-    Creates a test target from a kuro bxl script. BXL script must use "test" as entry
+    Creates a test target from a slug bxl script. BXL script must use "test" as entry
     point.
 
 
@@ -96,7 +96,7 @@ def check_dependencies_test(
         (for example, allowlist: //testing/jest/.*).
     """
 
-    bxl_main = "fbcode//kuro/tests/check_dependencies_test.bxl:test"
+    bxl_main = "fbcode//slug/tests/check_dependencies_test.bxl:test"
     allowlist_patterns = ",".join(allowlist_patterns) if allowlist_patterns else ""
     blocklist_patterns = ",".join(blocklist_patterns) if blocklist_patterns else ""
     if not (expect_failure_msg == None or len(expect_failure_msg) > 0):
@@ -151,7 +151,7 @@ def assert_dependencies_test(
         labels = [],
         **kwargs):
     """
-    Creates a test target fromfbcode//kuro/tests/assert_dependencies_test.bxl:test bxl script.
+    Creates a test target fromfbcode//slug/tests/assert_dependencies_test.bxl:test bxl script.
 
     Parameters:
         name: Name of the test target.
@@ -164,7 +164,7 @@ def assert_dependencies_test(
         target = target,
         contacts = contacts,
         env = {
-            "BXL_MAIN": "fbcode//kuro/tests/assert_dependencies_test.bxl:test",
+            "BXL_MAIN": "fbcode//slug/tests/assert_dependencies_test.bxl:test",
             "DEPS": ",".join(expected_deps),
             "EXPECT_FAILURE_MSG": expect_failure_msg or "",
             "FLAVOR": "assert_dependencies_test",
@@ -185,7 +185,7 @@ def audit_dependents_test(
         deps = None,
         **kwargs):
     """
-    Creates a test target from a kuro bxl script. BXL script must use "test" as entry
+    Creates a test target from a slug bxl script. BXL script must use "test" as entry
     point.
 
     Parameters:
@@ -202,7 +202,7 @@ def audit_dependents_test(
         contacts = contacts,
         env = {
             "ALLOWLIST": ",".join(allowlist_patterns) if allowlist_patterns else "",
-            "BXL_MAIN": "fbcode//kuro/tests/audit_dependents_test.bxl:test",
+            "BXL_MAIN": "fbcode//slug/tests/audit_dependents_test.bxl:test",
             "EXPECT_FAILURE_MSG": expect_failure_msg or "",
             "FLAVOR": "audit_dependents_test",
             "SOURCE_TARGET": source_target,
@@ -225,7 +225,7 @@ def check_mutually_exclusive_dependencies_test(
         build_mode = None,
         **kwargs):
     """
-    Creates a test target from a kuro bxl script that checks for mutually exclusive dependencies.
+    Creates a test target from a slug bxl script that checks for mutually exclusive dependencies.
 
     This test verifies that the target does not depend on more than one dependency from the
     mutually exclusive group. For example, if your group is:
@@ -254,7 +254,7 @@ def check_mutually_exclusive_dependencies_test(
     # Convert list to comma-separated string for BXL
     group_str = ",".join(mutually_exclusive_group)
 
-    # Build mode flagfile is passed directly to kuro as an argfile
+    # Build mode flagfile is passed directly to slug as an argfile
     # The flagfile contains --target-platforms and other config flags
     build_mode_argfile = ""
     ci_labels = []
@@ -275,7 +275,7 @@ def check_mutually_exclusive_dependencies_test(
         contacts = contacts,
         env = {
             "BUILD_MODE_ARGFILE": build_mode_argfile,
-            "BXL_MAIN": "fbcode//kuro/tests/check_mutually_exclusive_dependencies_test.bxl:test",
+            "BXL_MAIN": "fbcode//slug/tests/check_mutually_exclusive_dependencies_test.bxl:test",
             "EXPECT_FAILURE_MSG": expect_failure_msg or "",
             "FLAVOR": "check_mutually_exclusive_dependencies_test",
             "MUTUALLY_EXCLUSIVE_GROUP": group_str,

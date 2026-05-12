@@ -1,6 +1,6 @@
 ---
-id: kuro_telemetry
-title: Kuro Telemetry
+id: slug_telemetry
+title: Slug Telemetry
 ---
 
 :::note

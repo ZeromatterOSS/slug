@@ -1,3 +1,3 @@
 build --platforms=prelude//platforms:default
 build --extra_execution_platforms=prelude//platforms:default
-build --kuro_file_watcher=notify
+build --slug_file_watcher=notify

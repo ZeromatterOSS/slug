@@ -19,7 +19,7 @@ def _expand_template_impl(ctx):
         output = out,
         substitutions = {
             "{NAME}": ctx.attr.name_val,
-            "{PROJECT}": "kuro",
+            "{PROJECT}": "slug",
             "{VERSION}": "9.0",
         },
     )

@@ -35,8 +35,8 @@ use futures::stream::StreamExt;
 use futures::stream::TryStreamExt;
 use gazebo::prelude::*;
 use hyper_util::client::legacy::connect::HttpConnector;
-use kuro_re_configuration::HttpHeader;
-use kuro_re_configuration::KuroOssReConfiguration;
+use slug_re_configuration::HttpHeader;
+use slug_re_configuration::SlugOssReConfiguration;
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use prost::Message;
@@ -155,7 +155,7 @@ fn ttimestamp_from(ts: Option<::prost_types::Timestamp>) -> TTimestamp {
     }
 }
 
-async fn create_tls_config(opts: &KuroOssReConfiguration) -> anyhow::Result<ClientTlsConfig> {
+async fn create_tls_config(opts: &SlugOssReConfiguration) -> anyhow::Result<ClientTlsConfig> {
     let config = ClientTlsConfig::new().with_enabled_roots();
 
     let config = match opts.tls_client_cert.as_ref() {
@@ -225,7 +225,7 @@ pub struct RECapabilities {
     supported_compressors: Vec<Compressor>,
 }
 
-/// Contains runtime options for the remote execution client as set under `kuro_re_client`
+/// Contains runtime options for the remote execution client as set under `slug_re_client`
 pub struct RERuntimeOpts {
     /// Maximum number of concurrent upload requests.
     max_concurrent_uploads_per_action: Option<usize>,
@@ -284,7 +284,7 @@ impl Compressor {
 pub struct REClientBuilder;
 
 impl REClientBuilder {
-    pub async fn build_and_connect(opts: &KuroOssReConfiguration) -> anyhow::Result<REClient> {
+    pub async fn build_and_connect(opts: &SlugOssReConfiguration) -> anyhow::Result<REClient> {
         // We just always create this just in case, so that we implicitly validate it if set.
         let tls_config = create_tls_config(opts)
             .await
@@ -538,7 +538,7 @@ pub struct REClient {
     grpc_clients: GRPCClients,
     capabilities: RECapabilities,
     instance_name: InstanceName,
-    // kuro calls find_missing for same blobs
+    // slug calls find_missing for same blobs
     find_missing_cache: Mutex<FindMissingCache>,
     bystream_compressor: Option<Compressor>,
 }
@@ -1381,7 +1381,7 @@ where
         })
     });
 
-    kuro_util::future::try_join_all(writes).await?;
+    slug_util::future::try_join_all(writes).await?;
 
     Ok(DownloadResponse {
         inlined_blobs: Some(inlined_blobs),
@@ -1623,7 +1623,7 @@ fn with_re_metadata<T>(t: T, metadata: RemoteExecutionMetadata) -> tonic::Reques
         let mut encoded = Vec::new();
         RequestMetadata {
             tool_details: Some(ToolDetails {
-                tool_name: "kuro".to_owned(),
+                tool_name: "slug".to_owned(),
                 // TODO(#503): Pull the BuckVersion::get_unique_id() from BuckDaemon
                 tool_version: "0.1.0".to_owned(),
             }),

@@ -1,7 +1,7 @@
 # `.buckconfig` Knob Disposition (Plan 35.1 Audit)
 
 **Date**: 2026-05-01
-**Plan**: [35-buckconfig-removal.md](../plans/kuro-bazel-subplans/35-buckconfig-removal.md)
+**Plan**: [35-buckconfig-removal.md](../plans/slug-bazel-subplans/35-buckconfig-removal.md)
 **Phase**: 35.1 — Audit + decision freeze
 
 This document is the per-knob disposition table that Phase 35.1 produces.
@@ -18,7 +18,7 @@ are processed in batch in Phase 35.6a.
   `tests/{core,e2e}/**/test_*_data/`). Deferred to Phase 35.6a.
 - **Distinct sections seen in active workspaces**: `cells`, `repositories`,
   `cell_aliases`, `repository_aliases`, `external_cells`, `oss`, `project`,
-  `rust`, `parser`, `buildfile`, `build`, `kuro`, `kuro_re_client`, `alias`,
+  `rust`, `parser`, `buildfile`, `build`, `slug`, `slug_re_client`, `alias`,
   `http`, `ovrsource`, `java`, `kotlin`, `not_buildfile`, `not_http`,
   `not_repository_aliases`.
 - **Distinct Rust consumer files** (grep `BuckconfigKeyRef` outside
@@ -30,11 +30,11 @@ are processed in batch in Phase 35.6a.
 
 | Section | Keys | Disposition |
 |---|---|---|
-| `[cells]` | `gh_facebook_kuro = .`, `gh_facebook_kuro_shims_meta = shim` | MODULE.bazel — root `module(name = "gh_facebook_kuro")` + `bazel_dep` + `local_path_override` for shim |
-| `[cell_aliases]` | `root = gh_facebook_kuro` | MODULE.bazel — `repo_name = "root"` on the self module entry |
-| `[oss]` | `internal_cell = fbcode`, `stripped_root_dirs = kuro` | **drop** — Meta-internal Buck1 vestige; `is_open_source()` already gates this in Rust |
-| `[project]` | `ignore = app/kuro_explain, app_dep_graph_rules, examples, integrations/rust-project/tests` | `.bazelignore` — one path per line |
-| `[rust]` | `default_edition = 2024` | **drop** — kuro's own bootstrap config; Cargo handles edition; not a kuro build-system concern |
+| `[cells]` | `gh_facebook_slug = .`, `gh_facebook_slug_shims_meta = shim` | MODULE.bazel — root `module(name = "gh_facebook_slug")` + `bazel_dep` + `local_path_override` for shim |
+| `[cell_aliases]` | `root = gh_facebook_slug` | MODULE.bazel — `repo_name = "root"` on the self module entry |
+| `[oss]` | `internal_cell = fbcode`, `stripped_root_dirs = slug` | **drop** — Meta-internal Buck1 vestige; `is_open_source()` already gates this in Rust |
+| `[project]` | `ignore = app/slug_explain, app_dep_graph_rules, examples, integrations/rust-project/tests` | `.bazelignore` — one path per line |
+| `[rust]` | `default_edition = 2024` | **drop** — slug's own bootstrap config; Cargo handles edition; not a slug build-system concern |
 
 ### `./prelude/.buckconfig`
 
@@ -44,7 +44,7 @@ are processed in batch in Phase 35.6a.
 | `[repository_aliases]` | (empty under `[repository_aliases]`; populated under `[not_repository_aliases]` with `config = ovr_config` for non-OSS) | **drop** — `[not_*]` is OSS gating; OSS path is empty. Internal path uses `config = ovr_config` which is Meta-only. |
 | `[buildfile] / [not_buildfile]` | `name_v2 = TARGETS,BUCK` (non-OSS only) | **drop** for OSS (default is `BUILD.bazel`) |
 | `[ovrsource]` | (no keys) | **drop** — defensive empty section |
-| `[java]`, `[kotlin]` | language-specific knobs | **drop from prelude/.buckconfig** — these are Meta-internal language toolchains, no Kuro Rust consumer |
+| `[java]`, `[kotlin]` | language-specific knobs | **drop from prelude/.buckconfig** — these are Meta-internal language toolchains, no Slug Rust consumer |
 | `[http] / [not_http]` | `maven_repo = ...` (non-OSS only) | **drop** — Meta-internal Maven mirror |
 
 **Action**: Delete `prelude/.buckconfig` entirely after MODULE.bazel
@@ -56,8 +56,8 @@ needed.
 | Section | Keys | Disposition |
 |---|---|---|
 | `[buildfile]` | `name = BUCK.reindeer,BUCK` | **keep as `[buildfile]`-only `.buckconfig`** until reindeer-side BUILD.bazel support lands. Reindeer hardcodes `BUCK.reindeer`; this is a documented exception in Plan 35.2. |
-| `[cells]` | `gh_facebook_kuro_shims_meta = .`, `none = none` | MODULE.bazel |
-| `[cell_aliases]` | `root = gh_facebook_kuro_shims_meta`, `bazel_skylib`, `buck`, `fbcode`, `fbcode_macros`, `fbsource`, `shim`, `toolchains` → all alias to `gh_facebook_kuro_shims_meta` | MODULE.bazel via `repo_name` aliases on the self module |
+| `[cells]` | `gh_facebook_slug_shims_meta = .`, `none = none` | MODULE.bazel |
+| `[cell_aliases]` | `root = gh_facebook_slug_shims_meta`, `bazel_skylib`, `buck`, `fbcode`, `fbcode_macros`, `fbsource`, `shim`, `toolchains` → all alias to `gh_facebook_slug_shims_meta` | MODULE.bazel via `repo_name` aliases on the self module |
 | `[external_cells]` | (commented-out `prelude = bundled`) | **drop** — already handled by Plan 28 auto-registration |
 | `[parser]` | `target_platform_detector_spec = ...` | `.bazelrc` flag (`build --platforms=...` per detector spec; or hardcode if spec is trivial) |
 
@@ -92,12 +92,12 @@ Only a comment; no keys. **Action**: Delete entirely in Phase 35.6b.
 - `[alias] demoapp = root//app:demoapp_debug` (in `examples/android/demoapp/`) —
   → drop (Buck1-style target alias; not a Bazel concept). Verify no scripts
   rely on it.
-- `[kuro] file_watcher = notify` (in two go/python toolchain examples) —
+- `[slug] file_watcher = notify` (in two go/python toolchain examples) —
   → `.bazelrc` flag (already a CLI option pattern).
-- `[kuro_re_client]` (in 5 RE examples + vscode) —
+- `[slug_re_client]` (in 5 RE examples + vscode) —
   → `.bazelrc` flag block. See §3.
-- `[kuro] digest_algorithms = SHA256` —
-  → `.bazelrc` flag `build --kuro_digest_algorithms=SHA256`.
+- `[slug] digest_algorithms = SHA256` —
+  → `.bazelrc` flag `build --slug_digest_algorithms=SHA256`.
 
 **Empty `.buckconfig` files** (just a comment or zero bytes):
 `examples/bootstrap/bootstrap/.buckconfig`,
@@ -126,71 +126,71 @@ decision (specific flag name, drop vs keep), this table is authoritative.
 | `[buildfile]` `includes` / `package_includes` | drop | No active consumer in OSS path |
 | `[parser]` `target_platform_detector_spec` | `.bazelrc` | `build --platforms=<label>` (already supported by bazelrc parser); auto-`@local_config_platform//:host` covers host case |
 | `[project]` `ignore` | `.bazelignore` | One path per line |
-| `[project]` `package_boundary_exceptions` | `.bazelrc` | New flag `--kuro_package_boundary_exceptions=<list>` |
-| `[project]` `watchman_merge_base` | `.bazelrc` | New flag `--kuro_watchman_merge_base=<rev>` |
+| `[project]` `package_boundary_exceptions` | `.bazelrc` | New flag `--slug_package_boundary_exceptions=<list>` |
+| `[project]` `watchman_merge_base` | `.bazelrc` | New flag `--slug_watchman_merge_base=<rev>` |
 | `[oss]` | drop | Meta-internal Buck1 vestige |
 | `[rust]` | drop | Bootstrap config, Cargo's responsibility |
 | `[build]` `execution_platforms` | `.bazelrc` | `build --platforms=<label>` (Bazel-compat) |
 | `[build]` `threads` | `.bazelrc` | `build --jobs=<N>` (Bazel-compat) |
-| `[build]` `lazy_cycle_detector` | `.bazelrc` | `--kuro_lazy_cycle_detector` |
-| `[build]` RE knobs | `.bazelrc` | New `--kuro_*` flags (see §3.1) |
-| `[client]` `id` | `.bazelrc` | `--kuro_client_id` |
+| `[build]` `lazy_cycle_detector` | `.bazelrc` | `--slug_lazy_cycle_detector` |
+| `[build]` RE knobs | `.bazelrc` | New `--slug_*` flags (see §3.1) |
+| `[client]` `id` | `.bazelrc` | `--slug_client_id` |
 | `[log]`, `[sandbox]`, `[test]`, `[ui]`, `[http]` | `.bazelrc` | per-knob `.bazelrc` flag (see §3.2) |
-| `[kuro]` (~50 keys) | `.bazelrc` | `--kuro_<key>` per key (see §3.3) |
-| `[kuro_re_client]` | `.bazelrc` | `--kuro_re_*` per key (see §3.1) |
-| `[kuro_resource_control]` | `.bazelrc` | `--kuro_rc_*` per key |
-| `[kuro_health_check]` | `.bazelrc` | `--kuro_health_*` per key |
-| `[kuro_system_warning]` | `.bazelrc` | `--kuro_warn_*` per key |
-| `[build_report]` | drop | No consumers in audit (single grep hit in `build_report.rs:1057` reads `[build_report]` for one string key; verify in 35.5 — if used, becomes `--kuro_build_report_<key>`; otherwise drop) |
+| `[slug]` (~50 keys) | `.bazelrc` | `--slug_<key>` per key (see §3.3) |
+| `[slug_re_client]` | `.bazelrc` | `--slug_re_*` per key (see §3.1) |
+| `[slug_resource_control]` | `.bazelrc` | `--slug_rc_*` per key |
+| `[slug_health_check]` | `.bazelrc` | `--slug_health_*` per key |
+| `[slug_system_warning]` | `.bazelrc` | `--slug_warn_*` per key |
+| `[build_report]` | drop | No consumers in audit (single grep hit in `build_report.rs:1057` reads `[build_report]` for one string key; verify in 35.5 — if used, becomes `--slug_build_report_<key>`; otherwise drop) |
 | `[deprecated_config]` | drop | Used only in `test_deprecated_config_data` test fixture; tests goes to bucket (A) in 35.6a |
 | `[alias]` | drop | Buck1 target aliases; not a Bazel concept. The one in `examples/android/demoapp/` is removed in 35.3/35.5. |
 | `[ovrsource]`, `[java]`, `[kotlin]`, `[not_*]` | drop | Meta-internal / OSS gating |
 
 ### 3.1 `.bazelrc` flag names — RE client
 
-Existing `.bazelrc` parser (`app/kuro_client_ctx/src/bazelrc.rs`) supports
+Existing `.bazelrc` parser (`app/slug_client_ctx/src/bazelrc.rs`) supports
 arbitrary `--name=value` flags. The parser is value-agnostic; flag
 acceptance is delegated to the daemon. Plan 35.5 wires each flag to the
 existing `BuckconfigKeyRef` consumer.
 
 | Buckconfig key | `.bazelrc` flag |
 |---|---|
-| `kuro_re_client.engine_address` | `--remote_executor` (Bazel-compat) or `--kuro_re_engine_address` |
-| `kuro_re_client.action_cache_address` | `--remote_cache` (Bazel-compat) or `--kuro_re_action_cache_address` |
-| `kuro_re_client.cas_address` | `--kuro_re_cas_address` |
-| `kuro_re_client.tls` | `--kuro_re_tls` (default `true`) |
-| `kuro_re_client.tls_client_cert` | `--remote_tls_certificate` (Bazel-compat) or `--kuro_re_tls_client_cert` |
-| `kuro_re_client.tls_ca_certs` | `--tls_certificate` (Bazel-compat) or `--kuro_re_tls_ca_certs` |
-| `kuro_re_client.http_headers` | `--remote_header=K=V` (repeated; Bazel-compat) |
-| `kuro_re_client.instance_name` | `--remote_instance_name` (Bazel-compat) |
-| `kuro_re_client.capabilities` | `--kuro_re_capabilities` |
-| `kuro_re_client.use_fbcode_metadata` | `--kuro_re_use_fbcode_metadata` |
+| `slug_re_client.engine_address` | `--remote_executor` (Bazel-compat) or `--slug_re_engine_address` |
+| `slug_re_client.action_cache_address` | `--remote_cache` (Bazel-compat) or `--slug_re_action_cache_address` |
+| `slug_re_client.cas_address` | `--slug_re_cas_address` |
+| `slug_re_client.tls` | `--slug_re_tls` (default `true`) |
+| `slug_re_client.tls_client_cert` | `--remote_tls_certificate` (Bazel-compat) or `--slug_re_tls_client_cert` |
+| `slug_re_client.tls_ca_certs` | `--tls_certificate` (Bazel-compat) or `--slug_re_tls_ca_certs` |
+| `slug_re_client.http_headers` | `--remote_header=K=V` (repeated; Bazel-compat) |
+| `slug_re_client.instance_name` | `--remote_instance_name` (Bazel-compat) |
+| `slug_re_client.capabilities` | `--slug_re_capabilities` |
+| `slug_re_client.use_fbcode_metadata` | `--slug_re_use_fbcode_metadata` |
 
 **Recommendation**: Use Bazel-compatible names (`--remote_executor`,
 `--remote_cache`, `--remote_header`, `--remote_instance_name`,
 `--remote_tls_certificate`, `--tls_certificate`) where Bazel has a
-matching flag; Kuro-prefix (`--kuro_re_*`) for kuro-only knobs. This
+matching flag; Slug-prefix (`--slug_re_*`) for slug-only knobs. This
 makes RE-using Bazel projects drop-in compatible.
 
 ### 3.2 `.bazelrc` flag names — runtime knobs
 
 | Buckconfig key | `.bazelrc` flag |
 |---|---|
-| `kuro.digest_algorithms` | `--digest_function=SHA256` (Bazel-compat) — one of SHA1/SHA256/BLAKE3 |
-| `kuro.file_watcher` | `--kuro_file_watcher={notify,watchman,fs_hash_crawler}` |
-| `kuro.max_concurrent_requests` | `--kuro_max_concurrent_requests=<N>` |
-| `kuro.starlark_max_callstack_size` | `--kuro_starlark_max_callstack_size=<N>` |
+| `slug.digest_algorithms` | `--digest_function=SHA256` (Bazel-compat) — one of SHA1/SHA256/BLAKE3 |
+| `slug.file_watcher` | `--slug_file_watcher={notify,watchman,fs_hash_crawler}` |
+| `slug.max_concurrent_requests` | `--slug_max_concurrent_requests=<N>` |
+| `slug.starlark_max_callstack_size` | `--slug_starlark_max_callstack_size=<N>` |
 | `build.threads` | `--jobs=<N>` (Bazel-compat) |
 | `build.execution_platforms` | `--platforms=<label>` (Bazel-compat — first platform; multiple platforms use repeated flag) |
-| `parser.target_platform_detector_spec` | drop or expose as `--kuro_target_platform_detector_spec=<spec>` (the auto-`@local_config_platform//:host` register already covers most cases per Phase 17) |
-| `client.id` | `--kuro_client_id=<string>` |
+| `parser.target_platform_detector_spec` | drop or expose as `--slug_target_platform_detector_spec=<spec>` (the auto-`@local_config_platform//:host` register already covers most cases per Phase 17) |
+| `client.id` | `--slug_client_id=<string>` |
 | `ui.console` | `--curses={on,off,auto}` (Bazel-compat with `--curses`) |
-| `log.*` | `--kuro_log_*` |
+| `log.*` | `--slug_log_*` |
 | `test.*` | `--test_*` (Bazel-compat where possible) |
 
-### 3.3 `[kuro]` section flag names
+### 3.3 `[slug]` section flag names
 
-50+ keys. Strategy: every `kuro.<key>` becomes `--kuro_<key>` literally,
+50+ keys. Strategy: every `slug.<key>` becomes `--slug_<key>` literally,
 with Bazel-compat aliases for the common ones (`--digest_function`,
 `--jobs`, etc.). Per-key listing deferred to a Phase 35.5 sub-spreadsheet
 once each key's daemon-side wiring is touched.
@@ -201,18 +201,18 @@ Only one knob: `[project] ignore` from `./.buckconfig`. Translates to:
 
 ```
 # .bazelignore (root)
-app/kuro_explain
+app/slug_explain
 app_dep_graph_rules
 examples
 integrations/rust-project/tests
 ```
 
 No other active workspace uses `[project] ignore`. The `.bazelignore`
-parser must be added to `kuro_common` (Phase 35.4). Wire into the file
+parser must be added to `slug_common` (Phase 35.4). Wire into the file
 watcher / directory walker that currently reads `[project] ignore`
-(consumers found in `app/kuro_file_watcher/src/edenfs/interface.rs:130`,
-`app/kuro_file_watcher/src/watchman/interface.rs:362`,
-`app/kuro_server/src/daemon/state.rs:404`).
+(consumers found in `app/slug_file_watcher/src/edenfs/interface.rs:130`,
+`app/slug_file_watcher/src/watchman/interface.rs:362`,
+`app/slug_server/src/daemon/state.rs:404`).
 
 ## 5. Rust consumer cross-reference
 
@@ -223,22 +223,22 @@ consumer can be removed from the buckconfig path.
 
 | Section read by | Files |
 |---|---|
-| `[buildfile]` | `kuro_interpreter/src/import_paths.rs` |
-| `[kuro]` | many: `kuro_interpreter/{allow_relative_paths,factory}.rs`, `kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`, `kuro_build_api/{configure_dice,artifact_groups/calculation}.rs`, `kuro_file_watcher/{file_watcher,watchman/interface}.rs`, `kuro_execute_impl/src/materializers/deferred/clean_stale.rs`, `kuro_configured/src/nodes.rs`, `kuro_server/src/{ctx,daemon/{disk_state,io_provider,forkserver,state}}.rs`, `kuro_server_commands/src/build.rs` |
-| `[deprecated_config]` | `kuro_interpreter_for_build/src/interpreter/buckconfig.rs:255` (test-only support; goes away with Plan 35.6a bucket-(A) fixture) |
-| `[build]` | `kuro_build_api/src/materialize.rs`, `kuro_node/src/execution.rs`, `kuro_server/src/{ctx,daemon/state}.rs` |
-| `[build_report]` | `kuro_build_api/src/build/build_report.rs:1057` (single key — verify use; likely candidate to drop) |
-| `[parser]` | `kuro_configured/src/target_platform_resolution.rs:75` |
-| `[project]` | `kuro_file_watcher/src/{watchman/interface,edenfs/interface}.rs`, `kuro_server/src/daemon/state.rs:404` |
-| `[test]` | `kuro_test/src/command.rs:383` |
-| `[ui]` | `kuro_server/src/ctx.rs:737` |
-| `[sandbox]` | `kuro_server/src/ctx.rs:790` |
-| `[scuba]` | `kuro_server/src/ctx.rs:1025` (Meta-internal — drop in OSS) |
-| `[log]` | `kuro_server/src/ctx.rs:1039` |
-| `[client]` | `kuro_server/src/ctx.rs:1075` |
-| `[http]` | `kuro_common/src/init.rs:68-90` |
-| `[kuro_system_warning]` | `kuro_common/src/init.rs:168,172` |
-| `[kuro_re_client]` | `kuro_re_configuration/src/lib.rs` (~80 BuckconfigKeyRef calls — largest single consumer) |
+| `[buildfile]` | `slug_interpreter/src/import_paths.rs` |
+| `[slug]` | many: `slug_interpreter/{allow_relative_paths,factory}.rs`, `slug_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`, `slug_build_api/{configure_dice,artifact_groups/calculation}.rs`, `slug_file_watcher/{file_watcher,watchman/interface}.rs`, `slug_execute_impl/src/materializers/deferred/clean_stale.rs`, `slug_configured/src/nodes.rs`, `slug_server/src/{ctx,daemon/{disk_state,io_provider,forkserver,state}}.rs`, `slug_server_commands/src/build.rs` |
+| `[deprecated_config]` | `slug_interpreter_for_build/src/interpreter/buckconfig.rs:255` (test-only support; goes away with Plan 35.6a bucket-(A) fixture) |
+| `[build]` | `slug_build_api/src/materialize.rs`, `slug_node/src/execution.rs`, `slug_server/src/{ctx,daemon/state}.rs` |
+| `[build_report]` | `slug_build_api/src/build/build_report.rs:1057` (single key — verify use; likely candidate to drop) |
+| `[parser]` | `slug_configured/src/target_platform_resolution.rs:75` |
+| `[project]` | `slug_file_watcher/src/{watchman/interface,edenfs/interface}.rs`, `slug_server/src/daemon/state.rs:404` |
+| `[test]` | `slug_test/src/command.rs:383` |
+| `[ui]` | `slug_server/src/ctx.rs:737` |
+| `[sandbox]` | `slug_server/src/ctx.rs:790` |
+| `[scuba]` | `slug_server/src/ctx.rs:1025` (Meta-internal — drop in OSS) |
+| `[log]` | `slug_server/src/ctx.rs:1039` |
+| `[client]` | `slug_server/src/ctx.rs:1075` |
+| `[http]` | `slug_common/src/init.rs:68-90` |
+| `[slug_system_warning]` | `slug_common/src/init.rs:168,172` |
+| `[slug_re_client]` | `slug_re_configuration/src/lib.rs` (~80 BuckconfigKeyRef calls — largest single consumer) |
 
 ## 6. Drop list (no Rust consumer in OSS path)
 
@@ -267,11 +267,11 @@ consumer** in the OSS code path. They can be dropped directly without a
   `@local_config_platform//:host` auto-register, is the detector spec
   ever load-bearing in the OSS path? If yes, needs a flag; if no, drop.
   Phase 35.5 task: trace consumer at
-  `kuro_configured/src/target_platform_resolution.rs:75` and decide.
+  `slug_configured/src/target_platform_resolution.rs:75` and decide.
 - **`[deprecated_config]` Rust support**: Used only by
   `test_deprecated_config_data`. Bucket (A) deletion in 35.6a removes the
   test; the parser code at
-  `kuro_interpreter_for_build/src/interpreter/buckconfig.rs:255` then
+  `slug_interpreter_for_build/src/interpreter/buckconfig.rs:255` then
   becomes dead and is removed in 35.6b.
 
 ## 8. Test fixture inventory (Phase 35.6a seed)
@@ -319,7 +319,7 @@ exercising multi-cell setups. Triaged in Phase 35.6a step 1.
 
 ## 9. `.bazelrc` parser readiness check
 
-`app/kuro_client_ctx/src/bazelrc.rs` (1122 LOC, per plan §Dependencies):
+`app/slug_client_ctx/src/bazelrc.rs` (1122 LOC, per plan §Dependencies):
 - Supports `import` / `try-import` / `--config=` profiles. ✓
 - Accepts arbitrary `--key=value` flags. ✓
 - Parser is value-agnostic; daemon-side acceptance is the constraint.
@@ -330,7 +330,7 @@ exercising multi-cell setups. Triaged in Phase 35.6a step 1.
   35.5 step 1 must include a parser smoke test for each new flag shape.
 - Does `--remote_header=K=V` need parser changes to allow repeated form?
 - `parse_list` consumers (e.g.
-  `kuro_re_configuration/src/lib.rs:566 .parse_list`) translate
+  `slug_re_configuration/src/lib.rs:566 .parse_list`) translate
   cleanly to comma-separated `.bazelrc` flag values; verify.
 
 ## 10. Phase 35.1 acceptance check

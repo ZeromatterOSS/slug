@@ -6,7 +6,7 @@
 # of this source tree. You may select, at your option, one of the
 # above-listed licenses.
 
-load("@fbcode//kuro:buck_rust_binary.bzl", "buck_rust_binary")
+load("@fbcode//slug:buck_rust_binary.bzl", "buck_rust_binary")
 load("@fbcode_macros//build_defs:native_rules.bzl", "alias", "buck_genrule")
 load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
 
@@ -24,7 +24,7 @@ def rust_protobuf_library(
         name,
         srcs,
         build_script,
-        "kuro_protoc_dev",
+        "slug_protoc_dev",
         "prost",
         protos,
         [
@@ -58,7 +58,7 @@ def rust_protobuf_library_prost_0134(
         name,
         srcs,
         build_script,
-        "kuro_protoc_dev-tonic-0-12-3",
+        "slug_protoc_dev-tonic-0-12-3",
         "prost-0-13-4",
         protos,
         [
@@ -81,7 +81,7 @@ def _rust_protobuf_library(
         name,
         srcs,
         build_script,
-        kuro_protoc_dev,
+        slug_protoc_dev,
         versioned_prost_target,
         protos,
         deps,
@@ -98,7 +98,7 @@ def _rust_protobuf_library(
         srcs = [build_script],
         crate_root = build_script,
         deps = [
-            "fbcode//kuro/app/kuro_protoc_dev:" + kuro_protoc_dev,
+            "fbcode//slug/app/slug_protoc_dev:" + slug_protoc_dev,
         ],
     )
 

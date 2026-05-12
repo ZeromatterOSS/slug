@@ -1,0 +1,16 @@
+[package]
+description = "Tests for slug_error"
+edition = "2024"
+license = { workspace = true }
+name = "slug_error_tests"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dev-dependencies]
+anyhow = { workspace = true }
+
+starlark = { workspace = true }
+starlark_syntax = { workspace = true }
+
+slug_error = { workspace = true }
+slug_util = { workspace = true }

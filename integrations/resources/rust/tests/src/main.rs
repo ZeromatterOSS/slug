@@ -12,7 +12,7 @@ use std::process::Command;
 
 fn main() {
     println!("Hello from resources.rs. Will now execute the `hello_binary` resource.");
-    let hello_path = buck_resources::get("kuro/integrations/resources/rust/hello_binary").unwrap();
+    let hello_path = buck_resources::get("slug/integrations/resources/rust/hello_binary").unwrap();
     if let Err(err) = Command::new(&hello_path).status() {
         panic!("Failed to execute {}: {}", hello_path.display(), err);
     }
@@ -20,5 +20,5 @@ fn main() {
 
 #[test]
 fn resource_exists_in_unittest() {
-    buck_resources::get("kuro/integrations/resources/rust/hello_binary").unwrap();
+    buck_resources::get("slug/integrations/resources/rust/hello_binary").unwrap();
 }

@@ -1,0 +1,45 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "slug_execute_local"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+bincode = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+libc = { workspace = true }
+pin-project = { workspace = true }
+take_mut = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+
+slug_common = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_fs = { workspace = true }
+slug_miniperf_proto = { workspace = true }
+slug_resource_control = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+slug_wrapper_common = { workspace = true }
+dupe = { workspace = true }
+winapi = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+dupe = { workspace = true }
+sysinfo = { workspace = true }
+tempfile = { workspace = true }
+tokio-stream = { workspace = true }
+
+slug_util = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

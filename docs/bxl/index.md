@@ -3,22 +3,22 @@ id: index
 title: Why BXL
 ---
 
-## Kuro Extension Language (BXL)
+## Slug Extension Language (BXL)
 
 BXL is a Starlark-based script that enables integrators to inspect and interact
-with the Kuro graph.
+with the Slug graph.
 
 Integrators are able to:
 
-- Write Starlark code that queries, analyzes, and builds on the Kuro graph.
-- Introspect and interact with the Kuro graph structures natively, via
+- Write Starlark code that queries, analyzes, and builds on the Slug graph.
+- Introspect and interact with the Slug graph structures natively, via
   Starlark, in a safe, controlled manner.
 
-Introspection of the Kuro graph can occur at the unconfigured, configured,
+Introspection of the Slug graph can occur at the unconfigured, configured,
 providers, and action stages. There are also APIs offered to allow BXL to accept
 custom command line argument, output artifacts, and print results to stdout.
 
-BXL leverages Kuro core's incremental
+BXL leverages Slug core's incremental
 [caching](./faq#when-is-my-bxl-script-cached). It also has support for
 [running actions](./how_tos/basic_how_tos#running-actions),
 [dynamic outputs](./how_tos/how_to_run_actions_based_on_the_content_of_artifact),
@@ -32,34 +32,34 @@ scripts.
 BXL is considered to be mostly stable, with a bit more active development here
 and there.
 
-## When should I use BXL over Kuro API/CLI?
+## When should I use BXL over Slug API/CLI?
 
-There are many overlaps between BXL and Kuro (for example, both can run cquery
+There are many overlaps between BXL and Slug (for example, both can run cquery
 and both can build targets). It’s possible that one use case could be handled by
-both BXL and Kuro.
+both BXL and Slug.
 
 Following are some specific recommendations to help decide when to use BXL over
-regular Kuro:
+regular Slug:
 
 - **Use/inspect resolved attributes that are not exposed/accessible to users via
-  normal Kuro operations.**
+  normal Slug operations.**
   - This includes introspecting the Starlark object of providers, analyzing the
     Starlark object of a rule’s attr before and after coercing and resolution,
     and introspecting intermediate query results.
-- **Reduce/eliminate the need to make several Kuro calls within your program,
+- **Reduce/eliminate the need to make several Slug calls within your program,
   such as running several subprocesses to call `cquery` several times.**
   - With BXL, you can just call the BXL script once in a subprocess, potentially
     reducing the amount of code you need to write in your program. For example,
     if you need to call cquery and build several times, you can put that all
-    within a single BXL script and run `kuro bxl` once, rather than running
-    `kuro cquery` and `kuro build` several times.
-- **Reduce/eliminate the need to manually parse Kuro output format within your
+    within a single BXL script and run `slug bxl` once, rather than running
+    `slug cquery` and `slug build` several times.
+- **Reduce/eliminate the need to manually parse Slug output format within your
   program, and any bugs that may come with manual parsing**.
   - Some languages are more verbose than others when it comes to string parsing.
   - BXL scripts are written in Starlark, which is basically a deterministic,
     immutable Python. BXL is able to directly introspect Starlark objects (such
     as rules and target nodes, and so on) and call methods on these objects
-    instead of parsing them over Kuro’s output.
+    instead of parsing them over Slug’s output.
 
 ## Example Use Cases
 

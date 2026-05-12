@@ -2,10 +2,10 @@
 oncalls: ['build_infra']
 ---
 
-# Kuro Validation Rules
+# Slug Validation Rules
 
-**ALWAYS** run this after changing files in `kuro/app/` or `fbcode/kuro/app/`:
+**ALWAYS** run this after changing files in `slug/app/` or `fbcode/slug/app/`:
 
 ```bash
-arc rust-check fbcode//kuro/app/...
+arc rust-check fbcode//slug/app/...
 ```

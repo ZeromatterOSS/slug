@@ -1,8 +1,8 @@
 # Plan 28.5 negative test: loads :defs.bzl which references the
-# `_kuro_exported_native_probe` symbol that lives in
-# `@kuro_builtins//:exports.bzl::exported_native`. That dict is
+# `_slug_exported_native_probe` symbol that lives in
+# `@slug_builtins//:exports.bzl::exported_native`. That dict is
 # BUCK-only — the load must fail with
-# "Variable _kuro_exported_native_probe not found".
+# "Variable _slug_exported_native_probe not found".
 load(":defs.bzl", "_RUNTIME_REFERENCE")
 
 alias(

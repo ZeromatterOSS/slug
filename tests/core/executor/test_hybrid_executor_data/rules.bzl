@@ -36,7 +36,7 @@ def _platform(ctx):
             use_limited_hybrid = ctx.attrs.use_limited_hybrid,
             allow_limited_hybrid_fallbacks = ctx.attrs.allow_hybrid_fallbacks_on_failure,
             allow_hybrid_fallbacks_on_failure = ctx.attrs.allow_hybrid_fallbacks_on_failure,
-            remote_execution_use_case = "kuro-testing",
+            remote_execution_use_case = "slug-testing",
             allow_cache_uploads = ctx.attrs.allow_cache_uploads,
             remote_dep_file_cache_enabled = ctx.attrs.remote_dep_file_cache_enabled,
             experimental_low_pass_filter = ctx.attrs.experimental_low_pass_filter,

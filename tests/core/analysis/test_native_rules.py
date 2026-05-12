@@ -799,20 +799,20 @@ async def test_cc_library_removed_without_load(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
-async def test_28_2_kuro_builtins_visible_in_external_bzl(buck: Buck) -> None:
+async def test_28_2_slug_builtins_visible_in_external_bzl(buck: Buck) -> None:
     """Plan 28.2 acceptance: a public symbol exported from
-    `@kuro_builtins//:exports.bzl` is visible in an external `.bzl` file
+    `@slug_builtins//:exports.bzl` is visible in an external `.bzl` file
     without an explicit `load()`. This fixture's MODULE.bazel does not
     register a prelude, so the only injection path is the new
-    `bazel_builtins_autoload` (auto-registers `@kuro_builtins` as a
+    `bazel_builtins_autoload` (auto-registers `@slug_builtins` as a
     bundled cell + imports its public symbols into every env).
     See `thoughts/shared/research/2026-04-30-plan-28-1-builtins-loader-spike.md`.
     """
-    result = await buck.build("//:kuro_builtins_probe_target")
+    result = await buck.build("//:slug_builtins_probe_target")
     output = result.get_build_report().output_for_target(
-        "//:kuro_builtins_probe_target"
+        "//:slug_builtins_probe_target"
     )
-    assert output.read_text().strip() == "kuro-28-2-loader-ok"
+    assert output.read_text().strip() == "slug-28-2-loader-ok"
 
 
 @buck_test(data_dir="test_native_rules_data")
@@ -825,7 +825,7 @@ async def test_28_4_stage2_wrapper_passes_through(buck: Buck) -> None:
     reaches the output verbatim — broken if the wrapper drops or
     mutates the result. The unchanged @llvm-project//llvm:Demangle
     build is the broader regression net. See Plan 28.4 in
-    `thoughts/shared/plans/kuro-bazel-subplans/28-builtins-module-architecture.md`.
+    `thoughts/shared/plans/slug-bazel-subplans/28-builtins-module-architecture.md`.
     """
     result = await buck.build("//wrapper_proof:wrapper_probe_target")
     output = result.get_build_report().output_for_target(
@@ -841,7 +841,7 @@ async def test_28_4_stage3_facade_in_call_path(buck: Buck) -> None:
     `target_platform_has_constraint` from Rust into the facade. Two
     invariants verified by the fixture rule:
 
-      1. `ctx.kuro_facade_active == True` — the marker proves the
+      1. `ctx.slug_facade_active == True` — the marker proves the
          wrapper actually built a struct facade and passed it to the
          user's impl. If the wrapper degenerated back to
          `implementation(raw_ctx)`, the marker is missing and the
@@ -855,7 +855,7 @@ async def test_28_4_stage3_facade_in_call_path(buck: Buck) -> None:
          migration's behaviour.
 
     See Plan 28.4 in
-    `thoughts/shared/plans/kuro-bazel-subplans/28-builtins-module-architecture.md`.
+    `thoughts/shared/plans/slug-bazel-subplans/28-builtins-module-architecture.md`.
     """
     result = await buck.build("//wrapper_proof:facade_proof_target")
     output = result.get_build_report().output_for_target(
@@ -869,8 +869,8 @@ async def test_28_4_stage4_aspect_facade_in_call_path(buck: Buck) -> None:
     """Plan 28.4 Stage 4: aspect impls now flow through
     `aspect_implementation_wrapper(impl, target, ctx)`. The bundled
     wrapper installs a Starlark facade around the aspect's `raw_ctx`,
-    sets `ctx.kuro_facade_active = True` + `ctx.kuro_facade_kind =
-    "aspect"`, and reuses the same `_kuro_target_platform_has_constraint`
+    sets `ctx.slug_facade_active = True` + `ctx.slug_facade_kind =
+    "aspect"`, and reuses the same `_slug_target_platform_has_constraint`
     shim Stage 3 installed for rule contexts. The fixture aspect runs
     on the leaf target (via `attr.label_list(aspects = [...])` on the
     collector) and stuffs its observations into a provider; the
@@ -895,13 +895,13 @@ async def test_28_4_stage5_subrule_facade_in_call_path(buck: Buck) -> None:
     `subrule_implementation_wrapper(impl, ctx, **kwargs)`. The wrapper
     `Value` is stashed in TLS by `RuleSpec::Impl::invoke` for the
     duration of the rule's eval and read by
-    `kuro_interpreter_for_build::subrule::FrozenStarlarkSubruleCallable::invoke`.
+    `slug_interpreter_for_build::subrule::FrozenStarlarkSubruleCallable::invoke`.
 
     The fixture rule calls a subrule with a sentinel kwarg. Inside
     the subrule impl we assert:
 
-      1. `ctx.kuro_facade_active == True` (facade in path);
-      2. `ctx.kuro_facade_kind == "subrule"` (subrule wrapper, not
+      1. `ctx.slug_facade_active == True` (facade in path);
+      2. `ctx.slug_facade_kind == "subrule"` (subrule wrapper, not
          the leaked rule wrapper);
       3. `ctx.target_platform_has_constraint(...)` answers correctly
          (Starlark shim works inside subrules too); and
@@ -920,9 +920,9 @@ async def test_28_4_stage5_subrule_facade_in_call_path(buck: Buck) -> None:
 async def test_28_4_stage6_package_relative_label_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 6: `ctx.package_relative_label` migrated from
     Rust to Starlark. The Rust impl in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was
     deleted as part of this stage; the facade closure
-    `_kuro_package_relative_label` in `@kuro_builtins//:exports.bzl`
+    `_slug_package_relative_label` in `@slug_builtins//:exports.bzl`
     now serves the call.
 
     The fixture exercises every branch of the previous Rust impl
@@ -942,8 +942,8 @@ async def test_28_4_stage6_package_relative_label_starlark(buck: Buck) -> None:
 async def test_28_4_stage7_tokenize_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 7: `ctx.tokenize` migrated from Rust to
     Starlark. The Rust impl + its `shell_tokenize` helper in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` were
-    deleted; `_kuro_tokenize` in `@kuro_builtins//:exports.bzl` now
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` were
+    deleted; `_slug_tokenize` in `@slug_builtins//:exports.bzl` now
     serves the call.
 
     The pre-existing `test_tokenize` covers the basic shapes
@@ -969,11 +969,11 @@ async def test_28_4_stage8_coverage_instrumented_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 8: `ctx.coverage_instrumented` migrated from
     Rust to Starlark. Demonstrates the "global state hook" migration
     pattern: the per-build `--collect_code_coverage` flag is exposed
-    via a kuro-internal Starlark global
-    (`kuro_collect_code_coverage()`) registered in
-    `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`,
-    and `_kuro_coverage_instrumented` in
-    `@kuro_builtins//:exports.bzl` reads it.
+    via a slug-internal Starlark global
+    (`slug_collect_code_coverage()`) registered in
+    `app/slug_interpreter_for_build/src/interpreter/functions/slug_runtime.rs`,
+    and `_slug_coverage_instrumented` in
+    `@slug_builtins//:exports.bzl` reads it.
 
     The Rust impl ignored both `this` and `dep` and unconditionally
     returned the global flag. The migrated function preserves that:
@@ -992,9 +992,9 @@ async def test_28_4_stage8_coverage_instrumented_starlark(buck: Buck) -> None:
 async def test_28_4_stage9_var_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 9: `ctx.var` migrated from Rust to Starlark.
     The Rust `#[starlark(attribute)] fn var` in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
-    deleted; `_kuro_var` (sharing `_kuro_make_substitutions` with
-    `_kuro_expand_make_variables`) in `@kuro_builtins//:exports.bzl`
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_slug_var` (sharing `_slug_make_substitutions` with
+    `_slug_expand_make_variables`) in `@slug_builtins//:exports.bzl`
     now serves the field.
 
     The fixture pins:
@@ -1018,9 +1018,9 @@ async def test_28_4_stage9_var_starlark(buck: Buck) -> None:
 async def test_28_4_stage9_expand_make_variables_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 9: `ctx.expand_make_variables` migrated from
     Rust to Starlark. The Rust `fn expand_make_variables` in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
-    deleted; `_kuro_expand_make_variables` in
-    `@kuro_builtins//:exports.bzl` now serves the call.
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_slug_expand_make_variables` in
+    `@slug_builtins//:exports.bzl` now serves the call.
 
     The fixture pins behavioural parity with the deleted impl:
       - User-provided `additional_substitutions` win over builtins.
@@ -1043,8 +1043,8 @@ async def test_28_4_stage9_expand_make_variables_starlark(buck: Buck) -> None:
 async def test_28_4_stage11_resolve_tools_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 11: `ctx.resolve_tools` migrated from Rust to
     Starlark. The Rust `fn resolve_tools` in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
-    deleted; `_kuro_resolve_tools` in `@kuro_builtins//:exports.bzl`
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_slug_resolve_tools` in `@slug_builtins//:exports.bzl`
     now serves the call.
 
     The fixture pins:
@@ -1065,9 +1065,9 @@ async def test_28_4_stage11_resolve_tools_starlark(buck: Buck) -> None:
 async def test_28_4_stage12_resolve_command_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 12: `ctx.resolve_command` migrated from Rust to
     Starlark. The Rust `fn resolve_command` in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
-    deleted; `_kuro_resolve_command` (bound as `_resolve_command_bound`
-    in `_make_rule_facade`) in `@kuro_builtins//:exports.bzl` now
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_slug_resolve_command` (bound as `_resolve_command_bound`
+    in `_make_rule_facade`) in `@slug_builtins//:exports.bzl` now
     serves the call.
 
     The fixture pins:
@@ -1089,10 +1089,10 @@ async def test_28_4_stage12_resolve_command_starlark(buck: Buck) -> None:
 async def test_28_4_stage14_runfiles_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 14: `ctx.runfiles` migrated from Rust to Starlark.
     The Rust `fn runfiles` in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was deleted;
-    `_kuro_runfiles` (bound as `_runfiles_bound` in `_make_rule_facade`) in
-    `@kuro_builtins//:exports.bzl` now serves the call via two kuro_runtime
-    globals: `kuro_create_runfiles` and `kuro_collect_runfiles_into`.
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was deleted;
+    `_slug_runfiles` (bound as `_runfiles_bound` in `_make_rule_facade`) in
+    `@slug_builtins//:exports.bzl` now serves the call via two slug_runtime
+    globals: `slug_create_runfiles` and `slug_collect_runfiles_into`.
 
     The fixture pins:
       - `ctx.runfiles()` (no args) returns a non-None Runfiles value.
@@ -1111,8 +1111,8 @@ async def test_28_4_stage14_runfiles_starlark(buck: Buck) -> None:
 async def test_28_4_stage10_new_file_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 10: `ctx.new_file` migrated from Rust to Starlark.
     The Rust `fn new_file` in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
-    deleted; `_kuro_new_file` in `@kuro_builtins//:exports.bzl` now
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_slug_new_file` in `@slug_builtins//:exports.bzl` now
     serves both call shapes.
 
     The fixture pins behavioural parity with the deleted impl:
@@ -1133,10 +1133,10 @@ async def test_28_4_stage10_new_file_starlark(buck: Buck) -> None:
 async def test_28_4_stage13_expand_location_starlark(buck: Buck) -> None:
     """Plan 28.4 Stage 13: `ctx.expand_location` migrated from Rust to
     Starlark. The ~330-LOC Rust impl (pool-building + parser) in
-    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
-    replaced by a stub; `_kuro_expand_location` in
-    `@kuro_builtins//:exports.bzl` now serves the call, backed by
-    the `kuro_collect_location_pool` and `kuro_lookup_output_path`
+    `app/slug_build_api/src/interpreter/rule_defs/context.rs` was
+    replaced by a stub; `_slug_expand_location` in
+    `@slug_builtins//:exports.bzl` now serves the call, backed by
+    the `slug_collect_location_pool` and `slug_lookup_output_path`
     runtime hooks.
 
     The fixture pins behavioural parity with the deleted impl:
@@ -1155,25 +1155,25 @@ async def test_28_4_stage13_expand_location_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
-async def test_28_6_kuro_builtins_helpers_loadable(buck: Buck) -> None:
+async def test_28_6_slug_builtins_helpers_loadable(buck: Buck) -> None:
     """Plan 28.6 PR 2: helpers (paths, utils/expect, utils/type_defs,
-    utils/utils) migrated from `@prelude//` into `@kuro_builtins//`.
+    utils/utils) migrated from `@prelude//` into `@slug_builtins//`.
     The fixture loads from the new namespace, exercises common
     methods at module-eval time (paths.basename / dirname / join,
     flatten, value_or, is_string, is_list), and writes a sentinel
     if every assertion passes."""
-    result = await buck.build("//kuro_builtins_helpers:kuro_builtins_helpers_proof_target")
+    result = await buck.build("//slug_builtins_helpers:slug_builtins_helpers_proof_target")
     output = result.get_build_report().output_for_target(
-        "//kuro_builtins_helpers:kuro_builtins_helpers_proof_target"
+        "//slug_builtins_helpers:slug_builtins_helpers_proof_target"
     )
-    assert output.read_text().strip() == "kuro-builtins-helpers-proof-ok"
+    assert output.read_text().strip() == "slug-builtins-helpers-proof-ok"
 
 
 @buck_test(data_dir="test_native_rules_data")
 async def test_28_5_exported_native_visible_in_buck(buck: Buck) -> None:
-    """Plan 28.5: a member of `@kuro_builtins//:exports.bzl::exported_native`
+    """Plan 28.5: a member of `@slug_builtins//:exports.bzl::exported_native`
     becomes a BUCK-file global. The fixture's BUILD.bazel uses
-    `_kuro_exported_native_probe` directly (without `load()`); the rule
+    `_slug_exported_native_probe` directly (without `load()`); the rule
     captures it and writes the value to a file. The string in the
     output must match the value in `exported_native`.
     """
@@ -1181,7 +1181,7 @@ async def test_28_5_exported_native_visible_in_buck(buck: Buck) -> None:
     output = result.get_build_report().output_for_target(
         "//:exported_native_probe_target"
     )
-    assert output.read_text().strip() == "kuro-28-5-exported-native-ok"
+    assert output.read_text().strip() == "slug-28-5-exported-native-ok"
 
 
 @buck_test(data_dir="test_native_rules_data")
@@ -1194,7 +1194,7 @@ async def test_28_5_exported_native_hidden_in_bzl(buck: Buck) -> None:
     with pytest.raises(Exception) as exc_info:
         await buck.targets("//exported_native_hidden:test_exported_native_hidden")
     msg = str(exc_info.value)
-    assert "_kuro_exported_native_probe" in msg
+    assert "_slug_exported_native_probe" in msg
     assert "not found" in msg
 
 

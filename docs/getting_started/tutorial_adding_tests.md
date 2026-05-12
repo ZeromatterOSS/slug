@@ -11,7 +11,7 @@ target that uses it, even incorporating a shared `logging_lib`. Now, let's
 ensure our `library` target works as expected by adding unit tests. Writing
 tests helps us catch bugs early and refactor with confidence.
 
-Our goal is to learn how to define and run Rust unit tests within the Kuro.
+Our goal is to learn how to define and run Rust unit tests within the Slug.
 
 ## What We'll Do:
 
@@ -19,7 +19,7 @@ Our goal is to learn how to define and run Rust unit tests within the Kuro.
 2. Write a simple unit test for the greet function in `greeter_lib`.
 3. Update `greeter_lib/BUCK` to define a test target using { isInternal() ?
    <code>rust_unittest</code> : <code>rust_test</code> }.
-4. Run the tests using Kuro and see the results.
+4. Run the tests using Slug and see the results.
 
 ## Prerequisites
 
@@ -59,7 +59,7 @@ mod tests {
     #[test]
     fn test_greet() {
         assert_eq!(library::greet("World"), "Hello, World!");
-        assert_eq!(library::greet("Kuro"), "Hello, Kuro!");
+        assert_eq!(library::greet("Slug"), "Hello, Slug!");
     }
 
     #[test]
@@ -71,7 +71,7 @@ mod tests {
 
 ## Step 3: Updating greeter_lib/BUCK to Define the Test Target
 
-Next, we need to tell Kuro about our test file and how to run it.
+Next, we need to tell Slug about our test file and how to run it.
 
 1. Edit `greeter_lib/BUCK`:
 
@@ -88,7 +88,7 @@ rust_library(
     srcs = ["src/lib.rs"],
     visibility = ["PUBLIC"],
     deps = [
-        "fbcode//kuro/docs/kuro_lab/logging_lib:logging_lib",
+        "fbcode//slug/docs/slug_lab/logging_lib:logging_lib",
     ],
 )
 
@@ -112,9 +112,9 @@ Key additions and explanations:
 
 - `rust_unittest(...)`:
   - `name = "test"`: We're naming our test target "test".
-  - `srcs = ["tests/test.rs"]`: Specifies our test source file. Kuro will
+  - `srcs = ["tests/test.rs"]`: Specifies our test source file. Slug will
     compile this as a separate test binary.
-  - `deps = [":library"]`: This is crucial. It tells Kuro that our test code
+  - `deps = [":library"]`: This is crucial. It tells Slug that our test code
     depends on the `:library` target (our `greeter_lib:library`). This makes
     `library` target available to be imported and used within test.rs.
 
@@ -141,9 +141,9 @@ Key additions and explanations:
 
 - `rust_test(...)`:
   - `name = "test"`: We're naming our test target "test".
-  - `srcs = ["tests/test.rs"]`: Specifies our test source file. Kuro will
+  - `srcs = ["tests/test.rs"]`: Specifies our test source file. Slug will
     compile this as a separate test binary.
-  - `deps = [":library"]`: This is crucial. It tells Kuro that our test code
+  - `deps = [":library"]`: This is crucial. It tells Slug that our test code
     depends on the `:library` target (our `greeter_lib:library`). This makes
     `library` target available to be imported and used within test.rs.
 
@@ -154,13 +154,13 @@ Key additions and explanations:
 With the BUCK file updated, let's run our tests!
 
 1. Navigate to the `greeter_lib` directory.
-2. Run test using `kuro test`:
+2. Run test using `slug test`:
 
 ```bash
-kuro test :test
+slug test :test
 ```
 
-- `kuro test` is the command to run test targets.
+- `slug test` is the command to run test targets.
 - `:test` refers to the { isInternal() ? <code>rust_unittest</code> :
   <code>rust_test</code> } target named `test` that we defined in the current
   directory's `BUCK` file.
@@ -181,14 +181,14 @@ The key is seeing "Pass" and a summary indicating that all your test cases
 Congratulations! ✅
 
 You've successfully added unit tests to your `library` target and run them using
-Kuro!
+Slug!
 
 We've learned how to:
 
 - Define a test target using { isInternal() ? <code>rust_unittest</code> :
   <code>rust_test</code> } for a Rust library.
-- Execute tests using `kuro test` command.
+- Execute tests using `slug test` command.
 
-Testing is a vital skill, and now you know how to integrate it into your Kuro
+Testing is a vital skill, and now you know how to integrate it into your Slug
 Rust workflow. This allows you to build more robust and reliable libraries and
 applications.

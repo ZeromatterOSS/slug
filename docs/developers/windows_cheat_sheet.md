@@ -4,7 +4,7 @@ title: Windows Cheat Sheet
 ---
 
 This page contains notes and tips to assist you in understanding the different
-tools used when migrating Kuro to Windows.
+tools used when migrating Slug to Windows.
 
 ## CMD, Powershell, Bash Command Comparison
 

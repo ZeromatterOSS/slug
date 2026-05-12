@@ -78,13 +78,13 @@ script modifiers.
 ## Examples
 
 Examples can be found at 'tests/core/bxl/test_anon_bxl_data/anon_bxl.bxl' of
-kuro repro folder.
+slug repro folder.
 
 Run such command at `tests/core/bxl/test_anon_bxl_data` to run the example bxl
 script
 
 ```sh
-kuro bxl anon_bxl.bxl:eval_anon_bxl
+slug bxl anon_bxl.bxl:eval_anon_bxl
 ```
 
 ## Further Reading

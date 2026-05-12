@@ -6,11 +6,11 @@ built with the former.
 
 ## How to build
 
-1. Build or install `kuro` with Cargo
+1. Build or install `slug` with Cargo
 2. This project assumes Rust, Clang, and Python to be present. See
    `toolchains/BUCK` for how we pull those in from the system.
-3. Run `kuro init --git`
-4. Run commands: e.g. `kuro run :hello_world`, `kuro build //...`
+3. Run `slug init --git`
+4. Run commands: e.g. `slug run :hello_world`, `slug build //...`
 
 ## Project setup
 

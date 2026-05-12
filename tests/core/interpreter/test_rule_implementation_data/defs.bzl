@@ -18,8 +18,8 @@ bazel_style_rule = rule(
     attrs = {},
 )
 
-# Kuro-style: using `impl` parameter (also supported)
-kuro_style_rule = rule(
+# Slug-style: using `impl` parameter (also supported)
+slug_style_rule = rule(
     impl = _simple_impl,
     attrs = {},
 )

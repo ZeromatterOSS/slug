@@ -8,12 +8,12 @@
 
 Plan 20 closed Plan 19's td_generate win: cold
 `@llvm-project//clang:clang` wall is now **1107.6 s** vs Bazel's 1131 s
-(2.4 % faster). The remaining gap is critical-path shaped: kuro 109.7 s
+(2.4 % faster). The remaining gap is critical-path shaped: slug 109.7 s
 vs Bazel 71.4 s (1.54×).
 
 ## Per-mnemonic CP vs Bazel
 
-| Mnemonic       | kuro CP | Bazel CP | Delta  |
+| Mnemonic       | slug CP | Bazel CP | Delta  |
 |----------------|---------|----------|--------|
 | c_compile      | 47.5 s  | 42.6 s   | +4.9 s |
 | td_generate    | 33.1 s  | ~0 s     | +33 s  |
@@ -21,13 +21,13 @@ vs Bazel 71.4 s (1.54×).
 | cpp_archive    | 1.3 s   | 1.4 s    | flat   |
 | **sum (CP)**   | 110 s   | 71 s     | +38 s  |
 
-td_generate on kuro's CP is ~87 % of the gap. Bazel's critical path
+td_generate on slug's CP is ~87 % of the gap. Bazel's critical path
 doesn't include tablegen because its scheduler admits tablegen early
 and parallel with independent library compiles.
 
 ## Which td_generate is on CP
 
-`kuro log critical-path | grep td_generate` on the post-20 run:
+`slug log critical-path | grep td_generate` on the post-20 run:
 
     34956142  2198388  RISCVTargetParserDefGen ... td_generate ...   (exec cfg)
     57412624 32543586 AMDGPUCommonTableGen / AMDGPUGenRegisterBank ... td_generate ...  (target cfg ffb6fe5c7480b5e7)
@@ -41,11 +41,11 @@ is a genrule that invokes `llvm-tblgen` with a large `.td` input. The
 genrule itself is target-cfg; the tblgen tool it invokes was built in
 exec cfg (Plan 20.1) with opt flags.
 
-## Why it lands on kuro's CP
+## Why it lands on slug's CP
 
 Bazel's tablegen invocations are the same ~32 s absolute, but Bazel
 **starts** them earlier in the build so they finish while
-lib-compile work runs in parallel. Kuro starts them later.
+lib-compile work runs in parallel. Slug starts them later.
 
 Hypothesis (d) from `scheduler-parallelism-findings.md`: a
 false-serial dependency — the AMDGPU tablegen is forced to wait for
@@ -70,7 +70,7 @@ AMDGPU tablegen with no blocking dep means admission is the bug
 1 or 2).
 
 The action registry already records `user_us` and `potential_us` in
-`kuro log critical-path` output (visible in the log above). A
+`slug log critical-path` output (visible in the log above). A
 quick analysis: take the 32.5 s AMDGPU action's `start_offset` =
 57.4 s and compare to the build's t=0 — if td_generate has the
 inputs ready well before 57 s, it's admission latency; if inputs
@@ -84,7 +84,7 @@ suggesting admission, not dep.
 ## This is Plan 17.2 territory
 
 17.2 was already scoped around exactly this investigation
-(`thoughts/shared/plans/kuro-bazel-subplans/17-optimization.md:106`)
+(`thoughts/shared/plans/slug-bazel-subplans/17-optimization.md:106`)
 with hypotheses (a) through (d), and
 `scheduler-parallelism-findings.md` already ranked
 "Add instrumentation to measure action queue depth and spawn

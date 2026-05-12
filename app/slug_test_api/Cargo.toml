@@ -1,0 +1,37 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "slug_test_api"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+async-trait = { workspace = true }
+derivative = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+prost-types = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tower-layer = { workspace = true }
+tower-service = { workspace = true }
+tracing = { workspace = true }
+
+dupe = { workspace = true }
+gazebo = { workspace = true }
+host_sharing = { workspace = true }
+sorted_vector_map = { workspace = true }
+
+slug_core = { workspace = true }
+slug_downward_api = { workspace = true }
+slug_downward_api_proto = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_fs = { workspace = true }
+slug_grpc = { workspace = true }
+slug_host_sharing_proto = { workspace = true }
+slug_test_proto = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }

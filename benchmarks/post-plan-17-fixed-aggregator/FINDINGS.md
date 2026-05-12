@@ -60,9 +60,9 @@ close. Slowest 5 actions are all AMDGPU tablegen, 207–280 s each.
 
 ### (1) td_generate critical chain — **296 s of the 305 s wall gap vs Bazel**
 
-Bazel's critical path = 71 s. Kuro's = 367 s. The gap is **296 s**,
+Bazel's critical path = 71 s. Slug's = 367 s. The gap is **296 s**,
 and the total wall gap vs Bazel is **305 s**. These are almost
-identical numbers. If kuro's critical path matched Bazel's, the wall
+identical numbers. If slug's critical path matched Bazel's, the wall
 would be ~1,140 s — within a few % of Bazel.
 
 Of that 296 s critical-path gap, 290 s is inside `td_generate`. The
@@ -73,10 +73,10 @@ top five tablegen actions sit on the serial chain and take 207–280 s
   (depends on) -> `AMDGPUGenRegisterBank.inc` -> (depends on) -> …
   by BUILD-file wiring. In that case it's a rule-design question, not
   a scheduler one.
-- Or some kuro-specific dep edge (e.g. a shared genrule toolchain
+- Or some slug-specific dep edge (e.g. a shared genrule toolchain
   dependency pulling everything serial) that Bazel doesn't have.
 
-`kuro log critical-path benchmarks/post-plan-17-fixed-aggregator/
+`slug log critical-path benchmarks/post-plan-17-fixed-aggregator/
 llvm-project_clang_clang/cold-01/build.pb.zst` will dump the exact
 chain, including the edges between entries.
 
@@ -106,9 +106,9 @@ on this particular target.
 
 ## Plan 17.2 direction, revised again
 
-1. **(1)** is the headline. Run `kuro log critical-path` to dump
+1. **(1)** is the headline. Run `slug log critical-path` to dump
    the exact td_generate chain. If the chain is rule-design-induced,
-   note it for the LLVM repo owners and move on. If it's a kuro
+   note it for the LLVM repo owners and move on. If it's a slug
    scheduling bug, that's 17.2's real ticket.
 2. **(2)** is background — dive in only after the critical path is
    sorted. Fine-tune `HostSharingBroker` semaphore sizing, or

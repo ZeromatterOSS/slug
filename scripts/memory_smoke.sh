@@ -2,9 +2,9 @@
 # Sample RSS for a process, a pgrep pattern, or a command.
 #
 # Examples:
-#   scripts/memory_smoke.sh --pgrep kurod
+#   scripts/memory_smoke.sh --pgrep slugd
 #   scripts/memory_smoke.sh --pid 12345
-#   scripts/memory_smoke.sh --include-pgrep 'kurod\\[my-repo\\]' -- target/debug/kuro build //...
+#   scripts/memory_smoke.sh --include-pgrep 'slugd\\[my-repo\\]' -- target/debug/slug build //...
 
 set -euo pipefail
 

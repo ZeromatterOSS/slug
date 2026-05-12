@@ -86,7 +86,7 @@ predicted would drop td_generate critical-path from ~290 s to ~30 s:
    `virtual_includes` paths are absent from the dep graph once `tools`
    is exec-configured — observed as `fatal error: siphash/SipHash.h:
    No such file`). Comment in `native_rules.rs` describes the state.
-2. **Opt-mode analysis regression.** `kuro build --compilation_mode=opt
+2. **Opt-mode analysis regression.** `slug build --compilation_mode=opt
    @llvm-project//llvm:Support` fails with
    `Action category c_compile contains duplicate identifier` for
    several Demangle .cpp files. This is a rules_cc analysis path that
@@ -129,6 +129,6 @@ the right next work item).
 ## References
 
 - Baseline: `benchmarks/post-plan-17-fixed-aggregator/FINDINGS.md`
-- Plan file: `thoughts/shared/plans/kuro-bazel-subplans/19-configuration-transitions.md`
+- Plan file: `thoughts/shared/plans/slug-bazel-subplans/19-configuration-transitions.md`
 - Investigation motivating Plan 19:
   `thoughts/shared/research/td_generate-critical-path-investigation.md`

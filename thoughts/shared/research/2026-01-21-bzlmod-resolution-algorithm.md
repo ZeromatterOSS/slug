@@ -1,8 +1,8 @@
 # Bzlmod Dependency Resolution Algorithm
 
-**Referenced from:** `2026-01-21-kuro-bazel-compatible-build-tool.md` (Phase 4d)
+**Referenced from:** `2026-01-21-slug-bazel-compatible-build-tool.md` (Phase 4d)
 
-This document provides an in-depth analysis of Bazel's bzlmod dependency resolution algorithm for implementing compatible behavior in Kuro.
+This document provides an in-depth analysis of Bazel's bzlmod dependency resolution algorithm for implementing compatible behavior in Slug.
 
 ## Overview
 
@@ -431,7 +431,7 @@ After resolution, results are cached in `MODULE.bazel.lock`:
 - `src/test/java/com/google/devtools/build/lib/bazel/bzlmod/SelectionTest.java`
 - `src/test/java/com/google/devtools/build/lib/bazel/bzlmod/VersionTest.java`
 
-## Implementation Recommendations for Kuro
+## Implementation Recommendations for Slug
 
 1. **Start simple**: Implement basic MVS without multiple_version_override first
 2. **Use ordered collections**: Determinism requires consistent iteration order

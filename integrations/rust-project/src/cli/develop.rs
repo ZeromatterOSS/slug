@@ -65,7 +65,7 @@ impl Develop {
             pretty,
             mode,
             check_cycles,
-            kuro_command,
+            slug_command,
             include_all_buildfiles,
             max_extra_targets,
             ..
@@ -86,7 +86,7 @@ impl Develop {
             };
 
             let mode = select_mode(mode.as_deref());
-            let buck = buck::Buck::new(kuro_command.clone(), mode);
+            let buck = buck::Buck::new(slug_command.clone(), mode);
 
             let develop = Develop {
                 sysroot,
@@ -115,7 +115,7 @@ impl Develop {
         if let crate::Command::DevelopJson {
             sysroot_mode,
             args,
-            kuro_command,
+            slug_command,
             max_extra_targets,
             mode,
             ..
@@ -137,7 +137,7 @@ impl Develop {
             };
 
             let mode = select_mode(mode.as_deref());
-            let buck = buck::Buck::new(kuro_command.clone(), mode);
+            let buck = buck::Buck::new(slug_command.clone(), mode);
 
             let develop = Develop {
                 sysroot,

@@ -1,0 +1,280 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::fmt;
+use std::io::Write;
+use std::path::Path;
+
+use async_recursion::async_recursion;
+use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::DiceTransaction;
+use dupe::Dupe;
+use gazebo::variants::VariantName;
+use slug_common::dice::cells::HasCellResolver;
+use slug_common::file_ops::dice::DiceFileComputations;
+use slug_common::file_ops::metadata::RawPathMetadata;
+use slug_common::file_ops::metadata::RawSymlink;
+use slug_common::io::IoProvider;
+use slug_common::io::fs::FsIoProvider;
+use slug_core::cells::CellResolver;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_execute::digest_config::HasDigestConfig;
+use slug_fs::paths::abs_path::AbsPath;
+use slug_fs::paths::file_name::FileName;
+use slug_fs::paths::file_name::FileNameBuf;
+use slug_server_ctx::ctx::ServerCommandContextTrait;
+use slug_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
+use slug_server_ctx::stdout_partial_output::StdoutPartialOutput;
+use slug_server_ctx::template::ServerCommandTemplate;
+use slug_server_ctx::template::run_server_command;
+use slug_util::commas::commas;
+
+use crate::ctx::ServerCommandContext;
+
+pub(crate) async fn file_status_command(
+    ctx: &ServerCommandContext<'_>,
+    partial_result_dispatcher: PartialResultDispatcher<slug_cli_proto::StdoutBytes>,
+    req: slug_cli_proto::FileStatusRequest,
+) -> slug_error::Result<slug_cli_proto::GenericResponse> {
+    run_server_command(
+        FileStatusServerCommand { req },
+        ctx,
+        partial_result_dispatcher,
+    )
+    .await
+}
+struct FileStatusServerCommand {
+    req: slug_cli_proto::FileStatusRequest,
+}
+
+struct FileStatusResult<'a> {
+    /// Number of things we check
+    checked: usize,
+    /// Number of ones that were bad
+    bad: usize,
+    /// Whether to write matches
+    show_matches: bool,
+    stdout: StdoutPartialOutput<'a>,
+}
+
+impl FileStatusResult<'_> {
+    fn checking(&mut self) {
+        self.checked += 1;
+    }
+
+    fn report<T>(
+        &mut self,
+        kind: &str,
+        path: &ProjectRelativePath,
+        fs: &T,
+        dice: &T,
+    ) -> slug_error::Result<()>
+    where
+        T: PartialEq + fmt::Display + ?Sized,
+    {
+        if fs != dice {
+            writeln!(
+                self.stdout,
+                "MISMATCH: {kind} at {path}: fs = {fs}, dice = {dice}",
+            )?;
+            self.bad += 1;
+        } else if self.show_matches {
+            writeln!(self.stdout, "Match: {kind} at {path}: {fs}")?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(PartialEq)]
+struct DirList(Vec<FileNameBuf>);
+
+impl fmt::Display for DirList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut comma = commas();
+        for path in &self.0 {
+            comma(f)?;
+            write!(f, "{path}")?;
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl ServerCommandTemplate for FileStatusServerCommand {
+    type StartEvent = slug_data::FileStatusCommandStart;
+    type EndEvent = slug_data::FileStatusCommandEnd;
+    type Response = slug_cli_proto::GenericResponse;
+    type PartialResult = slug_cli_proto::StdoutBytes;
+
+    async fn command(
+        &self,
+        server_ctx: &dyn ServerCommandContextTrait,
+        mut stdout: PartialResultDispatcher<Self::PartialResult>,
+        mut ctx: DiceTransaction,
+    ) -> slug_error::Result<Self::Response> {
+        let cell_resolver = &ctx.get_cell_resolver().await?;
+        let project_root = server_ctx.project_root();
+        let digest_config = ctx.global_data().get_digest_config();
+
+        let io = &FsIoProvider::new(project_root.dupe(), digest_config.cas_digest_config());
+        let stdout = stdout.as_writer();
+
+        let mut result = FileStatusResult {
+            checked: 0,
+            bad: 0,
+            show_matches: self.req.show_matches,
+            stdout,
+        };
+
+        let mut stderr = server_ctx.stderr()?;
+
+        for path in &self.req.paths {
+            let path = project_root.relativize_any(AbsPath::new(Path::new(path))?)?;
+            writeln!(&mut stderr, "Check file status: {path}")?;
+            check_file_status(&mut ctx, cell_resolver, io, &path, &mut result).await?;
+        }
+        if result.bad != 0 {
+            Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "Failed with {} mismatches",
+                result.bad
+            ))
+        } else {
+            writeln!(
+                &mut stderr,
+                "No mismatches detected ({} entries checked)",
+                result.checked
+            )?;
+            Ok(slug_cli_proto::GenericResponse {})
+        }
+    }
+}
+
+#[async_recursion]
+async fn check_file_status(
+    ctx: &mut DiceComputations,
+    cell_resolver: &CellResolver,
+    io: &dyn IoProvider,
+    path: &ProjectRelativePath,
+    result: &mut FileStatusResult,
+) -> slug_error::Result<()> {
+    result.checking();
+
+    let cell_path = cell_resolver.get_cell_path(path);
+    if DiceFileComputations::is_ignored(ctx, cell_path.as_ref())
+        .await?
+        .is_ignored()
+    {
+        return Ok(());
+    }
+
+    let fs_metadata = io.read_path_metadata_if_exists(path.to_owned()).await?;
+
+    let dice_metadata =
+        DiceFileComputations::read_path_metadata_if_exists(ctx, cell_path.as_ref()).await?;
+
+    let (fs_metadata, dice_metadata) = match (&fs_metadata, &dice_metadata) {
+        (Some(fs), Some(dice)) => (fs, dice),
+        (fs, dice) => {
+            result.report("existence", path, &fs.is_some(), &dice.is_some())?;
+            return Ok(());
+        }
+    };
+
+    result.report(
+        "entry kind",
+        path,
+        fs_metadata.variant_name(),
+        dice_metadata.variant_name(),
+    )?;
+
+    match (fs_metadata, dice_metadata) {
+        (
+            RawPathMetadata::Symlink {
+                at: fs_at,
+                to: fs_to,
+            },
+            RawPathMetadata::Symlink {
+                at: dice_at,
+                to: dice_to,
+            },
+        ) => {
+            let dice_at = cell_resolver.resolve_path(dice_at.as_ref().as_ref())?;
+            result.report("symlink component location", path, fs_at, &dice_at)?;
+
+            result.report(
+                "symlink destination kind",
+                path,
+                fs_to.variant_name(),
+                dice_to.variant_name(),
+            )?;
+
+            match (fs_to, dice_to) {
+                (
+                    RawSymlink::Relative(fs_rel, fs_raw_rel),
+                    RawSymlink::Relative(dice_rel, dice_raw_rel),
+                ) => {
+                    let dice_rel = cell_resolver.resolve_path(dice_rel.as_ref().as_ref())?;
+                    result.report("relative symlink destination", path, fs_rel, &dice_rel)?;
+                    result.report(
+                        "relative symlink destination raw",
+                        path,
+                        fs_raw_rel,
+                        dice_raw_rel,
+                    )?;
+                }
+                (RawSymlink::External(fs_ext), RawSymlink::External(dice_ext)) => {
+                    result.report("external symlink destination", path, fs_ext, dice_ext)?;
+                }
+                _ => {
+                    // Reported earlier
+                }
+            };
+        }
+        (RawPathMetadata::File(fs_file), RawPathMetadata::File(dice_file)) => {
+            result.report("file metadata", path, fs_file, dice_file)?;
+        }
+        (RawPathMetadata::Directory, RawPathMetadata::Directory) => {
+            let fs_read_dir = io.read_dir(path.to_owned()).await?;
+            let dice_read_dir = DiceFileComputations::read_dir(ctx, cell_path.as_ref()).await?;
+
+            // No point checking file types here, we'll do that when we inspect them.
+            let mut fs_names = fs_read_dir
+                .iter()
+                .map(|f| slug_error::Ok(FileName::new(&f.file_name)?.to_owned()))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let mut dice_names = dice_read_dir
+                .included
+                .iter()
+                .map(|e| e.file_name.clone())
+                .collect::<Vec<_>>();
+
+            fs_names.sort();
+            dice_names.sort();
+
+            let fs_names = DirList(fs_names);
+            let dice_names = DirList(dice_names);
+
+            result.report("directory contents", path, &fs_names, &dice_names)?;
+
+            for file_name in &fs_names.0 {
+                check_file_status(ctx, cell_resolver, io, &path.join(file_name), result).await?;
+            }
+        }
+        (_, _) => {
+            // Reported earlier
+        }
+    }
+
+    Ok(())
+}

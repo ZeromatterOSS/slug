@@ -22,7 +22,7 @@ def _execution_platform(ctx):
             remote_execution_properties = {
                 "platform": "mtia",
             },
-            remote_execution_use_case = "kuro-testing",
+            remote_execution_use_case = "slug-testing",
         ),
     )
 

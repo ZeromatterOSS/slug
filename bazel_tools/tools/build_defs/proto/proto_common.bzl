@@ -14,7 +14,7 @@ It is injected as a global in BUILD files via the bootstrap mechanism.
 
 The proto_common module has two types of methods:
 
-1. ACTION PRIMITIVES - Create proto compilation actions. Since Kuro only supports
+1. ACTION PRIMITIVES - Create proto compilation actions. Since Slug only supports
    Bazel 9.0 and these are all stubs, they return None.
    - compile()
 

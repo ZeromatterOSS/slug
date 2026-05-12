@@ -6,5 +6,5 @@ runs:
     run: python3 -m pip install -r requirements-test.txt
     shell: bash
   - name: Run test.py
-    run: python3 test.py --ci --git --kuro=$RUNNER_TEMP/artifacts/kuro
+    run: python3 test.py --ci --git --slug=$RUNNER_TEMP/artifacts/slug
     shell: bash

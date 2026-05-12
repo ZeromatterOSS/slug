@@ -1,7 +1,7 @@
 # Plan 28.4 Stage 3 acceptance fixture. Two checks pinned in one rule:
 #
-#   1. `ctx.kuro_facade_active == True`. The marker is set by the
-#      Starlark facade in `@kuro_builtins//:exports.bzl::_invoke_rule`.
+#   1. `ctx.slug_facade_active == True`. The marker is set by the
+#      Starlark facade in `@slug_builtins//:exports.bzl::_invoke_rule`.
 #      A rule reaching this point with the marker missing means the
 #      wrapper was bypassed or returned `raw_ctx` directly — Stage 3
 #      regressed back to Stage 2 behaviour.
@@ -23,8 +23,8 @@ _HOST_OS_LABEL = "@platforms//os:linux"
 _NON_HOST_OS_LABEL = "@platforms//os:windows"
 
 def _facade_proof_impl(ctx):
-    if not getattr(ctx, "kuro_facade_active", False):
-        fail("Plan 28.4 Stage 3: ctx.kuro_facade_active missing — wrapper not in call path")
+    if not getattr(ctx, "slug_facade_active", False):
+        fail("Plan 28.4 Stage 3: ctx.slug_facade_active missing — wrapper not in call path")
 
     matching = platform_common.ConstraintValueInfo(
         label = _HOST_OS_LABEL,

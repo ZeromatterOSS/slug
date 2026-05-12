@@ -1,7 +1,7 @@
 # Plan 28.4 Stage 9 acceptance fixture for the
 # `ctx.expand_make_variables` migration. The Rust impl was deleted;
-# the bundled `_kuro_expand_make_variables` (sharing
-# `_kuro_make_substitutions` with `_kuro_var`) now serves the call.
+# the bundled `_slug_expand_make_variables` (sharing
+# `_slug_make_substitutions` with `_slug_var`) now serves the call.
 #
 # Pins:
 #   - User-provided substitutions win over builtins.

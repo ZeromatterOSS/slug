@@ -30,7 +30,7 @@ async def test_actions_expand_template(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:template_expansion")
     content = output.read_text().strip()
     assert "developer" in content, f"Expected 'developer' in '{content}'"
-    assert "kuro" in content, f"Expected 'kuro' in '{content}'"
+    assert "slug" in content, f"Expected 'slug' in '{content}'"
     assert "9.0" in content, f"Expected '9.0' in '{content}'"
 
 

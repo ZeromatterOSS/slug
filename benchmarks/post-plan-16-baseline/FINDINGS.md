@@ -7,7 +7,7 @@
 > build), but per-mnemonic numbers are corrected and queue wait is
 > now explicit. Re-aggregate anytime with:
 >
->     /var/mnt/dev/kuro/kuro log summary --format json \
+>     /var/mnt/dev/slug/slug log summary --format json \
 >         cold-01/build.pb.zst > cold-01/summary.json
 >
 > The pre-fix narrative below is preserved for bisect context; the
@@ -45,13 +45,13 @@ are negligible — this is entirely an execute-phase build.
 ## The critical-path surprise
 
 **critical_path_wall ≈ total_wall.** Bazel reports 71s of critical path
-for the same target. Kuro reports 1972s — **28× longer**.
+for the same target. Slug reports 1972s — **28× longer**.
 
 Two incompatible readings on the same data:
 - `peak_in_flight_actions = 2471` suggests massive parallelism.
 - `critical_path ≈ total` suggests almost zero parallelism.
 
-Most likely explanation: `CriticalPathEntry2.duration` in kuro
+Most likely explanation: `CriticalPathEntry2.duration` in slug
 includes *queue wait time* on each entry, not just execution. An
 action that queued for 700s behind other actions has its critical
 chain contribution inflated to 700s + exec-time. Summing those
@@ -129,7 +129,7 @@ cold run is too noisy to draw conclusions from.
 - `cold-01/wall.txt` — 1983.168 s
 - `cold-01/summary.json` — full BuildSummary in JSON
 - `cold-01/build.pb.zst` — event log (3.5 MB compressed), usable
-  for `kuro log diff summary`
+  for `slug log diff summary`
 - `cold-01/build.log` — captured stderr of the build
 
 ## Corrected numbers (re-aggregated 2026-04-22)
@@ -160,7 +160,7 @@ log tells a much clearer story:
 
 ### The real story
 
-**Kuro is queue-bound, not CPU-bound.** Pre-fix this was hidden — every
+**Slug is queue-bound, not CPU-bound.** Pre-fix this was hidden — every
 per-action and critical-path number included queue wait, making actions
 look impossibly slow. The corrected numbers reveal:
 

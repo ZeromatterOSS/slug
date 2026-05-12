@@ -24,7 +24,7 @@ their C++ compiler, linker, etc. the same way:
 Defining those in a toolchain lets us decouple those project-specific concerns
 from generic build rules.
 
-When running `kuro init`, Kuro sets up some demo toolchains via the
+When running `slug init`, Slug sets up some demo toolchains via the
 `system_demo_toolchains` macro. Those expect to find the relevant tools in the
 user's `PATH`.
 

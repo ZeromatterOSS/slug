@@ -222,7 +222,7 @@ cas_artifact_with_content_based_path = rule(
 )
 
 def _download_with_content_based_path_impl(ctx: AnalysisContext):
-    url = "https://interncache-all.fbcdn.net/manifold/buck_build_test/tree/kuro_test/http_archive/test.tgz"
+    url = "https://interncache-all.fbcdn.net/manifold/buck_build_test/tree/slug_test/http_archive/test.tgz"
 
     if ctx.attrs.defer_download:
         sha1 = "1a45666759704bf08fc670aa96118a0415c470fc"

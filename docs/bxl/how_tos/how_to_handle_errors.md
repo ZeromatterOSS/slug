@@ -78,12 +78,12 @@ The Return type is `list[Result[bxl.AnalysisResult]]`
 ## Examples
 
 Examples can be found at
-`tests/core/bxl/test_lazy_build_artifact_data/lazy_build_artifact.bxl` of kuro
+`tests/core/bxl/test_lazy_build_artifact_data/lazy_build_artifact.bxl` of slug
 repo folder.
 
 Run such command at `tests/core/bxl/test_lazy_build_artifact_data` to run the
 example bxl script
 
 ```sh
-kuro bxl lazy_build_artifact.bxl:build_artifact
+slug bxl lazy_build_artifact.bxl:build_artifact
 ```

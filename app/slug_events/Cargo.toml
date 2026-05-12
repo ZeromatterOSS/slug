@@ -1,0 +1,39 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "slug_events"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+console = { workspace = true }
+crossbeam-channel = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+hostname = { workspace = true }
+is_proc_translated = { workspace = true }
+pin-project = { workspace = true }
+serde = { workspace = true }
+smallvec = { workspace = true }
+sys-info = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+allocative = { workspace = true }
+dupe = { workspace = true }
+fbinit = { workspace = true }
+gazebo = { workspace = true }
+
+slug_build_info = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_util = { workspace = true }
+slug_wrapper_common = { workspace = true }
+
+[target."cfg(windows)".dependencies]
+winver = "1"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

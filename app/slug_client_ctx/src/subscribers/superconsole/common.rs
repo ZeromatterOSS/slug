@@ -1,0 +1,71 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::fmt::Debug;
+
+use superconsole::Component;
+use superconsole::Dimensions;
+use superconsole::DrawMode;
+use superconsole::Line;
+use superconsole::Lines;
+use superconsole::components::Aligned;
+use superconsole::components::DrawHorizontal;
+use superconsole::components::alignment::HorizontalAlignmentKind;
+use superconsole::components::alignment::VerticalAlignmentKind;
+
+#[derive(Debug)]
+pub(crate) struct HeaderLineComponent<A: Component, B: Component> {
+    lhs: A,
+    rhs: B,
+}
+
+impl<A: Component, B: Component> HeaderLineComponent<A, B> {
+    pub(crate) fn new(lhs: A, rhs: B) -> Self {
+        HeaderLineComponent { lhs, rhs }
+    }
+}
+
+impl<A: Component<Error = slug_error::Error>, B: Component<Error = slug_error::Error>> Component
+    for HeaderLineComponent<A, B>
+{
+    type Error = slug_error::Error;
+
+    fn draw_unchecked(&self, dimensions: Dimensions, mode: DrawMode) -> slug_error::Result<Lines> {
+        let mut draw = DrawHorizontal::new(dimensions);
+        draw.draw(&self.lhs, mode)?;
+        draw.draw(
+            &Aligned {
+                child: &self.rhs,
+                horizontal: HorizontalAlignmentKind::Right,
+                vertical: VerticalAlignmentKind::Top,
+            },
+            mode,
+        )?;
+        Ok(draw.finish())
+    }
+}
+
+/// This component is part of the header line and displays a hardcoded message.
+#[derive(Debug)]
+pub(crate) struct StaticStringComponent<S: AsRef<str>> {
+    pub header: S,
+}
+
+impl<S: AsRef<str>> Component for StaticStringComponent<S> {
+    type Error = slug_error::Error;
+
+    fn draw_unchecked(
+        &self,
+        _dimensions: Dimensions,
+        _mode: DrawMode,
+    ) -> slug_error::Result<Lines> {
+        Ok(Lines(vec![Line::unstyled(self.header.as_ref())?]))
+    }
+}

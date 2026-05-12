@@ -42,7 +42,7 @@ async def test_local_action(buck: Buck) -> None:
         if outputs is None:
             continue
         # da39a3ee is a SHA1 digest for empty directory.
-        # e3b0c442 is a SHA256 digest for empty directory (used by kuro in OSS).
+        # e3b0c442 is a SHA256 digest for empty directory (used by slug in OSS).
         # We have 2 directories "a" and "z", where
         # "a" is empty and "z" is not.
         # "z" is a first output for action.

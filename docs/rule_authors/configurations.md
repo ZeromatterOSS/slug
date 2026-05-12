@@ -133,7 +133,7 @@ target platform.
 
 ### Buck v1 compatibility
 
-Kuro also supports the `compatible_with` field on nodes but it has different
+Slug also supports the `compatible_with` field on nodes but it has different
 behavior.
 
 In summary:
@@ -218,7 +218,7 @@ as `:A` (as target platform gets inherited by `attrs.toolchain_dep()`s).
 
 If you have a binary that you want to run, but it isn't a build tool, then you
 should use `$(exe_target //:binary)` rather than `$(exe //:binary)`. That will
-run the same binary that you'd get from `kuro build`, rather than one that is
+run the same binary that you'd get from `slug build`, rather than one that is
 built for the execution platform.
 
 The path macros vary along two axes:

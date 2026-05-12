@@ -44,17 +44,17 @@ Re-generate by running `website/gen_docs.py`.
     )
 
 
-def kuro_command(args: argparse.Namespace) -> str:
-    if args.kuro:
-        return args.kuro
+def slug_command(args: argparse.Namespace) -> str:
+    if args.slug:
+        return args.slug
     elif args.buck2:
         return args.buck2
     elif args.prod:
-        return "kuro"
+        return "slug"
     elif args.cargo:
-        return "cargo run --bin=kuro --"
+        return "cargo run --bin=slug --"
     else:
-        return "./kuro.py"
+        return "./slug.py"
 
 
 def copy_starlark_docs() -> None:
@@ -91,7 +91,7 @@ def generate_prelude_rules_docs(buck: str) -> None:
             shutil.copyfile(orig, dest)
 
         index_file_content = (
-            "# Rules\n\nThese rules are available as standard in Kuro.\n"
+            "# Rules\n\nThese rules are available as standard in Slug.\n"
         )
 
         os.makedirs(base_dir, exist_ok=True)
@@ -192,7 +192,7 @@ def generate_help_docs_index_page(buck: str, subcommands: List[str]) -> str:
     titile = """\
 ---
 id: index
-title: kuro commands
+title: slug commands
 ---
 """
     common_options_section = """\
@@ -205,7 +205,7 @@ For common options available across multiple commands, see [Common Options](./co
         "|---------------|------------------------------|",
     ]
     for sub in subcommands:
-        full_cmd = f"`kuro {sub}`"
+        full_cmd = f"`slug {sub}`"
         cmd_with_link = f"[{full_cmd}](./{sub})"
         short_help = generate_subcommand_short_help(buck, [sub])
         # Escape any pipe characters in the help text
@@ -263,7 +263,7 @@ def main() -> None:
         "--prod",
         action="store_true",
         default=False,
-        help="Whether to use the production `kuro` binary",
+        help="Whether to use the production `slug` binary",
     )
     parser.add_argument(
         "--cargo",
@@ -272,9 +272,9 @@ def main() -> None:
         help="Whether to use a `cargo` built binary.",
     )
     parser.add_argument(
-        "--kuro",
+        "--slug",
         nargs="?",
-        help="Whether to use the provided kuro binary.",
+        help="Whether to use the provided slug binary.",
     )
     parser.add_argument(
         "--buck2",
@@ -283,16 +283,16 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Change to the Kuro repository root.
-    kuro_dir = Path(__file__).absolute().parent.parent
-    os.chdir(str(kuro_dir))
+    # Change to the Slug repository root.
+    slug_dir = Path(__file__).absolute().parent.parent
+    os.chdir(str(slug_dir))
 
     # Clear the docs folder first so that if we change the names of any
     # objects, we'll remove old docs
     for x in Path("docs").rglob("*.generated.md"):
         os.remove(x)
 
-    buck = kuro_command(args)
+    buck = slug_command(args)
     copy_starlark_docs()
     generate_prelude_rules_docs(buck)
     generate_api_docs(buck)

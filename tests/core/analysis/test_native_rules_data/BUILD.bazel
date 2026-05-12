@@ -1,4 +1,4 @@
-load(":defs.bzl", "actions_fail_test", "bool_flag", "build_config_test", "built_in_include_dirs_test", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_import", "cc_library", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "cc_shared_library", "cc_toolchain", "cc_toolchain_config_info_test", "cc_toolchain_suite", "collect_files", "constraint_provider_test", "dir_ctx_files_rule", "do_nothing_binds_test", "do_nothing_test", "exec_groups_test", "executable_rule", "existing_rules_test", "files_to_run_test", "fragments_test", "initializer_test", "instrumented_files_empty_test", "instrumented_files_test", "int_values_test", "is_tool_configuration_test", "java_common_test", "java_toolchain_test", "kuro_builtins_probe_value", "macro_test", "merge_cc_infos_full_test", "merge_compilation_contexts_test", "new_file_test", "non_executable_rule", "nonempty_deps_test", "nonempty_strings_test", "provider_callable_test", "provides_valid_rule", "psi_test_rule", "resolve_command_test", "resolve_command_tools_test", "run_env_info", "select_value", "sh_binary", "sh_library", "sh_test", "sibling_file", "split_attr_test", "stamp_file_info", "string_flag", "tokenize_test", "write_file_executable_test", "write_file_test", "write_list", "write_mnemonic_test")
+load(":defs.bzl", "actions_fail_test", "bool_flag", "build_config_test", "built_in_include_dirs_test", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_import", "cc_library", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "cc_shared_library", "cc_toolchain", "cc_toolchain_config_info_test", "cc_toolchain_suite", "collect_files", "constraint_provider_test", "dir_ctx_files_rule", "do_nothing_binds_test", "do_nothing_test", "exec_groups_test", "executable_rule", "existing_rules_test", "files_to_run_test", "fragments_test", "initializer_test", "instrumented_files_empty_test", "instrumented_files_test", "int_values_test", "is_tool_configuration_test", "java_common_test", "java_toolchain_test", "slug_builtins_probe_value", "macro_test", "merge_cc_infos_full_test", "merge_compilation_contexts_test", "new_file_test", "non_executable_rule", "nonempty_deps_test", "nonempty_strings_test", "provider_callable_test", "provides_valid_rule", "psi_test_rule", "resolve_command_test", "resolve_command_tools_test", "run_env_info", "select_value", "sh_binary", "sh_library", "sh_test", "sibling_file", "split_attr_test", "stamp_file_info", "string_flag", "tokenize_test", "write_file_executable_test", "write_file_test", "write_list", "write_mnemonic_test")
 
 # === filegroup tests ===
 
@@ -806,15 +806,15 @@ macro_test(
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")
 
-# === Plan 28.2: @kuro_builtins probe visible in external .bzl ===
-kuro_builtins_probe_value(name = "kuro_builtins_probe_target")
+# === Plan 28.2: @slug_builtins probe visible in external .bzl ===
+slug_builtins_probe_value(name = "slug_builtins_probe_target")
 
-# === Plan 28.5: @kuro_builtins exported_native member visible in BUCK ===
-# `_kuro_exported_native_probe` is in `exported_native` (not
+# === Plan 28.5: @slug_builtins exported_native member visible in BUCK ===
+# `_slug_exported_native_probe` is in `exported_native` (not
 # `exported_toplevels`), so it MUST be reachable as a BUCK-file
 # global here but invisible in `.bzl` files. The negative-visibility
 # half lives at `exported_native_hidden/`.
 write_list(
     name = "exported_native_probe_target",
-    items = [_kuro_exported_native_probe],  # noqa: F821 — Plan 28.5 BUCK global
+    items = [_slug_exported_native_probe],  # noqa: F821 — Plan 28.5 BUCK global
 )

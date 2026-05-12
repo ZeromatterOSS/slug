@@ -1,8 +1,8 @@
 # Starlark Frontends Over A Shared Build Graph Core
 
 **Date:** 2026-05-06
-**Repo:** kuro
-**Question:** Could Kuro/Buck2/Bazel-like systems share a core graph engine while
+**Repo:** slug
+**Question:** Could Slug/Buck2/Bazel-like systems share a core graph engine while
 the config-file and build-file frontend is written in Starlark?
 
 ## Short Answer
@@ -31,37 +31,37 @@ config files + package marker rules + Starlark env policy
     -> native graph core
 ```
 
-That is viable as a research direction. It is a bad near-term pivot for Kuro's
+That is viable as a research direction. It is a bad near-term pivot for Slug's
 Bazel 9 parity work, because the current risk is semantic exactness, not lack of
 frontend extensibility.
 
-## Existing Kuro Evidence
+## Existing Slug Evidence
 
-Kuro is already a useful experiment in this separation.
+Slug is already a useful experiment in this separation.
 
-Compared with the imported Buck2-shaped baseline at `3696b5eb`, current Kuro has
+Compared with the imported Buck2-shaped baseline at `3696b5eb`, current Slug has
 moved or added major frontend policy:
 
-- `app/kuro_common/src/buildfiles.rs`: default package markers changed from
+- `app/slug_common/src/buildfiles.rs`: default package markers changed from
   Buck2's `BUCK.v2`, `BUCK` plus `[buildfile] name_v2` behavior to Bazel-shaped
   `BUILD.bazel`, `BUILD`.
-- `app/kuro_bzlmod/`: new MODULE.bazel, module resolution, lockfile, repo-spec,
+- `app/slug_bzlmod/`: new MODULE.bazel, module resolution, lockfile, repo-spec,
   and module-extension machinery.
-- `app/kuro_client_ctx/src/bazelrc.rs`: new `.bazelrc` flag injection path.
-- `app/kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`:
-  `@kuro_builtins` and `@rules_cc` autoload policy is now layered on top of the
+- `app/slug_client_ctx/src/bazelrc.rs`: new `.bazelrc` flag injection path.
+- `app/slug_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`:
+  `@slug_builtins` and `@rules_cc` autoload policy is now layered on top of the
   existing Starlark evaluator.
-- `app/kuro_interpreter_for_build/src/interpreter/native_rules.rs` and
-  `kuro_builtins/`: Bazel-compatible globals/rules have been added without
+- `app/slug_interpreter_for_build/src/interpreter/native_rules.rs` and
+  `slug_builtins/`: Bazel-compatible globals/rules have been added without
   replacing the underlying package/load graph.
 
 What did not move:
 
-- `app/kuro_common/src/package_listing/interpreter.rs` still performs package
+- `app/slug_common/src/package_listing/interpreter.rs` still performs package
   discovery natively through DICE-tracked directory reads.
-- `app/kuro_interpreter_for_build/src/interpreter/module_internals.rs` still
+- `app/slug_interpreter_for_build/src/interpreter/module_internals.rs` still
   records `TargetNode`s through a native target recorder.
-- `app/kuro_node/src/nodes/unconfigured.rs` and `app/kuro_configured/src/nodes.rs`
+- `app/slug_node/src/nodes/unconfigured.rs` and `app/slug_configured/src/nodes.rs`
   still own unconfigured and configured target nodes.
 - Attribute coercion, dependency collection, configuration, toolchains, and
   analysis remain native.
@@ -223,7 +223,7 @@ FrontendConfigKey(workspace, frontend)
   -> CLI/server config objects
 ```
 
-For Kuro, `.bazelrc` is cheap enough either way. MODULE.bazel/bzlmod is more
+For Slug, `.bazelrc` is cheap enough either way. MODULE.bazel/bzlmod is more
 semantically heavy and already uses Starlark evaluation; that is a natural
 frontend component.
 
@@ -234,7 +234,7 @@ frontend component.
 Expected impact: modest.
 
 If the Starlark layer only declares environments and target calls append typed
-records, the cost is dominated by work Kuro already pays: parse/eval BUILD
+records, the cost is dominated by work Slug already pays: parse/eval BUILD
 files and loaded `.bzl` files. Extra overhead is one more Starlark export module
 load per frontend plus small per-package dispatch.
 
@@ -242,7 +242,7 @@ Warm daemon: probably below the noise floor for large execution-heavy builds,
 and measurable but likely acceptable for query/load-heavy workloads if target
 lowering stays native.
 
-Cold daemon: Kuro has no persistent Starlark compile cache
+Cold daemon: Slug has no persistent Starlark compile cache
 (`thoughts/shared/research/starlark-compilation-persistence.md`). More bundled
 frontend Starlark increases cold startup and cold package-load cost. That should
 be measured before adding large frontend modules.
@@ -260,7 +260,7 @@ config parsers or if config Starlark can perform untracked filesystem I/O.
 Expected impact: bad. Do not do this.
 
 Package discovery walks many directories, must be incremental, and must interact
-with ignores/watchers/package boundaries. Kuro's current
+with ignores/watchers/package boundaries. Slug's current
 `PackageListingKey -> InterpreterPackageListingResolver -> DiceFileComputations`
 path is the right shape. A Starlark directory walker would lose DICE visibility
 or require a complex async callback API that recreates the native path poorly.
@@ -272,7 +272,7 @@ Expected impact: risky to bad.
 Per-target and per-attribute work is hot in query and analysis. Moving attr
 canonicalization, dependency extraction, select normalization, or target-node
 construction into Starlark would add allocation, dynamic dispatch, and
-Rust/Starlark conversion costs exactly where Kuro needs to be fast.
+Rust/Starlark conversion costs exactly where Slug needs to be fast.
 
 Keep this native. Let Starlark decide which public function was called and pass
 raw values to native coercion.
@@ -289,7 +289,7 @@ semantics. The useful plugin point is the dialect/environment, not text parsing.
 
 ### Bazel 9
 
-High feasibility, because Kuro is already doing it incrementally. The remaining
+High feasibility, because Slug is already doing it incrementally. The remaining
 work is to make the current hardcoded Bazel policy look like a frontend
 descriptor without changing behavior.
 
@@ -298,11 +298,11 @@ hide parity regressions.
 
 ### Buck2
 
-Medium feasibility for a compatibility frontend, but undesirable for Kuro's
+Medium feasibility for a compatibility frontend, but undesirable for Slug's
 current product direction.
 
 The original Buck2 shape is still visible in DICE, package listing, target
-nodes, and the interpreter. But Kuro has deliberately removed Buck2 surface area
+nodes, and the interpreter. But Slug has deliberately removed Buck2 surface area
 for Bazel parity. Reintroducing Buck2 as a first-class frontend would fight
 AGENTS.md's Bazel 9-only rule unless it is kept as a private test harness.
 
@@ -320,7 +320,7 @@ need native core support if they differ materially from Bazel/Buck.
 
 ## Recommended Next Step
 
-Do not pivot Kuro now. Finish Bazel 9 parity first.
+Do not pivot Slug now. Finish Bazel 9 parity first.
 
 If we want to de-risk the idea, run a narrow spike:
 
@@ -342,7 +342,7 @@ Only after that should Starlark-authored frontend descriptors be considered.
 The idea is architecturally sound as "native graph core plus Starlark-authored
 frontend policy." It is not sound as "build system implemented in Starlark."
 
-For Kuro, the strongest version of the idea is also the least disruptive:
+For Slug, the strongest version of the idea is also the least disruptive:
 continue moving compatibility builtins and wrappers into bundled Starlark, but
 keep the graph core native and make the current Bazel frontend explicit only
 when doing so simplifies future parity work.

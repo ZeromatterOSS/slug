@@ -21,7 +21,7 @@ There are moments where types can be checked:
    are available.
 
 Currently runtime is the normal way of checking, but other systems built on
-Starlark (e.g. Kuro) may also perform additional types of checking. In all
+Starlark (e.g. Slug) may also perform additional types of checking. In all
 cases the meaning of the types is the same.
 
 The rest of this document lays out what types mean and what type-supporting
@@ -69,7 +69,7 @@ The goals of this type system are:
   for values like string/list are reused.
 - Provide a pleasing syntax.
 - Some degree of compatibility with Python, which allows types as expressions in
-  the same places Kuro allows them (but with different meaning and different
+  the same places Slug allows them (but with different meaning and different
   checking).
 - And finally, a non-goal is to provide a complete type system capable of
   representing every type invariant: it's intended to be a lossy approximation.

@@ -1,9 +1,9 @@
 # Plan 28.4 Stage 14 acceptance fixture for the `ctx.runfiles`
-# migration. The Rust impl was deleted; `_kuro_runfiles` (bound as
+# migration. The Rust impl was deleted; `_slug_runfiles` (bound as
 # `_runfiles_bound` in `_make_rule_facade`) in
-# `@kuro_builtins//:exports.bzl` now serves the call via two
-# kuro_runtime globals: `kuro_create_runfiles` and
-# `kuro_collect_runfiles_into`.
+# `@slug_builtins//:exports.bzl` now serves the call via two
+# slug_runtime globals: `slug_create_runfiles` and
+# `slug_collect_runfiles_into`.
 #
 # Fixture layout:
 #   - `runfiles_leaf`: rule that declares a file and returns it in

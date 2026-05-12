@@ -71,7 +71,7 @@ async def test_depset_keyword_direct_transitive(buck: Buck) -> None:
 
 @buck_test(data_dir="test_depset_order_data")
 async def test_depset_union_operator(buck: Buck) -> None:
-    """Bazel 9 depset does not support the Kuro prototype | operator."""
+    """Bazel 9 depset does not support the Slug prototype | operator."""
     await expect_failure(
         buck.build("//:depset_union"),
         stderr_regex="unsupported binary operation",
@@ -98,7 +98,7 @@ async def test_depset_len(buck: Buck) -> None:
 
 @buck_test(data_dir="test_depset_order_data")
 async def test_depset_transitive_set_bridge(buck: Buck) -> None:
-    """The explicit Kuro bridge is lossy but deterministic for basic values."""
+    """The explicit Slug bridge is lossy but deterministic for basic values."""
     result = await buck.build("//:depset_bridge")
     assert _read_lines(buck, "//:depset_bridge", result) == [
         "nodes=2,2",

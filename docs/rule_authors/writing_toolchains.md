@@ -38,7 +38,7 @@ are available:
 ### Writing a prelude-compatible toolchain
 
 People will often first encounter toolchains when they want to switch off of the
-demo toolchains that `kuro init` uses by default. For example, one might want
+demo toolchains that `slug init` uses by default. For example, one might want
 to tweak which compiler is used, which flags are passed to it, or where it is
 fetched from.
 
@@ -84,7 +84,7 @@ controlling the Python used when building other languages.
 Toolchains for custom languages (and more generally, any custom process/build)
 can also easily be written as rules with `is_toolchain_rule = True` which return
 any provider struct (conventionally named `*ToolchainInfo`). The
-[prelude's toolchains](https://github.com/ZeromatterOSS/kuro/tree/main/prelude/toolchains),
+[prelude's toolchains](https://github.com/ZeromatterOSS/slug/tree/main/prelude/toolchains),
 including `system_cxx_toolchain` referenced earlier, can serve as examples.
 
 There is no technical difference between toolchains defined in the prelude
@@ -127,7 +127,7 @@ foo_binary = rule(
 
 ## Writing a hermetic toolchain
 
-One of the benefits of Kuro is that it makes it quite easy to write a hermetic
+One of the benefits of Slug is that it makes it quite easy to write a hermetic
 toolchain, meaning one that does not look up tools in the environment, but
 instead explicitly downloads and tracks them as part of the build.
 
@@ -135,7 +135,7 @@ Doing is typically as follows:
 
 - Download the tools, e.g. using the
   [`http_archive`](../../prelude/rules/core/http_archive) rule (see the
-  [Zig-based C++ toolchain in the prelude](https://github.com/ZeromatterOSS/kuro/tree/main/prelude/toolchains/cxx/zig)
+  [Zig-based C++ toolchain in the prelude](https://github.com/ZeromatterOSS/slug/tree/main/prelude/toolchains/cxx/zig)
   as an example).
 - Expose those tools as [`RunInfo`](../../api/build/RunInfo/) providers in rules
   that are referenced as [exec deps](configurations_by_example.md#exec-deps) in

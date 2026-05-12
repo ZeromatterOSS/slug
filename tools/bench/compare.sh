@@ -2,7 +2,7 @@
 # Plan 16.8: compare two benchmark runs produced by run.sh.
 #
 # For each target slug present in both baseline and current, invoke
-# `kuro log diff summary` on the first matching run of each mode
+# `slug log diff summary` on the first matching run of each mode
 # (cold-01, warm-01). Emits a consolidated report plus optional CI
 # gate.
 #
@@ -10,7 +10,7 @@
 #   compare.sh --baseline benchmarks/2026-04-22-abc/ \
 #              --current  benchmarks/2026-04-23-def/ \
 #              [--threshold 5.0] [--fail-on-regression] \
-#              [--kuro BIN]
+#              [--slug BIN]
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ BASELINE=
 CURRENT=
 THRESHOLD=5.0
 FAIL_ON_REGRESSION=0
-KURO_BIN="${KURO:-$(command -v kuro || true)}"
+SLUG_BIN="${SLUG:-$(command -v slug || true)}"
 
 usage() {
   sed -n '1,20p' "$0" >&2
@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
     --current) CURRENT="$2"; shift 2;;
     --threshold) THRESHOLD="$2"; shift 2;;
     --fail-on-regression) FAIL_ON_REGRESSION=1; shift;;
-    --kuro) KURO_BIN="$2"; shift 2;;
+    --slug) SLUG_BIN="$2"; shift 2;;
     -h|--help) usage;;
     *) echo "unknown arg: $1" >&2; usage;;
   esac
@@ -41,8 +41,8 @@ if [[ -z "$BASELINE" || -z "$CURRENT" ]]; then
   echo "error: --baseline and --current required" >&2
   usage
 fi
-if [[ -z "$KURO_BIN" ]]; then
-  echo "error: pass --kuro or set KURO env var" >&2
+if [[ -z "$SLUG_BIN" ]]; then
+  echo "error: pass --slug or set SLUG env var" >&2
   exit 1
 fi
 
@@ -66,7 +66,7 @@ for baseline_target in "$BASELINE"/*/; do
     if [[ "$FAIL_ON_REGRESSION" == 1 ]]; then
       args+=(--fail-on-regression)
     fi
-    if ! "$KURO_BIN" "${args[@]}"; then
+    if ! "$SLUG_BIN" "${args[@]}"; then
       any_regression=1
     fi
     echo

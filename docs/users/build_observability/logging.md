@@ -5,9 +5,9 @@ title: Logging
 
 import { FbInternalOnly } from 'docusaurus-plugin-internaldocs-fb/internal';
 
-Kuro produces detailed event logs for each invocation, which follow a schema
-outlined in `app/kuro_data/data.proto` in the kuro parent directory. The event
-logs that Kuro produces automatically are always in protobuf zstd-compressed
+Slug produces detailed event logs for each invocation, which follow a schema
+outlined in `app/slug_data/data.proto` in the slug parent directory. The event
+logs that Slug produces automatically are always in protobuf zstd-compressed
 format (see [Viewing the event log](#viewing-the-event-log) for more details).
 
 ## Event log format
@@ -25,9 +25,9 @@ Invocation {
     command_line_args: List[str],
     # Expanded CLI args, which expand any argsfiles
     expanded_command_line_args: List[str],
-    # Absolute path of the current working directory of the Kuro command
+    # Absolute path of the current working directory of the Slug command
     working_dir: str,
-    # UUID of the Kuro command
+    # UUID of the Slug command
     trace_id: str,
 }
 ```
@@ -55,7 +55,7 @@ Event {
     # When the event was fired. This is always a 2-item list, where the first
     # value is millis, second value is micros
     timestamp: List[u64],
-    # UUID of the Kuro command, same one as the invocation header
+    # UUID of the Slug command, same one as the invocation header
     trace_id: str,
     # A trace-unique 64-bit integer identifying this event's span ID,
     # if this event begins a new span or belongs to one.
@@ -117,33 +117,33 @@ and DICE metrics.
 
 ## Viewing the event log
 
-Event logs can be accessed using commands under `kuro log show`, which outputs
-the event logs in JSONL format. You can run `kuro log show --help` to see all
+Event logs can be accessed using commands under `slug log show`, which outputs
+the event logs in JSONL format. You can run `slug log show --help` to see all
 available options. Some useful commands:
 
-- Show the logs for the most recent Kuro command:
+- Show the logs for the most recent Slug command:
 
 ```sh
-kuro log show
+slug log show
 ```
 
-- Show the logs for a specific Kuro command, given the command's UUID:
+- Show the logs for a specific Slug command, given the command's UUID:
 
 ```sh
-kuro log show --trace-id <UUID>
+slug log show --trace-id <UUID>
 ```
 
-- Show the logs for a recent Kuro command:
+- Show the logs for a recent Slug command:
 
 ```sh
-kuro log show --recent <NUMBER>
+slug log show --recent <NUMBER>
 ```
 
 <FbInternalOnly>
 
-You can also download the logs locally from Kuro UI. The logs will be
+You can also download the logs locally from Slug UI. The logs will be
 downloaded from Manifold in protobuf zstd-compressed format, and you can view
-them in JSONL format by passing the path into `kuro log show`.
+them in JSONL format by passing the path into `slug log show`.
 </FbInternalOnly>
 
 The JSON schema is derived from the protobuf types, and the log itself could be
@@ -152,7 +152,7 @@ things. For example, this jq script shows the max event delay between a snapshot
 event creation on the daemon side, and when the client receives it.
 
 ```sh
-kuro log show | jq -s '
+slug log show | jq -s '
   map(
     .Event.data.Instant.data.Snapshot.this_event_client_delay_ms
       | select(. != null)

@@ -5,13 +5,13 @@ title: Third-Party Packages
 
 # Third-Party Packages
 
-Kuro treats third-party Go packages the same way as first-party packages. There
+Slug treats third-party Go packages the same way as first-party packages. There
 are multiple ways to add third-party packages to your project, but we recommend
 the following approach:
 
 - Use [`go.mod`](https://go.dev/doc/modules/gomod-ref) for dependency resolution
 - Use
-  [`gobuckify`](https://github.com/ZeromatterOSS/kuro/tree/main/prelude/go/tools/gobuckify)
+  [`gobuckify`](https://github.com/ZeromatterOSS/slug/tree/main/prelude/go/tools/gobuckify)
   to generate `BUCK` files for your dependencies
 
 ## How `gobuckify` works
@@ -41,11 +41,11 @@ Your project doesn't have to be fully compatible with `go.mod`:
 
 ```sh
 $ (cd ./path/to/go-mod-dir && go mod vendor)
-$ kuro run prelude//go/tools/gobuckify:gobuckify -- ./path/to/go-mod-dir
+$ slug run prelude//go/tools/gobuckify:gobuckify -- ./path/to/go-mod-dir
 ```
 
 See a complete example in
-[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/kuro/blob/main/examples/toolchains/go_toolchain).
+[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/slug/blob/main/examples/toolchains/go_toolchain).
 
 ## The `gobuckify.json` file
 

@@ -1,6 +1,6 @@
-## A simple Hello World project using the kuro-prelude
+## A simple Hello World project using the slug-prelude
 
-This example demonstrates how a simple C++ project might be built with Kuro
+This example demonstrates how a simple C++ project might be built with Slug
 using the prelude.
 
 In the `toolchains` cell, we define two toolchains needed:
@@ -18,25 +18,25 @@ target_platform_detector_spec = target:root//...->prelude//platforms:default \
 
 ## Setup
 
-Run `kuro init --git`.
+Run `slug init --git`.
 
 ## Sample commands
 
 To view all targets in the project,
 
 ```bash
-kuro targets //...
+slug targets //...
 ```
 
 To build the main C++ binary,
 
 ```bash
-kuro build //:main
+slug build //:main
 ```
 
 To run the main C++ binary,
 
 ```bash
 # Should print "Hello from C++!"
-kuro run //:main
+slug run //:main
 ```

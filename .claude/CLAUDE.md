@@ -5,74 +5,74 @@ code in this repository.
 
 ## Repository Overview
 
-Kuro is a fast, hermetic, multi-language build system written in Rust.
-Kuro is designed to be a fully compatible drop-in replacement for bazel,
+Slug is a fast, hermetic, multi-language build system written in Rust.
+Slug is designed to be a fully compatible drop-in replacement for bazel,
 built using the internals from Meta's Buck2 project.
 
 This migration is in progress, and work is ongoing.
 
 ## Building and Development
 
-**Using Kuro (self-bootstrap):**
+**Using Slug (self-bootstrap):**
 
 ```bash
-./kuro.py           # Compile and run local kuro binary
+./slug.py           # Compile and run local slug binary
 ```
 
-Follow by normal kuro commands, e.g. `./kuro.py build fbcode//kuro:kuro` to
-using local changed kuro binary to build kuro
+Follow by normal slug commands, e.g. `./slug.py build fbcode//slug:slug` to
+using local changed slug binary to build slug
 
 ### Testing
 
-Kuro has extensive test suites located in the `tests/` directory:
+Slug has extensive test suites located in the `tests/` directory:
 
 **tests/core/** - Core integration tests
 
-- Tests for individual Kuro subsystems and features
+- Tests for individual Slug subsystems and features
 - Covers: analysis, audit commands, build system, BXL, configurations, DICE,
   query language, etc.
 
 **tests/e2e/** - End-to-end tests
 
-- Full workflow tests that exercise Kuro as users would
+- Full workflow tests that exercise Slug as users would
 - Tests for: audit, build, BXL scripts, configurations, test command, etc.
 
 **Running tests:**
 
 ```bash
 # Run all tests in a Python file (e.g., tests/core/analysis/test_cmd_args.py)
-kuro test fbcode//kuro/tests/core/analysis:test_cmd_args
+slug test fbcode//slug/tests/core/analysis:test_cmd_args
 
 # Run a specific test function within a Python file
 # (e.g., test_output_artifact_in_relative_to in tests/core/analysis/test_cmd_args.py)
-kuro test fbcode//kuro/tests/core/analysis:test_cmd_args -- test_output_artifact_in_relative_to
+slug test fbcode//slug/tests/core/analysis:test_cmd_args -- test_output_artifact_in_relative_to
 
 # Run all tests in a directory
-kuro test fbcode//kuro/tests/core/analysis/...
+slug test fbcode//slug/tests/core/analysis/...
 ```
 
 ## Code Architecture
 
 ### Major Components
 
-**app/** - Main Kuro application code
+**app/** - Main Slug application code
 
-- `kuro` - Main binary entry point
-- `kuro_client` - Client-side CLI handling
-- `kuro_server` - Server/daemon implementation
-- `kuro_server_commands` - Server command implementations
-- `kuro_build_api` - Core build system APIs
-- `kuro_interpreter` - Starlark interpreter integration
-- `kuro_execute` - Action execution framework
-- `kuro_query` - Query language implementation
-- `kuro_node` - Build graph node representation
-- `kuro_artifact` - Artifact handling
-- `kuro_bxl` - Buck Extension Language (BXL) support
-- `kuro_test` - Test runner framework
+- `slug` - Main binary entry point
+- `slug_client` - Client-side CLI handling
+- `slug_server` - Server/daemon implementation
+- `slug_server_commands` - Server command implementations
+- `slug_build_api` - Core build system APIs
+- `slug_interpreter` - Starlark interpreter integration
+- `slug_execute` - Action execution framework
+- `slug_query` - Query language implementation
+- `slug_node` - Build graph node representation
+- `slug_artifact` - Artifact handling
+- `slug_bxl` - Buck Extension Language (BXL) support
+- `slug_test` - Test runner framework
 
 **dice/** - Incremental computation engine
 
-- DICE (Deterministic Incremental Computation Engine) powers Kuro's incremental
+- DICE (Deterministic Incremental Computation Engine) powers Slug's incremental
   builds
 - Handles dependency tracking and change detection
 - `dice/dice` - Core DICE implementation
@@ -80,7 +80,7 @@ kuro test fbcode//kuro/tests/core/analysis/...
 
 **starlark-rust/** - Starlark language implementation
 
-- Kuro uses Starlark (a Python-like language) for build file definitions
+- Slug uses Starlark (a Python-like language) for build file definitions
 - `starlark` - Core language implementation
 - `starlark_lsp` - Language Server Protocol support
 - `starlark_syntax` - Parser and syntax tree
@@ -138,34 +138,34 @@ kuro test fbcode//kuro/tests/core/analysis/...
 
 ## Error Handling
 
-Kuro uses a custom error handling system via `kuro_error` instead of `anyhow`.
-All error handling in Kuro should follow these patterns:
+Slug uses a custom error handling system via `slug_error` instead of `anyhow`.
+All error handling in Slug should follow these patterns:
 
 ### Result Type
 
-Always use `kuro_error::Result<T>` instead of `anyhow::Result<T>`:
+Always use `slug_error::Result<T>` instead of `anyhow::Result<T>`:
 
 ```rust
-fn my_function() -> kuro_error::Result<String> {
+fn my_function() -> slug_error::Result<String> {
     // ...
 }
 ```
 
 ### Defining Custom Error Types
 
-Use `#[derive(Debug, kuro_error::Error)]` instead of `thiserror::Error`. Every
+Use `#[derive(Debug, slug_error::Error)]` instead of `thiserror::Error`. Every
 error must be tagged with an `ErrorTag`:
 
 ```rust
-#[derive(Debug, kuro_error::Error)]
+#[derive(Debug, slug_error::Error)]
 #[error("My error message: {field}")]
-#[kuro(tag = Input)]  // or other appropriate tag
+#[slug(tag = Input)]  // or other appropriate tag
 struct MyError {
     field: String,
 }
 
-#[derive(Debug, kuro_error::Error)]
-#[kuro(tag = Input)]
+#[derive(Debug, slug_error::Error)]
+#[slug(tag = Input)]
 enum MyErrors {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
@@ -177,26 +177,26 @@ enum MyErrors {
 
 ### Error Tags
 
-Common error tags (from `kuro_data::error::ErrorTag`):
+Common error tags (from `slug_data::error::ErrorTag`):
 
 - `Input` - User input errors (invalid arguments, malformed build files, etc.)
 - `Tier0` - Critical infrastructure failures
 - `Environment` - External environment issues (system configuration, external
   services, network/certificates, filesystem)
 - Create new/meaningful/distinct error tag whenever possible in
-  `app/kuro_data/error.proto`, and if the error is generic, use Input, Tier0,
+  `app/slug_data/error.proto`, and if the error is generic, use Input, Tier0,
   and Environment
 
 ### Creating Ad-Hoc Errors
 
-Use the `kuro_error!` macro to create errors without defining a type:
+Use the `slug_error!` macro to create errors without defining a type:
 
 ```rust
-use kuro_error::kuro_error;
+use slug_error::slug_error;
 
 if some_condition {
-    return Err(kuro_error!(
-        kuro_error::ErrorTag::Input,
+    return Err(slug_error!(
+        slug_error::ErrorTag::Input,
         "Invalid value: expected {}, got {}",
         expected,
         actual
@@ -206,10 +206,10 @@ if some_condition {
 
 ### Internal Errors
 
-For bugs in Kuro code, use `internal_error!` macro:
+For bugs in Slug code, use `internal_error!` macro:
 
 ```rust
-use kuro_error::internal_error;
+use slug_error::internal_error;
 
 let value = map.get(key).internal_error("Key must exist")?;
 
@@ -225,7 +225,7 @@ return Err(internal_error!(
 Use `BuckErrorContext` trait for adding context:
 
 ```rust
-use kuro_error::BuckErrorContext;
+use slug_error::BuckErrorContext;
 
 // Add context to Results
 result.buck_error_context("Failed to process file")?;
@@ -240,17 +240,17 @@ value.with_internal_error(|| format!("Missing key: {}", key))?;
 
 ### Error Conversion
 
-Kuro's error system provides automatic conversion:
+Slug's error system provides automatic conversion:
 
 ```rust
 // From std::io::Error, std::fmt::Error, etc.
-std::fs::read_to_string(path)?  // Automatically converts to kuro_error::Error
+std::fs::read_to_string(path)?  // Automatically converts to slug_error::Error
 
 // From custom error types (if they implement std::error::Error)
-my_custom_error?  // Works if error derives kuro_error::Error
+my_custom_error?  // Works if error derives slug_error::Error
 
 // Manual conversion with tags
-use kuro_error::conversion::from_any_with_tag;
+use slug_error::conversion::from_any_with_tag;
 
 some_result.map_err(|e| from_any_with_tag(e, ErrorTag::Tier0))?;
 ```
@@ -260,13 +260,13 @@ some_result.map_err(|e| from_any_with_tag(e, ErrorTag::Tier0))?;
 **Function returning Result:**
 
 ```rust
-fn process_artifact(&self, artifact: &Artifact) -> kuro_error::Result<()> {
+fn process_artifact(&self, artifact: &Artifact) -> slug_error::Result<()> {
     let path = artifact.path()
         .buck_error_context("Failed to get artifact path")?;
 
     if !path.exists() {
-        return Err(kuro_error!(
-            kuro_error::ErrorTag::Input,
+        return Err(slug_error!(
+            slug_error::ErrorTag::Input,
             "Artifact does not exist: {}",
             path
         ));
@@ -289,11 +289,11 @@ let item = collection.get(index)
 
 ### Key Differences from anyhow
 
-1. **No `anyhow!` macro** - Use `kuro_error!` instead
+1. **No `anyhow!` macro** - Use `slug_error!` instead
 2. **No `.context()`** - Use `.buck_error_context()` instead
 3. **Tags required** - All errors must be categorized with an `ErrorTag`
-4. **Type is `kuro_error::Result`** - Not `anyhow::Result`
-5. **Derive `kuro_error::Error`** - Not `thiserror::Error`
+4. **Type is `slug_error::Result`** - Not `anyhow::Result`
+5. **Derive `slug_error::Error`** - Not `thiserror::Error`
 
 ## Internal vs OSS Differences
 
@@ -304,5 +304,5 @@ let item = collection.get(index)
 
 ## Protobuf Handling
 
-Kuro uses Protocol Buffers extensively. On Linux/macOS/Windows, prebuilt
+Slug uses Protocol Buffers extensively. On Linux/macOS/Windows, prebuilt
 `protoc` binaries are used automatically.
