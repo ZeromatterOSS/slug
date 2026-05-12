@@ -27,7 +27,7 @@ pub(crate) fn run_zsh(
     let extra_fpath;
     let extra_mpath;
     if cfg!(target_os = "linux") {
-        let base_path = buck_resources::get("kuro/shed/completion_verify/zsh").unwrap();
+        let base_path = buck_resources::get("slug/shed/completion_verify/zsh").unwrap();
         let version_dir = base_path.join("usr/lib64/zsh");
         let version = std::fs::read_dir(version_dir)?
             .next()

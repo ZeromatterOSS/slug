@@ -1,0 +1,72 @@
+Showing summary from: /var/mnt/dev/slug/target/debug/slug build --local-only --event-log /var/mnt/dev/slug/benchmarks/2026-04-30-support-profile/llvm-project_llvm_Support/slug-local-warm-01/build.pb.zst @llvm-project//llvm:Support
+build ID: 0186c32f-6e91-421c-8cc0-2779ca1d5386
+
+Build Summary
+- Duration: 0.3s
+- Targets Analyzed: 18
+- Has Local Changes: unknown
+
+Actions
+- Local actions: 0
+- Remote actions: 0
+- Cached actions: 0
+- Other actions: 193
+
+File & Data
+  (Network transfer uses compression, file materialized shows uncompressed sizes)
+- Files materialized: 0
+- Total materialized: 0B
+- Total uploaded: 0B
+- Total downloaded: 78KiB
+  - RE downloaded: 78KiB
+  - HTTP downloaded: 0B
+
+Network
+
+Resource Usage
+- Peak process memory: 1.5GiB /  62GiB
+- Peak used disk space: 1665GiB / 1833GiB
+
+
+Build Rollup
+- Load: 0s
+- Analyze: 60ms
+- Execute: 28ms
+- Materialize: 0ms
+- Total wall: 299ms
+- Critical path: 271ms
+- Slowest path: 254ms
+- Peak in-flight actions: 41
+- Action count: 193
+- Graph: 286 nodes, 3027 edges, 3 action-graph
+
+By mnemonic
+  category                    count   cached       exec      queue       crit        p50        p95        p99
+  c_compile                     181        0         0s      468ms       17ms         0s         0s         0s
+  cpp_archive                     1        0         0s        2ms         0s         0s         0s         0s
+  cpp_link                        1        0         0s        2ms        2ms         0s         0s         0s
+
+Slowest actions
+          0s  c_compile  external/llvm-project/llvm/lib/Support/APSInt.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/LineIterator.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/AMDGPUMetadata.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/ARMBuildAttributes.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/raw_socket_stream.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/Valgrind.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/VersionTuple.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/UnicodeNameToCodepointGenerated.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/LEB128.cpp.pic
+          0s  c_compile  external/llvm-project/llvm/lib/Support/LSP/Logging.cpp.pic
+
+Slowest analyses
+        34ms  //llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)
+        16ms  //llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)
+        15ms  //llvm-project//third-party/siphash:siphash (local_config_platform//:host#ffb6fe5c7480b5e7)
+         4ms  //local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)
+         4ms  //llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)
+         2ms  //llvm-project//llvm:targets_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         2ms  //llvm-project//llvm:disassemblers_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         2ms  //llvm-project//llvm:target_exegesis_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         2ms  //llvm-project//llvm:abi_breaking_h_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         2ms  //llvm-project//third-party:zstd (local_config_platform//:host#ffb6fe5c7480b5e7)
+

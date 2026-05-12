@@ -5,5 +5,5 @@ runs:
   - name: Build example/no_prelude directory
     run: |-
       cd examples/no_prelude
-      $RUNNER_TEMP/artifacts/kuro build //... -v 2
+      $RUNNER_TEMP/artifacts/slug build //... -v 2
     shell: bash

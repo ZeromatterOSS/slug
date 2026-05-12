@@ -40,7 +40,7 @@ $ yarn generate
 
 You will need to re-run this each time you want to see changes to generated
 content, primarily the API docs. You can alternatively `yarn generate_local` to
-update generated content using a built-from-source kuro.
+update generated content using a built-from-source slug.
 
 ## Local Development
 

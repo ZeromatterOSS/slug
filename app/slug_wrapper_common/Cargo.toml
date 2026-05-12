@@ -1,0 +1,34 @@
+[package]
+description = """
+Code shared with Meta internal slug launcher.
+
+Careful! The wrapper is not released as part of the regular buck version bumps,
+meaning code changes here are not "atomically" updated.
+"""
+edition = "2024"
+license = { workspace = true }
+name = "slug_wrapper_common"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+derive_more = { workspace = true }
+dupe = { workspace = true }
+serde = { workspace = true }
+shlex = { workspace = true }
+sysinfo = { workspace = true }
+uuid = { workspace = true }
+
+slug_error = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+winapi = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+slug_util = { workspace = true }

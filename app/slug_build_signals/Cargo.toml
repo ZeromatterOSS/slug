@@ -1,0 +1,23 @@
+[package]
+authors = ["Meta"]
+description = "Interface for build signals"
+edition = "2024"
+license = { workspace = true }
+name = "slug_build_signals"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+async-trait = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_fs = { workspace = true }
+slug_util = { workspace = true }
+cmp_any = { workspace = true }
+derive_more = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }

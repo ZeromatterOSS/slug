@@ -12,8 +12,8 @@ there.
 When querying the unconfigured graph, dependencies appearing in all
 branches of `select()` dictionaries will be treated as dependencies.
 
-Run `kuro docs uquery` or
-https://kuro.build/docs/users/query/uquery/
+Run `slug docs uquery` or
+https://slug.build/docs/users/query/uquery/
 for more documentation about the functions available in uquery
 expressions.
 
@@ -21,10 +21,10 @@ Examples:
 
 Print all the attributes of a target
 
-`kuro uquery //java/com/example/app:amazing --output-all-attributes
+`slug uquery //java/com/example/app:amazing --output-all-attributes
 
 List the deps of a target (special characters in a target will require quotes):
-`kuro uquery 'deps("//java/com/example/app:amazing+more")'`
+`slug uquery 'deps("//java/com/example/app:amazing+more")'`
 
 select() encoding:
 
@@ -35,7 +35,7 @@ When printed, values with `select()`s use a special json encoding.
 `{"__type": "concat", "items": [1, {"__type": "selector", "entries": {"//:a": 1, "DEFAULT": 2}}]}`
 
 
-Usage: kuro uquery [OPTIONS] <QUERY> [QUERY_ARGS]...
+Usage: slug uquery [OPTIONS] <QUERY> [QUERY_ARGS]...
 
 Arguments:
   <QUERY>
@@ -129,7 +129,7 @@ Buckconfig Options:
       --preemptible <PREEMPTIBLE>
           Used to configure when this command could be preempted by another command for the same isolation dir.
 
-          Normally, when you run two commands - from different terminals, say - kuro will attempt to run them in parallel. However, if the two commands are based on different state, that is they either have different configs or different filesystem states, kuro cannot run them in parallel. The default behavior in this case is to block the second command until the first completes.
+          Normally, when you run two commands - from different terminals, say - slug will attempt to run them in parallel. However, if the two commands are based on different state, that is they either have different configs or different filesystem states, slug cannot run them in parallel. The default behavior in this case is to block the second command until the first completes.
 
           Possible values:
           - never:            (default) When another command starts that cannot run in parallel with this one, block that command
@@ -160,7 +160,7 @@ Starlark Options:
       --profile-patterns <PROFILE_PATTERNS>
           Enables profiling for all evaluations whose evaluation identifier matches one of the provided patterns.
 
-          Some examples identifiers: analysis/cell//kuro/app/kuro_action_impl:kuro_action_impl (cfg:linux-x86_64#27ac5723e0c99706) load/cell//build_defs/json.bzl load/prelude//playground/test.bxl load/cell//build_defs/json.bzl@other_cell load_buildfile/fbcode//third-party-buck/platform010/build/ncurses load_packagefile/fbcode//cli/rust/cli_delegate anon_analysis/anon//:_anon_link_rule (anon: 766183dc9b6f680a) (fbcode//kuro/platform/execution:linux-x86_64#08961b14cfb182aa) bxl/prelude//playground/test.bxl:playground
+          Some examples identifiers: analysis/cell//slug/app/slug_action_impl:slug_action_impl (cfg:linux-x86_64#27ac5723e0c99706) load/cell//build_defs/json.bzl load/prelude//playground/test.bxl load/cell//build_defs/json.bzl@other_cell load_buildfile/fbcode//third-party-buck/platform010/build/ncurses load_packagefile/fbcode//cli/rust/cli_delegate anon_analysis/anon//:_anon_link_rule (anon: 766183dc9b6f680a) (fbcode//slug/platform/execution:linux-x86_64#08961b14cfb182aa) bxl/prelude//playground/test.bxl:playground
 
           You can pass `--profile-patterns=.*` to enable no-op profiling for everything (additionally pass `--profile-patterns-mode=none` to use no-op profiling to just get a list of all the identifiers).
 
@@ -227,9 +227,9 @@ Event Log Options:
 
 Universal Options:
       --isolation-dir <ISOLATION_DIR>
-          The name of the directory that Kuro creates within buck-out for writing outputs and daemon information. If one is not provided, Kuro creates a directory with the default name.
+          The name of the directory that Slug creates within buck-out for writing outputs and daemon information. If one is not provided, Slug creates a directory with the default name.
 
-          Instances of Kuro share a daemon if and only if their isolation directory is identical. The isolation directory also influences the output paths provided by Kuro, and as a result using a non-default isolation dir will cause cache misses (and slower builds).
+          Instances of Slug share a daemon if and only if their isolation directory is identical. The isolation directory also influences the output paths provided by Slug, and as a result using a non-default isolation dir will cause cache misses (and slower builds).
 
           [env: BUCK_ISOLATION_DIR=]
           [default: v2]
@@ -247,4 +247,4 @@ Universal Options:
           The oncall executing this command
 
       --client-metadata <CLIENT_METADATA>
-          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the form `key=value`, where `key` is a snake_case identifier, and will be sent to backend datasets
+          Metadata key-value pairs to inject into Slug's logging. Client metadata must be of the form `key=value`, where `key` is a snake_case identifier, and will be sent to backend datasets

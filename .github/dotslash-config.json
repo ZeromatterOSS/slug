@@ -1,35 +1,35 @@
 {
     "exclude-github-release-provider": true,
     "outputs": {
-      "kuro": {
+      "slug": {
         "platforms": {
           "macos-aarch64": {
-            "regex": "^kuro-aarch64-apple-darwin.zst$",
-            "path": "kuro-aarch64-apple-darwin"
+            "regex": "^slug-aarch64-apple-darwin.zst$",
+            "path": "slug-aarch64-apple-darwin"
           },
           "windows-aarch64": {
-            "regex": "^kuro-aarch64-pc-windows-msvc.exe.zst$",
-            "path": "kuro-aarch64-pc-windows-msvc.exe"
+            "regex": "^slug-aarch64-pc-windows-msvc.exe.zst$",
+            "path": "slug-aarch64-pc-windows-msvc.exe"
           },
           "linux-aarch64": {
-            "regex": "^kuro-aarch64-unknown-linux-musl.zst$",
-            "path": "kuro-aarch64-unknown-linux-musl"
+            "regex": "^slug-aarch64-unknown-linux-musl.zst$",
+            "path": "slug-aarch64-unknown-linux-musl"
           },
           "linux-riscv64": {
-            "regex": "^kuro-riscv64gc-unknown-linux-gnu.zst$",
-            "path": "kuro-riscv64gc-unknown-linux-gnu"
+            "regex": "^slug-riscv64gc-unknown-linux-gnu.zst$",
+            "path": "slug-riscv64gc-unknown-linux-gnu"
           },
           "macos-x86_64": {
-            "regex": "^kuro-x86_64-apple-darwin.zst$",
-            "path": "kuro-x86_64-apple-darwin"
+            "regex": "^slug-x86_64-apple-darwin.zst$",
+            "path": "slug-x86_64-apple-darwin"
           },
           "windows-x86_64": {
-            "regex": "^kuro-x86_64-pc-windows-msvc.exe.zst$",
-            "path": "kuro-x86_64-pc-windows-msvc.exe"
+            "regex": "^slug-x86_64-pc-windows-msvc.exe.zst$",
+            "path": "slug-x86_64-pc-windows-msvc.exe"
           },
           "linux-x86_64": {
-            "regex": "^kuro-x86_64-unknown-linux-musl.zst$",
-            "path": "kuro-x86_64-unknown-linux-musl"
+            "regex": "^slug-x86_64-unknown-linux-musl.zst$",
+            "path": "slug-x86_64-unknown-linux-musl"
           }
         }
       },

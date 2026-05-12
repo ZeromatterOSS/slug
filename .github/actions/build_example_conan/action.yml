@@ -5,10 +5,10 @@ runs:
   - name: Build examples/toolchains/conan_toolchain
     run: |-
       cd examples/toolchains/conan_toolchain
-      $RUNNER_TEMP/artifacts/kuro init
+      $RUNNER_TEMP/artifacts/slug init
       cp -r ../../../prelude prelude
       # Generate Conan imports. TODO[AH] Make that unnecessary.
-      PATH="$RUNNER_TEMP/artifacts:$PATH" $RUNNER_TEMP/artifacts/kuro run //cpp/conan:update -v 2
-      $RUNNER_TEMP/artifacts/kuro build //... -v 2
-      $RUNNER_TEMP/artifacts/kuro test //... -v 2
+      PATH="$RUNNER_TEMP/artifacts:$PATH" $RUNNER_TEMP/artifacts/slug run //cpp/conan:update -v 2
+      $RUNNER_TEMP/artifacts/slug build //... -v 2
+      $RUNNER_TEMP/artifacts/slug test //... -v 2
     shell: bash

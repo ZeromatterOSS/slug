@@ -9,10 +9,10 @@
 # @nolint
 
 # Shell rules for nano_prelude. Mirrors the behavior of the now-removed
-# kuro native sh_binary / sh_test / sh_library rules so existing fixtures
+# slug native sh_binary / sh_test / sh_library rules so existing fixtures
 # continue to work after Plan 27.2 converts the native names to
 # removed-rule stubs. Semantics intentionally match what the deleted
-# `analyze_sh_*` helpers in kuro_analysis did:
+# `analyze_sh_*` helpers in slug_analysis did:
 #
 # - `sh_library` collects `srcs` (and merged dep outputs) as DefaultInfo.files.
 # - `sh_binary` exposes the first src as DefaultInfo(executable=...).

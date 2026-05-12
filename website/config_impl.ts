@@ -34,7 +34,7 @@ const presetOptions: ClassicPresetOptions = ({
     customCss: require.resolve('./src/css/custom.css'),
   },
   internSearch: true,
-  staticDocsProject: 'kuro',
+  staticDocsProject: 'slug',
 });
 
 const themeConfig: ClassicPresetConfig = ({
@@ -44,9 +44,9 @@ const themeConfig: ClassicPresetConfig = ({
     },
   },
   navbar: {
-    title: 'Kuro',
+    title: 'Slug',
     logo: {
-      alt: 'Kuro Logo',
+      alt: 'Slug Logo',
       src: 'img/logo.svg',
     },
     items: [
@@ -70,8 +70,8 @@ const themeConfig: ClassicPresetConfig = ({
       },
       {
         href: fbContent({
-          internal: 'https://github.com/ZeromatterOSS/kuro',
-          external: 'https://github.com/ZeromatterOSS/kuro',
+          internal: 'https://github.com/ZeromatterOSS/slug',
+          external: 'https://github.com/ZeromatterOSS/slug',
         }),
         // @ts-ignore : The type signature for `fbContent` incorrectly claims it might return a `[]`
         label: 'GitHub',
@@ -96,7 +96,7 @@ const themeConfig: ClassicPresetConfig = ({
         items: [
           {
             label: 'GitHub issues',
-            href: 'https://github.com/ZeromatterOSS/kuro/issues',
+            href: 'https://github.com/ZeromatterOSS/slug/issues',
           },
         ],
       },
@@ -106,8 +106,8 @@ const themeConfig: ClassicPresetConfig = ({
           {
             label: 'Code',
             href: fbContent({
-              internal: 'https://github.com/ZeromatterOSS/kuro',
-              external: 'https://github.com/ZeromatterOSS/kuro',
+              internal: 'https://github.com/ZeromatterOSS/slug',
+              external: 'https://github.com/ZeromatterOSS/slug',
             }),
           },
           {
@@ -133,14 +133,14 @@ const themeConfig: ClassicPresetConfig = ({
     external: {
       appId: '9RT0EWXQO8',
       apiKey: 'cf8a08e681e1e1d8a73a08d3f13948c7',
-      indexName: 'kuro',
+      indexName: 'slug',
     }
   }),
 });
 
 const config: DocusaurusConfig = ({
-  title: 'Kuro',
-  // Kuro does not currently have a public docs website. This local URL avoids
+  title: 'Slug',
+  // Slug does not currently have a public docs website. This local URL avoids
   // advertising a nonexistent domain in generated metadata.
   url: 'http://localhost',
   baseUrl: '/',
@@ -149,7 +149,7 @@ const config: DocusaurusConfig = ({
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/logo.png',
   organizationName: 'ZeromatterOSS',
-  projectName: 'kuro',
+  projectName: 'slug',
 
   presets: [
     [

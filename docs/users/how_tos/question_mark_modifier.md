@@ -8,7 +8,7 @@ modifiers, which allows users to specify modifiers for a target pattern by
 appending a `?` to the pattern followed by the modifiers delimited by `+`.
 
 ```sh
-kuro build repo//foo:bar?debug+linux
+slug build repo//foo:bar?debug+linux
 ```
 
 Since the `?modifier` syntax associates modifiers to target patterns rather than
@@ -16,11 +16,11 @@ the command, it allows us to potentially condense multiple command invocations.
 
 ```sh
 # Using --modifier flags
-kuro build --modifier debug repo//foo:bar
-kuro build --modifier debug --modifier linux repo//foo:bar
+slug build --modifier debug repo//foo:bar
+slug build --modifier debug --modifier linux repo//foo:bar
 
 # Using ?modifier syntax
-kuro build repo//foo:bar?debug repo//foo:bar?debug+linux
+slug build repo//foo:bar?debug repo//foo:bar?debug+linux
 ```
 
 ### Use in `--target-universe` flag
@@ -30,7 +30,7 @@ For command invocations that specify the `--target-universe` flag, the
 
 ```sh
 # Use of `?modifier` syntax in `--target-universe` flag
-kuro build repo//foo:bar --target-universe repo//foo:baz?debug
+slug build repo//foo:bar --target-universe repo//foo:baz?debug
 ```
 
 Using the `?modifier` syntax outside of the `--target-universe` flag when it is
@@ -38,7 +38,7 @@ specified will throw an error.
 
 ```sh
 # Command that would fail and throw an error
-kuro build repo//foo:bar?debug --target-universe repo//foo:baz
+slug build repo//foo:bar?debug --target-universe repo//foo:baz
 ```
 
 ### Incompatible with `--modifier` flag
@@ -48,8 +48,8 @@ cannot be used.
 
 ```sh
 # Commands that would fail and throw an error
-kuro build --modifier debug repo//foo:bar?linux
-kuro build --modifier debug repo//foo:bar --target-universe repo//foo:baz?linux
+slug build --modifier debug repo//foo:bar?linux
+slug build --modifier debug repo//foo:bar --target-universe repo//foo:baz?linux
 ```
 
 ### Commands that support `?modifier` syntax
@@ -74,7 +74,7 @@ in the `build` command.
 
 ```sh
 # CLI input
-kuro build --show-output repo//foo:bar?debug repo//foo:bar?linux
+slug build --show-output repo//foo:bar?debug repo//foo:bar?linux
 
 # Example output
 repo//foo:bar?debug buck-out/v2/gen/...
@@ -85,7 +85,7 @@ repo//foo:bar?linux buck-out/v2/gen/...
 
 ```sh
 # CLI input
-kuro build repo//foo:bar?debug repo//foo:bar?linux --build-report repo/build_report.json
+slug build repo//foo:bar?debug repo//foo:bar?linux --build-report repo/build_report.json
 ```
 
 ```json

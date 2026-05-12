@@ -1,7 +1,7 @@
 # Plan 28.4 Stage 6 acceptance fixture for the
 # `ctx.package_relative_label` migration. The Rust impl was deleted;
-# the bundled `_kuro_package_relative_label` in
-# `@kuro_builtins//:exports.bzl` now serves the method via a
+# the bundled `_slug_package_relative_label` in
+# `@slug_builtins//:exports.bzl` now serves the method via a
 # closure on the rule facade.
 #
 # Three input shapes are exercised, mirroring the branches in the

@@ -1,0 +1,27 @@
+[package]
+description = "`slug completion` command client implementation"
+edition = "2024"
+license = { workspace = true }
+name = "slug_cmd_completion_client"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+clap = { workspace = true }
+clap_complete = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true }
+
+slug_cli_proto = { workspace = true }
+slug_client_ctx = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_error = { workspace = true }
+slug_fs = { workspace = true }
+
+[dev-dependencies]
+paste = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(buck_build)"] }

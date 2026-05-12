@@ -50,7 +50,7 @@ build --remote_executor=grpc://localhost:50051
 build --remote_instance_name=main
 ```
 
-TLS is not used in this example. The `grpc://` URL scheme tells the kuro
+TLS is not used in this example. The `grpc://` URL scheme tells the slug
 RE client to dial the endpoint without TLS.
 
 ## Relevant configs in `ExecutionPlatformInfo`

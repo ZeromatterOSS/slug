@@ -1,0 +1,22 @@
+[package]
+authors = ["Meta"]
+description = "Critical path calculations for Slug"
+edition = "2024"
+license = { workspace = true }
+name = "slug_critical_path"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+crossbeam = { workspace = true }
+derive_more = { workspace = true }
+starlark_map = { workspace = true }
+
+slug_error = { workspace = true }
+
+[dev-dependencies]
+# Can't use workspace dependencies here because rand = { package = "rand_08", workspace = true } is
+# not valid syntax.
+rand = { package = "rand", version = "0.8.4", features = ["small_rng"] }
+rand_chacha = "0.3"
+rand_distr = { package = "rand_distr", version = "0.4" }

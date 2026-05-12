@@ -5,7 +5,7 @@ title: Configuration modifiers
 
 Modifiers (also referred to as configuration modifiers) are a feature that lets
 users add [constraints](../../rule_authors/configurations) to individual
-directories, target definitions and individual `kuro` invocations. They are the
+directories, target definitions and individual `slug` invocations. They are the
 recommended to customize build configuration.
 
 ## (Open-Source Only) Getting started with modifiers

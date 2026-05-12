@@ -6,7 +6,7 @@ title: load()
 The `load()` function is used to include definitions (functions, macros, rules,
 and constants) from another `.bzl` file.
 
-In Kuro, `load()` executes a `.bzl` file and imports the specified symbols into
+In Slug, `load()` executes a `.bzl` file and imports the specified symbols into
 the current file's namespace. This allows you to share code across multiple
 build files and create reusable build components.
 
@@ -41,7 +41,7 @@ load("//path/to/file:name.bzl", alias1="symbol1", alias2="symbol2")
 ## Arguments
 
 - **Path** (required): The first argument is a string specifying the label of
-  the `.bzl` file to load. This is similar to Kuro's target label syntax but diverges in the `cell` syntax with a prefixed `@`:
+  the `.bzl` file to load. This is similar to Slug's target label syntax but diverges in the `cell` syntax with a prefixed `@`:
   - Absolute to cell: `//package/path:file.bzl`
   - Relative to package: `:file.bzl`
   - From external cell: `@cell//package/path:file.bzl`

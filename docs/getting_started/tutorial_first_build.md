@@ -1,24 +1,24 @@
 ---
 id: tutorial_first_build
-title: 'Tutorial: Your First Kuro Application'
+title: 'Tutorial: Your First Slug Application'
 ---
 
 import { FbInternalOnly, OssOnly, isInternal } from
 'docusaurus-plugin-internaldocs-fb/internal';
 
 Welcome! This tutorial will help you learn the basics of building your first
-Rust application with Kuro. We will start from the very beginning, guiding you
+Rust application with Slug. We will start from the very beginning, guiding you
 step-by-step to get a "Hello, World!" message displayed in your terminal.
 Through this practical exercise, you'll acquire foundational skills for working
-with Kuro.
+with Slug.
 
 ## What We'll Do:
 
 1. Set up a simple project directory.
 2. Write a "Hello, World!" program in Rust.
-3. Create a BUCK file to tell Kuro how to build our program.
-4. Build the Rust program using Kuro.
-5. Run our compiled program using Kuro.
+3. Create a BUCK file to tell Slug how to build our program.
+4. Build the Rust program using Slug.
+5. Run our compiled program using Slug.
 6. Briefly inspect the build targets we created.
 
 ## Prerequisites:
@@ -27,7 +27,7 @@ For this tutorial, we will use Rust. You don't need to know how to write Rust.
 We will only use a few basics of Rust.
 
 <OssOnly>
-- [Follow the previous section to set up Kuro](../install)
+- [Follow the previous section to set up Slug](../install)
 - [Set up Rust](https://rustup.rs/)
 </OssOnly>
 <FbInternalOnly>
@@ -39,13 +39,13 @@ We will only use a few basics of Rust.
 <FbInternalOnly>
 
 First, we need a place for our project files. We will put it in
-`fbcode/scripts/<unixname>/kuro_lab`
+`fbcode/scripts/<unixname>/slug_lab`
 
 1. Create a new directory. In fbsource root
 
 ```bash
-mkdir -p fbcode/scripts/<unixname>/kuro_lab
-cd fbcode/scripts/<unixname>/kuro_lab
+mkdir -p fbcode/scripts/<unixname>/slug_lab
+cd fbcode/scripts/<unixname>/slug_lab
 ```
 
 Replace `<unixname>` with your unixname.
@@ -54,24 +54,24 @@ Replace `<unixname>` with your unixname.
 
 <OssOnly>
 
-First, we need to create a new kuro project directory and set up a folder to
+First, we need to create a new slug project directory and set up a folder to
 put all our files in.
 
-1. Create a new kuro project directory and create a new directory named
-   `kuro_lab` inside it.
+1. Create a new slug project directory and create a new directory named
+   `slug_lab` inside it.
 
 ```bash
-kuro init hello_world
+slug init hello_world
 
-mkdir hello_world/kuro_lab
+mkdir hello_world/slug_lab
 
-cd hello_world/kuro_lab
+cd hello_world/slug_lab
 ```
 
 </OssOnly>
 
-2. Inside `kuro_lab`, create another directory named `greeter_bin`, this is
-   where all files of our Kuro binary package will be stored.
+2. Inside `slug_lab`, create another directory named `greeter_bin`, this is
+   where all files of our Slug binary package will be stored.
 
 ```bash
 mkdir greeter_bin
@@ -87,7 +87,7 @@ mkdir greeter_bin/src
 Our project structure should look like this:
 
 ```
-kuro_lab
+slug_lab
 └── greeter_bin
     └── src
 ```
@@ -106,12 +106,12 @@ fn main() {
 ```
 
 This is the main function of our program. It prints "Hello world!" to the
-console. But we are not done yet, we need to tell Kuro how to build our
+console. But we are not done yet, we need to tell Slug how to build our
 program.
 
 ## Step 3: Defining the Build Target in a BUCK File
 
-Next, we need to tell Kuro about our program and how to build it. We do this
+Next, we need to tell Slug about our program and how to build it. We do this
 using a `BUCK` file.
 
 1. In the root of your `greeter_bin` directory (not inside src), create a new
@@ -144,25 +144,25 @@ rust_binary(
 Let's briefly see what this does (we'll keep explanations minimal, just enough
 for this step! ):
 
-- `load(...)` is a load statement. It tells Kuro to load the definition of the
+- `load(...)` is a load statement. It tells Slug to load the definition of the
   `rust_binary`.
-- `rust_binary` is a Kuro rule that tells Kuro how to build a Rust binary.
+- `rust_binary` is a Slug rule that tells Slug how to build a Rust binary.
 - `name = "main"`: We're giving our build target a name, "main". This is how
-  we'll refer to it in Kuro commands.
-- `srcs = ["src/main.rs"]`: This tells Kuro that the source code for this
+  we'll refer to it in Slug commands.
+- `srcs = ["src/main.rs"]`: This tells Slug that the source code for this
   "main" target is our `src/main.rs` file.
 
 Our project structure should look like this:
 
 ```
-kuro_lab
+slug_lab
 └── greeter_bin
     ├── BUCK
     └── src
         └── main.rs
 ```
 
-## Step 4: Building the Application with Kuro
+## Step 4: Building the Application with Slug
 
 With our Rust code and BUCK file in place, let's build the application!
 
@@ -170,13 +170,13 @@ With our Rust code and BUCK file in place, let's build the application!
 2. Run the following command:
 
 ```bash
-kuro build :main --show-output
+slug build :main --show-output
 ```
 
-- `kuro build :main` tells Kuro to build the target named main. The `:main`
+- `slug build :main` tells Slug to build the target named main. The `:main`
   part means the target is defined in the BUCK file in the root of this package
   (`greeter_bin`).
-- `--show-output` tells Kuro to show the path of our built binary.
+- `--show-output` tells Slug to show the path of our built binary.
 
 3. Expected Output: You should see output similar to this
 
@@ -185,7 +185,7 @@ kuro build :main --show-output
 ```
 ...
 BUILD SUCCEEDED
-fbcode//scripts/<unixname>/kuro_lab/greeter_bin:main buck-out/v2/gen/fbcode/c32808b9d4f0fdd0/scripts/<unixname>/kuro_lab/greeter_bin/__main__/main
+fbcode//scripts/<unixname>/slug_lab/greeter_bin:main buck-out/v2/gen/fbcode/c32808b9d4f0fdd0/scripts/<unixname>/slug_lab/greeter_bin/__main__/main
 ```
 
 </FbInternalOnly>
@@ -195,16 +195,16 @@ fbcode//scripts/<unixname>/kuro_lab/greeter_bin:main buck-out/v2/gen/fbcode/c328
 ```
 ...
 BUILD SUCCEEDED
-root//kuro_lab/greeter_bin:main /.../kuro_lab/buck-out/v2/gen/root/200212f73efcd57d/kuro_lab/greeter_bin/__main__/main
+root//slug_lab/greeter_bin:main /.../slug_lab/buck-out/v2/gen/root/200212f73efcd57d/slug_lab/greeter_bin/__main__/main
 ```
 
 </OssOnly>
 
 export const TARGET_NAME = isInternal() ?
-<code>fbcode//scripts/&lt;unixname&gt;/kuro_lab/greeter_bin:main</code> :
-<code>root//kuro_lab/greeter_bin:main</code>;
+<code>fbcode//scripts/&lt;unixname&gt;/slug_lab/greeter_bin:main</code> :
+<code>root//slug_lab/greeter_bin:main</code>;
 
-- `BUILD SUCCEEDED` indicates that Kuro successfully built our target.
+- `BUILD SUCCEEDED` indicates that Slug successfully built our target.
 - {TARGET_NAME} is the full target label name of our target.
 - Think of the `:main` we used in the step 2 as a relative path to the target
   from within its package (`greeter_bin`).
@@ -214,17 +214,17 @@ export const TARGET_NAME = isInternal() ?
   relative path to fbsource. You can use `--show-full-output` instead of
   `--show-output` to get the absolute path.
 
-## Step 5: Running Your Application with Kuro
+## Step 5: Running Your Application with Slug
 
-Since our target is a runnable target, we can run it by `kuro run`
+Since our target is a runnable target, we can run it by `slug run`
 
 1. In your terminal (still in the `greeter_bin` directory), execute:
 
 ```bash
-kuro run :main
+slug run :main
 ```
 
-This command tells Kuro to run the `main` target. Kuro will build it if it
+This command tells Slug to run the `main` target. Slug will build it if it
 hasn't been built already, and then execute it. (i.e. We can do this without
 step 4)
 
@@ -238,20 +238,20 @@ There it is! Our program ran successfully and printed the message.
 
 ## Step 6: Inspecting Your Target (Optional)
 
-This step is optional, but it's good to know how you can ask Kuro about the
+This step is optional, but it's good to know how you can ask Slug about the
 targets you've defined.
 
 1. To see the target that we defined (still in the `greeter_bin` directory),
    run:
 
 ```bash
-kuro targets :
+slug targets :
 ```
 
 or
 
 ```bash
-kuro targets fbcode//scripts/<unixname>/kuro_lab/greeter_bin:
+slug targets fbcode//scripts/<unixname>/slug_lab/greeter_bin:
 ```
 
 2. Expected Output:
@@ -261,7 +261,7 @@ This will show all the targets we defined,
 <FbInternalOnly>
 
 ```
-fbcode//scripts/<unixname>/kuro_lab/greeter_bin:main
+fbcode//scripts/<unixname>/slug_lab/greeter_bin:main
 ... other targets might be listed here ...
 ```
 
@@ -273,7 +273,7 @@ just focus on the `main` target.
 <OssOnly>
 
 ```
-root//kuro_lab/greeter_bin:main
+root//slug_lab/greeter_bin:main
 ```
 
 </OssOnly>
@@ -283,13 +283,13 @@ root//kuro_lab/greeter_bin:main
 Congratulations! 🎉
 
 You have successfully created, built, and run your first application using
-Kuro! We've walked through
+Slug! We've walked through
 
 - Setting up the project structure.
 - Writing a simple Rust program.
 - Defining a rust_binary target in a BUCK file.
-- Using `kuro build` to compile the code.
-- Using `kuro run` to execute the program.
-- Using `kuro targets` to inspect the target.
+- Using `slug build` to compile the code.
+- Using `slug run` to execute the program.
+- Using `slug targets` to inspect the target.
 
-You've taken your first concrete steps into the world of Kuro.
+You've taken your first concrete steps into the world of Slug.

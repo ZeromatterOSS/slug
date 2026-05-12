@@ -1,7 +1,7 @@
 # Plan 28.4 Stage 13 acceptance fixture for the `ctx.expand_location`
 # migration. The Rust impl (~330 LOC: pool-building + parser) was deleted;
-# the bundled `_kuro_expand_location` (backed by `kuro_collect_location_pool`
-# and `kuro_lookup_output_path` runtime hooks) now serves the call.
+# the bundled `_slug_expand_location` (backed by `slug_collect_location_pool`
+# and `slug_lookup_output_path` runtime hooks) now serves the call.
 #
 # Pins:
 #   - $(location :leaf) resolves to the first output path of a dep.

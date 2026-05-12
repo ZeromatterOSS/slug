@@ -1,13 +1,13 @@
 ---
-id: buck1_vs_kuro
-title: Buck1 vs Kuro
+id: buck1_vs_slug
+title: Buck1 vs Slug
 ---
 
 ## At a glance
 
-The following table provides an at-a-glance comparison of Buck1 and Kuro.
+The following table provides an at-a-glance comparison of Buck1 and Slug.
 
-| Buck1                                           | Kuro                                         |
+| Buck1                                           | Slug                                         |
 | :---------------------------------------------- | :-------------------------------------------- |
 | Build files in Starlark                         | Build files in Starlark                       |
 | Macros in Starlark                              | Macros in Starlark                            |
@@ -18,11 +18,11 @@ The following table provides an at-a-glance comparison of Buck1 and Kuro.
 | Remote Execution (RE) not well supported        | All rules support remote execution by default |
 | Varying degrees of incrementality / parallelism | Unified incrementality / parallelism          |
 
-## Top-down vs Bottom-up - understanding the implications of the difference in execution models between Buck1 and Kuro
+## Top-down vs Bottom-up - understanding the implications of the difference in execution models between Buck1 and Slug
 
-It is often said that Buck1 does 'top down' and Kuro does 'bottom up' building.
+It is often said that Buck1 does 'top down' and Slug does 'bottom up' building.
 This results in cases where some topics that seem conceptually trivial in Buck1
-are hard problems in Kuro, or vice versa.
+are hard problems in Slug, or vice versa.
 
 ### What are the differences?
 
@@ -58,33 +58,33 @@ Following is an oversimplified view of what happens:
     from the inputs of the action that needs executing, which at this point of
     the build are known (since they were just built)!
 
-#### Building A with Kuro
+#### Building A with Slug
 
-In contrast, if you ask Kuro to build A, here is what happens:
+In contrast, if you ask Slug to build A, here is what happens:
 
-- Kuro produce the action to compile B and computes the hash of the action.
+- Slug produce the action to compile B and computes the hash of the action.
   - This is the 'action digest', which consists of mixing the hashes of all the
     inputs (such as the C++ file), as well as the command line (so, implicitly,
     the compiler flags).
-- Kuro queries the action cache for the action digest hash.
-  - If there's a hit, Kuro obtains the hash of the resulting object file (that
+- Slug queries the action cache for the action digest hash.
+  - If there's a hit, Slug obtains the hash of the resulting object file (that
     is, the output of B).
-  - If there's a miss, Kuro runs the action on RE (or potentially locally) and
-    obtains the hash of the object file. If the action runs remotely, Kuro will
+  - If there's a miss, Slug runs the action on RE (or potentially locally) and
+    obtains the hash of the object file. If the action runs remotely, Slug will
     not download the output.
-- Kuro does the same thing for C.
-- Kuro produces the action to link A.
+- Slug does the same thing for C.
+- Slug produces the action to link A.
   - This consists of mixing together all the hashes of the input files (which
     were retrieved earlier) and the command line to produce an action digest,
     then querying the cache and potentially running the action.
-- Once Kuro produces A (again, on RE), then, since this output was requested by
-  the user (unlike the intermediary outputs B and C), Kuro downloads A.
+- Once Slug produces A (again, on RE), then, since this output was requested by
+  the user (unlike the intermediary outputs B and C), Slug downloads A.
 
 ### Some implications
 
 #### Rulekeys vs Action digests
 
-The closest thing to Buck1’s rulekey in Kuro is the action digest, but they are
+The closest thing to Buck1’s rulekey in Slug is the action digest, but they are
 very different!
 
 Since it’s a product of the (transitive) inputs of an action, the (default)
@@ -95,30 +95,30 @@ which means you need to build all the dependencies first.
 This means that:
 
 - In Buck1, you can ask for rulekeys for a target.
-- In Kuro, you’d have to run the build first then ask for the action digests
-  (this is what the `kuro log what-ran` would show you).
+- In Slug, you’d have to run the build first then ask for the action digests
+  (this is what the `slug log what-ran` would show you).
 
-#### Kuro queries many more caches
+#### Slug queries many more caches
 
 - Buck1 will not descend further down a tree of dependency when it gets a cache
   hit.
-- Kuro will always walk up all your dependencies, regardless of whether you get
+- Slug will always walk up all your dependencies, regardless of whether you get
   cache hits or not.
 
 #### Materialization
 
 - When Buck1 gets a cache miss, it downloads the outputs.
-- Kuro, by contract, does not download outputs as part of a build (this is
+- Slug, by contract, does not download outputs as part of a build (this is
   called 'deferred materialization').
-  - Note that Kuro does download the outputs if the user asked for them (that
+  - Note that Slug does download the outputs if the user asked for them (that
     is, they were the targets the user put on the command line).
 
 ### Second-order implications
 
 #### Non-determinism
 
-Non-determinism in a build affects Kuro and Buck1 differently. One scenario
-that often works fine in Buck1 but can work catastrophically bad in Kuro is a
+Non-determinism in a build affects Slug and Buck1 differently. One scenario
+that often works fine in Buck1 but can work catastrophically bad in Slug is a
 codegen step, driven by a Python binary.
 
 In certain configurations/modes, Python binaries are non-deterministic, because
@@ -129,7 +129,7 @@ ARchives](https://engineering.fb.com/2018/07/13/data-infrastructure/xars-a-more-
 - In Buck1, that doesn’t really matter, because you can get a cache hit on the
   codegen output without ever visiting the XAR (as long as the input files
   haven’t changed).
-- In Kuro, you need the XAR to check the action cache for the codegen step.
+- In Slug, you need the XAR to check the action cache for the codegen step.
   - However, binaries are often not cached in certain configurations/modes, so
     your XAR isn’t cached.
   - Therefore, since your XAR build is non-deterministic, you’ll always miss in
@@ -141,7 +141,7 @@ the entire build might become uncacheable.
 
 #### Cache misses don’t necessarily propagate
 
-Say that, in Kuro, you’re trying to build a chain of actions like codegen ->
+Say that, in Slug, you’re trying to build a chain of actions like codegen ->
 compile -> link.
 
 Even if your codegen step isn’t cached (say, because its action inputs are
@@ -151,17 +151,17 @@ deterministic, you can still get cache hits from compile and link steps.
 #### Hybrid execution
 
 If you squint, you’ll note that Buck1’s build could be viewed as 'local first',
-whereas Kuro’s would be better viewed as 'remote first':
+whereas Slug’s would be better viewed as 'remote first':
 
 - When Buck1 builds something remotely or gets a cache hit, the outputs are
   always downloaded.
-- When Kuro builds something remotely or gets a cache hit, the outputs are
+- When Slug builds something remotely or gets a cache hit, the outputs are
   never downloaded.
 
 In turn, this has some important implications:
 
 - When Buck1 builds something locally, the inputs are always already present.
-- When Kuro builds something locally, the inputs have to be downloaded, unless
+- When Slug builds something locally, the inputs have to be downloaded, unless
   they were built locally (which if you’re doing any RE, is usually not the
   case), or if another command caused them to be downloaded.
 
@@ -170,6 +170,6 @@ resources is usually a no-brainer, because it’s always ready to go, and you’
 save on not having to download the output from RE (though you might have to
 upload the output if you need to run actions depending on it later).
 
-On the flip side, with Kuro, that’s not necessarily the case. To run an action
+On the flip side, with Slug, that’s not necessarily the case. To run an action
 locally, you need to download inputs that you might otherwise not have needed,
 which will tax your network connection.

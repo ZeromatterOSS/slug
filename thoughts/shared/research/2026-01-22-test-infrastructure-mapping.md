@@ -2,17 +2,17 @@
 
 ## Executive Summary
 
-This document maps test concepts between the Buck2 (Kuro fork) and Bazel repositories to guide test migration. Our goal is to adopt Bazel semantics while leveraging the existing Buck2 test infrastructure (pytest-based Python tests with async support).
+This document maps test concepts between the Buck2 (Slug fork) and Bazel repositories to guide test migration. Our goal is to adopt Bazel semantics while leveraging the existing Buck2 test infrastructure (pytest-based Python tests with async support).
 
 ## Test Infrastructure Comparison
 
-### Buck2/Kuro Test Framework
+### Buck2/Slug Test Framework
 
 | Aspect | Details |
 |--------|---------|
 | **Primary Language** | Python (pytest with pytest-asyncio) |
 | **Test Location** | `tests/core/`, `tests/e2e/` |
-| **Unit Tests** | Rust tests in `app/kuro_*_tests/` |
+| **Unit Tests** | Rust tests in `app/slug_*_tests/` |
 | **Test Framework** | `@buck_test()` decorator, async/await pattern |
 | **Fixtures** | `test_*_data/` directories with `.buckconfig`, `TARGETS.fixture` |
 | **Golden Files** | `*.golden` files with hash sanitization |
@@ -77,7 +77,7 @@ This document maps test concepts between the Buck2 (Kuro fork) and Bazel reposit
 | `test_package_values_cross_cell.py` | Cross-cell packages | DELETE | Bazel uses bzlmod, not cells |
 | `test_package_values_missing_buck_file.py` | Missing build files | KEEP+UPDATE | Change to BUILD.bazel |
 | `test_peak_allocated_bytes*.py` | Memory limits | PRESERVE | Same concept |
-| `test_prelude_typecheck.py` | Type checking | PRESERVE | Kuro keeps type annotations |
+| `test_prelude_typecheck.py` | Type checking | PRESERVE | Slug keeps type annotations |
 | `test_print.py` | Print function | PRESERVE | Same `print()` function |
 | `test_read_root_config.py` | Config reading | DELETE | Uses `.buckconfig`, replace with bzlmod |
 | `test_relative_paths.py` | Path handling | PRESERVE | Same concept |
@@ -394,7 +394,7 @@ This document maps test concepts between the Buck2 (Kuro fork) and Bazel reposit
 
 ## Category 14: Rust Unit Tests
 
-**Buck2 Location**: `app/kuro_build_api_tests/`
+**Buck2 Location**: `app/slug_build_api_tests/`
 
 | Test Module | Concept | Action | Notes |
 |-------------|---------|--------|-------|

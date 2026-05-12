@@ -1,0 +1,25 @@
+[package]
+description = "Tests for slug_action_impl"
+edition = "2024"
+license = { workspace = true }
+name = "slug_action_impl_tests"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dev-dependencies]
+ctor = { workspace = true }
+indoc = { workspace = true }
+maplit = { workspace = true }
+
+slug_error = { workspace = true }
+dupe = { workspace = true }
+starlark = { workspace = true }
+
+slug_action_impl = { workspace = true }
+slug_anon_target = { workspace = true }
+slug_build_api = { workspace = true }
+slug_core = { workspace = true }
+slug_execute = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_interpreter_for_build = { workspace = true }
+slug_node = { workspace = true }

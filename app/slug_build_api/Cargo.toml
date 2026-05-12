@@ -1,0 +1,79 @@
+[package]
+description = "Build related interpreter defs, coercion logic, some build rule impelementations, and handing actions off to DICE for caching and execution. A large chunk of the 'build' part of BuckV2"
+edition = "2024"
+license = { workspace = true }
+name = "slug_build_api"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-recursion = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+blake3 = { workspace = true }
+console = { workspace = true }
+dashmap = { workspace = true }
+derivative = { workspace = true }
+derive_more = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+fxhash = { workspace = true }
+indexmap = { workspace = true }
+internment = { workspace = true }
+inventory = { workspace = true }
+itertools = { workspace = true }
+linkme = { workspace = true }
+multimap = { workspace = true }
+once_cell = { workspace = true }
+probminhash = { workspace = true }
+ref-cast = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+smallvec = { workspace = true }
+static_assertions = { workspace = true }
+strong_hash = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+display_container = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+pagable = { workspace = true }
+remote_execution = { workspace = true }
+rustls = { workspace = true }
+setsketch = { workspace = true }
+sorted_vector_map = { workspace = true }
+starlark = { workspace = true }
+starlark_map = { workspace = true }
+
+slug_artifact = { workspace = true }
+slug_build_api_derive = { workspace = true }
+slug_build_info = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_directory = { workspace = true }
+slug_error = { workspace = true }
+slug_errorformat = { workspace = true }
+slug_event_observer = { workspace = true }
+slug_events = { workspace = true }
+slug_execute = { workspace = true }
+slug_file_watcher = { workspace = true }
+slug_fs = { workspace = true }
+slug_http = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_node = { workspace = true }
+slug_query = { workspace = true }
+slug_test_api = { workspace = true }
+slug_util = { workspace = true }
+slug_wrapper_common = { workspace = true }
+dice_futures = { workspace = true }
+
+[dev-dependencies]
+slug_certs = { workspace = true }
+slug_wrapper_common = { workspace = true }

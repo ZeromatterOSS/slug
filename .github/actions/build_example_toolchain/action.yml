@@ -11,11 +11,11 @@ runs:
     if: ${{ runner.os != 'Windows' }}
     run: |-
       cd examples/toolchains/${{ inputs.toolchain }}
-      $RUNNER_TEMP/artifacts/kuro build //... -v 2
+      $RUNNER_TEMP/artifacts/slug build //... -v 2
     shell: bash
   - name: Build examples/toolchains/${{ inputs.toolchain }}
     if: ${{ runner.os == 'Windows' }}
     run: |-
       cd examples/toolchains/${{ inputs.toolchain }}
-      & $env:RUNNER_TEMP/artifacts/kuro build //... -v 2
+      & $env:RUNNER_TEMP/artifacts/slug build //... -v 2
     shell: pwsh

@@ -99,7 +99,7 @@ fn evaluate_expr<'v>(
     let ast = AstModule::parse("interactive", expr, &Dialect::AllOptionsInternal);
     // This technically loses structured access to the diagnostic information. However, it's
     // completely unused, so there's not much point in converting all of this code to using
-    // `starlark::Error`, only for kuro to then go and blindly turn it into a `anyhow::Error`
+    // `starlark::Error`, only for slug to then go and blindly turn it into a `anyhow::Error`
     // anyway.
     let res = ast
         .and_then(|ast| eval.eval_statements(ast))

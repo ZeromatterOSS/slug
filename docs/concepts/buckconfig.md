@@ -4,18 +4,18 @@ title: .buckconfig
 ---
 
 The root of your [project](glossary.md#project) must contain a configuration
-file named `.buckconfig`. Before executing, Kuro reads this file to incorporate
+file named `.buckconfig`. Before executing, Slug reads this file to incorporate
 any customizations it specifies.
 
-## Performance impact of Kuro configuration changes
+## Performance impact of Slug configuration changes
 
 Because configuration settings are sometimes included in the cache keys that
-Kuro uses in its caching system, changes to Buck's configuration can invalidate
-previously-built artifacts in Buck's caches. If this occurs, Kuro rebuilds
+Slug uses in its caching system, changes to Buck's configuration can invalidate
+previously-built artifacts in Buck's caches. If this occurs, Slug rebuilds
 those artifacts, which can impact your build time.
 
 These configuration changes can happen when modifying configuration files and
-command line args. [See more](#precedence-of-kuro-configuration-specifications)
+command line args. [See more](#precedence-of-slug-configuration-specifications)
 
 ## The .buckconfig file uses the INI file format
 
@@ -27,7 +27,7 @@ INI file format; these are discussed below.
 
 ### Other INI file parsers
 
-As mentioned previously, we have extended the INI file parser that Kuro uses to
+As mentioned previously, we have extended the INI file parser that Slug uses to
 parse configuration files. As a result, _INI file parsers provided by other
 languages or libraries are often not able to parse Buck's configuration files
 successfully_.
@@ -35,8 +35,8 @@ successfully_.
 ### Dot character not supported in section names
 
 We do not support the use of the _dot_ character (`.`) in section names within
-Kuro configuration files. For example, the following is **not**
-supported—_although Kuro does not issue a warning or error_.
+Slug configuration files. For example, the following is **not**
+supported—_although Slug does not issue a warning or error_.
 
 ```ini
 [foo.bar]
@@ -46,7 +46,7 @@ supported—_although Kuro does not issue a warning or error_.
 Note that sometimes you might need to define your own custom sections, such as
 for platform flavors for C++ or Python. These scenarios are examples of when you
 should be careful not to introduce the dot character in section names. This
-constraint is because Kuro uses the dot character to delimit section names and
+constraint is because Slug uses the dot character to delimit section names and
 key names in other contexts such as the `--config` command-line parameter.
 
 ## Character encoding
@@ -68,7 +68,7 @@ problematic. The following escape sequences are supported.
 ## Key values as lists
 
 Although the standard INI format supports only key values that represent a
-single item, Kuro supports key values that represent a list of items. The
+single item, Slug supports key values that represent a list of items. The
 syntax is to separate the items in the list using the space (`0x20`) character.
 For example, a key value for the list of command-line flags to be passed to a
 compiler could be represented as a list of the flags separated by spaces:
@@ -122,7 +122,7 @@ personal settings, such as personal aliases.
 ## Other initialization files
 
 In addition to the `.buckconfig` and `.buckconfig.local` files in the project
-root, Kuro reads configuration settings from the following additional
+root, Slug reads configuration settings from the following additional
 locations, some of which are actually directories:
 
 1. Directory `.buckconfig.d` located in the project root directory.
@@ -132,30 +132,30 @@ locations, some of which are actually directories:
 3. File `buckconfig` and directory `buckconfig.d` located in system directory
    `/etc/`.
 
-Kuro treats _any_ file—irrespective of name—in a
+Slug treats _any_ file—irrespective of name—in a
 `.buckconfig.d`(`buckconfig.d`) directory (excluding files found in
-subdirectories) as a Kuro configuration file, provided that it adheres to
+subdirectories) as a Slug configuration file, provided that it adheres to
 `.buckconfig` syntax. Note that a `.buckconfig.d` directory is distinct from the
 similarly-named `.buckd` directory which is used by the
-[Kuro Daemon (`buckd`)](daemon.md) . For a description of how Kuro resolves
+[Slug Daemon (`buckd`)](daemon.md) . For a description of how Slug resolves
 collisions between settings in these configuration files, see the section
-[**Precedence of Kuro configuration specifications**](#precedence-of-kuro-configuration-specifications)
+[**Precedence of Slug configuration specifications**](#precedence-of-slug-configuration-specifications)
 below.
 
 ## Command-line control of configuration
 
-In addition to the above configuration files, Kuro supports specifying
-additional configuration files from the Kuro command line using the
+In addition to the above configuration files, Slug supports specifying
+additional configuration files from the Slug command line using the
 `--config-file` parameter. You can also specify configuration settings
-_individually_ on the Kuro command line using the `--config` (`-c`) parameter.
+_individually_ on the Slug command line using the `--config` (`-c`) parameter.
 Furthermore, you can aggregate these settings into _flag files_ using the
 `--flagfile` parameter. A flag file provides similar functionality to a
 configuration file but uses a different syntax. Flag files are sometimes called
 _mode files_ or _at_ (`@`) files.
 
-## Precedence of Kuro configuration specifications
+## Precedence of Slug configuration specifications
 
-The following list shows the order of precedence for how Kuro interprets its
+The following list shows the order of precedence for how Slug interprets its
 configuration specifications. Settings specified using a method closer to the
 top of the list have higher precedence and will override those lower on the
 list. For example, the `.buckconfig` file in the repo overrides a `.buckconfig`
@@ -186,7 +186,7 @@ you'll need to ensure that the _included_ file is referenced beneath the
 appropriate section in the _including_ file. Because of this additional
 complexity, we recommend that you include only files that contain complete
 sections. **Note:** Inclusion of files is a Buck-specific extension to the INI
-file parser that Kuro uses. Therefore, if you use this feature, your Kuro
+file parser that Slug uses. Therefore, if you use this feature, your Slug
 configuration files will probably not be parsable by other more-generic INI file
 parsers. The syntax to include a file is
 
@@ -204,7 +204,7 @@ question mark (`?`).
 ```
 
 If you use this prefix, it is not an error condition if the file does not exist;
-Kuro just silently continues to process the rest of the configuration file. In
+Slug just silently continues to process the rest of the configuration file. In
 the following example, the `.buckconfig` file includes the file
 `cxx-other-platform.include` which exists in the subdirectory
 `cxx-other-platform`. The `.buckconfig` file will also include the file
@@ -245,13 +245,13 @@ This section contains definitions of [build target](build_target.md) aliases.
 These aliases can then be used from the command line:
 
 ```sh
-$ kuro build app
-$ kuro test apptest
+$ slug build app
+$ slug test apptest
 ```
 
 ## [cells]
 
-Lists the cells that constitute the Kuro project. Kuro builds that are part of
+Lists the cells that constitute the Slug project. Slug builds that are part of
 this project—that is, which use this `.buckconfig`—can access the cells
 specified in this section.
 
@@ -271,7 +271,7 @@ do so:
 buck = .
 ```
 
-You can view the contents of this section using the `kuro audit cell` command.
+You can view the contents of this section using the `slug audit cell` command.
 
 `[repositories]` is additionally supported as a deprecated alternative name for
 this section.

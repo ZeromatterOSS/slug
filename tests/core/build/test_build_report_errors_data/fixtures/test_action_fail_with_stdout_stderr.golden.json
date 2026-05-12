@@ -3,7 +3,7 @@
 {
   "error_category": "USER",
   "failures": {
-    "root//fail_action:fail_script": "Action failed: root//fail_action:fail_script (<unspecified>) (fail_script fail_script)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_script/fail_script' fbpython -c \"import sys; print('Some random stdout', file=sys.stdout); print('Some random stderr', file=sys.stderr); sys.exit(1)\" buck-out/v2/gen/root/<HASH>/fail_action/__fail_script__/fail_script\nStdout:\nSome random stdout\nStderr:\nSome random stderr\n"
+    "root//fail_action:fail_script": "Action failed: root//fail_action:fail_script (<unspecified>) (fail_script fail_script)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(slug root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_script/fail_script' fbpython -c \"import sys; print('Some random stdout', file=sys.stdout); print('Some random stderr', file=sys.stderr); sys.exit(1)\" buck-out/v2/gen/root/<HASH>/fail_action/__fail_script__/fail_script\nStdout:\nSome random stdout\nStderr:\nSome random stderr\n"
   },
   "results": {
     "root//fail_action:fail_script": {
@@ -47,7 +47,7 @@
     }
   },
   "strings": {
-    "<STRING_HASH>": "Action failed: root//fail_action:fail_script (<unspecified>) (fail_script fail_script)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_script/fail_script' fbpython -c \"import sys; print('Some random stdout', file=sys.stdout); print('Some random stderr', file=sys.stderr); sys.exit(1)\" buck-out/v2/gen/root/<HASH>/fail_action/__fail_script__/fail_script\nStdout:\nSome random stdout\nStderr:\nSome random stderr\n",
+    "<STRING_HASH>": "Action failed: root//fail_action:fail_script (<unspecified>) (fail_script fail_script)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(slug root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/fail_script/fail_script' fbpython -c \"import sys; print('Some random stdout', file=sys.stdout); print('Some random stderr', file=sys.stderr); sys.exit(1)\" buck-out/v2/gen/root/<HASH>/fail_action/__fail_script__/fail_script\nStdout:\nSome random stdout\nStderr:\nSome random stderr\n",
     "<STRING_HASH>": "Local command returned non-zero exit code 1",
     "<STRING_HASH>": "Some random stderr\n",
     "<STRING_HASH>": "Some random stdout\n"

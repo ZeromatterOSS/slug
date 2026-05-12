@@ -1,5 +1,5 @@
 [package]
-description = "Set sketches used by kuro"
+description = "Set sketches used by slug"
 edition = "2024"
 license = { workspace = true }
 name = "setsketch"

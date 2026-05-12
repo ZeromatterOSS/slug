@@ -7,7 +7,7 @@
 # above-listed licenses.
 
 def is_remote_enabled() -> bool:
-    re_enabled = read_config("kuro_re_client", "enabled", "false")
+    re_enabled = read_config("slug_re_client", "enabled", "false")
     return re_enabled == "true"
 
 def _execution_platforms_impl(ctx: AnalysisContext) -> list[Provider]:
@@ -43,7 +43,7 @@ def _execution_platforms_impl(ctx: AnalysisContext) -> list[Provider]:
                             "OSFamily": platform_name,
                             "container-image": "docker://" + platform_name + "_build",
                         },
-                        remote_execution_use_case = "kuro-default",
+                        remote_execution_use_case = "slug-default",
                         use_windows_path_separators = platform_name == "windows",
                     ),
                 ),

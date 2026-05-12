@@ -1,0 +1,46 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use async_trait::async_trait;
+use slug_server_ctx::bxl::BXL_SERVER_COMMANDS;
+use slug_server_ctx::bxl::BxlServerCommands;
+use slug_server_ctx::ctx::ServerCommandContextTrait;
+use slug_server_ctx::partial_result_dispatcher::NoPartialResult;
+use slug_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
+
+use crate::command::bxl_command;
+use crate::profile_command::bxl_profile_command;
+
+struct BxlServerCommandsInstance;
+
+#[async_trait]
+impl BxlServerCommands for BxlServerCommandsInstance {
+    async fn bxl(
+        &self,
+        ctx: &dyn ServerCommandContextTrait,
+        partial_result_dispatcher: PartialResultDispatcher<slug_cli_proto::StdoutBytes>,
+        req: slug_cli_proto::BxlRequest,
+    ) -> slug_error::Result<slug_cli_proto::BxlResponse> {
+        Ok(bxl_command(ctx, partial_result_dispatcher, req).await?)
+    }
+
+    async fn bxl_profile(
+        &self,
+        ctx: &dyn ServerCommandContextTrait,
+        partial_result_dispatcher: PartialResultDispatcher<NoPartialResult>,
+        req: slug_cli_proto::ProfileRequest,
+    ) -> slug_error::Result<slug_cli_proto::ProfileResponse> {
+        Ok(bxl_profile_command(ctx, partial_result_dispatcher, req).await?)
+    }
+}
+
+pub(crate) fn init_bxl_server_commands() {
+    BXL_SERVER_COMMANDS.init(&BxlServerCommandsInstance);
+}

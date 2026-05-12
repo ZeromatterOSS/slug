@@ -5,13 +5,13 @@
 Command
 
 ```shell
-kuro build //foo:bar@config//platform:linux-x86_64
+slug build //foo:bar@config//platform:linux-x86_64
 ```
 
 should be equivalent to current syntax:
 
 ```shell
-kuro build //foo:bar --target-platforms=//platform:linux-x86_64
+slug build //foo:bar --target-platforms=//platform:linux-x86_64
 ```
 
 ## Why
@@ -27,7 +27,7 @@ release=//config:linux-x86_64-release
 The command above can be expressed as:
 
 ```shell
-kuro build //foo:bar@release
+slug build //foo:bar@release
 ```
 
 Additionally, if we have
@@ -35,7 +35,7 @@ Additionally, if we have
 implemented, we can do something like:
 
 ```shell
-kuro build //foo:bar@release+gcc
+slug build //foo:bar@release+gcc
 ```
 
 ## Possible future extensions

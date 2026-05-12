@@ -1,14 +1,14 @@
 # Migrating from `.buckconfig` to MODULE.bazel + .bazelrc
 
-Plan 35 retired kuro's legacy `.buckconfig` parser. This guide shows
-the per-knob mapping for users coming from a kuro / Buck2 workspace.
+Plan 35 retired slug's legacy `.buckconfig` parser. This guide shows
+the per-knob mapping for users coming from a slug / Buck2 workspace.
 
-After the migration, a kuro workspace looks like:
+After the migration, a slug workspace looks like:
 
 ```
 my_workspace/
 ├── MODULE.bazel        ← cell registration (was [cells]/[cell_aliases])
-├── .bazelrc            ← runtime knobs (was [build]/[kuro]/[kuro_re_client]/...)
+├── .bazelrc            ← runtime knobs (was [build]/[slug]/[slug_re_client]/...)
 ├── .bazelignore        ← ignored paths (was [project] ignore)
 └── BUILD.bazel         ← build files (was BUCK; .buckconfig [buildfile] name retired)
 ```
@@ -21,11 +21,11 @@ workspace root. Migrating is a one-time per workspace.
 - [ ] Move `[cells]` / `[repositories]` / `[cell_aliases]` / `[external_cells]` to `MODULE.bazel`.
 - [ ] Move `[build] execution_platforms` to `.bazelrc` (`build --extra_execution_platforms=...`).
 - [ ] Move `[parser] target_platform_detector_spec` to `.bazelrc` (`build --platforms=...`).
-- [ ] Move `[kuro_re_client]` keys to `.bazelrc` (`--remote_executor` / `--remote_header` / etc.).
-- [ ] Move `[kuro] digest_algorithms` to `.bazelrc` (`--digest_function`).
-- [ ] Move `[kuro] file_watcher` to `.bazelrc` (`--kuro_file_watcher`).
+- [ ] Move `[slug_re_client]` keys to `.bazelrc` (`--remote_executor` / `--remote_header` / etc.).
+- [ ] Move `[slug] digest_algorithms` to `.bazelrc` (`--digest_function`).
+- [ ] Move `[slug] file_watcher` to `.bazelrc` (`--slug_file_watcher`).
 - [ ] Move `[project] ignore` to `.bazelignore`.
-- [ ] Drop `[buildfile]` — kuro accepts `BUILD.bazel` or `BUILD` only.
+- [ ] Drop `[buildfile]` — slug accepts `BUILD.bazel` or `BUILD` only.
 - [ ] Rename `BUCK` files to `BUILD.bazel`.
 - [ ] Rename `TARGETS.fixture` files to `BUILD.bazel`.
 - [ ] Delete the `.buckconfig`.
@@ -69,7 +69,7 @@ prelude = bundled
 ```
 
 **After**: drop the section entirely. The bundled cells (`prelude`,
-`bazel_tools`, `kuro_builtins`, `local_config_platform`,
+`bazel_tools`, `slug_builtins`, `local_config_platform`,
 `local_config_python`) auto-register via the daemon.
 
 ### Execution platform
@@ -117,9 +117,9 @@ supported; pick a single workspace-default platform or use per-target
 **Before**:
 
 ```ini
-[kuro] digest_algorithms = SHA256
+[slug] digest_algorithms = SHA256
 
-[kuro_re_client]
+[slug_re_client]
 engine_address       = grpcs://remote.buildbuddy.io
 action_cache_address = grpcs://remote.buildbuddy.io
 cas_address          = grpcs://remote.buildbuddy.io
@@ -142,7 +142,7 @@ build --tls_client_certificate=$CERT_PATH
 Notes:
 - `--remote_executor` covers all three of `engine_address` /
   `action_cache_address` / `cas_address`.
-- `tls` is no longer a flag; kuro infers it from the URL scheme
+- `tls` is no longer a flag; slug infers it from the URL scheme
   (`grpcs://` → TLS, `grpc://` → no TLS).
 - `--remote_header` uses `=` as the key/value separator
   (`name=value`), Bazel-compatible. The buckconfig used `:` (`name:value`).
@@ -155,14 +155,14 @@ Notes:
 **Before**:
 
 ```ini
-[kuro]
+[slug]
 file_watcher = notify
 ```
 
 **After** (`.bazelrc`):
 
 ```
-build --kuro_file_watcher=notify
+build --slug_file_watcher=notify
 ```
 
 Default is `watchman` on Meta-internal builds, `notify` in OSS. No
@@ -189,7 +189,7 @@ One path per line, no globs, project-relative.
 
 ### Build files
 
-The `[buildfile] name` knob is retired. Kuro accepts `BUILD.bazel`
+The `[buildfile] name` knob is retired. Slug accepts `BUILD.bazel`
 (preferred) or `BUILD` only. Rename `BUCK` files to `BUILD.bazel`:
 
 ```sh
@@ -198,9 +198,9 @@ find . -name BUCK -not -path '*/buck-out/*' | while read f; do
 done
 ```
 
-For workspaces using `TARGETS.fixture` (kuro test-fixture convention)
+For workspaces using `TARGETS.fixture` (slug test-fixture convention)
 or any other custom name: same migration. The default search order
-(`BUILD.bazel`, `BUILD`) is the only one kuro supports.
+(`BUILD.bazel`, `BUILD`) is the only one slug supports.
 
 ## Knobs that went away
 
@@ -208,12 +208,12 @@ These had no live consumers in this repo and were dropped without a
 replacement. If your workspace relied on any of them, file an issue.
 
 - `[oss] internal_cell`, `stripped_root_dirs` — Meta-internal Buck1 vestiges.
-- `[rust] default_edition` — kuro's own bootstrap config; not a build-system concern.
+- `[rust] default_edition` — slug's own bootstrap config; not a build-system concern.
 - `[deprecated_config]` — a Buck2-only opt-in mechanism.
-- `[kuro] allow_eden_io` — Eden integration is `#[cfg(fbcode_build)]`-gated; OSS path now hardcoded to `false`.
+- `[slug] allow_eden_io` — Eden integration is `#[cfg(fbcode_build)]`-gated; OSS path now hardcoded to `false`.
 - `[buck2] error_on_dep_only_incompatible{,_excluded}` — the gate is gone; behaviour is the default (no errors).
 
-## Knobs surviving as kuro-specific extensions
+## Knobs surviving as slug-specific extensions
 
 - `read_config(section, key)` Starlark API — still works, but reads
   from CLI overrides (`-c section.key=value`) only. The function's
@@ -231,21 +231,21 @@ replacement. If your workspace relied on any of them, file an issue.
 | `[external_cells] X = bundled` | drop | auto-registered |
 | `[build] execution_platforms` | `--extra_execution_platforms` | `.bazelrc` |
 | `[parser] target_platform_detector_spec` | `--platforms` | `.bazelrc` |
-| `[kuro] digest_algorithms` | `--digest_function` | `.bazelrc` |
-| `[kuro] file_watcher` | `--kuro_file_watcher` | `.bazelrc` |
-| `[kuro_re_client] engine_address` | `--remote_executor` | `.bazelrc` |
-| `[kuro_re_client] action_cache_address` | `--remote_executor` (covers all three) | `.bazelrc` |
-| `[kuro_re_client] cas_address` | `--remote_executor` (covers all three) | `.bazelrc` |
-| `[kuro_re_client] http_headers` | `--remote_header=K=V` | `.bazelrc` |
-| `[kuro_re_client] instance_name` | `--remote_instance_name` | `.bazelrc` |
-| `[kuro_re_client] tls` | infer from URL scheme | drop |
-| `[kuro_re_client] tls_client_cert` | `--tls_client_certificate` | `.bazelrc` |
+| `[slug] digest_algorithms` | `--digest_function` | `.bazelrc` |
+| `[slug] file_watcher` | `--slug_file_watcher` | `.bazelrc` |
+| `[slug_re_client] engine_address` | `--remote_executor` | `.bazelrc` |
+| `[slug_re_client] action_cache_address` | `--remote_executor` (covers all three) | `.bazelrc` |
+| `[slug_re_client] cas_address` | `--remote_executor` (covers all three) | `.bazelrc` |
+| `[slug_re_client] http_headers` | `--remote_header=K=V` | `.bazelrc` |
+| `[slug_re_client] instance_name` | `--remote_instance_name` | `.bazelrc` |
+| `[slug_re_client] tls` | infer from URL scheme | drop |
+| `[slug_re_client] tls_client_cert` | `--tls_client_certificate` | `.bazelrc` |
 | `[project] ignore` | one line per path | `.bazelignore` |
 | `[buildfile] name` | drop | rename files to `BUILD.bazel` |
 
 ## See also
 
-- The plan: `thoughts/shared/plans/kuro-bazel-subplans/35-buckconfig-removal.md`
+- The plan: `thoughts/shared/plans/slug-bazel-subplans/35-buckconfig-removal.md`
 - The audit that drove the dispositions:
   `thoughts/shared/research/2026-05-01-buckconfig-knob-disposition.md`
 - The bucket classification for test fixtures:

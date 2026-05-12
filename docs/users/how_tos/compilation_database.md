@@ -9,7 +9,7 @@ You can generate compilation databases for consumption by tools such as clangd
 and clang-tidy by running the following BXL script:
 
 ```sh
-kuro bxl prelude//cxx/tools/compilation_database.bxl:generate -- --targets ...
+slug bxl prelude//cxx/tools/compilation_database.bxl:generate -- --targets ...
 ```
 
 The script will generate a compilation database for all source and header inputs
@@ -22,7 +22,7 @@ when the file being linted has several entries.
 It is common to symlink the resulting data at the root of the repository:
 
 ```sh
-ln -sf $(kuro bxl prelude//cxx/tools/compilation_database.bxl:generate -- --targets ...) $(git rev-parse --show-toplevel)
+ln -sf $(slug bxl prelude//cxx/tools/compilation_database.bxl:generate -- --targets ...) $(git rev-parse --show-toplevel)
 ```
 
 Since the path to the script is rather long, consider setting up an alias in
@@ -37,9 +37,9 @@ gen = generate
 ```
 
 ```sh
-ln -sf $(kuro bxl comp_db.bxl:gen -- --targets ...) $(git rev-parse --show-toplevel)
+ln -sf $(slug bxl comp_db.bxl:gen -- --targets ...) $(git rev-parse --show-toplevel)
 ```
 
 Providing better ergonomics for BXL scripts (such as enabling something like
-`kuro comp_db`) is being discussed
-[here](https://github.com/ZeromatterOSS/kuro/issues/86).
+`slug comp_db`) is being discussed
+[here](https://github.com/ZeromatterOSS/slug/issues/86).

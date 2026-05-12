@@ -1,4 +1,4 @@
-# `kuro audit visibility` command
+# `slug audit visibility` command
 
 ## Context
 
@@ -24,11 +24,11 @@ although visibility in its current form is likely not fit for enforcing such
 repo boundaries. Visibility has also been used to enforce
 [requirements that only certain targets are allowed to depend on targets in fbcode/scripts](https://fb.workplace.com/groups/buckeng/permalink/4392940254087889/).
 
-For perf reasons, kuro doesn't always enforce visibility. Instead, it only
+For perf reasons, slug doesn't always enforce visibility. Instead, it only
 enforces visibility on construction of the configured target graph. Visibility
 checking is expensive memory-wise because it requires tracking all deps at each
 node. When constructing configured target graph, this cost is already paid for
-when kuro checks transitive target compatibility. When constructing the
+when slug checks transitive target compatibility. When constructing the
 unconfigured target graph, however, this is costly, so we avoid checking
 visibility there. (Note that buck does not allow you to specify selects in
 visibility attributes.)
@@ -56,9 +56,9 @@ reasons:
 ## Proposed Solution: `audit visibility` command
 
 It's clear that we need a way to check visibility on the unconfigured target
-graph, but we don't want `kuro uquery` and `kuro targets` to regress in memory
+graph, but we don't want `slug uquery` and `slug targets` to regress in memory
 use. To get the best of both worlds, I propose adding a separate command to
-kuro, `kuro audit visibility`, that will check visibility on the unconfigured
+slug, `slug audit visibility`, that will check visibility on the unconfigured
 target graph. Instead of checking on construction of the unconfigured target
 graph, this command will check after construction, which will avoid any memory
 regression. The tradeoff is that the visibility checking won't be cached, and
@@ -66,7 +66,7 @@ rerunning `audit visibility` will rerun visibility checking on each invocation.
 
 ## Usage and Invocation
 
-`kuro audit visibility` command will take in a list of target patterns as well
+`slug audit visibility` command will take in a list of target patterns as well
 as common build args like config flags and mode files as args. It will construct
 the unconfigured target graph based on the **transitive deps** of those targets
 and check that this graph has valid visibility. Checking transitive deps matches
@@ -77,12 +77,12 @@ For example, an invocation to check visibility on the transitive closure of
 fbobjc can be
 
 ```shell
-kuro audit visibility fbsource//fbobjc/...
+slug audit visibility fbsource//fbobjc/...
 ```
 
 It cannot be used to check that a target has a valid visibility with respect to
 targets outside of the transitive closure of its deps. For example,
-`kuro audit visibility fbcode//kuro/starlark-rust/starlark:starlark` will just
+`slug audit visibility fbcode//slug/starlark-rust/starlark:starlark` will just
 check that all transitive deps of `starlark` target (including `starlark`
 target) have valid visibility with respect to each other. It will not check that
 any targets that depend on `starlark` respect `starlark` target's visibility

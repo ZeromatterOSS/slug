@@ -10,7 +10,7 @@ load("@prelude//cfg/modifier:set_cfg_modifiers.bzl", _set_cfg_modifiers = "set_c
 load("@prelude//cfg/modifier:types.bzl", "Modifier")  # @unused Used in type annotation
 
 ##########################################################
-# NOTE: This file is now available in the kuro prelude. #
+# NOTE: This file is now available in the slug prelude. #
 #                                                        #
 # You should prefer including / using that version.      #
 ##########################################################

@@ -296,7 +296,7 @@ impl Ty {
 
     /// If this type is function, return the function type.
     ///
-    /// This is exposed for kuro providers implementation,
+    /// This is exposed for slug providers implementation,
     /// probably it does not do what you think.
     pub fn as_function(&self) -> Option<&TyFunction> {
         match self.iter_union() {

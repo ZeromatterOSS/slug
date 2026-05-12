@@ -56,7 +56,7 @@ CPP_UNITTEST_DEPS = [
 ]
 CPP_FOLLY_UNITTEST_DEPS = [
     "gh_facebook_folly//folly/test/common:test_main_lib",
-    "gh_facebook_folly//folly/ext/kuro:test_ext",
+    "gh_facebook_folly//folly/ext/slug:test_ext",
 ]
 
 def _get_headers_from_sources(srcs):
@@ -361,7 +361,7 @@ def rust_protobuf_library(
         name,
         srcs,
         build_script,
-        "kuro_protoc_dev",
+        "slug_protoc_dev",
         "prost",
         "prost-types",
         "tonic",
@@ -390,7 +390,7 @@ def rust_protobuf_library_prost_0134(
         name,
         srcs,
         build_script,
-        "kuro_protoc_dev-tonic-0-12-3",
+        "slug_protoc_dev-tonic-0-12-3",
         "prost-0-13-4",
         "prost-types-0-13-4",
         "tonic-0-12-3",
@@ -407,7 +407,7 @@ def _rust_protobuf_library(
         name,
         srcs,
         build_script,
-        kuro_protoc_dev,
+        slug_protoc_dev,
         versioned_prost_target,
         versioned_prost_types_target,
         versioned_tonic_target,
@@ -433,7 +433,7 @@ def _rust_protobuf_library(
         crate_root = build_script,
         deps = [
             "fbsource//third-party/rust:" + versioned_tonic_target,
-            "//kuro/app/kuro_protoc_dev:" + kuro_protoc_dev,
+            "//slug/app/slug_protoc_dev:" + slug_protoc_dev,
         ],
     )
 
@@ -551,8 +551,8 @@ def _default_rust_edition():
     #
     #     [rust]
     #     default_edition = 2024
-    #     default_edition:kuro = 2021
-    #     default_edition:kuro/dice = 2024
+    #     default_edition:slug = 2021
+    #     default_edition:slug/dice = 2024
     #
     if package:
         split = package.split("/")
@@ -577,7 +577,7 @@ def thrift_library(
         if False:
             pass
         else:
-            print("FIXME(kuro-shims-meta): unsupported thrift language: {}".format(l))
+            print("FIXME(slug-shims-meta): unsupported thrift language: {}".format(l))
 
 # Do a nasty conversion of e.g. ("supercaml", None, "ocaml-dev") to
 # 'fbcode//third-party-buck/platform010/build/supercaml:ocaml-dev'

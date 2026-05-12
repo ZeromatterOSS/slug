@@ -3,7 +3,7 @@
 **Date:** 2026-04-23
 **HEAD:** c9e2de7f (instrumentation landed)
 **Build:** cold `@llvm-project//clang:clang` with
-`KURO_LOG_ADMISSION=/tmp/kuro-admission-clang.csv`
+`SLUG_LOG_ADMISSION=/tmp/slug-admission-clang.csv`
 **CSV:** 5558 rows covering c_compile (3874), td_generate (450),
 copy (1054), cpp_archive (146), cpp_link (3), and minor other
 categories.
@@ -24,7 +24,7 @@ other category.
 
 ## What the critical-path data actually shows
 
-`kuro log critical-path` after this build breaks down as:
+`slug log critical-path` after this build breaks down as:
 
 | Slice                                   | Wall (s) |
 |-----------------------------------------|----------|
@@ -64,7 +64,7 @@ The remaining CP gap is two different bugs:
 
 a. **Action-duration outlier.** SemaConcept.cpp.pic 279 s on
    fastbuild is either pathological source (unavoidable) or a
-   kuro-specific slowdown (e.g. PCH/pre-compiled-header not
+   slug-specific slowdown (e.g. PCH/pre-compiled-header not
    reused, or include-path fanout making the preprocessor slower).
    Compare wall time vs Bazel on the same file.
 
@@ -79,7 +79,7 @@ b. **Serial dep chains.** 694 s of `waiting for_deps` on CP means
 ## Cost/benefit
 
 - Fixing (a) could recover 50-100+ s of wall, depending on whether
-  the 279 s is kuro-specific or inherent.
+  the 279 s is slug-specific or inherent.
 - Fixing (b) could unblock big parallel regions but the ROI depends
   on how much of the wait is "real dep chain" vs "serialisation bug".
 - Plan 17.2's original act/sec >= 5.5 target (post-20 is 5.05)
@@ -88,17 +88,17 @@ b. **Serial dep chains.** 694 s of `waiting for_deps` on CP means
 ## Deliverables
 
 - Instrumentation landed in commit c9e2de7f
-  (`app/kuro_build_api/src/actions/admission_log.rs`), env-gated
-  by `KURO_LOG_ADMISSION`.
+  (`app/slug_build_api/src/actions/admission_log.rs`), env-gated
+  by `SLUG_LOG_ADMISSION`.
 - Admission CSV for clang:clang archived at
-  `/tmp/kuro-admission-clang.csv` (not committed — regenerable).
+  `/tmp/slug-admission-clang.csv` (not committed — regenerable).
 
 ## cquery / aquery comparison
 
-To isolate pure analysis cost (no compile noise), compared kuro and
+To isolate pure analysis cost (no compile noise), compared slug and
 Bazel on the same `@llvm-project//clang:clang` graph:
 
-| Command           | Bazel cold | Kuro cold | Bazel warm | Kuro warm |
+| Command           | Bazel cold | Slug cold | Bazel warm | Slug warm |
 |-------------------|-----------:|----------:|-----------:|----------:|
 | cquery            | 4.87 s     | 46.1 s    | 0.17 s     | 2.04 s    |
 | aquery deps(...)  | 9.92 s     | 50.3 s    | —          | —         |
@@ -107,9 +107,9 @@ Ratios: cold 9.5× slower, warm 12× slower.
 
 **Where the 51 s of cold time goes.** Client log shows:
 
-    14:06:27 Could not connect to kuro daemon, killing daemon
-    14:06:27 Starting new kuro daemon
-    14:07:18 Connected to new kuro daemon     ← 51 s later
+    14:06:27 Could not connect to slug daemon, killing daemon
+    14:06:27 Starting new slug daemon
+    14:07:18 Connected to new slug daemon     ← 51 s later
     14:07:18 File change events (<100 ms)
     14:07:22 Toolchain warnings (4 s after connected)
     14:07:23 cquery result emitted
@@ -143,8 +143,8 @@ Bazel's equivalent:
     Execute phase:                       ~1126 s
     Total:                               ~1131 s
 
-So **kuro beats Bazel on action execution by ~70 s** but loses
-~45 s on cold startup. Net: kuro 23 s faster overall, but for the
+So **slug beats Bazel on action execution by ~70 s** but loses
+~45 s on cold startup. Net: slug 23 s faster overall, but for the
 ideal "match Bazel on every axis" narrative, the startup gap is
 the single biggest measurable item left.
 
@@ -153,13 +153,13 @@ the single biggest measurable item left.
 Re-scope 17.2-fix or split into two follow-ups:
 
 **17.2-compile-outlier.** Time-bound SemaConcept.cpp on Bazel and
-on kuro in isolation (`kuro build @llvm-project//clang:sema`).
-If kuro is materially slower than Bazel on the same file, trace
+on slug in isolation (`slug build @llvm-project//clang:sema`).
+If slug is materially slower than Bazel on the same file, trace
 the compile (preprocess+compile split, -ftime-report, include
-fanout). If kuro matches Bazel wall but Bazel doesn't put it on
+fanout). If slug matches Bazel wall but Bazel doesn't put it on
 CP, the fix is deeper scheduling.
 
-**17.2-dep-chain.** Use `kuro log critical-path` to identify what
+**17.2-dep-chain.** Use `slug log critical-path` to identify what
 dep chain fills the 446 s and 247 s `waiting for_deps` blocks.
 Specifically: what action became ready at the end of each wait
 block, and what was blocking it? DICE trace needed.

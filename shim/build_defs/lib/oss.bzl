@@ -95,7 +95,7 @@ STRIPPED_ROOT_DIRS = _filter_empty_strings(read_config("oss", "stripped_root_dir
 # Internally, most code shares the same cell in a monorepo, but public projects
 # only contain a subset, importing dependencies via git submodules or other
 # mechanisms. When this happens, the dependency may end up in a different
-# filepath, or may have it's own kuro configuration and should be treated as
+# filepath, or may have it's own slug configuration and should be treated as
 # an on disk external cell.
 #
 # If the target's cell is a match (or if unspecified, INTERNAL_CELL is a

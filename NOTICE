@@ -1,14 +1,14 @@
-Kuro modifications and new work are copyright Zeromatter Inc, with primary
+Slug modifications and new work are copyright Zeromatter Inc, with primary
 authorship by Walter Gray. The project is provided for educational and research
 purposes and is in large part an exercise in experimenting with agentic
 programming.
 
-Kuro is derived from Buck2 (https://github.com/facebook/buck2), originally
+Slug is derived from Buck2 (https://github.com/facebook/buck2), originally
 developed by Meta Platforms, Inc. Portions of the codebase, documentation, and
 architecture originate from Buck2, including DICE, starlark-rust, Superconsole,
 and the remote execution architecture.
 
-The code in `app/kuro_error_derive` is adapted from thiserror (https://github.com/dtolnay/thiserror).
+The code in `app/slug_error_derive` is adapted from thiserror (https://github.com/dtolnay/thiserror).
 
 The code in `shed/completion_verify/src/runtime` is adapted from `complete_pty`
 (https://crates.io/crates/completest_pty).

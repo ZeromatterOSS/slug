@@ -2,16 +2,16 @@
 #
 # This module declares many bazel_deps that each register their own toolchains,
 # but the only target in this workspace uses rules_rust. With Phase 3's lazy
-# toolchain loading, kuro should NOT materialize the transitive toolchain
+# toolchain loading, slug should NOT materialize the transitive toolchain
 # repos for the unused rules (rules_python, rules_oci, protobuf, rules_pkg,
 # rules_java, rules_go) — their `register_toolchains()` entries land in the
 # deferred pool and are never drained because no target requires their
 # toolchain types.
 #
 # Acceptance:
-#   - `kuro build //:bin` completes in < 60s on a warm daemon.
+#   - `slug build //:bin` completes in < 60s on a warm daemon.
 #   - `bazel-external/` count after build is < 50 repos.
-#   - `kuro build //:bin -v 5 2>&1 | grep "deferred"` shows transitive modules'
+#   - `slug build //:bin -v 5 2>&1 | grep "deferred"` shows transitive modules'
 #     toolchain registrations were deferred and never loaded.
 
 module(

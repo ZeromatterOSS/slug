@@ -31,7 +31,7 @@ async def test_bxl_analysis(buck: Buck) -> None:
     )
 
     assert result.stdout.splitlines() == [
-        "Target",  # kuro uses "Target" (Bazel-compatible) instead of "Dependency"
+        "Target",  # slug uses "Target" (Bazel-compatible) instead of "Dependency"
         "root//:stub (<unspecified>)",
     ]
 

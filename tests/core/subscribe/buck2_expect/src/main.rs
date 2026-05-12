@@ -12,12 +12,12 @@ use std::path::PathBuf;
 use std::process::Stdio;
 
 use anyhow::Context as _;
-use kuro_cli_proto::protobuf_util::ProtobufSplitter;
-use kuro_subscription_proto::Materialized;
-use kuro_subscription_proto::SubscribeToPaths;
-use kuro_subscription_proto::SubscriptionRequest;
-use kuro_subscription_proto::SubscriptionResponse;
-use kuro_subscription_proto::subscription_response::Response;
+use slug_cli_proto::protobuf_util::ProtobufSplitter;
+use slug_subscription_proto::Materialized;
+use slug_subscription_proto::SubscribeToPaths;
+use slug_subscription_proto::SubscriptionRequest;
+use slug_subscription_proto::SubscriptionResponse;
+use slug_subscription_proto::subscription_response::Response;
 use clap::Parser;
 use futures::stream::TryStreamExt;
 use prost::Message;
@@ -27,9 +27,9 @@ use tokio_util::codec::FramedRead;
 
 #[derive(Parser)]
 struct Opt {
-    /// Path to the Kuro binary
-    #[clap(long, default_value = "kuro")]
-    kuro: PathBuf,
+    /// Path to the Slug binary
+    #[clap(long, default_value = "slug")]
+    slug: PathBuf,
 
     /// Optional isolation dir
     #[clap(long)]
@@ -42,12 +42,12 @@ struct Opt {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let Opt {
-        kuro,
+        slug,
         isolation_dir,
         expect,
     } = Parser::parse();
 
-    let mut command = Command::new(kuro);
+    let mut command = Command::new(slug);
     command.stdin(Stdio::piped());
     command.stdout(Stdio::piped());
     command.stderr(Stdio::inherit());

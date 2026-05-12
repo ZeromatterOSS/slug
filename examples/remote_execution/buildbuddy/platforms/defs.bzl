@@ -26,7 +26,7 @@ def _platforms(ctx):
                 "OSFamily": "Linux",
                 "container-image": image,
             },
-            remote_execution_use_case = "kuro-default",
+            remote_execution_use_case = "slug-default",
             remote_output_paths = "output_paths",
         ),
     )

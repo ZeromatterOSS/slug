@@ -29,7 +29,7 @@ per-action.
 
 Two commits on top of Plan 19:
 
-- **20.1** `legacy_exec_cfg` in `app/kuro_configured/src/execution.rs`:
+- **20.1** `legacy_exec_cfg` in `app/slug_configured/src/execution.rs`:
   When `build.execution_platforms` is unset, load
   `@local_config_platform//:host`'s PlatformInfo and use *its* cfg as
   the exec cfg instead of the target cfg. This activates Plan 19.3's
@@ -42,7 +42,7 @@ Two commits on top of Plan 19:
   registers both a PIC and a non-PIC compile of each source in opt
   mode (Bazel semantics for binaries vs dynamic libs). Without the
   suffix both registered under the same `(c_compile, source_path)`
-  key and tripped kuro's action-registry dedup.
+  key and tripped slug's action-registry dedup.
 
 ## Per-mnemonic diff vs Post-19
 
@@ -71,7 +71,7 @@ dual-action overhead on the critical path.
 ## Verification
 
     cd /var/mnt/dev/llvm-project/utils/bazel
-    kuro log what-ran | grep c_compile | head -1 | tr ' ' '\n' | grep ^-
+    slug log what-ran | grep c_compile | head -1 | tr ' ' '\n' | grep ^-
 
 Produces the full rules_cc opt flag set when the action's cfg is the
 exec cfg (`local_config_platform//:host#520450dd0e3900b9`):
@@ -94,10 +94,10 @@ intended.
 
 ## Plan 19 success criteria (revisited)
 
-From `thoughts/shared/plans/kuro-bazel-subplans/19-configuration-transitions.md`:
+From `thoughts/shared/plans/slug-bazel-subplans/19-configuration-transitions.md`:
 
 - [x] Cold wall ≤ 1200 s (achieved: 1107.6 s)
-- [x] `kuro log critical-path` shows td_generate entries around 30 s
+- [x] `slug log critical-path` shows td_generate entries around 30 s
   each (p95: 4.3 s — far under 30 s; critical_wall 33.1 s total)
 - [x] c_compile flags include the opt set on exec-cfg compiles
 - [x] No hardcoded tool-name / binary-path special cases in Rust
@@ -107,12 +107,12 @@ All Plan 19 + Plan 20 criteria satisfied.
 
 ## What remains vs Bazel
 
-Bazel 1131 s, kuro 1107.6 s — kuro is 23 s faster on total wall. But
+Bazel 1131 s, slug 1107.6 s — slug is 23 s faster on total wall. But
 critical path is 38 s longer than Bazel (109.7 vs 71.4). That gap is:
 
-- c_compile: 47.5 s on kuro's critical path (Bazel: 42.6 s) — minor.
-- cpp_link: 26.1 s on kuro's critical path (Bazel: 31.2 s) — kuro faster.
-- td_generate: 33.1 s on kuro's critical path (Bazel: 0 s — Bazel's
+- c_compile: 47.5 s on slug's critical path (Bazel: 42.6 s) — minor.
+- cpp_link: 26.1 s on slug's critical path (Bazel: 31.2 s) — slug faster.
+- td_generate: 33.1 s on slug's critical path (Bazel: 0 s — Bazel's
   tablegen doesn't appear on its critical path because scheduler
   runs td_generate strictly in parallel with independent lib
   compiles). Plan 17.x scheduler work can close this.
@@ -121,7 +121,7 @@ critical path is 38 s longer than Bazel (109.7 vs 71.4). That gap is:
 
 Plan 20 closes Plan 19's td_generate gap. The remaining critical-path
 delta vs Bazel (≈ 38 s) is scheduler-shaped: td_generate ends up on
-kuro's critical path because the scheduler admits tablegen work
+slug's critical path because the scheduler admits tablegen work
 later than ideal. That's Plan 17.x territory — use the
-`kuro log what-ran` queue-vs-exec ratios on this fresh baseline to
+`slug log what-ran` queue-vs-exec ratios on this fresh baseline to
 pick which 17.x phase to promote next.

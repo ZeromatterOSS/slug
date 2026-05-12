@@ -1,0 +1,31 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "slug_configured"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+itertools = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+ref-cast = { workspace = true }
+starlark_map = { workspace = true }
+tracing = { workspace = true }
+
+slug_analysis = { workspace = true }
+slug_build_api = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_bzlmod = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_error = { workspace = true }
+slug_node = { workspace = true }
+slug_util = { workspace = true }
+dice_futures = { workspace = true }

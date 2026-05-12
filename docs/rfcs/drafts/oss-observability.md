@@ -1,4 +1,4 @@
-# Observability for Kuro OSS
+# Observability for Slug OSS
 
 ## Context
 
@@ -21,7 +21,7 @@ but most importantly it supports a protocol called BEP (Build Event Protocol) to
 send events to a remote server. The API is tool agnostic and only provides a
 method to send events of some kind. The type of the events though can be defined
 on a per tool basis. Bazel comes with its own set of events that should be
-almost completely applicable to Kuro as well, given the similarities between
+almost completely applicable to Slug as well, given the similarities between
 the two.
 
 File uploads are performed using the same ByteStream API the RBE protocol uses.
@@ -39,9 +39,9 @@ their own telemetry, rely on a more standardised approach using OTEL or
 Prometheus. Though this is potentially a good idea in terms of maintainability,
 it does not come with build debugging tooling out of the box, unlike BES.
 
-## Kuro's existing BuckEvent
+## Slug's existing BuckEvent
 
-Kuro already has a `BuckEvent` it defines. This could be transformed into a
+Slug already has a `BuckEvent` it defines. This could be transformed into a
 format supported by other APIs or a new API and combined with other options
 described in this document.
 
@@ -90,7 +90,7 @@ asynchronous stream of events may cause inconsistent uploads and thus incorrect
 results.
 
 Bazel implements both options. A third option could be to use async but provide
-a `kuro flush events` subcommand that waits until all the existing events have
+a `slug flush events` subcommand that waits until all the existing events have
 been sent, retried if necessary and returns success or failure depending on the
 outcome of the upload of events.
 
@@ -100,17 +100,17 @@ well.
 ### Using bazel's events or creating custom new ones?
 
 As previously mentioned, were we to adopt BES, then there'd still be an open
-question: should kuro reuse Bazel's events or should we create new ones? There
+question: should slug reuse Bazel's events or should we create new ones? There
 are
 [some generalization efforts](https://github.com/bazelbuild/remote-apis/issues/318)
-happening at the moment, however Bazel and Kuro share lots of similarities.
-Enough that all events are almost perfectly applicable to Kuro, though less
+happening at the moment, however Bazel and Slug share lots of similarities.
+Enough that all events are almost perfectly applicable to Slug, though less
 useful at times, like with command line options. On the other hand, a new set of
-events would perfectly describe a kuro build, but would be prone to more issues
+events would perfectly describe a slug build, but would be prone to more issues
 initially and would require a bigger investment upfront in terms of design and
 development. Alternatively, we could start with a smaller subset of Bazel events
-that are equivalent in Kuro and then proceed to add the additional events
-needed to properly express the unique behaviours of a Kuro build.
+that are equivalent in Slug and then proceed to add the additional events
+needed to properly express the unique behaviours of a Slug build.
 
 ## Proposal
 
@@ -122,7 +122,7 @@ In this case, as it's probably already obvious in the document, said protocol I
 am referring to is BES.
 
 The protocol is by nature very generic and the first iteration could be
-completely based on a subset of events Bazel uses that apply to Kuro:
+completely based on a subset of events Bazel uses that apply to Slug:
 
 - Phase 1: create an invocation and send logs to a remote server
 - [Progress](https://github.com/bazelbuild/bazel/blob/38ad73402b213b2a623d0953500b1cfc47c0e851/src/main/java/com/google/devtools/build/lib/buildeventstream/proto/build_event_stream.proto#L291C9-L291C17)
@@ -144,23 +144,23 @@ Additionally, as part of `Phase 1` we would need to implement the client itself,
 a basic streaming strategy (which to begin with could be the simple sync
 approach discussed in `Sync VS Async`) and provide an invocation-id to correlate
 events that may be sent to different servers into a single invocation (this is
-very similar to Kuro's trace id and could in fact be the same, but we should
+very similar to Slug's trace id and could in fact be the same, but we should
 make it possible for the user to provide it when invoking the CLI and/or print
 it visibly in the logs).
 
 Once this is done, I suggest we look into async uploads and add a
-`kuro flush events` command to wait for all events (or those of a specific
+`slug flush events` command to wait for all events (or those of a specific
 invocation) to be flushed out.
 
 ### Approaches
 
 There are multiple ways in which this proposal can be implemented:
 
-1. Kuro directly sends Bazel's BEP events and implements the BES protocol
-2. Kuro implements the BES protocol but sends BuckEvent events but a shim can
-   be built inside Kuro to turn these events into Bazel's BEP events
-3. Same as above but the shim lives outside of Kuro, so as far as Kuro is
-   concerned it sends Kuro BuckEvent via BES
+1. Slug directly sends Bazel's BEP events and implements the BES protocol
+2. Slug implements the BES protocol but sends BuckEvent events but a shim can
+   be built inside Slug to turn these events into Bazel's BEP events
+3. Same as above but the shim lives outside of Slug, so as far as Slug is
+   concerned it sends Slug BuckEvent via BES
 4. Same as 2 but we implement a new API that is BES-like, but not BES
 5. Same as 3 but we implement a new API that is BES-like, but not BES
 
@@ -180,6 +180,6 @@ my second favourite option is 3.
   build events by Bazel
 - BEP (Build Event Protocol): refers to the combination of BES and Bazel
   specific events
-- Invocation: a single execution of a Kuro/Bazel command. An invocation usually
+- Invocation: a single execution of a Slug/Bazel command. An invocation usually
   contains a single build or execution of a command, but may contain many in
   case of multiple retries. Initially, build and invocations overlap

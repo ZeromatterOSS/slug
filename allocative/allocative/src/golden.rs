@@ -34,7 +34,7 @@ fn make_golden<T: Allocative>(value: &T) -> (String, String) {
     let mut builder = FlameGraphBuilder::default();
     builder.visit_root(value);
     let flamegraph = builder.finish_and_write_flame_graph();
-    // Because crate name is `allocative_unittest` in fbcode kuro tests.
+    // Because crate name is `allocative_unittest` in fbcode slug tests.
     let flamegraph = flamegraph.replace("allocative_unittest::", "allocative::");
     let mut flamegraph_svg: Vec<u8> = Vec::new();
     let mut inferno_options = inferno::flamegraph::Options::default();
@@ -71,7 +71,7 @@ fn type_name_to_path(type_name: &str) -> String {
     let path = if let Some(path) = path.strip_prefix("allocative::") {
         path
     } else {
-        // In kuro test crate has suffix `_unittest`.
+        // In slug test crate has suffix `_unittest`.
         path.strip_prefix("allocative_unittest::").unwrap()
     };
     path.replace("::tests::", "_").replace("::", "/")

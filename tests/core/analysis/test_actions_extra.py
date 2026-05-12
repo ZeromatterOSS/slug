@@ -30,7 +30,7 @@ async def test_write_json_struct(buck: Buck) -> None:
     result = await buck.build("//:write_json_struct")
     output = result.get_build_report().output_for_target("//:write_json_struct")
     data = json.loads(output.read_text())
-    assert data["name"] == "kuro"
+    assert data["name"] == "slug"
     assert data["version"] == 1
     assert data["active"] is True
 

@@ -8,7 +8,7 @@
 
 def _requires_local(ctx):
     for label in ctx.attrs.labels:
-        if label == "kuro_test_local_exec":
+        if label == "slug_test_local_exec":
             return True
     return False
 

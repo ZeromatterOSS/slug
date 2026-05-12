@@ -6,7 +6,7 @@
 #
 # The targets are Bazel-shaped labels; they assume
 # `/var/mnt/dev/llvm-project/utils/bazel` is checked out and registered
-# as a Kuro workspace.
+# as a Slug workspace.
 
 # One small cc_library inside the repo — single-digit seconds.
 BENCH_TARGETS_SMALL=(

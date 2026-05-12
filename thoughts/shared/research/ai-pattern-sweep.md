@@ -6,7 +6,7 @@
 
 ## Summary
 
-Kuro's codebase is remarkably clean for a "AI-generated → perf pass" scenario. Most modern patterns are idiomatic—SmallMap is used appropriately, Dupe trait is respected in most cases, and regex compilation is properly lazy-loaded. However, a few P0 correctness issues and P1 idiom violations were found, mostly in low-frequency code paths (one-shot initialization or test utilities) that won't impact production hot loops.
+Slug's codebase is remarkably clean for a "AI-generated → perf pass" scenario. Most modern patterns are idiomatic—SmallMap is used appropriately, Dupe trait is respected in most cases, and regex compilation is properly lazy-loaded. However, a few P0 correctness issues and P1 idiom violations were found, mostly in low-frequency code paths (one-shot initialization or test utilities) that won't impact production hot loops.
 
 ---
 
@@ -16,16 +16,16 @@ Kuro's codebase is remarkably clean for a "AI-generated → perf pass" scenario.
 
 **File count:** 4 instances in file-watcher code
 
-#### app/kuro_file_watcher/src/notify.rs:321
+#### app/slug_file_watcher/src/notify.rs:321
 ```rust
 let mergebase = Mergebase(Arc::new(stats.branched_from_revision.clone()));
 ```
 `branched_from_revision` is already `String`; wrapping `String::clone()` in `Arc::new()` allocates the string, then wraps it. Should reuse or accept by value.
 
 **Related:** 
-- app/kuro_file_watcher/src/watchman/interface.rs:422 (same pattern)
-- app/kuro_file_watcher/src/edenfs/interface.rs:820 (same pattern)
-- app/kuro_file_watcher/src/fs_hash_crawler.rs:101 (same pattern)
+- app/slug_file_watcher/src/watchman/interface.rs:422 (same pattern)
+- app/slug_file_watcher/src/edenfs/interface.rs:820 (same pattern)
+- app/slug_file_watcher/src/fs_hash_crawler.rs:101 (same pattern)
 
 All are in sync/initialization code, not in hot event loops. **Severity: P0 (correctness) but low runtime impact.**
 
@@ -33,7 +33,7 @@ All are in sync/initialization code, not in hot event loops. **Severity: P0 (cor
 
 ### Pattern: Vec<Arc<T>>.collect() from iter().map(|x| Arc::new(x.clone()))
 
-#### app/kuro_query_impls/src/uquery/environment.rs:422
+#### app/slug_query_impls/src/uquery/environment.rs:422
 ```rust
 let universe_paths: Vec<ArcCellPath> =
     universe.iter().map(|file| Arc::new(file.clone())).collect();
@@ -48,7 +48,7 @@ let universe_paths: Vec<ArcCellPath> =
 
 ### Pattern: Arc::new(...clone()) in per-action or per-event code
 
-#### app/kuro_build_api/src/actions/execute/action_executor.rs:895
+#### app/slug_build_api/src/actions/execute/action_executor.rs:895
 ```rust
 Arc::new(DryRunExecutor::new(tracker, artifact_fs.clone()))
 ```
@@ -62,23 +62,23 @@ Arc::new(DryRunExecutor::new(tracker, artifact_fs.clone()))
 
 ### Pattern: Regex::new() inside non-lazy function context
 
-#### app/kuro_interpreter_for_build/src/interpreter/functions/regex.rs:31
+#### app/slug_interpreter_for_build/src/interpreter/functions/regex.rs:31
 ```rust
 fn regex_match(
     #[starlark(require = pos)] regex: &str,
     #[starlark(require = pos)] str: &str,
 ) -> starlark::Result<bool> {
-    let re = Regex::new(regex).map_err(kuro_error::Error::from)?;
-    Ok(re.is_match(str).map_err(kuro_error::Error::from)?)
+    let re = Regex::new(regex).map_err(slug_error::Error::from)?;
+    Ok(re.is_match(str).map_err(slug_error::Error::from)?)
 }
 ```
-If this function is called per-action or per-pattern-match during evaluation, compiling the regex on every call is wasteful. The comment at `/app/kuro_interpreter/src/types/regex.rs:15` says "TODO(nga): drop it, and only use `regex` function." suggesting this is a deprecated API path. **Not a hot-path today, but flagged for cleanup.**
+If this function is called per-action or per-pattern-match during evaluation, compiling the regex on every call is wasteful. The comment at `/app/slug_interpreter/src/types/regex.rs:15` says "TODO(nga): drop it, and only use `regex` function." suggesting this is a deprecated API path. **Not a hot-path today, but flagged for cleanup.**
 
 ---
 
-#### app/kuro_interpreter/src/extra/xcode.rs:118
+#### app/slug_interpreter/src/extra/xcode.rs:118
 ```rust
-pub fn from_version_and_build(version_and_build: &str) -> kuro_error::Result<Self> {
+pub fn from_version_and_build(version_and_build: &str) -> slug_error::Result<Self> {
     let re = Regex::new(r"^((\d+)\.(\d+)(?:\.(\d+))?)\-([[:alnum:]]+)$").unwrap();
     if !re.is_match(version_and_build) {
         return Err(XcodeVersionError::MalformedVersionBuildString.into());
@@ -94,7 +94,7 @@ pub fn from_version_and_build(version_and_build: &str) -> kuro_error::Result<Sel
 
 ### Pattern: Arc<T>.clone() on Dupe-impl types in non-hot contexts
 
-#### app/kuro_execute/src/path/artifact_path.rs:184, 308
+#### app/slug_execute/src/path/artifact_path.rs:184, 308
 ```rust
 BaseDeferredKey::TargetLabel(target) => Some(target.clone()),
 ```
@@ -124,12 +124,12 @@ No P2-level string-concat-in-loop or other style issues were found. The codebase
 
 | File | P0 | P1 | P2 | Notes |
 |------|----|----|----|-|
-| app/kuro_file_watcher/src/*.rs | 4 | 0 | 0 | All in sync/init, not event loop |
-| app/kuro_query_impls/src/uquery/environment.rs | 1 | 0 | 0 | One-time setup |
-| app/kuro_build_api/src/actions/execute/action_executor.rs | 1 | 0 | 0 | Action setup, not per-event |
-| app/kuro_interpreter_for_build/src/interpreter/functions/regex.rs | 0 | 1 | 0 | Deprecated API path (TODO noted in code) |
-| app/kuro_interpreter/src/extra/xcode.rs | 0 | 1 | 0 | Called once per session |
-| app/kuro_execute/src/path/artifact_path.rs | 0 | 2 | 0 | Non-hot context; idiom violation only |
+| app/slug_file_watcher/src/*.rs | 4 | 0 | 0 | All in sync/init, not event loop |
+| app/slug_query_impls/src/uquery/environment.rs | 1 | 0 | 0 | One-time setup |
+| app/slug_build_api/src/actions/execute/action_executor.rs | 1 | 0 | 0 | Action setup, not per-event |
+| app/slug_interpreter_for_build/src/interpreter/functions/regex.rs | 0 | 1 | 0 | Deprecated API path (TODO noted in code) |
+| app/slug_interpreter/src/extra/xcode.rs | 0 | 1 | 0 | Called once per session |
+| app/slug_execute/src/path/artifact_path.rs | 0 | 2 | 0 | Non-hot context; idiom violation only |
 
 ---
 

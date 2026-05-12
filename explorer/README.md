@@ -1,6 +1,6 @@
-# Kuro Explorer
+# Slug Explorer
 
-Explore Kuro from a GUI.
+Explore Slug from a GUI.
 
 `npm install && npm start`
 

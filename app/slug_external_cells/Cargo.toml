@@ -1,0 +1,35 @@
+[package]
+description = "Slug external cells implementation"
+edition = "2024"
+license = { workspace = true }
+name = "slug_external_cells"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+cmp_any = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+
+async-trait = { workspace = true }
+blake3 = { workspace = true }
+compact_str = { workspace = true }
+derive_more = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+slug_build_api = { workspace = true }
+slug_bzlmod = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_directory = { workspace = true }
+slug_error = { workspace = true }
+slug_execute = { workspace = true }
+slug_external_cells_bundled = { workspace = true }
+slug_fs = { workspace = true }
+slug_util = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

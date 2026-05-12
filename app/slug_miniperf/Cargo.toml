@@ -1,0 +1,19 @@
+[package]
+authors = ["Meta"]
+description = "A minimal implementation of perf. This has lower overhead when only CPU instruction counts are needed."
+edition = "2024"
+license = { workspace = true }
+name = "slug_miniperf"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+anyhow = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+bincode = { workspace = true }
+slug_miniperf_proto = { workspace = true }
+slug_util = { workspace = true }
+perf-event = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }

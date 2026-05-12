@@ -1,5 +1,5 @@
 ---
-id: kuro
+id: slug
 title: Architectural Model
 ---
 
@@ -7,9 +7,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 ## High-level Overview
 
-Kuro is a build system whose core is written in Rust. Starlark, which is a
-deterministic, immutable version of Python, is used to extend the Kuro build
-system, enabling Kuro to be language-agnostic.
+Slug is a build system whose core is written in Rust. Starlark, which is a
+deterministic, immutable version of Python, is used to extend the Slug build
+system, enabling Slug to be language-agnostic.
 
 The high-level flow starts with a user creating a build file (a `BUCK` file)
 containing one or more targets, which is specified by the target label, its
@@ -30,20 +30,20 @@ use, this is the `clang` to use). If the target type is a rule, then the macro
 layer is skipped altogether.
 
 This is all orchestrated by the core, which performs operations such as
-executing Kuro CLI args, generating/updating the dependency graph (which
+executing Slug CLI args, generating/updating the dependency graph (which
 contains the configured target nodes, unconfigured target nodes, action nodes,
 among other types of nodes that all allow for incrementality and execution), and
 materializing the artifacts. The core is written in Rust.
 
 The following diagram shows the high-level overview.
 
-<img src={useBaseUrl('/img/kuro_rule_workflow.png')} alt='justifyContent'/>
+<img src={useBaseUrl('/img/slug_rule_workflow.png')} alt='justifyContent'/>
 
-The Kuro CLI runs in a client process, which sends commands to the Kuro daemon
+The Slug CLI runs in a client process, which sends commands to the Slug daemon
 via gRPC. The daemon goes through several phases after receiving a request from
 the client: **evaluation, configuration, analysis, execution, and
 materialization** (see [Execution Model](#execution-model), below). When using
-`kuro test`, there is a final stage for **testing**. Note that these are the
+`slug test`, there is a final stage for **testing**. Note that these are the
 phases that a build goes through, but they are not always sequential.
 
 After finishing all phases, the daemon will send the response back to the client
@@ -54,7 +54,7 @@ via gRPC.
 The following diagram shows the Execution Model, which consists of 5 phases and
 states.
 
-<img src={useBaseUrl('/img/kuro_architecture.png')} alt='justifyContent'/>
+<img src={useBaseUrl('/img/slug_architecture.png')} alt='justifyContent'/>
 
 Each of the phases and states shown in the Execution Model, are detailed in the
 following sub-sections.
@@ -62,7 +62,7 @@ following sub-sections.
 ### State 0 - Build Files
 
 Build files (commonly referred to as `BUCK` files, their default name) are the
-main input to Kuro and are syntactically Python.
+main input to Slug and are syntactically Python.
 
 Each build file is uniquely identified by the directory in which it's located.
 Since all build files have the same name, there cannot be two build files in the
@@ -70,25 +70,25 @@ same directory. This is usually represented as the relative path from the root
 of the project (the directory where the .buckconfig file is).
 
 Each build file has a set of targets. These describe the things the user wants
-Kuro to know about. Each target has a type and a set of named attributes,
+Slug to know about. Each target has a type and a set of named attributes,
 including at least a name (also known as the label) identifying it. Additional
 attributes depend on the type of the target.
 
 ### Phase A: Evaluation
 
-First, Kuro evaluates a build file, and then constructs an unconfigured target
+First, Slug evaluates a build file, and then constructs an unconfigured target
 graph.
 
-Kuro performs directory listings to discover packages, then evaluates the build
+Slug performs directory listings to discover packages, then evaluates the build
 files that were found, expands any macros detected into their underlying rules,
 and then will take rule attributes and convert them from Starlark to Rust types
 to construct a target node, and insert it into the unconfigured target graph,
-which is a smaller portion of Kuro’s larger dependency graph. The target node
+which is a smaller portion of Slug’s larger dependency graph. The target node
 consists of a reference to rule implementation, and the set of attributes and
 sources.
 
 The result of evaluation is a list of targets read from the build file mapped to
-a target node in Kuro unconfigured target graph.
+a target node in Slug unconfigured target graph.
 
 ### State 1 - Unconfigured Target Graph is generated
 
@@ -103,8 +103,8 @@ right CPU) to make sure the target can be run where it needs to. This is also
 known as target platform resolution, and can be configured within the target,
 the buckconfig, propagated from dependencies, or passed into the CLI. After
 applying configurations, the target nodes are transformed into configured target
-nodes within the Kuro configured target graph, which is a smaller portion of
-Kuro’s larger dependency graph.
+nodes within the Slug configured target graph, which is a smaller portion of
+Slug’s larger dependency graph.
 
 ### State 2 - Configured Target Graph is generated
 
@@ -113,13 +113,13 @@ to generate the action graph.
 
 ### Phase C: Analysis
 
-In the analysis phase, Kuro constructs a context object (ctx) which contains
+In the analysis phase, Slug constructs a context object (ctx) which contains
 relevant information (such as attributes pulled from the configuration stage),
 all converted into Starlark types and made available to the rule. For example,
 the target’s dependencies are turned into a `ProviderCollection`, source files
 are converted into `StarlarkArtifacts`, and String attributes are turned into a
-`StarlarkString`. This ctx object is backed by Kuro’s dependency graph for
-computation and rules use it to tell Kuro to run actions, create dynamic
+`StarlarkString`. This ctx object is backed by Slug’s dependency graph for
+computation and rules use it to tell Slug to run actions, create dynamic
 actions, or create new files.
 
 The rule will return a list of providers, which is data that the rule wants to
@@ -131,7 +131,7 @@ outputs are. Some other common built-in providers include RunInfo, TestInfo, and
 InstallInfo.
 
 The end result is a list of providers and actions (inserted into the action
-graph) that Kuro needs to execute to produce the desired outputs, known as
+graph) that Slug needs to execute to produce the desired outputs, known as
 'bound artifacts'.
 
 ### State 3 - Action Graph and Providers are generated
@@ -141,32 +141,32 @@ the execution stage.
 
 ### Phase D: Execute
 
-Execution is where Kuro takes all the providers (input files from the targets,
+Execution is where Slug takes all the providers (input files from the targets,
 args from the command line), runs the actions, and then outputs the computed
 results. The critical path is the theoretical lower bound for the duration of a
 build, which are the slowest set of actions.
 
-Kuro can be run locally or on remote execution, or in a hybrid manner.
+Slug can be run locally or on remote execution, or in a hybrid manner.
 
 For each action, a digest is created which is a hash of an action's command and
-all its inputs. Kuro then checks if there is a result cached within RE for an
+all its inputs. Slug then checks if there is a result cached within RE for an
 action with a given digest.
 
-If there is a cache hit, Kuro does not need to run the command for the action.
+If there is a cache hit, Slug does not need to run the command for the action.
 Instead, the RE returns the output action digest. This digest can be used to
 download the actual output artifacts at a later time. This is known as the **RE
 action cache**.
 
 If there is a cache miss, the action needs to be run either remotely or locally.
-If Kuro decides to run the action remotely, it will first upload all of the
+If Slug decides to run the action remotely, it will first upload all of the
 action's inputs that are missing from the RE's content addressable storage. If
-Kuro decides to run the action locally, it will first download and materialize
+Slug decides to run the action locally, it will first download and materialize
 in `buck-out` all of the action's inputs. These inputs might be outputs of other
 actions and are stored in RE's content addressable storage but are missing on
-the local machine. Only after those steps will Kuro schedule the action for
+the local machine. Only after those steps will Slug schedule the action for
 actual execution.
 
-Kuro can also decide to run local and remote execution simultaneously (a
+Slug can also decide to run local and remote execution simultaneously (a
 process known as racing), and use the result of whichever action finishes first
 to speed up performance. This strategy is known as **hybrid execution**."
 
@@ -181,7 +181,7 @@ handled.
 
 At this point, the build is complete.
 
-If a user ran `kuro test`, then there is a final transformation for Kuro to
+If a user ran `slug test`, then there is a final transformation for Slug to
 construct a command for TPX to execute the actual test.
 
 ### Phase E: Execute tests

@@ -5,7 +5,7 @@ title: Toolchains
 
 # Toolchains
 
-Go toolchains in Kuro come in two types: "regular" and "bootstrap".
+Go toolchains in Slug come in two types: "regular" and "bootstrap".
 
 - **Regular toolchains** are used to build Go code.
 - **Bootstrap toolchains** are used to build the tools required to build Go
@@ -80,7 +80,7 @@ go_toolchain(
 ```
 
 For a complete example using `http_archive`, see
-[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/kuro/blob/main/examples/toolchains/go_toolchain/toolchains/BUCK).
+[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/slug/blob/main/examples/toolchains/go_toolchain/toolchains/BUCK).
 
 ### Advanced: Multi-platform Toolchains
 

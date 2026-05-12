@@ -120,7 +120,7 @@ depset_keyword_rule = rule(
 # === depset | operator (union) ===
 
 def _depset_union_impl(ctx):
-    """Bazel 9 rejects the old Kuro prototype depset | depset operator."""
+    """Bazel 9 rejects the old Slug prototype depset | depset operator."""
     a = depset(["x", "y"])
     b = depset(["z"])
     c = a | b
@@ -172,7 +172,7 @@ depset_len_rule = rule(
 # === depset <-> transitive_set bridge ===
 
 def _depset_bridge_impl(ctx):
-    """Tests Kuro's internal depset/transitive_set bridge shape and roundtrip."""
+    """Tests Slug's internal depset/transitive_set bridge shape and roundtrip."""
     leaf = depset(["a", "b"])
     parent = depset(["c", "d"], transitive = [leaf])
     tset = native.transitive_set_from_depset(parent, actions = ctx.actions)

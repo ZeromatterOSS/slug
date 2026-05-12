@@ -3,7 +3,7 @@ date: 2026-01-30T16:45:00-08:00
 researcher: Claude
 git_commit: 2ef2a593765ab0c603f7479c1b8426d62dd1ebd2
 branch: main
-repository: kuro
+repository: slug
 topic: "BXL vs Bazel Aspects: Feature Comparison and Implementation Strategy"
 tags: [research, bxl, aspects, bazel-compatibility, build-system, dependency-traversal]
 status: complete
@@ -17,11 +17,11 @@ last_updated_by: Claude
 **Researcher**: Claude
 **Git Commit**: 2ef2a593765ab0c603f7479c1b8426d62dd1ebd2
 **Branch**: main
-**Repository**: kuro
+**Repository**: slug
 
 ## Research Question
 
-Buck2 and Kuro have support for BXL (Buck Extension Language). Bazel has aspects. Since Kuro is working on adding support for Bazel compatibility, this research explores:
+Buck2 and Slug have support for BXL (Buck Extension Language). Bazel has aspects. Since Slug is working on adding support for Bazel compatibility, this research explores:
 
 1. What are the overlaps between BXL and Bazel aspects?
 2. Could aspect support be implemented in terms of BXL?
@@ -34,7 +34,7 @@ Buck2 and Kuro have support for BXL (Buck Extension Language). Bazel has aspects
 | Dimension | BXL | Bazel Aspects |
 |-----------|-----|---------------|
 | **Paradigm** | Imperative scripting | Declarative graph augmentation |
-| **Execution** | Separate command (`kuro bxl`) | During analysis phase |
+| **Execution** | Separate command (`slug bxl`) | During analysis phase |
 | **Graph Traversal** | Explicit via queries | Automatic via propagation rules |
 | **Output** | Artifacts, stdout, JSON | Providers on shadow graph |
 | **Integration** | External to build | Internal to build graph |
@@ -55,7 +55,7 @@ Buck2 and Kuro have support for BXL (Buck Extension Language). Bazel has aspects
 
 ### 1. BXL Architecture and Capabilities
 
-BXL (Buck Extension Language) is a Starlark-based scripting system that provides full access to Kuro's build graph, query capabilities, and action execution.
+BXL (Buck Extension Language) is a Starlark-based scripting system that provides full access to Slug's build graph, query capabilities, and action execution.
 
 #### Core Purpose
 
@@ -101,7 +101,7 @@ main = bxl_main(
 )
 ```
 
-Reference: `app/kuro_bxl/src/bxl/starlark_defs/context/methods.rs:88-822`
+Reference: `app/slug_bxl/src/bxl/starlark_defs/context/methods.rs:88-822`
 
 #### DICE Integration
 
@@ -115,7 +115,7 @@ struct BxlKeyData {
 }
 ```
 
-Reference: `app/kuro_bxl/src/bxl/key.rs:42-55`
+Reference: `app/slug_bxl/src/bxl/key.rs:42-55`
 
 #### Aspect-Like Patterns in BXL
 
@@ -358,7 +358,7 @@ Keep BXL and aspects as complementary:
 
 ---
 
-### 6. Kuro's Current Implementation Status
+### 6. Slug's Current Implementation Status
 
 #### Aspects (Phase 8)
 
@@ -373,7 +373,7 @@ Keep BXL and aspects as complementary:
 - 8c: Shadow graph propagation with DICE
 - 8d: Advanced features (required_aspect_providers, toolchains)
 
-Reference: `app/kuro_interpreter_for_build/src/aspect.rs`
+Reference: `app/slug_interpreter_for_build/src/aspect.rs`
 
 #### BXL
 
@@ -384,7 +384,7 @@ Reference: `app/kuro_interpreter_for_build/src/aspect.rs`
 - Action creation and materialization
 - DICE-based incrementality
 
-Reference: `app/kuro_bxl/src/`
+Reference: `app/slug_bxl/src/`
 
 ---
 
@@ -408,11 +408,11 @@ This indicates both systems recognize the need for:
 - **Declarative aspects**: For rule-internal computation
 - **Imperative scripting**: For user-facing automation
 
-### Recommended Architecture for Kuro
+### Recommended Architecture for Slug
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   Kuro Build System                  │
+│                   Slug Build System                  │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │   ┌─────────────┐         ┌─────────────────────┐  │
@@ -440,15 +440,15 @@ This indicates both systems recognize the need for:
 ## Code References
 
 ### BXL Implementation
-- `app/kuro_bxl/src/bxl/starlark_defs/context/methods.rs:88-822` - BxlContext API
-- `app/kuro_bxl/src/bxl/key.rs:42-55` - BxlKey for DICE caching
-- `app/kuro_bxl/src/command.rs:77-83` - Command entry point
+- `app/slug_bxl/src/bxl/starlark_defs/context/methods.rs:88-822` - BxlContext API
+- `app/slug_bxl/src/bxl/key.rs:42-55` - BxlKey for DICE caching
+- `app/slug_bxl/src/command.rs:77-83` - Command entry point
 - `prelude/rust/rust-analyzer/resolve_deps.bxl:205-244` - Aspect-like pattern
 
 ### Aspects Implementation
-- `app/kuro_interpreter_for_build/src/aspect.rs` - Phase 8a stub
-- `app/kuro_interpreter_for_build/src/attrs/attrs_global.rs:763-856` - Attribute integration
-- `thoughts/shared/plans/kuro-bazel-subplans/06-aspects.md` - Implementation plan
+- `app/slug_interpreter_for_build/src/aspect.rs` - Phase 8a stub
+- `app/slug_interpreter_for_build/src/attrs/attrs_global.rs:763-856` - Attribute integration
+- `thoughts/shared/plans/slug-bazel-subplans/06-aspects.md` - Implementation plan
 
 ### Usage Examples
 - `bazel_tools/tools/compliance/gather_packages.bzl:38-219` - Aspect example
@@ -504,7 +504,7 @@ Monitor Bazel's AXL development for potential patterns to adopt in BXL, and cons
 
 ## Related Research
 
-- `thoughts/shared/plans/kuro-bazel-subplans/06-aspects.md` - Aspects implementation plan
-- `thoughts/shared/plans/2026-01-21-kuro-bazel-compatible-build-tool.md` - Master plan
+- `thoughts/shared/plans/slug-bazel-subplans/06-aspects.md` - Aspects implementation plan
+- `thoughts/shared/plans/2026-01-21-slug-bazel-compatible-build-tool.md` - Master plan
 - `thoughts/shared/research/bxl-vs-axl-comparison.md` - BXL vs AXL (incomplete)
 - `docs/rfcs/implemented/bxl.md` - BXL RFC

@@ -58,7 +58,7 @@ impl Check {
                 // directory (`fbsource/fbcode/common/rust/tracing-scuba`), rust-analyzer will attempt to normalize the file paths
                 // in the machine-readable diagnostic message relative to the current working directory. rust-analyzer will then not
                 // be able find the resulting path inside its VFS, leading to no diagnostics being shown to the user. To fix this,
-                // we rewrite the file paths in the diagnostics to be relative to the kuro project root, resulting in a fully absolute
+                // we rewrite the file paths in the diagnostics to be relative to the slug project root, resulting in a fully absolute
                 // path.
                 if let Ok(mut message) = serde_json::from_str::<diagnostics::Message>(l) {
                     make_message_absolute(&mut message, &check_output.project_root);

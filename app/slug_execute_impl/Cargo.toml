@@ -1,0 +1,67 @@
+[package]
+description = "Implementations of executors and materializers"
+edition = "2024"
+license = { workspace = true }
+name = "slug_execute_impl"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-condvar-fair = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+dashmap = { workspace = true }
+derivative = { workspace = true }
+derive_more = { workspace = true }
+dupe = { workspace = true }
+futures = { workspace = true }
+gazebo = { workspace = true }
+host_sharing = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+pin-project = { workspace = true }
+prost = { workspace = true }
+regex = { workspace = true }
+remote_execution = { workspace = true }
+rusqlite = { workspace = true }
+starlark_map = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+zstd = { workspace = true }
+
+allocative = { workspace = true }
+
+slug_action_metadata_proto = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_sandbox = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_directory = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_execute = { workspace = true }
+slug_execute_local = { workspace = true }
+slug_fs = { workspace = true }
+slug_http = { workspace = true }
+slug_resource_control = { workspace = true }
+slug_util = { workspace = true }
+slug_worker_proto = { workspace = true }
+slug_wrapper_common = { workspace = true }
+dice_futures = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+slug_forkserver = { workspace = true }
+slug_forkserver_proto = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+tempfile = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

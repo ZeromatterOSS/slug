@@ -2,15 +2,15 @@
 Cargo.lock
 buck-out
 bazel-external
-# Bazel/Kuro generated workspace output links and trees.
+# Bazel/Slug generated workspace output links and trees.
 bazel-bin
 bazel-out
 bazel-testlogs
 bazel-*
 execroot
-# Kuro-generated apparent-name symlinks (kuro_core/src/cells.rs::ensure_external_symlink).
+# Slug-generated apparent-name symlinks (slug_core/src/cells.rs::ensure_external_symlink).
 # Bazel keeps externals under <output_base>/external/, not at workspace root —
-# kuro's convenience symlinks here are ephemeral and per-user.
+# slug's convenience symlinks here are ephemeral and per-user.
 external/
 /.direnv
 .buckconfig.local
@@ -24,7 +24,7 @@ external/
 
 # Claude Code ctags index
 .claude/tags
-kuro
+/slug
 
 # Python bytecode and test caches
 __pycache__/
@@ -33,7 +33,7 @@ __pycache__/
 .pytest_cache/
 examples/hello_world/library.exp
 examples/hello_world/library.lib
-kuro.exe
+/slug.exe
 tests/manual_test/**
 
 # Benchmark artifacts: keep FINDINGS.md + summary.json + wall.txt;

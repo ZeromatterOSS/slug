@@ -61,7 +61,7 @@ async def test_json_encode(buck: Buck) -> None:
     content = output.read_text().strip()
     # Parse the output as JSON to verify correctness
     parsed = json.loads(content)
-    assert parsed["name"] == "kuro"
+    assert parsed["name"] == "slug"
     assert parsed["version"] == 9
     assert parsed["stable"] is True
     assert "fast" in parsed["tags"]

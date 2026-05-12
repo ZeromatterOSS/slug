@@ -106,21 +106,21 @@ pub(crate) struct Crate {
 ///
 /// ```json
 /// "target_spec": {
-///     "manifest_file": "/Users/dbarsky/fbsource/fbcode/kuro/integrations/rust-project/TARGETS",
-///     "target_label": "fbcode//kuro/integrations/rust-project:rust-project",
+///     "manifest_file": "/Users/dbarsky/fbsource/fbcode/slug/integrations/rust-project/TARGETS",
+///     "target_label": "fbcode//slug/integrations/rust-project:rust-project",
 ///     "target_kind": "bin",
 ///     "runnables": {
 ///         "check": [
 ///            "build",
-///            "fbcode//kuro/integrations/rust-project:rust-project"
+///            "fbcode//slug/integrations/rust-project:rust-project"
 ///         ],
 ///         "run": [
 ///             "run",
-///             "fbcode//kuro/integrations/rust-project:rust-project"
+///             "fbcode//slug/integrations/rust-project:rust-project"
 ///         ],
 ///         "test": [
 ///             "test",
-///             "fbcode//kuro/integrations/rust-project:rust-project",
+///             "fbcode//slug/integrations/rust-project:rust-project",
 ///             "--",
 ///             "{test_id}",
 ///             "--print-passing-details"
@@ -128,7 +128,7 @@ pub(crate) struct Crate {
 ///     },
 ///     "flycheck_command": [
 ///         "build",
-///         "fbcode//kuro/integrations/rust-project:rust-project"
+///         "fbcode//slug/integrations/rust-project:rust-project"
 ///     ]
 /// }
 /// ```

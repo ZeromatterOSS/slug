@@ -1,3 +1,3 @@
-# Kuro
+# Slug
 
 - Initial version.

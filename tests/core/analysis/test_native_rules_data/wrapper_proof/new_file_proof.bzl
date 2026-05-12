@@ -1,6 +1,6 @@
 # Plan 28.4 Stage 10 acceptance fixture for the `ctx.new_file` migration.
-# The Rust impl was deleted; the bundled `_kuro_new_file` in
-# `@kuro_builtins//:exports.bzl` now serves both call shapes by
+# The Rust impl was deleted; the bundled `_slug_new_file` in
+# `@slug_builtins//:exports.bzl` now serves both call shapes by
 # delegating to `ctx.actions.declare_file(name)`.
 #
 # Two call shapes are exercised:

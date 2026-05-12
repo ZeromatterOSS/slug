@@ -1,3 +1,0 @@
-# Empty BUILD file for the @kuro_builtins bundled cell. The cell exists
-# only so the bundled `exports.bzl` can be loaded; there are no targets
-# to build inside it. See Plan 28 for the loader design.

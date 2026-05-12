@@ -10,7 +10,7 @@
 
 """Tests for rule() function implementation parameter.
 
-Verifies that both Bazel-style (`implementation`) and Kuro-style (`impl`)
+Verifies that both Bazel-style (`implementation`) and Slug-style (`impl`)
 parameter names work correctly for defining rule implementation functions.
 """
 
@@ -27,8 +27,8 @@ async def test_rule_with_implementation_parameter(buck: Buck) -> None:
 
 @buck_test()
 async def test_rule_with_impl_parameter(buck: Buck) -> None:
-    """Test that rule() works with Kuro-style `impl` parameter."""
-    await buck.build("//:kuro_style")
+    """Test that rule() works with Slug-style `impl` parameter."""
+    await buck.build("//:slug_style")
 
 
 @buck_test()

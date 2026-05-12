@@ -1,7 +1,7 @@
 # Plan 28.1 Feasibility Spike: Bundled Builtins Loader
 
 > **Plan**:
-> [Plan 28: Bazel Builtins Module Architecture](../plans/kuro-bazel-subplans/28-builtins-module-architecture.md)
+> [Plan 28: Bazel Builtins Module Architecture](../plans/slug-bazel-subplans/28-builtins-module-architecture.md)
 >
 > **Status**: spike landed 2026-04-30. Gap empirically confirmed; design
 > below to be implemented under Phase 28.2.
@@ -15,7 +15,7 @@ path.
 
 ## Findings
 
-### Environment matrix (current state, kuro main)
+### Environment matrix (current state, slug main)
 
 | Context | Visibility today |
 |---------|------------------|
@@ -27,12 +27,12 @@ path.
 | External `.bzl` in Bazel-mode workspace | **Rust globals only.** No prelude, no rules_cc autoload (autoload runs only for `BuildFile`). |
 
 The interesting cell is the last one: external `.bzl` files in
-Bazel-mode workspaces (the realistic target audience for kuro) see no
+Bazel-mode workspaces (the realistic target audience for slug) see no
 Starlark-defined symbols at all.
 
 ### Empirical confirmation of the gap
 
-Spike test: defined `kuro_28_1_probe = "spike-ok"` at the top level of
+Spike test: defined `slug_28_1_probe = "spike-ok"` at the top level of
 `tests/e2e_util/nano_prelude/prelude.bzl`. Referenced it without a
 `load()` from `tests/core/analysis/test_native_rules_data/defs.bzl`
 (a Bazel-mode fixture — its `MODULE.bazel` is `module(name = "native_rules_test")`,
@@ -42,10 +42,10 @@ Result:
 
 ```
 Error evaluating module: `native_rules_test//defs.bzl`
-error: Variable `kuro_28_1_probe` not found
+error: Variable `slug_28_1_probe` not found
    --> defs.bzl:12:23
     |
- 12 | _KURO_28_1_OBSERVED = kuro_28_1_probe
+ 12 | _SLUG_28_1_OBSERVED = slug_28_1_probe
 ```
 
 Confirms: in Bazel-mode workspaces, `import_public_symbols` is never
@@ -55,11 +55,11 @@ today is `rules_cc_autoload`, and it gates on `BuildFile` paths only.
 
 ### Insertion point identified
 
-`app/kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`:
+`app/slug_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`:
 
 - `Self::new` (~line 320): builds `rules_cc_autoload`. A new
   `bazel_builtins_autoload: Option<OwnedStarlarkModulePath>` field
-  goes here, resolved unconditionally to a kuro-bundled path.
+  goes here, resolved unconditionally to a slug-bundled path.
 - `Self::parse` (~line 514-528): appends implicit imports. The new
   builtins path joins both BUILD and `.bzl` paths (vs. rules_cc which
   is BUILD-only).
@@ -91,13 +91,13 @@ Three candidates considered:
 The builtins file needs to be loadable from *any* user workspace
 without the user having to register it in `MODULE.bazel`. Two options:
 
-- **A.** Auto-register a synthetic `@kuro_builtins` cell (similar to
+- **A.** Auto-register a synthetic `@slug_builtins` cell (similar to
   `@local_config_platform` per `memory/MEMORY.md` "Host Platform
-  Auto-Detection (Phase 17)"). Files live under `app/kuro_external_cells_bundled/`.
-  The loader resolves `@kuro_builtins//:exports.bzl` at startup.
+  Auto-Detection (Phase 17)"). Files live under `app/slug_external_cells_bundled/`.
+  The loader resolves `@slug_builtins//:exports.bzl` at startup.
 - **B.** Special-case load resolution: a hardcoded path (e.g.
-  `__kuro_builtins__//:exports.bzl`) bypassed via the load resolver
-  and served from kuro's compiled bundle.
+  `__slug_builtins__//:exports.bzl`) bypassed via the load resolver
+  and served from slug's compiled bundle.
 
 (A) is cleaner because it reuses the existing bundled-cell plumbing.
 The cell registration cost is a one-time addition to the cell resolver
@@ -105,13 +105,13 @@ seed list. Pick (A) for Phase 28.2 implementation.
 
 ## Recommended Phase 28.2 work
 
-1. Add `app/kuro_external_cells_bundled/cells/kuro_builtins/` (or
+1. Add `app/slug_external_cells_bundled/cells/slug_builtins/` (or
    reuse `prelude/bazel_builtins/` as the source path with bundled-cell
    wrapping).
 2. Add `exports.bzl` per the Plan 28 export contract — start with a
    single probe symbol.
 3. Auto-register the cell in cell resolution (mirror
-   `app/kuro_external_cells_bundled/build.rs` for `local_config_platform`).
+   `app/slug_external_cells_bundled/build.rs` for `local_config_platform`).
 4. In `InterpreterForDir`:
    - Add `bazel_builtins_autoload: Option<OwnedStarlarkModulePath>`
      resolved at `new()` time, unconditional (not gated on prelude
@@ -121,7 +121,7 @@ seed list. Pick (A) for Phase 28.2 implementation.
    - Call `import_public_symbols(builtins_env)` from `create_env()`
      when the autoload is set.
 5. Acceptance test: a fixture without a prelude and without registering
-   `@kuro_builtins` (autoload) sees a probe symbol from `exports.bzl`
+   `@slug_builtins` (autoload) sees a probe symbol from `exports.bzl`
    at the top of an external `.bzl` file.
 
 ## Risks / open questions
@@ -136,7 +136,7 @@ seed list. Pick (A) for Phase 28.2 implementation.
   invalidation key is simpler than tracking individual file mtimes.
 - **Stack traces.** When a symbol resolves through the builtins
   autoload, error backtraces should still attribute the call site to
-  the user's `.bzl`, not to kuro internals. The existing
+  the user's `.bzl`, not to slug internals. The existing
   `import_public_symbols` flow already gets this right for prelude.
 - **Order of injection.** Builtins should *not* override user
   `load()` bindings or Rust globals when names collide. Today
@@ -155,5 +155,5 @@ seed list. Pick (A) for Phase 28.2 implementation.
 - The probe symbol added to `nano_prelude/prelude.bzl` and the
   matching test were reverted after the spike confirmed the gap.
 - Plan 28's plan doc already captures the design intent — this
-  document records the *empirical* check and the specific kuro
+  document records the *empirical* check and the specific slug
   insertion points, not the high-level plan.

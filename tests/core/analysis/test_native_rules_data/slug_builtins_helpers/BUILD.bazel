@@ -1,0 +1,6 @@
+# Plan 28.6 PR 2 acceptance: load helpers from `@slug_builtins//`
+# instead of `@prelude//`. Confirms the migrated paths/utils/expect
+# files are reachable via the bundled cell's load namespace.
+load(":defs.bzl", "slug_builtins_helpers_proof")
+
+slug_builtins_helpers_proof(name = "slug_builtins_helpers_proof_target")

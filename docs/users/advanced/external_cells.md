@@ -3,12 +3,12 @@ id: external_cells
 title: External Cells
 ---
 
-Normally, kuro requires source files to be checked into the repo. However, this
+Normally, slug requires source files to be checked into the repo. However, this
 is sometimes inconvenient. It makes distribution of the prelude hard, and users
 may want to pull in third party dependencies without vendoring them or using
 source control tricks.
 
-To help support these use cases, kuro has a concept of "external cells."
+To help support these use cases, slug has a concept of "external cells."
 External cells act much like [normal cells], except that instead of having their
 source files checked into the repo, the source files have some alternative
 origin.
@@ -31,7 +31,7 @@ files, since those cross cell boundaries. It's also used for
 `expand-external-cells`, more on that below.
 
 Next, add an entry to the `external_cells` buckconfig section that specifies the
-"origin" of the external cell given an alias. This tells kuro where you want to
+"origin" of the external cell given an alias. This tells slug where you want to
 get the cell from, if not files in the source repo.
 
 ```ini
@@ -44,13 +44,13 @@ configuration.
 
 ## Origins
 
-Kuro currently supports three external cell origins: `bundled`, `git`, and
+Slug currently supports three external cell origins: `bundled`, `git`, and
 `disabled`.
 
 ### The `bundled` origin
 
 The bundled origin can only be used with the `prelude` cell, and provides access
-to a copy of the prelude that is bundled as part of the kuro binary. This is
+to a copy of the prelude that is bundled as part of the slug binary. This is
 useful as an easier-to-install alternative to vendoring or submoduling the
 prelude.
 
@@ -84,7 +84,7 @@ buckconfig section.
 ## Expanding external cells
 
 Because external cells only represent a different way to access source files,
-kuro provides an `expand-external-cell` command. This command will make a copy
+slug provides an `expand-external-cell` command. This command will make a copy
 of the external cell into the path in the repo you specified for your cell. By
 commenting out the `external_cells` buckconfig entry, this allows you to make
 direct edits to the cell's files in your repo.
@@ -101,7 +101,7 @@ direct edits to the cell's files in your repo.
   specifies its own toolchain and prelude configuration.
 
   Because of this difference between external and non-external cells, it's
-  possible that running `kuro expand-external-cell` may not produce a working
+  possible that running `slug expand-external-cell` may not produce a working
   cell immediately, but instead require you to delete the `cells` section first.
 
   `cell_aliases` still work just like with regular cells.

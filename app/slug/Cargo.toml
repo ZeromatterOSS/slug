@@ -1,0 +1,89 @@
+[package]
+description = ""
+edition = "2024"
+license = { workspace = true }
+name = "slug"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+backtrace = { workspace = true }
+blake3 = { workspace = true }
+clap = { workspace = true }
+fbinit = { workspace = true }
+hex = { workspace = true }
+rustls = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+dupe = { workspace = true }
+gazebo = { workspace = true }
+host_sharing = { workspace = true }
+
+slug_action_impl = { workspace = true }
+slug_analysis = { workspace = true }
+slug_anon_target = { workspace = true }
+slug_build_api = { workspace = true }
+slug_build_info = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_build_signals_impl = { workspace = true }
+slug_bxl = { workspace = true }
+slug_certs = { workspace = true }
+slug_cfg_constructor = { workspace = true }
+slug_client = { workspace = true }
+slug_client_ctx = { workspace = true }
+slug_cmd_audit_client = { workspace = true }
+slug_cmd_audit_server = { workspace = true }
+slug_cmd_completion_client = { workspace = true }
+slug_cmd_debug_client = { workspace = true }
+slug_cmd_docs_client = { workspace = true }
+slug_cmd_docs_server = { workspace = true }
+slug_cmd_log_client = { workspace = true }
+slug_cmd_query_server = { workspace = true }
+slug_cmd_rage_client = { workspace = true }
+slug_cmd_starlark_client = { workspace = true }
+slug_cmd_starlark_server = { workspace = true }
+slug_cmd_targets_server = { workspace = true }
+slug_common = { workspace = true }
+slug_configured = { workspace = true }
+slug_core = { workspace = true }
+slug_daemon = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_event_log = { workspace = true }
+slug_event_observer = { workspace = true }
+slug_events = { workspace = true }
+slug_external_cells = { workspace = true }
+slug_fs = { workspace = true }
+slug_interpreter_for_build = { workspace = true }
+slug_query_impls = { workspace = true }
+slug_server = { workspace = true }
+slug_server_commands = { workspace = true }
+slug_test = { workspace = true }
+slug_test_runner = { workspace = true }
+slug_transition = { workspace = true }
+slug_util = { workspace = true }
+slug_validation = { workspace = true }
+slug_wrapper_common = { workspace = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+tikv-jemallocator = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+dirs = { workspace = true }
+libc = { workspace = true }
+nix = { workspace = true }
+
+slug_forkserver = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+libc = { workspace = true }
+mimalloc = { workspace = true }
+winapi = { workspace = true }
+
+[[bin]]
+name = "slug"
+path = "bin/slug.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(buck_build)", "cfg(client_only)", "cfg(fbcode_build)"] }

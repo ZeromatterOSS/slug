@@ -22,9 +22,9 @@ def _platforms(ctx):
             # Set those up based on what workers you've registered with NativeLink.
             remote_execution_properties = {
                 "OSFamily": "linux",
-                "container-image": "docker://nativelink-toolchain-kuro:latest",
+                "container-image": "docker://nativelink-toolchain-slug:latest",
             },
-            remote_execution_use_case = "kuro-default",
+            remote_execution_use_case = "slug-default",
             remote_output_paths = "output_paths",
         ),
     )

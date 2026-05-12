@@ -1,0 +1,26 @@
+[package]
+description = "Implementation of configuration constructor for modifier feature"
+edition = "2024"
+license = { workspace = true }
+name = "slug_cfg_constructor"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+async-trait = { workspace = true }
+derive_more = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+futures = { workspace = true }
+starlark = { workspace = true }
+
+slug_build_api = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_interpreter_for_build = { workspace = true }
+slug_node = { workspace = true }
+dice_futures = { workspace = true }

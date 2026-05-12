@@ -51,7 +51,7 @@ pub struct Message {
     /// category. To Scribe, a message key is the atomic unit of partitioning for a stream. All messages with a given
     /// message key are guaranteed by Scribe to be processed by the same consumer shard.
     ///
-    /// The number itself is arbitrary; for example, Kuro hashes the trace ID and uses that as the message key.
+    /// The number itself is arbitrary; for example, Slug hashes the trace ID and uses that as the message key.
     pub message_key: Option<i64>,
 }
 
@@ -66,7 +66,7 @@ impl From<Message> for WriteMessage {
             category: message.category,
             message: message.message,
             metadata,
-            // TODO(swgillespie) add a kuro use case?
+            // TODO(swgillespie) add a slug use case?
             useCase: UseCase::DEFAULT_RUST,
             ..Default::default()
         }
@@ -792,7 +792,7 @@ mod tests {
         client.WriteMessages.mock(|req| {
             assert_eq!(req.messages.len(), 1);
             let msg = &req.messages[0];
-            assert_eq!(msg.category, "kuro_events");
+            assert_eq!(msg.category, "slug_events");
             assert_eq!(msg.message, b"hello, world!".to_vec());
             assert_eq!(msg.metadata.messageKey, Some(42));
             WriteMessagesResponse {
@@ -807,7 +807,7 @@ mod tests {
         let producer = make_ScribeProducer(fb, client, 5);
 
         let message = Message {
-            category: "kuro_events".to_owned(),
+            category: "slug_events".to_owned(),
             message: b"hello, world!".to_vec(),
             message_key: Some(42),
         };
@@ -852,7 +852,7 @@ mod tests {
 
     fn message(contents: &'static str) -> Message {
         Message {
-            category: "kuro_events".to_owned(),
+            category: "slug_events".to_owned(),
             message: contents.as_bytes().to_vec(),
             ..Default::default()
         }

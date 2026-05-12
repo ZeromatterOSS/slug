@@ -19,7 +19,7 @@ filegroup(
 # The source file `python_bootstrap_template.txt` exists in this package,
 # so referencing `:python_bootstrap_template.txt` resolves directly to
 # that file — no filegroup wrapper is needed, and adding one with the
-# same name would create a self-referential cycle under kuro.
+# same name would create a self-referential cycle under slug.
 exports_files(
     ["python_bootstrap_template.txt"],
     visibility = ["PUBLIC"],

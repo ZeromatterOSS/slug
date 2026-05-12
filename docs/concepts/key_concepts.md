@@ -7,7 +7,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Key concepts
 
-Kuro has a number of fundamental concepts:
+Slug has a number of fundamental concepts:
 
 - A [**_build rule_**](build_rule.md) describes how to produce an output file
   from a set of input files. Most build rules are specific to a particular
@@ -17,9 +17,9 @@ Kuro has a number of fundamental concepts:
   [`android_binary`](../../prelude/rules/android/android_binary) rule to create
   an Android APK.
 - A [**_build target_**](build_target.md) is a string that uniquely identifies a
-  build rule. It can be thought of as a URI for the build rule within the Kuro
+  build rule. It can be thought of as a URI for the build rule within the Slug
   project.
-- A [**_build file_**](build_rule.md) defines one or more build rules. In Kuro,
+- A [**_build file_**](build_rule.md) defines one or more build rules. In Slug,
   build files are typically named `BUCK`. A `BUCK` file is analogous to the
   `Makefile` used by the Make utility. In your project, you will usually have a
   separate `BUCK` file for each buildable unit of software—such as a binary or
@@ -27,14 +27,14 @@ Kuro has a number of fundamental concepts:
 
 ### Packages
 
-A Kuro **_package_** is defined by:
+A Slug **_package_** is defined by:
 
-- A Kuro build file (a `BUCK` file) that marks the root of the package
+- A Slug build file (a `BUCK` file) that marks the root of the package
 - All files in the same directory as this `BUCK` file
 - All files in subdirectories, _unless_ those subdirectories contain their own
   `BUCK` files
 
-In other words, Kuro packages are hierarchical and non-overlapping: Each `BUCK`
+In other words, Slug packages are hierarchical and non-overlapping: Each `BUCK`
 file creates a new package boundary. A package does not include subdirectories
 that contain their own `BUCK` files. Those subdirectories with `BUCK` files
 become roots of their own separate packages.
@@ -51,9 +51,9 @@ subdirectory of `app-dir-1`, it is _not_ part of Package A.
 
 ### Cells
 
-A Kuro **_cell_** is:
+A Slug **_cell_** is:
 
-- A directory tree containing one or more Kuro packages
+- A directory tree containing one or more Slug packages
 - Configured by a [**`.buckconfig`**](buckconfig.md) file at **its root**
   ```
   [cells]
@@ -64,15 +64,15 @@ A Kuro **_cell_** is:
 
 Note that although the cell root should contain a `.buckconfig`, the presence of
 a `.buckconfig` file doesn't in itself define a cell. Rather, _the cells
-involved in a build are defined at the time Kuro is invoked_; they are
-specified in the `.buckconfig` for the Kuro _project_ (see below).
+involved in a build are defined at the time Slug is invoked_; they are
+specified in the `.buckconfig` for the Slug _project_ (see below).
 
 ### Projects
 
-A Kuro **_project_** is:
+A Slug **_project_** is:
 
-- The entry point for Kuro builds
-- Defined by the `.buckconfig` file in the directory where Kuro is invoked (or
+- The entry point for Slug builds
+- Defined by the `.buckconfig` file in the directory where Slug is invoked (or
   in the nearest ancestor directory),
 - The container that specifies which cells are part of the build
 
@@ -81,25 +81,25 @@ cells in the [cells](buckconfig.md#cells) section. The directory containing the
 project's `.buckconfig` is automatically considered a cell. While not required,
 it's good practice to explicitly list the project cell in the configuration.
 
-### Kuro's dependency graph
+### Slug's dependency graph
 
 Every build rule can have zero or more dependencies. You can specify these
 dependencies using, for example, the `deps` argument to the build rule. For more
 information about specifying dependencies, consult the reference page for the
 build rule you are using. These dependencies form a directed graph, called the
-_target graph_. Kuro requires the graph to be acyclic. When building the output
+_target graph_. Slug requires the graph to be acyclic. When building the output
 of a build rule, all of the rule's transitive dependencies are built first. This
 means that the graph is built in a "bottom-up" fashion. A build rule knows only
 which rules it depends on, not which rules depend on it. This makes the graph
-easier to reason about and enables Kuro to identify independent subgraphs that
-can be built in parallel. It also enables Kuro to determine the minimal set of
+easier to reason about and enables Slug to identify independent subgraphs that
+can be built in parallel. It also enables Slug to determine the minimal set of
 build targets that need to be rebuilt.
 
-### Multiple Kuro projects in a single repository
+### Multiple Slug projects in a single repository
 
-Kuro is designed to build multiple deliverables from a single repository—that
+Slug is designed to build multiple deliverables from a single repository—that
 is, a _monorepo_—rather than from multiple repositories. Support for the
-monorepo design motivated Kuro's support for cells and projects. It is
+monorepo design motivated Slug's support for cells and projects. It is
 Facebook's experience that maintaining all dependencies in the same repository
 makes it easier to ensure that all developers have the correct version of the
 code and simplifies the process of making atomic commits.
@@ -107,4 +107,4 @@ code and simplifies the process of making atomic commits.
 ### See also
 
 Take a look at the [Concept Map](concept_map.md) for a visualization of how
-Kuro concepts interact with each other. Also see the [Glossary](glossary.md).
+Slug concepts interact with each other. Also see the [Glossary](glossary.md).

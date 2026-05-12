@@ -3,8 +3,8 @@ id: restarter
 title: Restarter
 ---
 
-The Restarter can automatically restart Kuro when Kuro detects that it hit a
-condition that may be recovered by restarting the Kuro daemon.
+The Restarter can automatically restart Slug when Slug detects that it hit a
+condition that may be recovered by restarting the Slug daemon.
 
 This is particularly useful with
 [Deferred Materialization](deferred_materialization.md), which may require a
@@ -16,6 +16,6 @@ your Remote Execution backend.
 To enable, add this to your Buckconfig:
 
 ```ini
-[kuro]
+[slug]
 restarter = true
 ```

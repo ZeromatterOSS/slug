@@ -2,7 +2,7 @@
 
 Print documentation for uquery
 
-Usage: kuro docs query [OPTIONS]
+Usage: slug docs query [OPTIONS]
 
 Options:
       --format <FORMAT>
@@ -31,6 +31,6 @@ Universal Options:
           The oncall executing this command
 
       --client-metadata <CLIENT_METADATA>
-          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the
+          Metadata key-value pairs to inject into Slug's logging. Client metadata must be of the
           form `key=value`, where `key` is a snake_case identifier, and will be sent to backend
           datasets

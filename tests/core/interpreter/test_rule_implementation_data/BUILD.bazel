@@ -1,13 +1,13 @@
-load(":defs.bzl", "bazel_style_rule", "kuro_style_rule")
+load(":defs.bzl", "bazel_style_rule", "slug_style_rule")
 
 # Target using Bazel-style rule definition
 bazel_style_rule(
     name = "bazel_style",
 )
 
-# Target using Kuro-style rule definition
-kuro_style_rule(
-    name = "kuro_style",
+# Target using Slug-style rule definition
+slug_style_rule(
+    name = "slug_style",
 )
 
 # Error case targets are in separate packages to avoid contaminating root BUILD file:

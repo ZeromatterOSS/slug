@@ -80,10 +80,10 @@ async def test_process_title(buck: Buck) -> None:
 
     if platform.system() == "Darwin":
         out = subprocess.check_output(["ps", "-o", "comm=", str(pid)]).strip()
-        assert out.startswith(b"kurod[")
+        assert out.startswith(b"slugd[")
     elif platform.system() == "Linux":
         out = subprocess.check_output(["ps", "-o", "cmd=", str(pid)]).strip()
-        assert out.startswith(b"kurod[")
+        assert out.startswith(b"slugd[")
     elif platform.system() == "Windows":
         # We guarantee no value there.
         pass
@@ -120,7 +120,7 @@ async def test_status_all(buck: Buck) -> None:
 
 
 @buck_test()
-@env("BUCK_LOG", "kuro_client_ctx::daemon::client::kill=debug")
+@env("BUCK_LOG", "slug_client_ctx::daemon::client::kill=debug")
 async def test_no_buckd_kills_existing_daemon(buck: Buck) -> None:
     await buck.audit("cell")  # Start the daemon
     result = await buck.audit("cell", "--no-buckd")  # Kill the existing daemon

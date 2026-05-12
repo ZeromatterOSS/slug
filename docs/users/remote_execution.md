@@ -3,20 +3,20 @@ id: remote_execution
 title: Remote Execution
 ---
 
-Kuro can use services that expose
+Slug can use services that expose
 [Bazel's remote execution API](https://github.com/bazelbuild/remote-apis) in
 order to run actions remotely.
 
-Kuro projects have been successfully tested for remote execution against
+Slug projects have been successfully tested for remote execution against
 [EngFlow](https://www.engflow.com/),
 [BuildBarn](https://github.com/buildbarn/bb-remote-execution) and
 [BuildBuddy](https://www.buildbuddy.io). Sample project configurations for those
 providers are available under
-[examples/remote_execution](https://github.com/ZeromatterOSS/kuro/tree/main/examples/remote_execution).
+[examples/remote_execution](https://github.com/ZeromatterOSS/slug/tree/main/examples/remote_execution).
 
 ## RE configuration in `.buckconfig`
 
-Configuration for remote execution can be found under `[kuro_re_client]` in
+Configuration for remote execution can be found under `[slug_re_client]` in
 `.buckconfig`.
 
 Keys supported include:
@@ -39,11 +39,11 @@ Keys supported include:
 - `instance_name` - an instance name to pass on execution, action cache, and CAS
   requests.
 
-Kuro uses `SHA256` for all its hashing by default. If your RE engine requires
+Slug uses `SHA256` for all its hashing by default. If your RE engine requires
 something else, this can be configured in `.buckconfig` as follows:
 
 ```ini
-[kuro]
+[slug]
 # Accepts BLAKE3, SHA1, or SHA256
 digest_algorithms = BLAKE3
 ```
@@ -54,10 +54,10 @@ Next, your build will need an
 [execution platform](../concepts/glossary.md#execution-platform)
 that specifies how and where actions should be executed. For a sample platform
 definition that sets up an execution platform to utilize RE, take a look at the
-[EngFlow example](https://github.com/ZeromatterOSS/kuro/blob/main/examples/remote_execution/engflow/platforms/defs.bzl),
-[BuildBarn example](https://github.com/ZeromatterOSS/kuro/blob/main/examples/remote_execution/buildbarn/platforms/defs.bzl),
+[EngFlow example](https://github.com/ZeromatterOSS/slug/blob/main/examples/remote_execution/engflow/platforms/defs.bzl),
+[BuildBarn example](https://github.com/ZeromatterOSS/slug/blob/main/examples/remote_execution/buildbarn/platforms/defs.bzl),
 or the
-[BuildBuddy example](https://github.com/ZeromatterOSS/kuro/blob/main/examples/remote_execution/buildbuddy/platforms/defs.bzl).
+[BuildBuddy example](https://github.com/ZeromatterOSS/slug/blob/main/examples/remote_execution/buildbuddy/platforms/defs.bzl).
 
 To enable remote execution, configure the following fields in
 [CommandExecutorConfig](../api/build/globals.md#commandexecutorconfig)

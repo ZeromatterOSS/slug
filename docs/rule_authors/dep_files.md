@@ -7,9 +7,9 @@ Dep files allow commands to declare which subset of their inputs were used when
 the command executed.
 
 When a command produces a dep file and is later invalidated due to an inputs
-change, Kuro uses the dep file to check whether the inputs that changed were in
+change, Slug uses the dep file to check whether the inputs that changed were in
 the set that the command reported as having used. If none of the inputs that
-changed were in that set, Kuro omits re-running the command and reuses the
+changed were in that set, Slug omits re-running the command and reuses the
 previous result.
 
 ## Use Cases
@@ -30,7 +30,7 @@ To use dep files, you need to do the following:
 - Declare what output is a dep file and associate it with your command.
 - Declare which inputs are covered by the dep file (this can be a subset of your
   inputs).
-- Have your command produce the dep file in a format Kuro can use.
+- Have your command produce the dep file in a format Slug can use.
 
 ## Declaring the dep files and associating inputs
 
@@ -68,14 +68,14 @@ ctx.actions.run(
 
 ## Producing the dep file
 
-Your command must produce dep files in the format Kuro expects, which is simply
+Your command must produce dep files in the format Slug expects, which is simply
 a list of all the inputs that were used, one per line.
 
-The paths must be the paths Kuro would use for your inputs, which means paths
+The paths must be the paths Slug would use for your inputs, which means paths
 relative to the project root.
 
 If this is not the format your tool produces, use a wrapper to take whatever
-output your command produces and rewrite it in the format Kuro expects.
+output your command produces and rewrite it in the format Slug expects.
 
 ## Testing dep files
 
@@ -83,7 +83,7 @@ When writing a command that produces a dep file, you should test it! At a
 minimum, check that the inputs you expect are tagged properly.
 
 To do so, build your target, then use
-`kuro audit dep-files TARGET CATEGORY IDENTIFIER`, which will show you the set
+`slug audit dep-files TARGET CATEGORY IDENTIFIER`, which will show you the set
 of inputs your command used and how they're tagged.
 
 ## Extra notes to the implementer
@@ -91,14 +91,14 @@ of inputs your command used and how they're tagged.
 ### Limitations
 
 Dep files only work if a previous invocation of the command is known to your
-Kuro daemon. Dep files are dropped when the daemon restarts or when you run
-`kuro debug flush-dep-files`.
+Slug daemon. Dep files are dropped when the daemon restarts or when you run
+`slug debug flush-dep-files`.
 
 This means that, for example, if you change an unused header, then run a build
-on a fresh daemon, Kuro will still need to execute this command in order to
+on a fresh daemon, Slug will still need to execute this command in order to
 identify that the header was in fact unused. In contrast, if you did the build
 (and got a remote cache hit on the command), then applied your change and
-re-built, Kuro would use the dep file on the second execution, and you wouldn't
+re-built, Slug would use the dep file on the second execution, and you wouldn't
 need to execute anything.
 
 ### Dep files don't need to be covering
@@ -112,33 +112,33 @@ when they change, and you'll get stale output.
 
 ### Dep files are lazy
 
-Dep files aren't parsed by Kuro unless the command needs to re-run. If the
+Dep files aren't parsed by Slug unless the command needs to re-run. If the
 command ran on RE, they aren't even downloaded until then. This ensures dep
 files don't cause a performance hit unless they are used, at which point they
 stand a chance of giving a performance boost instead.
 
-This means that if you produce an invalid dep file, Kuro will not report this
-until your command runs again, at which point Kuro will report that the dep
+This means that if you produce an invalid dep file, Slug will not report this
+until your command runs again, at which point Slug will report that the dep
 file is invalid and refuse to proceed (note: you can unblock yourself using
-`kuro debug flush-dep-files`).
+`slug debug flush-dep-files`).
 
 To flush out issues during development, you can pass `--eager-dep-files` to
-Kuro to force Kuro to parse your dep files as they are produced.
+Slug to force Slug to parse your dep files as they are produced.
 
 ## Dep files will traverse symlinks
 
-If your dep file reports that a symlink was used, Kuro will track the symlink's
+If your dep file reports that a symlink was used, Slug will track the symlink's
 target as covered by this dep file.
 
 ## Remote dep files
 
 Since dep files only work if a previous invocation of the command is known to
-your Kuro daemon, Kuro also supports "remote dep files". For actions with
-`allow_dep_file_cache_upload = True`, Kuro will upload dep files to the remote
+your Slug daemon, Slug also supports "remote dep files". For actions with
+`allow_dep_file_cache_upload = True`, Slug will upload dep files to the remote
 cache. The dep file is keyed on the current version control revision, in
 addition to information about the action itself.
 
-For those same actions, Kuro will look for a "remote dep file", and if it finds
+For those same actions, Slug will look for a "remote dep file", and if it finds
 one it will download dep file and use it exactly as it would if it found one
 locally (i.e. it compares the inputs to see if only unused inputs have changed
 and it can therefore skip the action execution)

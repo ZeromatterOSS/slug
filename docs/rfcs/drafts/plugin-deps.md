@@ -9,7 +9,7 @@ be re-exported. This means that if there is a dependency chain like
 `bin -> lib -> proc_macro`, the proc macro must be made available when compiling
 the binary, even though it does not appear directly in the dependencies.
 
-Proc macros have posed a challenge to kuro, for two reasons:
+Proc macros have posed a challenge to slug, for two reasons:
 
 1.  Rust users generally expect to not have to distinguish between proc macros
     and normal crates when specifying their dependencies. This means it is not
@@ -59,7 +59,7 @@ label when the target is declared. It then resolves as follows:
 
 - In the unconfigured graph: To the appropriate unconfigured target
 - In the configured graph: To the label of the unconfigured target. In other
-  words, this will still be displayed in `kuro cquery -A`, but will not appear
+  words, this will still be displayed in `slug cquery -A`, but will not appear
   in the deps.
 - During analysis: Also to the unconfigured target label.
 
@@ -184,8 +184,8 @@ Analysis for `:b` will see:
 As a result, the implementation of the `rust_library` rule should not propagate
 the providers of its proc macro deps (unlike its regular deps).
 
-There is one downside to this solution: `kuro build :p` does absolutely none of
-the things that the user is probably expecting. They need `kuro build :p_REAL`.
+There is one downside to this solution: `slug build :p` does absolutely none of
+the things that the user is probably expecting. They need `slug build :p_REAL`.
 That's a bit sad. Thankfully directly building proc macros is not that important
 a use case?
 

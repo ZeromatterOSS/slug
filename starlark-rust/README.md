@@ -15,7 +15,7 @@ This project provides a Rust implementation of the
 Starlark (formerly codenamed Skylark) is a deterministic language inspired by
 Python3, used for configuration in the build systems
 [Bazel](https://bazel.build), [Buck](https://buck.build) and
-[Kuro](https://kuro.build), of which Kuro depends on this library. This
+[Slug](https://slug.build), of which Slug depends on this library. This
 project was originally developed
 [in this repo](https://github.com/google/starlark-rust), which contains a more
 extensive history.

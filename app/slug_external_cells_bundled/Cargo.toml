@@ -1,0 +1,19 @@
+[package]
+build = "build.rs"
+description = "Slug external cells bundled data"
+edition = "2024"
+license = { workspace = true }
+name = "slug_external_cells_bundled"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+
+slug_common = { workspace = true }
+
+[build-dependencies]
+walkdir = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(buck_build)"] }

@@ -1,0 +1,59 @@
+[package]
+description = "Action implementations and context functions"
+edition = "2024"
+license = { workspace = true }
+name = "slug_action_impl"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+dashmap = { workspace = true }
+derive_more = { workspace = true }
+dupe = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+fxhash = { workspace = true }
+hex = { workspace = true }
+http = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+relative-path = { workspace = true }
+serde_json = { workspace = true }
+sha1 = { workspace = true }
+smallvec = { workspace = true }
+static_assertions = { workspace = true }
+tracing = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+gazebo = { workspace = true }
+sorted_vector_map = { workspace = true }
+starlark = { workspace = true }
+starlark_map = { workspace = true }
+
+slug_action_metadata_proto = { workspace = true }
+slug_analysis = { workspace = true }
+slug_artifact = { workspace = true }
+slug_build_api = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_directory = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_execute = { workspace = true }
+slug_file_watcher = { workspace = true }
+slug_fs = { workspace = true }
+slug_http = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_node = { workspace = true }
+slug_util = { workspace = true }
+dice_futures = { workspace = true }
+host_sharing = { workspace = true }
+remote_execution = { workspace = true }

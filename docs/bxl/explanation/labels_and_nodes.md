@@ -1,18 +1,18 @@
 ---
 id: labels_and_nodes
-title: Understanding Labels and Nodes in Kuro
+title: Understanding Labels and Nodes in Slug
 ---
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-Kuro's labels and nodes are fundamental components that work together to
+Slug's labels and nodes are fundamental components that work together to
 represent and track build targets in the build graph. Understanding how these
 different types of labels and nodes relate to each other is essential not only
-for writing BXL but also for working effectively with Kuro's architecture.
+for writing BXL but also for working effectively with Slug's architecture.
 
 ## Overview
 
-Kuro uses several types of labels and nodes, each serving a specific purpose:
+Slug uses several types of labels and nodes, each serving a specific purpose:
 
 |              | target label                                                      | providers label                                                                                                     | node                                                              |
 | ------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -32,26 +32,26 @@ alt='justifyContent'/>
 
 ### Configured vs Unconfigured
 
-In the targets build graph, Kuro operates with two main perspectives on build
+In the targets build graph, Slug operates with two main perspectives on build
 targets: unconfigured and configured. You can refer
-[execution model](../../../developers/architecture/kuro/#execution-model) to
-see these two phase in a kuro build.
+[execution model](../../../developers/architecture/slug/#execution-model) to
+see these two phase in a slug build.
 
 **Unconfigured** components are configuration independent representations. Think
-of them as the blueprint of your targets. For example, `//kuro:kuro` is the
-representation of `kuro`'s unconfigured target label.
+of them as the blueprint of your targets. For example, `//slug:slug` is the
+representation of `slug`'s unconfigured target label.
 
 **Configured** components, on the other hand, include all the platform-specific
 details and other configurations needed for actual building. They have the
 necessary information about how to build it for a specific platform or
-configuration. For example, `//kuro:kuro (cfg:linux-x86_64-xxxxxx)` is the
-representation of `kuro`'s configured target label.
+configuration. For example, `//slug:slug (cfg:linux-x86_64-xxxxxx)` is the
+representation of `slug`'s configured target label.
 
 ### Labels vs Nodes
 
 **Labels** are identifiers that uniquely reference targets in your build graph.
-They're like addresses that tell Kuro which target you're talking about. For
-example, `//kuro:kuro` is an unconfigured label that points to a specific
+They're like addresses that tell Slug which target you're talking about. For
+example, `//slug:slug` is an unconfigured label that points to a specific
 target.
 
 **Nodes** contain the actual information about targets. They hold the data about
@@ -60,10 +60,10 @@ what a target is, what it depends on, what attributes it has, etc.
 ### Target Labels vs Provider Labels
 
 **Target labels** (both configured and unconfigured) identify complete build
-targets. For example, `//kuro:kuro` refers to an entire target.
+targets. For example, `//slug:slug` refers to an entire target.
 
 **Provider labels** (both configured and unconfigured) represents a specific
-part of a target. For example, `//kuro:kuro[llvm_ir]` represents `kuro`
+part of a target. For example, `//slug:slug[llvm_ir]` represents `slug`
 target's `llvm_ir` sub-target
 
 ## Label and Nodes Conversion

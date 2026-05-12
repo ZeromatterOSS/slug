@@ -4,7 +4,7 @@
         {
             "label": "Build Main",
             "type": "shell",
-            "command": "kuro",
+            "command": "slug",
             "args": [
                 "build",
                 "--console",
@@ -18,17 +18,17 @@
                 "-ExecutionPolicy",
                 "Bypass",
                 "-File",
-                "kuro_utils/install.ps1",
+                "slug_utils/install.ps1",
                 "install"
             ]
         },
         {
             "label": "Create compilation database",
             "type": "shell",
-            "command": "kuro",
+            "command": "slug",
             "args": [
                 "bxl",
-                "kuro_utils/create_compile_commands.bxl:gen_compilation_database",
+                "slug_utils/create_compile_commands.bxl:gen_compilation_database",
                 "--",
                 "--directory",
                 "${workspaceFolder}",
@@ -37,7 +37,7 @@
                 "-ExecutionPolicy",
                 "Bypass",
                 "-File",
-                "kuro_utils/copy.ps1"
+                "slug_utils/copy.ps1"
             ]
         },
         {

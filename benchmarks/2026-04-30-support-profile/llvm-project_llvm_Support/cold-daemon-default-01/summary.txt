@@ -1,4 +1,4 @@
-Showing summary from: /var/mnt/dev/kuro/target/debug/kuro build --local-only --event-log /var/mnt/dev/kuro/benchmarks/2026-04-30-support-profile/llvm-project_llvm_Support/cold-daemon-default-01/build.pb.zst @llvm-project//llvm:Support
+Showing summary from: /var/mnt/dev/slug/target/debug/slug build --local-only --event-log /var/mnt/dev/slug/benchmarks/2026-04-30-support-profile/llvm-project_llvm_Support/cold-daemon-default-01/build.pb.zst @llvm-project//llvm:Support
 build ID: 699fafc1-8ba4-44c3-b3a0-bea6368bad18
 
 Build Summary

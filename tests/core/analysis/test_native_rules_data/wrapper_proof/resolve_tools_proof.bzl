@@ -1,6 +1,6 @@
 # Plan 28.4 Stage 11 acceptance fixture for the `ctx.resolve_tools`
-# migration. The Rust impl was deleted; `_kuro_resolve_tools` in
-# `@kuro_builtins//:exports.bzl` now serves the call by iterating
+# migration. The Rust impl was deleted; `_slug_resolve_tools` in
+# `@slug_builtins//:exports.bzl` now serves the call by iterating
 # `tools`, collecting each dep's `DefaultInfo.default_outputs`, and
 # returning `(files_list, [])`.
 #

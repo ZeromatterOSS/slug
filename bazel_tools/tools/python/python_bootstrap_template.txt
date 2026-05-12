@@ -169,14 +169,14 @@ def FindModuleSpace(main_rel_path):
     else:
       stub_filename = os.path.join(os.path.dirname(stub_filename), target)
 
-  # Kuro compatibility: create a runfiles tree on-demand if not found.
+  # Slug compatibility: create a runfiles tree on-demand if not found.
   # This handles cases where the build system doesn't pre-create runfiles.
   return _CreateRunfilesOnDemand(main_rel_path)
 
 def _CreateRunfilesOnDemand(main_rel_path):
-  """Creates a minimal runfiles tree for Kuro-built py_binary targets.
+  """Creates a minimal runfiles tree for Slug-built py_binary targets.
 
-  In Kuro, external modules are stored under bazel-external/{module_name}+{version}/.
+  In Slug, external modules are stored under bazel-external/{module_name}+{version}/.
   This function creates {binary}.runfiles/{workspace_name}/ -> that directory.
   """
   stub_filename = sys.argv[0]
@@ -191,7 +191,7 @@ def _CreateRunfilesOnDemand(main_rel_path):
     project_root = _FindProjectRoot(stub_filename)
     if project_root:
       # Look for bazel-external/{workspace_name}+{version}/ directories.
-      # Kuro stores BCR modules as bazel-external/{name}+{version}/ symlinks.
+      # Slug stores BCR modules as bazel-external/{name}+{version}/ symlinks.
       external_dir = os.path.join(project_root, 'bazel-external')
       if os.path.isdir(external_dir):
         prefix = workspace_name + '+'

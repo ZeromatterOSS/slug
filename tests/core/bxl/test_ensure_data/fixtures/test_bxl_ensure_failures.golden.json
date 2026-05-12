@@ -50,7 +50,7 @@
   },
   "strings": {
     "<STRING_HASH>": "",
-    "<STRING_HASH>": "Action failed: root//build:fail (<unspecified>) (run out.txt)\nLocal command returned non-zero exit code <no exit code>\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/run/out.txt' exit 1\nStdout: <empty>\nStderr:\nSpawning executable `exit` failed: Failed to spawn a process\n",
+    "<STRING_HASH>": "Action failed: root//build:fail (<unspecified>) (run out.txt)\nLocal command returned non-zero exit code <no exit code>\nLocal command: env --chdir=\"$(slug root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/run/out.txt' exit 1\nStdout: <empty>\nStderr:\nSpawning executable `exit` failed: Failed to spawn a process\n",
     "<STRING_HASH>": "Local command returned non-zero exit code <no exit code>",
     "<STRING_HASH>": "Spawning executable `exit` failed: Failed to spawn a process",
     "<STRING_HASH>": "fail to build"

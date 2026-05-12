@@ -2,102 +2,102 @@
 members = [
     "allocative/allocative",
     "allocative/allocative_derive",
-    "app/kuro",
-    "app/kuro_action_impl",
-    "app/kuro_action_impl_tests",
-    "app/kuro_action_metadata_proto",
-    "app/kuro_analysis",
-    "app/kuro_anon_target",
-    "app/kuro_cmd_audit_client",
-    "app/kuro_cmd_audit_server",
-    "app/kuro_bxl",
-    "app/kuro_build_event_stream",
-    "app/kuro_build_info",
-    "app/kuro_certs",
-    "app/kuro_cfg_constructor",
-    "app/kuro_client",
-    "app/kuro_client_ctx",
-    "app/kuro_cmd_completion_client",
-    "app/kuro_cmd_debug_client",
-    "app/kuro_cmd_docs_client",
-    "app/kuro_cmd_docs_server",
-    "app/kuro_cmd_log_client",
-    "app/kuro_cmd_query_server",
-    "app/kuro_cmd_rage_client",
-    "app/kuro_common",
-    "app/kuro_env",
-    "app/kuro_configured",
-    "app/kuro_core",
-    "app/kuro_cli_proto",
-    "app/kuro_cmd_targets_server",
-    "app/kuro_daemon",
-    "app/kuro_directory",
-    "app/kuro_downward_api",
-    "app/kuro_downward_api_proto",
-    "app/kuro_error",
-    "app/kuro_error_derive",
-    "app/kuro_error_tests",
-    "app/kuro_errorformat",
-    "app/kuro_event_observer",
-    "app/kuro_events",
-    "app/kuro_event_log",
-    "app/kuro_execute",
-    "app/kuro_execute_impl",
-    "app/kuro_execute_local",
-    "app/kuro_sandbox",
-    "app/kuro_external_cells",
-    "app/kuro_external_cells_bundled",
-    "app/kuro_grpc",
-    "app/kuro_health_check",
-    "app/kuro_health_check_proto",
-    "app/kuro_http",
-    "app/kuro_install_proto",
-    "app/kuro_interpreter",
-    "app/kuro_interpreter_for_build",
-    "app/kuro_interpreter_for_build_tests",
-    "app/kuro_miniperf",
-    "app/kuro_miniperf_proto",
-    "app/kuro_node",
-    "app/kuro_node_tests",
-    "app/kuro_offline_archive",
-    "app/kuro_artifact",
-    "app/kuro_cmd_starlark_client",
-    "app/kuro_cmd_starlark_server",
-    "app/kuro_test",
-    "app/kuro_test_api",
-    "app/kuro_test_proto",
-    "app/kuro_test_runner",
-    "app/kuro_forkserver",
-    "app/kuro_forkserver_proto",
-    "app/kuro_fs",
-    "app/kuro_profile",
-    "app/kuro_protoc_dev",
-    "app/kuro_query",
-    "app/kuro_query_impls",
-    "app/kuro_query_parser",
-    "app/kuro_query_derive",
-    "app/kuro_re_configuration",
-    "app/kuro_resource_control",
-    "app/kuro_server",
-    "app/kuro_server_commands",
-    "app/kuro_server_ctx",
-    "app/kuro_server_starlark_debug",
-    "app/kuro_transition",
-    "app/kuro_util",
-    "app/kuro_data",
-    "app/kuro_worker_proto",
-    "app/kuro_wrapper_common",
-    "app/kuro_build_api",
-    "app/kuro_build_api_derive",
-    "app/kuro_build_api_tests",
-    "app/kuro_subscription_proto",
-    "app/kuro_critical_path",
-    "app/kuro_build_signals",
-    "app/kuro_build_signals_impl",
-    "app/kuro_bzlmod",
-    "app/kuro_eden",
-    "app/kuro_validation",
-    "app/kuro_host_sharing_proto",
+    "app/slug",
+    "app/slug_action_impl",
+    "app/slug_action_impl_tests",
+    "app/slug_action_metadata_proto",
+    "app/slug_analysis",
+    "app/slug_anon_target",
+    "app/slug_cmd_audit_client",
+    "app/slug_cmd_audit_server",
+    "app/slug_bxl",
+    "app/slug_build_event_stream",
+    "app/slug_build_info",
+    "app/slug_certs",
+    "app/slug_cfg_constructor",
+    "app/slug_client",
+    "app/slug_client_ctx",
+    "app/slug_cmd_completion_client",
+    "app/slug_cmd_debug_client",
+    "app/slug_cmd_docs_client",
+    "app/slug_cmd_docs_server",
+    "app/slug_cmd_log_client",
+    "app/slug_cmd_query_server",
+    "app/slug_cmd_rage_client",
+    "app/slug_common",
+    "app/slug_env",
+    "app/slug_configured",
+    "app/slug_core",
+    "app/slug_cli_proto",
+    "app/slug_cmd_targets_server",
+    "app/slug_daemon",
+    "app/slug_directory",
+    "app/slug_downward_api",
+    "app/slug_downward_api_proto",
+    "app/slug_error",
+    "app/slug_error_derive",
+    "app/slug_error_tests",
+    "app/slug_errorformat",
+    "app/slug_event_observer",
+    "app/slug_events",
+    "app/slug_event_log",
+    "app/slug_execute",
+    "app/slug_execute_impl",
+    "app/slug_execute_local",
+    "app/slug_sandbox",
+    "app/slug_external_cells",
+    "app/slug_external_cells_bundled",
+    "app/slug_grpc",
+    "app/slug_health_check",
+    "app/slug_health_check_proto",
+    "app/slug_http",
+    "app/slug_install_proto",
+    "app/slug_interpreter",
+    "app/slug_interpreter_for_build",
+    "app/slug_interpreter_for_build_tests",
+    "app/slug_miniperf",
+    "app/slug_miniperf_proto",
+    "app/slug_node",
+    "app/slug_node_tests",
+    "app/slug_offline_archive",
+    "app/slug_artifact",
+    "app/slug_cmd_starlark_client",
+    "app/slug_cmd_starlark_server",
+    "app/slug_test",
+    "app/slug_test_api",
+    "app/slug_test_proto",
+    "app/slug_test_runner",
+    "app/slug_forkserver",
+    "app/slug_forkserver_proto",
+    "app/slug_fs",
+    "app/slug_profile",
+    "app/slug_protoc_dev",
+    "app/slug_query",
+    "app/slug_query_impls",
+    "app/slug_query_parser",
+    "app/slug_query_derive",
+    "app/slug_re_configuration",
+    "app/slug_resource_control",
+    "app/slug_server",
+    "app/slug_server_commands",
+    "app/slug_server_ctx",
+    "app/slug_server_starlark_debug",
+    "app/slug_transition",
+    "app/slug_util",
+    "app/slug_data",
+    "app/slug_worker_proto",
+    "app/slug_wrapper_common",
+    "app/slug_build_api",
+    "app/slug_build_api_derive",
+    "app/slug_build_api_tests",
+    "app/slug_subscription_proto",
+    "app/slug_critical_path",
+    "app/slug_build_signals",
+    "app/slug_build_signals_impl",
+    "app/slug_bzlmod",
+    "app/slug_eden",
+    "app/slug_validation",
+    "app/slug_host_sharing_proto",
     "dice/dice",
     "dice/dice_error",
     "dice/dice_examples",
@@ -137,7 +137,7 @@ resolver = "2"
 
 [workspace.package]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/facebook/kuro"
+repository = "https://github.com/facebook/slug"
 
 [workspace.dependencies]
 anyhow = "1.0.65"
@@ -200,7 +200,7 @@ futures-intrusive = "0.4"
 fxhash = "0.2.1"
 glob = "0.3.0"
 globset = "0.4.10"
-h2 = { version = "^0.4.13" } # force version bump for https://github.com/facebook/kuro/issues/1123
+h2 = { version = "^0.4.13" } # force version bump for https://github.com/facebook/slug/issues/1123
 hashbrown = { version = "0.14.3", features = ["raw"] }
 hex = "0.4.3"
 hostname = "0.3.1"
@@ -385,98 +385,98 @@ strong_hash.path = "gazebo/strong_hash"
 strong_hash_derive = { path = "gazebo/strong_hash_derive" }
 three_billion_instructions = { path = "shed/three_billion_instructions" }
 
-kuro_action_impl = { path = "app/kuro_action_impl" }
-kuro_action_metadata_proto = { path = "app/kuro_action_metadata_proto" }
-kuro_analysis = { path = "app/kuro_analysis" }
-kuro_anon_target = { path = "app/kuro_anon_target" }
-kuro_artifact = { path = "app/kuro_artifact" }
-kuro_build_api = { path = "app/kuro_build_api" }
-kuro_build_api_derive = { path = "app/kuro_build_api_derive" }
-kuro_build_event_stream = { path = "app/kuro_build_event_stream" }
-kuro_build_info = { path = "app/kuro_build_info" }
-kuro_build_signals = { path = "app/kuro_build_signals" }
-kuro_build_signals_impl = { path = "app/kuro_build_signals_impl" }
-kuro_bxl = { path = "app/kuro_bxl" }
-kuro_bzlmod = { path = "app/kuro_bzlmod" }
-kuro_certs = { path = "app/kuro_certs" }
-kuro_cfg_constructor = { path = "app/kuro_cfg_constructor" }
-kuro_cli_proto = { path = "app/kuro_cli_proto" }
-kuro_client = { path = "app/kuro_client" }
-kuro_client_ctx = { path = "app/kuro_client_ctx" }
-kuro_cmd_audit_client = { path = "app/kuro_cmd_audit_client" }
-kuro_cmd_audit_server = { path = "app/kuro_cmd_audit_server" }
-kuro_cmd_completion_client = { path = "app/kuro_cmd_completion_client" }
-kuro_cmd_debug_client = { path = "app/kuro_cmd_debug_client" }
-kuro_cmd_docs_client = { path = "app/kuro_cmd_docs_client" }
-kuro_cmd_docs_server = { path = "app/kuro_cmd_docs_server" }
-kuro_cmd_log_client = { path = "app/kuro_cmd_log_client" }
-kuro_cmd_query_server = { path = "app/kuro_cmd_query_server" }
-kuro_cmd_rage_client = { path = "app/kuro_cmd_rage_client" }
-kuro_cmd_starlark_client = { path = "app/kuro_cmd_starlark_client" }
-kuro_cmd_starlark_server = { path = "app/kuro_cmd_starlark_server" }
-kuro_cmd_targets_server = { path = "app/kuro_cmd_targets_server" }
-kuro_common = { path = "app/kuro_common" }
-kuro_configured = { path = "app/kuro_configured" }
-kuro_core = { path = "app/kuro_core" }
-kuro_critical_path = { path = "app/kuro_critical_path" }
-kuro_daemon = { path = "app/kuro_daemon" }
-kuro_data = { path = "app/kuro_data" }
-kuro_directory = { path = "app/kuro_directory" }
-kuro_downward_api = { path = "app/kuro_downward_api" }
-kuro_downward_api_proto = { path = "app/kuro_downward_api_proto" }
-kuro_eden = { path = "app/kuro_eden" }
-kuro_env = { path = "app/kuro_env" }
-kuro_error = { path = "app/kuro_error" }
-kuro_error_derive = { path = "app/kuro_error_derive" }
-kuro_errorformat = { path = "app/kuro_errorformat" }
-kuro_event_log = { path = "app/kuro_event_log" }
-kuro_event_observer = { path = "app/kuro_event_observer" }
-kuro_events = { path = "app/kuro_events" }
-kuro_execute = { path = "app/kuro_execute" }
-kuro_execute_impl = { path = "app/kuro_execute_impl" }
-kuro_execute_local = { path = "app/kuro_execute_local" }
-kuro_sandbox = { path = "app/kuro_sandbox" }
-kuro_external_cells = { path = "app/kuro_external_cells" }
-kuro_external_cells_bundled = { path = "app/kuro_external_cells_bundled" }
-kuro_file_watcher = { path = "app/kuro_file_watcher" }
-kuro_forkserver = { path = "app/kuro_forkserver" }
-kuro_forkserver_proto = { path = "app/kuro_forkserver_proto" }
-kuro_fs = { path = "app/kuro_fs" }
-kuro_grpc = { path = "app/kuro_grpc" }
-kuro_health_check = { path = "app/kuro_health_check" }
-kuro_health_check_proto = { path = "app/kuro_health_check_proto" }
-kuro_host_sharing_proto = { path = "app/kuro_host_sharing_proto" }
-kuro_http = { path = "app/kuro_http" }
-kuro_install_proto = { path = "app/kuro_install_proto" }
-kuro_interpreter = { path = "app/kuro_interpreter" }
-kuro_interpreter_for_build = { path = "app/kuro_interpreter_for_build" }
-kuro_interpreter_for_build_tests = { path = "app/kuro_interpreter_for_build_tests" }
-kuro_miniperf = { path = "app/kuro_miniperf" }
-kuro_miniperf_proto = { path = "app/kuro_miniperf_proto" }
-kuro_node = { path = "app/kuro_node" }
-kuro_offline_archive = { path = "app/kuro_offline_archive" }
-kuro_profile = { path = "app/kuro_profile" }
-kuro_protoc_dev = { path = "app/kuro_protoc_dev" }
-kuro_query = { path = "app/kuro_query" }
-kuro_query_derive = { path = "app/kuro_query_derive" }
-kuro_query_impls = { path = "app/kuro_query_impls" }
-kuro_query_parser = { path = "app/kuro_query_parser" }
-kuro_re_configuration = { path = "app/kuro_re_configuration" }
-kuro_resource_control = { path = "app/kuro_resource_control" }
-kuro_server = { path = "app/kuro_server" }
-kuro_server_commands = { path = "app/kuro_server_commands" }
-kuro_server_ctx = { path = "app/kuro_server_ctx" }
-kuro_server_starlark_debug = { path = "app/kuro_server_starlark_debug" }
-kuro_subscription_proto = { path = "app/kuro_subscription_proto" }
-kuro_test = { path = "app/kuro_test" }
-kuro_test_api = { path = "app/kuro_test_api" }
-kuro_test_proto = { path = "app/kuro_test_proto" }
-kuro_test_runner = { path = "app/kuro_test_runner" }
-kuro_transition = { path = "app/kuro_transition" }
-kuro_util = { path = "app/kuro_util" }
-kuro_validation = { path = "app/kuro_validation" }
-kuro_worker_proto = { path = "app/kuro_worker_proto" }
-kuro_wrapper_common = { path = "app/kuro_wrapper_common" }
+slug_action_impl = { path = "app/slug_action_impl" }
+slug_action_metadata_proto = { path = "app/slug_action_metadata_proto" }
+slug_analysis = { path = "app/slug_analysis" }
+slug_anon_target = { path = "app/slug_anon_target" }
+slug_artifact = { path = "app/slug_artifact" }
+slug_build_api = { path = "app/slug_build_api" }
+slug_build_api_derive = { path = "app/slug_build_api_derive" }
+slug_build_event_stream = { path = "app/slug_build_event_stream" }
+slug_build_info = { path = "app/slug_build_info" }
+slug_build_signals = { path = "app/slug_build_signals" }
+slug_build_signals_impl = { path = "app/slug_build_signals_impl" }
+slug_bxl = { path = "app/slug_bxl" }
+slug_bzlmod = { path = "app/slug_bzlmod" }
+slug_certs = { path = "app/slug_certs" }
+slug_cfg_constructor = { path = "app/slug_cfg_constructor" }
+slug_cli_proto = { path = "app/slug_cli_proto" }
+slug_client = { path = "app/slug_client" }
+slug_client_ctx = { path = "app/slug_client_ctx" }
+slug_cmd_audit_client = { path = "app/slug_cmd_audit_client" }
+slug_cmd_audit_server = { path = "app/slug_cmd_audit_server" }
+slug_cmd_completion_client = { path = "app/slug_cmd_completion_client" }
+slug_cmd_debug_client = { path = "app/slug_cmd_debug_client" }
+slug_cmd_docs_client = { path = "app/slug_cmd_docs_client" }
+slug_cmd_docs_server = { path = "app/slug_cmd_docs_server" }
+slug_cmd_log_client = { path = "app/slug_cmd_log_client" }
+slug_cmd_query_server = { path = "app/slug_cmd_query_server" }
+slug_cmd_rage_client = { path = "app/slug_cmd_rage_client" }
+slug_cmd_starlark_client = { path = "app/slug_cmd_starlark_client" }
+slug_cmd_starlark_server = { path = "app/slug_cmd_starlark_server" }
+slug_cmd_targets_server = { path = "app/slug_cmd_targets_server" }
+slug_common = { path = "app/slug_common" }
+slug_configured = { path = "app/slug_configured" }
+slug_core = { path = "app/slug_core" }
+slug_critical_path = { path = "app/slug_critical_path" }
+slug_daemon = { path = "app/slug_daemon" }
+slug_data = { path = "app/slug_data" }
+slug_directory = { path = "app/slug_directory" }
+slug_downward_api = { path = "app/slug_downward_api" }
+slug_downward_api_proto = { path = "app/slug_downward_api_proto" }
+slug_eden = { path = "app/slug_eden" }
+slug_env = { path = "app/slug_env" }
+slug_error = { path = "app/slug_error" }
+slug_error_derive = { path = "app/slug_error_derive" }
+slug_errorformat = { path = "app/slug_errorformat" }
+slug_event_log = { path = "app/slug_event_log" }
+slug_event_observer = { path = "app/slug_event_observer" }
+slug_events = { path = "app/slug_events" }
+slug_execute = { path = "app/slug_execute" }
+slug_execute_impl = { path = "app/slug_execute_impl" }
+slug_execute_local = { path = "app/slug_execute_local" }
+slug_sandbox = { path = "app/slug_sandbox" }
+slug_external_cells = { path = "app/slug_external_cells" }
+slug_external_cells_bundled = { path = "app/slug_external_cells_bundled" }
+slug_file_watcher = { path = "app/slug_file_watcher" }
+slug_forkserver = { path = "app/slug_forkserver" }
+slug_forkserver_proto = { path = "app/slug_forkserver_proto" }
+slug_fs = { path = "app/slug_fs" }
+slug_grpc = { path = "app/slug_grpc" }
+slug_health_check = { path = "app/slug_health_check" }
+slug_health_check_proto = { path = "app/slug_health_check_proto" }
+slug_host_sharing_proto = { path = "app/slug_host_sharing_proto" }
+slug_http = { path = "app/slug_http" }
+slug_install_proto = { path = "app/slug_install_proto" }
+slug_interpreter = { path = "app/slug_interpreter" }
+slug_interpreter_for_build = { path = "app/slug_interpreter_for_build" }
+slug_interpreter_for_build_tests = { path = "app/slug_interpreter_for_build_tests" }
+slug_miniperf = { path = "app/slug_miniperf" }
+slug_miniperf_proto = { path = "app/slug_miniperf_proto" }
+slug_node = { path = "app/slug_node" }
+slug_offline_archive = { path = "app/slug_offline_archive" }
+slug_profile = { path = "app/slug_profile" }
+slug_protoc_dev = { path = "app/slug_protoc_dev" }
+slug_query = { path = "app/slug_query" }
+slug_query_derive = { path = "app/slug_query_derive" }
+slug_query_impls = { path = "app/slug_query_impls" }
+slug_query_parser = { path = "app/slug_query_parser" }
+slug_re_configuration = { path = "app/slug_re_configuration" }
+slug_resource_control = { path = "app/slug_resource_control" }
+slug_server = { path = "app/slug_server" }
+slug_server_commands = { path = "app/slug_server_commands" }
+slug_server_ctx = { path = "app/slug_server_ctx" }
+slug_server_starlark_debug = { path = "app/slug_server_starlark_debug" }
+slug_subscription_proto = { path = "app/slug_subscription_proto" }
+slug_test = { path = "app/slug_test" }
+slug_test_api = { path = "app/slug_test_api" }
+slug_test_proto = { path = "app/slug_test_proto" }
+slug_test_runner = { path = "app/slug_test_runner" }
+slug_transition = { path = "app/slug_transition" }
+slug_util = { path = "app/slug_util" }
+slug_validation = { path = "app/slug_validation" }
+slug_worker_proto = { path = "app/slug_worker_proto" }
+slug_wrapper_common = { path = "app/slug_wrapper_common" }
 
 [profile.release]
 incremental = true

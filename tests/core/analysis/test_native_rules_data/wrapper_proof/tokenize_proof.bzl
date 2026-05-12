@@ -1,6 +1,6 @@
 # Plan 28.4 Stage 7 acceptance fixture for the `ctx.tokenize`
 # migration. The Rust impl + `shell_tokenize` helper were deleted;
-# `_kuro_tokenize` in `@kuro_builtins//:exports.bzl` now serves the
+# `_slug_tokenize` in `@slug_builtins//:exports.bzl` now serves the
 # call.
 #
 # The pre-existing `tokenize_test` in

@@ -14,15 +14,15 @@ that target's attributes with the configuration applied. The `uquery` command
 will not apply a configuration.
 
 Here is a heavily trimmed version of the outputs of invoking `uquery` and
-`cquery` on `//kuro/app/kuro_core:kuro_core`.
+`cquery` on `//slug/app/slug_core:slug_core`.
 
 ```sh
-> kuro uquery -A '"//kuro/app/kuro_core:kuro_core"'
+> slug uquery -A '"//slug/app/slug_core:slug_core"'
 {
-  "fbcode//kuro/app/kuro_core:kuro_core": {
+  "fbcode//slug/app/slug_core:slug_core": {
     "buck.type": "rust_library",
-    "buck.package": "fbcode//kuro/app/kuro_core:TARGETS",
-    "name": "kuro_core",
+    "buck.package": "fbcode//slug/app/slug_core:TARGETS",
+    "name": "slug_core",
     "visibility": [
       "PUBLIC"
     ],
@@ -56,14 +56,14 @@ Here is a heavily trimmed version of the outputs of invoking `uquery` and
 ```
 
 ```sh
-> kuro cquery -A '"//kuro/app/kuro_core:kuro_core"'
+> slug cquery -A '"//slug/app/slug_core:slug_core"'
 {
-  "fbcode//kuro/app/kuro_core:kuro_core (ovr_config//platform/linux:<OMITTED>)": {
+  "fbcode//slug/app/slug_core:slug_core (ovr_config//platform/linux:<OMITTED>)": {
     "buck.type": "rust_library",
-    "buck.package": "fbcode//kuro/app/kuro_core:TARGETS",
+    "buck.package": "fbcode//slug/app/slug_core:TARGETS",
     "buck.target_configuration": "ovr_config//platform/linux:<OMITTED>",
-    "buck.execution_platform": "fbcode//kuro/platform/<OMITTED>",
-    "name": "kuro_core",
+    "buck.execution_platform": "fbcode//slug/platform/<OMITTED>",
+    "name": "slug_core",
     "visibility": [
       "PUBLIC"
     ],

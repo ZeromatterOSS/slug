@@ -1,0 +1,291 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+//! Concrete implementation of Starlark repository rule execution.
+//!
+//! This module provides the implementation of `StarlarkRepoRuleExecutorImpl`
+//! that bridges the gap between the bzlmod system and the Starlark interpreter.
+//!
+//! ## Architecture
+//!
+//! This follows the same late-binding pattern as `module_extension_executor_impl.rs`:
+//!
+//! ```text
+//! slug_bzlmod                             slug_interpreter_for_build
+//! ┌─────────────────────────┐             ┌──────────────────────────────────┐
+//! │ ExtensionRepoExecution  │             │ ConcreteStarlarkRepoRule         │
+//! │ Key                     │──late bind──│ Executor                         │
+//! │                         │             │                                  │
+//! │ - RepositoryInvocation  │             │ - parse_bzlmod_bzl_path()        │
+//! │ - rule_source           │             │ - load .bzl via DICE             │
+//! │ - working_dir           │             │ - create RepositoryContext       │
+//! └─────────────────────────┘             │ - call rule.implementation(ctx)  │
+//!                                         └──────────────────────────────────┘
+//! ```
+
+use std::collections::HashMap;
+use std::path::Path;
+
+use async_trait::async_trait;
+use dice::DiceComputations;
+use slug_bzlmod::StarlarkRepoRuleExecutorImpl;
+use slug_bzlmod::repository_invocations::RepositoryInvocation;
+use slug_common::dice::cells::HasCellResolver;
+use slug_common::dice::data::HasIoProvider;
+use slug_error::BuckErrorContext;
+use slug_error::conversion::from_any_with_tag;
+use slug_interpreter::load_module::InterpreterCalculation;
+use slug_interpreter::paths::module::StarlarkModulePath;
+use starlark::environment::Module;
+use starlark::eval::Evaluator;
+use starlark::values::OwnedFrozenValueTyped;
+
+use crate::module_extension_executor_impl::parse_bzlmod_bzl_path;
+use crate::repository_ctx::AttrValue as CtxAttrValue;
+use crate::repository_ctx::RepositoryAttr;
+use crate::repository_ctx::RepositoryContext;
+use crate::repository_rule::FrozenStarlarkRepositoryRule;
+
+/// Errors during Starlark repository rule execution.
+#[derive(Debug, slug_error::Error)]
+#[slug(tag = Input)]
+enum StarlarkRepoRuleError {
+    #[error("Repository rule '{name}' not found in module '{path}'")]
+    RuleNotFound { name: String, path: String },
+
+    #[error("Value '{name}' in '{path}' is not a repository_rule")]
+    NotARepositoryRule { name: String, path: String },
+
+    #[error("Repository rule implementation returned an error: {0}")]
+    ImplementationError(String),
+}
+
+/// Convert a `slug_bzlmod` AttrValue to a `repository_ctx` AttrValue.
+fn convert_attr_value(value: &slug_bzlmod::RepoAttrValue) -> CtxAttrValue {
+    match value {
+        slug_bzlmod::RepoAttrValue::String(s) => CtxAttrValue::String(s.clone()),
+        slug_bzlmod::RepoAttrValue::Int(i) => CtxAttrValue::Int(*i),
+        slug_bzlmod::RepoAttrValue::Bool(b) => CtxAttrValue::Bool(*b),
+        slug_bzlmod::RepoAttrValue::None => CtxAttrValue::None,
+        slug_bzlmod::RepoAttrValue::StringList(list) => CtxAttrValue::StringList(list.clone()),
+        slug_bzlmod::RepoAttrValue::Label(s) => CtxAttrValue::Label(s.clone()),
+        slug_bzlmod::RepoAttrValue::Dict(map) => {
+            let converted: HashMap<String, CtxAttrValue> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), convert_attr_value(v)))
+                .collect();
+            CtxAttrValue::Dict(converted)
+        }
+    }
+}
+
+/// Convert a `CoercedAttr` default value to a `repository_ctx` AttrValue.
+/// Mirrors `repository_rule::coerced_attr_to_repo_attr_value` but produces
+/// the ctx flavour used directly in `RepositoryContext`.
+fn coerced_attr_to_ctx_attr_value(
+    attr: &slug_node::attrs::coerced_attr::CoercedAttr,
+) -> Option<CtxAttrValue> {
+    use slug_node::attrs::coerced_attr::CoercedAttr;
+    match attr {
+        CoercedAttr::String(s) | CoercedAttr::EnumVariant(s) => {
+            let s = s.as_str().to_owned();
+            if s.starts_with("//") || s.starts_with('@') || s.starts_with(':') {
+                Some(CtxAttrValue::Label(s))
+            } else {
+                Some(CtxAttrValue::String(s))
+            }
+        }
+        CoercedAttr::Int(i) => Some(CtxAttrValue::Int(*i)),
+        CoercedAttr::Bool(b) => Some(CtxAttrValue::Bool(b.0)),
+        CoercedAttr::None => Some(CtxAttrValue::None),
+        CoercedAttr::Label(label)
+        | CoercedAttr::Dep(label)
+        | CoercedAttr::SourceLabel(label)
+        | CoercedAttr::ConfigurationDep(label)
+        | CoercedAttr::SplitTransitionDep(label) => Some(CtxAttrValue::Label(label.to_string())),
+        CoercedAttr::OneOf(value, _) => coerced_attr_to_ctx_attr_value(value),
+        CoercedAttr::List(list) => {
+            let items: Vec<String> = list
+                .iter()
+                .filter_map(|v| match coerced_attr_to_ctx_attr_value(v)? {
+                    CtxAttrValue::String(s) | CtxAttrValue::Label(s) => Some(s),
+                    _ => None,
+                })
+                .collect();
+            Some(CtxAttrValue::StringList(items))
+        }
+        CoercedAttr::Dict(dict) => {
+            let entries = dict
+                .iter()
+                .filter_map(|(k, v)| {
+                    let key = match coerced_attr_to_ctx_attr_value(k)? {
+                        CtxAttrValue::String(s) | CtxAttrValue::Label(s) => s,
+                        _ => return None,
+                    };
+                    Some((key, coerced_attr_to_ctx_attr_value(v)?))
+                })
+                .collect();
+            Some(CtxAttrValue::Dict(entries))
+        }
+        _ => None,
+    }
+}
+
+/// Concrete implementation of Starlark repository rule executor.
+pub struct ConcreteStarlarkRepoRuleExecutor;
+
+#[async_trait]
+impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
+    async fn execute_rule(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        invocation: &RepositoryInvocation,
+        rule_bzl_path: &str,
+        rule_name: &str,
+        working_dir: &Path,
+    ) -> slug_error::Result<()> {
+        tracing::debug!(
+            "Executing Starlark repository rule '{}' from '{}' for repo '{}'",
+            rule_name,
+            rule_bzl_path,
+            invocation.name
+        );
+
+        // 1. Get the cell resolver to parse the bzl path
+        let cell_resolver = ctx.get_cell_resolver().await?;
+
+        // 2. Parse the bzl path into an ImportPath
+        let import_path = parse_bzlmod_bzl_path(rule_bzl_path, &cell_resolver)?;
+
+        tracing::debug!("Loading repository rule module from: {}", import_path);
+
+        // 3. Load the module via DICE
+        let loaded_module = ctx
+            .get_loaded_module(StarlarkModulePath::LoadFile(&import_path))
+            .await
+            .buck_error_context(format!(
+                "Loading repository rule bzl file: {}",
+                rule_bzl_path
+            ))?;
+
+        // 4. Get the rule value from the module
+        let rule_value = loaded_module
+            .env()
+            .get_any_visibility(rule_name)
+            .map_err(|e| from_any_with_tag(e, slug_error::ErrorTag::Input))?
+            .0;
+
+        // 5. Downcast to FrozenStarlarkRepositoryRule
+        let frozen_rule: OwnedFrozenValueTyped<FrozenStarlarkRepositoryRule> = rule_value
+            .downcast_starlark()
+            .map_err(|_| StarlarkRepoRuleError::NotARepositoryRule {
+                name: rule_name.to_owned(),
+                path: rule_bzl_path.to_owned(),
+            })?;
+
+        tracing::debug!("Found repository rule '{}' in module", frozen_rule.name());
+
+        // 6. Convert attrs from bzlmod AttrValue to repository_ctx AttrValue
+        let mut ctx_attrs: HashMap<String, CtxAttrValue> = invocation
+            .attrs
+            .iter()
+            .map(|(k, v)| (k.clone(), convert_attr_value(v)))
+            .collect();
+
+        // 6b. Merge in defaults from the rule's declared attrs for any user-
+        // unspecified attribute. Matches the extension-context path in
+        // repository_rule.rs:478-486.
+        for (attr_name, attr_def) in frozen_rule.attrs() {
+            if ctx_attrs.contains_key(attr_name) {
+                continue;
+            }
+            if let Some(default) = attr_def.default() {
+                if let Some(v) = coerced_attr_to_ctx_attr_value(default) {
+                    ctx_attrs.insert(attr_name.clone(), v);
+                }
+            }
+        }
+
+        let repo_attr = RepositoryAttr::new_with_name(invocation.name.clone(), ctx_attrs);
+
+        // 7. Create the RepositoryContext
+        let io = ctx.global_data().get_io_provider();
+        let workspace_root = io.project_root();
+        let repo_ctx = RepositoryContext::new_with_workspace_root(
+            invocation.name.clone(),
+            repo_attr,
+            working_dir.to_path_buf(),
+            workspace_root.root().to_path_buf(),
+        );
+
+        // 8. Execute the implementation function in Starlark
+        let starlark_module = Module::new();
+        let ctx_value = starlark_module.heap().alloc(repo_ctx);
+        let mut eval = Evaluator::new(&starlark_module);
+        let impl_fn = frozen_rule.implementation();
+
+        tracing::debug!(
+            "Invoking repository rule implementation for '{}'",
+            invocation.name
+        );
+
+        // Plan 39 phase 1.75: expose DICE to `rctx.path(Label)` so it can
+        // synchronously materialize cross-repo labels (notably the master
+        // git_repository clone that rules_rs's `crate_git_repository`
+        // worktree-fans-out from). `with_extension_dice` was originally
+        // introduced for module-extension Starlark eval (Plan 36); the same
+        // sync->async bridge applies here.
+        let invoke_result = slug_bzlmod::with_extension_dice(ctx, || {
+            eval.eval_function(impl_fn.to_value(), &[ctx_value], &[])
+        });
+
+        match invoke_result {
+            Ok(_) => {
+                tracing::info!(
+                    "Repository rule '{}' (rule: '{}') completed successfully",
+                    invocation.name,
+                    rule_name
+                );
+                Ok(())
+            }
+            Err(e) => {
+                let summary = diagnostic_summary(&e);
+                tracing::debug!(
+                    "Repository rule '{}' implementation failed: {}",
+                    rule_name,
+                    summary
+                );
+                Err(StarlarkRepoRuleError::ImplementationError(summary).into())
+            }
+        }
+    }
+}
+
+fn diagnostic_summary(error: impl std::fmt::Display) -> String {
+    const MAX_CHARS: usize = 2000;
+    let rendered = error.to_string();
+    let mut iter = rendered.char_indices();
+    let Some((idx, _)) = iter.nth(MAX_CHARS) else {
+        return rendered;
+    };
+    let omitted = rendered[idx..].chars().count();
+    format!(
+        "{} ... (truncated; {} chars omitted)",
+        &rendered[..idx],
+        omitted
+    )
+}
+
+/// Initialize the late binding for Starlark repository rule execution.
+///
+/// Called from `init_late_bindings()` in lib.rs.
+pub fn init_starlark_repo_rule_executor() {
+    slug_bzlmod::STARLARK_REPO_RULE_EXECUTOR_IMPL.init(&ConcreteStarlarkRepoRuleExecutor);
+}

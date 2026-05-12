@@ -1,0 +1,92 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use slug_core::soft_error;
+use slug_node::attrs::attr_type::any::AnyAttrType;
+use slug_node::attrs::attr_type::bool::BoolLiteral;
+use slug_node::attrs::attr_type::list::ListLiteral;
+use slug_node::attrs::attr_type::string::StringLiteral;
+use slug_node::attrs::attr_type::tuple::TupleLiteral;
+use slug_node::attrs::coerced_attr::CoercedAttr;
+use slug_node::attrs::coercion_context::AttrCoercionContext;
+use slug_node::attrs::configurable::AttrIsConfigurable;
+use starlark::typing::Ty;
+use starlark::values::UnpackValue;
+use starlark::values::Value;
+use starlark::values::dict::DictRef;
+use starlark::values::list::ListRef;
+use starlark::values::tuple::TupleRef;
+
+use crate::attrs::coerce::AttrTypeCoerce;
+use crate::attrs::coerce::attr_type::ty_maybe_select::TyMaybeSelect;
+
+#[derive(Debug, slug_error::Error)]
+#[slug(tag = Input)]
+enum AnyError {
+    #[error("Cannot coerce value of type `{0}` to any: `{1}`")]
+    CannotCoerce(&'static str, String),
+}
+
+fn to_literal(value: Value, ctx: &dyn AttrCoercionContext) -> slug_error::Result<CoercedAttr> {
+    if value.is_none() {
+        Ok(CoercedAttr::None)
+    } else if let Some(x) = value.unpack_bool() {
+        Ok(CoercedAttr::Bool(BoolLiteral(x)))
+    } else if let Some(x) = i64::unpack_value(value)? {
+        Ok(CoercedAttr::Int(x))
+    } else if let Some(x) = DictRef::from_value(value) {
+        Ok(CoercedAttr::Dict(
+            x.iter()
+                .map(|(k, v)| Ok((to_literal(k, ctx)?, to_literal(v, ctx)?)))
+                .collect::<slug_error::Result<_>>()?,
+        ))
+    } else if let Some(x) = TupleRef::from_value(value) {
+        Ok(CoercedAttr::Tuple(TupleLiteral(
+            ctx.intern_list(
+                x.iter()
+                    .map(|v| to_literal(v, ctx))
+                    .collect::<slug_error::Result<Vec<_>>>()?,
+            ),
+        )))
+    } else if let Some(x) = ListRef::from_value(value) {
+        Ok(CoercedAttr::List(ListLiteral(
+            ctx.intern_list(
+                x.iter()
+                    .map(|v| to_literal(v, ctx))
+                    .collect::<slug_error::Result<Vec<_>>>()?,
+            ),
+        )))
+    } else if let Some(s) = value.unpack_str() {
+        Ok(CoercedAttr::String(StringLiteral(ctx.intern_str(s))))
+    } else {
+        soft_error!(
+            "coerce_to_any",
+            AnyError::CannotCoerce(value.get_type(), value.to_repr()).into()
+        )?;
+        Ok(CoercedAttr::String(StringLiteral(
+            ctx.intern_str(&value.to_str()),
+        )))
+    }
+}
+
+impl AttrTypeCoerce for AnyAttrType {
+    fn coerce_item(
+        &self,
+        _configurable: AttrIsConfigurable,
+        ctx: &dyn AttrCoercionContext,
+        value: Value,
+    ) -> slug_error::Result<CoercedAttr> {
+        to_literal(value, ctx)
+    }
+
+    fn starlark_type(&self) -> TyMaybeSelect {
+        TyMaybeSelect::Basic(Ty::any())
+    }
+}

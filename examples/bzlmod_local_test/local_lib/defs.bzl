@@ -1,14 +1,14 @@
 # Simple rule definitions for testing bzlmod .bzl loading
-# Compatible with Kuro's Starlark API
+# Compatible with Slug's Starlark API
 
 def _simple_rule_impl(ctx):
     # Create a simple output file with the message
-    # Note: Kuro uses declare_output() instead of Bazel's declare_file()
-    # Note: Kuro uses ctx.attrs instead of Bazel's ctx.attr
+    # Note: Slug uses declare_output() instead of Bazel's declare_file()
+    # Note: Slug uses ctx.attrs instead of Bazel's ctx.attr
     out = ctx.actions.declare_output(ctx.label.name + ".txt")
-    # Note: Kuro's write() takes positional args, Bazel uses named args
+    # Note: Slug's write() takes positional args, Bazel uses named args
     ctx.actions.write(out, ctx.attrs.message + "\n")
-    # Use list instead of depset for simplicity - works in both Bazel and Kuro
+    # Use list instead of depset for simplicity - works in both Bazel and Slug
     return [DefaultInfo(default_outputs = [out])]
 
 simple_rule = rule(

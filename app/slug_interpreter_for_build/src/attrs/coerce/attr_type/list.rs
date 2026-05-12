@@ -1,0 +1,50 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use gazebo::prelude::*;
+use slug_node::attrs::attr_type::list::ListAttrType;
+use slug_node::attrs::attr_type::list::ListLiteral;
+use slug_node::attrs::coerced_attr::CoercedAttr;
+use slug_node::attrs::coercion_context::AttrCoercionContext;
+use slug_node::attrs::configurable::AttrIsConfigurable;
+use starlark::values::UnpackValue;
+use starlark::values::Value;
+use starlark::values::list::ListRef;
+use starlark::values::tuple::TupleRef;
+
+use crate::attrs::coerce::AttrTypeCoerce;
+use crate::attrs::coerce::attr_type::AttrTypeExt;
+use crate::attrs::coerce::attr_type::ty_maybe_select::TyMaybeSelect;
+
+impl AttrTypeCoerce for ListAttrType {
+    fn coerce_item(
+        &self,
+        configurable: AttrIsConfigurable,
+        ctx: &dyn AttrCoercionContext,
+        value: Value,
+    ) -> slug_error::Result<CoercedAttr> {
+        let list = coerce_list(value)?;
+        Ok(CoercedAttr::List(ListLiteral(ctx.intern_list(
+            list.try_map(|v| (self.inner).coerce(configurable, ctx, *v))?,
+        ))))
+    }
+
+    fn starlark_type(&self) -> TyMaybeSelect {
+        TyMaybeSelect::List(Box::new(self.inner.starlark_type()))
+    }
+}
+
+pub(crate) fn coerce_list<'v>(value: Value<'v>) -> slug_error::Result<&'v [Value<'v>]> {
+    if let Some(list) = TupleRef::from_value(value) {
+        Ok(list.content())
+    } else {
+        Ok(<&ListRef>::unpack_value_err(value)?.content())
+    }
+}

@@ -1,11 +1,11 @@
 # subrule: Decomposing Starlark rules
 
-> **Kuro Implementation Notes**
+> **Slug Implementation Notes**
 >
 > This is a reference copy of the Bazel subrule design document.
 >
-> - **Implementation Plan**: See Phase 8 in `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod.md`
-> - **Current Status**: Stub implementation in `app/kuro_interpreter_for_build/src/subrule.rs`
+> - **Implementation Plan**: See Phase 8 in `thoughts/shared/plans/slug-bazel-subplans/02-bzlmod.md`
+> - **Current Status**: Stub implementation in `app/slug_interpreter_for_build/src/subrule.rs`
 > - **Original Source**: https://docs.google.com/document/d/1RbNC88QieKvBEwir7iV5zZU08AaMlOzxhVkPnmKDedQ
 
 ---

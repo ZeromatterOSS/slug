@@ -1,11 +1,11 @@
 ---
 id: bxl_cquery_vs_cli_cquery
-title: BXL cquery vs. Kuro CLI cquery - Divergence in Configuration Handling
+title: BXL cquery vs. Slug CLI cquery - Divergence in Configuration Handling
 ---
 
 ## Overview
 
-The command `kuro cquery` and function `cquery` in bxl share the same goal but
+The command `slug cquery` and function `cquery` in bxl share the same goal but
 sometimes yield different results. This document explains why these commands
 might produce divergent results for identical-looking queries and how their
 underlying mechanisms diverge. By contrasting their approaches to configuration
@@ -25,12 +25,12 @@ Imagine we have:
 Assume that our goal is to determine the direct reverse dependencies of `X`
 within `root//path/...`. Let's look at two approaches:
 
-### `kuro cquery`
+### `slug cquery`
 
 We can do a query like this:
 
 ```shell
-kuro cquery 'rdeps(root//path/..., X, 1)`
+slug cquery 'rdeps(root//path/..., X, 1)`
 ```
 
 It will return `A (cfg_b)`, `C (cfg_b)` and `X(cfg_b)`
@@ -54,7 +54,7 @@ It will return empty.
 
 ## Core Difference
 
-### CLI `kuro cquery`
+### CLI `slug cquery`
 
 When no [target universe](../../concepts/glossary.md#target-universe) is
 provided via the `--target-universe` CLI argument, it constructs the
@@ -107,7 +107,7 @@ Thus, the final result is `A (cfg_b)`, `C (cfg_b)`, and `X (cfg_b)`.
 
 ### `cquery` in bxl
 
-The bxl logic differs from the `kuro cquery` approach.
+The bxl logic differs from the `slug cquery` approach.
 
 #### Phase 1: resolve arguments to configured target nodes if needed
 
@@ -119,7 +119,7 @@ If the arguments are not configured target(s), apply the default target platform
 
 #### Phase 2: run rdeps function
 
-This phase follows the same logic of "Phase 2" in CLI `kuro cquery`
+This phase follows the same logic of "Phase 2" in CLI `slug cquery`
 
 But in this case, the second argument is different, it only has `X (cfg_a)`.
 Since `A (cfg_b)`, `B (cfg_b)` and `C (cfg_b)` do not directly depend on

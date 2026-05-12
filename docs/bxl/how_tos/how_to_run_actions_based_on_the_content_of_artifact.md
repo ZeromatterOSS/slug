@@ -119,11 +119,11 @@ def _main(bxl_ctx: bxl.Context):
 ## Examples
 
 Examples can be found at 'tests/core/bxl/test_dynamic_new_data/dynamic.bxl' of
-kuro repo folder.
+slug repo folder.
 
 Run such command at `tests/core/bxl/test_dynamic_new_data/` to run the example
 bxl script
 
 ```sh
-kuro bxl dynamic.bxl:basic
+slug bxl dynamic.bxl:basic
 ```

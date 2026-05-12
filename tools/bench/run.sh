@@ -3,7 +3,7 @@
 #
 # Drive a build target N times (cold, warm, or both), emit a JSON
 # BuildSummary rollup per run, and save the raw event-log alongside so
-# `kuro log diff summary` can compare across runs.
+# `slug log diff summary` can compare across runs.
 #
 # Output layout:
 #   benchmarks/<YYYY-MM-DD>-<git-sha>/<slug>/
@@ -11,13 +11,13 @@
 #     cold-02/...
 #     warm-01/...
 #
-# Cold runs invoke `kuro kill` and (optionally) drop OS caches between
+# Cold runs invoke `slug kill` and (optionally) drop OS caches between
 # iterations. Warm runs reuse the daemon and source tree caches.
 #
 # Usage:
 #   run.sh --target '@llvm-project//clang:clang' [--runs 3] \
 #          [--cold|--warm|--both] [--drop-caches] [--out DIR] \
-#          [--kuro BIN] [--workspace DIR]
+#          [--slug BIN] [--workspace DIR]
 #
 # All options can be repeated for --target (multi-target batch run).
 
@@ -27,7 +27,7 @@ RUNS=3
 MODE=both
 DROP_CACHES=0
 OUT_ROOT=
-KURO_BIN="${KURO:-$(command -v kuro || true)}"
+SLUG_BIN="${SLUG:-$(command -v slug || true)}"
 WORKSPACE=
 TARGETS=()
 
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
     --both) MODE=both; shift;;
     --drop-caches) DROP_CACHES=1; shift;;
     --out) OUT_ROOT="$2"; shift 2;;
-    --kuro) KURO_BIN="$2"; shift 2;;
+    --slug) SLUG_BIN="$2"; shift 2;;
     --workspace) WORKSPACE="$2"; shift 2;;
     -h|--help) usage;;
     *) echo "unknown arg: $1" >&2; usage;;
@@ -56,17 +56,17 @@ if [[ ${#TARGETS[@]} -eq 0 ]]; then
   echo "error: at least one --target required" >&2
   usage
 fi
-if [[ -z "$KURO_BIN" ]]; then
-  echo "error: pass --kuro or set KURO env var" >&2
+if [[ -z "$SLUG_BIN" ]]; then
+  echo "error: pass --slug or set SLUG env var" >&2
   exit 1
 fi
-if [[ ! -x "$KURO_BIN" ]]; then
-  echo "error: kuro binary not executable: $KURO_BIN" >&2
+if [[ ! -x "$SLUG_BIN" ]]; then
+  echo "error: slug binary not executable: $SLUG_BIN" >&2
   exit 1
 fi
 
 if [[ -z "$OUT_ROOT" ]]; then
-  sha=$(git -C "$(dirname "$(realpath "$KURO_BIN")")" rev-parse --short HEAD 2>/dev/null || echo unknown)
+  sha=$(git -C "$(dirname "$(realpath "$SLUG_BIN")")" rev-parse --short HEAD 2>/dev/null || echo unknown)
   date=$(date +%Y-%m-%d)
   OUT_ROOT="benchmarks/${date}-${sha}"
 fi
@@ -90,9 +90,9 @@ drop_caches() {
   fi
 }
 
-kuro_kill() {
-  # kuro kill may fail if no daemon is running. That's fine.
-  "$KURO_BIN" kill >/dev/null 2>&1 || true
+slug_kill() {
+  # slug kill may fail if no daemon is running. That's fine.
+  "$SLUG_BIN" kill >/dev/null 2>&1 || true
 }
 
 slugify() {
@@ -119,7 +119,7 @@ run_one() {
   start_ns=$(date +%s%N)
   # Capture both stdout/stderr into build.log; let the user peek when
   # numbers look weird.
-  if ! (cd "$ws" && "$KURO_BIN" build "$target") >"$rundir/build.log" 2>&1; then
+  if ! (cd "$ws" && "$SLUG_BIN" build "$target") >"$rundir/build.log" 2>&1; then
     echo "  [$label] build failed — see $rundir/build.log" >&2
     tail -20 "$rundir/build.log" >&2 || true
     return 1
@@ -133,9 +133,9 @@ run_one() {
   log_src=$(ls -t "$ws/buck-out/v2/log/"*.pb.zst 2>/dev/null | head -n1 || true)
   if [[ -n "$log_src" ]]; then
     cp "$log_src" "$rundir/build.pb.zst"
-    "$KURO_BIN" log summary --format json "$rundir/build.pb.zst" \
+    "$SLUG_BIN" log summary --format json "$rundir/build.pb.zst" \
       >"$rundir/summary.json" 2>"$rundir/summary.err" || {
-      echo "  [$label] kuro log summary failed — see $rundir/summary.err" >&2
+      echo "  [$label] slug log summary failed — see $rundir/summary.err" >&2
     }
   else
     echo "  [$label] no event log found under $ws/buck-out/v2/log" >&2
@@ -153,7 +153,7 @@ for target in "${TARGETS[@]}"; do
     for i in $(seq 1 "$RUNS"); do
       label=$(printf 'cold-%02d' "$i")
       echo "  $label"
-      kuro_kill
+      slug_kill
       drop_caches
       run_one "$target" "$label" "$tdir/$label"
     done
@@ -163,7 +163,7 @@ for target in "${TARGETS[@]}"; do
     # Prime the daemon + cache once before warm measurements (unless we
     # just did a cold pass, in which case the state is already warm).
     if [[ "$MODE" == warm ]]; then
-      (cd "$(workspace_cwd)" && "$KURO_BIN" build "$target") >/dev/null 2>&1 || true
+      (cd "$(workspace_cwd)" && "$SLUG_BIN" build "$target") >/dev/null 2>&1 || true
     fi
     for i in $(seq 1 "$RUNS"); do
       label=$(printf 'warm-%02d' "$i")

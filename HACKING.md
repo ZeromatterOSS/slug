@@ -1,4 +1,4 @@
-# Tips and tricks for hacking on Kuro
+# Tips and tricks for hacking on Slug
 
 You might have been led here by reading [CONTRIBUTING.md](/CONTRIBUTING.md). If
 not, please read that as well! That will give you the high level overview; this
@@ -6,24 +6,24 @@ document is all about the needed elbow grease you'll have to apply.
 
 ## Building the code
 
-Kuro is written in Rust, and **currently requires a nightly toolchain**. You
+Slug is written in Rust, and **currently requires a nightly toolchain**. You
 need **[rustup](https://rustup.rs)** installed to provision the necessary
 version of `rustc` and `cargo` as a result.
 
-You can either build `kuro` from a clone of the Kuro repo (this will cause
+You can either build `slug` from a clone of the Slug repo (this will cause
 rustup/cargo to install the right nightly version of `rustc`):
 
 ```sh
-git clone https://github.com/ZeromatterOSS/kuro.git
-cd kuro/
-cargo install --path=app/kuro
+git clone https://github.com/ZeromatterOSS/slug.git
+cd slug/
+cargo install --path=app/slug
 ```
 
 Or, alternatively, install it directly from GitHub:
 
 ```sh
 rustup install nightly-2025-08-01
-cargo +nightly-2025-08-01 install --git https://github.com/ZeromatterOSS/kuro.git kuro
+cargo +nightly-2025-08-01 install --git https://github.com/ZeromatterOSS/slug.git slug
 ```
 
 ### Side note: using [Nix] to compile the source
@@ -33,17 +33,17 @@ cargo +nightly-2025-08-01 install --git https://github.com/ZeromatterOSS/kuro.gi
 > specifically.
 
 Most [Nix] users provision tools directly with Nix itself, rather than rustup;
-the Kuro source code includes a `flake.nix` file, which can be used to compile
-Kuro itself via `cargo`:
+the Slug source code includes a `flake.nix` file, which can be used to compile
+Slug itself via `cargo`:
 
 ```sh
-git clone https://github.com/ZeromatterOSS/kuro.git
-cd kuro/
+git clone https://github.com/ZeromatterOSS/slug.git
+cd slug/
 nix develop . # add 'rustc' and 'cargo' to $PATH
-cargo build --release --bin=kuro
+cargo build --release --bin=slug
 ```
 
-A Nix package (e.g. `nix build .#kuro`) does not yet exist; see `kuro` in
+A Nix package (e.g. `nix build .#slug`) does not yet exist; see `slug` in
 nixpkgs for inspiration for writing one.
 
 An `.envrc` file using the Nix flake is provided for `direnv` users:
@@ -56,7 +56,7 @@ An `.envrc` file using the Nix flake is provided for `direnv` users:
 > **NOTE**: You can probably skip this if you're on a typical "Tier 1" operating
 > system like aarch64/x86_64 Linux, Windows, or macOS.
 
-Kuro uses Protocol Buffers quite extensively in its internals, and also for
+Slug uses Protocol Buffers quite extensively in its internals, and also for
 communication with remote systems for tasks like Remote Execution. Therefore
 there are `.proto` files in the codebase that need to be compiled to Rust code.
 Due to the architecture of how Protocol Buffers works, you'll need the `protoc`
@@ -68,7 +68,7 @@ For the 3 major operating systems &mdash; Linux, Windows, and macOS &mdash; the
 accomplish this. So everything should transparently work with no intervention
 needed and just running `cargo build` is enough.
 
-But there are non-Tier-1 operating systems where Kuro might be used, and the
+But there are non-Tier-1 operating systems where Slug might be used, and the
 above crate won't work, and you'll need to override it. You will need to install
 `protoc` from some other source. Doing that is out of scope for this document.
 But once you've done so, you can use the following two environment variables
@@ -86,27 +86,27 @@ export BUCK2_BUILD_PROTOC=/opt/protobuf/bin/protoc
 export BUCK2_BUILD_PROTOC_INCLUDE=/opt/protobuf/include
 ```
 
-Kuro should then build with `cargo` using the steps above.
+Slug should then build with `cargo` using the steps above.
 
-### Building kuro with kuro
+### Building slug with slug
 
 See [Bootstrapping] for details; the gist is: use
 `reindeer --third-party-dir shim/third-party/rust buckify` to generate BUCK
-files for Cargo dependencies, then `kuro build //:kuro` will work.
+files for Cargo dependencies, then `slug build //:slug` will work.
 
 [Bootstrapping]: ./docs/about/bootstrapping.md
 
 ## Running tests and lints
 
-It's possible to run kuro's test suite with `cargo test`.
+It's possible to run slug's test suite with `cargo test`.
 
 [Currently][clippy-bug], `cargo clippy` will generate spurious warnings as the
 canonical lint configuration is in `lint_levels.bzl` rather than `Cargo.toml`,
 so it's recommended to use `test.py` instead.
 
-[clippy-bug]: https://github.com/ZeromatterOSS/kuro/issues/943
+[clippy-bug]: https://github.com/ZeromatterOSS/slug/issues/943
 
-To run the build, tests, rustdoc, and lints in the same way as kuro's OSS CI,
+To run the build, tests, rustdoc, and lints in the same way as slug's OSS CI,
 run:
 
 ```
@@ -154,12 +154,12 @@ have written. Some rules:
 
 ## Buck2 heritage
 
-Kuro is derived from Buck2, originally developed by Meta Platforms, Inc. A
+Slug is derived from Buck2, originally developed by Meta Platforms, Inc. A
 substantial amount of code, documentation, and architecture still reflects that
 heritage. Preserve accurate Buck2 and Meta attribution when editing inherited
 material.
 
-Kuro is now a separate Zeromatter Inc project with primary authorship by Walter
+Slug is now a separate Zeromatter Inc project with primary authorship by Walter
 Gray. It is provided for educational and research purposes and is in large part
 an exercise in experimenting with agentic programming on a substantial systems
 codebase. Pull requests may or may not be reviewed.

@@ -1,6 +1,6 @@
 # Plan 28.3 negative test: loads :defs.bzl which references the
 # rule_implementation_wrapper symbol that is intentionally NOT in
-# `@kuro_builtins//:exports.bzl::exported_toplevels`. The load must
+# `@slug_builtins//:exports.bzl::exported_toplevels`. The load must
 # fail with "Variable rule_implementation_wrapper not found".
 load(":defs.bzl", "_RUNTIME_REFERENCE")
 

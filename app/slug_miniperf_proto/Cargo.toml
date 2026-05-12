@@ -1,0 +1,16 @@
+[package]
+authors = ["Meta"]
+description = "Serialized datastructures for slug_miniperf"
+edition = "2024"
+license = { workspace = true }
+name = "slug_miniperf_proto"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+slug_data = { workspace = true }
+dupe = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }

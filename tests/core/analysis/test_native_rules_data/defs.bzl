@@ -1,19 +1,19 @@
 """Test rules for native_rules tests."""
 
-# Plan 28.2 acceptance: `kuro_builtins_probe` is exported from
-# `@kuro_builtins//:exports.bzl` and auto-injected into every BUILD/.bzl
+# Plan 28.2 acceptance: `slug_builtins_probe` is exported from
+# `@slug_builtins//:exports.bzl` and auto-injected into every BUILD/.bzl
 # environment by `bazel_builtins_autoload`. This fixture's MODULE.bazel
 # does NOT register a prelude, so resolving the symbol here without a
 # load() proves that the loader works for Bazel-mode workspaces.
-_KURO_BUILTINS_OBSERVED = kuro_builtins_probe  # noqa: F821 — autoloaded
+_SLUG_BUILTINS_OBSERVED = slug_builtins_probe  # noqa: F821 — autoloaded
 
-def _kuro_builtins_probe_value_impl(ctx):
+def _slug_builtins_probe_value_impl(ctx):
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
-    ctx.actions.write(out, _KURO_BUILTINS_OBSERVED + "\n")
+    ctx.actions.write(out, _SLUG_BUILTINS_OBSERVED + "\n")
     return [DefaultInfo(default_output = out)]
 
-kuro_builtins_probe_value = rule(
-    implementation = _kuro_builtins_probe_value_impl,
+slug_builtins_probe_value = rule(
+    implementation = _slug_builtins_probe_value_impl,
     attrs = {},
 )
 
@@ -1268,7 +1268,7 @@ macro_test = macro(
 )
 
 # Starlark replacements for the (now Bazel-9-removed) native sh_binary,
-# sh_test, sh_library. Mirrors the deleted kuro `analyze_sh_*` semantics
+# sh_test, sh_library. Mirrors the deleted slug `analyze_sh_*` semantics
 # so Plan 27.2 stub conversion does not regress these tests. Same shape as
 # `tests/e2e_util/nano_prelude/shell_rules.bzl`.
 
@@ -1326,7 +1326,7 @@ sh_test = rule(
 )
 
 # Minimal Starlark replacements for the (now Bazel-9-removed) native cc_*
-# rules. The existing kuro tests (`test_cc_toolchain_registers_target`,
+# rules. The existing slug tests (`test_cc_toolchain_registers_target`,
 # `test_cc_shared_library_builds`, etc.) only verify load-time / minimal
 # analysis behavior, so an empty-DefaultInfo stub is enough. Real cc_* are
 # in @rules_cc and exercised by the @llvm-project//llvm:Demangle smoke

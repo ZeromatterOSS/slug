@@ -1,4 +1,4 @@
-# BUILD file for Kuro's bazel_tools test directory
+# BUILD file for Slug's bazel_tools test directory
 # Provides file targets needed by rules_cc for testing and coverage
 
 load("@bazel_tools//tools/build_rules:filegroup.bzl", "filegroup")

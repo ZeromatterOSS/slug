@@ -18,7 +18,7 @@ load(":var_proof.bzl", "var_proof")
 # wrapper IS invoked but is currently a no-op (`return implementation(raw_ctx)`),
 # so the sentinel reaches the output unchanged. Test verifies output
 # matches; if the wrapper were silently bypassed, we'd get the same
-# result — so the meaningful follow-up here is the kuro-internal
+# result — so the meaningful follow-up here is the slug-internal
 # probe that intercepts wrapper invocations (filed as a Phase 28.4
 # Stage 3 follow-up). For Stage 2 the acceptance is "no-op produces
 # byte-for-byte equivalent providers", proven by this build target +

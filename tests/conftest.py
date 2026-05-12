@@ -1,8 +1,8 @@
 """
-Root conftest for kuro test suite.
+Root conftest for slug test suite.
 
 This file sets up the test infrastructure so that existing tests/core/ tests
-(originally written for Buck2's Meta-internal test framework) can run with kuro.
+(originally written for Buck2's Meta-internal test framework) can run with slug.
 
 Key responsibilities:
 1. Add tests/ to sys.path so `buck2.tests.e2e_util` imports work via the
@@ -39,7 +39,7 @@ collect_ignore = [
     # and test_audit_execution_platform_resolution.py now work with our NANO_PRELUDE setup.
     # test_audit_providers.py partially works (modifier tests skipped via SKIP_TESTS).
     # Buck2-specific ?modifier syntax (target configuration modifiers)
-    # These tests require kuro to support the `?modifier` target syntax which is Buck2-specific
+    # These tests require slug to support the `?modifier` target syntax which is Buck2-specific
     # and not part of Bazel's target language
     # NOTE: test_error_categorization.py partially works - failing tests added to SKIP_TESTS
     # NOTE: test_external_buckconfigs.py: all 4 tests pass with the fixed golden file
@@ -85,8 +85,8 @@ SKIP_TESTS = {
     "test_audit_providers_modifiers_with_subtarget": "Uses Buck2-specific ?modifier syntax",
     "test_audit_providers_modifiers_with_target_universe": "Uses Buck2-specific ?modifier syntax",
     "test_audit_providers_modifiers_with_multiple_target_universe": "Uses Buck2-specific ?modifier syntax",
-    # BLAKE3-KEYED not supported in OSS kuro build
-    "test_blake3": "BLAKE3-KEYED digest algorithm not supported in open source kuro build",
+    # BLAKE3-KEYED not supported in OSS slug build
+    "test_blake3": "BLAKE3-KEYED digest algorithm not supported in open source slug build",
     # Require Meta-internal tooling (fbpython, installer binary, etc.)
     # Buck2-specific cfg modifiers (set_modifiers in PACKAGE files)
     "test_cfg_modifiers_change_target_hash": "Uses Buck2-specific set_modifiers() PACKAGE function",
@@ -113,8 +113,8 @@ SKIP_TESTS = {
     # command_report tests requiring Meta-internal env vars or features
     "test_command_report_watchman_error": "Requires Watchman integration",
     "test_exit_result_connection_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal)",
-    "test_kill_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and kuro clean doesn't bypass daemon auth",
-    "test_clean_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and kuro clean doesn't bypass daemon auth",
+    "test_kill_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and slug clean doesn't bypass daemon auth",
+    "test_clean_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and slug clean doesn't bypass daemon auth",
     "test_command_report_post_build_client_error": "Requires BUCK2_TEST_BUILD_ERROR (Meta-internal)",
     "test_what_uploaded_csv": "Requires Remote Execution (RE) uploads not available",
     "test_what_uploaded_aggregated": "Requires Remote Execution (RE) uploads not available",
@@ -126,9 +126,9 @@ SKIP_TESTS = {
     # CAS artifact - requires Content Addressable Storage RE service
     "test_cas_artifact": "Requires CAS/RE service not available in local builds",
     # (test_unbound_artifact and test_unbound_artifact_inside_tset now pass - deadlock fixed)
-    # BXL tests with --materializations=none: kuro always materializes artifacts locally
-    "test_bxl_ensure_no_materialization": "kuro doesn't support --materializations=none; artifacts are always materialized",
-    "test_bxl_build_no_materialization": "kuro doesn't support --materializations=none; artifacts are always materialized",
+    # BXL tests with --materializations=none: slug always materializes artifacts locally
+    "test_bxl_ensure_no_materialization": "slug doesn't support --materializations=none; artifacts are always materialized",
+    "test_bxl_build_no_materialization": "slug doesn't support --materializations=none; artifacts are always materialized",
     # BXL execution platform tests: require fbpython (Meta-internal) and RE infrastructure
     "test_bxl_execution_platforms": "Requires fbpython (Meta-internal) and RE infrastructure",
     "test_bxl_exec_platform_dynamic_output": "Requires dynamic output feature and RE infrastructure",
@@ -158,7 +158,7 @@ SKIP_TESTS = {
     "test_re_uploads_limit": "Requires Remote Execution (RE) for action cache uploads",
     "test_re_uploads_default": "Requires Remote Execution (RE) for action cache uploads",
     # Content-based path tests - require RE or Buck2-specific content dedup feature
-    "test_write_macro_with_content_based_path": "Content-based path dedup differs between platforms in kuro",
+    "test_write_macro_with_content_based_path": "Content-based path dedup differs between platforms in slug",
     "test_run_remote_with_content_based_path": "Requires --remote-only execution (RE)",
     "test_cas_artifact_with_content_based_path": "Requires CAS/RE for artifact content addressing",
     "test_download_with_content_based_path": "Requires Meta-internal HTTP download service",
@@ -170,8 +170,8 @@ SKIP_TESTS = {
     # Dep files tests - RE or read_config() in rule analysis impl (not BUILD files)
     "test_input_cannot_be_normalized_and_hard_error": "Requires RE for dep file execution (platform has remote_enabled=True)",
     "test_input_cannot_be_normalized": "Requires RE for dep file execution (platform has remote_enabled=True)",
-    # Dep files tests - BUCK2_TEST_TOMBSTONED_DIGESTS uses SHA1 hash but kuro uses SHA256
-    "test_dep_files_ignore_missing_digests": "BUCK2_TEST_TOMBSTONED_DIGESTS uses SHA1 hash but kuro uses SHA256",
+    # Dep files tests - BUCK2_TEST_TOMBSTONED_DIGESTS uses SHA1 hash but slug uses SHA256
+    "test_dep_files_ignore_missing_digests": "BUCK2_TEST_TOMBSTONED_DIGESTS uses SHA1 hash but slug uses SHA256",
     "test_re_dep_file_uploads_same_key": "Requires RE for dep file cache uploads",
     "test_re_dep_file_uploads_different_key": "Requires RE for dep file cache uploads",
     "test_dep_file_does_not_upload_when_allow_cache_upload_is_true": "Requires RE for dep file cache",
@@ -235,16 +235,16 @@ SKIP_TESTS = {
 # 2. Set required environment variables for the Buck test infrastructure
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Path to the kuro binary (symlink at project root)
+# Path to the slug binary (symlink at project root)
 REPO_ROOT = TESTS_DIR.parent
-KURO_BIN = REPO_ROOT / "kuro"
-if not KURO_BIN.exists():
+SLUG_BIN = REPO_ROOT / "slug"
+if not SLUG_BIN.exists():
     # Try cargo debug build location (Windows uses .exe extension)
-    _kuro_exe = REPO_ROOT / "target" / "debug" / "kuro.exe"
-    _kuro_no_ext = REPO_ROOT / "target" / "debug" / "kuro"
-    KURO_BIN = _kuro_exe if _kuro_exe.exists() else _kuro_no_ext
+    _slug_exe = REPO_ROOT / "target" / "debug" / "slug.exe"
+    _slug_no_ext = REPO_ROOT / "target" / "debug" / "slug"
+    SLUG_BIN = _slug_exe if _slug_exe.exists() else _slug_no_ext
 
-os.environ.setdefault("TEST_EXECUTABLE", str(KURO_BIN))
+os.environ.setdefault("TEST_EXECUTABLE", str(SLUG_BIN))
 
 # Required by buck_workspace.py's assertion; it gets deleted before Buck is invoked
 os.environ.setdefault("BUCK2_MAX_BLOCKING_THREADS", "8")
@@ -267,7 +267,7 @@ def _setup_fbpython_shim():
 
     if sys.platform == "win32":
         # On Windows, copy the running Python executable to fbpython.exe so that
-        # kuro's action executor (which uses CreateProcess) can spawn it directly.
+        # slug's action executor (which uses CreateProcess) can spawn it directly.
         # sys.executable gives the exact Python running pytest — most reliable.
         import ctypes
 
@@ -275,7 +275,7 @@ def _setup_fbpython_shim():
         if not python_exe or not os.path.isfile(python_exe):
             return
 
-        shim_dir = Path(tempfile.mkdtemp(prefix="kuro_shims_"))
+        shim_dir = Path(tempfile.mkdtemp(prefix="slug_shims_"))
         # Resolve to long path to avoid 8.3 short-name issues (e.g., WALTER~1)
         buf = ctypes.create_unicode_buffer(32768)
         if ctypes.windll.kernel32.GetLongPathNameW(str(shim_dir), buf, 32768):
@@ -295,7 +295,7 @@ def _setup_fbpython_shim():
         python3 = shutil.which("python3")
         if not python3:
             return
-        shim_dir = Path(tempfile.mkdtemp(prefix="kuro_shims_"))
+        shim_dir = Path(tempfile.mkdtemp(prefix="slug_shims_"))
         shim = shim_dir / "fbpython"
         shim.write_text(f"#!/bin/sh\nexec {python3} \"$@\"\n")
         shim.chmod(0o755)

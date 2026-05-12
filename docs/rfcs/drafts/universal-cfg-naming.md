@@ -48,7 +48,7 @@ def name(cfg: ConfigurationInfo) -> str:
 ```
 
 `PlatformInfo` is no longer available in Starlark. Any place that previously
-uses a `PlatformInfo` will now use `ConfigurationInfo` instead. Kuro will
+uses a `PlatformInfo` will now use `ConfigurationInfo` instead. Slug will
 invoke this function each time it encounters a new `ConfigurationInfo` to define
 its name.
 

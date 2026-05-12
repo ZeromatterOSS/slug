@@ -1,0 +1,48 @@
+[package]
+description = "Common parts of Buck commands"
+edition = "2024"
+license = { workspace = true }
+name = "slug_server_ctx"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-condvar-fair = { workspace = true }
+async-trait = { workspace = true }
+const_format = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+itertools = { workspace = true }
+parking_lot = { workspace = true }
+pin-project = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+
+# Please do not add dependency on `slug_build_api`.
+slug_build_signals = { workspace = true }
+slug_certs = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_execute = { workspace = true }
+slug_fs = { workspace = true }
+slug_node = { workspace = true }
+slug_util = { workspace = true }
+slug_wrapper_common = { workspace = true }
+dice_futures = { workspace = true }
+starlark_map = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+derivative = { workspace = true }
+tokio = { workspace = true }

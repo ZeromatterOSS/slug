@@ -23,7 +23,7 @@ native.set_cfg_constructor(
 )
 ```
 
-`set_cfg_constructor` is a Kuro builtin used to setup configuration modifiers.
+`set_cfg_constructor` is a Slug builtin used to setup configuration modifiers.
 It supports a few configuration points:
 
 - `stage0` and `stage1` are used to resolve modifiers from the
@@ -87,6 +87,6 @@ constraint, we can build it in debug and release mode from the command line
 using the `-m`/`--modifier` flag:
 
 ```sh
-kuro build :my_target -m debug
-kuro build :my_target -m release
+slug build :my_target -m debug
+slug build :my_target -m release
 ```

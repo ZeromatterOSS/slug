@@ -27,7 +27,7 @@ other things apart from Starlark’s evaluation.
 ## How do I see my build file's peak memory usage?
 
 To see the Starlark peak memory usage of a build file, you can inspect the event
-log for your build file. Here is an example entry from the event log for kuro
+log for your build file. Here is an example entry from the event log for slug
 uquery `target` showing that it uses 1.5GB:
 
 ```json
@@ -47,7 +47,7 @@ troubleshooting.
 There are many reasons why Starlark's evaluation of your build file might use a
 lot of memory. We list a few common cases below but there might be more
 cases.<FbInternalOnly> See
-[this post](https://fb.workplace.com/groups/kuroeng/permalink/3309329642697846/)
+[this post](https://fb.workplace.com/groups/slugeng/permalink/3309329642697846/)
 for a few real world examples of debugging Starlark peak memory usage of core
 Android macros that have saved over 5.7GB peak memory!</FbInternalOnly>
 
@@ -165,6 +165,6 @@ memory.
 
 If you still can not figure out how to reduce Starlark memory footprint of your
 build files, <FbInternalOnly>please post in
-[Kuro Users](https://fb.workplace.com/groups/kurousers)</FbInternalOnly><OssOnly>raise
-[an issue](https://github.com/ZeromatterOSS/kuro/issues) in our Github
+[Slug Users](https://fb.workplace.com/groups/slugusers)</FbInternalOnly><OssOnly>raise
+[an issue](https://github.com/ZeromatterOSS/slug/issues) in our Github
 project</OssOnly>.

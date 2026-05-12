@@ -1,6 +1,0 @@
-# Plan 28.6 PR 2 acceptance: load helpers from `@kuro_builtins//`
-# instead of `@prelude//`. Confirms the migrated paths/utils/expect
-# files are reachable via the bundled cell's load namespace.
-load(":defs.bzl", "kuro_builtins_helpers_proof")
-
-kuro_builtins_helpers_proof(name = "kuro_builtins_helpers_proof_target")

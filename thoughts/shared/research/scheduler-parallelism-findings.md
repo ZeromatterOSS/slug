@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Kuro's action execution throughput (3.2 act/sec) lags Bazel (5.6 act/sec) by 43% despite using tokio::spawn for task dispatch. This investigation identified the architecture, measured concurrency controls, and isolated actionable bottlenecks.
+Slug's action execution throughput (3.2 act/sec) lags Bazel (5.6 act/sec) by 43% despite using tokio::spawn for task dispatch. This investigation identified the architecture, measured concurrency controls, and isolated actionable bottlenecks.
 
 **Key finding**: No fundamental architectural blocker preventing parallelism. The shortfall appears to be a combination of:
 1. **I/O thread pool hardcoded to 4 threads** (not related to action parallelism but affects cleanup)
@@ -45,8 +45,8 @@ No global action queue exists; DICE's work-stealing graph drives task spawning.
 - Main concurrency cap is **per-executor HostSharingBroker**, not per-category.
 
 **Citations**:
-- `/var/mnt/dev/kuro/app/kuro_action_impl/src/actions/impls/run.rs:664` — `concurrency: worker.concurrency` (optional per-worker, not per-category)
-- `/var/mnt/dev/kuro/host_sharing/src/host_sharing.rs:166-179` — HostSharingBroker constructor uses global `num_machine_permits`
+- `/var/mnt/dev/slug/app/slug_action_impl/src/actions/impls/run.rs:664` — `concurrency: worker.concurrency` (optional per-worker, not per-category)
+- `/var/mnt/dev/slug/host_sharing/src/host_sharing.rs:166-179` — HostSharingBroker constructor uses global `num_machine_permits`
 
 ---
 
@@ -56,9 +56,9 @@ No global action queue exists; DICE's work-stealing graph drives task spawning.
 
 **Issue 1: I/O thread pool hardcoded to 4 threads**
 
-- `/var/mnt/dev/kuro/app/kuro_execute/src/execute/blocking.rs:101`
+- `/var/mnt/dev/slug/app/slug_execute/src/execute/blocking.rs:101`
   ```rust
-  let io_threads = kuro_env!("BUCK2_IO_THREADS", type=usize, default=4)?;
+  let io_threads = slug_env!("BUCK2_IO_THREADS", type=usize, default=4)?;
   ```
   Default is 4 threads for all I/O operations (file writes, materializer operations). On an llvm-scale build with many concurrent compile actions, this may bottleneck output materialization.
 
@@ -66,7 +66,7 @@ No global action queue exists; DICE's work-stealing graph drives task spawning.
 
 **Issue 2: HostSharingBroker acquisition holds permits across semaphore wait**
 
-- `/var/mnt/dev/kuro/host_sharing/src/host_sharing.rs:212-229`
+- `/var/mnt/dev/slug/host_sharing/src/host_sharing.rs:212-229`
   ```rust
   async fn acquire_from_permits_and_identifiers<'a>(
       ...
@@ -92,7 +92,7 @@ No global action queue exists; DICE's work-stealing graph drives task spawning.
 
 **Rationale**:
 - Action execution is driven by DICE computations, which use `TokioSpawner` (tokio::spawn).
-- `/var/mnt/dev/kuro/dice/dice_futures/src/spawner.rs:29-36`
+- `/var/mnt/dev/slug/dice/dice_futures/src/spawner.rs:29-36`
   ```rust
   impl<T> Spawner<T> for TokioSpawner {
       fn spawn(...) -> JoinHandle<Box<dyn Any + Send + 'static>> {
@@ -100,7 +100,7 @@ No global action queue exists; DICE's work-stealing graph drives task spawning.
       }
   }
   ```
-- Action input materialization uses `tokio::task::unconstrained(KeepGoing::try_compute_join_all(...))` `/var/mnt/dev/kuro/app/kuro_build_api/src/actions/calculation.rs:115-129` — explicitly parallelized.
+- Action input materialization uses `tokio::task::unconstrained(KeepGoing::try_compute_join_all(...))` `/var/mnt/dev/slug/app/slug_build_api/src/actions/calculation.rs:115-129` — explicitly parallelized.
 - No `block_in_place` in the action execution path (only in Starlark evaluator for interpreter safety).
 
 **Conclusion**: Task dispatch is async and properly spawned. Not a candidate.
@@ -113,7 +113,7 @@ No global action queue exists; DICE's work-stealing graph drives task spawning.
 
 **Rationale**:
 - No per-category or per-package ReductionKey found in code review.
-- Action dependencies flow through DICE's `ActionKey` (defined in `kuro_artifact::actions::key::ActionKey`).
+- Action dependencies flow through DICE's `ActionKey` (defined in `slug_artifact::actions::key::ActionKey`).
 - Artifact groups are resolved to per-artifact inputs via `ensure_artifact_group_staged`.
 - Without a DICE trace showing the critical path and how many action nodes have the same inputs, cannot determine if dependencies are too coarse.
 
@@ -134,11 +134,11 @@ This suggests:
 
 **Rationale**:
 - Command execution happens in external workers (local or RE).
-- Kuro's action execution waits on futures, not blocking syscalls.
+- Slug's action execution waits on futures, not blocking syscalls.
 - I/O (materializer, cleanup) uses `BlockingExecutor` trait:
   - `execute_io_inline`: uses `tokio::task::block_in_place` (correct for synchronous I/O inside async)
   - `execute_io`: either dedicates a thread pool (BuckBlockingExecutor) or uses `tokio::task::spawn_blocking` (DirectIoExecutor)
-- `/var/mnt/dev/kuro/app/kuro_execute/src/execute/blocking.rs:137` and `:184`
+- `/var/mnt/dev/slug/app/slug_execute/src/execute/blocking.rs:137` and `:184`
 
 **Conclusion**: I/O handling is correct. Not a dispatcher bottleneck.
 
@@ -165,11 +165,11 @@ This suggests:
 
 ### 2. **Increase I/O thread pool default from 4 to CPU count** (MEDIUM impact, LOW risk)
 
-**Problem**: `/var/mnt/dev/kuro/app/kuro_execute/src/execute/blocking.rs:101` hardcodes `BUCK2_IO_THREADS=4`.
+**Problem**: `/var/mnt/dev/slug/app/slug_execute/src/execute/blocking.rs:101` hardcodes `BUCK2_IO_THREADS=4`.
 
 **Changes to try**:
 ```rust
-let io_threads = kuro_env!("BUCK2_IO_THREADS", type=usize, default=available_parallelism())?;
+let io_threads = slug_env!("BUCK2_IO_THREADS", type=usize, default=available_parallelism())?;
 ```
 
 **Expected impact**: 5-15% throughput gain if output materialization is bottlenecked on I/O thread pool.
@@ -272,7 +272,7 @@ let io_threads = kuro_env!("BUCK2_IO_THREADS", type=usize, default=available_par
 **Why**: Rule implementation evaluation might dominate action dispatch.
 
 **Method**:
-- Check plan-16 flame graphs for time spent in `kuro_interpreter`.
+- Check plan-16 flame graphs for time spent in `slug_interpreter`.
 
 **Output**: % of total build time.
 

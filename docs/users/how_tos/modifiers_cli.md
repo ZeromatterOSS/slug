@@ -27,5 +27,5 @@ pattern followed by the modifiers delimited by `+` (see
 [?modifier](./question_mark_modifier.md) page for more information):
 
 ```sh
-kuro build :my_target?debug+linux
+slug build :my_target?debug+linux
 ```

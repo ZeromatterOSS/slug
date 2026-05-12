@@ -17,7 +17,7 @@ def _dtp():
 def _check_client_to_re_path(ctx: AnalysisContext):
     path = ctx.attrs.client_to_re_path
     if len(path) != 0:
-        m = "Kuro client binary may not have a dependency on `fbcode//remote_execution/`!"
+        m = "Slug client binary may not have a dependency on `fbcode//remote_execution/`!"
         m += "\nDependency path:"
         m += "".join(["\n" + str(t) for t in path])
         fail(m)
@@ -36,7 +36,7 @@ def _check_top_level_only(ctx: AnalysisContext):
     for all_paths in ctx.attrs.top_level_only_paths:
         all_paths = list(all_paths)
         target = all_paths.pop()
-        remainder = filter(lambda t: not str(t.label).startswith("fbcode//kuro/app/kuro:"), all_paths)
+        remainder = filter(lambda t: not str(t.label).startswith("fbcode//slug/app/slug:"), all_paths)
 
         if len(remainder) != 0:
             m = "Top-level-only crate `" + str(target.label) + "` may not be depended on by:"
@@ -59,7 +59,7 @@ def _impl(ctx: AnalysisContext):
     _check_banned_dep_paths(ctx)
     return [DefaultInfo()]
 
-_test_kuro_dep_graph = rule(
+_test_slug_dep_graph = rule(
     impl = _impl,
     attrs = {
         "banned_dep_paths": attrs.list(attrs.query()),
@@ -69,15 +69,15 @@ _test_kuro_dep_graph = rule(
     },
 )
 
-_CLIENT_BIN = "fbcode//kuro/app/kuro:kuro_client-bin"
+_CLIENT_BIN = "fbcode//slug/app/slug:slug_client-bin"
 
-_BUCK2_BIN = "fbcode//kuro/app/kuro:kuro-bin"
+_BUCK2_BIN = "fbcode//slug/app/slug:slug-bin"
 
 _RE_CLIENT_TARGET = "//remote_execution/client_lib/wrappers/rust:re_client_lib"
 
 _CLIENT_TO_RE = "somepath({}, filter(fbcode//remote_execution/, deps({})) + {})".format(_CLIENT_BIN, _CLIENT_BIN, _RE_CLIENT_TARGET)
 
-def test_kuro_dep_graph(name):
+def test_slug_dep_graph(name):
     banned_dep_paths = []
     for a, b in BANNED_DEP_PATHS:
         if a > b:
@@ -89,7 +89,7 @@ def test_kuro_dep_graph(name):
         banned_dep_paths.append("somepath({}, {})".format(a, b))
         banned_dep_paths.append("somepath({}, {})".format(b, a))
 
-    _test_kuro_dep_graph(
+    _test_slug_dep_graph(
         name = name,
         banned_dep_paths = banned_dep_paths,
         client_to_re_path = _CLIENT_TO_RE,

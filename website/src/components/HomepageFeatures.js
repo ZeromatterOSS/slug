@@ -18,7 +18,7 @@ const FeatureList = [
     title: 'Fast',
     description: (
       <>
-        Kuro targets Bazel 9 compatibility while reusing Buck2's fast Rust
+        Slug targets Bazel 9 compatibility while reusing Buck2's fast Rust
         internals. It is experimental software for exploring build-system design
         and agentic programming.
       </>
@@ -29,7 +29,7 @@ const FeatureList = [
     title: 'Reliable',
     description: (
       <>
-        Kuro aims to preserve Bazel-compatible hermeticity and dependency
+        Slug aims to preserve Bazel-compatible hermeticity and dependency
         semantics. Missing dependencies should be surfaced as errors rather than
         hidden by local machine state.
       </>
@@ -40,7 +40,7 @@ const FeatureList = [
     title: 'Extensible',
     description: (
       <>
-        Kuro builds on Starlark, DICE, Superconsole, and remote execution
+        Slug builds on Starlark, DICE, Superconsole, and remote execution
         architecture inherited from Buck2 while evolving as a separate
         Zeromatter Inc project.
       </>

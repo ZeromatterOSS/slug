@@ -1,0 +1,1053 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::io::BufWriter;
+use std::marker::PhantomData;
+use std::sync::Arc;
+use std::time::Instant;
+
+use allocative::Allocative;
+use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::DiceData;
+use dice::DiceTransactionUpdater;
+use dice::UserComputationData;
+use dice::UserCycleDetector;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use gazebo::prelude::SliceExt;
+use host_sharing::HostSharingBroker;
+use host_sharing::HostSharingStrategy;
+use slug_build_api::actions::execute::dice_data::SetCommandExecutor;
+use slug_build_api::actions::execute::dice_data::SetReClient;
+use slug_build_api::actions::execute::dice_data::set_fallback_executor_config;
+use slug_build_api::actions::impls::run_action_knobs::HasRunActionKnobs;
+use slug_build_api::actions::impls::run_action_knobs::RunActionKnobs;
+use slug_build_api::build::HasCreateUnhashedSymlinkLock;
+use slug_build_api::build::detailed_aggregated_metrics::dice::SetDetailedAggregatedMetricsEventsHolder;
+use slug_build_api::build_signals::BuildSignalsInstaller;
+use slug_build_api::build_signals::SetBuildSignals;
+use slug_build_api::build_signals::create_build_signals;
+use slug_build_api::context::SetBuildContextData;
+use slug_build_api::keep_going::HasKeepGoing;
+use slug_build_api::materialize::HasMaterializationQueueTracker;
+use slug_build_api::spawner::BuckSpawner;
+use slug_build_signals::env::CriticalPathBackendName;
+use slug_build_signals::env::EarlyCommandTimingBuilder;
+use slug_build_signals::env::FILE_WATCHER_WAIT;
+use slug_build_signals::env::HasCriticalPathBackend;
+use slug_certs::validate::CertState;
+use slug_cli_proto::ClientContext;
+use slug_cli_proto::CommonBuildOptions;
+use slug_cli_proto::ConfigOverride;
+use slug_cli_proto::client_context::ExitWhen;
+use slug_cli_proto::client_context::HostArchOverride;
+use slug_cli_proto::client_context::HostPlatformOverride;
+use slug_cli_proto::client_context::PreemptibleWhen;
+use slug_cli_proto::common_build_options::ExecutionStrategy;
+use slug_cli_proto::config_override::ConfigType;
+use slug_common::dice::cells::SetCellResolver;
+use slug_common::dice::cycles::CycleDetectorAdapter;
+use slug_common::dice::cycles::PairDiceCycleDetector;
+use slug_common::file_ops::io::initialize_read_dir_cache;
+use slug_common::http::SetHttpClient;
+use slug_common::invocation_paths::InvocationPaths;
+use slug_common::io::trace::TracingIoProvider;
+use slug_common::legacy_configs::cells::BuckConfigBasedCells;
+use slug_common::legacy_configs::configs::LegacyBuckConfig;
+use slug_common::legacy_configs::dice::HasInjectedLegacyConfigs;
+use slug_configured::cycle::ConfiguredGraphCycleDescriptor;
+use slug_core::execution_types::executor_config::CommandExecutorConfig;
+use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
+use slug_core::facebook_only;
+use slug_core::fs::project::ProjectRoot;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
+use slug_core::pattern::pattern::ParsedPattern;
+use slug_core::pattern::pattern::ParsedPatternWithModifiers;
+use slug_core::pattern::pattern_type::ConfiguredProvidersPatternExtra;
+use slug_core::target::label::interner::ConcurrentTargetLabelInterner;
+use slug_events::dispatch::EventDispatcher;
+use slug_events::metadata;
+use slug_events::schedule_type::SandcastleScheduleType;
+use slug_execute::execute::blocking::SetBlockingExecutor;
+use slug_execute::knobs::ExecutorGlobalKnobs;
+use slug_execute::materialize::materializer::Materializer;
+use slug_execute::materialize::materializer::SetMaterializer;
+use slug_execute::re::client::RemoteExecutionClient;
+use slug_execute::re::manager::ReConnectionHandle;
+use slug_execute::re::manager::ReConnectionObserver;
+use slug_execute::re::output_trees_download_config::OutputTreesDownloadConfig;
+use slug_execute_impl::executors::worker::WorkerPool;
+use slug_execute_impl::low_pass_filter::LowPassFilter;
+use slug_file_watcher::mergebase::SetMergebase;
+use slug_fs::paths::abs_norm_path::AbsNormPath;
+use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
+use slug_fs::paths::file_name::FileName;
+use slug_fs::paths::file_name::FileNameBuf;
+use slug_fs::working_dir::AbsWorkingDir;
+use slug_interpreter::dice::starlark_debug::SetStarlarkDebugger;
+use slug_interpreter::extra::InterpreterHostArchitecture;
+use slug_interpreter::extra::InterpreterHostPlatform;
+use slug_interpreter::extra::xcode::XcodeVersionInfo;
+use slug_interpreter::factory::SetProfileEventListener;
+use slug_interpreter_for_build::interpreter::configuror::BuildInterpreterConfiguror;
+use slug_interpreter_for_build::interpreter::cycles::LoadCycleDescriptor;
+use slug_interpreter_for_build::interpreter::interpreter_setup::setup_interpreter;
+use slug_resource_control::HasResourceControl;
+use slug_server_ctx::bxl::InitBxlStreamingTracker;
+use slug_server_ctx::concurrency::DiceUpdater;
+use slug_server_ctx::ctx::DiceAccessor;
+use slug_server_ctx::ctx::LockedPreviousCommandData;
+use slug_server_ctx::ctx::PrivateStruct;
+use slug_server_ctx::ctx::ServerCommandContextTrait;
+use slug_server_ctx::stderr_output_guard::StderrOutputGuard;
+use slug_server_ctx::stderr_output_guard::StderrOutputWriter;
+use slug_server_starlark_debug::BuckStarlarkDebuggerHandle;
+use slug_server_starlark_debug::create_debugger_handle;
+use slug_test::local_resource_registry::InitLocalResourceRegistry;
+use slug_util::arc_str::ArcS;
+use slug_util::truncate::truncate_container;
+use slug_validation::enabled_optional_validations_key::SetEnabledOptionalValidations;
+use tracing::warn;
+
+use crate::active_commands::ActiveCommandDropGuard;
+use crate::daemon::common::CommandExecutorFactory;
+use crate::daemon::common::get_default_executor_config;
+use crate::daemon::state::DaemonStateData;
+use crate::dice_tracker::BuckDiceTracker;
+use crate::heartbeat_guard::HeartbeatGuard;
+use crate::host_info;
+use crate::profile_patterns::FileWritingProfileEventListener;
+use crate::profiling_manager::StarlarkProfilingManager;
+use crate::snapshot::SnapshotCollector;
+
+#[derive(Debug, slug_error::Error)]
+#[slug(tag = Environment)]
+enum DaemonCommunicationError {
+    #[error("Got invalid working directory `{0}`")]
+    InvalidWorkingDirectory(String),
+}
+
+fn parse_concurrency(requested: u32) -> Option<usize> {
+    let ret: usize = requested
+        .try_into()
+        .expect("Slug isn't built for 16 bit systems");
+
+    if ret == 0 { None } else { Some(ret) }
+}
+
+/// BaseCommandContext provides access to the global daemon state and information specific to a command (like the
+/// EventDispatcher). Most commands use a ServerCommandContext which has more command/client-specific information.
+pub struct BaseServerCommandContext {
+    /// An fbinit token for using things that require fbinit. fbinit is initialized on daemon startup.
+    pub _fb: fbinit::FacebookInit,
+    /// Absolute path to the project root.
+    pub project_root: ProjectRoot,
+    /// The event dispatcher for this command context.
+    pub events: EventDispatcher,
+    /// Underlying data that isn't command-level.
+    pub(crate) daemon: Arc<DaemonStateData>,
+    /// Removes this command from the set of active commands when dropped.
+    pub _drop_guard: ActiveCommandDropGuard,
+    /// Spawner
+    pub spawner: Arc<BuckSpawner>,
+}
+
+/// ServerCommandContext provides access to the global daemon state and information about the calling client for
+/// the implementation of DaemonApi endpoints (ex. targets, query, build).
+pub struct ServerCommandContext<'a> {
+    pub base_context: BaseServerCommandContext,
+
+    /// The working directory of the client. This is used for resolving things in the request in a
+    /// working-dir relative way. For example, it's common to resolve target patterns relative to
+    /// the working directory and resolving cell aliases there. This should generally only be used
+    /// to interpret values that are in the request. We should convert to client-agnostic things early.
+    pub working_dir: ArcS<ProjectRelativePath>,
+
+    working_dir_abs: AbsWorkingDir,
+
+    /// The oncall specified by the client, if any. This gets injected into request metadata.
+    pub oncall: Option<String>,
+    /// The client ID, if one was provided via --client-metadata.
+    pub client_id_from_client_metadata: Option<String>,
+
+    host_platform_override: HostPlatformOverride,
+    host_arch_override: HostArchOverride,
+    host_xcode_version_override: Option<String>,
+
+    reuse_current_config: bool,
+    config_overrides: Vec<ConfigOverride>,
+
+    // This ensures that there's only one RE connection during the lifetime of this context. It's possible
+    // that we give out other handles, but we don't depend on the lifetimes of those for this guarantee. We
+    // also use this to send a RemoteExecutionSessionCreated if the connection is made.
+    _re_connection_handle: ReConnectionHandle,
+
+    /// Starlark profiler instrumentation requested throughout the duration of this command. Usually associated with
+    /// the `slug profile` command.
+    pub starlark_profiling_manager: StarlarkProfilingManager,
+
+    debugger_handle: Option<BuckStarlarkDebuggerHandle>,
+
+    record_target_call_stacks: bool,
+    skip_targets_with_duplicate_names: bool,
+    disable_starlark_types: bool,
+    unstable_typecheck: bool,
+
+    pub buck_out_dir: ProjectRelativePathBuf,
+    isolation_prefix: FileNameBuf,
+
+    /// Common build options associated with this command.
+    build_options: Option<CommonBuildOptions>,
+
+    /// Keep emitting heartbeat events while the ServerCommandContext is alive  We put this in an
+    /// Option so that we can ensure heartbeat events are cancelled before everything else is
+    /// dropped.
+    heartbeat_guard_handle: Option<HeartbeatGuard>,
+
+    /// The current state of the certificate. This is used to detect errors due to invalid certs.
+    cert_state: CertState,
+
+    /// Daemon uuid passed in from the client side to detect nested invocation.
+    pub(crate) daemon_uuid_from_client: Option<String>,
+
+    /// Command named passed from the CLI
+    pub(crate) command_name: String,
+
+    /// Sanitized argument vector from the CLI from the client side.
+    pub(crate) sanitized_argv: Vec<String>,
+
+    cancellations: &'a CancellationContext,
+
+    preemptible: PreemptibleWhen,
+
+    exit_when: ExitWhen,
+
+    command_start: Instant,
+}
+
+impl<'a> ServerCommandContext<'a> {
+    pub fn new(
+        base_context: BaseServerCommandContext,
+        client_context: &ClientContext,
+        starlark_profiling_manager: StarlarkProfilingManager,
+        build_options: Option<&CommonBuildOptions>,
+        paths: &InvocationPaths,
+        cert_state: CertState,
+        snapshot_collector: SnapshotCollector,
+        cancellations: &'a CancellationContext,
+        command_start: Instant,
+    ) -> slug_error::Result<Self> {
+        let working_dir = AbsNormPath::new(&client_context.working_dir)?;
+
+        let working_dir_project_relative = working_dir
+            .strip_prefix(base_context.project_root.root())
+            .map_err(|_| {
+                Into::<slug_error::Error>::into(DaemonCommunicationError::InvalidWorkingDirectory(
+                    client_context.working_dir.clone(),
+                ))
+            })?;
+        let working_dir_project_relative: ArcS<ProjectRelativePath> =
+            ArcS::from(<&ProjectRelativePath>::from(&*working_dir_project_relative));
+
+        #[derive(Allocative)]
+        struct Observer {
+            events: EventDispatcher,
+        }
+
+        impl ReConnectionObserver for Observer {
+            fn session_created(&self, client: &RemoteExecutionClient) {
+                let session_id = client.get_session_id();
+                let experiment_name = match client.get_experiment_name() {
+                    Ok(Some(exp)) => exp,
+                    Ok(None) => "".to_owned(),
+                    Err(e) => {
+                        tracing::debug!("Failed to access RE experiment name: {:#}", e);
+                        "<ffi error>".to_owned()
+                    }
+                };
+
+                self.events
+                    .instant_event(slug_data::RemoteExecutionSessionCreated {
+                        session_id: session_id.to_owned(),
+                        experiment_name,
+                        persistent_cache_mode: client.get_persistent_cache_mode(),
+                    })
+            }
+        }
+
+        let mut re_connection_handle = base_context.daemon.re_client_manager.get_re_connection();
+
+        re_connection_handle.set_observer(Arc::new(Observer {
+            events: base_context.events.dupe(),
+        }));
+
+        // Add argfiles read by client into IO tracing state.
+        if let Some(tracing_provider) = TracingIoProvider::from_io(&*base_context.daemon.io) {
+            for p in client_context
+                .argfiles
+                .iter()
+                .map(|s| AbsNormPathBuf::new(s.into()))
+            {
+                tracing_provider.add_external_path(p?);
+            }
+        }
+
+        // Propagate compilation_mode and --define values from client to the global build config
+        slug_build_api::interpreter::rule_defs::build_config::set_compilation_mode(
+            &client_context.compilation_mode,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_defines(
+            &client_context.define_values,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_action_env(
+            &client_context.action_env,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_copts(&client_context.copts);
+        slug_build_api::interpreter::rule_defs::build_config::set_cxxopts(&client_context.cxxopts);
+        slug_build_api::interpreter::rule_defs::build_config::set_conlyopts(
+            &client_context.conlyopts,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_linkopts(
+            &client_context.linkopts,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_strip(&client_context.strip_mode);
+        slug_build_api::interpreter::rule_defs::build_config::set_features(
+            &client_context.global_features,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_test_env(
+            &client_context.test_env,
+        );
+        // Stamp comes from CommonBuildOptions (--stamp/--nostamp) or ClientContext proto
+        let stamp_enabled = build_options
+            .map(|opts| opts.stamp)
+            .unwrap_or(client_context.stamp);
+        slug_build_api::interpreter::rule_defs::build_config::set_stamp(stamp_enabled);
+        slug_build_api::interpreter::rule_defs::build_config::set_collect_code_coverage(
+            client_context.collect_code_coverage,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_force_pic(
+            client_context.force_pic,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_experimental_cc_implementation_deps(
+            client_context.experimental_cc_implementation_deps,
+        );
+        slug_build_api::interpreter::rule_defs::build_config::set_starlark_flags(
+            &client_context.starlark_flags,
+        );
+
+        let oncall = if client_context.oncall.is_empty() {
+            None
+        } else {
+            Some(client_context.oncall.clone())
+        };
+
+        // Use rev() to get the last "id" entry if there are duplicates.
+        let client_id_from_client_metadata = client_context
+            .client_metadata
+            .iter()
+            .rev()
+            .find(|m| m.key == "id")
+            .map(|m| m.value.clone());
+
+        let heartbeat_guard_handle =
+            HeartbeatGuard::new(base_context.events.dupe(), snapshot_collector);
+
+        let debugger_handle = create_debugger_handle(base_context.events.dupe());
+
+        Ok(ServerCommandContext {
+            base_context,
+            working_dir: working_dir_project_relative,
+            working_dir_abs: AbsWorkingDir::unchecked_new(working_dir.to_buf()),
+            host_platform_override: client_context.host_platform(),
+            host_arch_override: client_context.host_arch(),
+            host_xcode_version_override: client_context.host_xcode_version.clone(),
+            reuse_current_config: client_context.reuse_current_config,
+            config_overrides: client_context.config_overrides.clone(),
+            oncall,
+            client_id_from_client_metadata,
+            _re_connection_handle: re_connection_handle,
+            cert_state,
+            starlark_profiling_manager,
+            buck_out_dir: paths.buck_out_dir(),
+            isolation_prefix: paths.isolation.clone(),
+            build_options: build_options.cloned(),
+            record_target_call_stacks: client_context.target_call_stacks,
+            skip_targets_with_duplicate_names: client_context.skip_targets_with_duplicate_names,
+            disable_starlark_types: client_context.disable_starlark_types,
+            unstable_typecheck: client_context.unstable_typecheck,
+            heartbeat_guard_handle: Some(heartbeat_guard_handle),
+            daemon_uuid_from_client: client_context.daemon_uuid.clone(),
+            command_name: client_context.command_name.clone(),
+            sanitized_argv: client_context.sanitized_argv.clone(),
+            debugger_handle,
+            cancellations,
+            preemptible: client_context.preemptible(),
+            exit_when: client_context.exit_when(),
+            command_start,
+        })
+    }
+
+    async fn dice_updater<'s>(
+        &'s self,
+        build_signals: BuildSignalsInstaller,
+    ) -> slug_error::Result<DiceCommandUpdater<'s, 'a>> {
+        let execution_strategy = self
+            .build_options
+            .as_ref()
+            .map(|opts| opts.execution_strategy)
+            .map_or(ExecutionStrategy::LocalOnly, |strategy| {
+                ExecutionStrategy::try_from(strategy).expect("execution strategy should be valid")
+            });
+
+        let skip_cache_read = self
+            .build_options
+            .as_ref()
+            .map(|opts| opts.skip_cache_read)
+            .unwrap_or_default();
+
+        let skip_cache_write = self
+            .build_options
+            .as_ref()
+            .map(|opts| opts.skip_cache_write)
+            .unwrap_or_default();
+
+        let eager_dep_files = if let Some(build_options) = self.build_options.as_ref() {
+            build_options.eager_dep_files
+        } else {
+            false
+        };
+
+        let run_action_knobs = RunActionKnobs {
+            use_network_action_output_cache: self
+                .base_context
+                .daemon
+                .use_network_action_output_cache,
+            eager_dep_files,
+            default_allow_cache_upload: false,
+            action_paths_interner: None,
+            deduplicate_get_digests_ttl_calls: false,
+            re_outputs_required: false,
+        };
+
+        let concurrency = self
+            .build_options
+            .as_ref()
+            .and_then(|opts| opts.concurrency.as_ref())
+            .and_then(|obj| parse_concurrency(obj.concurrency));
+
+        let re_configured = self
+            .base_context
+            .daemon
+            .re_client_manager
+            .is_re_configured();
+        let default_exec_properties = self
+            .base_context
+            .daemon
+            .re_client_manager
+            .default_exec_properties();
+        let executor_config = get_default_executor_config(
+            self.host_platform_override,
+            re_configured,
+            &default_exec_properties,
+        );
+        let re_connection = Arc::new(self.get_re_connection());
+
+        let upload_all_actions = self
+            .build_options
+            .as_ref()
+            .is_some_and(|opts| opts.upload_all_actions);
+
+        let (interpreter_platform, interpreter_architecture, interpreter_xcode_version) =
+            host_info::get_host_info(
+                self.host_platform_override,
+                self.host_arch_override,
+                &self.host_xcode_version_override,
+            )?;
+
+        Ok(DiceCommandUpdater {
+            cmd_ctx: self,
+            execution_strategy,
+            run_action_knobs,
+            concurrency,
+            executor_config: Arc::new(executor_config),
+            re_connection,
+            build_signals,
+            upload_all_actions,
+            skip_cache_read,
+            skip_cache_write,
+            keep_going: self
+                .build_options
+                .as_ref()
+                .is_some_and(|opts| opts.keep_going),
+            materialize_failed_inputs: self
+                .build_options
+                .as_ref()
+                .is_some_and(|opts| opts.materialize_failed_inputs),
+            interpreter_platform,
+            interpreter_architecture,
+            interpreter_xcode_version,
+            materialize_failed_outputs: self
+                .build_options
+                .as_ref()
+                .is_some_and(|opts| opts.materialize_failed_outputs),
+            sandbox_cli_override: self
+                .build_options
+                .as_ref()
+                .and_then(|opts| opts.sandbox_enabled),
+            profile_event_listener: self
+                .starlark_profiling_manager
+                .profile_event_listener
+                .dupe(),
+        })
+    }
+
+    pub fn get_re_connection(&self) -> ReConnectionHandle {
+        self.base_context
+            .daemon
+            .re_client_manager
+            .get_re_connection()
+    }
+
+    // Called at the end of the command to perform any necessary final actions or cleanup.
+    pub(crate) async fn finalize(mut self) -> slug_error::Result<()> {
+        self.starlark_profiling_manager.finalize()?;
+        self.heartbeat_guard_handle.take().unwrap().finalize().await;
+        Ok(())
+    }
+}
+
+impl ServerCommandContext<'_> {
+    async fn load_new_configs(
+        &self,
+        dice_ctx: &mut DiceComputations<'_>,
+    ) -> slug_error::Result<BuckConfigBasedCells> {
+        let new_configs = BuckConfigBasedCells::parse_with_config_args(
+            &self.base_context.project_root,
+            &self.config_overrides,
+        )
+        .await?;
+
+        if self.reuse_current_config {
+            if dice_ctx
+                .is_injected_external_buckconfig_data_key_set()
+                .await?
+            {
+                if !self.config_overrides.is_empty() {
+                    let config_type_str = |c| match ConfigType::try_from(c) {
+                        Ok(ConfigType::Value) => "--config",
+                        Ok(ConfigType::File) => "--config-file",
+                        Err(_) => "",
+                    };
+                    warn!(
+                        "Found config overrides while using --reuse-current-config flag. Ignoring overrides [{}] and using current config instead",
+                        truncate_container(
+                            self.config_overrides.iter().map(|o| {
+                                format!("{} {}", config_type_str(o.config_type), o.config_override)
+                            }),
+                            200
+                        ),
+                    );
+                }
+                // If `--reuse-current-config` is set, use the external config data from the
+                // previous command.
+                Ok(BuckConfigBasedCells {
+                    cell_resolver: new_configs.cell_resolver,
+                    root_config: new_configs.root_config,
+                    external_data: (*dice_ctx.get_injected_external_buckconfig_data().await?)
+                        .clone(),
+                    is_bzlmod: new_configs.is_bzlmod,
+                })
+            } else {
+                // If there is no previous command but the flag was set, then the flag is ignored,
+                // the command behaves as if there isn't the reuse config flag.
+                warn!(
+                    "--reuse-current-config flag was set, but there was no previous invocation detected. Ignoring --reuse-current-config flag"
+                );
+                Ok(new_configs)
+            }
+        } else {
+            Ok(new_configs)
+        }
+    }
+}
+
+struct DiceCommandUpdater<'s, 'a: 's> {
+    cmd_ctx: &'s ServerCommandContext<'a>,
+    execution_strategy: ExecutionStrategy,
+    concurrency: Option<usize>,
+    executor_config: Arc<CommandExecutorConfig>,
+    re_connection: Arc<ReConnectionHandle>,
+    profile_event_listener: Option<Arc<FileWritingProfileEventListener>>,
+    build_signals: BuildSignalsInstaller,
+    upload_all_actions: bool,
+    run_action_knobs: RunActionKnobs,
+    skip_cache_read: bool,
+    skip_cache_write: bool,
+    keep_going: bool,
+    materialize_failed_inputs: bool,
+    materialize_failed_outputs: bool,
+    /// CLI override for sandbox: Some(true/false) from --sandbox/--nosandbox, None to use buckconfig.
+    sandbox_cli_override: Option<bool>,
+    interpreter_platform: InterpreterHostPlatform,
+    interpreter_architecture: InterpreterHostArchitecture,
+    interpreter_xcode_version: Option<XcodeVersionInfo>,
+}
+
+fn create_cycle_detector() -> Arc<dyn UserCycleDetector> {
+    Arc::new(PairDiceCycleDetector(
+        CycleDetectorAdapter::<LoadCycleDescriptor>::new(),
+        CycleDetectorAdapter::<ConfiguredGraphCycleDescriptor>::new(),
+    ))
+}
+
+#[async_trait]
+impl DiceUpdater for DiceCommandUpdater<'_, '_> {
+    async fn update(
+        &self,
+        mut ctx: DiceTransactionUpdater,
+        early_timings: &mut EarlyCommandTimingBuilder,
+    ) -> slug_error::Result<(DiceTransactionUpdater, UserComputationData)> {
+        let existing_state = &mut ctx.existing_state().await.clone();
+        let cells_and_configs = self.cmd_ctx.load_new_configs(existing_state).await?;
+        let is_bzlmod = cells_and_configs.is_bzlmod;
+        let cell_resolver = cells_and_configs.cell_resolver;
+
+        let configuror = BuildInterpreterConfiguror::new(
+            self.interpreter_platform,
+            self.interpreter_architecture,
+            self.interpreter_xcode_version.clone(),
+            self.cmd_ctx.record_target_call_stacks,
+            self.cmd_ctx.skip_targets_with_duplicate_names,
+            None,
+            // New interner for each transaction.
+            Arc::new(ConcurrentTargetLabelInterner::default()),
+        )?;
+
+        ctx.set_buck_out_path(Some(self.cmd_ctx.buck_out_dir.clone()))?;
+
+        let optional_validations = self
+            .cmd_ctx
+            .build_options
+            .as_ref()
+            .map_or(Vec::new(), |opts| opts.enable_optional_validations.clone());
+
+        ctx.set_enabled_optional_validations(optional_validations)?;
+
+        // Plan 24 Phase 1: thread `--extra_execution_platforms` from the
+        // BuildRequest into a DICE injected key so
+        // `compute_execution_platforms` is properly invalidated when the
+        // flag changes between builds in the same daemon. Modeled as
+        // `InjectedKey` (not `UserComputationData`) because compute()
+        // returning Err for one set of extras would otherwise be served
+        // to a follow-up build with different extras.
+        let extra_exec_platforms: Vec<String> = self
+            .cmd_ctx
+            .build_options
+            .as_ref()
+            .map(|opts| opts.extra_execution_platforms.clone())
+            .unwrap_or_default();
+        slug_configured::execution::SetExtraExecutionPlatforms::set_extra_execution_platforms(
+            &mut ctx,
+            extra_exec_platforms,
+        )?;
+
+        let profiler_instrumentation_override =
+            &self.cmd_ctx.starlark_profiling_manager.configuration;
+
+        setup_interpreter(
+            &mut ctx,
+            cell_resolver,
+            configuror,
+            cells_and_configs.external_data,
+            profiler_instrumentation_override.clone(),
+            self.cmd_ctx.disable_starlark_types,
+            self.cmd_ctx.unstable_typecheck,
+        )?;
+        ctx.set_is_bzlmod(is_bzlmod)?;
+
+        early_timings.start_span(FILE_WATCHER_WAIT.to_owned());
+        let (ctx, mergebase) = self
+            .cmd_ctx
+            .base_context
+            .daemon
+            .file_watcher
+            .sync(ctx)
+            .await?;
+        early_timings.end_known_span();
+
+        let mut user_data = self.make_user_computation_data(&cells_and_configs.root_config)?;
+        user_data.set_mergebase(mergebase);
+
+        Ok((ctx, user_data))
+    }
+}
+
+impl DiceCommandUpdater<'_, '_> {
+    fn make_user_computation_data(
+        &self,
+        root_config: &LegacyBuckConfig,
+    ) -> slug_error::Result<UserComputationData> {
+        let concurrency = self
+            .concurrency
+            .unwrap_or_else(slug_util::threads::available_parallelism_fresh);
+
+        let enable_miniperf = true;
+        let log_action_keys = true;
+        let log_configured_graph_size = false;
+        let persistent_worker_shutdown_timeout_s = Some(10);
+
+        // CLI flag (--sandbox/--nosandbox) is the only source for sandbox enablement.
+        let sandbox_enabled = self.sandbox_cli_override.unwrap_or(false);
+
+        let executor_global_knobs = ExecutorGlobalKnobs {
+            enable_miniperf,
+            log_action_keys,
+            re_cancel_on_estimated_queue_time_exceeds: None,
+            re_fallback_on_estimated_queue_time_exceeds: None,
+            sandbox_enabled,
+        };
+
+        let host_sharing_broker =
+            HostSharingBroker::new(HostSharingStrategy::SmallerTasksFirst, concurrency);
+
+        // We use the job count for the low pass filter too. The low pass filter prevents sending
+        // RE-eligile tasks to local if their concurrency is higher than our threshold. While it
+        // doesn't *have* to be the same as the concurrency we give the actual executor, it's a
+        // reasonable pick, because if we send more tasks than our concurrency limit allows, we
+        // would expect to start losing out to RE in terms of perf.
+        let low_pass_filter = LowPassFilter::new(concurrency);
+
+        let mut data = DiceData::new();
+        data.set(self.cmd_ctx.events().dupe());
+        data.set(HasResourceControl(
+            self.cmd_ctx.base_context.daemon.memory_tracker.is_some(),
+        ));
+
+        let cycle_detector = Some(create_cycle_detector());
+        let has_cycle_detector = cycle_detector.is_some();
+
+        let run_action_knobs = self.run_action_knobs.dupe();
+
+        let output_trees_download_config = OutputTreesDownloadConfig::new(None, true);
+
+        _ = slug_core::faster_directories::VALUE.store(true, std::sync::atomic::Ordering::Relaxed);
+
+        let mut data = UserComputationData {
+            data,
+            tracker: Arc::new(BuckDiceTracker::new(self.cmd_ctx.events().dupe())?),
+            cycle_detector,
+            activation_tracker: Some(self.build_signals.activation_tracker.dupe()),
+            ..Default::default()
+        };
+        data.set_detailed_aggregated_metrics_events_holder();
+
+        let worker_pool = Arc::new(WorkerPool::new(persistent_worker_shutdown_timeout_s));
+
+        let critical_path_backend = CriticalPathBackendName::LongestPathGraph;
+
+        let override_use_case: Option<RemoteExecutorUseCase> = None;
+
+        set_fallback_executor_config(&mut data.data, self.executor_config.dupe());
+        // This client is only used in places that do not use the RE use case specified in the executor config.
+        // They currently use either a usecase specified in actions (cas_artifact), or a global default (slug.default_remote_execution_use_case).
+        // We should not override the cas_artifact usecase or else the ttl may not match the action declaration.
+        data.set_re_client(self.re_connection.get_client());
+        if let Some(v) = &self.profile_event_listener {
+            SetProfileEventListener::set(&mut data, v.clone());
+        }
+        data.set_command_executor(Box::new(CommandExecutorFactory::new(
+            self.re_connection.dupe(),
+            host_sharing_broker,
+            low_pass_filter,
+            self.cmd_ctx.base_context.daemon.materializer.dupe(),
+            self.cmd_ctx.base_context.daemon.blocking_executor.dupe(),
+            self.execution_strategy,
+            executor_global_knobs,
+            self.upload_all_actions,
+            self.cmd_ctx.base_context.daemon.forkserver.dupe(),
+            self.skip_cache_read,
+            self.skip_cache_write,
+            self.cmd_ctx.base_context.daemon.io.project_root().dupe(),
+            worker_pool,
+            self.cmd_ctx.base_context.daemon.paranoid.dupe(),
+            self.materialize_failed_inputs,
+            self.materialize_failed_outputs,
+            override_use_case,
+            self.cmd_ctx.base_context.daemon.memory_tracker.dupe(),
+            self.cmd_ctx.base_context.daemon.incremental_db_state.dupe(),
+            run_action_knobs.deduplicate_get_digests_ttl_calls,
+            output_trees_download_config.dupe(),
+            self.cmd_ctx.base_context.daemon.daemon_id.dupe(),
+        )));
+        data.set_blocking_executor(self.cmd_ctx.base_context.daemon.blocking_executor.dupe());
+        data.set_http_client(self.cmd_ctx.base_context.daemon.http_client.dupe());
+        data.set_materializer(self.cmd_ctx.base_context.daemon.materializer.dupe());
+        data.init_materialization_queue_tracker();
+        data.set_build_signals(self.build_signals.build_signals.dupe());
+        data.set_run_action_knobs(run_action_knobs);
+        data.set_create_unhashed_symlink_lock(
+            self.cmd_ctx
+                .base_context
+                .daemon
+                .create_unhashed_outputs_lock
+                .dupe(),
+        );
+        data.set_starlark_debugger_handle(
+            self.cmd_ctx
+                .debugger_handle
+                .clone()
+                .map(|v| Box::new(v) as _),
+        );
+        data.set_keep_going(self.keep_going);
+        data.set_critical_path_backend(critical_path_backend);
+        data.init_local_resource_registry();
+        data.init_bxl_streaming_tracker();
+        initialize_read_dir_cache(&mut data);
+        data.spawner = self.cmd_ctx.base_context.daemon.spawner.dupe();
+
+        let tags = vec![
+            format!("lazy-cycle-detector:{}", has_cycle_detector),
+            format!("miniperf:{}", enable_miniperf),
+            format!("log-configured-graph-size:{}", log_configured_graph_size),
+        ];
+        self.cmd_ctx
+            .events()
+            .instant_event(slug_data::TagEvent { tags });
+
+        self.cmd_ctx
+            .events()
+            .instant_event(slug_data::CommandOptions {
+                configured_parallelism: concurrency as _,
+                available_parallelism: slug_util::threads::available_parallelism() as _,
+            });
+
+        collect_config_metadata_into(root_config, &mut data);
+
+        Ok(data)
+    }
+}
+
+struct ConfigMetadataHolder(HashMap<String, String>);
+
+fn collect_config_metadata_into(_config: &LegacyBuckConfig, data: &mut UserComputationData) {
+    // Facebook only: metadata collection for Scribe writes
+    facebook_only();
+
+    let mut metadata = HashMap::new();
+
+    if let Ok(schedule_type) = SandcastleScheduleType::new() {
+        if let Some(schedule_type_str) = schedule_type.as_str() {
+            metadata.insert("schedule_type".to_owned(), schedule_type_str.to_owned());
+        }
+    }
+
+    data.data.set(ConfigMetadataHolder(metadata));
+}
+
+impl Drop for ServerCommandContext<'_> {
+    fn drop(&mut self) {
+        // Ensure we cancel the heartbeat guard first.
+        std::mem::drop(self.heartbeat_guard_handle.take());
+    }
+}
+
+#[async_trait]
+impl ServerCommandContextTrait for ServerCommandContext<'_> {
+    fn working_dir(&self) -> &ProjectRelativePath {
+        &self.working_dir
+    }
+
+    fn working_dir_abs(&self) -> &AbsWorkingDir {
+        &self.working_dir_abs
+    }
+
+    fn command_name(&self) -> &str {
+        &self.command_name
+    }
+
+    fn isolation_prefix(&self) -> &FileName {
+        &self.isolation_prefix
+    }
+
+    fn cert_state(&self) -> CertState {
+        self.cert_state.dupe()
+    }
+
+    fn project_root(&self) -> &ProjectRoot {
+        &self.base_context.project_root
+    }
+
+    fn materializer(&self) -> Arc<dyn Materializer> {
+        self.base_context.daemon.materializer.dupe()
+    }
+
+    /// Provides a DiceTransaction, initialized on first use and shared after initialization.
+    async fn dice_accessor<'s>(
+        &'s self,
+        _private: PrivateStruct,
+    ) -> slug_error::Result<DiceAccessor<'s>> {
+        let (build_signals_installer, deferred_build_signals) = create_build_signals();
+
+        let is_nested_invocation = if let Some(uuid) = &self.daemon_uuid_from_client {
+            uuid == &self.base_context.daemon.daemon_id.to_string()
+        } else {
+            false
+        };
+
+        Ok(DiceAccessor {
+            dice_handler: self.base_context.daemon.dice_manager.dupe(),
+            setup: Box::new(self.dice_updater(build_signals_installer).await?),
+            is_nested_invocation,
+            sanitized_argv: self.sanitized_argv.clone(),
+            preemptible: self.preemptible,
+            build_signals: deferred_build_signals,
+            exit_when: self.exit_when,
+        })
+    }
+
+    fn events(&self) -> &EventDispatcher {
+        &self.base_context.events
+    }
+
+    fn previous_command_data(&self) -> Arc<LockedPreviousCommandData> {
+        self.base_context.daemon.previous_command_data.clone()
+    }
+
+    fn stderr(&self) -> slug_error::Result<StderrOutputGuard<'_>> {
+        Ok(StderrOutputGuard {
+            _phantom: PhantomData,
+            inner: BufWriter::with_capacity(
+                // TODO(nga): no need to buffer here.
+                4096,
+                StderrOutputWriter::new(self)?,
+            ),
+        })
+    }
+
+    /// Create command start event with metadata
+    async fn command_start_event(
+        &self,
+        data: slug_data::command_start::Data,
+    ) -> slug_error::Result<slug_data::CommandStart> {
+        Ok(slug_data::CommandStart {
+            metadata: self.request_metadata().await?,
+            data: Some(data),
+            cli_args: self.sanitized_argv.clone(),
+            tags: self.base_context.daemon.tags.clone(),
+            ..Default::default()
+        })
+    }
+
+    /// Gathers metadata to attach to events for when a command starts and stops.
+    async fn request_metadata(&self) -> slug_error::Result<HashMap<String, String>> {
+        // Facebook only: metadata collection for Scribe writes
+        facebook_only();
+
+        let mut metadata = metadata::collect(&self.base_context.daemon.daemon_id);
+
+        metadata.insert(
+            "io_provider".to_owned(),
+            self.base_context.daemon.io.name().to_owned(),
+        );
+
+        metadata.insert(
+            "materializer".to_owned(),
+            self.base_context.daemon.materializer.name().to_owned(),
+        );
+
+        if let Some(oncall) = &self.oncall {
+            metadata.insert("oncall".to_owned(), oncall.clone());
+        }
+
+        if let Some(client_id_from_client_metadata) = &self.client_id_from_client_metadata {
+            metadata.insert("client".to_owned(), client_id_from_client_metadata.clone());
+        }
+
+        metadata.insert(
+            "vpnless".to_owned(),
+            self.base_context
+                .daemon
+                .http_client
+                .supports_vpnless()
+                .to_string(),
+        );
+
+        metadata.insert(
+            "http_versions".to_owned(),
+            match self.base_context.daemon.http_client.http2() {
+                true => "1,2",
+                false => "1",
+            }
+            .to_owned(),
+        );
+
+        Ok(metadata)
+    }
+
+    /// Gathers metadata from buckconfig to attach to events for when a command enters the critical
+    /// section
+    async fn config_metadata(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+    ) -> slug_error::Result<HashMap<String, String>> {
+        ctx.per_transaction_data()
+            .data
+            .get::<ConfigMetadataHolder>()
+            .map(|holder| holder.0.clone())
+            .map_err(|_| slug_error::internal_error!("Config metadata not set"))
+    }
+
+    fn log_target_pattern(
+        &self,
+        providers_patterns: &[ParsedPattern<ConfiguredProvidersPatternExtra>],
+    ) {
+        let patterns = providers_patterns.map(|pat| slug_data::TargetPattern {
+            value: format!("{pat}"),
+        });
+
+        self.events()
+            .instant_event(slug_data::ParsedTargetPatterns {
+                target_patterns: patterns,
+            })
+    }
+
+    fn log_target_pattern_with_modifiers(
+        &self,
+        providers_patterns_with_modifiers: &[ParsedPatternWithModifiers<
+            ConfiguredProvidersPatternExtra,
+        >],
+    ) {
+        let seen_values = BTreeSet::from_iter(
+            providers_patterns_with_modifiers.map(|pat| format!("{}", pat.parsed_pattern)),
+        );
+
+        let patterns = seen_values
+            .into_iter()
+            .map(|pat| slug_data::TargetPattern { value: pat })
+            .collect();
+
+        self.events()
+            .instant_event(slug_data::ParsedTargetPatterns {
+                target_patterns: patterns,
+            })
+    }
+
+    fn cancellation_context(&self) -> &CancellationContext {
+        self.cancellations
+    }
+
+    fn command_start(&self) -> Instant {
+        self.command_start
+    }
+}

@@ -1,19 +1,19 @@
-# Contributing to Kuro
+# Contributing to Slug
 
-Kuro is provided for educational and research purposes by Zeromatter Inc, with
+Slug is provided for educational and research purposes by Zeromatter Inc, with
 primary authorship by Walter Gray. The project is in large part an exercise in
 experimenting with agentic programming on a substantial systems codebase.
 
 ## Our Development Process
 
-Kuro is developed in the open from this repository. The project is experimental,
+Slug is developed in the open from this repository. The project is experimental,
 and pull requests may or may not be reviewed, responded to, or merged. Please do
 not rely on this repository as a supported upstream for production work unless a
 specific support arrangement exists.
 
-Kuro is derived from Buck2, originally developed by Meta Platforms, Inc. We
+Slug is derived from Buck2, originally developed by Meta Platforms, Inc. We
 preserve Buck2 and Meta attribution for inherited code and documentation while
-evolving Kuro as a separate project.
+evolving Slug as a separate project.
 
 ## Pull Requests
 
@@ -43,6 +43,6 @@ See [HACKING.md](./HACKING.md) for the nitty gritty on how to contribute.
 
 ## License
 
-By contributing to Kuro, you agree that your contributions will be licensed
+By contributing to Slug, you agree that your contributions will be licensed
 under both the [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE)
 files in the root directory of this source tree.

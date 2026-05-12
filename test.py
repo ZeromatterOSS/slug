@@ -409,20 +409,20 @@ def _normalize_windows_path(path: str) -> str:
     return path
 
 
-def run_python_tests(kuro_binary: str) -> None:
+def run_python_tests(slug_binary: str) -> None:
     """Run Python integration tests in tests/core/ using pytest."""
     print_running("pytest tests/core/")
     # On Windows (via Git Bash CI), paths like /d/a/_temp need conversion
     if is_windows():
-        kuro_binary = _normalize_windows_path(kuro_binary)
-    # On Windows, kuro binary may be named kuro.exe
-    binary_path = Path(kuro_binary)
+        slug_binary = _normalize_windows_path(slug_binary)
+    # On Windows, slug binary may be named slug.exe
+    binary_path = Path(slug_binary)
     if is_windows() and not binary_path.exists():
         exe_path = binary_path.with_suffix(".exe")
         if exe_path.exists():
-            kuro_binary = str(exe_path)
+            slug_binary = str(exe_path)
     env = os.environ.copy()
-    env["TEST_EXECUTABLE"] = kuro_binary
+    env["TEST_EXECUTABLE"] = slug_binary
     # 30 minutes should be enough for all integration tests
     timeout_sec = 30 * 60
     run(
@@ -460,10 +460,10 @@ def main() -> None:
         help="Path to a buck2 binary",
     )
     parser.add_argument(
-        "--kuro",
+        "--slug",
         action="store",
         default=None,
-        help="Path to a kuro binary (alias for --buck2 in CI)",
+        help="Path to a slug binary (alias for --buck2 in CI)",
     )
     parser.add_argument(
         "--lint-only",
@@ -514,9 +514,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # --kuro is an alias for --buck2 (used in CI)
-    if args.kuro is not None:
-        args.buck2 = args.kuro
+    # --slug is an alias for --buck2 (used in CI)
+    if args.slug is not None:
+        args.buck2 = args.slug
 
     # Change to buck2 directory
     buck2_dir = Path(__file__).parent.absolute()
@@ -560,8 +560,8 @@ def main() -> None:
         with timing():
             test(package_args)
 
-    # Run Python integration tests when a kuro binary is provided (e.g., in CI)
-    if args.kuro is not None and not (
+    # Run Python integration tests when a slug binary is provided (e.g., in CI)
+    if args.slug is not None and not (
         args.lint_only
         or args.lint_rust_only
         or args.lint_starlark_only

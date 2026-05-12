@@ -1,0 +1,63 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::time::Duration;
+
+use slug_client_ctx::client_ctx::BuckSubcommand;
+use slug_client_ctx::client_ctx::ClientCommandContext;
+use slug_client_ctx::common::BuckArgMatches;
+use slug_client_ctx::common::CommonEventLogOptions;
+use slug_client_ctx::daemon::client::BuckdLifecycleLock;
+use slug_client_ctx::events_ctx::EventsCtx;
+use slug_client_ctx::exit_result::ExitResult;
+use slug_client_ctx::startup_deadline::StartupDeadline;
+
+/// Kill the buck daemon.
+///
+/// Note there's also `slug killall` and `slug clean`.
+///
+/// `slug killall` kills all the slug processes on the machine.
+///
+/// `slug clean` kills the slug daemon and also deletes the slug state files.
+#[derive(Debug, clap::Parser)]
+pub struct KillCommand {
+    #[clap(flatten)]
+    pub(crate) event_log_opts: CommonEventLogOptions,
+}
+
+impl BuckSubcommand for KillCommand {
+    const COMMAND_NAME: &'static str = "kill";
+
+    async fn exec_impl(
+        self,
+        _matches: BuckArgMatches<'_>,
+        ctx: ClientCommandContext<'_>,
+        _events_ctx: &mut EventsCtx,
+    ) -> ExitResult {
+        let daemon_dir = ctx.paths()?.daemon_dir()?;
+
+        let lifecycle_lock = BuckdLifecycleLock::lock_with_timeout(
+            daemon_dir.clone(),
+            StartupDeadline::duration_from_now(Duration::from_secs(10))?,
+        )
+        .await?;
+
+        slug_client_ctx::daemon::client::kill::kill_command_impl(
+            &lifecycle_lock,
+            "`buck kill` was invoked",
+        )
+        .await
+        .into()
+    }
+
+    fn event_log_opts(&self) -> &CommonEventLogOptions {
+        &self.event_log_opts
+    }
+}

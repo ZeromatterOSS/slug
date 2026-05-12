@@ -1,0 +1,53 @@
+[package]
+description = "Tests for slug_build_api crate"
+edition = "2024"
+license = { workspace = true }
+name = "slug_build_api_tests"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+async-trait = { workspace = true }
+ctor = { workspace = true }
+derivative = { workspace = true }
+fxhash = { workspace = true }
+indexmap = { workspace = true }
+indoc = { workspace = true }
+maplit = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+sorted_vector_map = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+itertools = { workspace = true }
+starlark = { workspace = true }
+starlark_map = { workspace = true }
+
+slug_action_impl = { workspace = true }
+slug_analysis = { workspace = true }
+slug_anon_target = { workspace = true }
+slug_artifact = { workspace = true }
+slug_build_api = { workspace = true }
+slug_build_signals = { workspace = true }
+slug_certs = { workspace = true }
+slug_common = { workspace = true }
+slug_configured = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_directory = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_execute = { workspace = true }
+slug_file_watcher = { workspace = true }
+slug_fs = { workspace = true }
+slug_http = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_interpreter_for_build = { workspace = true }
+slug_node = { workspace = true }
+slug_transition = { workspace = true }
+slug_util = { workspace = true }

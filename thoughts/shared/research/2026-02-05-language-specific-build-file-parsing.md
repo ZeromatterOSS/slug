@@ -3,8 +3,8 @@ date: 2026-02-05T10:53:29-08:00
 researcher: Claude
 git_commit: 52f9ff18363a6640b14f9f20ab70fa74c3381b79
 branch: main
-repository: kuro
-topic: "Extending Kuro with Language-Specific Build File Parsing"
+repository: slug
+topic: "Extending Slug with Language-Specific Build File Parsing"
 tags: [research, codebase, starlark, dice, bzlmod, module-extensions, cargo, cmake, language-rules, buck2, anonymous-targets, bxl, package-files, gazelle, build-generation, hook-points]
 status: complete
 last_updated: 2026-02-05
@@ -12,17 +12,17 @@ last_updated_by: Claude
 last_updated_note: "Added concrete hook points for BUILD file generation (Gazelle-like functionality) and Buck2-specific features"
 ---
 
-# Research: Extending Kuro with Language-Specific Build File Parsing
+# Research: Extending Slug with Language-Specific Build File Parsing
 
 **Date**: 2026-02-05T10:53:29-08:00
 **Researcher**: Claude
 **Git Commit**: 52f9ff18363a6640b14f9f20ab70fa74c3381b79
 **Branch**: main
-**Repository**: kuro
+**Repository**: slug
 
 ## Research Question
 
-Is it viable to extend Kuro with the ability to define language-specific build file parsing via Starlark? This would allow:
+Is it viable to extend Slug with the ability to define language-specific build file parsing via Starlark? This would allow:
 - Custom build file patterns (e.g., `Cargo.toml`, `go.mod`, `CMakeLists.txt`)
 - Analysis-time file reading and tool invocation
 - Translation of language-native manifests into BUILD targets
@@ -32,7 +32,7 @@ Is it viable to extend Kuro with the ability to define language-specific build f
 
 **Viability: Yes, with significant architectural work.**
 
-Kuro's architecture provides several foundation pieces that could support language-specific build file parsing, but there are fundamental timing constraints and missing infrastructure that would need to be addressed. The most promising approach is to extend the **module extension system** rather than the BUILD file evaluation system, as module extensions already have file reading capabilities and execute before analysis.
+Slug's architecture provides several foundation pieces that could support language-specific build file parsing, but there are fundamental timing constraints and missing infrastructure that would need to be addressed. The most promising approach is to extend the **module extension system** rather than the BUILD file evaluation system, as module extensions already have file reading capabilities and execute before analysis.
 
 ### Key Findings
 
@@ -50,7 +50,7 @@ Kuro's architecture provides several foundation pieces that could support langua
 
 ### Current Build File Discovery System
 
-**Location**: `app/kuro_common/src/buildfiles.rs`, `app/kuro_common/src/find_buildfile.rs`
+**Location**: `app/slug_common/src/buildfiles.rs`, `app/slug_common/src/find_buildfile.rs`
 
 The build file discovery system is configured via buckconfig:
 
@@ -71,7 +71,7 @@ name = BUILD.bazel,BUILD
 
 ### Repository Context (repository_ctx)
 
-**Location**: `app/kuro_interpreter_for_build/src/repository_ctx.rs`
+**Location**: `app/slug_interpreter_for_build/src/repository_ctx.rs`
 
 Repository rules provide the most complete file I/O API:
 
@@ -94,7 +94,7 @@ repository_ctx.template("BUILD.bazel", template, substitutions)
 
 ### Module Extensions (module_ctx)
 
-**Location**: `app/kuro_interpreter_for_build/src/module_ctx.rs`, `app/kuro_interpreter_for_build/src/module_extension.rs`
+**Location**: `app/slug_interpreter_for_build/src/module_ctx.rs`, `app/slug_interpreter_for_build/src/module_extension.rs`
 
 Module extensions aggregate configuration from all modules and create repositories:
 
@@ -135,7 +135,7 @@ cargo = module_extension(
 
 ### Dynamic Actions
 
-**Location**: `app/kuro_action_impl/src/context/dynamic_output.rs`, `app/kuro_build_api/src/interpreter/rule_defs/artifact/starlark_artifact_value.rs`
+**Location**: `app/slug_action_impl/src/context/dynamic_output.rs`, `app/slug_build_api/src/interpreter/rule_defs/artifact/starlark_artifact_value.rs`
 
 Dynamic actions can read artifact contents during execution:
 
@@ -150,7 +150,7 @@ def _impl(actions, config: ArtifactValue, out: OutputArtifact):
 
 ### DICE Integration Points
 
-**Location**: `dice/dice/src/api/key.rs`, `app/kuro_common/src/file_ops/dice.rs`
+**Location**: `dice/dice/src/api/key.rs`, `app/slug_common/src/file_ops/dice.rs`
 
 DICE provides incremental computation with automatic dependency tracking:
 
@@ -178,11 +178,11 @@ GeneratedBuildFileKey {
 }
 ```
 
-**File watching**: Kuro uses Watchman/EdenFS/Notify for file change detection (`app/kuro_file_watcher/`). Changes flow through DICE invalidation. Manifest file changes would automatically trigger re-parsing if properly tracked as DICE dependencies.
+**File watching**: Slug uses Watchman/EdenFS/Notify for file change detection (`app/slug_file_watcher/`). Changes flow through DICE invalidation. Manifest file changes would automatically trigger re-parsing if properly tracked as DICE dependencies.
 
 ### MODULE.lock for Caching
 
-**Location**: `app/kuro_bzlmod/src/lockfile.rs`
+**Location**: `app/slug_bzlmod/src/lockfile.rs`
 
 The lockfile already stores:
 - Resolved module versions
@@ -385,7 +385,7 @@ Based on detailed analysis of the code flow, here are the specific locations whe
 
 ### Hook Point 1: Content Injection in `parse_file()` (Recommended)
 
-**Location**: `app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:182-197`
+**Location**: `app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:182-197`
 
 This is the most surgical insertion point - after file content is read but before parsing:
 
@@ -393,7 +393,7 @@ This is the most surgical insertion point - after file content is read but befor
 async fn parse_file(
     &mut self,
     starlark_path: StarlarkPath<'_>,
-) -> kuro_error::Result<ParseResult> {
+) -> slug_error::Result<ParseResult> {
     // Line 187: Read original file content
     let content = DiceFileComputations::read_file(
         self.ctx,
@@ -418,7 +418,7 @@ async fn generate_or_augment_build_content(
     &mut self,
     build_file: &BuildFilePath,
     original_content: String,
-) -> kuro_error::Result<String> {
+) -> slug_error::Result<String> {
     let package_path = build_file.package().as_cell_path();
 
     // Check for generator files in this package
@@ -451,7 +451,7 @@ async fn generate_or_augment_build_content(
 
 ### Hook Point 2: New DICE Key for Generated Content
 
-**Location**: Create new file `app/kuro_interpreter_for_build/src/interpreter/generated_build.rs`
+**Location**: Create new file `app/slug_interpreter_for_build/src/interpreter/generated_build.rs`
 
 For better caching and separation of concerns, create a dedicated DICE key:
 
@@ -463,7 +463,7 @@ pub struct GeneratedBuildContentKey(pub PackageLabel);
 
 #[async_trait]
 impl Key for GeneratedBuildContentKey {
-    type Value = kuro_error::Result<Option<GeneratedBuildContent>>;
+    type Value = slug_error::Result<Option<GeneratedBuildContent>>;
 
     async fn compute(
         &self,
@@ -535,7 +535,7 @@ async fn parse_file(&mut self, starlark_path: StarlarkPath<'_>) -> ParseResult {
 
 ### Hook Point 3: Configurable Generator Registry
 
-**Location**: `app/kuro_common/src/buildfiles.rs` (extend existing)
+**Location**: `app/slug_common/src/buildfiles.rs` (extend existing)
 
 Add configuration for which files trigger generation:
 
@@ -606,7 +606,7 @@ def generate_from_cargo(ctx):
 
 ### Hook Point 4: Target Injection via ModuleInternals
 
-**Location**: `app/kuro_interpreter_for_build/src/interpreter/module_internals.rs`
+**Location**: `app/slug_interpreter_for_build/src/interpreter/module_internals.rs`
 
 For cases where generating BUILD content isn't enough (need programmatic target creation):
 
@@ -659,7 +659,7 @@ pub fn new_extra_context(...) -> Result<(Module, ModuleInternals)> {
 
 ### Hook Point 5: Package Listing Extension
 
-**Location**: `app/kuro_common/src/package_listing/interpreter.rs:390-407`
+**Location**: `app/slug_common/src/package_listing/interpreter.rs:390-407`
 
 Generate BUILD file during directory scanning:
 
@@ -734,11 +734,11 @@ For a Gazelle-like experience, I recommend combining **Hook Points 1, 2, and 3**
 
 ## Buck2-Specific Features as Extension Points
 
-Buck2 (Kuro's foundation) provides several unique features not found in Bazel that could serve as better entrypoints for language-specific parsing. These deserve special consideration.
+Buck2 (Slug's foundation) provides several unique features not found in Bazel that could serve as better entrypoints for language-specific parsing. These deserve special consideration.
 
 ### Anonymous Targets (Most Promising)
 
-**Location**: `app/kuro_anon_target/`
+**Location**: `app/slug_anon_target/`
 
 Anonymous targets are build targets created programmatically during analysis, identified by content hash rather than BUILD file labels. This is **the most promising Buck2 feature** for manifest-based target generation.
 
@@ -783,13 +783,13 @@ def _my_rule_impl(ctx):
 - A "pre-analysis" phase that provides parsed data to rules
 
 **Code references**:
-- `app/kuro_anon_target/src/anon_targets.rs:222-256` - Target creation
-- `app/kuro_anon_target/src/starlark_defs.rs:257-278` - `ctx.actions.anon_target()` API
-- `app/kuro_anon_target/src/anon_promises.rs:51-101` - Promise resolution
+- `app/slug_anon_target/src/anon_targets.rs:222-256` - Target creation
+- `app/slug_anon_target/src/starlark_defs.rs:257-278` - `ctx.actions.anon_target()` API
+- `app/slug_anon_target/src/anon_promises.rs:51-101` - Promise resolution
 
 ### BXL (Buck Extension Language)
 
-**Location**: `app/kuro_bxl/`
+**Location**: `app/slug_bxl/`
 
 BXL is a top-level scripting system for build introspection. Unlike rules, BXL can access the filesystem and create actions without being triggered by a target.
 
@@ -824,18 +824,18 @@ def _bxl_impl(ctx):
 - Runs as separate command, not integrated into normal build flow
 
 **Potential architecture**: BXL as a "pre-build" step:
-1. Run `kuro bxl //tools:generate_build_files.bxl`
+1. Run `slug bxl //tools:generate_build_files.bxl`
 2. BXL discovers manifests, invokes parsers via actions
 3. Outputs generated BUILD files or target metadata
-4. Normal `kuro build` uses generated content
+4. Normal `slug build` uses generated content
 
 **Code references**:
-- `app/kuro_bxl/src/bxl/starlark_defs/context/fs.rs:167-362` - Filesystem operations
-- `app/kuro_bxl/src/bxl/starlark_defs/context/actions.rs:190-212` - Action creation
+- `app/slug_bxl/src/bxl/starlark_defs/context/fs.rs:167-362` - Filesystem operations
+- `app/slug_bxl/src/bxl/starlark_defs/context/actions.rs:190-212` - Action creation
 
 ### PACKAGE Files (Target Injection)
 
-**Location**: `app/kuro_interpreter_for_build/src/super_package/`
+**Location**: `app/slug_interpreter_for_build/src/super_package/`
 
 PACKAGE files set package-level configuration inherited by all BUILD files in subdirectories. This could be extended to inject targets.
 
@@ -879,12 +879,12 @@ for proto in glob(["**/*.proto"]):
 - Need conflict resolution for injected vs declared targets
 
 **Code references**:
-- `app/kuro_interpreter_for_build/src/super_package/package.rs:105-165` - `package()` function
-- `app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:441-479` - PACKAGE evaluation
+- `app/slug_interpreter_for_build/src/super_package/package.rs:105-165` - `package()` function
+- `app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:441-479` - PACKAGE evaluation
 
 ### Deferred Computations (Lazy Parsing)
 
-**Location**: `app/kuro_core/src/deferred/`, `app/kuro_build_api/src/deferred/`
+**Location**: `app/slug_core/src/deferred/`, `app/slug_build_api/src/deferred/`
 
 Deferred computations allow lazy evaluation - computations are registered during analysis but only executed when outputs are needed.
 
@@ -930,12 +930,12 @@ def _rule_impl(ctx):
 - Would need "resolve deferred" step before analysis completes
 
 **Code references**:
-- `app/kuro_core/src/deferred/key.rs:40-42` - `DeferredHolderKey` enum
-- `app/kuro_build_api/src/deferred/calculation.rs:83-93` - `lookup_deferred_holder()`
+- `app/slug_core/src/deferred/key.rs:40-42` - `DeferredHolderKey` enum
+- `app/slug_build_api/src/deferred/calculation.rs:83-93` - `lookup_deferred_holder()`
 
 ### Subrules (Rule Composition)
 
-**Location**: `app/kuro_interpreter_for_build/src/subrule.rs`
+**Location**: `app/slug_interpreter_for_build/src/subrule.rs`
 
 Subrules allow decomposing rules into reusable action-generating functions. Could be used for manifest-to-action translation.
 
@@ -965,8 +965,8 @@ def _cargo_library_impl(ctx):
 - Clear separation: parsing vs compilation
 
 **Code references**:
-- `app/kuro_interpreter_for_build/src/subrule.rs` - Subrule implementation
-- `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod-phase-8-subrule.md` - Design plans
+- `app/slug_interpreter_for_build/src/subrule.rs` - Subrule implementation
+- `thoughts/shared/plans/slug-bazel-subplans/02-bzlmod-phase-8-subrule.md` - Design plans
 
 ### Recommended Buck2-Native Architecture
 
@@ -1029,15 +1029,15 @@ Combining these features, here's a Buck2-native approach:
 
 3. **Normal build uses results**:
    ```bash
-   kuro bxl //tools:generate_targets.bxl  # Pre-step
-   kuro build //...  # Uses generated content
+   slug bxl //tools:generate_targets.bxl  # Pre-step
+   slug build //...  # Uses generated content
    ```
 
 ## Difficulties and Challenges
 
 ### 1. Timing and Phase Separation
 
-**Problem**: Kuro strictly separates loading (MODULE.bazel), analysis (BUILD evaluation), and execution (action running). File reading during analysis would blur these boundaries.
+**Problem**: Slug strictly separates loading (MODULE.bazel), analysis (BUILD evaluation), and execution (action running). File reading during analysis would blur these boundaries.
 
 **Impact**:
 - Adding new targets based on file contents violates the current model
@@ -1135,63 +1135,63 @@ c. **Native parser functions**: Add `native.parse_toml()`, `native.parse_json()`
 ## Code References
 
 ### Build File Discovery
-- `app/kuro_common/src/buildfiles.rs:26` - DEFAULT_BUILDFILES constant
-- `app/kuro_common/src/buildfiles.rs:74` - BuildfilesKey DICE integration
-- `app/kuro_common/src/find_buildfile.rs:16-28` - find_buildfile() function
+- `app/slug_common/src/buildfiles.rs:26` - DEFAULT_BUILDFILES constant
+- `app/slug_common/src/buildfiles.rs:74` - BuildfilesKey DICE integration
+- `app/slug_common/src/find_buildfile.rs:16-28` - find_buildfile() function
 
 ### Repository Context
-- `app/kuro_interpreter_for_build/src/repository_ctx.rs:1206-1214` - ctx.read() implementation
-- `app/kuro_interpreter_for_build/src/repository_ctx.rs:1024-1088` - ctx.execute() implementation
-- `app/kuro_interpreter_for_build/src/repository_ctx.rs:979-1021` - ctx.file() implementation
+- `app/slug_interpreter_for_build/src/repository_ctx.rs:1206-1214` - ctx.read() implementation
+- `app/slug_interpreter_for_build/src/repository_ctx.rs:1024-1088` - ctx.execute() implementation
+- `app/slug_interpreter_for_build/src/repository_ctx.rs:979-1021` - ctx.file() implementation
 
 ### Module Extensions
-- `app/kuro_interpreter_for_build/src/module_ctx.rs:586-594` - module_ctx.read() stub
-- `app/kuro_interpreter_for_build/src/module_ctx.rs:403-533` - ModuleContext struct
-- `app/kuro_interpreter_for_build/src/extension_execution.rs:268-276` - register_repo()
+- `app/slug_interpreter_for_build/src/module_ctx.rs:586-594` - module_ctx.read() stub
+- `app/slug_interpreter_for_build/src/module_ctx.rs:403-533` - ModuleContext struct
+- `app/slug_interpreter_for_build/src/extension_execution.rs:268-276` - register_repo()
 
 ### DICE Integration
-- `app/kuro_common/src/file_ops/dice.rs:285` - ReadFileKey
-- `app/kuro_bzlmod/src/repository_execution.rs:127-158` - RepositoryRuleExecutionKey
+- `app/slug_common/src/file_ops/dice.rs:285` - ReadFileKey
+- `app/slug_bzlmod/src/repository_execution.rs:127-158` - RepositoryRuleExecutionKey
 - `dice/dice/src/api/key.rs` - Key trait definition
 
 ### Lockfile
-- `app/kuro_bzlmod/src/lockfile.rs` - MODULE.lock handling
+- `app/slug_bzlmod/src/lockfile.rs` - MODULE.lock handling
 
 ### Hook Points for BUILD Generation
-- `app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:182-197` - `parse_file()` - content injection point
-- `app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:571-583` - After package listing, before BUILD evaluation
-- `app/kuro_interpreter_for_build/src/interpreter/module_internals.rs:155-167` - `record()` - target registration
-- `app/kuro_interpreter_for_build/src/interpreter/configuror.rs:146-155` - ModuleInternals creation
-- `app/kuro_common/src/package_listing/interpreter.rs:390-407` - Directory scanning where generator files detected
+- `app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:182-197` - `parse_file()` - content injection point
+- `app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:571-583` - After package listing, before BUILD evaluation
+- `app/slug_interpreter_for_build/src/interpreter/module_internals.rs:155-167` - `record()` - target registration
+- `app/slug_interpreter_for_build/src/interpreter/configuror.rs:146-155` - ModuleInternals creation
+- `app/slug_common/src/package_listing/interpreter.rs:390-407` - Directory scanning where generator files detected
 
 ### Anonymous Targets (Buck2-specific)
-- `app/kuro_anon_target/src/anon_targets.rs:222-256` - Target creation and hashing
-- `app/kuro_anon_target/src/starlark_defs.rs:257-278` - `ctx.actions.anon_target()` Starlark API
-- `app/kuro_anon_target/src/anon_promises.rs:51-101` - Promise resolution after analysis
-- `app/kuro_anon_target/src/anon_target_node.rs:64-82` - AnonTarget struct definition
+- `app/slug_anon_target/src/anon_targets.rs:222-256` - Target creation and hashing
+- `app/slug_anon_target/src/starlark_defs.rs:257-278` - `ctx.actions.anon_target()` Starlark API
+- `app/slug_anon_target/src/anon_promises.rs:51-101` - Promise resolution after analysis
+- `app/slug_anon_target/src/anon_target_node.rs:64-82` - AnonTarget struct definition
 
 ### BXL (Buck2-specific)
-- `app/kuro_bxl/src/bxl/starlark_defs/context/fs.rs:167-362` - Filesystem operations (exists, list, source)
-- `app/kuro_bxl/src/bxl/starlark_defs/context/actions.rs:190-212` - `ctx.bxl_actions()` for action creation
-- `app/kuro_bxl/src/bxl/starlark_defs/context/methods.rs:421-544` - BXL context methods
+- `app/slug_bxl/src/bxl/starlark_defs/context/fs.rs:167-362` - Filesystem operations (exists, list, source)
+- `app/slug_bxl/src/bxl/starlark_defs/context/actions.rs:190-212` - `ctx.bxl_actions()` for action creation
+- `app/slug_bxl/src/bxl/starlark_defs/context/methods.rs:421-544` - BXL context methods
 
 ### PACKAGE Files (Buck2-specific)
-- `app/kuro_interpreter_for_build/src/super_package/package.rs:105-165` - `package()` function
-- `app/kuro_interpreter_for_build/src/super_package/package_value.rs:227-234` - `write_package_value()`
-- `app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:441-479` - PACKAGE evaluation
+- `app/slug_interpreter_for_build/src/super_package/package.rs:105-165` - `package()` function
+- `app/slug_interpreter_for_build/src/super_package/package_value.rs:227-234` - `write_package_value()`
+- `app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs:441-479` - PACKAGE evaluation
 
 ### Deferred Computations (Buck2-specific)
-- `app/kuro_core/src/deferred/key.rs:40-42` - DeferredHolderKey enum variants
-- `app/kuro_build_api/src/deferred/calculation.rs:83-93` - lookup_deferred_holder()
-- `app/kuro_build_api/src/actions/calculation.rs:653-683` - BuildKey DICE implementation
+- `app/slug_core/src/deferred/key.rs:40-42` - DeferredHolderKey enum variants
+- `app/slug_build_api/src/deferred/calculation.rs:83-93` - lookup_deferred_holder()
+- `app/slug_build_api/src/actions/calculation.rs:653-683` - BuildKey DICE implementation
 
 ## Historical Context (from thoughts/)
 
 The thoughts directory contains extensive planning for language integration:
 
-- `thoughts/shared/plans/kuro-bazel-subplans/07-rules-integration.md` - Plans for rules_rust (crate_universe), rules_python (pip.parse)
-- `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod-phase-5e.md` - Module extension execution with deferred repository model
-- `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod.md` - Overall bzlmod philosophy
+- `thoughts/shared/plans/slug-bazel-subplans/07-rules-integration.md` - Plans for rules_rust (crate_universe), rules_python (pip.parse)
+- `thoughts/shared/plans/slug-bazel-subplans/02-bzlmod-phase-5e.md` - Module extension execution with deferred repository model
+- `thoughts/shared/plans/slug-bazel-subplans/02-bzlmod.md` - Overall bzlmod philosophy
 
 **Key insight**: The current plan follows Bazel's model where language package managers integrate via module extensions (crate_universe, pip.parse, rules_go), not via Gazelle-style BUILD file generation. This research explores extending that model.
 

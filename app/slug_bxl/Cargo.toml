@@ -1,0 +1,59 @@
+[package]
+description = "Buck V2 extension language"
+edition = "2024"
+license = { workspace = true }
+name = "slug_bxl"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+anyhow = { workspace = true }
+async-recursion = { workspace = true }
+async-trait = { workspace = true }
+slug_events = { workspace = true }
+clap = { workspace = true }
+cmp_any = { workspace = true }
+derivative = { workspace = true }
+derive_more = { workspace = true }
+dice = { workspace = true }
+display_container = { workspace = true }
+dupe = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+gazebo = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+num-bigint = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+starlark = { workspace = true }
+starlark_map = { workspace = true }
+strong_hash = { workspace = true }
+tokio = { workspace = true }
+
+slug_action_impl = { workspace = true }
+slug_analysis = { workspace = true }
+slug_artifact = { workspace = true }
+slug_build_api = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_execute = { workspace = true }
+slug_fs = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_interpreter_for_build = { workspace = true }
+slug_node = { workspace = true }
+slug_profile = { workspace = true }
+slug_query = { workspace = true }
+slug_query_parser = { workspace = true }
+slug_server_ctx = { workspace = true }
+slug_util = { workspace = true }
+dice_futures = { workspace = true }
+once_cell = { workspace = true }
+
+[dev-dependencies]
+ctor = { workspace = true }
+maplit = { workspace = true }

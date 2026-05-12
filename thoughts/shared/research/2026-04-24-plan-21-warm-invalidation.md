@@ -1,7 +1,7 @@
 # Plan 21.2 — CellResolver self-invalidates on every warm cquery
 
 **Date:** 2026-04-24
-**Workload:** `kuro cquery @llvm-project//llvm:Demangle` on
+**Workload:** `slug cquery @llvm-project//llvm:Demangle` on
 `/var/mnt/dev/llvm-project/utils/bazel`
 **Baseline:** warm cquery 1.85 s (matched Plan 21 headline).
 
@@ -22,7 +22,7 @@ caching; they had to all be fixed to get warm hits.
 
 ## Instrumentation
 
-Added in 21.1 (committed 6c25ea29) — `KURO_LOG_DICE=<path>` writes a
+Added in 21.1 (committed 6c25ea29) — `SLUG_LOG_DICE=<path>` writes a
 CSV row per `DiceTaskWorker::do_work` with outcome ∈ {`hit`, `reused`,
 `miss_deps`, `miss_fresh`}. The split between `miss_deps` and
 `miss_fresh` is the forensic clue: if 4151 of 4300 warm keys are
@@ -37,7 +37,7 @@ instead.
   `NotifyFileWatcher::sync2`. Every warm run reported
   `events=0 ignored=0 missed=false`. `unstable_take` never fires.
 - **Buck-out self-write flap.** Plan 17.4's filter in
-  `kuro_file_watcher::install_filtered_watches` is working as
+  `slug_file_watcher::install_filtered_watches` is working as
   designed; no buck-out paths surface.
 - **`ConcurrentTargetLabelInterner` fresh per transaction** — the
   CLAUDE.md comment at `ctx.rs:645` made this suspect, but its
@@ -87,7 +87,7 @@ in the `cells` HashMap differed. Three categories of diff surfaced:
 The iteration orders were seeded by two HashMaps:
 
 - `resolved_graph.modules: HashMap<String, ResolvedModuleInfo>` in
-  `kuro_bzlmod::resolution` — iterated at
+  `slug_bzlmod::resolution` — iterated at
   `legacy_configs/cells.rs:814` to build the `cells` Vec which seeds
   `parsed_modules` and ultimately `pre_computed_cells`.
 - `extension_results: HashMap<String, (ModuleExtensionResult,
@@ -154,7 +154,7 @@ affects which slot a key lands in, so iteration order still depends
 on insertion order even with a deterministic hasher. Verified
 empirically: same 40 string keys inserted into `HashMap<String, u32,
 BuildHasherDefault<FxHasher>>` in forward vs reverse vs rotated
-orders gives different iteration orders every time (`/tmp/kuro-map-
+orders gives different iteration orders every time (`/tmp/slug-map-
 bench/src/bin/order_test.rs`).
 
 Swapping ~8 struct fields (`ResolvedGraph.modules`,
@@ -176,8 +176,8 @@ orthogonal.
 ## References
 
 - DICE hit/miss instrumentation: commit 6c25ea29 (21.1)
-- Plan doc: `thoughts/shared/plans/kuro-bazel-subplans/21-warm-invocation-overhead.md`
-- CellInstance fix: `app/kuro_core/src/cells/instance.rs`
-- Sort fixes: `app/kuro_bzlmod/src/pending_repo_cells.rs`,
-  `app/kuro_common/src/legacy_configs/cells.rs`
-- Hashbrown order-invariance test: `/tmp/kuro-map-bench/src/bin/order_test.rs`
+- Plan doc: `thoughts/shared/plans/slug-bazel-subplans/21-warm-invocation-overhead.md`
+- CellInstance fix: `app/slug_core/src/cells/instance.rs`
+- Sort fixes: `app/slug_bzlmod/src/pending_repo_cells.rs`,
+  `app/slug_common/src/legacy_configs/cells.rs`
+- Hashbrown order-invariance test: `/tmp/slug-map-bench/src/bin/order_test.rs`

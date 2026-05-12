@@ -1,0 +1,43 @@
+[package]
+authors = ["Facebook"]
+description = "uquery, cquery, aquery and analysis query implementations for Slug"
+edition = "2024"
+license = { workspace = true }
+name = "slug_query_impls"
+repository = { workspace = true }
+version = "0.0.0"
+
+[dependencies]
+async-trait = { workspace = true }
+dashmap = { workspace = true }
+derive_more = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+ref-cast = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+starlark = { workspace = true }
+
+slug_artifact = { workspace = true }
+slug_build_api = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_fs = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_node = { workspace = true }
+slug_query = { workspace = true }
+slug_query_parser = { workspace = true }
+slug_util = { workspace = true }
+dice_futures = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }

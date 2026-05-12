@@ -1,13 +1,13 @@
 name: build_release
-description: Build kuro binary (release)
+description: Build slug binary (release)
 runs:
   using: composite
   steps:
   - uses: Swatinem/rust-cache@v2
     with:
-      prefix-key: kuro-release
-  - name: Build kuro binary (release)
+      prefix-key: slug-release
+  - name: Build slug binary (release)
     run: |-
       mkdir $RUNNER_TEMP/artifacts
-      cargo build --bin=kuro --release -Z unstable-options --artifact-dir=$RUNNER_TEMP/artifacts
+      cargo build --bin=slug --release -Z unstable-options --artifact-dir=$RUNNER_TEMP/artifacts
     shell: bash

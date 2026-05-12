@@ -28,7 +28,7 @@ impl StateProcessor {
         let state = CoreState::new();
 
         std::thread::Builder::new()
-            .name("kuro-dice".to_owned())
+            .name("slug-dice".to_owned())
             .spawn(move || StateProcessor { state, rx }.event_loop())
             .unwrap();
 

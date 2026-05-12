@@ -2,13 +2,13 @@
 
 ## Executive Summary
 
-AXL (Aspect Extension Language) is explicitly designed as "the Bazel equivalent of Buck2's BXL." Both languages share the same fundamental goals and programming model, making them highly conceptually compatible. However, there are significant implementation differences due to the underlying build systems (Bazel vs Buck2/Kuro).
+AXL (Aspect Extension Language) is explicitly designed as "the Bazel equivalent of Buck2's BXL." Both languages share the same fundamental goals and programming model, making them highly conceptually compatible. However, there are significant implementation differences due to the underlying build systems (Bazel vs Buck2/Slug).
 
-**Key Finding**: AXL and BXL are architecturally similar enough that supporting AXL in Kuro would be feasible, but would require adaptation layers for Bazel-specific concepts.
+**Key Finding**: AXL and BXL are architecturally similar enough that supporting AXL in Slug would be feasible, but would require adaptation layers for Bazel-specific concepts.
 
 ## Overview Comparison
 
-| Aspect | BXL (Buck2/Kuro) | AXL (Aspect/Bazel) |
+| Aspect | BXL (Buck2/Slug) | AXL (Aspect/Bazel) |
 |--------|------------------|-------------------|
 | Language | Starlark | Starlark |
 | File Extension | `.bxl` | `.axl` |
@@ -24,7 +24,7 @@ AXL (Aspect Extension Language) is explicitly designed as "the Bazel equivalent 
 
 ### Context Object Structure
 
-**BXL (Kuro)**
+**BXL (Slug)**
 ```starlark
 def _impl(ctx):
     # Query operations
@@ -135,7 +135,7 @@ axl_archive_dep(
 
 ### 1. Build System Integration
 
-**BXL in Kuro**
+**BXL in Slug**
 - Deep DICE integration for caching
 - Native Rust implementation
 - Action graph is directly accessible
@@ -152,7 +152,7 @@ axl_archive_dep(
 ### 2. Execution Model
 
 **BXL**
-- Scripts execute within Kuro's Starlark evaluator
+- Scripts execute within Slug's Starlark evaluator
 - Full access to build graph internals
 - Can create actions that run during the build
 - Three context types: Root, Dynamic, AnonTarget
@@ -242,7 +242,7 @@ ctx.output.ensure(output)
    - AXL orchestrates external tools
    - Fundamentally different approaches
 
-## Recommendations for Kuro
+## Recommendations for Slug
 
 ### Option 1: AXL Compatibility Layer
 
@@ -294,7 +294,7 @@ Given that:
 1. AXL is very new (announced Nov 2025)
 2. AXL documentation is incomplete
 3. BXL already has rich functionality
-4. Kuro aims to be Bazel-compatible
+4. Slug aims to be Bazel-compatible
 
 The most pragmatic approach is:
 1. Monitor AXL's development and API stabilization
@@ -306,7 +306,7 @@ The most pragmatic approach is:
 
 1. **AXL API Stability** - AXL is brand new; API may change significantly
 2. **Bazel-specific Features** - Some AXL features may depend on Bazel internals
-3. **Go Plugin System** - AXL's Go plugins cannot be supported in Kuro
+3. **Go Plugin System** - AXL's Go plugins cannot be supported in Slug
 4. **User Demand** - Is there actual demand for AXL compatibility?
 
 ## Sources
@@ -315,7 +315,7 @@ The most pragmatic approach is:
 - [BazelCon 2025 Blog Post](https://blog.aspect.build/bazelcon-2025)
 - [Aspect CLI GitHub](https://github.com/aspect-build/aspect-cli)
 - [Aspect Extensions GitHub](https://github.com/aspect-extensions)
-- Kuro BXL Implementation: `app/kuro_bxl/`
+- Slug BXL Implementation: `app/slug_bxl/`
 - Buck2 BXL Documentation: https://buck2.build/docs/bxl/
 
 ## Appendix: BXL API Reference Summary

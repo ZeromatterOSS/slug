@@ -1,15 +1,15 @@
 ---
 id: what-ran
-title: Finding Commands That Kuro Ran
+title: Finding Commands That Slug Ran
 ---
 
 import { FbInternalOnly, OssOnly } from
 'docusaurus-plugin-internaldocs-fb/internal';
 
-Kuro logs all the commands it runs. So, after you've run a build, you can query
-Kuro to get access to the exact command it used.
+Slug logs all the commands it runs. So, after you've run a build, you can query
+Slug to get access to the exact command it used.
 
-To do so, do your build as normal, then run `kuro log what-ran`.
+To do so, do your build as normal, then run `slug log what-ran`.
 
 ## What Ran output format
 
@@ -44,7 +44,7 @@ Use What Ran as follows:
 - Once you found it, reproduce as follows:
   - If the executor was `local`, the command is in the output, so just run it.
     It's expected that you'll do this from the root of your project (use
-    `kuro root --kind project` to find where that is).
+    `slug root --kind project` to find where that is).
   - If the executor was `re` or `cache`, you're provided a RE digest of the form
     `HASH:SIZE`.
 

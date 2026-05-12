@@ -12,7 +12,7 @@
   fbcode_macros = none
   buck = none
 
-# Uses a copy of the prelude bundled with the kuro binary. You can alternatively delete this
+# Uses a copy of the prelude bundled with the slug binary. You can alternatively delete this
 # section and vendor a copy of the prelude to the `prelude` directory of your project.
 [external_cells]
   prelude = bundled

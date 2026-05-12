@@ -20,7 +20,7 @@ use std::slice;
 
 /// Populate a slice with values from iterator, handle panic by writing provided fallback value.
 ///
-/// kuro is compiled without unwinding, but other users of starlark-rust may.
+/// slug is compiled without unwinding, but other users of starlark-rust may.
 /// It's hard to say how dangerous is to leave for example a list containing
 /// uninitialized memory in heap in case of panic. So let's just initialize
 /// the slice with valid values on panic.

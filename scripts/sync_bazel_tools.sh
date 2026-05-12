@@ -3,7 +3,7 @@
 #
 # This script downloads the tools/ directory from Bazel's repository
 # and places it in the bazel_tools/ directory at the project root.
-# These files are bundled into the kuro binary as @bazel_tools.
+# These files are bundled into the slug binary as @bazel_tools.
 #
 # Usage: ./scripts/sync_bazel_tools.sh [VERSION]
 #   VERSION defaults to 9.0.0

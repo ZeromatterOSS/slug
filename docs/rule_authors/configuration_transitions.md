@@ -6,7 +6,7 @@ title: Configuration Transitions
 Configuration transition is a mechanism for changing the configuration when
 depending on a target.
 
-Currently, Kuro has incoming and outgoing transitions:
+Currently, Slug has incoming and outgoing transitions:
 
 - **Incoming** transitions are specified per-target and take effect when
   depending on that target.

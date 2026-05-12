@@ -1,12 +1,12 @@
 ---
 id: bootstrapping
-title: Bootstrapping Kuro
+title: Bootstrapping Slug
 ---
 
-# Bootstrapping Kuro
+# Bootstrapping Slug
 
-Kuro can be built with `cargo` or `kuro`. The source repository includes
-[DotSlash](https://dotslash-cli.com) files for `kuro` itself, so that you can
+Slug can be built with `cargo` or `slug`. The source repository includes
+[DotSlash](https://dotslash-cli.com) files for `slug` itself, so that you can
 quickly self-bootstrap the build. This is particularly useful if you're writing
 patches and need to test both builds.
 
@@ -27,12 +27,12 @@ cargo install --locked dotslash
 Next, use `reindeer` to buckify dependencies:
 
 ```sh
-cd kuro/
+cd slug/
 ./bootstrap/reindeer --third-party-dir shim/third-party/rust buckify
 ```
 
-Build a copy of `kuro` with `kuro`:
+Build a copy of `slug` with `slug`:
 
 ```sh
-./bootstrap/kuro build //:kuro
+./bootstrap/slug build //:slug
 ```

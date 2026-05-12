@@ -1,0 +1,192 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::ffi::OsStr;
+use std::io::ErrorKind;
+use std::num::ParseIntError;
+
+use slug_common::init::ResourceControlConfig;
+use slug_common::init::ResourceControlStatus;
+use slug_fs::paths::abs_norm_path::AbsNormPath;
+use slug_util::process;
+use slug_util::process::async_background_command;
+
+#[derive(Debug, slug_error::Error)]
+#[slug(tag = Environment)]
+enum SystemdNotAvailableReason {
+    #[error("Unexpected `systemctl --version` output format: {0}")]
+    UnexpectedVersionOutputFormat(String),
+    #[error("Failed to parse systemd version number into u32: {0:#}")]
+    VersionNumberParseError(ParseIntError),
+    #[error("Detected systemd version {detected}. Minimum requirement is {min_required}.")]
+    TooOldSystemdVersion { detected: u32, min_required: u32 },
+    #[error("Systemctl command returned non-zero: {0}")]
+    SystemctlCommandReturnedNonZero(String),
+    #[error("Systemctl command failed to launch: {0:#}")]
+    SystemctlCommandLaunchFailed(std::io::Error),
+    #[error("Systemctl command not found in PATH.")]
+    SystemctlCommandNotFound,
+    #[error("Resource control with systemd is only supported on Linux.")]
+    UnsupportedPlatform,
+}
+
+pub struct ResourceControlRunner(());
+
+impl ResourceControlRunner {
+    pub async fn create_if_enabled(
+        config: &ResourceControlConfig,
+    ) -> slug_error::Result<Option<Self>> {
+        if config.status == ResourceControlStatus::Off {
+            return Ok(None);
+        }
+
+        match systemd_check_available().await {
+            Ok(()) => Ok(Some(ResourceControlRunner(()))),
+            Err(e) => match config.status {
+                ResourceControlStatus::Off => unreachable!("Checked earlier"),
+                ResourceControlStatus::IfAvailable => Ok(None),
+                ResourceControlStatus::Required => Err(e),
+            },
+        }
+    }
+
+    /// Creates `std::process::Command` to run `program` under a systemd scope unit (cgroup). `unit_name` is
+    /// an arbitrary string that you name the unit so it can be identified by the name later.
+    pub fn cgroup_scoped_command<S: AsRef<OsStr>>(
+        &self,
+        program: S,
+        unit_name: &str,
+        working_directory: &AbsNormPath,
+    ) -> std::process::Command {
+        let mut cmd = process::background_command("systemd-run");
+        cmd.arg("--user");
+        cmd.arg("--scope");
+        cmd.arg("--quiet");
+        cmd.arg("--collect");
+        cmd.arg("--property=Delegate=yes");
+        cmd.arg("--slice=slug");
+        cmd.arg(format!("--working-directory={working_directory}"));
+        cmd.arg(format!("--unit={unit_name}"));
+        cmd.arg(program);
+        cmd
+    }
+}
+
+// Helper function to replace a special characters in a cgroup unit name
+pub fn replace_unit_delimiter(unit: &str) -> String {
+    unit.replace("-", "_").replace(":", "_")
+}
+
+fn validate_systemd_version(raw_stdout: &[u8]) -> Result<(), SystemdNotAvailableReason> {
+    const SYSTEMD_MIN_VERSION: u32 = 253;
+
+    let stdout = String::from_utf8_lossy(raw_stdout);
+    let version = stdout
+        .split(' ')
+        .nth(1)
+        .ok_or_else(|| {
+            SystemdNotAvailableReason::UnexpectedVersionOutputFormat(stdout.to_string())
+        })?
+        .parse::<u32>()
+        .map_err(SystemdNotAvailableReason::VersionNumberParseError)?;
+
+    if version < SYSTEMD_MIN_VERSION {
+        Err(SystemdNotAvailableReason::TooOldSystemdVersion {
+            detected: version,
+            min_required: SYSTEMD_MIN_VERSION,
+        })
+    } else {
+        Ok(())
+    }
+}
+
+async fn systemd_check_available() -> slug_error::Result<()> {
+    if !cfg!(target_os = "linux") {
+        return Err(SystemdNotAvailableReason::UnsupportedPlatform.into());
+    }
+
+    match async_background_command("systemctl")
+        .arg("--version")
+        .output()
+        .await
+    {
+        Ok(output) => {
+            if output.status.success() {
+                validate_systemd_version(&output.stdout).map_err(|e| e.into())
+            } else {
+                Err(SystemdNotAvailableReason::SystemctlCommandReturnedNonZero(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                )
+                .into())
+            }
+        }
+        Err(e) => match e.kind() {
+            ErrorKind::NotFound => Err(SystemdNotAvailableReason::SystemctlCommandNotFound.into()),
+            _ => Err(SystemdNotAvailableReason::SystemctlCommandLaunchFailed(e).into()),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_systemd_version_normal() {
+        let raw_output = "systemd 253 (v253.7-1.9.hs+fb.el9)".as_bytes();
+        assert!(validate_systemd_version(raw_output).is_ok());
+    }
+
+    #[test]
+    fn test_validate_systemd_version_unexpected_format() {
+        let raw_output = "abc".as_bytes();
+        assert!(matches!(
+            validate_systemd_version(raw_output).unwrap_err(),
+            SystemdNotAvailableReason::UnexpectedVersionOutputFormat(..)
+        ));
+    }
+
+    #[test]
+    fn test_validate_systemd_version_empty() {
+        let raw_output = "".as_bytes();
+        assert!(matches!(
+            validate_systemd_version(raw_output).unwrap_err(),
+            SystemdNotAvailableReason::UnexpectedVersionOutputFormat(..)
+        ));
+    }
+
+    #[test]
+    fn test_validate_systemd_version_unexpected_version() {
+        let raw_output = "systemd v253.7-1.9.hs+fb.el9".as_bytes();
+        assert!(matches!(
+            validate_systemd_version(raw_output).unwrap_err(),
+            SystemdNotAvailableReason::VersionNumberParseError(..)
+        ));
+    }
+
+    #[test]
+    fn test_validate_systemd_version_old_version() {
+        let raw_output = "systemd 111 (v253.7-1.9.hs+fb.el9)".as_bytes();
+        assert!(matches!(
+            validate_systemd_version(raw_output).unwrap_err(),
+            SystemdNotAvailableReason::TooOldSystemdVersion { .. }
+        ));
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[tokio::test]
+    async fn test_always_unavailable_on_nonlinux() {
+        let _error = slug_error::Error::from(SystemdNotAvailableReason::UnsupportedPlatform);
+        assert!(matches!(
+            systemd_check_available().await.unwrap_err(),
+            _error
+        ));
+    }
+}

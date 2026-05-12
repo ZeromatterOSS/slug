@@ -61,6 +61,6 @@ async fn main() {
 ```
 
 You can group computations in traits however you wish, with whatever Key types
-you desire. In kuro, we tend to group related computations together (i.e all
+you desire. In slug, we tend to group related computations together (i.e all
 parsing computations in one trait, or all action computations in one trait) to
 better organize our modules and limit the number of dependencies pulled in.

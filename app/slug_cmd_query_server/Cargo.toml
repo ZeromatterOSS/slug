@@ -1,0 +1,39 @@
+[package]
+description = "Query server commands for Slug"
+edition = "2024"
+license = { workspace = true }
+name = "slug_cmd_query_server"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
+indent_write = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+starlark_map = { workspace = true }
+
+slug_build_api = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_fs = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_node = { workspace = true }
+slug_profile = { workspace = true }
+slug_query = { workspace = true }
+slug_server_ctx = { workspace = true }
+slug_util = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

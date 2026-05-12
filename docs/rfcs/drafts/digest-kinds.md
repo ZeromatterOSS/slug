@@ -2,14 +2,14 @@
 
 ## Use cases:
 
-- Kuro needs to support more than just SHA1 for open-sourcing, since publicly
+- Slug needs to support more than just SHA1 for open-sourcing, since publicly
   available RE providers use SHA256.
 - Internally, we want to migrate to (potentially keyed) Blake3, and there will
   be a transition period where we need to support both Blake3 and SHA1.
 
 ## Proposed plan
 
-Make all the ways in which Kuro _ingests_ digests either configurable or
+Make all the ways in which Slug _ingests_ digests either configurable or
 explicit about the type of digest they expect.
 
 Internally, we may keep track of digest types for debugging purposes, but we
@@ -25,7 +25,7 @@ never have a choice about the hash to use.
 For interactions with RE, we'll expose two configurations (this can be on the
 CommandExecutorConfig):
 
-- Preferred hash to use when Kuro is doing the hashing (e.g. hashing
+- Preferred hash to use when Slug is doing the hashing (e.g. hashing
   directories).
 - Accepted hashes.
 

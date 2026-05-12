@@ -47,13 +47,13 @@ You cannot use this API for artifacts declared in BXL.
 ## Examples
 
 Examples can be found at
-`tests/core/bxl/test_lazy_build_artifact_data/lazy_build_artifact.bxl` of kuro
+`tests/core/bxl/test_lazy_build_artifact_data/lazy_build_artifact.bxl` of slug
 repo folder.
 
 Run such command at `tests/core/bxl/test_lazy_build_artifact_data` to run the
 example bxl script
 
 ```sh
-kuro bxl lazy_build_artifact.bxl:build_artifact
-kuro bxl lazy_build_artifact.bxl:build_artifact_fail
+slug bxl lazy_build_artifact.bxl:build_artifact
+slug bxl lazy_build_artifact.bxl:build_artifact_fail
 ```

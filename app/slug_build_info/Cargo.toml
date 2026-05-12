@@ -1,0 +1,12 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "slug_build_info"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+slug_util = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

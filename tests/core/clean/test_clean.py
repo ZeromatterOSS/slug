@@ -120,7 +120,7 @@ async def test_clean_background(buck: Buck) -> None:
     assert "Buck-out moved to trash. Now cleaning up..." in clean_result.stderr
     assert "Tip: Use Ctrl-Z to put this in the background" in clean_result.stderr
     assert (
-        "You can run other kuro commands while this completes." in clean_result.stderr
+        "You can run other slug commands while this completes." in clean_result.stderr
     )
 
     # Verify all build outputs are eventually deleted

@@ -174,8 +174,8 @@ def sanitize_hashes(s: str) -> str:
 
 
 def sanitize_stderr(s: str) -> str:
-    # Remove tracing log lines (e.g., WARN/INFO/DEBUG lines from kuro's tracing output)
-    # These look like: [TIMESTAMP] [2m2026-...Z[0m [33m WARN[0m [2mkuro_...[0m...
+    # Remove tracing log lines (e.g., WARN/INFO/DEBUG lines from slug's tracing output)
+    # These look like: [TIMESTAMP] [2m2026-...Z[0m [33m WARN[0m [2mslug_...[0m...
     # The inner ANSI timestamp also contains a timestamp; strip the whole line
     # Match lines that start with a timestamp bracket and contain WARN/INFO/DEBUG/ERROR
     s = re.sub(r"^\[.{29}\].*? (WARN|INFO|DEBUG|ERROR).+$", "", s, flags=re.MULTILINE)

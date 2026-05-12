@@ -1,6 +1,6 @@
 # Multi-Package C++ Example
 
-This example demonstrates a multi-package C++ project built with Kuro,
+This example demonstrates a multi-package C++ project built with Slug,
 showing common Bazel patterns.
 
 ## Features Demonstrated
@@ -20,40 +20,40 @@ showing common Bazel patterns.
 
 ```bash
 # Build everything
-kuro build //...
+slug build //...
 
 # Build specific target
-kuro build //app:calculator
+slug build //app:calculator
 
 # Build with optimization
-kuro build //app:calculator --compilation_mode=opt
+slug build //app:calculator --compilation_mode=opt
 ```
 
 ## Running
 
 ```bash
-kuro run //app:calculator
+slug run //app:calculator
 ```
 
 ## Testing
 
 ```bash
 # Run specific test
-kuro test //test:math_test
+slug test //test:math_test
 
 # Run test suite
-kuro test //test:all_tests
+slug test //test:all_tests
 ```
 
 ## Querying
 
 ```bash
 # List dependencies
-kuro query "deps(//app:calculator)"
+slug query "deps(//app:calculator)"
 
 # Configured query (with platform resolution)
-kuro cquery "deps(//app:calculator)" --output=json
+slug cquery "deps(//app:calculator)" --output=json
 
 # Graphviz dependency graph
-kuro query "deps(//app:calculator)" --output=graph
+slug query "deps(//app:calculator)" --output=graph
 ```

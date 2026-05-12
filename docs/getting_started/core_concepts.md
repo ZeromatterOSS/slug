@@ -17,11 +17,11 @@ this learning process.
 
 ## Understanding Target Labels
 
-This is one of the most important concepts to understand when using Kuro. It is
+This is one of the most important concepts to understand when using Slug. It is
 a precise way to identify any buildable unit in your codebase.
 
 In the tutorials, you encountered the following target label like
-[<FbInternalOnly> `fbcode//scripts/<unixname>/kuro_lab/greeter_bin:main` </FbInternalOnly> <OssOnly> `root//kuro_lab/greeter_bin:main` </OssOnly>](../tutorial_adding_dependencies/#step-5-run-the-binary).
+[<FbInternalOnly> `fbcode//scripts/<unixname>/slug_lab/greeter_bin:main` </FbInternalOnly> <OssOnly> `root//slug_lab/greeter_bin:main` </OssOnly>](../tutorial_adding_dependencies/#step-5-run-the-binary).
 
 Here is the anatomy of a target label:
 
@@ -29,7 +29,7 @@ Here is the anatomy of a target label:
 
 <TargetDiagram
     cell_name="fbcode"
-    pkg_name="scripts/<unixname>/kuro_lab/greeter_bin"
+    pkg_name="scripts/<unixname>/slug_lab/greeter_bin"
     target_name="main"
     cell_href="#cell"
     pkg_href="#package"
@@ -42,7 +42,7 @@ Here is the anatomy of a target label:
 
 <TargetDiagram
     cell_name="root"
-    pkg_name="kuro_lab/greeter_bin"
+    pkg_name="slug_lab/greeter_bin"
     target_name="main"
     cell_href="#cell"
     pkg_href="#package"
@@ -73,16 +73,16 @@ is the buck cell root.
 
 </FbInternalOnly>
 
-You can run `kuro audit cell` to inspect the abs path of each cell root.
+You can run `slug audit cell` to inspect the abs path of each cell root.
 
 ## Package
 
 The existence of a [BUCK file](#buck-file) ({ isInternal() ?
-<code>scripts/&lt;unixname&gt;/kuro_lab/greeter_bin/BUCK</code> :
-<code>kuro_lab/greeter_bin/BUCK</code> }) defines a buck
+<code>scripts/&lt;unixname&gt;/slug_lab/greeter_bin/BUCK</code> :
+<code>slug_lab/greeter_bin/BUCK</code> }) defines a buck
 [package](../../concepts/key_concepts/#packages) { isInternal() ?
-<code>scripts/&lt;unixname&gt;/kuro_lab/greeter_bin</code> :
-<code>kuro_lab/greeter_bin</code> } isn't just a directory. If a buck target
+<code>scripts/&lt;unixname&gt;/slug_lab/greeter_bin</code> :
+<code>slug_lab/greeter_bin</code> } isn't just a directory. If a buck target
 uses the source file as input, that target is regarded as the **owner** of the
 source.
 
@@ -133,7 +133,7 @@ you will soon become very familiar with these patterns during daily development.
 
 #### Tips:
 
-<!--  TODO: change link to kuro doc once available for macros -->
+<!--  TODO: change link to slug doc once available for macros -->
 
 - Buck targets can be either build rules or
   [macros](https://buck.build/extending/macros.html), which are
@@ -141,7 +141,7 @@ you will soon become very familiar with these patterns during daily development.
   files. <FbInternalOnly> The `rust_binary`, `rust_library` and `rust_unittest`
   used in the lab are actually fbcode macros, not native rules as defined in this
   doc. You may notice that when we run
-  [`kuro targets`](../tutorial_first_build/#step-6-inspecting-your-target-optional)
+  [`slug targets`](../tutorial_first_build/#step-6-inspecting-your-target-optional)
   there are several other targets except `:main` in the outputs. These are
   defined in macros. </FbInternalOnly>
 - Buck uses [starlark](../../concepts/glossary/#starlark) language which is a
@@ -150,19 +150,19 @@ you will soon become very familiar with these patterns during daily development.
 ## Visualizing Your Tutorial Project
 
 Now that we understand the basic terminology, let's visualize what you built.
-We'll start with the simple file structure, then explore how Kuro interprets
+We'll start with the simple file structure, then explore how Slug interprets
 these files as packages and targets.
 
 ### File Structure Overview
 
 Here's the complete project structure you built through the tutorials:
 <FbInternalOnly> For simplicity, we show `logging_lib` as a subdirectory of
-`kuro_lab` in the diagram below. </FbInternalOnly>
+`slug_lab` in the diagram below. </FbInternalOnly>
 
 <TutorialMermaidDiagram>
 {`
 graph TD
-    A[kuro_lab] --> B[greeter_bin/]
+    A[slug_lab] --> B[greeter_bin/]
     A --> C[greeter_lib/]
     A --> D[logging_lib/]
 
@@ -229,13 +229,13 @@ graph TD
 ### The Complete Picture
 
 Finally, let's put it all together. This comprehensive diagram shows how your
-file structure, Kuro packages, targets, and dependencies all interconnect to
+file structure, Slug packages, targets, and dependencies all interconnect to
 form a cohesive build system:
 
 <TutorialMermaidDiagram>
 {`
 graph TD
-    A["📁 kuro_lab"] --> B["📁 greeter_bin/<br/>(Package)"]
+    A["📁 slug_lab"] --> B["📁 greeter_bin/<br/>(Package)"]
     A --> C["📁 greeter_lib/<br/>(Package)"]
     A --> D["📁 logging_lib/<br/>(Package)"]
 
@@ -332,7 +332,7 @@ graph TD
 
 - **Dotted arrows**: Show how BUCK files define targets
 - **Thick arrows**: Show dependency relationships between targets
-- **Double circles**: Represent Kuro targets with 🎯 icon
+- **Double circles**: Represent Slug targets with 🎯 icon
 - **Curly braces**: Contain target attributes and configurations
 - **Subgraphs**: Group targets with their attributes
 - **📁 Icons**: Represent directories and packages
@@ -407,7 +407,7 @@ exercise, <code>:library</code> and <code>:logging_lib</code> targets are
 dependencies of the <code>:main</code> target. One target can depend on multiple
 dependencies, which in turn can have their own dependencies to form a web of
 connections, a so-called
-[dependency graph](../../concepts/key_concepts/#kuros-dependency-graph), our
+[dependency graph](../../concepts/key_concepts/#slugs-dependency-graph), our
 lab renders a very simple dependency graph with maximum depth of 2, in real
 world, the graph will be much bigger and one top level target could have tens of
 thousands dependencies.
@@ -426,7 +426,7 @@ dependency graph.
 ## Buck Commands
 
 In the lab, once buck and source files are in place, we use
-`kuro build :main --show-output` to build the `:main` target. This uses the
+`slug build :main --show-output` to build the `:main` target. This uses the
 [buck build command](../../users/commands/build/) to compile and link your rust
 code into a binary. Now let’s take a closer look at this command. A buck command
 is usually composed of a command type ( `build`, `run`, `test` ...), some
@@ -466,7 +466,7 @@ As you become more adept, you can explore other powerful buck commands, such as:
   build due to either bad daemon or bad artifacts in cache;
 - [`buck log`](../../users/commands/log/) to see information about previous
   builds
-- [`buck bxl`](../../bxl/tutorial/) to run bxl scripts. BXL is a kuro script
+- [`buck bxl`](../../bxl/tutorial/) to run bxl scripts. BXL is a slug script
   language using starlark syntax to write complex query or build logic.
 
 #### Tips:
@@ -484,18 +484,18 @@ As you become more adept, you can explore other powerful buck commands, such as:
 
 </FbInternalOnly>
 
-### Kuro Command Flow
+### Slug Command Flow
 
-Here's how Kuro commands work in your tutorial workflow:
+Here's how Slug commands work in your tutorial workflow:
 
 <TutorialMermaidDiagram>
 {`
 graph TD
-    A[User runs kuro command] --> B{Command Type}
+    A[User runs slug command] --> B{Command Type}
 
-    B -->|build| C[kuro build :main]
-    B -->|run| D[kuro run :main]
-    B -->|test| E[kuro test :test]
+    B -->|build| C[slug build :main]
+    B -->|run| D[slug run :main]
+    B -->|test| E[slug test :test]
 
     C --> F[Parse BUCK files]
     D --> F
@@ -561,9 +561,9 @@ buck-out,it has the following characteristics:
 ## Buck UI
 
 Buck is mostly a command line tool but buck team does offer a
-[web-based UI](../../users/build_observability/observability/#kuros-web-ui) for
+[web-based UI](../../users/build_observability/observability/#slugs-web-ui) for
 users to inspect the build afterwards. To access the UI, the simplest way is to
-type “kuro” in the browser URL and it should bring you to your latest build
+type “slug” in the browser URL and it should bring you to your latest build
 history. Clicking on the uuid of the build will take you to the individual
 build.
 

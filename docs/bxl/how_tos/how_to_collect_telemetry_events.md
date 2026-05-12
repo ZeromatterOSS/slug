@@ -57,15 +57,15 @@ my_script = bxl_main(
 
 You cannot use `now()` to measure the time it takes to run actions and ensure
 artifacts because these processes occur asynchronously outside of the BXL script
-execution. For BXL user telemetry, we emit action events via the kuro core
+execution. For BXL user telemetry, we emit action events via the slug core
 automatically. Events around ensuring the artifacts are not emitted currently,
 but will be added soon.
 
 ### User event log
 
 To write to your own event log when running BXL, you can run your BXL command
-with the `--user-event-log` flag to tell kuro where to write the events to.
-Kuro is aware of the following file extensions: `.json-lines`,
+with the `--user-event-log` flag to tell slug where to write the events to.
+Slug is aware of the following file extensions: `.json-lines`,
 `json-lines.zst`, `.json-lines.gz`, and will compress the files automatically
 for you depending on the extension. If the extension is not one of these, the
 logs will always be written in JSONL format, uncompressed.
@@ -73,22 +73,22 @@ logs will always be written in JSONL format, uncompressed.
 Example:
 
 ```sh
-kuro bxl path//to/my_script/script.bxl:my_script --user-event-log my_file.json-lines.gz
+slug bxl path//to/my_script/script.bxl:my_script --user-event-log my_file.json-lines.gz
 ```
 
 When using this flag to write to a custom event log, it is up to you to clean up
 these log files. In addition, if the same filename is used with subsequent BXL
 invocations, events are always appended to the existing file contents, which is
-the same behavior as `kuro <any command> --event-log <path>`. If you tell kuro
+the same behavior as `slug <any command> --event-log <path>`. If you tell slug
 to write to a compressed file, you are responsible for decompressing them.
 
 ### Getting a user event log from a normal event log
 
-`kuro log show-user` can be used to convert a normal event log (regardless of
-encoding/compression) to a user event. Similar to `kuro log show`, you can
+`slug log show-user` can be used to convert a normal event log (regardless of
+encoding/compression) to a user event. Similar to `slug log show`, you can
 choose the most recent invocation, or the nth invocation, or provide a path to
 the normal user event log. Note that user event logs are not able to be passed
-into `kuro log show` or `kuro log show-user`.
+into `slug log show` or `slug log show-user`.
 
 ### Event log output
 
@@ -148,7 +148,7 @@ Sample:
 - Local: action was executed locally
 - Remote: action was executed via a remote executor
 - ActionCache: action was served by the action cache and not executed
-- Simple: action is simple and executed inline within kuro (ex: write,
+- Simple: action is simple and executed inline within slug (ex: write,
   symlink_dir)
 - Skipped: action was not executed at all
 - Deferred: action logically executed, but didn't do all the work

@@ -5,10 +5,10 @@ title: FAQs
 
 ## When is my BXL script cached?
 
-The entire BXL script is represented as a single node on the DICE graph (Kuro’s
+The entire BXL script is represented as a single node on the DICE graph (Slug’s
 internal dependency graph). When the script’s input changes, the entire node is
 invalidated and needs to be recomputed. For example, if a BXL function calls
-uquery, then uses the result to do a cquery and then a build, if Kuro detects
+uquery, then uses the result to do a cquery and then a build, if Slug detects
 that any of the recorded calls to uquery, cquery, and build changes, then the
 entire BXL script will be reran. The computations themselves (uquery, cquery,
 and build) will still be incrementally evaluated via DICE, so we are not
@@ -24,9 +24,9 @@ use of DICE’s existing incrementality support.
 
 ## What’s the difference between `ctx.output.print()` and `print()`?
 
-- `ctx.output.print()` writes items to stdout by kuro even when the script is
+- `ctx.output.print()` writes items to stdout by slug even when the script is
   cached. Items written to the output stream are considered to be the results of
-  a BXL script, which will be displayed to stdout by kuro even when the script
+  a BXL script, which will be displayed to stdout by slug even when the script
   is cached.
 - `print()` is offered by Starlark via the stdlib. This prints anything you want
   but won’t be provided to stdout at the end of a BXL script. These can be used
@@ -41,7 +41,7 @@ but will print out `<ensured artifact bound to <some path>>` via `print()`.
 
 This is intentional because when the ensured artifact is created within BXL, it
 has not been materialized yet. It will be materialized after the BXL script
-finishes executing, and Kuro core performs some additional actions after the
+finishes executing, and Slug core performs some additional actions after the
 BXL script.
 
 This is a safeguard to prevent people from misusing the artifact path and

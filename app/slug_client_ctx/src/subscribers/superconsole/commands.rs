@@ -1,0 +1,37 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use slug_event_observer::action_stats::ActionStats;
+use superconsole::Component;
+use superconsole::Line;
+use superconsole::Lines;
+
+use crate::subscribers::superconsole::SuperConsoleConfig;
+
+pub(crate) struct CommandsComponent<'a> {
+    pub(crate) super_console_config: &'a SuperConsoleConfig,
+    pub(crate) action_stats: &'a ActionStats,
+}
+
+impl Component for CommandsComponent<'_> {
+    type Error = slug_error::Error;
+
+    fn draw_unchecked(
+        &self,
+        _dimensions: superconsole::Dimensions,
+        _mode: superconsole::DrawMode,
+    ) -> slug_error::Result<Lines> {
+        if !self.super_console_config.enable_commands {
+            return Ok(Lines::new());
+        }
+
+        Ok(Lines(vec![Line::unstyled(&self.action_stats.to_string())?]))
+    }
+}

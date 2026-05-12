@@ -1,6 +1,6 @@
 {
   "cold_real_actions_discounted": {
-    "kuro": {
+    "slug": {
       "cli_wall_s": 13.86,
       "daemon_wall_s": 12.911006,
       "external_action_union_s": 9.579889,
@@ -29,7 +29,7 @@
     }
   },
   "warm_noop_rebuild": {
-    "kuro": {
+    "slug": {
       "cli_wall_s": 0.87,
       "daemon_wall_s": 0.299735,
       "analyze_s": 0.060295,

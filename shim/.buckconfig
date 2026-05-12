@@ -6,5 +6,5 @@
 # of this source tree.
 #
 # Cell registration for the shim cell is now handled by the root MODULE.bazel
-# via local_path_override(module_name = "gh_facebook_kuro_shims_meta", path = "shim").
+# via local_path_override(module_name = "gh_facebook_slug_shims_meta", path = "shim").
 # This file is kept for any shim-local config settings.

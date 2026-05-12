@@ -25,7 +25,7 @@ Dynamic dependencies, in their full generality, enable users to do a thing, look
 at the result, then ask for fresh things. However, this full generality is not
 provided as it breaks processes, like query, that power the Target Determinator.
 
-In Kuro, dynamic dependencies are implemented using `dynamic_output`, which
+In Slug, dynamic dependencies are implemented using `dynamic_output`, which
 provides users with the ability to create new actions, after running actions,
 then look at the result. `dynamic_output` is restricted in its power when
 compared to fully generic dynamic dependencies, as detailed in the
@@ -237,7 +237,7 @@ Attribute resolution is handled differently from normal code:
 - The `name` attribute is a reserved attribute. It is an implicit attribute when
   defining a rule for an anon target, but can be optionally set when creating an
   anon target. If present, it must be a syntactically valid target, but could
-  refer to a cell/package that does not exist. If not present, kuro will
+  refer to a cell/package that does not exist. If not present, slug will
   generate a name for the target automatically.
 
 ### `name` attribute example

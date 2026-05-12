@@ -5,7 +5,7 @@
 **Baseline:** `benchmarks/post-plan-17-fixed-aggregator/`
 
 The 296 s wall gap vs Bazel on this target has **nothing to do with
-the scheduler**. It's a rules-layer problem: kuro doesn't implement
+the scheduler**. It's a rules-layer problem: slug doesn't implement
 Bazel's exec-configuration for tools, so tool binaries (llvm-tblgen,
 clang drivers built-to-run-during-build) are compiled in the same
 fastbuild (-O0) mode as the final target binaries. The resulting
@@ -13,9 +13,9 @@ llvm-tblgen binary is 5–10× slower than Bazel's.
 
 ## Two orthogonal investigations converged on the same root
 
-### 1. Critical path — kuro's td_generate is 10× slower than Bazel's
+### 1. Critical path — slug's td_generate is 10× slower than Bazel's
 
-From `kuro log critical-path`, stripping synthetic waits:
+From `slug log critical-path`, stripping synthetic waits:
 
     offset (s)  dur (s)  action
        0.000      3.103  <listing + load + analysis>
@@ -36,23 +36,23 @@ Bazel's log for the same action:
     [2,463 / 6,352] TdGenerate AMDGPUGenRegisterInfo.inc;  28s
     <disappears from log shortly after>
 
-Bazel finishes `AMDGPUGenRegisterInfo.inc` in ~30 s. Kuro takes 280 s.
+Bazel finishes `AMDGPUGenRegisterInfo.inc` in ~30 s. Slug takes 280 s.
 
-Running kuro's built `llvm-tblgen` binary manually outside the build:
+Running slug's built `llvm-tblgen` binary manually outside the build:
 
     $ time buck-out/.../llvm-tblgen -gen-register-info AMDGPU.td ...
     real    2m44s     (164 s of user CPU, two consecutive runs)
 
-Kuro's llvm-tblgen is genuinely 5× slower than Bazel's on the same
+Slug's llvm-tblgen is genuinely 5× slower than Bazel's on the same
 input. It's not scheduler contention.
 
-### 2. Action count — Bazel has 954 more actions than kuro
+### 2. Action count — Bazel has 954 more actions than slug
 
     Bazel: 6352 total = 1105 internal + 5247 linux-sandbox
-    Kuro:  5367 total = 1074 non-Run + 4293 Run (the same split)
+    Slug:  5367 total = 1074 non-Run + 4293 Run (the same split)
 
 The `internal` ≈ `non-Run` numbers match within 3 %. The real gap is
-954 fewer sandboxed actions in kuro. Searching Bazel's log for the
+954 fewer sandboxed actions in slug. Searching Bazel's log for the
 same source file compiled twice:
 
     $ grep -cE 'Compiling.*${file} \[for tool\]'   # exec-config compile
@@ -64,7 +64,7 @@ same source file compiled twice:
 
 Every tblgen-dep source (Record.cpp, Support/*, Demangle/*, etc.)
 is compiled **twice** in Bazel — once in exec config, once in target
-config. Kuro compiles each once.
+config. Slug compiles each once.
 
 That's where the 954 missing actions come from.
 
@@ -77,13 +77,13 @@ result:
 - Bazel's llvm-tblgen is compiled with exec-config features,
   including whichever optimization level the exec config applies
   (historically opt mode for tools).
-- Kuro's llvm-tblgen is compiled with target fastbuild mode. No
-  `-O` anywhere in the command line (`kuro log what-ran | grep
+- Slug's llvm-tblgen is compiled with target fastbuild mode. No
+  `-O` anywhere in the command line (`slug log what-ran | grep
   c_compile | tr ' ' '\n' | grep ^-O` → nothing).
 
-I confirmed kuro's compile arguments:
+I confirmed slug's compile arguments:
 
-    $ kuro log what-ran ... | grep c_compile | head -1 | tr ' ' '\n' | \
+    $ slug log what-ran ... | grep c_compile | head -1 | tr ' ' '\n' | \
           grep -E '^-[OgfmWD]' | sort -u
     -D_GNU_SOURCE
     -DHAVE_BUILTIN_THREAD_POINTER
@@ -106,21 +106,21 @@ That's the full set of non-`-D*` switches. Default gcc without
     cxx_flags                  = [-std=c++17]
     unfiltered_compile_flags   = [-fno-canonical-system-headers ...]
 
-Kuro's rules aren't threading ANY of these through. Not the always-
+Slug's rules aren't threading ANY of these through. Not the always-
 on `compile_flags`, not the mode-specific flags, not even
 `-std=c++17` for C++.
 
 ## Why this explains the wall gap
 
-Critical path in kuro = 367.6 s. In Bazel = 71.4 s. Delta = 296 s.
+Critical path in slug = 367.6 s. In Bazel = 71.4 s. Delta = 296 s.
 
-Estimated Bazel-equivalent kuro critical path if AMDGPU tablegen
+Estimated Bazel-equivalent slug critical path if AMDGPU tablegen
 ran 10× faster (i.e., 28 s instead of 280 s): 367.6 − (280 − 28)
 = 115 s. Still double Bazel's 71 s, but within the noise of other
 differences. And wall would drop from 1436 s → ~1184 s, closing
 most of the gap vs Bazel's 1131 s.
 
-## What kuro's rules-layer is missing
+## What slug's rules-layer is missing
 
 1. **Exec configuration for tools.** cc_binary targets used as
    build-time tools should compile in a distinct "exec" config
@@ -138,11 +138,11 @@ most of the gap vs Bazel's 1131 s.
 
 ## Confirming the theory (cheap next step)
 
-Hand-compile `llvm-tblgen` with `-O2` and replace the kuro-built
+Hand-compile `llvm-tblgen` with `-O2` and replace the slug-built
 binary:
 
     $ cd /var/mnt/dev/llvm-project/utils/bazel
-    $ # run a kuro c_compile command, change -O0 to -O2 for all tblgen
+    $ # run a slug c_compile command, change -O0 to -O2 for all tblgen
     $ # deps, re-link
     $ time buck-out/.../llvm-tblgen-O2 -gen-register-info AMDGPU.td ...
     # expected: ~30 s to match Bazel

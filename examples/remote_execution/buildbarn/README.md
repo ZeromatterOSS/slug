@@ -14,7 +14,7 @@ already have a `Buildbarn` deployment you can use that instead.
 
 `Buildbarn` runs all actions in a completely bare environment by default, and
 relies on the build client to specify the `$PATH` and other environment
-variables in the REAPI action message. As `kuro` does not send a default
+variables in the REAPI action message. As `slug` does not send a default
 `$PATH` build will fail with errors about missing executables.
 
 Add the environment variables to the worker config you want - normally either
@@ -85,7 +85,7 @@ build --remote_executor=grpc://localhost:8980
 build --remote_instance_name=fuse
 ```
 
-TLS is not used in this example. The `grpc://` URL scheme tells the kuro
+TLS is not used in this example. The `grpc://` URL scheme tells the slug
 RE client to dial the endpoint without TLS.
 
 ## Relevant configs in `ExecutionPlatformInfo`

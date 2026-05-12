@@ -1,0 +1,124 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::sync::Arc;
+
+use allocative::Allocative;
+use async_trait::async_trait;
+use dice::CancellationContext;
+use dice::Demand;
+use dice::DiceComputations;
+use dice::Key;
+use dupe::Dupe;
+use slug_build_api::build::detailed_aggregated_metrics::dice::HasDetailedAggregatedMetrics;
+use slug_build_api::deferred::calculation::DeferredHolder;
+use slug_build_api::deferred::calculation::lookup_deferred_holder;
+use slug_build_api::dynamic::calculation::DYNAMIC_LAMBDA_CALCULATION_IMPL;
+use slug_build_api::dynamic::calculation::DynamicLambdaCalculation;
+use slug_build_api::dynamic::calculation::DynamicLambdaResult;
+use slug_build_signals::node_key::BuildSignalsNodeKey;
+use slug_build_signals::node_key::BuildSignalsNodeKeyImpl;
+use slug_core::deferred::base_deferred_key::BaseDeferredKey;
+use slug_core::deferred::dynamic::DynamicLambdaResultsKey;
+use slug_core::deferred::key::DeferredHolderKey;
+use slug_data::ToProtoMessage;
+
+use crate::dynamic::deferred::prepare_and_execute_lambda;
+use crate::dynamic::storage::FrozenDynamicLambdaParamsStorageImpl;
+
+struct DynamicLambdaCalculationImpl;
+
+#[async_trait]
+impl DynamicLambdaCalculation for DynamicLambdaCalculationImpl {
+    async fn dynamic_lambda_result(
+        &self,
+        dice: &mut DiceComputations<'_>,
+        key: &DynamicLambdaResultsKey,
+    ) -> slug_error::Result<Arc<DynamicLambdaResult>> {
+        Ok(dice.compute(&DynamicLambdaDiceKey(key.dupe())).await??)
+    }
+}
+
+pub(crate) fn init_dynamic_lambda_calculation() {
+    DYNAMIC_LAMBDA_CALCULATION_IMPL.init(&DynamicLambdaCalculationImpl)
+}
+
+#[derive(
+    Debug,
+    derive_more::Display,
+    Dupe,
+    Clone,
+    Allocative,
+    Hash,
+    Eq,
+    PartialEq
+)]
+pub struct DynamicLambdaDiceKey(DynamicLambdaResultsKey);
+
+#[async_trait]
+impl Key for DynamicLambdaDiceKey {
+    type Value = slug_error::Result<Arc<DynamicLambdaResult>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        cancellation: &CancellationContext,
+    ) -> Self::Value {
+        let self_deferred_key = DeferredHolderKey::DynamicLambda(Arc::new(self.0.dupe()));
+        ctx.analysis_started(&self_deferred_key)?;
+
+        let deferred_holder = lookup_deferred_holder(ctx, self.0.holder_key()).await?;
+        let lambda = FrozenDynamicLambdaParamsStorageImpl::lookup_lambda(
+            deferred_holder.analysis_values().analysis_storage()?,
+            &self.0,
+        )?;
+
+        let analysis_values =
+            prepare_and_execute_lambda(ctx, cancellation, lambda, self.0.dupe()).await?;
+        let res = Arc::new(DynamicLambdaResult { analysis_values });
+        ctx.analysis_complete(
+            &self_deferred_key,
+            &DeferredHolder::DynamicLambda(res.dupe()),
+        )?;
+        Ok(res)
+    }
+
+    fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
+        false
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
+
+    fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
+        demand.provide_value_with(|| BuildSignalsNodeKey::new(self.dupe()));
+    }
+}
+
+impl BuildSignalsNodeKeyImpl for DynamicLambdaDiceKey {
+    fn critical_path_entry_proto(&self) -> Option<slug_data::critical_path_entry2::Entry> {
+        let entry = slug_data::critical_path_entry2::Entry::DynamicAnalysis(
+            slug_data::critical_path_entry2::DynamicAnalysis {
+                target: match self.0.holder_key() {
+                    DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target)) => Some(
+                        slug_data::critical_path_entry2::dynamic_analysis::Target::StandardTarget(
+                            target.as_proto(),
+                        ),
+                    ),
+                    _ => None,
+                },
+                index: self.0.dynamic_actions_index().as_u32(),
+            },
+        );
+
+        Some(entry)
+    }
+}

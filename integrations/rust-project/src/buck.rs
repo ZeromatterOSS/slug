@@ -443,12 +443,12 @@ pub(crate) struct Buck {
 impl Buck {
     pub(crate) fn new(command: Option<String>, mode: Option<String>) -> Self {
         Buck {
-            command: command.unwrap_or_else(|| "kuro".into()),
+            command: command.unwrap_or_else(|| "slug".into()),
             mode,
         }
     }
 
-    /// Invoke `kuro` with the given subcommands.
+    /// Invoke `slug` with the given subcommands.
     ///
     /// Care should be taken to ensure that buck is invoked with the same set
     /// options and configuration to avoid invalidating caches.
@@ -478,7 +478,7 @@ impl Buck {
         let mut cmd = Command::new(&self.command);
 
         // rust-analyzer invokes the check-on-save command with `RUST_BACKTRACE=short`
-        // set. Unfortunately, kuro doesn't handle that well and becomes extremely
+        // set. Unfortunately, slug doesn't handle that well and becomes extremely
         // slow when the daemon is started with backtrace variables set. Until that is
         // fixed, just unset them here.
         cmd.env_remove("RUST_BACKTRACE")

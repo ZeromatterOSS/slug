@@ -57,7 +57,7 @@ copy_to_dir = rule(
 )
 
 def _download(ctx: AnalysisContext):
-    url = "https://interncache-all.fbcdn.net/manifold/buck_build_test/tree/kuro_test/http_archive/test.tgz"
+    url = "https://interncache-all.fbcdn.net/manifold/buck_build_test/tree/slug_test/http_archive/test.tgz"
     sha1 = "1a45666759704bf08fc670aa96118a0415c470fc"
     download = ctx.actions.download_file("download", url, sha1 = sha1)
     return [
@@ -87,7 +87,7 @@ cas_artifact = rule(impl = _cas_artifact_impl, attrs = {
     "expires_after_timestamp": attrs.int(default = 0),
     "is_directory": attrs.bool(default = False),
     "is_tree": attrs.bool(default = False),
-    "use_case": attrs.string(default = "kuro-testing"),
+    "use_case": attrs.string(default = "slug-testing"),
 })
 
 def symlink_files_impl(ctx):

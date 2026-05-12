@@ -274,7 +274,7 @@ impl<'v> StarlarkValue<'v> for StarlarkStr {
 
     // Bazel-compatible: Label strings support .name, .package, .workspace_name attributes.
     // In Bazel, Label("//pkg:target") returns a Label object with these attributes.
-    // In Kuro, Label() returns a string. We support attribute access on strings
+    // In Slug, Label() returns a string. We support attribute access on strings
     // that look like labels (contain "//" or ":").
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         if !matches!(

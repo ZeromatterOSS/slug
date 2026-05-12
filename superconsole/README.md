@@ -23,7 +23,7 @@ use to inject state into their otherwise immutable rendering logic.
 
 ## Demo
 
-![Superconsole running some kuro tests](demo.gif)
+![Superconsole running some slug tests](demo.gif)
 
 ## Examples
 

@@ -24,7 +24,7 @@ def _normalize(s: str) -> str:
         s,
     )
     s = re.sub(r"buck2\.exe", "buck2", s)
-    s = re.sub(r"kuro\.exe", "kuro", s)
+    s = re.sub(r"slug\.exe", "slug", s)
     return "\n".join([x.rstrip() for x in s.splitlines()]) + "\n"
 
 

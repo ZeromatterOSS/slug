@@ -57,18 +57,18 @@ BuildReport {
     build_metrics: AllTargetsBuildMetrics,
 
     # Set sketch of configured target graph stored in a hex string.
-    # Enabled by setting `-c kuro.log_total_configured_graph_sketch=true`.
+    # Enabled by setting `-c slug.log_total_configured_graph_sketch=true`.
     total_configured_graph_sketch: Optional[str],
 
     # Set sketch of unconfigured target labels in configured target graph
     # stored in a hex string.
     # Enabled by setting
-    # `-c kuro.log_total_configured_graph_unconfigured_sketch=true`.
+    # `-c slug.log_total_configured_graph_unconfigured_sketch=true`.
     total_configured_graph_unconfigured_sketch: Optional[str],
 
     # Reports data about each configuration encountered as part of the build,
     # if requested. Currently shows total unconfigured sketch per configuration
-    # if `-c kuro.log_total_per_configuration_sketch=true` is set.
+    # if `-c slug.log_total_per_configuration_sketch=true` is set.
     per_configuration_data: dict[str, PerConfigurationData],
 }
 
@@ -112,7 +112,7 @@ ConfiguredBuildReportEntry {
 
     # The number of targets in the configured dependency graph of this target.
     #
-    # This is only included if `-c kuro.log_configured_graph_size=true` is set.
+    # This is only included if `-c slug.log_configured_graph_size=true` is set.
     # Otherwise, it is left as None.
     configured_graph_size: Optional[uint],
 
@@ -121,7 +121,7 @@ ConfiguredBuildReportEntry {
     artifact_info: dict[str, ArtifactInfoFile | ArtifactInfoSymlink | ArtifactInfoExternalSymlink],
 
     # Set sketch of configured target graph stored in a hex string.
-    # Enabled by setting `-c kuro.log_configured_graph_sketch=true`.
+    # Enabled by setting `-c slug.log_configured_graph_sketch=true`.
     configured_graph_sketch: Optional[str],
 
     # Metrics for this target. Represents the aggregated metrics for top level targets.
@@ -130,7 +130,7 @@ ConfiguredBuildReportEntry {
     # Set sketch of unconfigured taret labels in configured target graph
     # stored in a hex string.
     # Enabled by setting
-    # `-c kuro.log_configured_graph_unconfigured_sketch=true`.
+    # `-c slug.log_configured_graph_unconfigured_sketch=true`.
     configured_graph_unconfigured_sketch: Optional[str],
 }
 
@@ -200,7 +200,7 @@ Error {
     cause_index: uint,
 
     # List of error tags associated with the error. The error tags provide hints to the error category
-    # that the error is associated to as determined by Kuro internally. This is meant to classify errors
+    # that the error is associated to as determined by Slug internally. This is meant to classify errors
     # more precisely, helping developers better understand the nature of the error.
     error_tags: list[str],
 }
@@ -254,7 +254,7 @@ ActionSubError {
     # Name of the error category. The category should be finer grain error categorizations
     # provided by the rule authors, and tend to be language specific. These should not be
     # any kind of shared concepts among all errors for all languages/rules. For example,
-    # timeouts and infra errors should not go here - kuro tries to categorize these types
+    # timeouts and infra errors should not go here - slug tries to categorize these types
     # of errors automatically. An example of a finer grain error category may be the error
     # code for rustc outputs.
     category: str,
@@ -329,9 +329,9 @@ The build report currently has at least the following limitations:
     passed, this is a bug.
 1.  It is currently not generated when a non-existent package is specified on
     the command line. This is also a bug.
-1.  It cannot be requested for any kuro command other than `build`
+1.  It cannot be requested for any slug command other than `build`
 1.  Errors do not contain any additional metadata outside of the error message.
-    This will be made available as such metadata is available in kuro.
+    This will be made available as such metadata is available in slug.
 1.  The "failures" field is always empty. This will be changed under a
     backcompat opt-in flag in the future.
 

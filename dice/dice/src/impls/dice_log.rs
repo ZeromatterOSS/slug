@@ -10,7 +10,7 @@
 
 //! DICE compute-outcome side channel (Plan 21.1).
 //!
-//! When `KURO_LOG_DICE` is set to a path, every key passing through
+//! When `SLUG_LOG_DICE` is set to a path, every key passing through
 //! `DiceTaskWorker::do_work` emits one CSV row describing whether the key was
 //! a cache hit (direct version match), reused (deps re-checked, unchanged),
 //! or a miss (compute function ran). Diffing two back-to-back warm runs
@@ -34,7 +34,7 @@ static WRITER: OnceLock<Option<Mutex<BufWriter<File>>>> = OnceLock::new();
 
 fn writer() -> Option<&'static Mutex<BufWriter<File>>> {
     WRITER
-        .get_or_init(|| match std::env::var("KURO_LOG_DICE") {
+        .get_or_init(|| match std::env::var("SLUG_LOG_DICE") {
             Ok(path) if !path.is_empty() => {
                 let file = File::create(&path).ok()?;
                 let mut w = BufWriter::new(file);

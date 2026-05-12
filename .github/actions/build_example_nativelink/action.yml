@@ -9,14 +9,14 @@ runs:
   - name: Build examples/remote_execution/nativelink directory using remote execution
     run: |-
       {
-      echo "[kuro]
+      echo "[slug]
       digest_algorithms = SHA256
       execution_platforms = root//platforms:platforms
 
-      [kuro_re_client]
-      engine_address       = grpc://scheduler-kuro.build-faster.nativelink.net:443
-      action_cache_address = grpc://cas-kuro.build-faster.nativelink.net:443
-      cas_address          = grpc://cas-kuro.build-faster.nativelink.net:443
+      [slug_re_client]
+      engine_address       = grpc://scheduler-slug.build-faster.nativelink.net:443
+      action_cache_address = grpc://cas-slug.build-faster.nativelink.net:443
+      cas_address          = grpc://cas-slug.build-faster.nativelink.net:443
       http_headers         = x-nativelink-api-key:$NATIVELINK_HEADER_RW_KEY
       tls = true
       instance_name = main"
@@ -25,7 +25,7 @@ runs:
       if [[ -z ${NATIVELINK_HEADER_RW_KEY:+x} ]]; then
         echo "Missing NativeLink Api key." >&2
       else
-        $RUNNER_TEMP/artifacts/kuro build //...
+        $RUNNER_TEMP/artifacts/slug build //...
       fi
     env:
       NATIVELINK_HEADER_RW_KEY: ${{ inputs.NATIVELINK_HEADER_RW_KEY_SECRET }}

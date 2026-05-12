@@ -38,7 +38,7 @@ def _demo_impl(ctx: AnalysisContext) -> list[Provider]:
         env = {
             # modify this value to force an action rerun even if caching is enabled.
             # `--no-remote-cache` does not have the desired effect, because it also causes
-            # the action to be omitted from `kuro log what-ran`, which interferes with the
+            # the action to be omitted from `slug log what-ran`, which interferes with the
             # test setup.
             "CACHE_SILO_KEY": read_root_config("build", "cache_silo_key", "0"),
         },

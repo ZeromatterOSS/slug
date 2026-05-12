@@ -1,0 +1,42 @@
+[package]
+description = "Server side of `slug audit`"
+edition = "2024"
+license = { workspace = true }
+name = "slug_cmd_audit_server"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+indent_write = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+ref-cast = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+starlark_map = { workspace = true }
+
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+
+slug_analysis = { workspace = true }
+slug_build_api = { workspace = true }
+slug_cli_proto = { workspace = true }
+slug_client_ctx = { workspace = true }
+slug_cmd_audit_client = { workspace = true }
+slug_common = { workspace = true }
+slug_core = { workspace = true }
+slug_data = { workspace = true }
+slug_error = { workspace = true }
+slug_events = { workspace = true }
+slug_execute = { workspace = true }
+slug_fs = { workspace = true }
+slug_interpreter = { workspace = true }
+slug_node = { workspace = true }
+slug_query = { workspace = true }
+slug_server_ctx = { workspace = true }
+slug_util = { workspace = true }

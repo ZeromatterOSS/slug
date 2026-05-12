@@ -1,13 +1,13 @@
 name: build_debug
-description: Build kuro binary (debug)
+description: Build slug binary (debug)
 runs:
   using: composite
   steps:
   - uses: Swatinem/rust-cache@v2
     with:
-      prefix-key: kuro-debug
-  - name: Build kuro binary (debug)
+      prefix-key: slug-debug
+  - name: Build slug binary (debug)
     run: |-
       mkdir $RUNNER_TEMP/artifacts
-      cargo build --bin=kuro -Z unstable-options --artifact-dir=$RUNNER_TEMP/artifacts
+      cargo build --bin=slug -Z unstable-options --artifact-dir=$RUNNER_TEMP/artifacts
     shell: bash

@@ -3,7 +3,7 @@ id: configurations_by_example
 title: Configurations By Example
 ---
 
-[Buck’s architectural model](../../developers/architecture/kuro/) description
+[Buck’s architectural model](../../developers/architecture/slug/) description
 is a very helpful pre-read.
 
 The main use of configurations is changing target properties based on what the
@@ -220,7 +220,7 @@ java_binary(
 )
 ```
 
-If you then do `kuro build //binaries:cats //binaries:dogs`, the
+If you then do `slug build //binaries:cats //binaries:dogs`, the
 //binaries:cats binary will be built in the //platforms:windows-arm64-dev
 configuration and the //binaries:dogs binary will be built in the
 //platforms:mac-x86-dev configuration. Each of those binaries depend on
@@ -233,7 +233,7 @@ contain //libs:lib3-x86.
 
 You can specify a different target platform on the command line. If you run
 
-`kuro build //binaries:cats //binaries:dogs --target-platforms //platforms:mac-x86-opt`,
+`slug build //binaries:cats //binaries:dogs --target-platforms //platforms:mac-x86-opt`,
 both //binaries:cats and //binaries:dogs will be built in the
 //platforms:mac-x86-opt configuration.
 
@@ -266,9 +266,9 @@ java_library(
 )
 ```
 
-Running `kuro build //other:other --target-platforms //platforms:win-x86-dev`
+Running `slug build //other:other --target-platforms //platforms:win-x86-dev`
 would build other in that configuration. But running
-`kuro build //other:other --target-platforms //platforms:mac-x86-dev` would
+`slug build //other:other --target-platforms //platforms:mac-x86-dev` would
 fail, because //other:other_lib would be incompatible with that configuration
 and so //other:other would be as well. buck considers it an error to request to
 build (or run or install or test) an explicit target that is incompatible.
@@ -279,7 +279,7 @@ simply be skipped (buck should print a message that it is skipping them). In
 this example, the default_target_platform is being selected based on the host
 (you could imagine this being commonly done within some small macro layer that
 your project uses). There may be other targets in the //other/BUCK file that are
-compatible with mac, and so if you do `kuro build //other:` that could build
+compatible with mac, and so if you do `slug build //other:` that could build
 all the targets in that package that are compatible with their
 default_target_platform and if they all used the same as //other:other some of
 them may be compatible with mac when building on a mac and those would be built
@@ -316,7 +316,7 @@ execution_platform(
     local_enabled = host_info().os.is_macos,
     remote_enabled = True,
     use_limited_hybrid = False,
-    remote_execution_use_case = "kuro-build",
+    remote_execution_use_case = "slug-build",
     remote_execution_properties = {
         "platform": "mac-re"
     },

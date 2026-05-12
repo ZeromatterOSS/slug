@@ -3,7 +3,7 @@ id: incremental_actions
 title: Incremental Actions
 ---
 
-It's possible to make certain Kuro actions behave incrementally, that is, to
+It's possible to make certain Slug actions behave incrementally, that is, to
 produce results for a current invocation based on the result from the previous
 run. Incrementality could significantly improve performance of some actions such
 as packaging (such as Apple App Bundles) or linking (MSVC incremental linking).
@@ -15,19 +15,19 @@ There are two essential requirements to make an action incremental:
   easy to compare inputs from a previous run with inputs from the current run
   and detect those changed.
 
-The only way to run user-defined commands in Kuro is with `ctx.actions.run`.
+The only way to run user-defined commands in Slug is with `ctx.actions.run`.
 Both of the above requirements are met via its `metadata_env_var`,
 `metadata_path` and `no_outputs_cleanup` parameters.
 
-When the `no_outputs_cleanup` flag is turned on, Kuro won't perform any
+When the `no_outputs_cleanup` flag is turned on, Slug won't perform any
 deletion of old outputs for the action. That means the result from the previous
 run will be accessible, but the user script has to detect which parts of it
 should be deleted and perform a manual cleanup.
 
-When the `metadata_env_var` and `metadata_path` parameters are present, Kuro
+When the `metadata_env_var` and `metadata_path` parameters are present, Slug
 will create a JSON file on a disk before actually executing the command. The
 file will contain a list of paths and hash digests for every command action
-input. All paths in the file are relative to the Kuro project root. Symlinks
+input. All paths in the file are relative to the Slug project root. Symlinks
 are not included in metadata because it is possible for the user script to
 resolve symlink and use a resolved path to get the destination hash digest from
 action metadata if it's needed, as shown in the following JSON example:

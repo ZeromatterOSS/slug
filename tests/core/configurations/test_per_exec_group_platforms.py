@@ -32,7 +32,7 @@ async def test_two_groups_pick_disjoint_platforms(buck: Buck) -> None:
     #
     # Fine-grained routing-correctness verification (asserting the
     # action's actual `re_properties` per group) lives in the Rust
-    # unit tests in `kuro_build_api::actions::registry::
+    # unit tests in `slug_build_api::actions::registry::
     # select_action_executor_config_tests`. This integration test
     # only asserts the path doesn't error — equivalent to the
     # default-group `test_extra_exec_platforms` smoke check, but for

@@ -1,6 +1,6 @@
 # Package-local values
 
-This RFC proposes to extend kuro Starlark with package-local values.
+This RFC proposes to extend slug Starlark with package-local values.
 
 ## Why
 
@@ -30,7 +30,7 @@ Proposed per-package properties can replace `get_modes` mechanism.
 
 ### `PACKAGE` files
 
-Before evaluating `BUCK` file, kuro will evaluate all `PACKAGE` files in the
+Before evaluating `BUCK` file, slug will evaluate all `PACKAGE` files in the
 same directory and all parent directories. Absent `PACKAGE` files are treated as
 empty files.
 

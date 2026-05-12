@@ -5,9 +5,9 @@ title: Buck Query Language
 
 # Buck Query Language
 
-Kuro's query language provides a powerful way to inspect and analyze the build
+Slug's query language provides a powerful way to inspect and analyze the build
 graph. The query language is shared across different query commands
-(`kuro uquery`, `kuro cquery`, and `kuro aquery`), though each command
+(`slug uquery`, `slug cquery`, and `slug aquery`), though each command
 operates on different graph representations and supports different sets of
 operators.
 
@@ -22,11 +22,11 @@ could be:
 - A [.buckconfig alias](buckconfig.md)
 - The set of targets returned by another Buck query operator
 
-**Tip:** You can pass an alias directly to the `kuro query` command line to see
+**Tip:** You can pass an alias directly to the `slug query` command line to see
 what it resolves to. For example:
 
 ```sh
-kuro uquery app
+slug uquery app
 ```
 
 ### Non-target Parameters
@@ -45,22 +45,22 @@ drawn from the alphabet, numerals, forward slash (`/`), colon (`:`), period
 with a hyphen or period. For example, quoting `java_test` is unnecessary.
 
 However, we **do recommend** that you quote arguments as a best practice even
-when Kuro doesn't require it.
+when Slug doesn't require it.
 
-You should always use quotes when writing scripts that construct `kuro query`
+You should always use quotes when writing scripts that construct `slug query`
 expressions from user-supplied values.
 
-Note that argument quoting for `kuro query` is in addition to any quoting that
+Note that argument quoting for `slug query` is in addition to any quoting that
 your shell requires. In the following example, double-quotes are used for the
 shell and single-quotes are used for the build target expression:
 
 ```sh
-kuro uquery "'//foo:bar=wiz'"
+slug uquery "'//foo:bar=wiz'"
 ```
 
 ## Algebraic Set Operations
 
-Kuro's query language supports algebraic set operations for combining query
+Slug's query language supports algebraic set operations for combining query
 results.
 
 ### Set Operations: intersection, union, set difference
@@ -79,13 +79,13 @@ just faster to type.
 For example:
 
 ```sh
-kuro uquery "deps('//foo:bar') intersect deps('//baz:lib')"
+slug uquery "deps('//foo:bar') intersect deps('//baz:lib')"
 ```
 
 and
 
 ```sh
-kuro uquery "deps('//foo:bar') ^ deps('//baz:lib')"
+slug uquery "deps('//foo:bar') ^ deps('//baz:lib')"
 ```
 
 both return the targets that appear in the transitive closure of `//foo:bar` and
@@ -121,27 +121,27 @@ The `set()` operator computes the union of a set of zero or more target
 expressions. Separate the targets with white space (not commas). Quote the
 targets to ensure they are parsed correctly.
 
-If you want to invoke `kuro query` on a list of targets, then `set()` is a way
+If you want to invoke `slug query` on a list of targets, then `set()` is a way
 to group this list in a query.
 
 **Example:**
 
 The following command line returns the target `main` in the build file in the
-root of the Kuro project and all the targets from the build file in the
+root of the Slug project and all the targets from the build file in the
 `myclass` subdirectory of the root:
 
 ```sh
-kuro uquery "set( '//:main' '//myclass:' )"
+slug uquery "set( '//:main' '//myclass:' )"
 ```
 
 **Example:**
 
 The following command line returns the merged set (union) of dependencies for
-the targets `main` and `subs` in the build file in the root of the Kuro
+the targets `main` and `subs` in the build file in the root of the Slug
 project:
 
 ```sh
-kuro uquery "deps( set( '//:main' '//:subs' ) )"
+slug uquery "deps( set( '//:main' '//:subs' ) )"
 ```
 
 ## Executing Multiple Queries at Once
@@ -150,18 +150,18 @@ Suppose you want to know the tests associated with a set of targets. This can be
 done by combining query operators. For example:
 
 ```sh
-kuro cquery "testsof(deps(set('target1' 'target2' 'target3')))"
+slug cquery "testsof(deps(set('target1' 'target2' 'target3')))"
 ```
 
 Suppose you now want to know the tests for **each** of these targets; the above
 command returns the union of the tests. Instead of executing one query for the
-entire set of targets, Kuro's query commands provide a way to repeat a query
+entire set of targets, Slug's query commands provide a way to repeat a query
 with different targets using a single command. To do this, first define the
 query expression format and then list the input targets, separated by spaces.
 For example:
 
 ```sh
-kuro cquery "testsof(deps( %s ))" target1 target2 target3
+slug cquery "testsof(deps( %s ))" target1 target2 target3
 ```
 
 The `%s` in the query expression is replaced by each of the listed targets, and
@@ -175,7 +175,7 @@ targets, such as `owner()`. Recall that the `set()` operator works only with
 targets, but the `owner()` operator takes a filename as its argument:
 
 ```sh
-kuro uquery "owner( %s )" main.cpp myclass.cpp myclass.h
+slug uquery "owner( %s )" main.cpp myclass.cpp myclass.h
 ```
 
 ## Referencing Args Files
@@ -186,7 +186,7 @@ of arguments is long or when you want to persist the query input in source
 control.
 
 ```sh
-kuro cquery "testsof(deps(%s))" @/path/to/args-file
+slug cquery "testsof(deps(%s))" @/path/to/args-file
 ```
 
 If you want to include all the targets in the `@`-file in a single query
@@ -194,7 +194,7 @@ execution, you can use the following alternative syntax. Note the addition of
 the capital "S" in `%Ss`:
 
 ```sh
-kuro cquery "testsof(deps(%Ss))" @/path/to/args-file
+slug cquery "testsof(deps(%Ss))" @/path/to/args-file
 ```
 
 In the example above, the lines of the file are converted to a set and
@@ -209,12 +209,12 @@ In the example above, if the args file contains the following:
 Then the query expression is equivalent to:
 
 ```sh
-kuro cquery "testsof(deps(set('//foo:bar' '//foo:baz')))"
+slug cquery "testsof(deps(set('//foo:bar' '//foo:baz')))"
 ```
 
 ## Query Environments
 
-Kuro provides different query environments that operate on different graph
+Slug provides different query environments that operate on different graph
 representations:
 
 - **Uquery (Unconfigured Query)**: Operates on the unconfigured target graph.
@@ -236,6 +236,6 @@ each environment.
 
 ## See Also
 
-- [Kuro Cheat Sheet](../users/cheatsheet.md) for practical query examples
+- [Slug Cheat Sheet](../users/cheatsheet.md) for practical query examples
 - [Glossary](glossary.md) for definitions of key concepts
 - [Target Patterns](target_pattern.md) for more on specifying targets

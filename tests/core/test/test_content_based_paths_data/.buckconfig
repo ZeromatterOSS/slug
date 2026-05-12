@@ -1,4 +1,4 @@
-# Bucket-C fixture (Plan 35.6a). Uses kuro-specific knobs not yet
+# Bucket-C fixture (Plan 35.6a). Uses slug-specific knobs not yet
 # migrated to CLI flags. See thoughts/shared/research/2026-05-04-fixture-bucket-classification.md
 
 [cells]
@@ -11,5 +11,5 @@
 [external_cells]
   nano_prelude = bundled
 
-[kuro]
+[slug]
   create_unhashed_links = true
