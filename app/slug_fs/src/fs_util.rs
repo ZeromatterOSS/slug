@@ -22,12 +22,12 @@ use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 
+use relative_path::RelativePath;
+use relative_path::RelativePathBuf;
 pub use slug_env::soft_error::soft_error;
 use slug_error::BuckErrorContext;
 use slug_error::ErrorTag;
 use slug_error::slug_error;
-use relative_path::RelativePath;
-use relative_path::RelativePathBuf;
 
 use crate::cwd::assert_cwd_is_not_set;
 use crate::io_counters::IoCounterGuard;
@@ -533,13 +533,18 @@ fn make_tree_writable_for_removal(path: &AbsPath) -> Result<(), IoError> {
         {
             let entry = entry.map_err(|e| IoError::new_with_path("read_dir entry", path, e))?;
             let child_path = entry.path();
-            let child = AbsPath::new(&child_path).map_err(|e| {
-                IoError::new(
-                    "absolute path conversion".to_owned(),
-                    io::Error::other(e.to_string()),
-                )
-            })?;
-            make_tree_writable_for_removal(child)?;
+            if child_path.is_absolute() {
+                let child = AbsPath::new(&child_path).map_err(|e| {
+                    IoError::new(
+                        "absolute path conversion".to_owned(),
+                        io::Error::other(e.to_string()),
+                    )
+                })?;
+                make_tree_writable_for_removal(child)?;
+            } else {
+                let child = path.join(entry.file_name());
+                make_tree_writable_for_removal(&child)?;
+            }
         }
     } else {
         permissions.set_mode(mode | 0o600);
@@ -832,8 +837,8 @@ mod tests {
     use std::path::PathBuf;
 
     use assert_matches::assert_matches;
-    use slug_error::ErrorTag;
     use relative_path::RelativePath;
+    use slug_error::ErrorTag;
 
     use crate::fs_util;
     use crate::fs_util::IoError;
