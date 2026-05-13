@@ -67,6 +67,10 @@ impl<'v, V: ValueLike<'v>> ConstraintSettingInfoGen<V> {
             .into_option()
     }
 
+    pub fn default_label(&self) -> Option<slug_core::provider::label::ProvidersLabel> {
+        self.default().map(|default| default.label().dupe())
+    }
+
     /// Convert to a ConstraintKey for use in configuration data.
     pub(crate) fn to_constraint_key(&self) -> ConstraintKey {
         let default_constraint_value = self
@@ -103,10 +107,21 @@ impl FrozenConstraintSettingInfo {
         label: slug_core::target::label::label::TargetLabel,
         heap: &FrozenHeap,
     ) -> FrozenValue {
+        Self::create_on_frozen_heap_with_default(label, None, heap)
+    }
+
+    pub fn create_on_frozen_heap_with_default(
+        label: slug_core::target::label::label::TargetLabel,
+        default: Option<slug_core::provider::label::ProvidersLabel>,
+        heap: &FrozenHeap,
+    ) -> FrozenValue {
         let label_val = heap.alloc(StarlarkTargetLabel::new(label));
+        let default = default
+            .map(|label| heap.alloc(StarlarkProvidersLabel::new(label)))
+            .unwrap_or_else(FrozenValue::new_none);
         heap.alloc(ConstraintSettingInfoGen::<FrozenValue> {
             label: FrozenValueOfUnchecked::new(label_val),
-            default: FrozenValueOfUnchecked::new(FrozenValue::new_none()),
+            default: FrozenValueOfUnchecked::new(default),
         })
     }
 }

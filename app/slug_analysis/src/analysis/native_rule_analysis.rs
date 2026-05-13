@@ -44,6 +44,8 @@ use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_t
 use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_frozen_sh_test_info;
 use slug_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
+use slug_core::configuration::constraints::ConstraintKey;
+use slug_core::configuration::constraints::ConstraintValue;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_core::deferred::key::DeferredHolderKey;
 use slug_core::execution_types::executor_config::CommandExecutorConfig;
@@ -53,6 +55,7 @@ use slug_core::package::source_path::SourcePath;
 use slug_core::provider::label::ProvidersLabel;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_core::target::label::label::TargetLabel;
+use slug_core::target::name::TargetNameRef;
 use slug_error::BuckErrorContext;
 use slug_error::internal_error;
 use slug_execute::execute::request::OutputType;
@@ -599,12 +602,17 @@ fn collect_artifact_groups_from_configured_attr(
 /// `refs.x[ConstraintSettingInfo]` works in configuration transitions.
 fn analyze_constraint_setting(
     target: &ConfiguredTargetLabel,
-    _configured_node: ConfiguredTargetNodeRef<'_>,
+    configured_node: ConfiguredTargetNodeRef<'_>,
 ) -> slug_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
     let default_info = FrozenDefaultInfo::testing_empty(&heap);
-    let constraint_setting_info =
-        FrozenConstraintSettingInfo::create_on_frozen_heap(target.unconfigured().dupe(), &heap);
+    let default_constraint_value =
+        native_constraint_setting_default_value(target, configured_node)?;
+    let constraint_setting_info = FrozenConstraintSettingInfo::create_on_frozen_heap_with_default(
+        target.unconfigured().dupe(),
+        default_constraint_value,
+        &heap,
+    );
 
     let providers = SmallMap::from_iter([
         (
@@ -618,6 +626,45 @@ fn analyze_constraint_setting(
     ]);
 
     make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
+}
+
+fn native_constraint_setting_default_value(
+    target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
+) -> slug_error::Result<Option<ProvidersLabel>> {
+    let Some(attr) = configured_node
+        .attrs(AttrInspectOptions::All)
+        .find(|attr| attr.name == "default_constraint_value")
+    else {
+        return Ok(None);
+    };
+    let name = match &attr.value {
+        ConfiguredAttr::String(s) => s.as_str(),
+        ConfiguredAttr::OneOf(inner, _) => match &**inner {
+            ConfiguredAttr::String(s) => s.as_str(),
+            _ => return Ok(None),
+        },
+        _ => return Ok(None),
+    };
+    if name.is_empty() {
+        return Ok(None);
+    }
+    let label = if let Some(rest) = name.strip_prefix(':') {
+        TargetLabel::new(
+            target.unconfigured().pkg().dupe(),
+            TargetNameRef::new(rest)?,
+        )
+    } else if !name.contains("//") && !name.contains(':') {
+        TargetLabel::new(
+            target.unconfigured().pkg().dupe(),
+            TargetNameRef::new(name)?,
+        )
+    } else {
+        // Absolute default labels are uncommon for native constraint_setting; leave
+        // them without a default until this path has a cell resolver available.
+        return Ok(None);
+    };
+    Ok(Some(ProvidersLabel::default_for(label)))
 }
 
 /// Analyze a constraint_value target.
@@ -644,7 +691,20 @@ fn analyze_constraint_value(
 
     // Create the real FrozenConstraintSettingInfo and FrozenConstraintValueInfo so that
     // transition functions can access `.setting.label` on the ConstraintValueInfo instance.
-    let frozen_cs_info = FrozenConstraintSettingInfo::create_on_frozen_heap(cs_target_label, &heap);
+    let default_constraint_value = dep_analysis
+        .first()
+        .and_then(|(_, dep_result)| dep_result.providers().ok())
+        .and_then(|providers| {
+            providers
+                .value()
+                .builtin_provider::<FrozenConstraintSettingInfo>()
+                .and_then(|info| info.default_label())
+        });
+    let frozen_cs_info = FrozenConstraintSettingInfo::create_on_frozen_heap_with_default(
+        cs_target_label,
+        default_constraint_value.clone(),
+        &heap,
+    );
     let cv_providers_label = ProvidersLabel::default_for(target.unconfigured().dupe());
     let constraint_value_info =
         FrozenConstraintValueInfo::create_on_frozen_heap(frozen_cs_info, cv_providers_label, &heap);
@@ -665,8 +725,16 @@ fn analyze_constraint_value(
     if !dep_analysis.is_empty() {
         let cs_label = dep_analysis[0].0.unconfigured().dupe();
         let cv_label = ProvidersLabel::default_for(target.unconfigured().dupe());
-        let config_info =
-            FrozenConfigurationInfo::for_native_config_setting(&[(cs_label, cv_label)], &heap);
+        let config_info = FrozenConfigurationInfo::for_native_config_setting_keys(
+            &[(
+                ConstraintKey {
+                    key: cs_label,
+                    default: default_constraint_value.map(ConstraintValue),
+                },
+                cv_label,
+            )],
+            &heap,
+        );
         providers.insert(
             FrozenConfigurationInfo::builtin_provider_id().dupe(),
             config_info,
@@ -740,7 +808,7 @@ fn analyze_config_setting(
             {
                 let config_data = config_info.to_config_setting_data();
                 for (ck, cv) in config_data.constraints {
-                    all_constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
+                    all_constraint_pairs.push((ck, cv.0.dupe()));
                 }
             }
         }
@@ -751,7 +819,13 @@ fn analyze_config_setting(
     if !flag_values_match || !values_match {
         let sentinel_setting = target.unconfigured().dupe();
         let sentinel_value = ProvidersLabel::default_for(target.unconfigured().dupe());
-        all_constraint_pairs.push((sentinel_setting, sentinel_value));
+        all_constraint_pairs.push((
+            ConstraintKey {
+                key: sentinel_setting,
+                default: None,
+            },
+            sentinel_value,
+        ));
     }
     // Otherwise (flag_values and values both match), leave all_constraint_pairs as-is.
     // If empty → config_setting matches everything (no constraints).
@@ -759,7 +833,7 @@ fn analyze_config_setting(
 
     // Create merged ConfigurationInfo with all constraint pairs
     let config_info =
-        FrozenConfigurationInfo::for_native_config_setting(&all_constraint_pairs, &heap);
+        FrozenConfigurationInfo::for_native_config_setting_keys(&all_constraint_pairs, &heap);
 
     let mut providers = SmallMap::from_iter([(
         DefaultInfoCallable::provider_id().dupe(),
@@ -931,7 +1005,7 @@ fn analyze_platform(
             {
                 let config_data = config_info.to_config_setting_data();
                 for (ck, cv) in config_data.constraints {
-                    all_constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
+                    all_constraint_pairs.push((ck, cv.0.dupe()));
                 }
             }
             // Also collect from PlatformInfo (provided by parent platform deps)
@@ -940,7 +1014,7 @@ fn analyze_platform(
                 if let Ok(config_data) = platform_info.to_configuration() {
                     if let Ok(data) = config_data.data() {
                         for (ck, cv) in &data.constraints {
-                            all_constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
+                            all_constraint_pairs.push((ck.dupe(), cv.0.dupe()));
                         }
                     }
                 }
@@ -973,7 +1047,7 @@ fn analyze_platform(
     let label_str = bazel_platform_label(target.unconfigured());
 
     // Create PlatformInfo with the merged constraint configuration.
-    let platform_info = FrozenPlatformInfo::for_native_platform(
+    let platform_info = FrozenPlatformInfo::for_native_platform_keys(
         &label_str,
         &all_constraint_pairs,
         &exec_properties_vec,

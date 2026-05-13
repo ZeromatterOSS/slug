@@ -404,7 +404,30 @@ def _find_paths_for_label(pool, label_str):
         # `<rel>` in the BUILD file.
         if dep_label.endswith("/" + query_name):
             return paths
+
+        # Slug can currently lose the intermediate label for selected files
+        # whose DefaultInfo forwards one file from another target. Preserve
+        # Bazel's location behavior when the explicit target has exactly one
+        # output and that output's path names the requested label.
+        if len(paths) == 1 and paths[0].endswith("/" + query_name):
+            return paths
     return None
+
+def _slug_explicit_targets_location_pool(targets):
+    entries = []
+    for target in targets:
+        # `ctx.expand_location(..., targets = ...)` is specified in terms of
+        # targets, so collect their DefaultInfo files directly in Starlark.
+        # The Rust pool still handles implicit attrs and artifact-only values.
+        if not hasattr(target, "label"):
+            continue
+        if DefaultInfo not in target:
+            continue
+        paths = []
+        for file_ in target[DefaultInfo].files.to_list():
+            paths.append(file_.path)
+        entries.append([str(target.label), paths])
+    return entries
 
 def _slug_expand_location(raw_ctx, input, targets, short_paths):
     # `short_paths` is accepted for Bazel API parity; both the old Rust
@@ -414,7 +437,7 @@ def _slug_expand_location(raw_ctx, input, targets, short_paths):
 
     # Build the pool: explicit targets + implicit attrs walk (Rust-side).
     targets_val = targets if targets != None else []
-    pool = slug_collect_location_pool(raw_ctx, targets_val)
+    pool = _slug_explicit_targets_location_pool(targets_val) + slug_collect_location_pool(raw_ctx, targets_val)
 
     # Parse and substitute $(verb label) patterns using a
     # for-loop-with-cursor (Starlark has no `while`).

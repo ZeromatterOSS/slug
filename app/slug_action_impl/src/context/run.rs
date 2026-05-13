@@ -51,6 +51,7 @@ use starlark::collections::SmallSet;
 use starlark::environment::MethodsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::Heap;
 use starlark::values::StringValue;
 use starlark::values::UnpackAndDiscard;
 use starlark::values::Value;
@@ -1331,11 +1332,26 @@ fn collect_items_from_value<'v>(
     val: Value<'v>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<Vec<Value<'v>>> {
-    if is_depset_value(val) {
-        return depset_to_list(val, eval.heap());
+    fn collect<'v>(
+        val: Value<'v>,
+        heap: Heap<'v>,
+        out: &mut Vec<Value<'v>>,
+    ) -> starlark::Result<()> {
+        if is_depset_value(val) {
+            out.extend(depset_to_list(val, heap)?);
+            return Ok(());
+        }
+        if let Ok(iter) = val.iterate(heap) {
+            for item in iter {
+                collect(item, heap, out)?;
+            }
+            return Ok(());
+        }
+        out.push(val);
+        Ok(())
     }
-    if let Ok(iter) = val.iterate(eval.heap()) {
-        return Ok(iter.collect());
-    }
-    Ok(vec![val])
+
+    let mut items = Vec::new();
+    collect(val, eval.heap(), &mut items)?;
+    Ok(items)
 }

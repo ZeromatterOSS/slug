@@ -103,9 +103,9 @@ use dupe::OptionDupedExt;
 use gazebo::prelude::*;
 use instance::CellInstance;
 use itertools::Itertools;
+use sequence_trie::SequenceTrie;
 use slug_fs::paths::abs_path::AbsPath;
 use slug_fs::paths::file_name::FileNameBuf;
-use sequence_trie::SequenceTrie;
 
 use crate::cells::alias::CellAlias;
 use crate::cells::alias::NonEmptyCellAlias;
@@ -317,6 +317,15 @@ pub fn canonical_dynamic_extension_cell_name(name: &str) -> Option<String> {
     if cells.contains_key(name) {
         return Some(name.to_owned());
     }
+
+    // Do not let the suffix fallback rewrite an already-resolved bzlmod module
+    // cell. Kuro has both a direct `zstd` module and an extension repo named
+    // `ape+ape_cosmos+zstd`; once a target label is in the `zstd` cell, action
+    // source paths must stay under `external/zstd`, not the extension repo.
+    if is_known_external_cell_name(name) {
+        return None;
+    }
+
     let suffix = format!("+{name}");
     if let Some(canonical) = cells
         .keys()
@@ -698,6 +707,13 @@ pub fn get_external_cell_names() -> Vec<String> {
         .unwrap_or_default()
 }
 
+fn is_known_external_cell_name(name: &str) -> bool {
+    EXTERNAL_CELL_NAMES
+        .lock()
+        .map(|names| names.iter().any(|cell_name| cell_name == name))
+        .unwrap_or(false)
+}
+
 /// Errors from cell creation
 #[derive(slug_error::Error, Debug)]
 #[slug(input)]
@@ -731,6 +747,11 @@ pub struct CellAliasResolver {
 }
 
 impl CellAliasResolver {
+    fn lookup_alias(&self, alias: &str) -> Option<CellName> {
+        let alias = NonEmptyCellAlias::new(alias.to_owned()).ok()?;
+        self.aliases.get(&alias).duped()
+    }
+
     fn current_as_alias(current: CellName) -> slug_error::Result<NonEmptyCellAlias> {
         NonEmptyCellAlias::new(current.as_str().to_owned())
     }
@@ -820,7 +841,7 @@ impl CellAliasResolver {
                 return Ok(cell_name);
             }
         }
-        if let Some(name) = self.aliases.get(alias).duped() {
+        if let Some(name) = self.lookup_alias(alias) {
             return Ok(name);
         }
 
@@ -857,7 +878,7 @@ impl CellAliasResolver {
             let prefix = &current_str[..=prefix_end]; // "X+Y+"
             let candidate = format!("{}{}", prefix, alias);
             // Check if this is a known alias (canonical names are their own aliases)
-            if let Some(name) = self.aliases.get(candidate.as_str()).duped() {
+            if let Some(name) = self.lookup_alias(&candidate) {
                 return Ok(name);
             }
             // Check the global dynamic registry
@@ -1567,6 +1588,46 @@ mod tests {
         assert!(!err.contains("alias_099"));
 
         Ok(())
+    }
+
+    #[test]
+    fn cell_alias_resolver_resolves_non_empty_alias_key() -> slug_error::Result<()> {
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            NonEmptyCellAlias::new("bazel_lib".to_owned())?,
+            CellName::testing_new("bazel_lib"),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), aliases)?;
+
+        assert_eq!(
+            CellName::testing_new("bazel_lib"),
+            resolver.resolve("bazel_lib")?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_dynamic_extension_cell_name_preserves_exact_external_cell() {
+        let apparent = "exact_external_cell_test_unique";
+        let canonical = "owner+extension+exact_external_cell_test_unique";
+        register_dynamic_extension_cell(
+            canonical.to_owned(),
+            format!("bazel-external/{canonical}"),
+        );
+
+        let original = {
+            let mut names = EXTERNAL_CELL_NAMES.lock().unwrap();
+            let original = names.clone();
+            names.push(apparent.to_owned());
+            original
+        };
+
+        let resolved = canonical_dynamic_extension_cell_name(apparent);
+
+        *EXTERNAL_CELL_NAMES.lock().unwrap() = original;
+
+        assert_eq!(None, resolved);
     }
 
     #[test]

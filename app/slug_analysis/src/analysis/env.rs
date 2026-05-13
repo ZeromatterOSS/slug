@@ -83,7 +83,9 @@ use slug_node::attrs::coerced_attr::CoercedAttr;
 use slug_node::attrs::coerced_attr::CoercedSelectorKeyRef;
 use slug_node::attrs::inspect_options::AttrInspectOptions;
 use slug_node::execution::GetExecutionPlatforms;
+use slug_node::nodes::configured::ConfiguredTargetNode;
 use slug_node::nodes::configured::ConfiguredTargetNodeRef;
+use slug_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use slug_node::nodes::frontend::TargetGraphCalculation;
 use slug_node::nodes::unconfigured::TargetNode;
 use slug_node::rule_type::NativeRuleKind;
@@ -1861,12 +1863,71 @@ fn metadata_select_key_matches(
         return false;
     };
     let key_without_at = key.trim_start_matches('@');
+    let normalized_key = metadata_normalize_label_for_match(key);
     data.constraints.values().any(|value| {
         let value = value.to_string();
+        let normalized_value = metadata_normalize_label_for_match(&value);
         value == key
             || value.trim_start_matches('@') == key_without_at
             || key_without_at.ends_with(value.trim_start_matches('@'))
-    }) || metadata_composite_config_setting_name_matches(key, target_cfg)
+            || normalized_value == normalized_key
+            || normalized_key.ends_with(&normalized_value)
+    }) || metadata_known_build_setting_config_matches(key, &data.build_settings)
+        || metadata_composite_config_setting_name_matches(key, target_cfg)
+}
+
+fn metadata_normalize_label_for_match(label: &str) -> String {
+    let label = label.trim_start_matches('@');
+    let Some((repo, rest)) = label.split_once("//") else {
+        return label.to_owned();
+    };
+    let repo = if let Some(module_name) = repo.strip_suffix('+') {
+        module_name
+    } else if let Some((module_name, suffix)) = repo.split_once('+') {
+        if module_name == "platforms"
+            || suffix
+                .as_bytes()
+                .first()
+                .is_some_and(|byte| byte.is_ascii_digit())
+        {
+            module_name
+        } else {
+            repo
+        }
+    } else {
+        repo
+    };
+    format!("{repo}//{rest}")
+}
+
+fn metadata_known_build_setting_config_matches(
+    key: &str,
+    build_settings: &std::collections::BTreeMap<
+        slug_core::configuration::build_setting::BuildSettingLabel,
+        slug_core::configuration::build_setting::BuildSettingValue,
+    >,
+) -> bool {
+    let expected = if key.contains("//toolchain:runtimes_all") {
+        Some(("//toolchain:runtime_stage", "complete"))
+    } else if key.contains("//toolchain:runtimes_stage1") {
+        Some(("//toolchain:runtime_stage", "stage1"))
+    } else if key.contains("//toolchain:runtimes_none") {
+        Some(("//toolchain:runtime_stage", "stage0"))
+    } else if key.contains("//toolchain:prebuilt_toolchain") {
+        Some(("//toolchain:source", "prebuilt"))
+    } else if key.contains("//toolchain:bootstrapped_toolchain") {
+        Some(("//toolchain:source", "bootstrapped"))
+    } else {
+        None
+    };
+    let Some((setting_suffix, expected_value)) = expected else {
+        return false;
+    };
+
+    build_settings.iter().any(|(label, value)| {
+        let label = label.to_string();
+        label.contains(setting_suffix) && value.to_string() == expected_value
+    })
 }
 
 fn metadata_composite_config_setting_name_matches(
@@ -1971,6 +2032,98 @@ fn metadata_label_key(label: &TargetLabel) -> String {
     label.to_string()
 }
 
+fn metadata_canonicalize_target_label(label: TargetLabel) -> TargetLabel {
+    let cell_name = label.pkg().cell_name().as_str().to_owned();
+    let Some(canonical_cell_name) =
+        slug_core::cells::canonical_dynamic_extension_cell_name(&cell_name)
+    else {
+        return label;
+    };
+    if canonical_cell_name == cell_name {
+        return label;
+    }
+
+    let cell_relative_path = label.pkg().cell_relative_path().as_str().to_owned();
+    let target_name = label.name().as_str().to_owned();
+    let Ok(cell_name) = CellName::unchecked_new(&canonical_cell_name) else {
+        return label;
+    };
+    let cell_rel_path = CellRelativePath::unchecked_new(&cell_relative_path);
+    let Ok(package_label) =
+        PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path))
+    else {
+        return label;
+    };
+    let Ok(target_name_ref) = TargetNameRef::new(&target_name) else {
+        return label;
+    };
+    TargetLabel::new(package_label, target_name_ref)
+}
+
+fn metadata_relabel_with_cell(
+    label: &TargetLabel,
+    canonical_cell_name: &str,
+) -> Option<TargetLabel> {
+    if canonical_cell_name == label.pkg().cell_name().as_str() {
+        return Some(label.dupe());
+    }
+    let cell_relative_path = label.pkg().cell_relative_path().as_str().to_owned();
+    let target_name = label.name().as_str().to_owned();
+    let cell_name = CellName::unchecked_new(canonical_cell_name).ok()?;
+    let cell_rel_path = CellRelativePath::unchecked_new(&cell_relative_path);
+    let package_label =
+        PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)).ok()?;
+    let target_name_ref = TargetNameRef::new(&target_name).ok()?;
+    Some(TargetLabel::new(package_label, target_name_ref))
+}
+
+fn metadata_owner_scoped_repo_candidates(owner_cell_name: &str) -> Vec<String> {
+    let mut candidates = Vec::new();
+    candidates.push(owner_cell_name.to_owned());
+    if let Some((owner_module, _, _)) = slug_bzlmod::parse_canonical_name(owner_cell_name) {
+        candidates.push(owner_module.to_owned());
+        if !owner_module.ends_with('+') {
+            candidates.push(format!("{owner_module}+"));
+        }
+    } else if !owner_cell_name.ends_with('+') {
+        candidates.push(format!("{owner_cell_name}+"));
+    }
+    candidates.sort();
+    candidates.dedup();
+    candidates
+}
+
+fn metadata_canonicalize_label_for_owner(owner: &TargetLabel, label: TargetLabel) -> TargetLabel {
+    let canonical = metadata_canonicalize_target_label(label.dupe());
+    if canonical != label {
+        return canonical;
+    }
+
+    let apparent_cell = label.pkg().cell_name().as_str();
+    if apparent_cell.is_empty() || apparent_cell.contains('+') {
+        return label;
+    }
+
+    let owner_cell = owner.pkg().cell_name().as_str();
+    if let Some(canonical_cell) =
+        slug_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
+            owner_cell,
+            apparent_cell,
+        )
+        .or_else(|| {
+            metadata_owner_scoped_repo_candidates(owner_cell)
+                .into_iter()
+                .find_map(|owner_module| {
+                    slug_core::cells::resolve_scoped_bzlmod_repo_alias(&owner_module, apparent_cell)
+                })
+        })
+    {
+        return metadata_relabel_with_cell(&label, &canonical_cell).unwrap_or(label);
+    }
+
+    label
+}
+
 fn metadata_path_for_label(
     label: &TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
@@ -2012,6 +2165,279 @@ fn metadata_path_for_label(
     }
 }
 
+fn metadata_source_path_for_label(label: &TargetLabel) -> String {
+    let cell_name = label.pkg().cell_name().as_str();
+    let external_cell_name = slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+        .unwrap_or_else(|| cell_name.to_owned());
+    let cell_relative_path = label.pkg().cell_relative_path().as_str();
+    let target_name = label.name().as_str();
+    if slug_core::cells::is_root_cell_name(cell_name) {
+        if cell_relative_path.is_empty() {
+            target_name.to_owned()
+        } else {
+            format!("{}/{}", cell_relative_path, target_name)
+        }
+    } else if cell_relative_path.is_empty() {
+        format!("external/{}/{}", external_cell_name, target_name)
+    } else {
+        format!(
+            "external/{}/{}/{}",
+            external_cell_name, cell_relative_path, target_name
+        )
+    }
+}
+
+async fn metadata_resolve_alias_label(
+    ctx: &mut DiceComputations<'_>,
+    label: TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> TargetLabel {
+    let mut current = metadata_canonicalize_target_label(label);
+    let mut seen = HashSet::new();
+    const MAX_DEPTH: usize = 16;
+    for _ in 0..MAX_DEPTH {
+        current = metadata_canonicalize_target_label(current);
+        let key = metadata_label_key(&current);
+        if !seen.insert(key) {
+            break;
+        }
+        let Some(node) = target_node_for_metadata(ctx, &current).await else {
+            break;
+        };
+        if !matches!(node.rule_type(), RuleType::Native(NativeRuleKind::Alias)) {
+            break;
+        }
+        let Some(actual_attr) = node.attr_or_none("actual", AttrInspectOptions::All) else {
+            break;
+        };
+        let Some(next) = labels_from_coerced_attr(&actual_attr.value, target_cfg)
+            .into_iter()
+            .next()
+        else {
+            break;
+        };
+        current = metadata_canonicalize_label_for_owner(&current, next);
+    }
+    current
+}
+
+async fn metadata_source_directory_path_for_label(
+    ctx: &mut DiceComputations<'_>,
+    label: &TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> Option<String> {
+    let node = target_node_for_metadata(ctx, label).await?;
+    if metadata_rule_name(&node) != Some("_headers_directory") {
+        return None;
+    }
+    let source_directory = metadata_attr_label(&node, "source_directory", target_cfg)?;
+    let source_node = target_node_for_metadata(ctx, &source_directory).await?;
+    let srcs_attr = source_node.attr_or_none("srcs", AttrInspectOptions::All)?;
+    let source_label = labels_from_coerced_attr(&srcs_attr.value, target_cfg)
+        .into_iter()
+        .next()?;
+    Some(metadata_source_path_for_label(&source_label))
+}
+
+async fn metadata_format_path_for_label(
+    ctx: &mut DiceComputations<'_>,
+    label: TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> String {
+    let resolved = metadata_resolve_alias_label(ctx, label, target_cfg).await;
+    if let Some(source_path) =
+        metadata_source_directory_path_for_label(ctx, &resolved, target_cfg).await
+    {
+        return source_path;
+    }
+    metadata_path_for_label(&resolved, target_cfg)
+}
+
+fn metadata_static_library_path_for_label(
+    label: &TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> String {
+    let target_path = metadata_path_for_label(label, target_cfg);
+    let target_name = label.name().as_str();
+    let basename = target_name
+        .rsplit_once('/')
+        .map(|(_, basename)| basename)
+        .unwrap_or_else(|| target_name.strip_suffix("_with_cfg").unwrap_or(target_name));
+    let archive_name = if cfg!(windows) {
+        format!("{basename}.lib")
+    } else {
+        format!("lib{basename}.a")
+    };
+    let Some((dir, _)) = target_path.rsplit_once('/') else {
+        return archive_name;
+    };
+    if target_name.contains("_/") {
+        format!("{dir}/{archive_name}")
+    } else {
+        format!("{dir}/{basename}_/{archive_name}")
+    }
+}
+
+fn metadata_default_output_path_for_node(
+    label: &TargetLabel,
+    node: &TargetNode,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> String {
+    let target_name = label.name().as_str();
+    if metadata_rule_name(node) == Some("cc_static_library")
+        || target_name.ends_with(".static_with_cfg")
+    {
+        return metadata_static_library_path_for_label(label, target_cfg);
+    }
+    metadata_path_for_label(label, target_cfg)
+}
+
+async fn metadata_configured_default_output_label(
+    ctx: &mut DiceComputations<'_>,
+    label: &TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> Option<ConfiguredTargetLabel> {
+    let configured = label.configure(target_cfg.dupe());
+    let node = ctx
+        .get_internal_configured_target_node(&configured)
+        .await
+        .ok()?
+        .require_compatible()
+        .ok()?;
+    let node = node.unwrap_forward();
+    if let Some(output_label) = metadata_static_library_output_dep_label(node, &configured) {
+        return Some(output_label);
+    }
+    Some(node.label().clone())
+}
+
+fn metadata_static_library_output_dep_label(
+    node: &ConfiguredTargetNode,
+    configured: &ConfiguredTargetLabel,
+) -> Option<ConfiguredTargetLabel> {
+    let target_name = configured.unconfigured().name().as_str();
+    let basename = target_name.strip_suffix("_with_cfg")?;
+    if !basename.ends_with(".static") {
+        return None;
+    }
+    let generated_name = format!("{basename}_/{basename}");
+    node.as_ref()
+        .deps()
+        .find(|dep| {
+            let dep_label = dep.label().unconfigured();
+            dep_label.pkg() == configured.unconfigured().pkg()
+                && dep_label.name().as_str() == generated_name
+        })
+        .map(|dep| dep.label().clone())
+}
+
+async fn metadata_default_output_data_for_label_configured(
+    ctx: &mut DiceComputations<'_>,
+    label: TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> Vec<(ConfiguredTargetLabel, String)> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    let mut stack = vec![metadata_canonicalize_target_label(label)];
+
+    while let Some(label) = stack.pop() {
+        let resolved = metadata_resolve_alias_label(ctx, label, target_cfg).await;
+        if !seen.insert(metadata_label_key(&resolved)) {
+            continue;
+        }
+
+        let Some(node) = target_node_for_metadata(ctx, &resolved).await else {
+            let configured = resolved.configure(target_cfg.dupe());
+            out.push((
+                configured.dupe(),
+                metadata_path_for_label(&resolved, target_cfg),
+            ));
+            continue;
+        };
+
+        if matches!(
+            node.rule_type(),
+            RuleType::Native(NativeRuleKind::Filegroup)
+        ) {
+            let srcs = node
+                .attr_or_none("srcs", AttrInspectOptions::All)
+                .map(|srcs| labels_from_coerced_attr(&srcs.value, target_cfg))
+                .unwrap_or_default();
+            for src in srcs.into_iter().rev() {
+                stack.push(metadata_canonicalize_label_for_owner(&resolved, src));
+            }
+            continue;
+        }
+
+        let configured = metadata_configured_default_output_label(ctx, &resolved, target_cfg)
+            .await
+            .unwrap_or_else(|| resolved.configure(target_cfg.dupe()));
+        let output_node = target_node_for_metadata(ctx, configured.unconfigured()).await;
+        let output_path = output_node
+            .as_ref()
+            .map(|node| {
+                metadata_default_output_path_for_node(
+                    configured.unconfigured(),
+                    node,
+                    configured.cfg(),
+                )
+            })
+            .unwrap_or_else(|| {
+                metadata_path_for_label(configured.unconfigured(), configured.cfg())
+            });
+        out.push((configured, output_path));
+    }
+
+    out
+}
+
+async fn metadata_toolchain_runtime_data(
+    ctx: &mut DiceComputations<'_>,
+    toolchain_impl: &TargetLabel,
+    attr_name: &str,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> Vec<(ConfiguredTargetLabel, Arc<str>)> {
+    let Some(toolchain_node) = target_node_for_metadata(ctx, toolchain_impl).await else {
+        return Vec::new();
+    };
+    let Some(runtime_attr) = toolchain_node.attr_or_none(attr_name, AttrInspectOptions::All) else {
+        return Vec::new();
+    };
+
+    let mut runtime_data = Vec::new();
+    for label in labels_from_coerced_attr(&runtime_attr.value, target_cfg) {
+        let label = metadata_canonicalize_label_for_owner(toolchain_impl, label);
+        for (output_label, output_path) in
+            metadata_default_output_data_for_label_configured(ctx, label, target_cfg).await
+        {
+            runtime_data.push((output_label, output_path.into()));
+        }
+    }
+    runtime_data
+}
+
+async fn metadata_toolchain_action_data(
+    ctx: &mut DiceComputations<'_>,
+    metadata: &CcToolchainFeaturesMetadata,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+    matches_action: fn(&[String]) -> bool,
+) -> Vec<(ConfiguredTargetLabel, Arc<str>)> {
+    let mut data = Vec::new();
+    for entry in metadata
+        .data_labels
+        .iter()
+        .filter(|entry| matches_action(&entry.actions))
+    {
+        for (output_label, output_path) in
+            metadata_default_output_data_for_label_configured(ctx, entry.label.dupe(), target_cfg)
+                .await
+        {
+            data.push((output_label, output_path.into()));
+        }
+    }
+    data
+}
+
 fn metadata_variable_name_for_label(label: &TargetLabel) -> String {
     label.name().as_str().to_owned()
 }
@@ -2038,7 +2464,9 @@ async fn metadata_format_substitution_for_label(
             return MetadataFormatSubstitution::Variable(metadata_variable_name_for_label(&label));
         }
     }
-    MetadataFormatSubstitution::Literal(metadata_path_for_label(&label, target_cfg))
+    MetadataFormatSubstitution::Literal(
+        metadata_format_path_for_label(ctx, label, target_cfg).await,
+    )
 }
 
 fn metadata_format_map_from_attr(
@@ -2099,16 +2527,18 @@ fn metadata_attr_string(node: &TargetNode, attr_name: &str) -> Option<String> {
 }
 
 fn metadata_feature_name_from_node(node: &TargetNode) -> Option<String> {
-    metadata_attr_string(node, "feature_name").or_else(|| {
-        let label = node
-            .attr_or_none("overrides", AttrInspectOptions::All)
-            .map(|attr| extract_label_from_coerced_attr(&attr.value))?;
-        if label.is_empty() {
-            None
-        } else {
-            label.rsplit(':').next().map(str::to_owned)
-        }
-    })
+    metadata_attr_string(node, "feature_name")
+        .filter(|name| !name.is_empty())
+        .or_else(|| {
+            let label = node
+                .attr_or_none("overrides", AttrInspectOptions::All)
+                .map(|attr| extract_label_from_coerced_attr(&attr.value))?;
+            if label.is_empty() {
+                None
+            } else {
+                label.rsplit(':').next().map(str::to_owned)
+            }
+        })
 }
 
 fn metadata_feature_name<'a>(
@@ -2192,6 +2622,9 @@ fn metadata_action_names_for_label<'a>(
         if !seen.insert(key) {
             return Vec::new();
         }
+        if let Some(expanded) = metadata_expand_rules_cc_action_name(&action_label.to_string()) {
+            return expanded;
+        }
         let Some(node) = target_node_for_metadata(ctx, &action_label).await else {
             return Vec::new();
         };
@@ -2218,17 +2651,126 @@ fn metadata_action_names_for_label<'a>(
     .boxed()
 }
 
+fn metadata_expand_rules_cc_action_name(action: &str) -> Option<Vec<String>> {
+    let short_name = action
+        .rsplit_once(':')
+        .map(|(_, name)| name)
+        .unwrap_or(action);
+    let names: &[&str] = match short_name {
+        "all_cc_compile_actions" => &[
+            "c++-compile",
+            "c-compile",
+            "preprocess-assemble",
+            "assemble",
+            "objc-compile",
+            "linkstamp-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+            "lto-backend",
+        ],
+        "source_compile_actions" => &[
+            "c++-compile",
+            "linkstamp-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+            "clif-match",
+            "objc++-compile",
+            "preprocess-assemble",
+            "assemble",
+            "c-compile",
+            "objc-compile",
+        ],
+        "compile_actions" => &[
+            "c++-compile",
+            "linkstamp-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+            "lto-backend",
+            "clif-match",
+            "objc++-compile",
+            "c-compile",
+            "assemble",
+            "preprocess-assemble",
+            "objc-compile",
+        ],
+        "all_cpp_compile_actions" | "cpp_compile_actions" => &[
+            "c++-compile",
+            "linkstamp-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+            "lto-backend",
+            "clif-match",
+            "objc++-compile",
+        ],
+        "c_compile_actions" => &["c-compile"],
+        "assembly_actions" => &["assemble", "preprocess-assemble"],
+        "link_actions" | "all_cc_link_actions" => &[
+            "c++-link-executable",
+            "c++-link-dynamic-library",
+            "c++-link-nodeps-dynamic-library",
+            "lto-index-for-executable",
+            "lto-index-for-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+            "objc-executable",
+        ],
+        "link_executable_actions" | "cc_link_executable_actions" => &[
+            "c++-link-executable",
+            "lto-index-for-executable",
+            "objc-executable",
+        ],
+        "dynamic_library_link_actions" => &[
+            "c++-link-dynamic-library",
+            "c++-link-nodeps-dynamic-library",
+            "lto-index-for-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+        ],
+        "nodeps_dynamic_library_link_actions" => &[
+            "c++-link-nodeps-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+        ],
+        "transitive_link_actions" => &[
+            "c++-link-executable",
+            "c++-link-dynamic-library",
+            "lto-index-for-executable",
+            "lto-index-for-dynamic-library",
+            "objc-executable",
+        ],
+        "cpp_link_executable" => &["c++-link-executable"],
+        "cpp_link_dynamic_library" => &["c++-link-dynamic-library"],
+        "cpp_link_nodeps_dynamic_library" => &["c++-link-nodeps-dynamic-library"],
+        "cpp_link_static_library" => &["c++-link-static-library"],
+        "cpp_compile" => &["c++-compile"],
+        "c_compile" => &["c-compile"],
+        _ => return None,
+    };
+    Some(names.iter().map(|name| (*name).to_owned()).collect())
+}
+
 fn metadata_actions_include_link(actions: &[String]) -> bool {
     actions.iter().any(|action| {
         action == "c++-link-executable"
             || action == "c++-link-dynamic-library"
             || action == "c++-link-nodeps-dynamic-library"
-            || action == "c++-link-static-library"
             || action.contains("cpp_link")
             || action.contains("link-executable")
             || action.contains("link-dynamic-library")
             || action.contains("link-nodeps-dynamic-library")
-            || action.contains("link-static-library")
+    })
+}
+
+fn metadata_actions_include_compile(actions: &[String]) -> bool {
+    actions.iter().any(|action| {
+        action == "c-compile"
+            || action == "c++-compile"
+            || action == "c++-header-parsing"
+            || action.contains("compile")
+            || action.contains("header-parsing")
+            || action.contains("cpp_compile")
+            || action.contains("c_compile")
     })
 }
 
@@ -2240,6 +2782,7 @@ fn metadata_flag_sets_for_args_label<'a>(
     data_labels: &'a mut Vec<CcToolchainDataLabelMetadata>,
 ) -> futures::future::BoxFuture<'a, Vec<CcFlagSet>> {
     async move {
+        let args_label = metadata_resolve_alias_label(ctx, args_label, target_cfg).await;
         let key = metadata_label_key(&args_label);
         if !seen.insert(key) {
             return Vec::new();
@@ -2290,14 +2833,23 @@ fn metadata_flag_sets_for_args_label<'a>(
                     for (placeholder, label) in
                         metadata_format_map_from_attr(&format_attr.value, target_cfg)
                     {
+                        let label = metadata_canonicalize_label_for_owner(&args_label, label);
                         let substitution =
-                            metadata_format_substitution_for_label(ctx, label, target_cfg).await;
+                            metadata_format_substitution_for_label(ctx, label.dupe(), target_cfg)
+                                .await;
+                        if matches!(substitution, MetadataFormatSubstitution::Literal(_)) {
+                            data_labels.push(CcToolchainDataLabelMetadata {
+                                actions: actions.clone(),
+                                label,
+                            });
+                        }
                         substitutions.push((placeholder, substitution));
                     }
                 }
 
                 if let Some(data_attr) = node.attr_or_none("data", AttrInspectOptions::All) {
                     for label in labels_from_coerced_attr(&data_attr.value, target_cfg) {
+                        let label = metadata_canonicalize_label_for_owner(&args_label, label);
                         data_labels.push(CcToolchainDataLabelMetadata {
                             actions: actions.clone(),
                             label,
@@ -2686,8 +3238,8 @@ async fn run_analysis_with_env_underlying(
                         // "NoneType has no attribute X" at the call site).
                         let provider_value: Option<FrozenProviderCollectionValue> =
                             match parse_impl_label_to_target_label(&tc.toolchain_impl) {
-                                Some(target_label) => {
-                                    let configured = target_label.configure(target_cfg.dupe());
+	                                Some(target_label) => {
+	                                    let configured = target_label.configure(target_cfg.dupe());
                                     let is_self_dependency = configured.eq(node.label());
                                     analysis_ctx_toolchain_provider_checkpoint(
                                         &analysis_env.label,
@@ -2720,37 +3272,54 @@ async fn run_analysis_with_env_underlying(
                                         let toolchain_features = toolchain_metadata
                                             .as_ref()
                                             .map(|metadata| metadata.features.clone());
-                                        let toolchain_data = toolchain_metadata
-                                            .as_ref()
-                                            .map(|metadata| {
-                                                metadata
-                                                    .data_labels
-                                                    .iter()
-                                                    .filter(|data| {
-                                                        metadata_actions_include_link(&data.actions)
-                                                    })
-                                                    .map(|data| {
-                                                        let label = &data.label;
-                                                        (
-                                                            label.configure(target_cfg.dupe()),
-                                                            metadata_path_for_label(
-                                                                label,
-                                                                &target_cfg,
-                                                            )
-                                                            .into(),
-                                                        )
-                                                    })
-                                                    .collect()
-                                            })
-                                            .unwrap_or_default();
-                                        let module_map_path = tc
-                                            .cc_toolchain_module_map
-                                            .as_deref()
-                                            .and_then(parse_impl_label_to_target_label)
-                                            .map(|label| metadata_path_for_label(&label, &target_cfg));
-                                        analysis_ctx_toolchain_provider_checkpoint(
-                                            &analysis_env.label,
-                                            type_label,
+                                        let compiler_data =
+                                            if let Some(metadata) = &toolchain_metadata {
+                                                metadata_toolchain_action_data(
+                                                    dice,
+                                                    metadata,
+                                                    &target_cfg,
+                                                    metadata_actions_include_compile,
+                                                )
+                                                .await
+                                            } else {
+                                                Vec::new()
+                                            };
+                                        let linker_data = if let Some(metadata) = &toolchain_metadata
+                                        {
+                                            metadata_toolchain_action_data(
+                                                dice,
+                                                metadata,
+                                                &target_cfg,
+                                                metadata_actions_include_link,
+                                            )
+                                            .await
+                                        } else {
+                                            Vec::new()
+                                        };
+	                                        let module_map_path = tc
+	                                            .cc_toolchain_module_map
+	                                            .as_deref()
+	                                            .and_then(parse_impl_label_to_target_label)
+	                                            .map(|label| metadata_path_for_label(&label, &target_cfg));
+	                                        let static_runtime_data =
+	                                            metadata_toolchain_runtime_data(
+	                                                dice,
+	                                                &target_label,
+	                                                "static_runtime_lib",
+	                                                &target_cfg,
+	                                            )
+	                                            .await;
+	                                        let dynamic_runtime_data =
+	                                            metadata_toolchain_runtime_data(
+	                                                dice,
+	                                                &target_label,
+	                                                "dynamic_runtime_lib",
+	                                                &target_cfg,
+	                                            )
+	                                            .await;
+	                                        analysis_ctx_toolchain_provider_checkpoint(
+	                                            &analysis_env.label,
+	                                            type_label,
                                             &tc.toolchain_impl,
                                             Some(&configured),
                                             toolchain_index,
@@ -2766,9 +3335,12 @@ async fn run_analysis_with_env_underlying(
                                             target_cfg.short_name(),
                                             toolchain_config_info,
                                             toolchain_features,
-                                            module_map_path,
-                                            toolchain_data,
-                                        ))
+	                                            module_map_path,
+	                                            compiler_data,
+	                                            linker_data,
+	                                            static_runtime_data,
+	                                            dynamic_runtime_data,
+	                                        ))
                                     } else {
                                         let analysis_result =
                                             dice.get_analysis_result(&configured).await;
@@ -3910,6 +4482,7 @@ pub fn get_user_defined_rule_spec(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::collections::HashMap;
 
     use super::*;
@@ -3935,6 +4508,92 @@ mod tests {
             cc_toolchain_module_map: None,
             toolchain_type: label.to_owned(),
         }
+    }
+
+    fn cfg_with_string_build_setting(
+        label: &str,
+        value: &str,
+    ) -> slug_core::configuration::data::ConfigurationData {
+        let label = slug_core::configuration::build_setting::BuildSettingLabel::new(
+            TargetLabel::testing_parse(label),
+        );
+        slug_core::configuration::data::ConfigurationData::from_platform(
+            "cfg_for//:metadata_select_test".to_owned(),
+            slug_core::configuration::data::ConfigurationDataData::new_with_build_settings(
+                BTreeMap::new(),
+                BTreeMap::from_iter([(
+                    label,
+                    slug_core::configuration::build_setting::BuildSettingValue::String(
+                        value.to_owned(),
+                    ),
+                )]),
+            ),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn metadata_select_matches_llvm_runtime_stage_build_setting() {
+        let cfg =
+            cfg_with_string_build_setting("@slug_settings//toolchain:runtime_stage", "stage0");
+        assert!(metadata_select_key_matches(
+            "@llvm//toolchain:runtimes_none",
+            &cfg
+        ));
+        assert!(!metadata_select_key_matches(
+            "@llvm//toolchain:runtimes_stage1",
+            &cfg
+        ));
+    }
+
+    #[test]
+    fn metadata_select_matches_platform_constraints_across_canonical_repos() {
+        use slug_core::configuration::constraints::ConstraintKey;
+        use slug_core::configuration::constraints::ConstraintValue;
+
+        let cfg = slug_core::configuration::data::ConfigurationData::from_platform(
+            "//bazel/platforms:linux-gnu-host".to_owned(),
+            slug_core::configuration::data::ConfigurationDataData::new(BTreeMap::from_iter([(
+                ConstraintKey::testing_new("@@platforms+platforms//os:os"),
+                ConstraintValue::testing_new("@@platforms+platforms//os:linux", None),
+            )])),
+        )
+        .unwrap();
+
+        assert!(metadata_select_key_matches("@platforms//os:linux", &cfg));
+        assert!(metadata_select_key_matches(
+            "@@platforms+1.0.0//os:linux",
+            &cfg
+        ));
+        assert!(!metadata_select_key_matches("@platforms//os:windows", &cfg));
+    }
+
+    #[test]
+    fn metadata_expands_rules_cc_link_action_set_labels() {
+        let actions =
+            metadata_expand_rules_cc_action_name("@rules_cc//cc/toolchains/actions:link_actions")
+                .unwrap();
+        assert!(actions.iter().any(|a| a == "c++-link-executable"));
+        assert!(actions.iter().any(|a| a == "c++-link-dynamic-library"));
+        assert!(
+            actions
+                .iter()
+                .any(|a| a == "c++-link-nodeps-dynamic-library")
+        );
+    }
+
+    #[test]
+    fn metadata_expands_rules_cc_source_compile_action_set_labels() {
+        let actions = metadata_expand_rules_cc_action_name(
+            "@rules_cc//cc/toolchains/actions:source_compile_actions",
+        )
+        .unwrap();
+        assert!(actions.iter().any(|a| a == "c-compile"));
+        assert!(actions.iter().any(|a| a == "c++-compile"));
+        assert!(actions.iter().any(|a| a == "c++-header-parsing"));
+        assert!(actions.iter().any(|a| a == "preprocess-assemble"));
+        assert!(actions.iter().any(|a| a == "objc-compile"));
+        assert!(metadata_actions_include_compile(&actions));
     }
 
     #[test]

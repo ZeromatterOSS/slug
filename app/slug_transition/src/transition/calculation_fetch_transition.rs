@@ -14,13 +14,13 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
 use either::Either;
+use ref_cast::RefCast;
 use slug_build_api::analysis::calculation::RuleAnalysisCalculation;
 use slug_build_api::transition::TRANSITION_ATTRS_PROVIDER;
 use slug_build_api::transition::TransitionAttrProvider;
 use slug_core::configuration::transition::id::TransitionId;
 use slug_core::provider::label::ProvidersLabel;
 use slug_interpreter::load_module::InterpreterCalculation;
-use ref_cast::RefCast;
 use starlark::values::FrozenStringValue;
 use starlark::values::OwnedFrozenValueTyped;
 
@@ -119,6 +119,9 @@ impl FetchTransition for DiceComputations<'_> {
 
                 Ok(TransitionData::MagicObject(transition.downcast_starlark()?))
             }
+            TransitionId::AnonymousBazel { .. } => Err(slug_error::Error::from(
+                FetchTransitionError::NotFound(id.clone()),
+            )),
             TransitionId::Target(label) => {
                 let transition_info = self
                     .get_configuration_analysis_result(label)
@@ -165,15 +168,16 @@ impl Key for TransitionAttrsKey {
         ctx: &mut DiceComputations,
         _cancellation: &dice::CancellationContext,
     ) -> Self::Value {
-        // Anonymous `rule(cfg = dict(...))` transitions — see comment in
-        // `calculation_apply_transition::do_apply_transition`. The transition
-        // isn't bound to any module-level global, so `fetch_transition`
-        // always fails. Slug doesn't execute Starlark transitions, so the
-        // anonymous transition has no attribute-name requirements.
-        if let TransitionId::MagicObject { name, .. } = &self.0 {
-            if name == "_anonymous_transition" {
+        // Anonymous transitions are not bound to module globals. Bazel-style
+        // anonymous transitions are handled from their declared outputs and all
+        // configured attrs during application; legacy anonymous transitions do
+        // not declare attr requirements.
+        match &self.0 {
+            TransitionId::MagicObject { name, .. } if name == "_anonymous_transition" => {
                 return Ok(None);
             }
+            TransitionId::AnonymousBazel { .. } => return Ok(None),
+            _ => {}
         }
         Ok(ctx
             .fetch_transition(&self.0)

@@ -158,6 +158,24 @@ impl SourceFetcher {
             return Ok(self.cache.source_dir(registry_url, name, version));
         }
 
+        let dest_dir = self.cache.source_dir(registry_url, name, version);
+        if dest_dir.exists() {
+            tracing::debug!(
+                "Removing incomplete cached source for {}@{} at {:?}",
+                name,
+                version,
+                dest_dir
+            );
+            std::fs::remove_dir_all(&dest_dir).with_buck_error_context(|| {
+                format!(
+                    "Failed to remove incomplete cached source for {}@{} at {}",
+                    name,
+                    version,
+                    dest_dir.display()
+                )
+            })?;
+        }
+
         let dest_dir = self.cache.create_source_dir(registry_url, name, version)?;
 
         if source_info.is_git() {

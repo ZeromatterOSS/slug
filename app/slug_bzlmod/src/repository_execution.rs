@@ -303,6 +303,15 @@ fn complete_marker(spec_hash: &str) -> String {
     }
 }
 
+fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
+    let marker = marker.trim();
+    if spec_hash.is_empty() {
+        marker == "complete" || marker.starts_with("complete:")
+    } else {
+        marker == complete_marker(spec_hash)
+    }
+}
+
 #[async_trait]
 impl Key for ExtensionRepoExecutionKey {
     type Value = slug_error::Result<Arc<RepositoryRuleResult>>;
@@ -326,6 +335,37 @@ impl Key for ExtensionRepoExecutionKey {
             .project_root
             .join("bazel-external")
             .join(self.canonical_name.as_ref());
+
+        let marker_path = working_dir.join(".slug_repo_complete");
+        let marker_contents = marker_path
+            .exists()
+            .then(|| std::fs::read_to_string(&marker_path).ok())
+            .flatten();
+        if marker_contents
+            .as_deref()
+            .is_some_and(|marker| complete_marker_matches(marker, &self.spec_hash))
+        {
+            return Ok(Arc::new(RepositoryRuleResult::success(
+                self.canonical_name.to_string(),
+                working_dir,
+            )));
+        }
+
+        if working_dir.exists() {
+            tracing::debug!(
+                "Removing incomplete repository rule working dir for '{}': {:?}",
+                self.canonical_name,
+                working_dir
+            );
+            std::fs::remove_dir_all(&working_dir).map_err(|e| {
+                RepositoryExecutionError::WorkingDirFailed {
+                    reason: format!(
+                        "Failed to remove incomplete repository directory {:?}: {}",
+                        working_dir, e
+                    ),
+                }
+            })?;
+        }
 
         // For non-builtin rules with a known Starlark source, try Starlark execution
         let is_builtin =

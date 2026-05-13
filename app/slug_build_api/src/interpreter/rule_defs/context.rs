@@ -79,6 +79,7 @@ use crate::interpreter::rule_defs::cc_common::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::cc_common::CcToolchainVariablesGen;
 use crate::interpreter::rule_defs::cc_common::CtxCheatArtifactStub;
+use crate::interpreter::rule_defs::cc_common::FeatureConfiguration;
 use crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArgLike;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
@@ -1323,6 +1324,27 @@ pub fn collect_location_pool_for_ctx<'v>(
                 let label_str = dep.label().label().unconfigured().to_string();
                 let paths = collect_output_paths(dep.provider_collection());
                 entries.push((label_str, paths));
+            } else if let Some(source) = dep_val.downcast_ref::<SourceFileTarget>() {
+                let artifact_value = source.artifact_value(heap);
+                if let Some(art) = artifact_value.downcast_ref::<StarlarkArtifact>()
+                    && let Ok(bound) = art.get_bound_starlark_artifact()
+                {
+                    let path = bound
+                        .artifact()
+                        .get_path()
+                        .with_full_path(|p| p.as_str().to_owned());
+                    let short = bound
+                        .artifact()
+                        .get_path()
+                        .with_short_path(|p| p.as_str().to_owned());
+                    entries.push((
+                        source.label().unconfigured().to_string(),
+                        vec![path.clone()],
+                    ));
+                    if !short.is_empty() {
+                        entries.push((short, vec![path]));
+                    }
+                }
             }
         }
     }
@@ -1987,7 +2009,10 @@ struct CcToolchainInfoNativeShim {
     toolchain_config_info: Option<FrozenValue>,
     toolchain_features: Option<CcToolchainFeatures>,
     module_map_path: Option<String>,
-    toolchain_files: Option<Arc<[ToolchainInputFile]>>,
+    compiler_files: Option<Arc<[ToolchainInputFile]>>,
+    linker_files: Option<Arc<[ToolchainInputFile]>>,
+    static_runtime_files: Option<Arc<[ToolchainInputFile]>>,
+    dynamic_runtime_files: Option<Arc<[ToolchainInputFile]>>,
 }
 
 const CC_TOOLCHAIN_NATIVE_SHIM_ATTRS: &[&str] = &[
@@ -2115,6 +2140,16 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
+        if let Some(shim) = this
+            .inner
+            .to_value()
+            .downcast_ref::<CcToolchainInfoNativeShim>()
+        {
+            if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
+                return Ok(heap.alloc(Depset::empty()));
+            }
+            return Ok(shim.toolchain_file_stubs_depset(&shim.static_runtime_files, heap));
+        }
         if let Ok(Some(method)) = this.inner.to_value().get_attr("static_runtime_lib", heap) {
             if let Ok(result) = eval.eval_function(
                 method,
@@ -2133,6 +2168,16 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
+        if let Some(shim) = this
+            .inner
+            .to_value()
+            .downcast_ref::<CcToolchainInfoNativeShim>()
+        {
+            if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
+                return Ok(heap.alloc(Depset::empty()));
+            }
+            return Ok(shim.toolchain_file_stubs_depset(&shim.dynamic_runtime_files, heap));
+        }
         if let Ok(Some(method)) = this.inner.to_value().get_attr("dynamic_runtime_lib", heap) {
             if let Ok(result) = eval.eval_function(
                 method,
@@ -2180,7 +2225,10 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
                     toolchain_config_info: None,
                     toolchain_features: None,
                     module_map_path: None,
-                    toolchain_files: None,
+                    compiler_files: None,
+                    linker_files: None,
+                    static_runtime_files: None,
+                    dynamic_runtime_files: None,
                 };
                 shim.get_attr(attribute, heap)
             })
@@ -2304,6 +2352,7 @@ impl<'v> StarlarkValue<'v> for ToolchainInputFileStub {
             attribute,
             "path"
                 | "short_path"
+                | "dirname"
                 | "basename"
                 | "extension"
                 | "is_source"
@@ -2315,6 +2364,10 @@ impl<'v> StarlarkValue<'v> for ToolchainInputFileStub {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "path" | "short_path" => Some(heap.alloc_str(self.path).to_value()),
+            "dirname" => {
+                let dirname = self.path.rsplit_once('/').map(|(dir, _)| dir).unwrap_or("");
+                Some(heap.alloc_str(dirname).to_value())
+            }
             "basename" => {
                 let basename = self.path.rsplit('/').next().unwrap_or(self.path);
                 Some(heap.alloc_str(basename).to_value())
@@ -2520,11 +2573,15 @@ impl CcToolchainInfoNativeShim {
         heap.alloc(CcToolchainVariablesGen { vars })
     }
 
-    fn toolchain_files_depset<'v>(&self, heap: Heap<'v>) -> Value<'v> {
+    fn toolchain_files_depset<'v>(
+        &self,
+        files: &Option<Arc<[ToolchainInputFile]>>,
+        heap: Heap<'v>,
+    ) -> Value<'v> {
         if std::env::var_os("SLUG_DISABLE_CC_TOOLCHAIN_FILE_SHIM").is_some() {
             return heap.alloc(Depset::empty());
         }
-        self.toolchain_files
+        files
             .as_ref()
             .map(|files| {
                 let carrier = heap.alloc(ToolchainInputFilesArg {
@@ -2534,6 +2591,38 @@ impl CcToolchainInfoNativeShim {
                     .expect("toolchain file carrier depset should be valid")
             })
             .unwrap_or_else(|| heap.alloc(Depset::empty()))
+    }
+
+    fn toolchain_file_stubs_depset<'v>(
+        &self,
+        files: &Option<Arc<[ToolchainInputFile]>>,
+        heap: Heap<'v>,
+    ) -> Value<'v> {
+        files
+            .as_ref()
+            .map(|files| {
+                let direct = files
+                    .iter()
+                    .map(|file| {
+                        heap.alloc(ToolchainInputFileStub {
+                            path: file.path,
+                            input_target: file.input_target,
+                        })
+                    })
+                    .collect();
+                make_depset_from_lists(heap, direct, vec![], "default")
+                    .expect("toolchain file stub depset should be valid")
+            })
+            .unwrap_or_else(|| heap.alloc(Depset::empty()))
+    }
+
+    fn cpp_runtime_feature_enabled(feature_configuration: Value) -> bool {
+        feature_configuration
+            .downcast_ref::<FeatureConfiguration>()
+            .map(|feature_configuration| {
+                feature_configuration.is_feature_enabled("static_link_cpp_runtimes")
+            })
+            .unwrap_or(false)
     }
 }
 
@@ -2548,21 +2637,25 @@ fn cc_toolchain_native_shim_methods(builder: &mut MethodsBuilder) {
     }
 
     fn static_runtime_lib<'v>(
-        #[starlark(this)] _this: &CcToolchainInfoNativeShim,
+        #[starlark(this)] this: &CcToolchainInfoNativeShim,
         #[starlark(require = named)] feature_configuration: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = feature_configuration;
-        Ok(heap.alloc(Depset::empty()))
+        if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
+            return Ok(heap.alloc(Depset::empty()));
+        }
+        Ok(this.toolchain_file_stubs_depset(&this.static_runtime_files, heap))
     }
 
     fn dynamic_runtime_lib<'v>(
-        #[starlark(this)] _this: &CcToolchainInfoNativeShim,
+        #[starlark(this)] this: &CcToolchainInfoNativeShim,
         #[starlark(require = named)] feature_configuration: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = feature_configuration;
-        Ok(heap.alloc(Depset::empty()))
+        if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
+            return Ok(heap.alloc(Depset::empty()));
+        }
+        Ok(this.toolchain_file_stubs_depset(&this.dynamic_runtime_files, heap))
     }
 }
 
@@ -2609,21 +2702,25 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             "toolchain_id" => Some(empty_string()),
             "dynamic_runtime_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
             "built_in_include_directories" => Some(empty_list()),
-            "all_files" => Some(self.toolchain_files_depset(heap)),
+            "all_files" | "_compiler_files" | "_builtin_include_files" => {
+                Some(self.toolchain_files_depset(&self.compiler_files, heap))
+            }
+            "_linker_files" => Some(self.toolchain_files_depset(&self.linker_files, heap)),
             "_as_files"
             | "_ar_files"
             | "_strip_files"
-            | "_linker_files"
             | "_coverage_files"
-            | "_compiler_files"
             | "_dwp_files"
-            | "_builtin_include_files"
             | "_all_files_including_libc"
             | "_build_info_files"
-            | "_static_runtime_lib_depset"
-            | "_dynamic_runtime_lib_depset"
             | "_compiler_files_without_includes"
             | "_objcopy_files" => Some(empty_depset()),
+            "_static_runtime_lib_depset" => {
+                Some(self.toolchain_file_stubs_depset(&self.static_runtime_files, heap))
+            }
+            "_dynamic_runtime_lib_depset" => {
+                Some(self.toolchain_file_stubs_depset(&self.dynamic_runtime_files, heap))
+            }
             "sysroot"
             | "_link_dynamic_library_tool"
             | "_grep_includes"
@@ -2684,7 +2781,22 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
         "CcToolchainInfoNativeShim".hash(hasher);
         self.toolchain_label.hash(hasher);
         self.target_platform.hash(hasher);
-        if let Some(toolchain_files) = &self.toolchain_files {
+        if let Some(toolchain_files) = &self.compiler_files {
+            for file in toolchain_files.iter() {
+                file.path.hash(hasher);
+            }
+        }
+        if let Some(toolchain_files) = &self.linker_files {
+            for file in toolchain_files.iter() {
+                file.path.hash(hasher);
+            }
+        }
+        if let Some(toolchain_files) = &self.static_runtime_files {
+            for file in toolchain_files.iter() {
+                file.path.hash(hasher);
+            }
+        }
+        if let Some(toolchain_files) = &self.dynamic_runtime_files {
             for file in toolchain_files.iter() {
                 file.path.hash(hasher);
             }
@@ -2699,24 +2811,35 @@ pub fn cc_toolchain_native_shim_provider_collection(
     toolchain_config_info: Option<FrozenValue>,
     toolchain_features: Option<CcToolchainFeatures>,
     module_map_path: Option<String>,
-    toolchain_data: Vec<(ConfiguredTargetLabel, Arc<str>)>,
+    compiler_data: Vec<(ConfiguredTargetLabel, Arc<str>)>,
+    linker_data: Vec<(ConfiguredTargetLabel, Arc<str>)>,
+    static_runtime_data: Vec<(ConfiguredTargetLabel, Arc<str>)>,
+    dynamic_runtime_data: Vec<(ConfiguredTargetLabel, Arc<str>)>,
 ) -> FrozenProviderCollectionValue {
     let heap = FrozenHeap::new();
-    let toolchain_files: Arc<[ToolchainInputFile]> = toolchain_data
-        .into_iter()
-        .map(|(target, path)| {
-            let path = Box::leak(path.to_string().into_boxed_str());
-            let input_target = Box::leak(Box::new(target));
-            ToolchainInputFile { path, input_target }
-        })
-        .collect();
+    let make_files = |data: Vec<(ConfiguredTargetLabel, Arc<str>)>| -> Arc<[ToolchainInputFile]> {
+        data.into_iter()
+            .map(|(target, path)| {
+                let path = Box::leak(path.to_string().into_boxed_str());
+                let input_target = Box::leak(Box::new(target));
+                ToolchainInputFile { path, input_target }
+            })
+            .collect()
+    };
+    let compiler_files = make_files(compiler_data);
+    let linker_files = make_files(linker_data);
+    let static_runtime_files = make_files(static_runtime_data);
+    let dynamic_runtime_files = make_files(dynamic_runtime_data);
     let cc = heap.alloc(CcToolchainInfoNativeShim {
         toolchain_label: toolchain_label.to_owned(),
         target_platform: target_platform.to_owned(),
         toolchain_config_info,
         toolchain_features,
         module_map_path,
-        toolchain_files: Some(toolchain_files),
+        compiler_files: Some(compiler_files),
+        linker_files: Some(linker_files),
+        static_runtime_files: Some(static_runtime_files),
+        dynamic_runtime_files: Some(dynamic_runtime_files),
     });
     let cc_provider_in_toolchain = heap.alloc(true);
     let fields = heap.alloc(AllocDict([
@@ -2902,6 +3025,9 @@ fn alloc_cc_toolchain_info_shim<'v>(
         None,
         None,
         None,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
         Vec::new(),
     );
     let cc_toolchain_info_id =

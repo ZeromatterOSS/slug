@@ -151,6 +151,13 @@ impl Freeze for Transition<'_> {
         // using the path where the transition was defined.
         let id = match self.id.into_inner() {
             Some(id) => id,
+            None if !self.inputs.is_empty() || !self.outputs.is_empty() => {
+                Arc::new(TransitionId::AnonymousBazel {
+                    path: self.path.clone(),
+                    name: "_anonymous_bazel_transition".to_owned(),
+                    outputs: Arc::from(self.outputs.clone().into_boxed_slice()),
+                })
+            }
             None => {
                 use std::collections::HashMap;
                 use std::sync::Mutex;
@@ -202,18 +209,26 @@ starlark_complex_values!(Transition);
 
 impl TransitionValue for Transition<'_> {
     fn transition_id(&self) -> slug_error::Result<Arc<TransitionId>> {
-        let id = self.id.borrow();
-        if let Some(id) = id.as_ref() {
-            Ok(id.dupe())
-        } else {
-            // In Bazel, transitions don't need to be assigned to top-level variables.
-            // They can be created inline (e.g., inside a function or rule() call).
-            // Generate a synthetic ID based on the module path.
-            Ok(Arc::new(TransitionId::MagicObject {
-                path: self.path.clone(),
-                name: "_anonymous_transition".to_owned(),
-            }))
+        let mut id = self.id.borrow_mut();
+        if id.is_none() {
+            // Bazel-style transitions created by helper functions, such as
+            // with_cfg.bzl's transition aliases, are not bound to module-level
+            // globals. Preserve their declared outputs so transition
+            // application can still produce a distinct configuration.
+            *id = Some(if !self.inputs.is_empty() || !self.outputs.is_empty() {
+                Arc::new(TransitionId::AnonymousBazel {
+                    path: self.path.clone(),
+                    name: "_anonymous_bazel_transition".to_owned(),
+                    outputs: Arc::from(self.outputs.clone().into_boxed_slice()),
+                })
+            } else {
+                Arc::new(TransitionId::MagicObject {
+                    path: self.path.clone(),
+                    name: "_anonymous_transition".to_owned(),
+                })
+            });
         }
+        Ok(id.as_ref().unwrap().dupe())
     }
 }
 

@@ -24,7 +24,7 @@ Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiel
 (the "leaf sheep" sea slug) &mdash; this slug absorbs the chloroplasts in the
 algae it eats via kleptoplasty, which seemed apt given the goal of absorbing
 Bazel into Buck2's codebase. Incidentally, the original author was a UC Santa
-Cruz alumnus, so marine slugs seemed like a nice homage.
+Cruz alumnus, so a marine slug seemed like a nice homage.
 
 ## Why Slug?
 

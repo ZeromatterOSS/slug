@@ -22,9 +22,9 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use fxhash::FxHashMap;
-use slug_error::BuckErrorContext;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_error::BuckErrorContext;
 
 use crate::cache::ModuleCache;
 use crate::fetch::SourceFetcher;
@@ -1020,55 +1020,82 @@ impl MvsResolver {
     ///
     /// This downloads and extracts sources for modules that don't have local overrides.
     pub async fn fetch_sources(&self, graph: &mut ResolvedGraph) -> slug_error::Result<()> {
+        let mut first_error = None;
+
         for (name, info) in &mut graph.modules {
-            match &info.source {
+            let source_path = match &info.source {
                 ModuleSource::Registry { url: _ } => {
                     // Fetch from registry
-                    let source_info = self
-                        .registry_client
-                        .fetch_source_info(name, &info.version)
-                        .await?;
+                    let result = async {
+                        let source_info = self
+                            .registry_client
+                            .fetch_source_info(name, &info.version)
+                            .await?;
 
-                    let source_path = self
-                        .source_fetcher
-                        .fetch_source(
-                            self.registry_client.base_url(),
-                            name,
-                            &info.version,
-                            &source_info,
-                        )
-                        .await?;
+                        self.source_fetcher
+                            .fetch_source(
+                                self.registry_client.base_url(),
+                                name,
+                                &info.version,
+                                &source_info,
+                            )
+                            .await
+                    }
+                    .await;
 
-                    info.source_path = Some(source_path);
+                    match result {
+                        Ok(path) => Some(path),
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to fetch source for {}@{}: {}",
+                                name,
+                                info.version,
+                                e
+                            );
+                            if first_error.is_none() {
+                                first_error = Some(e);
+                            }
+                            None
+                        }
+                    }
                 }
                 ModuleSource::LocalPath { path } => {
                     // Local path is already available
-                    info.source_path = Some(PathBuf::from(path));
+                    Some(PathBuf::from(path))
                 }
                 ModuleSource::Git { fetched_path, .. } => {
                     if let Some(path) = fetched_path {
-                        info.source_path = Some(path.clone());
+                        Some(path.clone())
                     } else {
                         tracing::warn!(
                             "Git override for {} has no fetched path (should have been fetched during resolution)",
                             name
                         );
+                        None
                     }
                 }
                 ModuleSource::Archive { fetched_path, .. } => {
                     if let Some(path) = fetched_path {
-                        info.source_path = Some(path.clone());
+                        Some(path.clone())
                     } else {
                         tracing::warn!(
                             "Archive override for {} has no fetched path (should have been fetched during resolution)",
                             name
                         );
+                        None
                     }
                 }
+            };
+
+            if let Some(source_path) = source_path {
+                info.source_path = Some(source_path);
             }
         }
 
-        Ok(())
+        match first_error {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 }
 

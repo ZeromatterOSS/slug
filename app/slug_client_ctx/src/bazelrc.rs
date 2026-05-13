@@ -11,10 +11,11 @@
 //! `.bazelrc` file parser and argument injector.
 //!
 //! Bazel loads `.bazelrc` files to apply default flags to each command.
-//! Slug reads these files in the same order Bazel does:
+//! Slug reads these files in this order:
 //!
-//!  1. `$HOME/.bazelrc` (user-level)
-//!  2. `<workspace>/.bazelrc` (workspace-level, highest priority)
+//!  1. `/etc/bazel.bazelrc` (system-level)
+//!  2. `$HOME/.bazelrc` (user-level)
+//!  3. `<workspace>/.bazelrc` (workspace-level, highest priority)
 //!
 //! Flags from `.bazelrc` are injected right after the subcommand in the argument
 //! list, so explicit command-line flags always override them.
@@ -533,19 +534,28 @@ fn is_bazel_specific_flag(normalized_flag: &str) -> bool {
             | "build_runfile_links"
             | "build_runfile_manifests"
             | "process_headers_in_dependencies"
+            | "heap_dump_on_oom"
+            | "show_result"
+            | "show_progress_rate_limit"
             // Sandbox flags
             | "sandbox_base"
             | "sandbox_default_allow_network"
             | "sandbox_fake_hostname"
             | "sandbox_fake_username"
+            | "reuse_sandbox_directories"
             // Remote execution / caching flags. Note: `remote_cache`,
             // `remote_executor`, and `remote_default_exec_properties`
             // are NOT here — slug accepts them via
             // `CommonBuildConfigurationOptions` and routes them through
             // the `cli_re_config_snapshot()` overlay.
+            | "disk_cache"
+            | "repository_cache"
+            | "disk_cache_gc_max_age"
+            | "disk_cache_gc_max_size"
             | "remote_upload_local_results"
             | "remote_accept_cached"
             | "remote_local_fallback"
+            | "remote_download_outputs"
             | "remote_timeout"
             // Compilation / output flags. Note: `compilation_mode` is NOT
             // here because slug's clap parser accepts it (see
@@ -558,9 +568,14 @@ fn is_bazel_specific_flag(normalized_flag: &str) -> bool {
             | "linkopt"
             | "host_linkopt"
             | "repo_env"
+            | "module_mirrors"
             | "compiler"
-            // Runfiles / symlinks
-            | "build_runfile_links"
+            // Console/UI flags
+            | "announce_rc"
+            | "color"
+            | "curses"
+            // Bzlmod/lockfile policy flags
+            | "lockfile_mode"
             // Test flags
             | "test_output"
             | "test_summary"
@@ -668,7 +683,13 @@ pub fn inject_bazelrc_args(mut args: Vec<String>, project_root: Option<&Path>) -
     // Load bazelrc data from standard locations
     let mut data = BazelRcData::default();
 
-    // 1. User-level: ~/.bazelrc
+    // 1. System-level: /etc/bazel.bazelrc
+    let system_bazelrc = Path::new("/etc/bazel.bazelrc");
+    if system_bazelrc.exists() {
+        parse_bazelrc_file(system_bazelrc, &mut data, false, project_root);
+    }
+
+    // 2. User-level: ~/.bazelrc
     if let Some(home) = dirs::home_dir() {
         let user_bazelrc = home.join(".bazelrc");
         if user_bazelrc.exists() {
@@ -676,7 +697,7 @@ pub fn inject_bazelrc_args(mut args: Vec<String>, project_root: Option<&Path>) -
         }
     }
 
-    // 2. Workspace-level: <project_root>/.bazelrc
+    // 3. Workspace-level: <project_root>/.bazelrc
     if let Some(root) = project_root {
         let workspace_bazelrc = root.join(".bazelrc");
         if workspace_bazelrc.exists() {
@@ -994,6 +1015,21 @@ mod tests {
         assert!(!is_bazel_transitional_flag("--jobs=8"));
         assert!(!is_bazel_transitional_flag("//my:target"));
         assert!(!is_bazel_transitional_flag("-c"));
+    }
+
+    #[test]
+    fn bazel_only_runtime_and_cache_flags_are_stripped() {
+        assert!(is_bazel_transitional_flag("--heap_dump_on_oom"));
+        assert!(is_bazel_transitional_flag(
+            "--module_mirrors=https://bcr.cloudflaremirrors.com"
+        ));
+        assert!(is_bazel_transitional_flag(
+            "--disk_cache=/var/mnt/dev/.bazel-cache/disk-cache"
+        ));
+        assert!(is_bazel_transitional_flag(
+            "--repository_cache=/var/mnt/dev/.bazel-cache/repo-cache"
+        ));
+        assert!(is_bazel_transitional_flag("--show_progress_rate_limit=1"));
     }
 
     #[test]

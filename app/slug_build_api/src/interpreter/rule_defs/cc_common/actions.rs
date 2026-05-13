@@ -48,6 +48,9 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::TupleRef;
 
+use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
+use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatArtifactStub;
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatWithActions;
 use crate::interpreter::rule_defs::cc_common::feature_config::CcEnvEntry;
@@ -60,6 +63,7 @@ use crate::interpreter::rule_defs::cc_common::feature_config::CcFlagSet;
 use crate::interpreter::rule_defs::cc_common::feature_config::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::feature_config::CcWithFeatureSet;
 use crate::interpreter::rule_defs::cc_common::feature_config::FeatureConfiguration;
+use crate::interpreter::rule_defs::cc_common::host::include_flag_for_context_attr;
 use crate::interpreter::rule_defs::cc_common::host::include_flag_for_dir_impl;
 use crate::interpreter::rule_defs::cc_common::host::is_msvc_compiler;
 use crate::interpreter::rule_defs::cc_common::host::is_windows_host;
@@ -125,6 +129,15 @@ fn action_category_from_bazel_action_name(action_name: &str) -> String {
         .replace('-', "_")
 }
 
+fn is_header_parsing_action(action_name: &str) -> bool {
+    let short_name = action_name
+        .rsplit_once(':')
+        .map(|(_, name)| name)
+        .unwrap_or(action_name);
+    let normalized = normalize_action_name(short_name).replace('_', "-");
+    normalized == "c++-header-parsing"
+}
+
 fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
     let root = slug_core::cells::get_dynamic_project_root()?;
     let os = match std::env::consts::OS {
@@ -169,6 +182,43 @@ fn is_musl_cc_toolchain_target(
 ) -> bool {
     target_system_name.is_some_and(|s| s.contains("musl"))
         || target_libc.is_some_and(|s| s.contains("musl"))
+}
+
+fn is_compiler_rt_crtbegin_link_output(output_path: Option<&str>) -> bool {
+    output_path.is_some_and(|path| {
+        path.contains("compiler-rt/libclang_rt.crtbegin.so")
+            || path.ends_with("libclang_rt.crtbegin.so")
+    })
+}
+
+fn cc_toolchain_attr_any<'v>(
+    cc_toolchain: Value<'v>,
+    heap: Heap<'v>,
+    names: &[&str],
+) -> Option<Value<'v>> {
+    for name in names {
+        if let Ok(Some(value)) = cc_toolchain.get_attr(name, heap)
+            && !value.is_none()
+        {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn cc_toolchain_target_system_name<'v>(
+    cc_toolchain: Value<'v>,
+    heap: Heap<'v>,
+) -> Option<Value<'v>> {
+    cc_toolchain_attr_any(
+        cc_toolchain,
+        heap,
+        &["target_gnu_system_name", "target_system_name"],
+    )
+}
+
+fn cc_toolchain_target_libc<'v>(cc_toolchain: Value<'v>, heap: Heap<'v>) -> Option<Value<'v>> {
+    cc_toolchain_attr_any(cc_toolchain, heap, &["libc", "target_libc"])
 }
 
 fn first_external_dir(
@@ -618,6 +668,124 @@ fn cc_freeze_user_link_flags<'v>(
     cc_internal_freeze_values(options, heap)
 }
 
+fn cc_value_path<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<String> {
+    if let Some(path) = value.unpack_str() {
+        return Some(path.to_owned());
+    }
+    if let Some(artifact) = value.downcast_ref::<StarlarkArtifact>()
+        && let Ok(bound) = artifact.get_bound_starlark_artifact()
+    {
+        return Some(
+            bound
+                .artifact()
+                .get_path()
+                .with_full_path(|p| p.as_str().to_owned()),
+        );
+    }
+    if let Some(artifact) = value.downcast_ref::<StarlarkDeclaredArtifact<'v>>()
+        && let Ok(bound) = artifact.get_bound_starlark_artifact()
+    {
+        return Some(
+            bound
+                .artifact()
+                .get_path()
+                .with_full_path(|p| p.as_str().to_owned()),
+        );
+    }
+    value
+        .get_attr("path", heap)
+        .ok()
+        .flatten()
+        .and_then(|path| path.unpack_str().map(str::to_owned))
+}
+
+fn cc_location_matches_path(label: &str, path: &str) -> bool {
+    let query_name = label
+        .trim_start_matches(':')
+        .rsplit(':')
+        .next()
+        .unwrap_or(label)
+        .rsplit('/')
+        .next()
+        .unwrap_or(label);
+    path == query_name || path.ends_with(&format!("/{query_name}"))
+}
+
+fn cc_expand_link_flag_locations<'v>(
+    flag: Value<'v>,
+    inputs: &[Value<'v>],
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    let Some(input) = flag.unpack_str() else {
+        return Ok(flag);
+    };
+    if !input.contains("$(location")
+        && !input.contains("$(execpath")
+        && !input.contains("$(rootpath")
+        && !input.contains("$(rlocationpath")
+    {
+        return Ok(flag);
+    }
+
+    let input_paths = inputs
+        .iter()
+        .filter_map(|value| cc_value_path(*value, heap))
+        .collect::<Vec<_>>();
+    let mut result = String::with_capacity(input.len());
+    let mut remaining = input;
+    while let Some(start) = remaining.find("$(") {
+        result.push_str(&remaining[..start]);
+        remaining = &remaining[start..];
+
+        let pattern: Option<(usize, bool)> = if remaining.starts_with("$(locations ") {
+            Some(("$(locations ".len(), true))
+        } else if remaining.starts_with("$(location ") {
+            Some(("$(location ".len(), false))
+        } else if remaining.starts_with("$(execpaths ") {
+            Some(("$(execpaths ".len(), true))
+        } else if remaining.starts_with("$(execpath ") {
+            Some(("$(execpath ".len(), false))
+        } else if remaining.starts_with("$(rootpaths ") {
+            Some(("$(rootpaths ".len(), true))
+        } else if remaining.starts_with("$(rootpath ") {
+            Some(("$(rootpath ".len(), false))
+        } else if remaining.starts_with("$(rlocationpaths ") {
+            Some(("$(rlocationpaths ".len(), true))
+        } else if remaining.starts_with("$(rlocationpath ") {
+            Some(("$(rlocationpath ".len(), false))
+        } else {
+            None
+        };
+
+        if let Some((prefix_len, is_multi)) = pattern
+            && let Some(end) = remaining.find(')')
+        {
+            let label = remaining[prefix_len..end].trim();
+            let paths = input_paths
+                .iter()
+                .filter(|path| cc_location_matches_path(label, path))
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            if !paths.is_empty() {
+                if is_multi {
+                    result.push_str(&paths.join(" "));
+                } else {
+                    result.push_str(paths[0]);
+                }
+            } else {
+                result.push_str(&remaining[..end + 1]);
+            }
+            remaining = &remaining[end + 1..];
+            continue;
+        }
+
+        result.push_str("$(");
+        remaining = &remaining[2..];
+    }
+    result.push_str(remaining);
+    Ok(heap.alloc_str(&result).to_value())
+}
+
 fn cc_common_checkpoint(
     name: &'static str,
     fields: impl IntoIterator<Item = (&'static str, usize)>,
@@ -794,7 +962,7 @@ fn parse_cc_flag_set<'v>(
         .map(|actions| {
             cc_string_list(actions, heap)
                 .into_iter()
-                .map(|action| normalize_action_name(&action))
+                .flat_map(|action| expand_rules_cc_action_name(&action))
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
@@ -845,6 +1013,76 @@ fn parse_cc_feature_flag_sets<'v>(
     })
 }
 
+fn expand_rules_cc_action_name(action: &str) -> Vec<String> {
+    let short_name = action
+        .rsplit_once(':')
+        .map(|(_, name)| name)
+        .unwrap_or(action);
+    let names: &[&str] = match short_name {
+        "all_cc_compile_actions" => &[
+            "c++-compile",
+            "c-compile",
+            "preprocess-assemble",
+            "assemble",
+            "objc-compile",
+            "linkstamp-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+            "lto-backend",
+        ],
+        "all_cpp_compile_actions" | "cpp_compile_actions" => &[
+            "c++-compile",
+            "linkstamp-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+            "lto-backend",
+        ],
+        "c_compile_actions" => &["c-compile"],
+        "assembly_actions" => &["assemble", "preprocess-assemble"],
+        "link_actions" | "all_cc_link_actions" => &[
+            "c++-link-executable",
+            "c++-link-dynamic-library",
+            "c++-link-nodeps-dynamic-library",
+            "lto-index-for-executable",
+            "lto-index-for-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+            "objc-executable",
+        ],
+        "link_executable_actions" | "cc_link_executable_actions" => &[
+            "c++-link-executable",
+            "lto-index-for-executable",
+            "objc-executable",
+        ],
+        "dynamic_library_link_actions" => &[
+            "c++-link-dynamic-library",
+            "c++-link-nodeps-dynamic-library",
+            "lto-index-for-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+        ],
+        "nodeps_dynamic_library_link_actions" => &[
+            "c++-link-nodeps-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+        ],
+        "transitive_link_actions" => &[
+            "c++-link-executable",
+            "c++-link-dynamic-library",
+            "lto-index-for-executable",
+            "lto-index-for-dynamic-library",
+            "objc-executable",
+        ],
+        "cpp_link_executable" => &["c++-link-executable"],
+        "cpp_link_dynamic_library" => &["c++-link-dynamic-library"],
+        "cpp_link_nodeps_dynamic_library" => &["c++-link-nodeps-dynamic-library"],
+        "cpp_link_static_library" => &["c++-link-static-library"],
+        "cpp_compile" => &["c++-compile"],
+        "c_compile" => &["c-compile"],
+        _ => return vec![normalize_action_name(action)],
+    };
+    names.iter().map(|name| (*name).to_owned()).collect()
+}
+
 fn cc_action_names<'v>(value: Value<'v>, heap: Heap<'v>) -> Vec<String> {
     depset_or_iterable_values(value, heap)
         .unwrap_or_default()
@@ -856,8 +1094,53 @@ fn cc_action_names<'v>(value: Value<'v>, heap: Heap<'v>) -> Vec<String> {
                     .map(str::to_owned)
             })
         })
-        .map(|action| normalize_action_name(&action))
+        .flat_map(|action| expand_rules_cc_action_name(&action))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expands_rules_cc_link_action_set_labels() {
+        let actions = expand_rules_cc_action_name("@rules_cc//cc/toolchains/actions:link_actions");
+        assert!(actions.iter().any(|a| a == "c++-link-executable"));
+        assert!(actions.iter().any(|a| a == "c++-link-dynamic-library"));
+        assert!(
+            actions
+                .iter()
+                .any(|a| a == "c++-link-nodeps-dynamic-library")
+        );
+    }
+
+    #[test]
+    fn expands_rules_cc_single_action_labels() {
+        assert_eq!(
+            expand_rules_cc_action_name(
+                "@rules_cc//cc/toolchains/actions:cpp_link_dynamic_library"
+            ),
+            vec!["c++-link-dynamic-library".to_owned()]
+        );
+    }
+
+    #[test]
+    fn identifies_header_parsing_action_labels() {
+        assert!(is_header_parsing_action("c++-header-parsing"));
+        assert!(is_header_parsing_action(
+            "@rules_cc//cc/toolchains/actions:cpp_header_parsing"
+        ));
+    }
+
+    #[test]
+    fn identifies_compiler_rt_crtbegin_link_output() {
+        assert!(is_compiler_rt_crtbegin_link_output(Some(
+            "gen/llvm+llvm_source+compiler-rt/e966/external/llvm+llvm_source+compiler-rt/libclang_rt.crtbegin.so"
+        )));
+        assert!(!is_compiler_rt_crtbegin_link_output(Some(
+            "gen/other/libclang_rt.builtins.so"
+        )));
+    }
 }
 
 fn parse_cc_modern_feature_constraint<'v>(
@@ -1365,6 +1648,10 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             return Ok(NoneType);
         }
 
+        // Get the action name for mnemonic/category.
+        let action_name_raw = action_name.into_option().unwrap_or("c-compile");
+        let is_header_parsing_action = is_header_parsing_action(action_name_raw);
+
         // Get the actions from action_construction_context
         // The context is a CtxCheatWithActions that has the real actions
         let actions_attr_result = action_construction_context.get_attr("actions", heap);
@@ -1374,6 +1661,36 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             // Fallback: action_construction_context might itself be actions
             action_construction_context
         };
+
+        if is_header_parsing_action {
+            // Header parsing is a validation-only action. Slug does not consume
+            // the generated header-token artifact, and executing these actions
+            // for runtime headers such as glibc's private bits/*.h turns
+            // validation into a build failure. Still bind the declared outputs
+            // so downstream providers that carry the token artifacts remain
+            // well-formed.
+            if let Ok(Some(write_method)) = actions_value.get_attr("write", heap) {
+                let content = heap.alloc_str("").to_value();
+                for artifact in [
+                    output_file,
+                    dotd_file,
+                    diagnostics_file,
+                    gcno_file,
+                    dwo_file,
+                    lto_indexing_file,
+                ] {
+                    if artifact.is_none() {
+                        continue;
+                    }
+                    if let Ok(Some(as_output_method)) = artifact.get_attr("as_output", heap)
+                        && let Ok(out) = eval.eval_function(as_output_method, &[], &[])
+                    {
+                        eval.eval_function(write_method, &[out, content], &[])?;
+                    }
+                }
+            }
+            return Ok(NoneType);
+        }
 
         // Try to get the run method from actions
         let run_attr_result = actions_value.get_attr("run", heap);
@@ -1394,9 +1711,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             .unwrap_or("unknown")
             .to_owned();
 
-        // Get the action name for mnemonic/category
         // Convert Bazel action names (with hyphens) to Slug categories (snake_case)
-        let action_name_raw = action_name.into_option().unwrap_or("c-compile");
         let action_name_str = action_category_from_bazel_action_name(action_name_raw);
 
         // Determine if this is a C++ compile action (vs plain C)
@@ -1569,7 +1884,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                             if dir.is_empty() || !seen_include_dirs.insert(dir.to_string()) {
                                 continue;
                             }
-                            let flag = include_flag_for_dir_impl(&dir, msvc);
+                            let flag = include_flag_for_context_attr(attr_name, &dir, msvc);
                             args_vec.push(heap.alloc_str(&flag).to_value());
                         }
                     }
@@ -2326,6 +2641,12 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 } else {
                     args.push(heap.alloc_str(&output.to_str()).to_value());
                 }
+            }
+            if !msvc
+                && action_name_str.contains("dynamic-library")
+                && is_compiler_rt_crtbegin_link_output(output_path_str.as_deref())
+            {
+                args.push(heap.alloc_str("-nostdlib").to_value());
             }
         }
 
@@ -3735,6 +4056,76 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
                 .unwrap_or_else(|| output_name.clone());
 
+            let direct_additional_inputs = if additional_inputs.is_none() {
+                Vec::new()
+            } else {
+                depset_or_iterable_values(additional_inputs, heap)?
+            };
+            let expanded_user_link_flags = if user_link_flags.is_none() {
+                user_link_flags
+            } else {
+                let mut flags = Vec::new();
+                for flag in depset_or_iterable_values(user_link_flags, heap)? {
+                    flags.push(cc_expand_link_flag_locations(
+                        flag,
+                        &direct_additional_inputs,
+                        heap,
+                    )?);
+                }
+                heap.alloc(AllocList(flags))
+            };
+
+            let mut link_vars: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
+            link_vars.insert_hashed(
+                heap.alloc_str("output_execpath")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
+                heap.alloc_str(&output_path_str).to_value(),
+            );
+            insert_if_set(
+                &mut link_vars,
+                heap,
+                "user_link_flags",
+                expanded_user_link_flags,
+            );
+            if is_dynamic {
+                link_vars.insert_hashed(
+                    heap.alloc_str("is_linking_dynamic_library")
+                        .to_value()
+                        .get_hashed()
+                        .unwrap(),
+                    Value::new_bool(true),
+                );
+            }
+            if let Some(target_system_name) = cc_toolchain_target_system_name(cc_toolchain, heap) {
+                insert_if_set(
+                    &mut link_vars,
+                    heap,
+                    "target_system_name",
+                    target_system_name,
+                );
+            }
+            if let Some(target_libc) = cc_toolchain_target_libc(cc_toolchain, heap) {
+                insert_if_set(&mut link_vars, heap, "target_libc", target_libc);
+            }
+            if !variables_extension.is_none()
+                && let Some(dict_ref) = DictRef::from_value(variables_extension)
+            {
+                for (key, value) in dict_ref.iter() {
+                    if let Ok(hashed) = key.get_hashed() {
+                        link_vars.insert_hashed(hashed, value);
+                    }
+                }
+            }
+            let link_variables = heap.alloc(Dict::new(link_vars));
+            let feature_args = feature_configuration
+                .downcast_ref::<FeatureConfiguration>()
+                .map(|fc| expand_cc_flag_sets(fc, action_name, link_variables, heap))
+                .transpose()?
+                .unwrap_or_default();
+            let has_feature_args = !feature_args.is_empty();
+
             // Get linker tool path
             let linker_tool = match std::env::consts::OS {
                 "windows" => {
@@ -3770,17 +4161,19 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             args.push(heap.alloc_str(&linker_tool).to_value());
 
             if is_static {
-                // Static library: ar rcs output.a obj1.o obj2.o ...
-                if !is_windows_host() {
-                    args.push(heap.alloc_str("rcs").to_value());
-                }
-                args.push(output_artifact);
-                if is_windows_host() {
-                    // MSVC lib.exe: /OUT:output.lib obj1.obj obj2.obj
-                    // Replace the last push with /OUT: flag
-                    args.pop();
-                    let out_flag = format!("/OUT:{}", output_path_str);
-                    args.push(heap.alloc_str(&out_flag).to_value());
+                if !has_feature_args {
+                    // Static library fallback: ar rcs output.a obj1.o obj2.o ...
+                    if !is_windows_host() {
+                        args.push(heap.alloc_str("rcs").to_value());
+                    }
+                    args.push(output_artifact);
+                    if is_windows_host() {
+                        // MSVC lib.exe: /OUT:output.lib obj1.obj obj2.obj
+                        // Replace the last push with /OUT: flag
+                        args.pop();
+                        let out_flag = format!("/OUT:{}", output_path_str);
+                        args.push(heap.alloc_str(&out_flag).to_value());
+                    }
                 }
             } else {
                 // Executable or shared library
@@ -3797,9 +4190,15 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     args.push(output_artifact);
                     if is_dynamic {
                         args.push(heap.alloc_str("-shared").to_value());
+                        if is_compiler_rt_crtbegin_link_output(Some(&output_path_str)) {
+                            args.push(heap.alloc_str("-nostdlib").to_value());
+                        }
                     }
                 }
             }
+
+            args.extend(feature_args);
+            let mut run_inputs = direct_additional_inputs.clone();
 
             // Collect object files from compilation_outputs
             if !compilation_outputs.is_none() {
@@ -3916,6 +4315,22 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                     // Extract user_link_flags from linker inputs (e.g., -lpthread)
+                                    let input_additional_inputs =
+                                        if let Ok(Some(dep_additional_inputs)) =
+                                            input.get_attr("additional_inputs", heap)
+                                        {
+                                            if dep_additional_inputs.is_none() {
+                                                Vec::new()
+                                            } else {
+                                                depset_or_iterable_values(
+                                                    dep_additional_inputs,
+                                                    heap,
+                                                )?
+                                            }
+                                        } else {
+                                            Vec::new()
+                                        };
+                                    run_inputs.extend(input_additional_inputs.iter().copied());
                                     if let Ok(Some(dep_link_flags)) =
                                         input.get_attr("user_link_flags", heap)
                                     {
@@ -3923,7 +4338,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                             for flag in
                                                 depset_or_iterable_values(dep_link_flags, heap)?
                                             {
-                                                args.push(flag);
+                                                args.push(cc_expand_link_flag_locations(
+                                                    flag,
+                                                    &input_additional_inputs,
+                                                    heap,
+                                                )?);
                                             }
                                         }
                                     }
@@ -3935,8 +4354,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
 
             // Add user link flags
-            if !user_link_flags.is_none() {
-                if let Ok(iter) = user_link_flags.iterate(heap) {
+            if !has_feature_args && !expanded_user_link_flags.is_none() {
+                if let Ok(iter) = expanded_user_link_flags.iterate(heap) {
                     for flag in iter {
                         args.push(flag);
                     }
@@ -3972,6 +4391,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
             let args_val = heap.alloc(args);
             let outputs_list = heap.alloc(vec![output_artifact]);
+            let inputs_list = heap.alloc(run_inputs);
             let progress = heap
                 .alloc_str(&format!("Linking {}", output_name))
                 .to_value();
@@ -3988,6 +4408,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 &[args_val],
                 &[
                     ("outputs", outputs_list),
+                    ("inputs", inputs_list),
                     ("category", heap.alloc_str(category).to_value()),
                     ("identifier", heap.alloc_str(&output_name).to_value()),
                     ("progress_message", progress),
@@ -4139,9 +4560,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // enabled based on the feature configuration. We map action names to
         // features where there's a direct correspondence.
         if let Some(fc) = feature_configuration.downcast_ref::<FeatureConfiguration>() {
+            let normalized_action = normalize_action_name(action_name);
+            let action_name = normalized_action.as_str();
             // Some actions correspond directly to features
             let feature_name = match action_name {
                 "c++-compile" | "c-compile" | "cc-flags-make-variable" => None, // Always enabled
+                _ if is_header_parsing_action(action_name) => Some("parse_headers"),
                 "c++-link-executable"
                 | "c++-link-dynamic-library"
                 | "c++-link-nodeps-dynamic-library"
@@ -4229,24 +4653,27 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             let has_feature_args = !feature_args.is_empty();
             let use_llvm_linux_link_defaults = !msvc
                 && !has_feature_args
-                && has_host_llvm_toolchain()
-                && is_musl_cc_toolchain_target(
-                    target_system_name.as_deref(),
-                    target_libc.as_deref(),
-                );
+                && ((has_host_llvm_toolchain()
+                    && is_musl_cc_toolchain_target(
+                        target_system_name.as_deref(),
+                        target_libc.as_deref(),
+                    ))
+                    || is_compiler_rt_crtbegin_link_output(output_path.as_deref()));
 
             if is_static_lib {
-                if msvc {
-                    // MSVC: lib.exe /nologo /OUT:<output>
-                    args.push(heap.alloc_str("/nologo").to_value());
-                    if let Some(ref path) = output_path {
-                        args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
-                    }
-                } else {
-                    // ar archiver: rcs <output>
-                    args.push(heap.alloc_str("rcs").to_value());
-                    if let Some(ref path) = output_path {
-                        args.push(heap.alloc_str(path).to_value());
+                if !has_feature_args {
+                    if msvc {
+                        // MSVC: lib.exe /nologo /OUT:<output>
+                        args.push(heap.alloc_str("/nologo").to_value());
+                        if let Some(ref path) = output_path {
+                            args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
+                        }
+                    } else {
+                        // ar archiver: rcs <output>
+                        args.push(heap.alloc_str("rcs").to_value());
+                        if let Some(ref path) = output_path {
+                            args.push(heap.alloc_str(path).to_value());
+                        }
                     }
                 }
             } else if is_dynamic_lib {
@@ -4260,6 +4687,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 } else {
                     args.push(heap.alloc_str("-shared").to_value());
                     args.push(heap.alloc_str("-fPIC").to_value());
+                    if use_llvm_linux_link_defaults {
+                        args.push(heap.alloc_str("-nostdlib").to_value());
+                    }
                     if let Some(ref path) = output_path {
                         args.push(heap.alloc_str("-o").to_value());
                         args.push(heap.alloc_str(path).to_value());
@@ -4348,6 +4778,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
 
         // --- Compile actions below ---
+        let feature_args = feature_configuration
+            .downcast_ref::<FeatureConfiguration>()
+            .map(|fc| expand_cc_flag_sets(fc, action_name, variables, heap))
+            .transpose()?
+            .unwrap_or_default();
+        let has_feature_args = !feature_args.is_empty();
 
         // `-c` / `/c` (compile-only) belongs to the Bazel action_config's
         // command_line template, not to feature-derived flag_sets. It is only
@@ -4378,8 +4814,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
+        args.extend(feature_args);
+
         if is_compile
             && !msvc
+            && !has_feature_args
             && has_host_llvm_toolchain()
             && is_musl_cc_toolchain_target(target_system_name.as_deref(), target_libc.as_deref())
         {
@@ -4393,7 +4832,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // a target-cfg compile sees whatever the user requested via
         // `--compilation_mode`. Also emit rules_cc's always-on compile flags
         // that the cc_toolchain_config feature set assumes as baseline.
-        if is_compile {
+        if is_compile && !has_feature_args {
             if !msvc {
                 // Always-on flags from rules_cc's `compile_flags` feature.
                 // rules_cc's default linux_cc_toolchain_config sets these
@@ -4452,7 +4891,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
 
         // Add --copt flags from command line (apply to all C/C++ compilations)
-        if is_compile {
+        if is_compile && !has_feature_args {
             for opt in crate::interpreter::rule_defs::build_config::get_copts() {
                 args.push(heap.alloc_str(&opt).to_value());
             }
@@ -4506,7 +4945,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
 
         // User compile flags
-        if let Some(user_flags) = get_var("user_compile_flags") {
+        if !has_feature_args && let Some(user_flags) = get_var("user_compile_flags") {
             if !user_flags.is_none() {
                 for flag in iterate_value(user_flags, eval) {
                     if let Some(s) = flag.unpack_str() {
@@ -4520,7 +4959,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         // Include paths
         let inc_prefix = if msvc { "/I" } else { "-I" };
-        if let Some(includes) = get_var("include_paths") {
+        if !has_feature_args && let Some(includes) = get_var("include_paths") {
             if !includes.is_none() {
                 for inc in iterate_value(includes, eval) {
                     if let Some(s) = inc.unpack_str() {
@@ -4533,7 +4972,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
 
         // Quote include paths
-        if let Some(quote_includes) = get_var("quote_include_paths") {
+        if !has_feature_args && let Some(quote_includes) = get_var("quote_include_paths") {
             if !quote_includes.is_none() {
                 for inc in iterate_value(quote_includes, eval) {
                     if let Some(s) = inc.unpack_str() {
@@ -4551,7 +4990,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
 
         // System include paths
-        if let Some(system_includes) = get_var("system_include_paths") {
+        if !has_feature_args && let Some(system_includes) = get_var("system_include_paths") {
             if !system_includes.is_none() {
                 for inc in iterate_value(system_includes, eval) {
                     if let Some(s) = inc.unpack_str() {
@@ -4876,7 +5315,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                         for elem in depset_values(includes_val, heap)? {
                             let dir = elem.to_str();
                             if !dir.is_empty() {
-                                let flag = include_flag_for_dir_impl(&dir, msvc);
+                                let flag = include_flag_for_context_attr(attr_name, &dir, msvc);
                                 args_vec.push(heap.alloc_str(&flag).to_value());
                             }
                         }
@@ -5519,11 +5958,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             );
         }
 
-        let direct_target_system_name = cc_toolchain
-            .get_attr("target_gnu_system_name", heap)
-            .ok()
-            .flatten();
-        let direct_target_libc = cc_toolchain.get_attr("libc", heap).ok().flatten();
+        let direct_target_system_name = cc_toolchain_target_system_name(cc_toolchain, heap);
+        let direct_target_libc = cc_toolchain_target_libc(cc_toolchain, heap);
         if let Some(target_system_name) = direct_target_system_name {
             insert_if_set(&mut map, heap, "target_system_name", target_system_name);
         }
@@ -5620,11 +6056,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         );
         insert_if_set(&mut map, heap, "linker_param_file", param_file);
 
-        if let Ok(Some(target_system_name)) = cc_toolchain.get_attr("target_gnu_system_name", heap)
-        {
+        if let Some(target_system_name) = cc_toolchain_target_system_name(cc_toolchain, heap) {
             insert_if_set(&mut map, heap, "target_system_name", target_system_name);
         }
-        if let Ok(Some(target_libc)) = cc_toolchain.get_attr("libc", heap) {
+        if let Some(target_libc) = cc_toolchain_target_libc(cc_toolchain, heap) {
             insert_if_set(&mut map, heap, "target_libc", target_libc);
         }
 

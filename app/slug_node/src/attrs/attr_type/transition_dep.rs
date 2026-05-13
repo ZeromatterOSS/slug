@@ -14,10 +14,10 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::configuration::transition::id::TransitionId;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProvidersLabel;
-use pagable::Pagable;
 
 use crate::attrs::attr_type::configuration_dep::ConfigurationDepKind;
 use crate::attrs::configuration_context::AttrConfigurationContext;
@@ -148,7 +148,7 @@ impl CoercedTransitionDep {
     ) -> slug_error::Result<()> {
         let transition = t.get_transition(self);
         match &**transition {
-            TransitionId::MagicObject { .. } => (),
+            TransitionId::MagicObject { .. } | TransitionId::AnonymousBazel { .. } => (),
             TransitionId::Target(label) => {
                 traversal.configuration_dep(label, ConfigurationDepKind::Transition)?
             }
@@ -160,7 +160,9 @@ impl CoercedTransitionDep {
     pub fn get_dynamic_transition(&self) -> Option<&ProvidersLabel> {
         match &**self.transition.as_ref()? {
             TransitionId::Target(t) => Some(t),
-            TransitionId::MagicObject { .. } => unreachable!(),
+            TransitionId::MagicObject { .. } | TransitionId::AnonymousBazel { .. } => {
+                unreachable!()
+            }
         }
     }
 }

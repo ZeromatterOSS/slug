@@ -284,6 +284,130 @@ fn build_setting_value_from_starlark(v: Value<'_>) -> slug_error::Result<BuildSe
     ))
 }
 
+fn build_setting_value_from_configured_attr(
+    attr: &ConfiguredAttr,
+) -> slug_error::Result<Option<BuildSettingValue>> {
+    Ok(Some(match attr {
+        ConfiguredAttr::OneOf(inner, _) => {
+            return build_setting_value_from_configured_attr(inner);
+        }
+        ConfiguredAttr::None => return Ok(None),
+        ConfiguredAttr::Bool(v) => BuildSettingValue::Bool(v.0),
+        ConfiguredAttr::Int(v) => BuildSettingValue::Int(*v),
+        ConfiguredAttr::String(v) | ConfiguredAttr::EnumVariant(v) => {
+            BuildSettingValue::String(v.0.as_str().to_owned())
+        }
+        ConfiguredAttr::List(v) => {
+            let mut values = Vec::with_capacity(v.len());
+            for item in v.iter() {
+                match item {
+                    ConfiguredAttr::String(v) | ConfiguredAttr::EnumVariant(v) => {
+                        values.push(v.0.as_str().to_owned());
+                    }
+                    other => {
+                        return Err(slug_error::slug_error!(
+                            slug_error::ErrorTag::Input,
+                            "anonymous Bazel transition list value contains unsupported `{}`",
+                            other.as_display_no_ctx()
+                        ));
+                    }
+                }
+            }
+            BuildSettingValue::StringList(values)
+        }
+        other => {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "anonymous Bazel transition value type is not supported as a build setting: `{}`",
+                other.as_display_no_ctx()
+            ));
+        }
+    }))
+}
+
+fn make_valid_identifier_suffix(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
+fn anonymous_bazel_attr_name_for_output<'a>(
+    output: &str,
+    attrs: &'a [(String, Arc<ConfiguredAttr>)],
+) -> slug_error::Result<&'a str> {
+    if let Some(option) = output.strip_prefix("//command_line_option:") {
+        let attr_name = format!("with_cfg_{option}");
+        if let Some((name, _)) = attrs.iter().find(|(name, _)| name == &attr_name) {
+            return Ok(name);
+        }
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "anonymous Bazel transition output `{}` has no matching attr `{}`",
+            output,
+            attr_name
+        ));
+    }
+
+    let target_name = output
+        .rsplit_once(':')
+        .map(|(_, name)| name)
+        .or_else(|| output.rsplit('/').next())
+        .unwrap_or(output);
+    let suffix = format!("_{}", make_valid_identifier_suffix(target_name));
+    let mut matches = attrs.iter().filter(|(name, _)| {
+        let Some(hash_part) = name
+            .strip_prefix("s_")
+            .and_then(|rest| rest.strip_suffix(&suffix))
+        else {
+            return false;
+        };
+        !hash_part.is_empty() && hash_part.chars().all(|c| c == '_' || c.is_ascii_digit())
+    });
+    let Some((name, _)) = matches.next() else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "anonymous Bazel transition output `{}` has no matching setting attr suffix `{}`",
+            output,
+            suffix
+        ));
+    };
+    if matches.next().is_some() {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "anonymous Bazel transition output `{}` matched multiple setting attrs ending in `{}`",
+            output,
+            suffix
+        ));
+    }
+    Ok(name)
+}
+
+fn apply_anonymous_bazel_transition(
+    conf: &ConfigurationData,
+    outputs: &[String],
+    bazel_all_attrs: Option<&[(String, Arc<ConfiguredAttr>)]>,
+) -> slug_error::Result<TransitionApplied> {
+    let attrs = bazel_all_attrs.ok_or_else(|| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "anonymous Bazel transition requires configured attrs"
+        )
+    })?;
+    let mut out = conf.dupe();
+    for output in outputs {
+        let attr_name = anonymous_bazel_attr_name_for_output(output, attrs)?;
+        let Some((_, attr)) = attrs.iter().find(|(name, _)| name == attr_name) else {
+            unreachable!("anonymous_bazel_attr_name_for_output returned an existing attr")
+        };
+        let Some(value) = build_setting_value_from_configured_attr(attr)? else {
+            continue;
+        };
+        let label = BuildSettingLabel::from_bazel_label(output)?;
+        out = out.with_build_setting(label, value)?;
+    }
+    Ok(TransitionApplied::Single(out))
+}
+
 /// Resolve the current value of a build setting for the transition-input dict.
 ///
 /// Priority order:
@@ -369,14 +493,13 @@ async fn do_apply_transition(
         return Ok(TransitionApplied::Single(conf.dupe()));
     }
 
-    // Anonymous `rule(cfg = dict(implementation=..., inputs=[...], outputs=[...]))`
-    // transitions (used by rules_python's py_binary builder) are stored with a
-    // magic id `(<defining_bzl>, "_anonymous_transition")`. The transition
-    // object itself is never bound to a module-level global, so the
-    // fetch-by-name lookup always fails. Slug does not yet execute Starlark
-    // transitions, so treat anonymous cfg= transitions as identity (matches
-    // the behaviour we already apply to `config.target()` and bazel-style
-    // no-op transitions in `rule.rs::call`).
+    if let TransitionId::AnonymousBazel { outputs, .. } = transition_id {
+        return apply_anonymous_bazel_transition(conf, outputs, bazel_all_attrs);
+    }
+
+    // Legacy anonymous transitions are not bound to module-level globals and
+    // do not carry declared Bazel outputs. Keep the old no-op behavior for
+    // that unsupported shape.
     if let TransitionId::MagicObject { name, .. } = transition_id {
         if name == "_anonymous_transition" {
             return Ok(TransitionApplied::Single(conf.dupe()));
@@ -523,13 +646,9 @@ impl TransitionCalculation for TransitionCalculationImpl {
         cfg: &ConfigurationData,
         transition_id: &TransitionId,
     ) -> slug_error::Result<Arc<TransitionApplied>> {
-        // Anonymous `rule(cfg = dict(...))` transitions: the transition
-        // object is never bound to a module-level global, so the later
-        // `ctx.fetch_transition(transition_id)` call inside this function
-        // fails. Slug does not execute Starlark transitions, so treat the
-        // anonymous form as identity and short-circuit the whole path.
-        // See also `do_apply_transition` below for the same guard applied
-        // through the DICE key route.
+        // Legacy anonymous transitions are not bound to module-level globals.
+        // Anonymous Bazel-style transitions carry their outputs in
+        // `TransitionId::AnonymousBazel` and are handled below with all attrs.
         if let TransitionId::MagicObject { name, .. } = transition_id {
             if name == "_anonymous_transition" {
                 return Ok(Arc::new(TransitionApplied::Single(cfg.dupe())));
@@ -607,32 +726,40 @@ impl TransitionCalculation for TransitionCalculationImpl {
             }
         }
 
-        let transition = ctx.fetch_transition(transition_id).await?;
-
-        #[allow(clippy::manual_map)]
-        let attrs = if let Some(attrs) = transition.attr_names() {
-            Some(
-                attrs
-                    .into_iter()
-                    .map(|attr| configured_attrs.get(attr).duped())
-                    .collect(),
-            )
-        } else {
-            None
-        };
-
-        // For Bazel-style transitions, store all rule attrs as named pairs
-        // so the transition can access them via `attr.xxx`.
-        let bazel_all_attrs: Option<Vec<(String, Arc<ConfiguredAttr>)>> =
-            if transition.is_bazel_style() {
-                Some(
-                    configured_attrs
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), v.dupe()))
-                        .collect(),
+        let (attrs, bazel_all_attrs) =
+            if matches!(transition_id, TransitionId::AnonymousBazel { .. }) {
+                (
+                    None,
+                    Some(
+                        configured_attrs
+                            .iter()
+                            .map(|(k, v)| (k.to_string(), v.dupe()))
+                            .collect(),
+                    ),
                 )
             } else {
-                None
+                let transition = ctx.fetch_transition(transition_id).await?;
+                let attrs = if let Some(attrs) = transition.attr_names() {
+                    Some(
+                        attrs
+                            .into_iter()
+                            .map(|attr| configured_attrs.get(attr).duped())
+                            .collect(),
+                    )
+                } else {
+                    None
+                };
+                let bazel_all_attrs = if transition.is_bazel_style() {
+                    Some(
+                        configured_attrs
+                            .iter()
+                            .map(|(k, v)| (k.to_string(), v.dupe()))
+                            .collect(),
+                    )
+                } else {
+                    None
+                };
+                (attrs, bazel_all_attrs)
             };
 
         let key = TransitionKey {

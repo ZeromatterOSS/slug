@@ -313,8 +313,24 @@ impl FeatureConfiguration {
 
     /// Check if a feature is enabled.
     pub fn is_feature_enabled(&self, feature_name: &str) -> bool {
-        self.enabled_features.iter().any(|f| f == feature_name)
+        self.enabled_features
+            .iter()
+            .any(|f| cc_feature_name_matches(f, feature_name))
     }
+}
+
+fn cc_feature_short_name(feature_name: &str) -> &str {
+    feature_name
+        .rsplit(':')
+        .next()
+        .unwrap_or(feature_name)
+        .rsplit('/')
+        .next()
+        .unwrap_or(feature_name)
+}
+
+fn cc_feature_name_matches(enabled: &str, requested: &str) -> bool {
+    enabled == requested || cc_feature_short_name(enabled) == cc_feature_short_name(requested)
 }
 
 impl Display for FeatureConfiguration {
@@ -598,5 +614,15 @@ mod tests {
         let fc = FeatureConfiguration::new(vec!["dbg".to_owned()], vec![]);
         assert!(fc.is_feature_enabled("dbg"));
         assert!(!fc.is_feature_enabled("opt"));
+    }
+
+    #[test]
+    fn label_shaped_feature_names_match_by_bazel_feature_name() {
+        let fc = FeatureConfiguration::new(
+            vec!["@llvm//toolchain/features:static_link_cpp_runtimes".to_owned()],
+            vec![],
+        );
+        assert!(fc.is_feature_enabled("static_link_cpp_runtimes"));
+        assert!(fc.is_feature_enabled("@llvm//toolchain/features:static_link_cpp_runtimes"));
     }
 }

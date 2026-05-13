@@ -83,6 +83,22 @@ pub(crate) fn include_flag_for_dir_impl(dir: &str, msvc: bool) -> String {
     }
 }
 
+/// Choose an include flag for an explicit `CcCompilationContext` field.
+///
+/// Unlike source-derived fallback include dirs, these fields already carry
+/// Bazel's include class. Preserve that class and ordering instead of applying
+/// the external-subdir `-idirafter` heuristic.
+pub(crate) fn include_flag_for_context_attr(attr_name: &str, dir: &str, msvc: bool) -> String {
+    if msvc {
+        return format!("/I{}", dir);
+    }
+    match attr_name {
+        "quote_includes" => format!("-iquote{}", dir),
+        "system_includes" | "external_includes" => format!("-isystem{}", dir),
+        _ => format!("-I{}", dir),
+    }
+}
+
 /// Normalize a `buck-out/v2/external_cells/bzlmod/<name>/<version>/...` path to
 /// the equivalent `external/<name>/...` path for include path computation.
 ///
@@ -103,4 +119,33 @@ pub(crate) fn normalize_external_cells_path(path: &str) -> Option<String> {
     let version_end = after_name.find('/')?;
     let after_version = &after_name[version_end + 1..];
     Some(format!("external/{}/{}", name, after_version))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn context_include_flags_preserve_explicit_include_kind() {
+        assert_eq!(
+            include_flag_for_context_attr("includes", "external/musl/src/include", false),
+            "-Iexternal/musl/src/include"
+        );
+        assert_eq!(
+            include_flag_for_context_attr("system_includes", "external/musl/include", false),
+            "-isystemexternal/musl/include"
+        );
+        assert_eq!(
+            include_flag_for_context_attr("quote_includes", "external/musl/src/internal", false),
+            "-iquoteexternal/musl/src/internal"
+        );
+    }
+
+    #[test]
+    fn source_derived_deep_external_includes_still_use_idirafter() {
+        assert_eq!(
+            include_flag_for_dir_impl("external/absl/base/internal", false),
+            "-idirafterexternal/absl/base/internal"
+        );
+    }
 }

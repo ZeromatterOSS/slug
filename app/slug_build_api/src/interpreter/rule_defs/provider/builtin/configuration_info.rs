@@ -16,6 +16,7 @@ use dupe::Dupe;
 use slug_build_api_derive::internal_provider;
 use slug_common::legacy_configs::configs::parse_config_section_and_key;
 use slug_core::configuration::config_setting::ConfigSettingData;
+use slug_core::configuration::constraints::ConstraintKey;
 use slug_core::configuration::data::ConfigurationDataData;
 use slug_interpreter::types::configured_providers_label::StarlarkProvidersLabel;
 use slug_interpreter::types::target_label::StarlarkTargetLabel;
@@ -157,17 +158,42 @@ impl FrozenConfigurationInfo {
         )],
         heap: &FrozenHeap,
     ) -> FrozenValue {
+        let constraint_pairs = constraint_pairs
+            .iter()
+            .map(|(cs_label, cv_label)| {
+                (
+                    ConstraintKey {
+                        key: cs_label.dupe(),
+                        default: None,
+                    },
+                    cv_label.dupe(),
+                )
+            })
+            .collect::<Vec<_>>();
+        Self::for_native_config_setting_keys(&constraint_pairs, heap)
+    }
+
+    pub fn for_native_config_setting_keys(
+        constraint_pairs: &[(ConstraintKey, slug_core::provider::label::ProvidersLabel)],
+        heap: &FrozenHeap,
+    ) -> FrozenValue {
         use crate::interpreter::rule_defs::provider::builtin::constraint_setting_info::FrozenConstraintSettingInfo;
 
         let mut constraints_map = SmallMap::<FrozenValue, FrozenValue>::new();
 
-        for (cs_label, cv_label) in constraint_pairs {
+        for (constraint_key, cv_label) in constraint_pairs {
             // Create the constraint setting info
-            let cs_info_frozen =
-                FrozenConstraintSettingInfo::create_on_frozen_heap(cs_label.dupe(), heap);
+            let cs_info_frozen = FrozenConstraintSettingInfo::create_on_frozen_heap_with_default(
+                constraint_key.key.dupe(),
+                constraint_key
+                    .default
+                    .as_ref()
+                    .map(|default| default.0.dupe()),
+                heap,
+            );
 
             // Get the StarlarkTargetLabel from the constraint setting info for use as dict key
-            let cs_starlark_label = heap.alloc(StarlarkTargetLabel::new(cs_label.dupe()));
+            let cs_starlark_label = heap.alloc(StarlarkTargetLabel::new(constraint_key.key.dupe()));
 
             // Create the constraint value info
             let cv_info_frozen = FrozenConstraintValueInfo::create_on_frozen_heap(

@@ -17,6 +17,7 @@
 use std::sync::Arc;
 
 use dupe::Dupe;
+use once_cell::sync::Lazy;
 use slug_core::package::package_relative_path::PackageRelativePathBuf;
 use slug_core::plugins::PluginKindSet;
 use slug_core::provider::label::ProvidersLabel;
@@ -50,7 +51,6 @@ use slug_node::visibility::VisibilitySpecification;
 use slug_node::visibility::VisibilityWithinViewBuilder;
 use slug_util::arc_str::ArcSlice;
 use slug_util::arc_str::ArcStr;
-use once_cell::sync::Lazy;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
@@ -97,13 +97,23 @@ pub(crate) mod rule_defs {
     }
 
     /// Creates the AttributeSpec for constraint_setting.
-    /// constraint_setting only has the standard internal attributes (name, visibility, etc.)
     fn constraint_setting_attributes() -> AttributeSpec {
-        // Configuration rules don't need any user-defined attributes beyond the standard ones
-        // (name, visibility, etc. are added automatically by AttributeSpec::from)
+        // Bazel's `default_constraint_value` is a label, but storing it as a dep
+        // would create a false constraint_setting -> constraint_value -> constraint_setting cycle.
+        let default_constraint_value_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                "",
+            ))))),
+            "The default constraint value label for this setting",
+            AttrType::string(),
+        );
+
         AttributeSpec::from(
-            vec![], // No user-defined attributes
-            false,  // Not an anonymous target
+            vec![(
+                "default_constraint_value".to_owned(),
+                default_constraint_value_attr,
+            )],
+            false, // Not an anonymous target
             &RuleIncomingTransition::None,
         )
         .expect("constraint_setting attributes should be valid")
@@ -942,17 +952,25 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = starlark::values::none::NoneType)] features: Value<
             'v,
         >,
+        #[starlark(require = named, default = "")] default_constraint_value: &str,
         #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "constraint_setting")?;
+        let mut attrs = Vec::new();
+        if !default_constraint_value.is_empty() {
+            attrs.push((
+                "default_constraint_value".to_owned(),
+                CoercedAttr::String(StringLiteral(ArcStr::from(default_constraint_value))),
+            ));
+        }
 
         let target_node = create_native_target_node(
             rule_defs::CONSTRAINT_SETTING_RULE.clone(),
             internals.package(),
             name,
-            vec![], // No attributes beyond name
+            attrs,
             &extract_visibility_strings(visibility),
             internals.attr_coercion_context(),
             &internals.default_visibility(),

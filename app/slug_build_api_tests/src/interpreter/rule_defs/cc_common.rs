@@ -12,9 +12,12 @@ use indoc::indoc;
 use slug_build_api::interpreter::rule_defs::register_rule_defs;
 use slug_interpreter_for_build::interpreter::testing::Tester;
 
+use crate::interpreter::rule_defs::artifact::testing::artifactory;
+
 fn tester() -> slug_error::Result<Tester> {
     let mut tester = Tester::new()?;
     tester.additional_globals(register_rule_defs);
+    tester.additional_globals(artifactory);
     Ok(tester)
 }
 
@@ -407,6 +410,202 @@ fn cc_common_modern_toolchain_args_expand_for_link_action() -> slug_error::Resul
                 variables = variables,
             )
             assert_eq(["-o", "out", "-resource-dir", "bazel-out/resource_directory"], cmd)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_static_archive_uses_feature_args_instead_of_fallback_prefix() -> slug_error::Result<()>
+{
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            action = struct(name = "c++-link-static-library")
+            nested = struct(
+                legacy_flag_group = struct(
+                    flags = ["rcsD", "%{output_execpath}"],
+                    flag_groups = [],
+                    iterate_over = None,
+                    expand_if_available = None,
+                    expand_if_not_available = None,
+                    expand_if_true = None,
+                    expand_if_false = None,
+                    expand_if_equal = None,
+                ),
+            )
+            archive_args = struct(
+                actions = depset([action]),
+                requires_any_of = [],
+                nested = nested,
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    features = [],
+                    enabled_features = [],
+                    args = struct(
+                        by_action = [
+                            struct(action = action, args = [archive_args]),
+                        ],
+                    ),
+                ),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = [])
+            variables = cc_common.create_link_variables(
+                feature_configuration = fc,
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                output_file = "libout.a",
+            )
+            cmd = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = fc,
+                action_name = "c++-link-static-library",
+                variables = variables,
+            )
+            assert_eq(["rcsD", "libout.a"], cmd)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_link_expands_linker_input_locations_and_inputs() -> slug_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            captured = []
+
+            def declare_file(name):
+                return struct(
+                    path = "buck-out/gen/pkg/" + name,
+                    as_output = lambda: "out:" + name,
+                )
+
+            def run(args, outputs = [], inputs = [], category = None, identifier = None, progress_message = None):
+                captured.append(struct(args = args, inputs = inputs))
+
+            actions = struct(declare_file = declare_file, run = run)
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(features = [], enabled_features = [], args = struct(by_action = [])),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = [])
+            map_file = bound_artifact("//pkg:all_map", "buck-out/gen/external/llvm/runtimes/glibc/build/all.map")
+            linker_input = cc_common.create_linker_input(
+                owner = Label("//pkg:owner"),
+                user_link_flags = ["-Wl,--version-script=$(location :all.map)"],
+                additional_inputs = depset([map_file]),
+            )
+            linking_context = cc_common.create_linking_context(
+                linker_inputs = depset([linker_input]),
+            )
+
+            cc_common.link(
+                actions = actions,
+                name = "libexample",
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                feature_configuration = fc,
+                output_type = "dynamic_library",
+                linking_contexts = [linking_context],
+            )
+
+            assert_eq(1, len(captured))
+            version_script_flags = [
+                arg
+                for arg in captured[0].args
+                if type(arg) == "string" and arg.startswith("-Wl,--version-script=")
+            ]
+            assert_eq(1, len(version_script_flags))
+            assert_eq(True, version_script_flags[0].endswith("/all.map"))
+            assert_eq(False, "$(" in version_script_flags[0])
+            assert_eq([map_file], captured[0].inputs)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_link_expands_direct_user_link_flags_before_feature_expansion() -> slug_error::Result<()>
+{
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            captured = []
+
+            def declare_file(name):
+                return struct(
+                    path = "buck-out/gen/pkg/" + name,
+                    as_output = lambda: "out:" + name,
+                )
+
+            def run(args, outputs = [], inputs = [], category = None, identifier = None, progress_message = None):
+                captured.append(struct(args = args, inputs = inputs))
+
+            action = struct(name = "c++-link-dynamic-library")
+            nested = struct(
+                legacy_flag_group = struct(
+                    flags = ["%{user_link_flags}"],
+                    flag_groups = [],
+                    iterate_over = "user_link_flags",
+                    expand_if_available = "user_link_flags",
+                    expand_if_not_available = None,
+                    expand_if_true = None,
+                    expand_if_false = None,
+                    expand_if_equal = None,
+                ),
+            )
+            args_info = struct(
+                actions = depset([action]),
+                requires_any_of = [],
+                nested = nested,
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    features = [],
+                    enabled_features = [],
+                    args = struct(
+                        by_action = [
+                            struct(action = action, args = [args_info]),
+                        ],
+                    ),
+                ),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = [])
+            map_file = bound_artifact("//pkg:all_map", "buck-out/gen/external/llvm/runtimes/glibc/build/all.map")
+
+            cc_common.link(
+                actions = struct(declare_file = declare_file, run = run),
+                name = "libexample",
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                feature_configuration = fc,
+                output_type = "dynamic_library",
+                user_link_flags = ["-Wl,--version-script=$(location :all.map)"],
+                additional_inputs = [map_file],
+            )
+
+            assert_eq(1, len(captured))
+            version_script_flags = [
+                arg
+                for arg in captured[0].args
+                if type(arg) == "string" and arg.startswith("-Wl,--version-script=")
+            ]
+            assert_eq(1, len(version_script_flags))
+            assert_eq(True, version_script_flags[0].endswith("/all.map"))
+            assert_eq(False, "$(" in version_script_flags[0])
+            assert_eq([map_file], captured[0].inputs)
         "#
     ))?;
     Ok(())

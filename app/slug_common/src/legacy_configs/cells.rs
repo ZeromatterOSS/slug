@@ -771,16 +771,14 @@ impl BuckConfigBasedCells {
                 if let Some(target_name) =
                     selected_bzlmod_cell_name_for_dep(&cells, &dep.name, &resolved_graph)
                 {
-                    if apparent_name != target_name {
-                        let cell_name = CellName::unchecked_new(target_name)?;
-                        let alias_name = NonEmptyCellAlias::new(apparent_name.to_owned())?;
-                        tracing::info!(
-                            "Creating root bazel_dep apparent alias: {} -> {}",
-                            apparent_name,
-                            target_name
-                        );
-                        aliases.push((alias_name, cell_name));
-                    }
+                    let cell_name = CellName::unchecked_new(target_name)?;
+                    let alias_name = NonEmptyCellAlias::new(apparent_name.to_owned())?;
+                    tracing::info!(
+                        "Creating root bazel_dep apparent alias: {} -> {}",
+                        apparent_name,
+                        target_name
+                    );
+                    aliases.push((alias_name, cell_name));
                 }
             }
 
@@ -1143,9 +1141,18 @@ impl BuckConfigBasedCells {
         // second cell identity.
         let mut ext_aliases = Vec::new();
         for alias in pre_computed_aliases {
+            if let Some((owner_module, _, _)) =
+                slug_bzlmod::parse_canonical_name(&alias.canonical_name)
+            {
+                slug_core::cells::register_scoped_bzlmod_repo_alias(
+                    owner_module.to_owned(),
+                    alias.apparent_name.clone(),
+                    alias.canonical_name.clone(),
+                );
+            }
             if existing_cell_names.contains(alias.apparent_name.as_str()) {
                 tracing::debug!(
-                    "Skipping alias '{}' -> '{}': cell already exists (synthetic repo)",
+                    "Skipping global alias '{}' -> '{}': cell already exists; scoped alias remains registered",
                     alias.apparent_name,
                     alias.canonical_name
                 );
@@ -1153,15 +1160,6 @@ impl BuckConfigBasedCells {
             }
             let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
             let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
-            if let Some((owner_module, _, _)) =
-                slug_bzlmod::parse_canonical_name(canonical_name.as_str())
-            {
-                slug_core::cells::register_scoped_bzlmod_repo_alias(
-                    owner_module.to_owned(),
-                    apparent_name.as_str().to_owned(),
-                    canonical_name.as_str().to_owned(),
-                );
-            }
             slug_core::cells::register_dynamic_extension_cell_alias(
                 apparent_name.as_str().to_owned(),
                 canonical_name.as_str().to_owned(),

@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::sync::Arc;
+
 use allocative::Allocative;
 use derive_more::Display;
 use pagable::Pagable;
@@ -20,6 +22,12 @@ use crate::provider::label::ProvidersLabel;
 pub enum TransitionId {
     #[display("{}#{}", path, name)]
     MagicObject { path: ImportPath, name: String },
+    #[display("{}#{}", path, name)]
+    AnonymousBazel {
+        path: ImportPath,
+        name: String,
+        outputs: Arc<[String]>,
+    },
     #[display("{}", _0)]
     Target(ProvidersLabel),
 }

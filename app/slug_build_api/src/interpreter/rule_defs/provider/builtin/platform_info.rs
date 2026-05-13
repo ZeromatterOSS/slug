@@ -11,9 +11,11 @@
 use std::fmt::Debug;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use slug_build_api_derive::internal_provider;
 use slug_core::configuration::build_setting::BuildSettingLabel;
 use slug_core::configuration::build_setting::BuildSettingValue;
+use slug_core::configuration::constraints::ConstraintKey;
 use slug_core::configuration::data::ConfigurationData;
 use slug_core::provider::label::ProvidersLabel;
 use slug_core::target::label::label::TargetLabel;
@@ -133,9 +135,32 @@ impl FrozenPlatformInfo {
         exec_properties: &[(String, String)],
         heap: &FrozenHeap,
     ) -> FrozenValue {
+        let constraint_pairs = constraint_pairs
+            .iter()
+            .map(|(cs_label, cv_label)| {
+                (
+                    ConstraintKey {
+                        key: cs_label.dupe(),
+                        default: None,
+                    },
+                    cv_label.dupe(),
+                )
+            })
+            .collect::<Vec<_>>();
+        Self::for_native_platform_keys(label_str, &constraint_pairs, exec_properties, heap)
+    }
+
+    /// Create a frozen PlatformInfo for a native `platform()` rule while
+    /// preserving constraint defaults carried by `constraint_setting()`.
+    pub fn for_native_platform_keys(
+        label_str: &str,
+        constraint_pairs: &[(ConstraintKey, ProvidersLabel)],
+        exec_properties: &[(String, String)],
+        heap: &FrozenHeap,
+    ) -> FrozenValue {
         let label_frozen = heap.alloc_str(label_str).to_frozen_value();
         let config_info =
-            FrozenConfigurationInfo::for_native_config_setting(constraint_pairs, heap);
+            FrozenConfigurationInfo::for_native_config_setting_keys(constraint_pairs, heap);
         let exec_properties_frozen = heap.alloc(AllocDict(
             exec_properties
                 .iter()
