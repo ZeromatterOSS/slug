@@ -1345,6 +1345,25 @@ mod tests {
     }
 
     #[test]
+    fn source_backed_musl_headers_directory_uses_generated_include_tree() {
+        assert_eq!(
+            source_backed_toolchain_include_path(
+                "buck-out/gen/llvm+musl+musl_libc/f9d25665faba5414/external/llvm+musl+musl_libc/headers_x86_64_include_directory",
+            ),
+            Some(
+                "buck-out/gen/llvm+musl+musl_libc/f9d25665faba5414/external/llvm+musl+musl_libc/generated/x86_64/includes"
+                    .to_owned()
+            )
+        );
+        assert_eq!(
+            source_backed_toolchain_include_path(
+                "external/llvm++musl+musl_libc/headers_aarch64_include_directory",
+            ),
+            Some("external/llvm++musl+musl_libc/generated/aarch64/includes".to_owned())
+        );
+    }
+
+    #[test]
     fn source_backed_toolchain_executable_uses_source_repo_alias() {
         assert_eq!(
             source_backed_toolchain_executable_path(
@@ -1493,10 +1512,23 @@ fn cc_variable_to_string<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<String>
 }
 
 fn source_backed_toolchain_include_path(path: &str) -> Option<String> {
-    let external_path = path
-        .strip_prefix("external/")
-        .or_else(|| path.split_once("/external/").map(|(_, external)| external))?;
+    let (prefix, external_path) = if let Some(external) = path.strip_prefix("external/") {
+        (None, external)
+    } else {
+        path.split_once("/external/")
+            .map(|(prefix, external)| (Some(prefix), external))?
+    };
     let (repo, rest) = external_path.split_once('/')?;
+    if let Some(arch) = rest
+        .strip_prefix("headers_")
+        .and_then(|rest| rest.strip_suffix("_include_directory"))
+    {
+        let rest = format!("generated/{arch}/includes");
+        return Some(match prefix {
+            Some(prefix) => format!("{prefix}/external/{repo}/{rest}"),
+            None => format!("external/{repo}/{rest}"),
+        });
+    }
     match rest {
         "kernel_headers_directory"
         | "glibc_headers_directory"
