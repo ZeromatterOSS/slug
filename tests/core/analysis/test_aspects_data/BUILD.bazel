@@ -1,4 +1,4 @@
-load(":defs.bzl", "attr_reporter", "collector", "configurable_lib", "counter", "kind_reporter", "label_reporter", "my_lib", "plain_lib", "tagged_lib")
+load(":defs.bzl", "attr_reporter", "base_lib", "collector", "configurable_lib", "counter", "kind_reporter", "label_reporter", "my_lib", "plain_lib", "shadow_reporter", "tagged_lib")
 
 # files_aspect tests
 my_lib(
@@ -89,4 +89,18 @@ label_reporter(
 attr_reporter(
     name = "attr_report",
     deps = [":config_beta"],
+)
+
+base_lib(
+    name = "shadow_leaf",
+)
+
+base_lib(
+    name = "shadow_parent",
+    deps = [":shadow_leaf"],
+)
+
+shadow_reporter(
+    name = "shadow_overlay_report",
+    deps = [":shadow_parent"],
 )

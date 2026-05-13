@@ -178,6 +178,43 @@ impl CcFlagSet {
                         .all(|feature| !feature_configuration.is_feature_enabled(feature))
             })
     }
+
+    pub fn with_additional_feature_constraints(mut self, additional: &[CcWithFeatureSet]) -> Self {
+        self.with_features = combine_cc_with_feature_sets(additional, &self.with_features);
+        self
+    }
+}
+
+pub fn combine_cc_with_feature_sets(
+    left: &[CcWithFeatureSet],
+    right: &[CcWithFeatureSet],
+) -> Vec<CcWithFeatureSet> {
+    if left.is_empty() {
+        return right.to_vec();
+    }
+    if right.is_empty() {
+        return left.to_vec();
+    }
+
+    let mut combined = Vec::new();
+    for l in left {
+        for r in right {
+            let mut features = l.features.clone();
+            for feature in &r.features {
+                if !features.iter().any(|existing| existing == feature) {
+                    features.push(feature.clone());
+                }
+            }
+            let mut not_features = l.not_features.clone();
+            for feature in &r.not_features {
+                if !not_features.iter().any(|existing| existing == feature) {
+                    not_features.push(feature.clone());
+                }
+            }
+            combined.push(CcWithFeatureSet::new(features, not_features));
+        }
+    }
+    combined
 }
 
 #[derive(Debug, Allocative, Clone)]

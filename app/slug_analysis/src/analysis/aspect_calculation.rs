@@ -438,8 +438,8 @@ async fn compute_dep_aspects(
 ///
 /// The `dep_aspects` parameter contains shadow graph results: aspect providers
 /// for dependencies that have been processed by this aspect. When resolving
-/// `ctx.rule.attr.deps`, these aspect providers take precedence over the
-/// target's regular providers.
+/// `ctx.rule.attr.deps`, these aspect providers are overlaid onto the target's
+/// regular providers.
 async fn execute_aspect(
     ctx: &mut DiceComputations<'_>,
     target: &ConfiguredTargetLabel,
@@ -496,29 +496,24 @@ async fn execute_aspect(
     // Collect dependency labels from the node's deps
     let dep_labels: Vec<ConfiguredTargetLabel> = node.deps().map(|d| d.label().dupe()).collect();
 
-    // Build dep_analysis_results: aspect results take precedence (shadow graph)
-    // Only fetch regular analysis for deps that don't have aspect results
+    // Build dep_analysis_results: aspect results overlay base target providers
+    // in the shadow graph. Bazel aspects add providers to the target view; they
+    // do not replace providers such as CcInfo that attr constraints still need.
     let dep_analysis_results: std::collections::HashMap<
         ConfiguredTargetLabel,
         slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
     > = {
-        // Determine which deps need regular analysis (no aspect result available)
-        let deps_needing_analysis: Vec<_> = dep_labels
-            .iter()
-            .filter(|label| !dep_aspects.contains_key(*label))
-            .cloned()
-            .collect();
+        use slug_build_api::interpreter::rule_defs::provider::collection::merge_provider_collections;
 
-        // Fetch regular analysis results only for deps without aspect results
-        let regular_analysis: HashMap<ConfiguredTargetLabel, slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> = if !deps_needing_analysis.is_empty() {
-            let results = ctx.compute_join(deps_needing_analysis.iter(), |ctx, label| {
+        let regular_analysis: HashMap<ConfiguredTargetLabel, slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> = if !dep_labels.is_empty() {
+            let results = ctx.compute_join(dep_labels.iter(), |ctx, label| {
                 async move {
                     ctx.compute(&AnalysisKey(label.dupe())).await
                 }.boxed()
             }).await;
 
             let mut map = HashMap::new();
-            for (label, result) in deps_needing_analysis.iter().zip(results) {
+            for (label, result) in dep_labels.iter().zip(results) {
                 if let Ok(Ok(analysis_result)) = result {
                     if let Ok(compatible) = analysis_result.require_compatible() {
                         if let Ok(providers) = compatible.providers() {
@@ -532,19 +527,19 @@ async fn execute_aspect(
             HashMap::new()
         };
 
-        // Build combined map: aspect results take precedence
         let mut combined = HashMap::new();
 
-        // First, add aspect results (shadow graph - these take precedence)
-        for (label, aspect_value) in &dep_aspects {
-            combined.insert(label.dupe(), aspect_value.providers.dupe());
+        for (label, providers) in regular_analysis {
+            combined.insert(label, providers);
         }
 
-        // Then add regular analysis results for deps without aspects
-        for (label, providers) in regular_analysis {
-            if !combined.contains_key(&label) {
-                combined.insert(label, providers);
-            }
+        for (label, aspect_value) in &dep_aspects {
+            let providers = if let Some(base_providers) = combined.get(label) {
+                merge_provider_collections(base_providers, &aspect_value.providers)
+            } else {
+                aspect_value.providers.dupe()
+            };
+            combined.insert(label.dupe(), providers);
         }
 
         combined

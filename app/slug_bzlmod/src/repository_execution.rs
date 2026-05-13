@@ -29,6 +29,7 @@
 //!
 //! This follows the `GitFileOpsDelegateKey` pattern from `slug_external_cells/src/git.rs`.
 
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -41,6 +42,7 @@ use dice::Key;
 use dupe::Dupe;
 
 use crate::repo_spec::RepoSpec;
+use crate::repository_invocations::AttrValue;
 use crate::repository_invocations::RepositoryInvocation;
 
 /// Errors that can occur during repository rule execution.
@@ -329,7 +331,8 @@ impl Key for ExtensionRepoExecutionKey {
         );
 
         // Convert RepoSpec to RepositoryInvocation
-        let invocation = repo_spec_to_invocation(&self.canonical_name, &self.repo_spec)?;
+        let mut invocation = repo_spec_to_invocation(&self.canonical_name, &self.repo_spec)?;
+        repair_stale_local_path_attrs(&mut invocation, &self.project_root);
 
         let working_dir = self
             .project_root
@@ -502,6 +505,51 @@ pub fn repo_spec_to_invocation(
     }
 
     Ok(invocation)
+}
+
+fn repair_stale_local_path_attrs(invocation: &mut RepositoryInvocation, project_root: &Path) {
+    let Some(AttrValue::String(path) | AttrValue::Label(path)) = invocation.attrs.get_mut("path")
+    else {
+        return;
+    };
+    let original = Path::new(path);
+    if !original.is_absolute() || original.exists() {
+        return;
+    }
+    let Some(repaired) = existing_suffix_under_project_root(original, project_root) else {
+        return;
+    };
+    tracing::info!(
+        "Rewriting stale absolute repository path for '{}': {} -> {}",
+        invocation.name,
+        path,
+        repaired.display()
+    );
+    *path = repaired.to_string_lossy().into_owned();
+}
+
+fn existing_suffix_under_project_root(path: &Path, project_root: &Path) -> Option<PathBuf> {
+    let components: Vec<_> = path
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(part) => Some(part.to_owned()),
+            _ => None,
+        })
+        .collect();
+    for start in 0..components.len() {
+        let mut suffix = PathBuf::new();
+        for component in &components[start..] {
+            suffix.push(component);
+        }
+        if suffix.components().count() < 2 {
+            continue;
+        }
+        let candidate = project_root.join(&suffix);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 /// Extract the rule name from a repo_rule_id.
@@ -691,6 +739,36 @@ mod tests {
                 ][..]
             )
         );
+    }
+
+    #[test]
+    fn repairs_stale_absolute_repo_path_by_project_suffix() {
+        let base =
+            std::env::temp_dir().join(format!("slug-repair-repo-path-{}", std::process::id()));
+        let project = base.join("current");
+        let crate_dir = project.join("vendor/raw_sync-rs");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&crate_dir).unwrap();
+
+        let mut inv =
+            RepositoryInvocation::new("crates__raw_sync-0.1.5".to_owned(), "local".to_owned());
+        inv.attrs.insert(
+            "path".to_owned(),
+            AttrValue::String(
+                base.join("old/workspace/vendor/raw_sync-rs")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+        );
+
+        repair_stale_local_path_attrs(&mut inv, &project);
+
+        assert_eq!(
+            inv.attrs.get("path").and_then(AttrValue::as_string),
+            Some(crate_dir.to_str().unwrap())
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

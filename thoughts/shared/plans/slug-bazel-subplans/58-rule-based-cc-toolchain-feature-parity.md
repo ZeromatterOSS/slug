@@ -107,6 +107,43 @@ Decision tree:
 - If it receives the correct `LibraryToLink` and still omits argv, only then
   debug final C++ link argv conversion.
 
+Update 2026-05-13:
+
+- The missing `liblibc.a` input class is now narrowed and fixed in the provider
+  path: Slug's `cc_shared_library` action receives the runtime archive and
+  emits it under whole-archive for the `libc.so.6` action.
+- The next blocker is the same rule-based toolchain abstraction, not a glibc
+  special case. The runtime-stage link actions still miss toolchain action
+  flags such as `-nostdlib` and `-fuse-ld=lld`; the `libld.so.2` action then
+  falls back to `/usr/bin/ld` and fails with duplicate definitions.
+- Diagnostic counts showed the NativeShim metadata extractor does read the
+  generated `cc_toolchain_config` and produces non-empty action flag sets.
+  The drop was later: rules_cc's shared-library path uses
+  `cc_common_internal.get_link_args`, and Slug's implementation manually built
+  `libraries_to_link` / user flags without expanding the rule-based toolchain
+  action-config flag sets. The systemic fix is to expand those action-config
+  flag sets in `get_link_args` before the manually modelled link variables.
+- After that fix, the direct glibc `libc.so.6` target builds and
+  `@rules_rust//util/process_wrapper:process_wrapper` progresses to the C++
+  helper link. The new failure is undefined `std::__cxx11` symbols in
+  `bootstrap_process_wrapper.pic.o`: Slug links LLVM libc++ archives, but the
+  object was compiled against host libstdc++ headers. Bazel's compile action
+  for the same target includes rule-based C++ compile flags such as
+  `-target`, `-nostdlibinc`, libc++/libc++abi `-isystem` directories,
+  kernel/glibc/compiler-rt include directories, and clang
+  `-internal-isystem`; Slug's compile action is still a native approximation.
+  The systemic fix is to make Slug's C++ compile action construction expand
+  the selected rule-based toolchain's `cpp_compile` action-config flag sets.
+  Do not fix this by adding a process-wrapper-specific include path, linking
+  libstdc++, or special-casing LLVM libc++ headers.
+- Expanding those compile feature flags exposed the matching input-dependency
+  boundary: the generated libc++/libc++abi/kernel/glibc/compiler-rt include
+  directories appear in `system_include_paths`, so the compile action must
+  collect artifact-valued compile variables (including `DirectoryPathInfo` /
+  `DefaultInfo.files`-style wrappers) as inputs. Otherwise Slug schedules only
+  the compile action and clang fails under `-nostdlibinc` before the generated
+  include directories are materialized.
+
 ## Important Artifacts
 
 - Kuro process-wrapper timeout and action trace:
@@ -376,6 +413,171 @@ bazel aquery 'deps(@rules_rust//util/process_wrapper:process_wrapper)' \
   its output tree is byte-identical and mode-identical to Bazel.
 - No SDK-, glibc-, or process-wrapper-specific link-flag/path-remap shims are
   introduced.
+
+## 2026-05-13 Update
+
+- A stale external-repo materialization blocker was isolated while reproducing
+  the glibc stub target: a completed `llvm+llvm_source+libunwind` repo could
+  retain top-level absolute symlinks into a different project checkout. Slug now
+  treats those repo materializations as stale and rematerializes them; the narrow
+  target no longer fails on missing `Unwind-wasm.c`.
+- Current narrow Slug repro:
+
+  ```sh
+  SLUG_MEMORY_CHECKPOINTS=1 /var/mnt/dev/slug/target/debug/slug \
+    --isolation-dir plan58-glibc-libc-symlinkfix-20260513-124126 \
+    build -M none '@llvm//runtimes/glibc:libc_shared_library_/libc_shared_library' \
+    --target-platforms=//bazel/platforms:linux-gnu-host
+  ```
+
+  Result: build succeeds, but `log what-ran --filter-category cpp_link
+  --skip-cache-hits` still shows the runtime-stage `libc.so.6` link without
+  Bazel's `liblibc.a` input or `-Wl,-whole-archive` wrapper.
+- Bazel aquery for the same target confirms the runtime-stage action includes
+  `external/llvm+/runtimes/glibc/liblibc.a` under
+  `-Wl,-whole-archive ... -Wl,-no-whole-archive`.
+- The next ownership boundary is rules_cc provider parity, not a target-specific
+  link workaround: Slug's native `LibraryToLink`, `LinkerInput`, and
+  `LinkingContext` provider shapes must preserve the private fields that
+  rules_cc's `cc_shared_library` and link-variable builders read.
+- The process-wrapper C++ helper exposed the compile-side half of the same
+  boundary. `cc_common.compile` now expands the selected rule-based
+  `c++-compile` feature flags for C++ sources and carries artifact-like
+  compile variables, `CcCompilationContext.headers`, and toolchain compiler
+  files into `ctx.actions.run(inputs=...)`. The generated libc++ header tree is
+  represented by the toolchain's private `<toolchain files>` value, so compile
+  input collection preserves command-line-like hidden carriers instead of
+  trying to fake public file artifacts.
+- After that fix, process-wrapper advanced into glibc runtime actions and
+  exposed a generated assembly source (`glibc/build/dl.s`) missing from compile
+  inputs. Rule-based feature expansion renders `%{source_file}` as a path
+  string, so the compile action must explicitly carry the original source
+  artifact in `inputs=...` even when argv comes entirely from feature flags.
+- The next process-wrapper failure reached the intended C++ compile and showed
+  path-rendering parity for toolchain include directories: Bazel renders
+  source-backed kernel/glibc/compiler-rt include directories as
+  `external/<repo>/include`, while Slug rendered buck-out generated directory
+  labels that were not real scheduled inputs. Include-variable expansion now
+  maps those source-backed toolchain header directory sentinels back to their
+  external source include paths while keeping generated libc++/libcxxabi header
+  search directories as generated outputs.
+- Focused verification now passes for the process-wrapper blocker:
+
+  ```sh
+  cargo test -p slug_build_api_tests \
+    cc_internal_compile_action_expands_rule_based_toolchain_flags -- --nocapture
+  cargo build -p slug
+  SLUG_MEMORY_CHECKPOINTS=1 timeout 900s /var/mnt/dev/slug/target/debug/slug \
+    --isolation-dir plan58-rules-rust-process-wrapper-sysincmap3-20260513-140307 \
+    build -M none '@rules_rust//util/process_wrapper:process_wrapper' \
+    --target-platforms=//bazel/platforms:linux-gnu-host
+  ```
+
+  Result: `BUILD SUCCEEDED` after 668 local commands. The loop should now move
+  back to the SDK target and treat the next failure as the current plan-58
+  blocker.
+- SDK retry `plan58-sdk-sysincmap-kuro-20260513-140444` advanced back to
+  analysis and exposed anonymous rules_python executable transition handling:
+  `_transition_executable_impl` declares outputs such as
+  `@@rules_python//python/config_settings:add_srcs_to_runfiles`, but unchanged
+  settings do not have matching Slug synthetic setting-value attrs. Anonymous
+  Bazel transition application now treats unmatched declared outputs as
+  identity instead of failing. Focused coverage:
+
+  ```sh
+  cargo test -p slug_transition \
+    anonymous_bazel_output_without_synthetic_attr_is_identity -- --nocapture
+  ```
+
+- SDK retry `plan58-sdk-anontransition-kuro-20260513-140801` advanced past
+  that transition blocker. The current blocker is lazy materialization for a
+  path-based crate repo: `rules_rs+crate+crates//:raw_sync-0.1.5` resolves to
+  `crates__raw_sync-0.1.5//:raw_sync`, but Slug materialized
+  `rules_rs++crate+crates__raw_sync-0.1.5` as a stub. The cached RepoSpec path
+  is an old absolute host checkout path
+  `/run/host/var/mnt/dev/zeromatter-kuro/vendor/raw_sync-rs`; the current
+  checkout has the same suffix at
+  `/var/mnt/dev/zeromatter-kuro/vendor/raw_sync-rs`. Lazy RepoSpec execution
+  now rewrites stale absolute `path` attrs to an existing suffix under the
+  current project root before executing the repository rule.
+- SDK retry `plan58-sdk-stalepath-kuro-20260513-141347` proved that repair:
+  `crates__raw_sync-0.1.5//:raw_sync` was materialized and analyzed under
+  several configurations. The build then ran for about 3m50s, reached roughly
+  1.06 GiB max Slug RSS with more than 19k completed analysis nodes, and failed
+  without a Starlark/action diagnostic when the client lost the daemon event
+  stream:
+  `h2 protocol error: error reading a body from connection ... broken pipe`.
+  The next loop step is to narrow this stability/performance failure from the
+  visible active targets in that log, starting with the SDK FFI edge
+  `//sdk/zeromatter_ffi:zeromatter_ffi`, and only then classify whether this is
+  Plan 51 memory/event-stream behavior or another Plan 58 semantic blocker.
+- Focused SDK FFI retry `plan58-sdk-ffi-narrow-kuro-20260513-141947`
+  produced a real Plan 58 provider/aspect blocker before any daemon
+  disconnect:
+  `llvm+llvm_source+compiler-rt//:sanitizers_interface_headers` was visible to
+  a rules_cc `graph_structure_aspect` edge with only `GraphNodeInfo`, while the
+  underlying `cc_library` target must still provide `CcInfo`. This is not a
+  sanitizer-header special case. Bazel aspects add/overlay providers onto the
+  target view used by `ctx.rule.attr.*`; they do not replace the base target's
+  provider collection. Slug's aspect execution shadow graph currently uses
+  aspect-only providers for dependencies with aspect results. The systemic fix
+  belongs in aspect dependency-provider merging: when resolving rule attributes
+  inside aspect execution, merge the dependency's regular providers with the
+  aspect providers before enforcing attr `providers = [...]` constraints.
+- That aspect provider overlay is now fixed and covered by
+  `tests/core/analysis/test_aspects.py::test_aspect_overlay_preserves_base_providers_for_attr_constraints`.
+  The next focused SDK FFI retry
+  `plan58-sdk-ffi-aspectmerge-kuro-20260513-142815` reached execution and failed
+  in `crates__aws-lc-sys-0.38.0//:_bs`: the Rust build script receives
+  feature-expanded C toolchain flags through `CFLAGS`/target `CFLAGS`, including
+  `_FORTIFY_SOURCE=1` and later `-O0`, and cc-rs probe compiles promote glibc's
+  `_FORTIFY_SOURCE requires compiling with optimization` warning to an error.
+  This is now the active Plan 58 blocker. Treat it as rule-based C toolchain
+  flag/env parity for rules_rust build-script paths, not an aws-lc special case.
+- Feature-level `requires_any_of` constraints are now conjoined onto
+  feature-owned flag/env sets. The follow-up retry
+  `plan58-sdk-ffi-featreq-kuro-20260513-143804` confirms the mode-flag leak is
+  fixed: the build-script `CFLAGS` no longer contain `_FORTIFY_SOURCE=1`,
+  `-O2`, or `-O0`, and aws-lc's compile probes succeed. The remaining blocker
+  is resource-dir path parity: compile flags still render
+  `@llvm-toolchain-minimal//:builtin_resource_dir` as a generated
+  `buck-out/.../builtin_resource_dir/include` path that is not materialized,
+  so the final cc-rs compile-and-link probe cannot find clang's `stddef.h`.
+  Bazel renders this header directory as the source-backed external path under
+  the prebuilt LLVM repo.
+- Resource-dir path mapping now handles both `builtin_resource_dir` and
+  `builtin_resource_dir/include`, covered by
+  `source_backed_builtin_resource_dir_uses_prebuilt_clang_tree`. Focused SDK
+  FFI retry
+  `plan58-sdk-ffi-resdirinclude-kuro-20260513-145829` advanced past the
+  previous `stddef.h` failure and reached `compiler-rt` runtime CRT objects.
+  The `int32_t` error there was not missing glibc headers: Bazel's aquery for
+  the same `CppCompile` action also has only Clang's resource dir. The mismatch
+  was path aliasing. Slug invoked Clang through
+  `bazel-external/llvm+http_archive+.../bin/clang` while the rule-based
+  resource-dir flag used `external/llvm++http_archive+.../lib/clang/22/include`.
+  Clang then searched its implicit resource dir and `#include_next` re-entered
+  the builtin `stdint.h` through the second alias, leaving `int32_t`
+  undefined. Compiler executable paths for the LLVM prebuilt toolchain are now
+  normalized to the same source-backed `external/llvm++http_archive+.../bin/*`
+  alias as Bazel, covered by
+  `source_backed_toolchain_executable_uses_source_repo_alias`.
+- Focused SDK FFI retry
+  `plan58-sdk-ffi-exealias-kuro-20260513-150703` did not reproduce the
+  `crtend.c`/`int32_t` failure. It timed out after 900s with stable low RSS
+  (~351 MiB), 0% CPU, and no IO while the client repeatedly logged
+  `Waiting on slug daemon ...`. The last concrete progress line before the idle
+  wait was a Rust action:
+  `zeromatter//zerobuf_generated/h2_types:h2_types` metadata plus three other
+  actions. The next step is to narrow this target before classifying the result
+  as Plan 51 daemon/action-completion behavior.
+- Narrow retry `plan58-h2types-narrow-kuro-20260513-152244` for
+  `//zerobuf_generated/h2_types:h2_types` succeeded in 2m16s
+  (`BUILD SUCCEEDED`, 1990 local commands, peak RSS ~2.32 GiB). This clears the
+  suspected Rust target as a standalone Plan 58 semantic blocker. The remaining
+  blocker is the focused FFI target's daemon/client completion stall after
+  successful progress past the C++ runtime failures; investigate under the
+  Plan 51 daemon/action-completion lane before broadening to `//sdk:sdk_contents`.
 
 ## Risks
 

@@ -55,6 +55,7 @@ pub use feature_config::CcFlagSet;
 pub use feature_config::CcToolchainFeatures;
 pub use feature_config::CcWithFeatureSet;
 pub use feature_config::FeatureConfiguration;
+pub use feature_config::combine_cc_with_feature_sets;
 pub use msvc_detect::get_msvc_include_dirs;
 pub use providers::CcCompilationContext;
 pub use providers::CcCompilationContextGen;

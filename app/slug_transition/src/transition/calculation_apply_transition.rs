@@ -334,18 +334,13 @@ fn make_valid_identifier_suffix(name: &str) -> String {
 fn anonymous_bazel_attr_name_for_output<'a>(
     output: &str,
     attrs: &'a [(String, Arc<ConfiguredAttr>)],
-) -> slug_error::Result<&'a str> {
+) -> slug_error::Result<Option<&'a str>> {
     if let Some(option) = output.strip_prefix("//command_line_option:") {
         let attr_name = format!("with_cfg_{option}");
         if let Some((name, _)) = attrs.iter().find(|(name, _)| name == &attr_name) {
-            return Ok(name);
+            return Ok(Some(name));
         }
-        return Err(slug_error::slug_error!(
-            slug_error::ErrorTag::Input,
-            "anonymous Bazel transition output `{}` has no matching attr `{}`",
-            output,
-            attr_name
-        ));
+        return Ok(None);
     }
 
     let target_name = output
@@ -364,12 +359,7 @@ fn anonymous_bazel_attr_name_for_output<'a>(
         !hash_part.is_empty() && hash_part.chars().all(|c| c == '_' || c.is_ascii_digit())
     });
     let Some((name, _)) = matches.next() else {
-        return Err(slug_error::slug_error!(
-            slug_error::ErrorTag::Input,
-            "anonymous Bazel transition output `{}` has no matching setting attr suffix `{}`",
-            output,
-            suffix
-        ));
+        return Ok(None);
     };
     if matches.next().is_some() {
         return Err(slug_error::slug_error!(
@@ -379,7 +369,7 @@ fn anonymous_bazel_attr_name_for_output<'a>(
             suffix
         ));
     }
-    Ok(name)
+    Ok(Some(name))
 }
 
 fn apply_anonymous_bazel_transition(
@@ -395,7 +385,9 @@ fn apply_anonymous_bazel_transition(
     })?;
     let mut out = conf.dupe();
     for output in outputs {
-        let attr_name = anonymous_bazel_attr_name_for_output(output, attrs)?;
+        let Some(attr_name) = anonymous_bazel_attr_name_for_output(output, attrs)? else {
+            continue;
+        };
         let Some((_, attr)) = attrs.iter().find(|(name, _)| name == attr_name) else {
             unreachable!("anonymous_bazel_attr_name_for_output returned an existing attr")
         };
@@ -809,6 +801,21 @@ mod tests {
     #[test]
     fn bazel_label_rejects_bare() {
         assert!(BuildSettingLabel::from_bazel_label("my_flag").is_err());
+    }
+
+    #[test]
+    fn anonymous_bazel_output_without_synthetic_attr_is_identity() -> slug_error::Result<()> {
+        let base = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::empty(),
+        )?;
+        let applied = super::apply_anonymous_bazel_transition(
+            &base,
+            &["@@rules_python//python/config_settings:add_srcs_to_runfiles".to_owned()],
+            Some(&[]),
+        )?;
+        assert_eq!(applied, super::TransitionApplied::Single(base));
+        Ok(())
     }
 
     /// `with_build_setting` on a cfg with no prior settings adds the entry and

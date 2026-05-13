@@ -87,3 +87,15 @@ async def test_aspect_ctx_rule_attr_string_and_int(buck: Buck) -> None:
     lines = output.read_text().strip().splitlines()
     # attr_reporter has dep config_beta (value="beta", count=20)
     assert "beta:20" in lines, f"Expected 'beta:20' in {lines}"
+
+
+@buck_test(data_dir="test_aspects_data")
+async def test_aspect_overlay_preserves_base_providers_for_attr_constraints(
+    buck: Buck,
+) -> None:
+    """Aspect providers overlay target providers when resolving ctx.rule.attr deps."""
+    result = await buck.build("//:shadow_overlay_report")
+    output = result.get_build_report().output_for_target("//:shadow_overlay_report")
+    lines = output.read_text().strip().splitlines()
+    assert "shadow_leaf" in lines, f"Expected leaf provider through aspect: {lines}"
+    assert "shadow_parent" in lines, f"Expected parent provider through aspect: {lines}"

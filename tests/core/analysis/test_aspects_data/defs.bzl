@@ -3,6 +3,8 @@
 FilesInfo = provider(fields = ["files"])
 TagInfo = provider(fields = ["tag"])
 CountInfo = provider(fields = ["count"])
+BaseInfo = provider(fields = ["name"])
+ShadowInfo = provider(fields = ["names"])
 
 # ── Basic aspect: collect source paths transitively ───────────────────────────
 
@@ -211,5 +213,49 @@ attr_reporter = rule(
     impl = _attr_reporter_impl,
     attrs = {
         "deps": attr.label_list(aspects = [attr_value_aspect]),
+    },
+)
+
+# ── aspect provider overlay keeps base providers ─────────────────────────────
+
+def _shadow_aspect_impl(target, ctx):
+    names = []
+    if BaseInfo in target:
+        names.append(target[BaseInfo].name)
+    for dep in ctx.rule.attr.deps:
+        if ShadowInfo in dep:
+            names.extend(dep[ShadowInfo].names)
+    return [ShadowInfo(names = names)]
+
+shadow_aspect = aspect(
+    implementation = _shadow_aspect_impl,
+    attr_aspects = ["deps"],
+)
+
+def _base_lib_impl(ctx):
+    return [DefaultInfo(), BaseInfo(name = ctx.label.name)]
+
+base_lib = rule(
+    impl = _base_lib_impl,
+    attrs = {
+        "deps": attr.label_list(
+            aspects = [shadow_aspect],
+            providers = [BaseInfo],
+        ),
+    },
+)
+
+def _shadow_reporter_impl(ctx):
+    names = []
+    for dep in ctx.attrs.deps:
+        if ShadowInfo in dep:
+            names.extend(dep[ShadowInfo].names)
+    out = ctx.actions.write("shadow.txt", "\n".join(sorted(names)))
+    return [DefaultInfo(default_outputs = [out])]
+
+shadow_reporter = rule(
+    impl = _shadow_reporter_impl,
+    attrs = {
+        "deps": attr.label_list(aspects = [shadow_aspect]),
     },
 )

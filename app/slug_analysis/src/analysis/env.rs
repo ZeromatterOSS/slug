@@ -2227,9 +2227,6 @@ async fn metadata_source_directory_path_for_label(
     target_cfg: &slug_core::configuration::data::ConfigurationData,
 ) -> Option<String> {
     let node = target_node_for_metadata(ctx, label).await?;
-    if metadata_rule_name(&node) != Some("_headers_directory") {
-        return None;
-    }
     let source_directory = metadata_attr_label(&node, "source_directory", target_cfg)?;
     let source_node = target_node_for_metadata(ctx, &source_directory).await?;
     let srcs_attr = source_node.attr_or_none("srcs", AttrInspectOptions::All)?;
@@ -2944,6 +2941,17 @@ fn metadata_feature_flag_sets<'a>(
         let Some(node) = target_node_for_metadata(ctx, &feature_label).await else {
             return Vec::new();
         };
+        let feature_constraints =
+            if let Some(attr) = node.attr_or_none("requires_any_of", AttrInspectOptions::All) {
+                metadata_with_features_for_constraints(
+                    ctx,
+                    labels_from_coerced_attr(&attr.value, target_cfg),
+                    target_cfg,
+                )
+                .await
+            } else {
+                Vec::new()
+            };
         let mut flag_sets = Vec::new();
         if let Some(args_attr) = node.attr_or_none("args", AttrInspectOptions::All) {
             for args_label in labels_from_coerced_attr(&args_attr.value, target_cfg) {
@@ -2955,7 +2963,11 @@ fn metadata_feature_flag_sets<'a>(
                         &mut HashSet::new(),
                         data_labels,
                     )
-                    .await,
+                    .await
+                    .into_iter()
+                    .map(|flag_set| {
+                        flag_set.with_additional_feature_constraints(&feature_constraints)
+                    }),
                 );
             }
         }
@@ -3258,17 +3270,17 @@ async fn run_analysis_with_env_underlying(
                                         is_cpp_toolchain_type_label(type_label);
                                     if use_cpp_native_shim {
                                         let toolchain_config_info = None;
+                                        let toolchain_metadata_label = tc
+                                            .cc_toolchain_config
+                                            .as_deref()
+                                            .unwrap_or(&tc.toolchain_impl);
                                         let toolchain_metadata =
-                                            if let Some(toolchain_config) = &tc.cc_toolchain_config {
-                                                extract_cc_toolchain_features_metadata(
-                                                    dice,
-                                                    toolchain_config,
-                                                    &target_cfg,
-                                                )
-                                                .await
-                                            } else {
-                                                None
-                                            };
+                                            extract_cc_toolchain_features_metadata(
+                                                dice,
+                                                toolchain_metadata_label,
+                                                &target_cfg,
+                                            )
+                                            .await;
                                         let toolchain_features = toolchain_metadata
                                             .as_ref()
                                             .map(|metadata| metadata.features.clone());

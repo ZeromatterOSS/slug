@@ -77,23 +77,40 @@ fn cc_common_create_linker_input_is_depset_eligible() -> slug_error::Result<()> 
                 cc_toolchain = None,
                 static_library = "libexample.a",
                 objects = depset(["example.o"]),
+                alwayslink = True,
             )
+            assert_eq(None, library_to_link.resolved_symlink_dynamic_library)
+            assert_eq(None, library_to_link.resolved_symlink_interface_library)
+            assert_eq([], library_to_link.lto_bitcode_files + [])
+            assert_eq([], library_to_link.pic_lto_bitcode_files + [])
+            assert_eq("libexample", library_to_link._library_identifier)
+            assert_eq(True, library_to_link._contains_objects)
+            assert_eq(False, library_to_link._disable_whole_archive)
+            assert_eq(False, library_to_link._must_keep_debug)
+            assert_eq(None, library_to_link._lto_compilation_context)
+            assert_eq(None, library_to_link._pic_lto_compilation_context)
+            assert_eq(0, len(library_to_link._shared_non_lto_backends))
+            assert_eq(0, len(library_to_link._pic_shared_non_lto_backends))
+            assert_eq(True, library_to_link.alwayslink)
 
             linker_input = cc_common.create_linker_input(
                 owner = Label("//pkg:owner"),
                 libraries = depset([library_to_link]),
                 user_link_flags = ["-Wl,example", ["-Wl,nested"]],
                 additional_inputs = depset(["input.script"]),
+                linkstamps = depset(["stamp.cc"]),
             )
             assert_eq("list", type(linker_input.user_link_flags))
             assert_eq(
                 ["-Wl,example", "-Wl,nested", "-Wl,more"],
                 linker_input.user_link_flags + ["-Wl,more"],
             )
+            assert_eq(["stamp.cc"], linker_input.linkstamps + [])
 
             linker_inputs = depset([linker_input])
             linking_context = cc_common.create_linking_context(linker_inputs = linker_inputs)
             assert_eq([linker_input], linking_context.linker_inputs.to_list())
+            assert_eq([], linking_context._extra_link_time_libraries.libraries + [])
         "#
     ))?;
     Ok(())
@@ -115,6 +132,141 @@ fn cc_common_compile_variables_carry_toolchain_target_identity() -> slug_error::
             )
             assert_eq("x86_64-linux-musl", variables.target_system_name)
             assert_eq("musl", variables.target_libc)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_internal_compile_action_expands_rule_based_toolchain_flags() -> slug_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def _flag_group(flags, iterate_over = None, expand_if_available = None):
+            return struct(
+                flags = flags,
+                flag_groups = [],
+                iterate_over = iterate_over,
+                expand_if_available = expand_if_available,
+                expand_if_not_available = None,
+                expand_if_true = None,
+                expand_if_false = None,
+                expand_if_equal = None,
+            )
+
+        def test():
+            captured = []
+
+            def run(args, outputs = [], inputs = [], category = None, mnemonic = None, identifier = None, progress_message = None):
+                captured.append(struct(args = args, inputs = inputs))
+
+            actions = struct(run = run)
+            source = bound_artifact("//pkg:bootstrap_process_wrapper", "external/rules_rust/util/process_wrapper/private/bootstrap_process_wrapper.cc")
+            output = struct(
+                path = "buck-out/gen/rules_rust/bootstrap_process_wrapper.pic.o",
+                as_output = lambda: "out/bootstrap_process_wrapper.pic.o",
+            )
+            dotd = struct(
+                path = "buck-out/gen/rules_rust/bootstrap_process_wrapper.pic.d",
+                as_output = lambda: "out/bootstrap_process_wrapper.pic.d",
+            )
+            header_dir = bound_artifact("//pkg:libcxx_headers", "buck-out/gen/libcxx/include")
+            compiler_files = bound_artifact("//pkg:compiler_files", "buck-out/gen/toolchain/compiler_files")
+
+            action_config = struct(
+                config_name = "c++-compile",
+                action_name = "c++-compile",
+                flag_sets = [
+                    struct(
+                        actions = ["c++-compile"],
+                        flag_groups = [
+                            _flag_group(["-target", "%{target_system_name}", "-nostdlibinc"]),
+                        ],
+                        with_features = [],
+                    ),
+                ],
+            )
+            includes_feature = struct(
+                name = "stdlib_includes",
+                enabled = True,
+                flag_sets = [
+                    struct(
+                        actions = ["c++-compile"],
+                        flag_groups = [
+                            _flag_group(
+                                ["-isystem", "%{system_include_paths}"],
+                                iterate_over = "system_include_paths",
+                                expand_if_available = "system_include_paths",
+                            ),
+                            _flag_group(
+                                ["%{user_compile_flags}"],
+                                iterate_over = "user_compile_flags",
+                                expand_if_available = "user_compile_flags",
+                            ),
+                        ],
+                        with_features = [],
+                    ),
+                ],
+                env_sets = [],
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    _features_DO_NOT_USE = [includes_feature],
+                    _action_configs_DO_NOT_USE = [action_config],
+                ),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = ["stdlib_includes"])
+            variables = cc_common.create_compile_variables(
+                feature_configuration = fc,
+                cc_toolchain = struct(
+                    compiler_executable = "clang",
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                source_file = source,
+                output_file = output,
+                system_include_directories = [header_dir],
+                user_compile_flags = ["-std=c++17"],
+                use_pic = True,
+            )
+
+            cc_common.internal_DO_NOT_USE.create_cc_compile_action(
+                action_construction_context = struct(actions = actions),
+                cc_compilation_context = None,
+                cc_toolchain = struct(
+                    compiler_executable = "clang",
+                    _compiler_files = depset([compiler_files]),
+                ),
+                configuration = None,
+                copts_filter = None,
+                feature_configuration = fc,
+                additional_compilation_inputs = None,
+                additional_include_scanning_roots = None,
+                source = source,
+                output_file = output,
+                diagnostics_file = None,
+                dotd_file = dotd,
+                gcno_file = None,
+                dwo_file = None,
+                use_pic = True,
+                lto_indexing_file = None,
+                action_name = "c_compile",
+                compile_build_variables = variables,
+                needs_include_validation = False,
+                toolchain_type = None,
+            )
+
+            cmd = captured[0].args
+            assert_eq(True, "-target" in cmd)
+            assert_eq(True, "x86_64-linux-gnu" in cmd)
+            assert_eq(True, "-nostdlibinc" in cmd)
+            assert_eq(True, "-isystem" in cmd)
+            assert_eq(True, "-std=c++17" in cmd)
+            assert_eq(1, len([flag for flag in cmd if flag == "-std=c++17"]))
+            assert_eq(True, source in captured[0].inputs)
+            assert_eq(True, header_dir in captured[0].inputs)
+            assert_eq(True, compiler_files in captured[0].inputs)
         "#
     ))?;
     Ok(())
@@ -308,6 +460,73 @@ fn cc_common_flag_sets_expand_action_configs_before_features() -> slug_error::Re
                 "-resource-dir",
                 "bazel-out/resource_directory",
             ], blocked_cmd)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_feature_level_requires_gate_flag_sets() -> slug_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            feature = struct(
+                name = "_underlying_opt",
+                enabled = True,
+                requires_any_of = [
+                    struct(all_of = [struct(name = "opt")], none_of = []),
+                ],
+                env_sets = [],
+                flag_sets = [
+                    struct(
+                        actions = ["c++-compile"],
+                        with_features = [],
+                        flag_groups = [
+                            struct(
+                                flags = ["-O2", "-D_FORTIFY_SOURCE=1"],
+                                flag_groups = [],
+                                iterate_over = None,
+                                expand_if_available = None,
+                                expand_if_not_available = None,
+                                expand_if_true = None,
+                                expand_if_false = None,
+                                expand_if_equal = None,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    _features_DO_NOT_USE = [feature],
+                    _action_configs_DO_NOT_USE = [],
+                ),
+                tools_directory = "",
+            )
+            variables = cc_common.create_compile_variables(
+                feature_configuration = features.configure_features(requested_features = []),
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+            )
+
+            no_mode = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = features.configure_features(requested_features = []),
+                action_name = "c++-compile",
+                variables = variables,
+            )
+            assert_eq(False, "-O2" in no_mode)
+            assert_eq(False, "-D_FORTIFY_SOURCE=1" in no_mode)
+
+            opt = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = features.configure_features(requested_features = ["opt"]),
+                action_name = "c++-compile",
+                variables = variables,
+            )
+            assert_eq(True, "-O2" in opt)
+            assert_eq(True, "-D_FORTIFY_SOURCE=1" in opt)
         "#
     ))?;
     Ok(())
