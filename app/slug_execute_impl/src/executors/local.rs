@@ -345,16 +345,16 @@ impl LocalExecutor {
         // scratch dir, then splice the slot's `param_file_arg` (with `%s` →
         // path) over the slot range in `args`. Iterate slots in descending
         // `start` order so earlier indices remain valid after splicing.
+        let scratch_dir = scratch_path
+            .0
+            .as_ref()
+            .map(|sp| self.artifact_fs.fs().resolve(sp).as_path().to_owned())
+            .unwrap_or_else(std::env::temp_dir);
         let param_args_owned: Option<Vec<String>> = if request.param_files().is_empty() {
             None
         } else {
             let exe_len = request.exe().len();
             let mut new_args: Vec<String> = args.to_vec();
-            let scratch_dir = scratch_path
-                .0
-                .as_ref()
-                .map(|sp| self.artifact_fs.fs().resolve(sp).as_path().to_owned())
-                .unwrap_or_else(std::env::temp_dir);
             let mut any_failed = false;
             let mut slots: Vec<&slug_execute::execute::request::ParamFileSlot> =
                 request.param_files().iter().collect();
@@ -420,7 +420,18 @@ impl LocalExecutor {
             }
             if any_failed { None } else { Some(new_args) }
         };
-        let args: &[String] = param_args_owned.as_deref().unwrap_or(args);
+        let mut args_owned = param_args_owned;
+        match rewrite_inline_rustc_llvm_linker_for_compiler_rt(
+            args_owned.as_deref().unwrap_or(args),
+            &scratch_dir,
+        ) {
+            Ok(Some(rewritten_args)) => args_owned = Some(rewritten_args),
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!("Failed to prepare inline rustc linker wrapper: {e}");
+            }
+        }
+        let args: &[String] = args_owned.as_deref().unwrap_or(args);
 
         let (time_span, start_time, res) = executor_stage_async(
             {
@@ -1712,11 +1723,11 @@ pub async fn materialize_inputs(
 fn rewrite_rustc_llvm_linker_for_compiler_rt(
     args: &mut [String],
     scratch_dir: &Path,
-) -> slug_error::Result<()> {
+) -> slug_error::Result<bool> {
     #[cfg(not(unix))]
     {
         let _ = (args, scratch_dir);
-        return Ok(());
+        return Ok(false);
     }
 
     #[cfg(unix)]
@@ -1725,19 +1736,31 @@ fn rewrite_rustc_llvm_linker_for_compiler_rt(
             .iter()
             .position(|arg| arg.starts_with("--codegen=linker="))
         else {
-            return Ok(());
+            return Ok(false);
         };
         let linker = args[linker_idx]
             .trim_start_matches("--codegen=linker=")
             .to_owned();
         if !should_filter_rustc_implicit_gcc_s(args, &linker) {
-            return Ok(());
+            return Ok(false);
         }
 
         let wrapper = scratch_dir.join("slug-rustc-clangxx-filter-gcc-s");
         write_rustc_linker_filter_wrapper(&wrapper, &linker)?;
         args[linker_idx] = format!("--codegen=linker={}", wrapper.to_string_lossy());
-        Ok(())
+        Ok(true)
+    }
+}
+
+fn rewrite_inline_rustc_llvm_linker_for_compiler_rt(
+    args: &[String],
+    scratch_dir: &Path,
+) -> slug_error::Result<Option<Vec<String>>> {
+    let mut rewritten_args = args.to_vec();
+    if rewrite_rustc_llvm_linker_for_compiler_rt(&mut rewritten_args, scratch_dir)? {
+        Ok(Some(rewritten_args))
+    } else {
+        Ok(None)
     }
 }
 
@@ -2213,6 +2236,30 @@ mod tests {
             "--codegen=linker=external/llvm++http_archive+llvm-toolchain-minimal/bin/clang++"
         );
         assert!(!temp.path().join("slug-rustc-clangxx-filter-gcc-s").exists());
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_rustc_compiler_rt_linker_filter_rewrites_inline_argv() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let args = vec![
+            "rustc".to_owned(),
+            "build.rs".to_owned(),
+            "--codegen=linker=clang++".to_owned(),
+            "--codegen=link-arg=-rtlib=compiler-rt".to_owned(),
+            "--codegen=link-arg=-nostdlib++".to_owned(),
+            "--codegen=link-arg=--unwindlib=none".to_owned(),
+        ];
+
+        let rewritten = rewrite_inline_rustc_llvm_linker_for_compiler_rt(&args, temp.path())?
+            .expect("inline rustc argv should be rewritten");
+
+        assert_eq!(args[2], "--codegen=linker=clang++");
+        assert_ne!(rewritten[2], args[2]);
+        assert!(rewritten[2].ends_with("slug-rustc-clangxx-filter-gcc-s"));
+        assert!(temp.path().join("slug-rustc-clangxx-filter-gcc-s").exists());
 
         Ok(())
     }

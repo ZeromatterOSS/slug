@@ -628,6 +628,18 @@ bazel aquery 'deps(@rules_rust//util/process_wrapper:process_wrapper)' \
   `libzeromatter_ffi.so` now has Bazel-shaped dynamic dependencies:
   `librt.so.1`, `libpthread.so.0`, `libm.so.6`, `libdl.so.2`, and `libc.so.6`
   only, with unresolved/unversioned `_Unwind_*` symbols.
+- Full `//sdk:sdk_contents` retry
+  `sdkcontents-after-gccs-filter-20260514-223137` exposed the same failure
+  class for short rustc invocations that stayed inline instead of being
+  materialized into paramfiles: `crates__procfs-0.17.0`'s musl build-script bin
+  still used the raw LLVM `clang++` linker and failed after rustc injected
+  `-lgcc_s`. The local executor now applies the same guarded rewrite to the
+  final inline argv after paramfile splicing. Focused executor coverage verifies
+  this inline path, narrow retry
+  `procfs-inline-gccs-filter-20260514-224242` passed, and full retry
+  `sdkcontents-inline-gccs-filter-20260514-224424` completed successfully
+  (`BUILD SUCCEEDED`, 6548 local commands, total 13m55s). The previous
+  post-build daemon/client wait did not reproduce.
 
 ## Risks
 

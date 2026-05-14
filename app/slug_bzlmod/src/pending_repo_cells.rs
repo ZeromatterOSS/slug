@@ -1176,9 +1176,11 @@ mod tests {
             .push(UseRepo::new().add_repo("expand_template_toolchains".to_owned()));
         module.extension_usages.push(usage);
 
-        let (cells, aliases) =
-            pre_compute_extension_repo_cells(&[("bazel_lib+3.2.2".to_owned(), module)], "zeromatter")
-                .unwrap();
+        let (cells, aliases) = pre_compute_extension_repo_cells(
+            &[("bazel_lib+3.2.2".to_owned(), module)],
+            "zeromatter",
+        )
+        .unwrap();
 
         assert_eq!(cells.len(), 1);
         assert_eq!(
