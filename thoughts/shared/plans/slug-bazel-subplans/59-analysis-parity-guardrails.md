@@ -195,6 +195,44 @@ divergence.
 - Plan 58 can return to SDK output parity work with concrete action/content
   comparisons instead of only "build succeeded" evidence.
 
+## Phase 6: Analysis Metadata Preserves Label Context
+
+**Class boundary:** metadata exported from configured target nodes into
+generated configuration files and toolchain runtime descriptors.
+
+**Owning subsystems:** analysis environment metadata helpers and provider
+default-output extraction.
+
+**Current evidence:** the SDK FFI target reached execution, but the final Rust
+`cdylib` link used runtime metadata paths inferred from labels and the consumer
+configuration. The generated params referenced `-lcxx`/`-lcxxabi` under the
+wrong config hash, while the LLVM runtime targets declare outputs such as
+`libc++.so.1` and `libc++abi.so.1`.
+
+**Work:**
+
+- Do not recursively analyze arbitrary targets while building C++ toolchain
+  metadata; that metadata is constructed during C++ toolchain resolution and
+  recursively analyzing runtime libraries can wait on the same toolchain.
+- Preserve apparent repository labels long enough to load target rule metadata,
+  then render output paths through the canonical external repository name.
+- Preserve configured labels while walking metadata `filegroup`, `alias`, and
+  `Forward` edges so selects and toolchain transitions cannot collapse back to
+  the consumer configuration.
+- Add focused unit coverage for declared output names and artifact-owner config
+  preservation. The SDK smoke remains integration verification, not the only
+  regression guard.
+
+**Exit criteria:**
+
+- Runtime metadata for LLVM `dynamic_runtime_lib` uses declared shared-library
+  output names, not target-name-derived library names.
+- The `//sdk/zeromatter_ffi:zeromatter_ffi --target-platforms=//bazel/platforms:linux-gnu-host`
+  narrow repro no longer fails with missing `-lcxx`/`-lcxxabi`.
+- Focused tests fail if metadata conversion collapses apparent/canonical repo
+  identity incorrectly or replaces a declared output filename with the target
+  name.
+
 ## Current Slice: 2026-05-14
 
 Pursuing Phase 1 before resuming Plan 58:
@@ -227,3 +265,44 @@ Initial direct-`FrozenValue` audit:
   `interpreter_for_build::{rule,aspect,module_extension,repository_rule,macro_callable}`
   implementation fields, provider callable fields, and builtin-provider
   `FrozenValueOfUnchecked` payloads.
+
+Continuing Phase 6 before resuming Plan 58:
+
+- The next blocker was not a new C++ feature flag. It was another metadata
+  boundary issue: runtime library metadata was synthesized from canonicalized
+  labels before the rule metadata could be loaded.
+- A trial fix that recursively read analyzed `DefaultInfo` artifacts reproduced
+  the failure class but exposed a second systemic constraint: C++ toolchain
+  metadata must not analyze runtime libraries while the C++ toolchain is being
+  resolved.
+- The systemic fix is therefore to preserve configured label context during
+  metadata traversal and use target-node rule attributes such as
+  `shared_lib_name` without recursively analyzing the runtime target.
+- Focused regression coverage belongs in `slug_analysis::analysis::env`:
+  one test for declared `shared_lib_name` path generation and one test that
+  apparent and canonical extension repo labels deduplicate to the same metadata
+  identity.
+- 2026-05-14 follow-up: the first non-recursive metadata fix and unit coverage
+  were still too shallow. Added a focused `with_cfg`-style wrapper regression
+  that preserves an exported dep's transitioned config and declared shared
+  library name, but the live `zeromatter_ffi` smoke still emitted
+  `-Lnative=.../llvm++llvm_source+libcxx/097238...` plus `-ldylib=cxx` and
+  `-ldylib=cxxabi`.
+- Root cause of that follow-up: the focused regression still used a plain dep,
+  while the real `with_cfg` wrapper stores `exports` as a transition dep.
+  The systemic fix is to teach metadata label extraction about transition deps,
+  explicit configured deps, and forward-node configured deps, then resolve the
+  actual configured dependency from the node's deps.
+- The focused regression now uses a transition-dep-shaped `exports` attr and
+  asserts the exported dependency's transitioned config and `shared_lib_name`
+  survive through frontend output-path generation.
+- Verification:
+  `cargo test -p slug_analysis metadata_ -- --nocapture`, `cargo build -p slug`,
+  and the narrow
+  `//sdk/zeromatter_ffi:zeromatter_ffi --target-platforms=//bazel/platforms:linux-gnu-host`
+  smoke in isolation `ffi-runtime-transition-exports-20260514-172101` all pass.
+  The generated Rust params now contain transitioned `-Lnative` runtime paths
+  for libcxx/libcxxabi/libunwind and link names `c++`, `c++abi`, and `unwind`.
+- Phase 6 is complete enough to return to Plan 58/SDK burn-down. If runtime
+  metadata fails again, add the next regression at the concrete owner of the
+  missed attr/edge shape before relying on another long SDK smoke.

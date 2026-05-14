@@ -161,6 +161,15 @@ a numbered subplan before implementation. The implementation should then follow
 that subplan. Do not continue with an ad hoc code change simply because the
 current failure has an obvious local workaround.
 
+When a failure is discovered, first try to reproduce the bug class in a focused
+unit or regression test at the owning abstraction. The goal is to build durable
+coverage as blockers burn down, not just to move the current SDK smoke forward.
+If a direct unit test is impractical because the behavior spans integration
+boundaries, add the smallest focused regression test, fixture, or source-cited
+assertion that would have failed before the fix, and record why a narrower unit
+test was not practical in the active plan. Do not rely on the full SDK smoke as
+the only regression test for a semantic bug class.
+
 The following are not acceptable parity fixes unless explicitly approved by the
 user as temporary diagnostics:
 
@@ -189,13 +198,20 @@ For every new SDK failure or stall:
 3. Update or create the relevant plan before implementing.
 4. If it is a bug class, search for other instances of the same class.
 5. Identify the owning abstraction and explicitly reject symptom-only patches.
-6. Implement the narrowest systemic fix in the plan scope.
-7. Add focused Bazel 9 parity tests or source-cited assertions.
-8. Run focused verification, then broader verification appropriate to the
+6. Reproduce the failure class in a focused unit or regression test before the
+   fix whenever feasible. Prefer a unit test in the subsystem that owns the
+   semantic; use a focused integration-style test only when the bug cannot be
+   expressed at a narrower boundary.
+7. Implement the narrowest systemic fix in the plan scope and make the new test
+   pass. The test should encode the Bazel 9 semantic, not the SDK target name,
+   current isolation directory, or observed configuration hash.
+8. Add any additional Bazel 9 parity tests or source-cited assertions needed
+   for confidence in the broader bug class.
+9. Run focused verification, then broader verification appropriate to the
    blast radius.
-9. Rerun the SDK smoke from `/var/mnt/dev/zeromatter`.
-10. Commit each clean completed slice with a clear message.
-11. Continue the loop.
+10. Rerun the SDK smoke from `/var/mnt/dev/zeromatter`.
+11. Commit each clean completed slice with a clear message.
+12. Continue the loop.
 
 ## Recommended SDK Smoke
 

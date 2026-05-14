@@ -1799,6 +1799,11 @@ fn labels_from_coerced_attr(
             | CoercedAttr::SourceLabel(label)
             | CoercedAttr::ConfigurationDep(label)
             | CoercedAttr::SplitTransitionDep(label) => labels.push(label.target().dupe()),
+            CoercedAttr::TransitionDep(dep) => labels.push(dep.dep.target().dupe()),
+            CoercedAttr::ExplicitConfiguredDep(dep) => labels.push(dep.label.target().dupe()),
+            CoercedAttr::ConfiguredDepForForwardNode(dep) => {
+                labels.push(dep.label.target().unconfigured().dupe())
+            }
             CoercedAttr::PluginDep(label) => labels.push(label.dupe()),
             CoercedAttr::List(list) => {
                 for item in list.iter() {
@@ -2275,11 +2280,45 @@ fn metadata_static_library_path_for_label(
     }
 }
 
+fn metadata_named_output_path_for_label(
+    label: &TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+    output_name: &str,
+) -> String {
+    if output_name.is_empty() {
+        return metadata_path_for_label(label, target_cfg);
+    }
+    let target_path = metadata_path_for_label(label, target_cfg);
+    let Some((dir, _)) = target_path.rsplit_once('/') else {
+        return output_name.to_owned();
+    };
+    format!("{dir}/{output_name}")
+}
+
+fn metadata_shared_lib_name_for_node(node: &TargetNode) -> Option<String> {
+    node.attr_or_none("shared_lib_name", AttrInspectOptions::All)
+        .and_then(|attr| string_from_coerced_attr(&attr.value))
+}
+
+fn metadata_output_path_for_label_with_declared_name(
+    label: &TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+    declared_output_name: Option<&str>,
+) -> String {
+    declared_output_name
+        .map(|output_name| metadata_named_output_path_for_label(label, target_cfg, output_name))
+        .unwrap_or_else(|| metadata_path_for_label(label, target_cfg))
+}
+
 fn metadata_default_output_path_for_node(
     label: &TargetLabel,
     node: &TargetNode,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
 ) -> String {
+    if let Some(shared_lib_name) = metadata_shared_lib_name_for_node(node) {
+        return metadata_named_output_path_for_label(label, target_cfg, &shared_lib_name);
+    }
+
     let target_name = label.name().as_str();
     if metadata_rule_name(node) == Some("cc_static_library")
         || target_name.ends_with(".static_with_cfg")
@@ -2289,23 +2328,110 @@ fn metadata_default_output_path_for_node(
     metadata_path_for_label(label, target_cfg)
 }
 
-async fn metadata_configured_default_output_label(
+async fn configured_target_node_for_metadata(
     ctx: &mut DiceComputations<'_>,
-    label: &TargetLabel,
-    target_cfg: &slug_core::configuration::data::ConfigurationData,
-) -> Option<ConfiguredTargetLabel> {
-    let configured = label.configure(target_cfg.dupe());
-    let node = ctx
-        .get_internal_configured_target_node(&configured)
+    label: &ConfiguredTargetLabel,
+) -> Option<(ConfiguredTargetLabel, ConfiguredTargetNode)> {
+    if let Some(node) = ctx
+        .get_internal_configured_target_node(label)
+        .await
+        .ok()
+        .and_then(|node| node.require_compatible().ok())
+        .map(|node| node.dupe())
+    {
+        let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe());
+        let output_label = if canonical == *label.unconfigured() {
+            label.dupe()
+        } else {
+            canonical.configure(label.cfg().dupe())
+        };
+        return Some((output_label, node));
+    }
+
+    let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe());
+    if canonical == *label.unconfigured() {
+        return None;
+    }
+    let canonical = canonical.configure(label.cfg().dupe());
+    ctx.get_internal_configured_target_node(&canonical)
         .await
         .ok()?
         .require_compatible()
-        .ok()?;
-    let node = node.unwrap_forward();
-    if let Some(output_label) = metadata_static_library_output_dep_label(node, &configured) {
-        return Some(output_label);
+        .ok()
+        .map(|node| (canonical, node.dupe()))
+}
+
+fn metadata_configured_label_key(label: &ConfiguredTargetLabel) -> String {
+    let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe());
+    format!(
+        "{}#{}",
+        metadata_label_key(&canonical),
+        label.cfg().output_hash().as_str()
+    )
+}
+
+fn metadata_configured_labels_equivalent(
+    left: &ConfiguredTargetLabel,
+    right: &ConfiguredTargetLabel,
+) -> bool {
+    metadata_configured_label_key(left) == metadata_configured_label_key(right)
+}
+
+fn metadata_target_labels_equivalent(left: &TargetLabel, right: &TargetLabel) -> bool {
+    metadata_label_key(&metadata_canonicalize_target_label(left.dupe()))
+        == metadata_label_key(&metadata_canonicalize_target_label(right.dupe()))
+}
+
+fn metadata_configured_exports_dep(
+    configured_node: &ConfiguredTargetNode,
+    owner: &ConfiguredTargetLabel,
+) -> Option<ConfiguredTargetNode> {
+    let exports_attr = configured_node
+        .target_node()
+        .attr_or_none("exports", AttrInspectOptions::All)?;
+    let exports = labels_from_coerced_attr(&exports_attr.value, owner.cfg())
+        .into_iter()
+        .map(|label| metadata_canonicalize_label_for_owner(owner.unconfigured(), label))
+        .collect::<Vec<_>>();
+    if exports.is_empty() {
+        return None;
     }
-    Some(node.label().clone())
+
+    configured_node
+        .deps()
+        .find(|dep| {
+            exports
+                .iter()
+                .any(|export| metadata_target_labels_equivalent(dep.label().unconfigured(), export))
+        })
+        .map(|dep| dep.dupe())
+}
+
+fn metadata_should_forward_exports(configured: &ConfiguredTargetLabel, node: &TargetNode) -> bool {
+    configured
+        .unconfigured()
+        .name()
+        .as_str()
+        .ends_with("_with_cfg")
+        || metadata_rule_name(node).is_some_and(|rule_name| {
+            rule_name.contains("with_cfg") || rule_name.contains("transitioning_alias")
+        })
+}
+
+fn metadata_with_cfg_frontend_label(
+    configured: &ConfiguredTargetLabel,
+    cfg: &slug_core::configuration::data::ConfigurationData,
+) -> Option<ConfiguredTargetLabel> {
+    let frontend_name = configured
+        .unconfigured()
+        .name()
+        .as_str()
+        .strip_suffix("_with_cfg")?;
+    let frontend_name = slug_core::target::name::TargetName::new(frontend_name).ok()?;
+    Some(
+        TargetLabel::new(configured.unconfigured().pkg(), frontend_name.as_ref())
+            .configure(cfg.dupe()),
+    )
 }
 
 fn metadata_static_library_output_dep_label(
@@ -2335,54 +2461,188 @@ async fn metadata_default_output_data_for_label_configured(
 ) -> Vec<(ConfiguredTargetLabel, String)> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
-    let mut stack = vec![metadata_canonicalize_target_label(label)];
+    let initial = label.configure(target_cfg.dupe());
+    let mut stack = vec![(initial, None::<String>)];
 
-    while let Some(label) = stack.pop() {
-        let resolved = metadata_resolve_alias_label(ctx, label, target_cfg).await;
-        if !seen.insert(metadata_label_key(&resolved)) {
+    while let Some((configured, declared_output_name)) = stack.pop() {
+        if !seen.insert(metadata_configured_label_key(&configured)) {
             continue;
         }
+        let fallback_node = target_node_for_metadata(ctx, configured.unconfigured()).await;
+        let declared_output_name = declared_output_name.or_else(|| {
+            fallback_node
+                .as_ref()
+                .and_then(metadata_shared_lib_name_for_node)
+        });
 
-        let Some(node) = target_node_for_metadata(ctx, &resolved).await else {
-            let configured = resolved.configure(target_cfg.dupe());
-            out.push((
-                configured.dupe(),
-                metadata_path_for_label(&resolved, target_cfg),
-            ));
+        let Some((configured, configured_node)) =
+            configured_target_node_for_metadata(ctx, &configured).await
+        else {
+            if let Some(node) = fallback_node.as_ref() {
+                if matches!(
+                    node.rule_type(),
+                    RuleType::Native(NativeRuleKind::Filegroup)
+                ) {
+                    let srcs = node
+                        .attr_or_none("srcs", AttrInspectOptions::All)
+                        .map(|srcs| labels_from_coerced_attr(&srcs.value, configured.cfg()))
+                        .unwrap_or_default();
+                    for src in srcs.into_iter().rev() {
+                        let src =
+                            metadata_canonicalize_label_for_owner(configured.unconfigured(), src);
+                        stack.push((src.configure(configured.cfg().dupe()), None));
+                    }
+                    continue;
+                }
+
+                if matches!(node.rule_type(), RuleType::Native(NativeRuleKind::Alias)) {
+                    if let Some(actual_attr) = node.attr_or_none("actual", AttrInspectOptions::All)
+                    {
+                        if let Some(actual) =
+                            labels_from_coerced_attr(&actual_attr.value, configured.cfg())
+                                .into_iter()
+                                .next()
+                        {
+                            let actual = metadata_canonicalize_label_for_owner(
+                                configured.unconfigured(),
+                                actual,
+                            );
+                            stack.push((actual.configure(configured.cfg().dupe()), None));
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            let output_path = fallback_node
+                .as_ref()
+                .map(|node| {
+                    metadata_default_output_path_for_node(
+                        configured.unconfigured(),
+                        node,
+                        configured.cfg(),
+                    )
+                })
+                .unwrap_or_else(|| {
+                    if configured
+                        .unconfigured()
+                        .name()
+                        .as_str()
+                        .ends_with(".static")
+                    {
+                        metadata_static_library_path_for_label(
+                            configured.unconfigured(),
+                            configured.cfg(),
+                        )
+                    } else {
+                        metadata_path_for_label(configured.unconfigured(), configured.cfg())
+                    }
+                });
+            out.push((configured.dupe(), output_path));
             continue;
         };
+        let node = configured_node.as_ref();
+        let declared_output_name = declared_output_name
+            .or_else(|| metadata_shared_lib_name_for_node(configured_node.target_node()));
 
         if matches!(
             node.rule_type(),
             RuleType::Native(NativeRuleKind::Filegroup)
         ) {
-            let srcs = node
-                .attr_or_none("srcs", AttrInspectOptions::All)
-                .map(|srcs| labels_from_coerced_attr(&srcs.value, target_cfg))
-                .unwrap_or_default();
-            for src in srcs.into_iter().rev() {
-                stack.push(metadata_canonicalize_label_for_owner(&resolved, src));
+            let deps = node
+                .deps()
+                .map(|dep| {
+                    metadata_canonicalize_label_for_owner(
+                        configured.unconfigured(),
+                        dep.label().unconfigured().dupe(),
+                    )
+                    .configure(dep.label().cfg().dupe())
+                })
+                .collect::<Vec<_>>();
+            for dep in deps.into_iter().rev() {
+                stack.push((dep, None));
             }
             continue;
         }
 
-        let configured = metadata_configured_default_output_label(ctx, &resolved, target_cfg)
-            .await
-            .unwrap_or_else(|| resolved.configure(target_cfg.dupe()));
-        let output_node = target_node_for_metadata(ctx, configured.unconfigured()).await;
-        let output_path = output_node
-            .as_ref()
-            .map(|node| {
-                metadata_default_output_path_for_node(
+        if matches!(
+            node.rule_type(),
+            RuleType::Native(NativeRuleKind::Alias) | RuleType::Forward
+        ) {
+            if let Some(forward_target) = configured_node.forward_target() {
+                stack.push((forward_target.label().dupe(), declared_output_name));
+            } else if let Some(dep) = node.deps().next() {
+                let actual = metadata_canonicalize_label_for_owner(
                     configured.unconfigured(),
-                    node,
-                    configured.cfg(),
-                )
-            })
-            .unwrap_or_else(|| {
-                metadata_path_for_label(configured.unconfigured(), configured.cfg())
-            });
-        out.push((configured, output_path));
+                    dep.label().unconfigured().dupe(),
+                );
+                stack.push((
+                    actual.configure(dep.label().cfg().dupe()),
+                    declared_output_name,
+                ));
+            }
+            continue;
+        }
+
+        if metadata_should_forward_exports(&configured, configured_node.target_node()) {
+            if let Some(export_dep) = metadata_configured_exports_dep(&configured_node, &configured)
+            {
+                let declared_output_name = declared_output_name
+                    .or_else(|| metadata_shared_lib_name_for_node(export_dep.target_node()));
+                if let Some(frontend_label) =
+                    metadata_with_cfg_frontend_label(&configured, export_dep.label().cfg())
+                {
+                    let output_path =
+                        if let Some(declared_output_name) = declared_output_name.as_deref() {
+                            metadata_output_path_for_label_with_declared_name(
+                                frontend_label.unconfigured(),
+                                frontend_label.cfg(),
+                                Some(declared_output_name),
+                            )
+                        } else {
+                            metadata_default_output_path_for_node(
+                                frontend_label.unconfigured(),
+                                export_dep.target_node(),
+                                frontend_label.cfg(),
+                            )
+                        };
+                    out.push((frontend_label, output_path));
+                } else {
+                    stack.push((export_dep.label().dupe(), declared_output_name));
+                }
+                continue;
+            }
+        }
+
+        let output_label = metadata_static_library_output_dep_label(&configured_node, &configured)
+            .unwrap_or_else(|| configured.dupe());
+        let output_unconfigured = output_label.unconfigured();
+        let output_path = if let Some(declared_output_name) = declared_output_name.as_deref() {
+            metadata_output_path_for_label_with_declared_name(
+                output_unconfigured,
+                output_label.cfg(),
+                Some(declared_output_name),
+            )
+        } else if metadata_configured_labels_equivalent(&output_label, &configured) {
+            metadata_default_output_path_for_node(
+                output_unconfigured,
+                configured_node.target_node(),
+                output_label.cfg(),
+            )
+        } else {
+            let output_node = target_node_for_metadata(ctx, output_unconfigured).await;
+            output_node
+                .as_ref()
+                .map(|node| {
+                    metadata_default_output_path_for_node(
+                        output_unconfigured,
+                        node,
+                        output_label.cfg(),
+                    )
+                })
+                .unwrap_or_else(|| metadata_path_for_label(output_unconfigured, output_label.cfg()))
+        };
+        out.push((output_label, output_path));
     }
 
     out
@@ -4497,6 +4757,24 @@ mod tests {
     use std::collections::BTreeMap;
     use std::collections::HashMap;
 
+    use slug_core::configuration::build_setting::BuildSettingLabel;
+    use slug_core::configuration::build_setting::BuildSettingValue;
+    use slug_core::configuration::pair::ConfigurationNoExec;
+    use slug_core::configuration::transition::id::TransitionId;
+    use slug_core::plugins::PluginLists;
+    use slug_core::provider::label::ProvidersLabel;
+    use slug_core::provider::label::ProvidersName;
+    use slug_node::attrs::attr::Attribute;
+    use slug_node::attrs::attr_type::AttrType;
+    use slug_node::attrs::attr_type::string::StringLiteral;
+    use slug_node::attrs::attr_type::transition_dep::CoercedTransitionDep;
+    use slug_node::configuration::resolved::MatchedConfigurationSettingKeys;
+    use slug_node::configuration::resolved::MatchedConfigurationSettingKeysWithCfg;
+    use slug_node::nodes::unconfigured::testing::TargetNodeExt;
+    use slug_node::provider_id_set::ProviderIdSet;
+    use slug_util::arc_str::ArcStr;
+    use starlark_map::ordered_map::OrderedMap;
+
     use super::*;
     use crate::analysis::toolchain_resolution::ExecGroupResolutionRequest;
     use crate::analysis::toolchain_resolution::MultiGroupResolutionResult;
@@ -4578,6 +4856,194 @@ mod tests {
             &cfg
         ));
         assert!(!metadata_select_key_matches("@platforms//os:windows", &cfg));
+    }
+
+    #[test]
+    fn metadata_named_output_uses_declared_file_name() {
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let label = TargetLabel::testing_parse("@llvm++llvm_source+libcxx//:libcxx.shared");
+
+        assert_eq!(
+            metadata_named_output_path_for_label(&label, &cfg, "libc++.so.1"),
+            format!(
+                "{}/gen/llvm++llvm_source+libcxx/{}/external/llvm++llvm_source+libcxx/libc++.so.1",
+                slug_execute::path::artifact_path::get_artifact_path_buck_out_root(),
+                cfg.output_hash().as_str()
+            )
+        );
+    }
+
+    #[test]
+    fn metadata_declared_output_name_overrides_forwarded_target_name() {
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let forwarded =
+            TargetLabel::testing_parse("@llvm++llvm_source+libcxx//:libcxx.shared_with_cfg");
+
+        assert_eq!(
+            metadata_output_path_for_label_with_declared_name(
+                &forwarded,
+                &cfg,
+                Some("libc++.so.1")
+            ),
+            format!(
+                "{}/gen/llvm++llvm_source+libcxx/{}/external/llvm++llvm_source+libcxx/libc++.so.1",
+                slug_execute::path::artifact_path::get_artifact_path_buck_out_root(),
+                cfg.output_hash().as_str()
+            )
+        );
+    }
+
+    fn metadata_transition_dep_attr(label: TargetLabel) -> (&'static str, Attribute, CoercedAttr) {
+        let transition = Arc::new(TransitionId::Target(ProvidersLabel::new(
+            TargetLabel::testing_parse("@llvm//runtimes:linkmode_transition"),
+            ProvidersName::Default,
+        )));
+        (
+            "exports",
+            Attribute::new(
+                None,
+                "",
+                AttrType::transition_dep(ProviderIdSet::EMPTY, Some(transition), false),
+            ),
+            CoercedAttr::TransitionDep(Box::new(CoercedTransitionDep {
+                dep: ProvidersLabel::new(label, ProvidersName::Default),
+                transition: None,
+            })),
+        )
+    }
+
+    fn metadata_string_attr(
+        name: &'static str,
+        value: &'static str,
+    ) -> (&'static str, Attribute, CoercedAttr) {
+        (
+            name,
+            Attribute::new(None, "", AttrType::string()),
+            CoercedAttr::String(StringLiteral(ArcStr::from(value))),
+        )
+    }
+
+    fn metadata_configured_node(
+        label: ConfiguredTargetLabel,
+        rule_name: &str,
+        attrs: Vec<(&str, Attribute, CoercedAttr)>,
+        deps: Vec<ConfiguredTargetNode>,
+    ) -> ConfiguredTargetNode {
+        let rule_type = RuleType::Starlark(Arc::new(StarlarkRuleType {
+            path: slug_node::bzl_or_bxl_path::BzlOrBxlPath::Bzl(
+                slug_core::bzl::ImportPath::testing_new("cell//pkg:rules.bzl"),
+            ),
+            name: rule_name.to_owned(),
+        }));
+        let target_node =
+            TargetNode::testing_new(label.unconfigured().dupe(), rule_type, attrs, None);
+        ConfiguredTargetNode::new(
+            label.dupe(),
+            target_node,
+            MatchedConfigurationSettingKeysWithCfg::new(
+                ConfigurationNoExec::new(label.cfg().dupe()),
+                MatchedConfigurationSettingKeys::empty(),
+            ),
+            OrderedMap::new(),
+            ExecutionPlatformResolution::unspecified(),
+            deps,
+            Vec::new(),
+            OrderedMap::new(),
+            PluginLists::new(),
+        )
+    }
+
+    #[test]
+    fn metadata_with_cfg_exports_use_exported_cfg_and_frontend_output_name() {
+        let base_cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let runtime_cfg = base_cfg
+            .with_build_setting(
+                BuildSettingLabel::new(TargetLabel::testing_parse("@llvm//runtimes:linkmode")),
+                BuildSettingValue::String("dynamic".to_owned()),
+            )
+            .unwrap();
+        let original_label =
+            TargetLabel::testing_parse("@llvm++llvm_source+libcxx//:libcxx.shared_/libcxx.shared")
+                .configure(runtime_cfg.dupe());
+        let original_node = metadata_configured_node(
+            original_label.dupe(),
+            "cc_shared_library",
+            vec![metadata_string_attr("shared_lib_name", "libc++.so.1")],
+            Vec::new(),
+        );
+        let with_cfg_label =
+            TargetLabel::testing_parse("@llvm++llvm_source+libcxx//:libcxx.shared_with_cfg")
+                .configure(base_cfg.dupe());
+        let with_cfg_node = metadata_configured_node(
+            with_cfg_label.dupe(),
+            "_cc_stage1_shared_library_internal",
+            vec![metadata_transition_dep_attr(
+                original_label.unconfigured().dupe(),
+            )],
+            vec![original_node],
+        );
+
+        let export_dep = metadata_configured_exports_dep(&with_cfg_node, &with_cfg_label).unwrap();
+        let frontend_label =
+            metadata_with_cfg_frontend_label(&with_cfg_label, export_dep.label().cfg()).unwrap();
+        let output_path = metadata_output_path_for_label_with_declared_name(
+            frontend_label.unconfigured(),
+            frontend_label.cfg(),
+            metadata_shared_lib_name_for_node(export_dep.target_node()).as_deref(),
+        );
+
+        assert_eq!(
+            frontend_label.unconfigured().name().as_str(),
+            "libcxx.shared"
+        );
+        assert_eq!(
+            frontend_label.cfg().output_hash(),
+            runtime_cfg.output_hash()
+        );
+        assert_eq!(
+            output_path,
+            format!(
+                "{}/gen/llvm++llvm_source+libcxx/{}/external/llvm++llvm_source+libcxx/libc++.so.1",
+                slug_execute::path::artifact_path::get_artifact_path_buck_out_root(),
+                runtime_cfg.output_hash().as_str()
+            )
+        );
+    }
+
+    #[test]
+    fn metadata_configured_key_deduplicates_apparent_and_canonical_repo_labels() {
+        slug_core::cells::register_dynamic_extension_cell(
+            "metadata_test+ext+runtime".to_owned(),
+            "/tmp/metadata_test_ext_runtime".to_owned(),
+        );
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let apparent = ConfiguredTargetLabel::testing_parse("@runtime//:lib.shared", cfg.dupe());
+        let canonical = ConfiguredTargetLabel::testing_parse(
+            "@metadata_test+ext+runtime//:lib.shared",
+            cfg.dupe(),
+        );
+
+        assert_eq!(
+            metadata_configured_label_key(&apparent),
+            metadata_configured_label_key(&canonical)
+        );
+    }
+
+    #[test]
+    fn metadata_equivalent_configured_labels_match_across_repo_forms() {
+        slug_core::cells::register_dynamic_extension_cell(
+            "metadata_test+ext+runtime_equiv".to_owned(),
+            "/tmp/metadata_test_ext_runtime_equiv".to_owned(),
+        );
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let apparent =
+            ConfiguredTargetLabel::testing_parse("@runtime_equiv//:lib.shared", cfg.dupe());
+        let canonical = ConfiguredTargetLabel::testing_parse(
+            "@metadata_test+ext+runtime_equiv//:lib.shared",
+            cfg.dupe(),
+        );
+
+        assert!(metadata_configured_labels_equivalent(&apparent, &canonical));
     }
 
     #[test]
