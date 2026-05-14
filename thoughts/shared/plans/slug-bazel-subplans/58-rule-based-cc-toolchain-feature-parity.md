@@ -611,6 +611,23 @@ bazel aquery 'deps(@rules_rust//util/process_wrapper:process_wrapper)' \
   leaves the `_Unwind_*` symbols unresolved/unversioned in the shared object.
   Treat the next fix as hermetic linker/search-path parity for the Rust/cc
   toolchain execution environment, not as a target-specific post-link cleanup.
+- Manual reruns confirm that filtering rustc's implicit `-lgcc_s` from the
+  LLVM/Clang linker invocation produces the Bazel-shaped ELF: no
+  `NEEDED libgcc_s.so.1` and unresolved, unversioned `_Unwind_*` symbols.
+  The focused execution-layer fix should only apply to rustc links that use the
+  rule-based LLVM C++ toolchain's compiler-rt path
+  (`-rtlib=compiler-rt`, `-nostdlib++`, `--unwindlib=none`) so host GCC runtime
+  libraries cannot leak into otherwise-hermetic links.
+- Implemented that execution-layer guard in local paramfile materialization:
+  rustc paramfiles that use an LLVM `clang++` linker plus the compiler-rt /
+  no-libstdc++ / no-unwindlib feature shape are rewritten to a scratch linker
+  wrapper that drops rustc's exact implicit `-lgcc_s` argument before invoking
+  the real linker. Focused executor coverage verifies both the narrow guard and
+  the generated wrapper behavior. Narrow retry
+  `ffi-filter-gccs-20260514-222125` succeeded, and
+  `libzeromatter_ffi.so` now has Bazel-shaped dynamic dependencies:
+  `librt.so.1`, `libpthread.so.0`, `libm.so.6`, `libdl.so.2`, and `libc.so.6`
+  only, with unresolved/unversioned `_Unwind_*` symbols.
 
 ## Risks
 

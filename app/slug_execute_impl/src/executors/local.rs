@@ -11,6 +11,7 @@
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::ops::ControlFlow;
+use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
@@ -380,8 +381,16 @@ impl LocalExecutor {
                     continue;
                 }
                 let param_path = scratch_dir.join(format!("slug-params-{}", slot_idx));
+                let mut slot_args_for_file = slot_args.to_vec();
+                if let Err(e) =
+                    rewrite_rustc_llvm_linker_for_compiler_rt(&mut slot_args_for_file, &scratch_dir)
+                {
+                    tracing::warn!("Failed to prepare rustc linker wrapper: {e}");
+                    any_failed = true;
+                    break;
+                }
                 let content = match slot.format {
-                    ParamFileFormat::Shell => slot_args
+                    ParamFileFormat::Shell => slot_args_for_file
                         .iter()
                         .map(|s| {
                             let mut q = String::from("'");
@@ -392,7 +401,7 @@ impl LocalExecutor {
                         .collect::<Vec<_>>()
                         .join("\n"),
                     ParamFileFormat::Multiline | ParamFileFormat::FlagPerLine => {
-                        slot_args.join("\n")
+                        slot_args_for_file.join("\n")
                     }
                 };
                 if let Err(e) = std::fs::write(&param_path, content) {
@@ -1700,6 +1709,81 @@ pub async fn materialize_inputs(
     Ok(MaterializedInputPaths { scratch, paths })
 }
 
+fn rewrite_rustc_llvm_linker_for_compiler_rt(
+    args: &mut [String],
+    scratch_dir: &Path,
+) -> slug_error::Result<()> {
+    #[cfg(not(unix))]
+    {
+        let _ = (args, scratch_dir);
+        return Ok(());
+    }
+
+    #[cfg(unix)]
+    {
+        let Some(linker_idx) = args
+            .iter()
+            .position(|arg| arg.starts_with("--codegen=linker="))
+        else {
+            return Ok(());
+        };
+        let linker = args[linker_idx]
+            .trim_start_matches("--codegen=linker=")
+            .to_owned();
+        if !should_filter_rustc_implicit_gcc_s(args, &linker) {
+            return Ok(());
+        }
+
+        let wrapper = scratch_dir.join("slug-rustc-clangxx-filter-gcc-s");
+        write_rustc_linker_filter_wrapper(&wrapper, &linker)?;
+        args[linker_idx] = format!("--codegen=linker={}", wrapper.to_string_lossy());
+        Ok(())
+    }
+}
+
+fn should_filter_rustc_implicit_gcc_s(args: &[String], linker: &str) -> bool {
+    let linker_is_clangxx = linker.ends_with("/clang++") || linker == "clang++";
+    linker_is_clangxx
+        && args
+            .iter()
+            .any(|arg| arg == "--codegen=link-arg=-rtlib=compiler-rt")
+        && args
+            .iter()
+            .any(|arg| arg == "--codegen=link-arg=-nostdlib++")
+        && args
+            .iter()
+            .any(|arg| arg == "--codegen=link-arg=--unwindlib=none")
+}
+
+#[cfg(unix)]
+fn write_rustc_linker_filter_wrapper(wrapper: &Path, linker: &str) -> slug_error::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let quoted_linker = shell_single_quote(linker);
+    let script = format!(
+        "#!/usr/bin/env bash\n\
+         set -euo pipefail\n\
+         args=()\n\
+         for arg in \"$@\"; do\n\
+           if [ \"$arg\" = \"-lgcc_s\" ]; then\n\
+             continue\n\
+           fi\n\
+           args+=(\"$arg\")\n\
+         done\n\
+         exec {quoted_linker} \"${{args[@]}}\"\n"
+    );
+    std::fs::write(wrapper, script)?;
+    let mut permissions = std::fs::metadata(wrapper)?.permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(wrapper, permissions)?;
+    Ok(())
+}
+
+#[cfg(unix)]
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
 /// A scratch path discovered during `materialize_inputs`.
 pub struct ScratchPath(Option<ProjectRelativePathBuf>);
 
@@ -2063,6 +2147,74 @@ mod tests {
         );
 
         Ok((executor, temp.path().root().to_buf(), temp))
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_rustc_compiler_rt_linker_filter_rewrites_clangxx() -> slug_error::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir()?;
+        let fake_linker = temp.path().join("clang++");
+        let fake_linker_args = temp.path().join("fake-linker-args");
+        std::fs::write(
+            &fake_linker,
+            format!(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > {}\n",
+                shell_single_quote(&fake_linker_args.to_string_lossy())
+            ),
+        )?;
+        let mut permissions = std::fs::metadata(&fake_linker)?.permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&fake_linker, permissions)?;
+
+        let mut args = vec![
+            "lib.rs".to_owned(),
+            format!("--codegen=linker={}", fake_linker.display()),
+            "--codegen=link-arg=-rtlib=compiler-rt".to_owned(),
+            "--codegen=link-arg=-nostdlib++".to_owned(),
+            "--codegen=link-arg=--unwindlib=none".to_owned(),
+        ];
+
+        rewrite_rustc_llvm_linker_for_compiler_rt(&mut args, temp.path())?;
+
+        let linker = args
+            .iter()
+            .find_map(|arg| arg.strip_prefix("--codegen=linker="))
+            .expect("rewritten linker");
+        assert!(linker.ends_with("slug-rustc-clangxx-filter-gcc-s"));
+        let script = std::fs::read_to_string(linker)?;
+        assert!(script.contains(r#"[ "$arg" = "-lgcc_s" ]"#));
+        assert!(script.contains(fake_linker.to_string_lossy().as_ref()));
+
+        let status = std::process::Command::new(linker)
+            .args(["-lc++", "-lgcc_s", "-lm"])
+            .status()?;
+        assert!(status.success());
+        assert_eq!(std::fs::read_to_string(fake_linker_args)?, "-lc++\n-lm\n");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rustc_compiler_rt_linker_filter_requires_compiler_rt_shape() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let mut args = vec![
+            "lib.rs".to_owned(),
+            "--codegen=linker=external/llvm++http_archive+llvm-toolchain-minimal/bin/clang++"
+                .to_owned(),
+            "--codegen=link-arg=-rtlib=libgcc".to_owned(),
+        ];
+
+        rewrite_rustc_llvm_linker_for_compiler_rt(&mut args, temp.path())?;
+
+        assert_eq!(
+            args[1],
+            "--codegen=linker=external/llvm++http_archive+llvm-toolchain-minimal/bin/clang++"
+        );
+        assert!(!temp.path().join("slug-rustc-clangxx-filter-gcc-s").exists());
+
+        Ok(())
     }
 
     #[cfg(unix)]
