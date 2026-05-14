@@ -471,6 +471,7 @@ pub(crate) async fn get_from_template_placeholder_info<'x>(
                 }
             }
             ResolvedArtifactGroup::TargetDefaultOutputs(_) => {}
+            ResolvedArtifactGroup::InputSymlink(_) => {}
         }
     }
     Ok(label_to_artifact)

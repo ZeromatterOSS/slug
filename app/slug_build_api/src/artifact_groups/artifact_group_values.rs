@@ -15,18 +15,24 @@ use std::sync::Arc;
 use allocative::Allocative;
 use dupe::Dupe;
 use slug_artifact::artifact::artifact_type::Artifact;
+use slug_common::file_ops::metadata::Symlink;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
+use slug_directory::directory::entry::DirectoryEntry;
 use slug_error::BuckErrorContext;
 use slug_execute::artifact::artifact_dyn::ArtifactDyn;
 use slug_execute::artifact::group::artifact_group_values_dyn::ArtifactGroupValuesDyn;
 use slug_execute::artifact_value::ArtifactValue;
 use slug_execute::digest_config::DigestConfig;
+use slug_execute::directory::ActionDirectoryMember;
 use slug_execute::directory::ActionSharedDirectory;
 use slug_execute::directory::INTERNER;
 use slug_execute::directory::LazyActionDirectoryBuilder;
 use slug_execute::directory::insert_artifact_lazy;
+use slug_execute::directory::insert_entry;
 use smallvec::SmallVec;
 use smallvec::smallvec;
+
+use crate::artifact_groups::InputSymlink;
 
 /// The [`ArtifactValue`]s for an [`crate::artifact_groups::ArtifactGroup`].
 #[derive(Clone, Dupe, Allocative)]
@@ -90,6 +96,30 @@ impl ArtifactGroupValues {
             children: Vec::new(),
             directory: None,
         }))
+    }
+
+    pub fn from_input_symlink(
+        symlink: &InputSymlink,
+        digest_config: DigestConfig,
+    ) -> slug_error::Result<Self> {
+        let mut builder = LazyActionDirectoryBuilder::empty();
+        insert_entry(
+            &mut builder,
+            symlink.path.clone(),
+            DirectoryEntry::Leaf(ActionDirectoryMember::Symlink(Arc::new(Symlink::new(
+                symlink.target.clone(),
+            )))),
+        )?;
+        let directory = builder
+            .finalize()?
+            .fingerprint(digest_config.as_directory_serializer())
+            .shared(&*INTERNER);
+
+        Ok(Self(Arc::new(ArtifactGroupValuesData {
+            values: smallvec![],
+            children: Vec::new(),
+            directory: Some(directory),
+        })))
     }
 
     pub fn add_to_directory(

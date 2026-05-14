@@ -578,6 +578,39 @@ bazel aquery 'deps(@rules_rust//util/process_wrapper:process_wrapper)' \
   blocker is the focused FFI target's daemon/client completion stall after
   successful progress past the C++ runtime failures; investigate under the
   Plan 51 daemon/action-completion lane before broadening to `//sdk:sdk_contents`.
+- Full `//sdk:sdk_contents` retry
+  `sdkcontents-postbuild-wait-20260514-110738` no longer reproduced the
+  daemon/client completion stall: the command completed successfully, analyzed
+  the expected 4090 targets, and materialized the SDK tree. Comparing against
+  Bazel 9.0.1 showed the output file list and modes now match, leaving binary
+  content divergences as the active Plan 58 work.
+- The first content divergence was rules_cc runtime-solib path parity for
+  dynamic C++ runtime libraries consumed by rules_rust. Bazel exposes those
+  libraries under `_solib__<escaped cc_toolchain label>` and rules_rust derives
+  `-Lnative` from that directory. Slug's native C++ toolchain shim had exposed
+  direct physical runtime output directories instead. The systemic fix models
+  those action-input solib symlinks and keeps the real producing targets as
+  inputs, covered by focused cc_common/native-toolchain tests.
+- The remaining narrowed divergence is in
+  `cc_common.get_memory_inefficient_command_line` for dynamic library links:
+  Slug prepends fallback `-shared -fPIC` even when rule-based feature expansion
+  already provided the Bazel command line. Bazel's `zeromatter_ffi` aquery has
+  only the feature-expanded `-target ... -fuse-ld=lld ... -shared` sequence.
+  This belongs in the cc_common dynamic-link fallback guard, not in a
+  target-specific Rust workaround.
+- That dynamic-link fallback leak is now fixed and covered by
+  `cc_common_dynamic_library_uses_feature_args_instead_of_fallback_prefix`.
+  Focused retry `ffi-dynamic-feature-args-20260514-122153` succeeded and the
+  generated Rust params now match Bazel's feature-expanded shape: no fallback
+  `-fPIC`, no duplicate early `-shared`, and runtime `-Lnative` paths all use
+  `_solib__llvm++toolchain+llvm_Utoolchains_A_Clinux_Ux86_U64_Ucc_Utoolchain`.
+  The remaining SDK FFI binary divergence is that Slug still records
+  `NEEDED libgcc_s.so.1` while Bazel 9.0.1 does not. A linker-wrapper probe of
+  the final Slug rustc action showed rustc injects `-lgcc_s`; Slug resolves it
+  from the host GCC search path and versions `_Unwind_Resume@GCC_3.0`. Bazel
+  leaves the `_Unwind_*` symbols unresolved/unversioned in the shared object.
+  Treat the next fix as hermetic linker/search-path parity for the Rust/cc
+  toolchain execution environment, not as a target-specific post-link cleanup.
 
 ## Risks
 

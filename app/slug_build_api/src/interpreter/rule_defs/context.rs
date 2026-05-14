@@ -72,6 +72,7 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
 use crate::artifact_groups::ArtifactGroup;
+use crate::artifact_groups::InputSymlink;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
@@ -2350,6 +2351,7 @@ impl<'v> StarlarkValue<'v> for ToolchainInputRootStub {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct ToolchainInputFileStub {
     path: &'static str,
+    symlink_target: Option<&'static str>,
     input_target: &'static ConfiguredTargetLabel,
 }
 
@@ -2447,6 +2449,12 @@ impl<'v> CommandLineArgLike<'v> for ToolchainInputFileStub {
             ArtifactGroup::TargetDefaultOutputs(Arc::new(self.input_target.dupe())),
             vec![],
         );
+        if let Some(target) = self.symlink_target {
+            visitor.visit_input(
+                ArtifactGroup::InputSymlink(Arc::new(InputSymlink::new(self.path, target)?)),
+                vec![],
+            );
+        }
         Ok(())
     }
 
@@ -2466,6 +2474,7 @@ impl<'v> CommandLineArgLike<'v> for ToolchainInputFileStub {
 #[derive(Clone, Copy, Debug, Allocative)]
 struct ToolchainInputFile {
     path: &'static str,
+    symlink_target: Option<&'static str>,
     input_target: &'static ConfiguredTargetLabel,
 }
 
@@ -2531,6 +2540,12 @@ impl<'v> CommandLineArgLike<'v> for ToolchainInputFilesArg {
                 ArtifactGroup::TargetDefaultOutputs(Arc::new(file.input_target.dupe())),
                 vec![],
             );
+            if let Some(target) = file.symlink_target {
+                visitor.visit_input(
+                    ArtifactGroup::InputSymlink(Arc::new(InputSymlink::new(file.path, target)?)),
+                    vec![],
+                );
+            }
         }
         Ok(())
     }
@@ -2626,6 +2641,7 @@ impl CcToolchainInfoNativeShim {
                     .map(|file| {
                         heap.alloc(ToolchainInputFileStub {
                             path: file.path,
+                            symlink_target: file.symlink_target,
                             input_target: file.input_target,
                         })
                     })
@@ -2720,7 +2736,10 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             "target_gnu_system_name" => Some(heap.alloc_str(self.target_system_name()).to_value()),
             "libc" => Some(heap.alloc_str(self.target_libc()).to_value()),
             "toolchain_id" => Some(empty_string()),
-            "dynamic_runtime_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
+            "dynamic_runtime_solib_dir" => Some(
+                heap.alloc_str(&cc_toolchain_runtime_solib_dir_base(&self.toolchain_label))
+                    .to_value(),
+            ),
             "built_in_include_directories" => Some(empty_list()),
             "all_files" | "_compiler_files" | "_builtin_include_files" => {
                 Some(self.toolchain_files_depset(&self.compiler_files, heap))
@@ -2755,7 +2774,10 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
                 ),
                 ("target_libc", heap.alloc_str(self.target_libc()).to_value()),
             ]))),
-            "_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
+            "_solib_dir" => Some(
+                heap.alloc_str(&cc_toolchain_runtime_solib_dir_base(&self.toolchain_label))
+                    .to_value(),
+            ),
             "_fdo_context" => Some(heap.alloc(AllocStruct::EMPTY)),
             "_legacy_cc_flags_make_variable"
             | "_abi"
@@ -2825,6 +2847,79 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
     }
 }
 
+fn cc_toolchain_runtime_solib_dir_base(toolchain_label: &str) -> String {
+    let label = toolchain_label
+        .strip_prefix("@@")
+        .or_else(|| toolchain_label.strip_prefix('@'))
+        .unwrap_or(toolchain_label);
+    let (repo, rest) = label.split_once("//").unwrap_or(("", label));
+    let (package, name) = rest.rsplit_once(':').unwrap_or((rest, ""));
+    let mut path = String::new();
+    if !repo.is_empty() {
+        path.push_str(repo);
+        path.push('@');
+    }
+    path.push_str(package);
+    path.push(':');
+    path.push_str(name);
+
+    let mut escaped = String::with_capacity(path.len());
+    for c in path.chars() {
+        match c {
+            '_' => escaped.push_str("_U"),
+            '/' => escaped.push_str("_S"),
+            '\\' => escaped.push_str("_B"),
+            ':' => escaped.push_str("_C"),
+            '@' => escaped.push_str("_A"),
+            _ => escaped.push(c),
+        }
+    }
+    format!("_solib__{}", escaped)
+}
+
+fn cc_toolchain_runtime_solib_path(
+    physical_path: &str,
+    runtime_solib_dir_base: &str,
+) -> Option<String> {
+    let basename = physical_path.rsplit('/').next()?;
+    let (prefix, _) = physical_path.split_once("/gen/")?;
+    Some(format!(
+        "{}/gen/{}/{}",
+        prefix, runtime_solib_dir_base, basename
+    ))
+}
+
+fn relative_symlink_target(symlink_path: &str, target_path: &str) -> String {
+    let symlink_dir = symlink_path
+        .rsplit_once('/')
+        .map(|(dir, _)| dir)
+        .unwrap_or("");
+    let symlink_parts: Vec<&str> = symlink_dir
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect();
+    let target_parts: Vec<&str> = target_path
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect();
+    let mut common = 0;
+    while common < symlink_parts.len()
+        && common < target_parts.len()
+        && symlink_parts[common] == target_parts[common]
+    {
+        common += 1;
+    }
+
+    let mut rel = Vec::new();
+    rel.extend(std::iter::repeat("..").take(symlink_parts.len() - common));
+    rel.extend(target_parts[common..].iter().copied());
+    if rel.is_empty() {
+        ".".to_owned()
+    } else {
+        rel.join("/")
+    }
+}
+
 pub fn cc_toolchain_native_shim_provider_collection(
     toolchain_label: &str,
     target_platform: &str,
@@ -2842,14 +2937,46 @@ pub fn cc_toolchain_native_shim_provider_collection(
             .map(|(target, path)| {
                 let path = Box::leak(path.to_string().into_boxed_str());
                 let input_target = Box::leak(Box::new(target));
-                ToolchainInputFile { path, input_target }
+                ToolchainInputFile {
+                    path,
+                    symlink_target: None,
+                    input_target,
+                }
             })
             .collect()
     };
+    let dynamic_runtime_solib_base = cc_toolchain_runtime_solib_dir_base(toolchain_label);
+    let make_dynamic_runtime_files =
+        |data: Vec<(ConfiguredTargetLabel, Arc<str>)>| -> Arc<[ToolchainInputFile]> {
+            data.into_iter()
+                .map(|(target, path)| {
+                    let physical_path = path.to_string();
+                    let logical_path = cc_toolchain_runtime_solib_path(
+                        &physical_path,
+                        &dynamic_runtime_solib_base,
+                    )
+                    .unwrap_or_else(|| physical_path.clone());
+                    let symlink_target = if logical_path == physical_path {
+                        None
+                    } else {
+                        Some(Box::leak(
+                            relative_symlink_target(&logical_path, &physical_path).into_boxed_str(),
+                        ) as &'static str)
+                    };
+                    let path = Box::leak(logical_path.into_boxed_str());
+                    let input_target = Box::leak(Box::new(target));
+                    ToolchainInputFile {
+                        path,
+                        symlink_target,
+                        input_target,
+                    }
+                })
+                .collect()
+        };
     let compiler_files = make_files(compiler_data);
     let linker_files = make_files(linker_data);
     let static_runtime_files = make_files(static_runtime_data);
-    let dynamic_runtime_files = make_files(dynamic_runtime_data);
+    let dynamic_runtime_files = make_dynamic_runtime_files(dynamic_runtime_data);
     let cc = heap.alloc(CcToolchainInfoNativeShim {
         toolchain_label: toolchain_label.to_owned(),
         target_platform: target_platform.to_owned(),
@@ -3093,7 +3220,10 @@ mod resolved_toolchains_tests {
 
     use super::CcToolchainInfoTargetPlatformOverlay;
     use super::cc_toolchain_native_shim_provider_collection;
+    use super::cc_toolchain_runtime_solib_dir_base;
+    use super::cc_toolchain_runtime_solib_path;
     use super::normalize_toolchain_type_label;
+    use super::relative_symlink_target;
 
     #[test]
     fn toolchain_type_lookup_normalizes_bzlmod_module_versions() {
@@ -3157,6 +3287,28 @@ mod resolved_toolchains_tests {
             .get_attr("all_files", heap)
             .expect("overlay should still access owned inner provider attrs");
         assert!(!all_files.is_none());
+    }
+
+    #[test]
+    fn cc_toolchain_runtime_solib_paths_match_rules_cc_escape_shape() {
+        let base = cc_toolchain_runtime_solib_dir_base(
+            "llvm++toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain",
+        );
+        assert_eq!(
+            "_solib__llvm++toolchain+llvm_Utoolchains_A_Clinux_Ux86_U64_Ucc_Utoolchain",
+            base
+        );
+
+        let physical = "buck-out/kuro/gen/llvm++llvm_source+libcxx/abc/external/llvm++llvm_source+libcxx/libc++.so.1";
+        let logical = cc_toolchain_runtime_solib_path(physical, &base).unwrap();
+        assert_eq!(
+            "buck-out/kuro/gen/_solib__llvm++toolchain+llvm_Utoolchains_A_Clinux_Ux86_U64_Ucc_Utoolchain/libc++.so.1",
+            logical
+        );
+        assert_eq!(
+            "../llvm++llvm_source+libcxx/abc/external/llvm++llvm_source+libcxx/libc++.so.1",
+            relative_symlink_target(&logical, physical)
+        );
     }
 }
 

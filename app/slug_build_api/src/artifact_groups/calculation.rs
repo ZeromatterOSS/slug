@@ -125,6 +125,12 @@ pub(crate) fn ensure_artifact_group_staged<'a, 'd>(
             ResolvedArtifactGroup::TargetDefaultOutputs(label) => {
                 ensure_target_default_outputs_staged(ctx, label).await
             }
+            ResolvedArtifactGroup::InputSymlink(symlink) => {
+                let digest_config = ctx.global_data().get_digest_config();
+                Ok(EnsureArtifactGroupReady::TransitiveSet(
+                    ArtifactGroupValues::from_input_symlink(symlink, digest_config)?,
+                ))
+            }
         }
     }
 }
@@ -245,6 +251,9 @@ impl EnsureArtifactGroupReady {
                 ResolvedArtifactGroup::TargetDefaultOutputs(_) => {
                     Err(EnsureArtifactStagedError::ExpectedTransitiveSet.into())
                 }
+                ResolvedArtifactGroup::InputSymlink(_) => {
+                    Err(EnsureArtifactStagedError::ExpectedTransitiveSet.into())
+                }
             },
         }
     }
@@ -303,7 +312,8 @@ fn ensure_target_default_outputs_staged<'a, 'd>(
                 }
                 ResolvedArtifactGroup::TransitiveSetProjection(..)
                 | ResolvedArtifactGroup::Depset(..)
-                | ResolvedArtifactGroup::TargetDefaultOutputs(..) => {
+                | ResolvedArtifactGroup::TargetDefaultOutputs(..)
+                | ResolvedArtifactGroup::InputSymlink(..) => {
                     children.push(ready.to_group_values(group)?)
                 }
             }
@@ -351,7 +361,8 @@ fn ensure_depset_artifact_group_staged<'a, 'd>(
                 }
                 ResolvedArtifactGroup::TransitiveSetProjection(..)
                 | ResolvedArtifactGroup::Depset(..)
-                | ResolvedArtifactGroup::TargetDefaultOutputs(..) => {
+                | ResolvedArtifactGroup::TargetDefaultOutputs(..)
+                | ResolvedArtifactGroup::InputSymlink(..) => {
                     children.push(ready.to_group_values(group)?)
                 }
             }
@@ -798,6 +809,9 @@ impl Key for EnsureTransitiveSetProjectionKey {
                         children.push(ready.to_group_values(group)?)
                     }
                     ResolvedArtifactGroup::TargetDefaultOutputs(..) => {
+                        children.push(ready.to_group_values(group)?)
+                    }
+                    ResolvedArtifactGroup::InputSymlink(..) => {
                         children.push(ready.to_group_values(group)?)
                     }
                 }

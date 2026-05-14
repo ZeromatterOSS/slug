@@ -130,6 +130,7 @@ impl<'a> Graph<'a> {
                 .map(|key| Key::Action(key.dupe()))),
             ArtifactGroup::Depset(_) => Ok(None),
             ArtifactGroup::TargetDefaultOutputs(_) => Ok(None),
+            ArtifactGroup::InputSymlink(_) => Ok(None),
         }
     }
 

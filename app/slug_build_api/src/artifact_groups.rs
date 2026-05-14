@@ -24,7 +24,10 @@ use dupe::Dupe;
 use gazebo::variants::UnpackVariants;
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_core::configuration::data::ConfigurationData;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
+use slug_fs::paths::RelativePathBuf;
 use starlark::values::FrozenValue;
 use starlark::values::ValueIdentity;
 use static_assertions::assert_eq_size;
@@ -35,7 +38,7 @@ use crate::artifact_groups::deferred::TransitiveSetKey;
 use crate::artifact_groups::promise::PromiseArtifact;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 
-#[derive(Clone, Debug, Display, Dupe, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("{} {}", promise_artifact, has_content_based_path)]
 pub struct PromiseArtifactWrapper {
     pub promise_artifact: PromiseArtifact,
@@ -51,7 +54,7 @@ impl PromiseArtifactWrapper {
     }
 }
 
-#[derive(Clone, Debug, Display, Dupe, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("{} {}", key, has_content_based_path)]
 pub struct TransitiveSetProjectionWrapper {
     pub key: TransitiveSetProjectionKey,
@@ -105,6 +108,22 @@ impl Hash for DepsetArtifactGroup {
     }
 }
 
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("{} -> {}", path, target)]
+pub struct InputSymlink {
+    pub path: ProjectRelativePathBuf,
+    pub target: RelativePathBuf,
+}
+
+impl InputSymlink {
+    pub fn new(path: &str, target: &str) -> slug_error::Result<Self> {
+        Ok(Self {
+            path: ProjectRelativePath::new(path)?.to_buf(),
+            target: RelativePathBuf::from(target),
+        })
+    }
+}
+
 /// An [ArtifactGroup] can expand to one or more [Artifact]. Those Artifacts will be made available
 /// to Actions when they execute.
 #[derive(
@@ -124,6 +143,7 @@ pub enum ArtifactGroup {
     Depset(Arc<DepsetArtifactGroup>),
     Promise(Arc<PromiseArtifactWrapper>),
     TargetDefaultOutputs(Arc<ConfiguredTargetLabel>),
+    InputSymlink(Arc<InputSymlink>),
 }
 
 assert_eq_size!(ArtifactGroup, [usize; 2]);
@@ -155,6 +175,7 @@ impl ArtifactGroup {
             ArtifactGroup::TargetDefaultOutputs(label) => {
                 ResolvedArtifactGroup::TargetDefaultOutputs(label.as_ref())
             }
+            ArtifactGroup::InputSymlink(symlink) => ResolvedArtifactGroup::InputSymlink(symlink),
         })
     }
 
@@ -165,6 +186,7 @@ impl ArtifactGroup {
             ArtifactGroup::Depset(a) => a.has_content_based_path,
             ArtifactGroup::Promise(p) => p.has_content_based_path,
             ArtifactGroup::TargetDefaultOutputs(_) => false,
+            ArtifactGroup::InputSymlink(_) => false,
         }
     }
 
@@ -192,6 +214,7 @@ impl ArtifactGroup {
             }
             ArtifactGroup::Promise(p) => p.has_content_based_path,
             ArtifactGroup::TargetDefaultOutputs(_) => false,
+            ArtifactGroup::InputSymlink(_) => false,
         };
 
         if is_artifact_group_eligible_for_dedupe {
@@ -211,6 +234,7 @@ impl ArtifactGroup {
                 ArtifactGroup::TargetDefaultOutputs(label) => {
                     return label.cfg() != target_platform;
                 }
+                ArtifactGroup::InputSymlink(_) => return false,
             };
 
             artifact_group_owner
@@ -232,6 +256,7 @@ pub enum ResolvedArtifactGroup<'a> {
     TransitiveSetProjection(&'a TransitiveSetProjectionKey),
     Depset(&'a DepsetArtifactGroup),
     TargetDefaultOutputs(&'a ConfiguredTargetLabel),
+    InputSymlink(&'a InputSymlink),
 }
 
 pub enum ResolvedArtifactGroupBuildSignalsKey {

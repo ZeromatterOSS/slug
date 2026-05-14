@@ -100,7 +100,8 @@ impl CopyAction {
             ArtifactGroup::Artifact(..) | ArtifactGroup::Promise(..) => {}
             ArtifactGroup::TransitiveSetProjection(..)
             | ArtifactGroup::Depset(..)
-            | ArtifactGroup::TargetDefaultOutputs(..) => {
+            | ArtifactGroup::TargetDefaultOutputs(..)
+            | ArtifactGroup::InputSymlink(..) => {
                 return Err(CopyActionValidationError::UnsupportedInput(src.dupe()).into());
             }
         };

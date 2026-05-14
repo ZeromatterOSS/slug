@@ -117,6 +117,51 @@ fn cc_common_create_linker_input_is_depset_eligible() -> slug_error::Result<()> 
 }
 
 #[test]
+fn cc_common_solib_helpers_return_declared_symlink_artifacts() -> slug_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            declared = []
+            symlinked = []
+
+            def declare_file(path):
+                out = struct(
+                    path = "buck-out/gen/" + path,
+                    short_path = path,
+                    basename = path.rpartition("/")[2],
+                )
+                declared.append(out)
+                return out
+
+            def symlink(output, target_file = None, target_path = None):
+                symlinked.append(struct(output = output, target_file = target_file, target_path = target_path))
+                return output
+
+            actions = struct(declare_file = declare_file, symlink = symlink)
+            ctx = struct(actions = actions)
+            artifact = struct(
+                path = "bazel-out/k8-fastbuild/bin/external/llvm++llvm_source+libcxx/libc++.so.1",
+                short_path = "../llvm++llvm_source+libcxx/libc++.so.1",
+                basename = "libc++.so.1",
+            )
+
+            solib = cc_common.internal_DO_NOT_USE.solib_symlink_action(
+                ctx = ctx,
+                artifact = artifact,
+                solib_directory = "_solib_k8",
+                runtime_solib_dir_base = "_solib__llvm++toolchain+llvm_Utoolchains_A_Clinux_Ux86_U64_Ucc_Utoolchain",
+            )
+            assert_eq("_solib__llvm++toolchain+llvm_Utoolchains_A_Clinux_Ux86_U64_Ucc_Utoolchain/libc++.so.1", solib.short_path)
+            assert_eq(artifact, symlinked[0].target_file)
+            assert_eq(solib, symlinked[0].output)
+            assert_eq(1, len(declared))
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
 fn cc_common_compile_variables_carry_toolchain_target_identity() -> slug_error::Result<()> {
     let mut positive = tester()?;
     positive.run_starlark_bzl_test(indoc!(
@@ -686,6 +731,64 @@ fn cc_common_static_archive_uses_feature_args_instead_of_fallback_prefix() -> sl
                 variables = variables,
             )
             assert_eq(["rcsD", "libout.a"], cmd)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_common_dynamic_library_uses_feature_args_instead_of_fallback_prefix() -> slug_error::Result<()>
+{
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            action = struct(name = "c++-link-dynamic-library")
+            nested = struct(
+                legacy_flag_group = struct(
+                    flags = ["-target", "%{target_system_name}", "-fuse-ld=lld", "-shared"],
+                    flag_groups = [],
+                    iterate_over = None,
+                    expand_if_available = None,
+                    expand_if_not_available = None,
+                    expand_if_true = None,
+                    expand_if_false = None,
+                    expand_if_equal = None,
+                ),
+            )
+            link_args = struct(
+                actions = depset([action]),
+                requires_any_of = [],
+                nested = nested,
+            )
+            features = cc_common.internal_DO_NOT_USE.cc_toolchain_features(
+                toolchain_config_info = struct(
+                    features = [],
+                    enabled_features = [],
+                    args = struct(
+                        by_action = [
+                            struct(action = action, args = [link_args]),
+                        ],
+                    ),
+                ),
+                tools_directory = "",
+            )
+            fc = features.configure_features(requested_features = [])
+            variables = cc_common.create_link_variables(
+                feature_configuration = fc,
+                cc_toolchain = struct(
+                    target_gnu_system_name = "x86_64-linux-gnu",
+                    libc = "gnu",
+                ),
+                output_file = "libout.so",
+                is_linking_dynamic_library = True,
+            )
+            cmd = cc_common.get_memory_inefficient_command_line(
+                feature_configuration = fc,
+                action_name = "c++-link-dynamic-library",
+                variables = variables,
+            )
+            assert_eq(["-target", "x86_64-linux-gnu", "-fuse-ld=lld", "-shared"], cmd)
         "#
     ))?;
     Ok(())

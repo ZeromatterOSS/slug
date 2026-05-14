@@ -145,6 +145,78 @@ fn is_header_parsing_action(action_name: &str) -> bool {
     normalized == "c++-header-parsing"
 }
 
+fn cc_attr_string<'v>(value: Value<'v>, attr: &str, heap: Heap<'v>) -> starlark::Result<String> {
+    let Some(attr_value) = value.get_attr(attr, heap)? else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "expected value passed to cc_common to have `{}` attribute",
+            attr
+        )
+        .into());
+    };
+    attr_value.unpack_str().map(str::to_owned).ok_or_else(|| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "expected cc_common attribute `{}` to be a string, got `{}`",
+            attr,
+            attr_value.get_type()
+        )
+        .into()
+    })
+}
+
+fn cc_solib_symlink_path<'v>(
+    artifact: Value<'v>,
+    runtime_solib_dir_base: &str,
+    heap: Heap<'v>,
+) -> starlark::Result<String> {
+    let basename = cc_attr_string(artifact, "basename", heap)?;
+    if runtime_solib_dir_base.is_empty() {
+        Ok(basename)
+    } else {
+        Ok(format!(
+            "{}/{}",
+            runtime_solib_dir_base.trim_end_matches('/'),
+            basename
+        ))
+    }
+}
+
+fn cc_declare_and_symlink<'v>(
+    actions: Value<'v>,
+    artifact: Value<'v>,
+    symlink_path: &str,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<Value<'v>> {
+    let heap = eval.heap();
+    let Some(declare_file) = actions.get_attr("declare_file", heap)? else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "cc_common solib symlink requires actions.declare_file"
+        )
+        .into());
+    };
+    let output = eval.eval_function(
+        declare_file,
+        &[heap.alloc_str(symlink_path).to_value()],
+        &[],
+    )?;
+
+    let Some(symlink) = actions.get_attr("symlink", heap)? else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "cc_common solib symlink requires actions.symlink"
+        )
+        .into());
+    };
+    eval.eval_function(
+        symlink,
+        &[],
+        &[("output", output), ("target_file", artifact)],
+    )?;
+    Ok(output)
+}
+
 fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
     let root = slug_core::cells::get_dynamic_project_root()?;
     let os = match std::env::consts::OS {
@@ -2897,7 +2969,33 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] use_short_path: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // Return the artifact unchanged - symlink creation is a stub
+        let _ = (
+            this,
+            actions,
+            solib_dir,
+            preserve_name,
+            use_short_path,
+            eval,
+        );
+        // rules_cc also calls this while constructing the link action for a
+        // not-yet-bound linker output. Slug cannot register a target_file
+        // symlink action for that artifact at this point, so keep the existing
+        // direct-artifact behaviour here. Toolchain runtime solibs are handled
+        // by solib_symlink_action below.
+        Ok(artifact)
+    }
+
+    /// Creates a symlink for a dynamic library at an explicit solib-relative path.
+    #[allow(unused_variables)]
+    fn dynamic_library_symlink2<'v>(
+        #[starlark(this)] this: &CcCommonInternal,
+        #[starlark(require = pos)] actions: Value<'v>,
+        #[starlark(require = pos)] artifact: Value<'v>,
+        #[starlark(require = pos)] solib_dir: Value<'v>,
+        #[starlark(require = pos)] symlink_path: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = (this, actions, solib_dir, symlink_path, eval);
         Ok(artifact)
     }
 
@@ -3577,9 +3675,19 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] artifact: Value<'v>,
         #[starlark(require = named)] solib_directory: &str,
         #[starlark(require = named)] runtime_solib_dir_base: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // Return the artifact unchanged - symlinks aren't needed for local execution
-        Ok(artifact)
+        let _ = this;
+        let Some(actions) = ctx.get_attr("actions", eval.heap())? else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "solib_symlink_action requires ctx.actions"
+            )
+            .into());
+        };
+        let _ = solib_directory;
+        let symlink_path = cc_solib_symlink_path(artifact, runtime_solib_dir_base, eval.heap())?;
+        cc_declare_and_symlink(actions, artifact, &symlink_path, eval)
     }
 
     /// Returns the exec platform OS name.
@@ -5104,22 +5212,24 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     }
                 }
             } else if is_dynamic_lib {
-                if msvc {
-                    // MSVC: link.exe /nologo /DLL /OUT:<output>
-                    args.push(heap.alloc_str("/nologo").to_value());
-                    args.push(heap.alloc_str("/DLL").to_value());
-                    if let Some(ref path) = output_path {
-                        args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
-                    }
-                } else {
-                    args.push(heap.alloc_str("-shared").to_value());
-                    args.push(heap.alloc_str("-fPIC").to_value());
-                    if use_llvm_linux_link_defaults {
-                        args.push(heap.alloc_str("-nostdlib").to_value());
-                    }
-                    if let Some(ref path) = output_path {
-                        args.push(heap.alloc_str("-o").to_value());
-                        args.push(heap.alloc_str(path).to_value());
+                if !has_feature_args {
+                    if msvc {
+                        // MSVC: link.exe /nologo /DLL /OUT:<output>
+                        args.push(heap.alloc_str("/nologo").to_value());
+                        args.push(heap.alloc_str("/DLL").to_value());
+                        if let Some(ref path) = output_path {
+                            args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
+                        }
+                    } else {
+                        args.push(heap.alloc_str("-shared").to_value());
+                        args.push(heap.alloc_str("-fPIC").to_value());
+                        if use_llvm_linux_link_defaults {
+                            args.push(heap.alloc_str("-nostdlib").to_value());
+                        }
+                        if let Some(ref path) = output_path {
+                            args.push(heap.alloc_str("-o").to_value());
+                            args.push(heap.alloc_str(path).to_value());
+                        }
                     }
                 }
             } else {

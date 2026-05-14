@@ -585,6 +585,7 @@ async fn build_configured_label_inner<'a>(
                 ),
                 ResolvedArtifactGroup::Depset(_) => None,
                 ResolvedArtifactGroup::TargetDefaultOutputs(_) => None,
+                ResolvedArtifactGroup::InputSymlink(_) => None,
             })
             .collect();
 
