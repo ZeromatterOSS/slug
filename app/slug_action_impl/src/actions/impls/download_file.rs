@@ -46,6 +46,8 @@ use slug_execute::materialize::materializer::HttpDownloadInfo;
 use slug_http::HttpClient;
 use starlark::values::OwnedFrozenValue;
 
+use crate::actions::impls::common::first_output_from_slice;
+
 use crate::actions::impls::offline;
 
 #[derive(Debug, slug_error::Error)]
@@ -119,10 +121,7 @@ impl DownloadFileAction {
     }
 
     fn output(&self) -> &BuildArtifact {
-        self.outputs
-            .iter()
-            .next()
-            .expect("a single artifact by construction")
+        first_output_from_slice(&self.outputs)
     }
 
     fn url(&self, client: &HttpClient) -> &Arc<str> {

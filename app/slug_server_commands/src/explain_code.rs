@@ -9,16 +9,12 @@
  */
 
 use core::iter::Iterator;
-use std::collections::HashMap;
-
 use dice::DiceTransaction;
 use dupe::Dupe;
 use dupe::IterDupedExt;
-use futures::TryStreamExt;
 use slug_build_api::query::oneshot::QUERY_FRONTEND;
 use slug_cli_proto::new_generic::ExplainRequest;
 use slug_data::CommandInvalidationInfo;
-use slug_data::FileWatcherEvent;
 use slug_data::action_key;
 use slug_event_log::read::EventLogPathBuf;
 use slug_event_log::stream_value::StreamValue;
@@ -26,10 +22,11 @@ use slug_event_observer::display::TargetDisplayOptions;
 use slug_event_observer::display::display_anon_target;
 use slug_event_observer::display::display_bxl_key;
 use slug_event_observer::display::display_configured_target_label;
-use slug_event_observer::what_ran::CommandReproducer;
+use slug_event_observer::projection::collect_buck_events;
+use slug_event_observer::projection::project_actions_and_file_changes;
 use slug_event_observer::what_ran::WhatRanOptions;
+use slug_event_observer::what_ran::CommandReproducer;
 use slug_event_observer::what_ran::WhatRanRelevantAction;
-use slug_events::span::SpanId;
 use slug_explain::ActionEntryData;
 use slug_explain::ChangedFilesEntryData;
 use slug_node::nodes::configured::ConfiguredTargetNode;
@@ -37,86 +34,72 @@ use slug_query::query::syntax::simple::eval::label_indexed::LabelIndexedSet;
 use slug_server_ctx::ctx::ServerCommandContextTrait;
 use slug_server_ctx::global_cfg_options::global_cfg_options_from_client_context;
 
-#[allow(clippy::vec_box)]
-#[cfg(fbcode_build)]
-struct ActionEntry {
-    action: WhatRanRelevantAction,
-    reproducers: Vec<CommandReproducer>,
-}
 
-#[cfg(fbcode_build)]
-impl ActionEntry {
-    fn format_action(
-        &self,
-        event: &slug_data::SpanEndEvent,
-    ) -> slug_error::Result<Option<(String, ActionEntryData)>> {
-        let action = &self.action;
+fn format_projected_action(
+    action: &WhatRanRelevantAction,
+    reproducers: &[CommandReproducer],
+    event: &slug_data::SpanEndEvent,
+) -> slug_error::Result<Option<(String, ActionEntryData)>> {
+    let action_execution = match &event.data {
+        Some(slug_data::span_end_event::Data::ActionExecution(action_exec)) => action_exec,
+        _ => return Ok(None),
+    };
 
-        let action_execution = match &event.data {
-                Some(slug_data::span_end_event::Data::ActionExecution(action_exec)) => Some(action_exec),
-                _ => None,
-        }.expect("Should always be an ActionExecution end event because span ID must match ActionExecution start event.");
-        let failed = action_execution.failed;
-        let execution_kind =
-            slug_data::ActionExecutionKind::try_from(action_execution.execution_kind)
-                .ok()
-                .map(|v| v.as_str_name().to_owned());
-        let input_files_bytes = action_execution.input_files_bytes;
-        let affected_by_file_changes = match &action_execution.invalidation_info {
-            Some(CommandInvalidationInfo {
-                changed_file: Some(_),
-                ..
-            }) => true,
-            _ => false,
-        };
+    let failed = action_execution.failed;
+    let execution_kind = slug_data::ActionExecutionKind::try_from(action_execution.execution_kind)
+        .ok()
+        .map(|v| v.as_str_name().to_owned());
+    let input_files_bytes = action_execution.input_files_bytes;
+    let affected_by_file_changes = matches!(
+        &action_execution.invalidation_info,
+        Some(CommandInvalidationInfo {
+            changed_file: Some(_),
+            ..
+        })
+    );
 
-        let (target, mut entry) = match action {
-            WhatRanRelevantAction::ActionExecution(act) => {
-                let category = act.name.as_ref().map(|n| n.category.clone());
-                let identifier = act.name.as_ref().map(|n| n.identifier.clone());
-                let owner = match act.key.as_ref() {
-                    Some(key) => key.owner.as_ref(),
-                    None => return Ok(None),
-                };
+    let (target, mut entry) = match action {
+        WhatRanRelevantAction::ActionExecution(act) => {
+            let category = act.name.as_ref().map(|n| n.category.clone());
+            let identifier = act.name.as_ref().map(|n| n.identifier.clone());
+            let owner = match act.key.as_ref() {
+                Some(key) => key.owner.as_ref(),
+                None => return Ok(None),
+            };
 
-                let opts = TargetDisplayOptions::for_log();
-                let target = match owner {
-                    Some(o) => match o {
-                        action_key::Owner::TargetLabel(target_label)
-                        | action_key::Owner::TestTargetLabel(target_label)
-                        | action_key::Owner::LocalResourceSetup(target_label) => {
-                            display_configured_target_label(&target_label, opts)
-                        }
-                        action_key::Owner::BxlKey(bxl_key) => display_bxl_key(&bxl_key),
-                        action_key::Owner::AnonTarget(anon_target) => {
-                            display_anon_target(&anon_target)
-                        }
-                    }?,
-                    None => return Ok(None),
-                };
+            let opts = TargetDisplayOptions::for_log();
+            let target = match owner {
+                Some(o) => match o {
+                    action_key::Owner::TargetLabel(target_label)
+                    | action_key::Owner::TestTargetLabel(target_label)
+                    | action_key::Owner::LocalResourceSetup(target_label) => {
+                        display_configured_target_label(target_label, opts)
+                    }
+                    action_key::Owner::BxlKey(bxl_key) => display_bxl_key(bxl_key),
+                    action_key::Owner::AnonTarget(anon_target) => display_anon_target(anon_target),
+                }?,
+                None => return Ok(None),
+            };
 
-                (
-                    target,
-                    ActionEntryData {
-                        category,
-                        failed,
-                        repros: vec![],
-                        execution_kind,
-                        identifier,
-                        input_files_bytes,
-                        affected_by_file_changes,
-                    },
-                )
-            }
-            _ => return Ok(None),
-        };
-
-        for reproducer in self.reproducers.iter() {
-            entry.repros.push(reproducer.to_string());
+            (
+                target,
+                ActionEntryData {
+                    category,
+                    failed,
+                    repros: vec![],
+                    execution_kind,
+                    identifier,
+                    input_files_bytes,
+                    affected_by_file_changes,
+                },
+            )
         }
+        _ => return Ok(None),
+    };
 
-        Ok(Some((target, entry)))
-    }
+    entry.repros = reproducers.iter().map(ToString::to_string).collect();
+
+    Ok(Some((target, entry)))
 }
 
 pub(crate) async fn explain(
@@ -132,61 +115,25 @@ pub(crate) async fn explain(
         emit_cache_queries: false,
         ..Default::default()
     };
-    let mut known_actions: HashMap<SpanId, ActionEntry> = Default::default();
+
+    let build_events = collect_buck_events(events).await?;
+
+    let projection = project_actions_and_file_changes(build_events.iter().map(|e| e.as_ref()), &options)?;
 
     let mut executed_actions = vec![];
-    let mut changed_files = vec![];
-
-    while let Some(event) = events.try_next().await? {
-        match event {
-            StreamValue::Event(event) => {
-                // TODO iguridi: deduplicate this from whatran code
-                if let Some(data) = event.data {
-                    if let Some(action) = WhatRanRelevantAction::from_buck_data(&data) {
-                        known_actions.insert(
-                            SpanId::from_u64(event.span_id)?,
-                            ActionEntry {
-                                action,
-                                reproducers: Default::default(),
-                            },
-                        );
-                    }
-                    if let Some(repro) = CommandReproducer::from_buck_data(&data, &options) {
-                        if let Some(parent_id) = SpanId::from_u64_opt(event.parent_id) {
-                            if let Some(entry) = known_actions.get_mut(&parent_id) {
-                                entry.reproducers.push(repro);
-                            }
-                        }
-                    }
-
-                    match data {
-                        slug_data::buck_event::Data::SpanEnd(span) => {
-                            if let Some(entry) =
-                                known_actions.remove(&SpanId::from_u64(event.span_id)?)
-                            {
-                                if let Some(entry) = entry.format_action(&span)? {
-                                    executed_actions.push(entry);
-                                }
-                            }
-                            match &span.data {
-                                Some(slug_data::span_end_event::Data::FileWatcher(end)) => {
-                                    let events: &[FileWatcherEvent] =
-                                        end.stats.as_ref().expect("of source eh").events.as_ref();
-                                    for event in events {
-                                        let path = event.path.clone();
-                                        changed_files.push(path);
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
+    for action in projection.actions {
+        let Some(span_end) = action.span_end else {
+            continue;
+        };
+        if let Some(entry) = format_projected_action(&action.action, &action.reproducers, &span_end)? {
+            executed_actions.push(entry);
         }
     }
+    let changed_files = projection
+        .changed_files
+        .into_iter()
+        .map(|event| event.path)
+        .collect::<Vec<_>>();
 
     let target_universe: Option<&[String]> = if req.target_universe.is_empty() {
         None

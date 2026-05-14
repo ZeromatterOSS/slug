@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)]
+#![cfg_attr(not(fbcode_build), allow(dead_code))]
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;

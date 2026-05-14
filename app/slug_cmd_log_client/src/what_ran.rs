@@ -9,10 +9,8 @@
  */
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::io::Write;
 
-use futures::TryStreamExt;
 use futures::stream::Stream;
 use indexmap::IndexMap;
 use slug_client_ctx::client_ctx::BuckSubcommand;
@@ -28,14 +26,14 @@ use slug_error::conversion::from_any_with_tag;
 use slug_event_log::stream_value::StreamValue;
 use slug_event_observer::fmt_duration;
 use slug_event_observer::what_ran;
+use slug_event_observer::projection::collect_buck_events;
+use slug_event_observer::projection::project_actions_and_file_changes;
 use slug_event_observer::what_ran::CommandReproducer;
 use slug_event_observer::what_ran::WhatRanOptions;
 use slug_event_observer::what_ran::WhatRanOutputCommand;
 use slug_event_observer::what_ran::WhatRanOutputCommandExtra;
 use slug_event_observer::what_ran::WhatRanOutputWriter;
 use slug_event_observer::what_ran::WhatRanRelevantAction;
-use slug_event_observer::what_ran::WhatRanState;
-use slug_events::span::SpanId;
 
 use crate::LogCommandOutputFormat;
 use crate::LogCommandOutputFormatWithWriter;
@@ -202,135 +200,64 @@ impl WhatRanEntry {
 
 /// The state for a WhatRan command. This is all the events we have seen that are
 /// we have seen that are WhatRanRelevantActions, and the CommandReproducer associated with them.
-#[derive(Default)]
-pub struct WhatRanCommandState {
-    /// Maps action spans to their details.
-    known_actions: HashMap<SpanId, WhatRanEntry>,
-}
-
-impl WhatRanState for WhatRanCommandState {
-    fn get(&self, span_id: SpanId) -> Option<WhatRanRelevantAction> {
-        self.known_actions.get(&span_id).map(|e| e.action.clone())
-    }
-}
+pub struct WhatRanCommandState;
 
 impl WhatRanCommandState {
     async fn execute(
-        mut events: impl Stream<Item = slug_error::Result<StreamValue>> + Unpin + Send,
+        events: impl Stream<Item = slug_error::Result<StreamValue>> + Unpin + Send,
         output: &mut impl WhatRanOutputWriter,
         options: &WhatRanCommandOptions,
     ) -> Result<(), ClientIoError> {
-        let mut cmd = Self::default();
+        let build_events = collect_buck_events(events).await?;
 
-        while let Some(event) = events.try_next().await? {
-            match event {
-                StreamValue::Event(event) => cmd.event(event, output, options)?,
-                _ => {}
+        let projection = project_actions_and_file_changes(build_events.iter().map(|e| e.as_ref()), &options.options)?;
+
+        for projected in projection.actions {
+            let Some(span) = projected.span_end.as_ref() else {
+                continue;
+            };
+            if should_emit_finished_action(&span.data, options) {
+                let mut entry = WhatRanEntry {
+                    action: projected.action,
+                    reproducers: projected.reproducers,
+                };
+
+                let (execution_kind, std_err, duration, scheduling_mode) = match &span.data {
+                    Some(slug_data::span_end_event::Data::ActionExecution(action_exec)) => (
+                        Some(action_exec.execution_kind),
+                        action_exec.commands.iter().last().and_then(|cmd| {
+                            cmd.details.as_ref().map(|d| d.cmd_stderr.as_ref())
+                        }),
+                        action_exec.wall_time.as_ref().map(
+                            |prost_types::Duration { seconds, nanos }| {
+                                std::time::Duration::new(*seconds as u64, *nanos as u32)
+                            },
+                        ),
+                        action_exec
+                            .scheduling_mode
+                            .as_ref()
+                            .and_then(|o| SchedulingMode::try_from(*o).ok()),
+                    ),
+                    _ => (None, None, None, None),
+                };
+
+                if execution_kind == Some(slug_data::ActionExecutionKind::LocalDepFile as i32) {
+                    entry
+                        .reproducers
+                        .push(CommandReproducer::LocalDepFileCacheHit);
+                }
+
+                entry.emit_what_ran_entry(output, options, std_err, duration, scheduling_mode)?;
             }
         }
 
-        // emit remaining
-        cmd.emit_remaining(output, options)?;
-        Ok(())
-    }
-
-    fn emit_remaining(
-        self,
-        output: &mut impl WhatRanOutputWriter,
-        options: &WhatRanCommandOptions,
-    ) -> slug_error::Result<()> {
-        for (_, entry) in self.known_actions.into_iter() {
-            if should_emit_unfinished_action(options) {
+        if should_emit_unfinished_action(options) {
+            for projected in projection.unfinished_actions {
+                let entry = WhatRanEntry {
+                    action: projected.action,
+                    reproducers: projected.reproducers,
+                };
                 entry.emit_what_ran_entry(output, options, None, None, None)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Receive a new event. We store it if it's relevant and emit them later.
-    ///
-    /// For each entry we emit we track 4 types of events.
-    /// - action start, to create WhatRanRelevantAction
-    /// - executor stage, to create CommandReproducer to add to WhatRanRelevantAction
-    /// - action end, to emit WhatRanRelevantAction if action finished. If not, action is considered
-    ///   unfinished. We check to emit all unfinished after all events are received
-    fn event(
-        &mut self,
-        event: Box<slug_data::BuckEvent>,
-        output: &mut impl WhatRanOutputWriter,
-        options: &WhatRanCommandOptions,
-    ) -> slug_error::Result<()> {
-        if let Some(data) = event.data {
-            // Create WhatRanRelevantAction on SpanStart to track CommandReproducers as they come
-            if let Some(action) = WhatRanRelevantAction::from_buck_data(&data) {
-                self.known_actions.insert(
-                    SpanId::from_u64(event.span_id)?,
-                    WhatRanEntry {
-                        action,
-                        reproducers: Default::default(),
-                    },
-                );
-                return Ok(());
-            }
-            // Create CommandReproducers on SpanStart an add them to corresponding WhatRanRelevantAction
-            if let Some(repro) = CommandReproducer::from_buck_data(&data, &options.options) {
-                if let Some(parent_id) = SpanId::from_u64_opt(event.parent_id) {
-                    if let Some(entry) = self.known_actions.get_mut(&parent_id) {
-                        entry.reproducers.push(repro);
-                    }
-                }
-                return Ok(());
-            }
-            // Emit WhatRanRelevantAction when we see the corresponding SpanEnd
-            match &data {
-                slug_data::buck_event::Data::SpanEnd(span) => {
-                    if let Some(mut entry) =
-                        self.known_actions.remove(&SpanId::from_u64(event.span_id)?)
-                    {
-                        if should_emit_finished_action(&span.data, options) {
-                            // Get extra data out of SpanEnd event
-                            let (execution_kind, std_err, duration, scheduling_mode) = match &span
-                                .data
-                            {
-                                Some(slug_data::span_end_event::Data::ActionExecution(
-                                    action_exec,
-                                )) => (
-                                    Some(action_exec.execution_kind),
-                                    action_exec.commands.iter().last().and_then(|cmd| {
-                                        cmd.details.as_ref().map(|d| d.cmd_stderr.as_ref())
-                                    }),
-                                    action_exec.wall_time.as_ref().map(
-                                        |prost_types::Duration { seconds, nanos }| {
-                                            std::time::Duration::new(*seconds as u64, *nanos as u32)
-                                        },
-                                    ),
-                                    action_exec
-                                        .scheduling_mode
-                                        .as_ref()
-                                        .and_then(|o| SchedulingMode::try_from(*o).ok()),
-                                ),
-                                _ => (None, None, None, None),
-                            };
-
-                            if execution_kind
-                                == Some(slug_data::ActionExecutionKind::LocalDepFile as i32)
-                            {
-                                entry
-                                    .reproducers
-                                    .push(CommandReproducer::LocalDepFileCacheHit);
-                            }
-
-                            entry.emit_what_ran_entry(
-                                output,
-                                options,
-                                std_err,
-                                duration,
-                                scheduling_mode,
-                            )?;
-                        }
-                    }
-                }
-                _ => {}
             }
         }
 

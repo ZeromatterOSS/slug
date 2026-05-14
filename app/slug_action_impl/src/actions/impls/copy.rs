@@ -40,6 +40,8 @@ use slug_execute::execute::command_executor::ActionExecutionTimingData;
 use slug_execute::materialize::materializer::CopiedArtifact;
 use slug_execute::materialize::materializer::DeclareArtifactPayload;
 use starlark::values::OwnedFrozenValue;
+use crate::actions::impls::common::first_input_artifact;
+use crate::actions::impls::common::first_output_artifact;
 
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -118,17 +120,11 @@ impl CopyAction {
     }
 
     fn input(&self) -> &ArtifactGroup {
-        self.inputs
-            .iter()
-            .next()
-            .expect("a single input by construction")
+        first_input_artifact(&self.inputs)
     }
 
     fn output(&self) -> &BuildArtifact {
-        self.outputs
-            .iter()
-            .next()
-            .expect("a single artifact by construction")
+        first_output_artifact(&self.outputs)
     }
 }
 

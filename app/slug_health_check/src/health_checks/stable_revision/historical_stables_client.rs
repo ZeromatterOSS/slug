@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // TODO(rajneeshl) : Remove this in further diffs
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // TODO(slug-bazel-healthcheck): Remove after historical stables client is wired in OSS.
 
 use fbinit::FacebookInit;
 use graphql_client::GraphQLQuery;

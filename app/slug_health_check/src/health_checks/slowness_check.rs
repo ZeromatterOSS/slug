@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // The code here will be used in future diffs.
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // TODO(slug-bazel-healthcheck): Remove when slowness check is fully enabled in OSS.
 
 use std::time::Duration;
 use std::time::SystemTime;
@@ -131,7 +131,7 @@ impl SlownessCheck {
     }
 
     fn determine_if_incremental_build(&self, _context: &HealthCheckContext) -> bool {
-        // TODO(junliqin) Determine if this is an incremental build based on context. Currently hardcoded to false. Will update in future diffs.
+        // TODO(slug-bazel-healthcheck): determine incremental-build status from execution context; currently hardcoded false in OSS path.
         false
     }
 

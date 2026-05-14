@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // Unused in oss
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // Unused in oss
 
 use dupe::Dupe;
 

@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // Presently used only in oss
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // Presently used only in oss
 
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 

@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // This mod will be used in the next diffs.
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // TODO(slug-bazel-healthcheck): Remove after stable-revision flow is wired in OSS.
 
 use regex::Regex;
 

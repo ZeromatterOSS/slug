@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // TODO(rajneeshl): Remove this when the health checks are moved to the server.
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // TODO(slug-bazel-healthcheck): Remove once health checks run fully server-side in OSS.
 
 use slug_common::invocation_paths::InvocationPaths;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;

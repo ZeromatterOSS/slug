@@ -43,6 +43,7 @@ use starlark::values::ValueError;
 use starlark::values::dict::UnpackDictEntries;
 use starlark_map::small_set::SmallSet;
 
+use crate::actions::impls::common::first_output_artifact;
 use crate::actions::impls::copy::CopyMode;
 
 #[derive(Debug, slug_error::Error)]
@@ -54,6 +55,9 @@ enum SymlinkedDirError {
     EmptyPath,
     #[error("Only artifact inputs are supported in symlink_dir actions, got {0}")]
     UnsupportedInput(ArtifactGroup),
+
+    #[error("Exactly one output directory must be specified for a symlink_dir action, got {0}")]
+    WrongNumberOfOutputs(usize),
 }
 
 #[derive(Allocative)]
@@ -168,6 +172,10 @@ impl UnregisteredAction for UnregisteredSymlinkedDirAction {
         _starlark_data: Option<OwnedFrozenValue>,
         _error_handler: Option<OwnedFrozenValue>,
     ) -> slug_error::Result<Box<dyn Action>> {
+        if outputs.len() != 1 {
+            return Err(SymlinkedDirError::WrongNumberOfOutputs(outputs.len()).into());
+        }
+
         Ok(Box::new(SymlinkedDirAction {
             copy: self.copy,
             args: self.args,
@@ -185,10 +193,7 @@ struct SymlinkedDirAction {
 
 impl SymlinkedDirAction {
     fn output(&self) -> &BuildArtifact {
-        self.outputs
-            .iter()
-            .next()
-            .expect("a single artifact by construction")
+        first_output_artifact(&self.outputs)
     }
 }
 
@@ -312,6 +317,10 @@ impl Action for SymlinkedDirAction {
 #[cfg(test)]
 mod tests {
     use slug_artifact::artifact::artifact_type::Artifact;
+
+    use indexmap::indexset;
+    use slug_artifact::artifact::artifact_type::testing::BuildArtifactTestingExt;
+
     use slug_artifact::artifact::source_artifact::SourceArtifact;
     use slug_core::package::source_path::SourcePath;
 
@@ -321,11 +330,35 @@ mod tests {
         let buck_path = SourcePath::testing_new("cell//pkg", "");
         Artifact::from(SourceArtifact::new(buck_path))
     }
-
-    // TODO: This needs proper tests, but right now it's kind of a pain to get the
-    //       action framework up and running to test actions
     #[test]
-    fn symlinked_dir_test() {}
+    fn test_register_validates_single_output() {
+        let action = UnregisteredSymlinkedDirAction {
+            copy: CopyMode::Symlink,
+            args: vec![(
+                ArtifactGroup::Artifact(mk_artifact()),
+                ForwardRelativePath::new("out").unwrap().to_buf().into_box(),
+            )],
+            unioned_associated_artifacts: AssociatedArtifacts::new(),
+        };
+
+        let result = Box::new(action).register(indexset![], None, None);
+        let err = result.expect_err("register should reject zero outputs");
+        assert!(format!("{err:#}").contains("Exactly one output directory"));
+
+        let output1 = BuildArtifact::testing_new("cell//pkg:out1", "out1");
+        let output2 = BuildArtifact::testing_new("cell//pkg:out2", "out2");
+        let result = Box::new(UnregisteredSymlinkedDirAction {
+            copy: CopyMode::Symlink,
+            args: vec![(
+                ArtifactGroup::Artifact(mk_artifact()),
+                ForwardRelativePath::new("out").unwrap().to_buf().into_box(),
+            )],
+            unioned_associated_artifacts: AssociatedArtifacts::new(),
+        })
+        .register(indexset![output1, output2], None, None);
+        let err = result.expect_err("register should reject multiple outputs");
+        assert!(format!("{err:#}").contains("Exactly one output directory"));
+    }
 
     #[test]
     fn test_symlinked_dir_validation() {

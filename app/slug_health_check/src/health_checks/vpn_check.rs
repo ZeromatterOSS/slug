@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // The code here will be used in future diffs.
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // TODO(slug-bazel-healthcheck): Remove when vpn check is fully enabled in OSS.
 
 use regex::Regex;
 use slug_core::soft_error;

@@ -45,6 +45,8 @@ use slug_execute::execute::command_executor::ActionExecutionTimingData;
 use slug_execute::materialize::materializer::WriteRequest;
 use starlark::values::OwnedFrozenValue;
 
+use crate::actions::impls::common::first_input_artifact;
+
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
 enum ExpandTemplateActionError {
@@ -90,7 +92,9 @@ impl ExpandTemplateAction {
         if outputs.len() != 1 {
             return Err(ExpandTemplateActionError::WrongNumberOfOutputs(outputs.len()).into());
         }
-        let output = outputs.into_iter().next().expect("exactly one");
+        let output = outputs.into_iter().next().ok_or_else(|| {
+            ExpandTemplateActionError::WrongNumberOfOutputs(0)
+        })?;
         Ok(ExpandTemplateAction {
             inputs: BoxSliceSet::from(indexset![unreg.template]),
             output,
@@ -100,10 +104,7 @@ impl ExpandTemplateAction {
     }
 
     fn input(&self) -> &ArtifactGroup {
-        self.inputs
-            .iter()
-            .next()
-            .expect("a single input by construction")
+        first_input_artifact(&self.inputs)
     }
 }
 

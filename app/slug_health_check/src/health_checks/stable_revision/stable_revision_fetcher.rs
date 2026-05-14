@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-#![allow(dead_code)] // Placeholder struct will be used to make GraphQL queries in subsequent diffs
+#![cfg_attr(not(fbcode_build), allow(dead_code))] // TODO(slug-bazel-healthcheck): Remove after GraphQL-backed stable revision fetch is enabled in OSS.
 
 use crate::health_checks::stable_revision::bookmark_revision_fetcher::BookmarkRevisionFetcher;
 use crate::health_checks::stable_revision::historical_stables_client::get_recent_revisions_for_bookmark;
