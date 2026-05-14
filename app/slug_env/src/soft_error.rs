@@ -16,8 +16,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use arc_swap::ArcSwapOption;
-use slug_error::BuckErrorContext;
 use once_cell::sync::Lazy;
+use slug_error::BuckErrorContext;
 use starlark_map::small_set::SmallSet;
 
 use crate::env::slug_env;

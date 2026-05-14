@@ -13,8 +13,8 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_core::provider::id::ProviderId;
 use pagable::Pagable;
+use slug_core::provider::id::ProviderId;
 use strong_hash::StrongHash;
 
 #[derive(

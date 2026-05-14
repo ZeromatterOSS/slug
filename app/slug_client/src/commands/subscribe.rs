@@ -11,6 +11,8 @@
 use async_trait::async_trait;
 use futures::stream::StreamExt;
 use futures::stream::TryStreamExt;
+use once_cell::sync::Lazy;
+use prost::Message;
 use slug_cli_proto::protobuf_util::ProtobufSplitter;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
@@ -28,8 +30,6 @@ use slug_client_ctx::stream_util::reborrow_stream_for_static;
 use slug_client_ctx::streaming::StreamingCommand;
 use slug_error::BuckErrorContext;
 use slug_subscription_proto::SubscriptionRequest;
-use once_cell::sync::Lazy;
-use prost::Message;
 use tokio_util::codec::FramedRead;
 
 /// Open a subscription channel to the Slug daemon. This allows you to interact with the Slug

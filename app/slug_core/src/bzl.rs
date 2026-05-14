@@ -12,8 +12,8 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use allocative::Allocative;
-use slug_fs::paths::file_name::FileName;
 use pagable::Pagable;
+use slug_fs::paths::file_name::FileName;
 use strong_hash::StrongHash;
 
 use crate::cells::build_file_cell::BuildFileCell;

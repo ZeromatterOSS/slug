@@ -7,10 +7,10 @@
 use std::fs::File;
 use std::io::Read;
 
+use prost::Message;
 use slug_build_event_stream::build_event_stream as bep;
 use slug_build_event_stream::file_sink::Encoding;
 use slug_build_event_stream::file_sink::FileSink;
-use prost::Message;
 use tempfile::TempDir;
 
 fn make_event(code: i32) -> bep::BuildEvent {

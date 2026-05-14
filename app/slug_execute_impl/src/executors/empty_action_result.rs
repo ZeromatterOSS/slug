@@ -8,14 +8,14 @@
  * above-listed licenses.
  */
 
+use remote_execution as RE;
+use remote_execution::TActionResult2;
+use remote_execution::TExecutedActionMetadata;
 use slug_core::execution_types::executor_config::RePlatformFields;
 use slug_execute::digest::CasDigestToReExt;
 use slug_execute::digest_config::DigestConfig;
 use slug_execute::execute::action_digest_and_blobs::ActionDigestAndBlobs;
 use slug_execute::execute::action_digest_and_blobs::ActionDigestAndBlobsBuilder;
-use remote_execution as RE;
-use remote_execution::TActionResult2;
-use remote_execution::TExecutedActionMetadata;
 
 use crate::executors::to_re_platform::RePlatformFieldsToRePlatform;
 

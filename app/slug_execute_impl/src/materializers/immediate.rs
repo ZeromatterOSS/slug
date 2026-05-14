@@ -11,6 +11,8 @@
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use gazebo::prelude::*;
+use remote_execution::NamedDigest;
+use remote_execution::NamedDigestWithPermissions;
 use slug_common::file_ops::metadata::FileMetadata;
 use slug_common::file_ops::metadata::TrackedFileDigest;
 use slug_core::fs::project::ProjectRoot;
@@ -30,8 +32,6 @@ use slug_execute::execute::clean_output_paths::cleanup_path;
 use slug_execute::materialize::materializer::CasDownloadInfo;
 use slug_execute::materialize::materializer::WriteRequest;
 use slug_execute::re::manager::ReConnectionManager;
-use remote_execution::NamedDigest;
-use remote_execution::NamedDigestWithPermissions;
 
 use crate::materializers::io::MaterializeTreeStructure;
 

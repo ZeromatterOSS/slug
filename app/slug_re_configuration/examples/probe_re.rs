@@ -13,9 +13,9 @@
 
 use std::env;
 
+use remote_execution::REClientBuilder;
 use slug_re_configuration::HttpHeader;
 use slug_re_configuration::SlugOssReConfiguration;
-use remote_execution::REClientBuilder;
 
 fn main() {
     let _ = rustls::crypto::ring::default_provider().install_default();

@@ -40,10 +40,10 @@ pub static ENV_INFO: [EnvInfoEntry];
 
 #[cfg(test)]
 mod tests {
-    use crate::env::slug_env;
     use crate::env::registry::Applicability;
     use crate::env::registry::ENV_INFO;
     use crate::env::registry::EnvInfoEntry;
+    use crate::env::slug_env;
 
     #[test]
     fn test_env_info() {

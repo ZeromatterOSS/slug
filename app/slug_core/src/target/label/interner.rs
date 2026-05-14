@@ -13,8 +13,8 @@ use std::fmt::Formatter;
 use std::hash::BuildHasher;
 
 use allocative::Allocative;
-use slug_util::hash::BuckHasherBuilder;
 use lock_free_hashtable::sharded::ShardedLockFreeRawTable;
+use slug_util::hash::BuckHasherBuilder;
 
 use crate::target::label::label::TargetLabel;
 

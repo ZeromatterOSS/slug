@@ -9,10 +9,10 @@
  */
 
 use allocative::Allocative;
-use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use relative_path::Component;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
+use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 
 use crate::cells::cell_path::CellPath;
 use crate::cells::paths::CellRelativePathBuf;
@@ -131,8 +131,8 @@ impl CellPathWithAllowedRelativeDir {
 
 #[cfg(test)]
 mod tests {
-    use slug_fs::paths::file_name::FileName;
     use relative_path::RelativePath;
+    use slug_fs::paths::file_name::FileName;
 
     use crate::cells::cell_path::CellPath;
     use crate::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;

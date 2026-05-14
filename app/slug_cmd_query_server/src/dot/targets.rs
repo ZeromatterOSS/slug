@@ -8,11 +8,11 @@
  * above-listed licenses.
  */
 
+use regex::RegexSet;
 use slug_query::query::environment::AttrFmtOptions;
 use slug_query::query::environment::QueryTarget;
 use slug_query::query::environment::QueryTargets;
 use slug_query::query::syntax::simple::eval::set::TargetSet;
-use regex::RegexSet;
 use starlark_map::small_map::SmallMap;
 
 use crate::dot::DotDigraph;

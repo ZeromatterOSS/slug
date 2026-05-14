@@ -11,9 +11,9 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use slug_fs::paths::abs_path::AbsPathBuf;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_fs::paths::abs_path::AbsPathBuf;
 
 use crate::TargetCfg;
 

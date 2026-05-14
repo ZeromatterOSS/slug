@@ -17,11 +17,11 @@ use std::sync::RwLock;
 use allocative::Allocative;
 use dupe::Dupe;
 use gazebo::prelude::SliceExt;
+use pagable::Pagable;
 use slug_core::pattern::pattern::ParsedPattern;
 use slug_core::pattern::pattern_type::TargetPatternExtra;
 use slug_core::target::label::label::TargetLabel;
 use slug_util::arc_str::ThinArcSlice;
-use pagable::Pagable;
 
 use crate::attrs::attr_type::any_matches::AnyMatches;
 

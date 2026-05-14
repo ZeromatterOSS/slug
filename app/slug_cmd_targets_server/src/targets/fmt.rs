@@ -14,6 +14,7 @@ use std::iter;
 use std::sync::Arc;
 
 use gazebo::prelude::SliceExt;
+use regex::RegexSet;
 use slug_build_api::configure_targets::ConfiguredTargetsWithErrors;
 use slug_cli_proto::ConfiguredTargetsRequest;
 use slug_cli_proto::HasClientContext;
@@ -45,7 +46,6 @@ use slug_node::nodes::configured::ConfiguredTargetNode;
 use slug_node::nodes::unconfigured::TargetNodeRef;
 use slug_node::super_package::SuperPackage;
 use slug_util::indent::indent;
-use regex::RegexSet;
 
 use crate::json::QuotedJson;
 use crate::target_hash::BuckTargetHash;

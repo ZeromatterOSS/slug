@@ -14,13 +14,13 @@ use allocative::Allocative;
 use derive_more::Display;
 use dupe::Dupe;
 use gazebo::prelude::SliceExt;
+use pagable::Pagable;
 use slug_core::package::PackageLabel;
 use slug_core::package::source_path::SourcePathRef;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProvidersLabel;
 use slug_core::provider::label::ProvidersLabelMaybeConfigured;
 use slug_util::arc_str::ArcStr;
-use pagable::Pagable;
 use static_assertions::assert_eq_size;
 use strong_hash::StrongHash;
 

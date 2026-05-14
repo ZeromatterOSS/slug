@@ -16,6 +16,7 @@ mod target;
 
 use std::time::Duration;
 
+use package::PackageCompleter;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::command_outcome::CommandOutcome;
 use slug_client_ctx::common::BuckArgMatches;
@@ -26,7 +27,6 @@ use slug_error::ErrorTag;
 use slug_error::slug_error;
 use slug_fs::fs_util;
 use slug_fs::paths::abs_path::AbsPath;
-use package::PackageCompleter;
 use target::CompleteTargetCommand;
 
 #[derive(Debug, clap::Parser)]

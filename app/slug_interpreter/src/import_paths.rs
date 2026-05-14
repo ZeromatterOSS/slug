@@ -16,6 +16,7 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::legacy_configs::configs::LegacyBuckConfig;
 use slug_common::legacy_configs::dice::HasLegacyConfigs;
@@ -23,7 +24,6 @@ use slug_common::legacy_configs::view::LegacyBuckConfigView;
 use slug_core::bzl::ImportPath;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::build_file_cell::BuildFileCell;
-use pagable::Pagable;
 
 use crate::package_imports::PackageImplicitImports;
 

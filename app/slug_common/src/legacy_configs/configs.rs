@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_cli_proto::ConfigOverride;
 use pagable::Pagable;
+use slug_cli_proto::ConfigOverride;
 use starlark_map::sorted_map::SortedMap;
 
 use crate::legacy_configs::key::BuckconfigKeyRef;

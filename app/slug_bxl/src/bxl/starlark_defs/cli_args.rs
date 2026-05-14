@@ -24,6 +24,8 @@ use futures::FutureExt;
 use futures::future::BoxFuture;
 use gazebo::variants::VariantName;
 use itertools::Itertools;
+use num_bigint::BigInt;
+use serde::Serialize;
 use slug_build_api::configure_targets::load_compatible_patterns_with_modifiers;
 use slug_common::dice::data::HasIoProvider;
 use slug_core::fs::project_rel_path::ProjectRelativePath;
@@ -46,8 +48,6 @@ use slug_interpreter::types::target_label::StarlarkTargetLabel;
 use slug_node::load_patterns::MissingTargetBehavior;
 use slug_node::load_patterns::load_patterns;
 use slug_node::target_calculation::ConfiguredTargetCalculation;
-use num_bigint::BigInt;
-use serde::Serialize;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -1074,6 +1074,7 @@ impl<'a> ArgAccessor<'a> {
 mod tests {
     use std::collections::HashSet;
 
+    use num_bigint::BigInt;
     use slug_core::configuration::data::ConfigurationData;
     use slug_core::provider::label::ProvidersLabel;
     use slug_core::provider::label::testing::ProvidersLabelTestExt;
@@ -1082,7 +1083,6 @@ mod tests {
     use slug_interpreter::types::configured_providers_label::StarlarkProvidersLabel;
     use slug_interpreter::types::target_label::StarlarkConfiguredTargetLabel;
     use slug_interpreter::types::target_label::StarlarkTargetLabel;
-    use num_bigint::BigInt;
     use starlark::values::Heap;
     use starlark::values::Value;
     use starlark_map::ordered_map::OrderedMap;

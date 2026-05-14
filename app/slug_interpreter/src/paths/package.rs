@@ -9,12 +9,12 @@
  */
 
 use allocative::Allocative;
+use pagable::Pagable;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path::CellPathRef;
 use slug_core::cells::name::CellName;
 use slug_fs::paths::file_name::FileName;
-use pagable::Pagable;
 
 /// Represents the path to a PACKAGE file.
 ///

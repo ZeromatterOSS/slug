@@ -30,10 +30,10 @@ use slug_client_ctx::restarter::Restarter;
 use slug_client_ctx::stdin::Stdin;
 use slug_client_ctx::stdio;
 use slug_client_ctx::subscribers::recorder::InvocationRecorder;
-use slug_core::slug_env;
 use slug_core::logging::LogConfigurationReloadHandle;
 use slug_core::logging::init_tracing_for_writer;
 use slug_core::logging::log_file::TracingLogFile;
+use slug_core::slug_env;
 use slug_fs::working_dir::AbsWorkingDir;
 use slug_wrapper_common::invocation_id::TraceId;
 

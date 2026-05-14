@@ -9,6 +9,7 @@
  */
 
 use indoc::indoc;
+use serde_json::json;
 use slug_build_api::interpreter::rule_defs::transitive_set::transitive_set_definition::register_transitive_set;
 use slug_core::bzl::ImportPath;
 use slug_interpreter::file_loader::LoadedModules;
@@ -17,7 +18,6 @@ use slug_interpreter_for_build::nodes::attr_spec::AttributeSpecExt;
 use slug_node::attrs::inspect_options::AttrInspectOptions;
 use slug_node::attrs::spec::AttributeSpec;
 use slug_node::nodes::unconfigured::testing::targets_to_json;
-use serde_json::json;
 use starlark::docs::DocFunction;
 use starlark::docs::DocItem;
 use starlark::docs::DocMember;

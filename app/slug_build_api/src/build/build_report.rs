@@ -29,6 +29,7 @@ use dupe::OptionDupedExt;
 use itertools::Either;
 use itertools::EitherOrBoth;
 use itertools::Itertools;
+use serde::Serialize;
 use slug_artifact::artifact::artifact_dump::ArtifactInfo;
 use slug_artifact::artifact::artifact_dump::DirectoryInfo;
 use slug_artifact::artifact::artifact_dump::ExternalSymlinkInfo;
@@ -64,7 +65,6 @@ use slug_execute::directory::ActionSharedDirectory;
 use slug_fs::fs_util;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_wrapper_common::invocation_id::TraceId;
-use serde::Serialize;
 use starlark_map::small_set::SmallSet;
 
 use crate::build::BuildProviderType;

@@ -25,6 +25,8 @@ use either::Either;
 use gazebo::variants::VariantName;
 use indexmap::IndexMap;
 use internment::ArcIntern;
+use ref_cast::RefCast;
+use serde::Serialize;
 use slug_artifact::actions::key::ActionKey;
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_core::build_file_path::BuildFilePath;
@@ -43,8 +45,6 @@ use slug_query::query::environment::QueryTarget;
 use slug_query::query::graph::node::LabeledNode;
 use slug_query::query::graph::node::NodeKey;
 use slug_util::late_binding::LateBinding;
-use ref_cast::RefCast;
-use serde::Serialize;
 use starlark::values::Heap;
 use starlark::values::Value;
 

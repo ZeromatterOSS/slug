@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
+use pagable::Pagable;
 use slug_core::bzl::ImportPath;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::build_file_cell::BuildFileCell;
@@ -19,7 +20,6 @@ use slug_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRe
 use slug_core::cells::paths::CellRelativePath;
 use slug_core::cells::paths::CellRelativePathBuf;
 use slug_core::package::PackageLabel;
-use pagable::Pagable;
 use starlark_map::ordered_map::OrderedMap;
 
 use crate::parse_import::RelativeImports;

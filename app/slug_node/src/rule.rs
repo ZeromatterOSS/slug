@@ -11,11 +11,11 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
+use pagable::Pagable;
 use slug_core::configuration::transition::id::TransitionId;
 use slug_core::plugins::PluginKind;
 #[allow(unused_imports)]
 use slug_util::hash::BuckHasher;
-use pagable::Pagable;
 use static_interner::interner;
 
 use crate::attrs::spec::AttributeSpec;

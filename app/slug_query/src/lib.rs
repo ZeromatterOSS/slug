@@ -27,6 +27,6 @@ extern crate self as slug_query;
 pub mod __derive_refs {
     pub use async_trait;
     pub use indexmap;
-    pub use slug_query_parser;
     pub use ref_cast;
+    pub use slug_query_parser;
 }

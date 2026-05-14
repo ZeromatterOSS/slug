@@ -12,13 +12,13 @@ use std::fmt;
 use std::fmt::Display;
 
 use dupe::Dupe;
-use slug_error::conversion::rusqlite::SlugErrorAsRusqliteError;
 use rusqlite::ToSql;
 use rusqlite::types::FromSql;
 use rusqlite::types::FromSqlError;
 use rusqlite::types::FromSqlResult;
 use rusqlite::types::ToSqlOutput;
 use rusqlite::types::ValueRef;
+use slug_error::conversion::rusqlite::SlugErrorAsRusqliteError;
 
 pub(crate) const ARTIFACT_TYPE_DIRECTORY: &str = "directory";
 pub(crate) const ARTIFACT_TYPE_FILE: &str = "file";

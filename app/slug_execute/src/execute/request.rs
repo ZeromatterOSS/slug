@@ -18,6 +18,8 @@ use gazebo::variants::UnpackVariants;
 use host_sharing::host_sharing::HostSharingRequirements;
 use indexmap::IndexSet;
 use itertools::Itertools;
+use prost::Message;
+use remote_execution as RE;
 use slug_common::file_ops::metadata::TrackedFileDigest;
 use slug_common::local_resource_state::LocalResourceState;
 use slug_core::content_hash::ContentBasedPathHash;
@@ -37,8 +39,6 @@ use slug_directory::directory::directory::Directory;
 use slug_directory::directory::directory_iterator::DirectoryIterator;
 use slug_directory::directory::fingerprinted_directory::FingerprintedDirectory;
 use slug_error::slug_error;
-use prost::Message;
-use remote_execution as RE;
 use sorted_vector_map::SortedVectorMap;
 use starlark_map::sorted_set::SortedSet;
 

@@ -11,6 +11,7 @@
 use dupe::Dupe;
 use gazebo::prelude::SliceExt;
 use indoc::indoc;
+use serde_json::json;
 use slug_build_api::interpreter::rule_defs::provider::registration::register_builtin_providers;
 use slug_common::legacy_configs::cells::BuckConfigBasedCells;
 use slug_common::legacy_configs::configs::LegacyBuckConfig;
@@ -28,7 +29,6 @@ use slug_interpreter_for_build::interpreter::testing::Tester;
 use slug_interpreter_for_build::interpreter::testing::run_simple_starlark_test;
 use slug_node::attrs::inspect_options::AttrInspectOptions;
 use slug_node::nodes::unconfigured::testing::targets_to_json;
-use serde_json::json;
 
 #[test]
 fn test_eval_import() {

@@ -22,6 +22,7 @@ use dupe::Dupe;
 use futures::Future;
 use futures::FutureExt;
 use itertools::Itertools;
+use ref_cast::RefCast;
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_artifact::artifact::artifact_type::ArtifactKind;
 use slug_artifact::artifact::artifact_type::BaseArtifactKind;
@@ -47,7 +48,6 @@ use slug_execute::directory::INTERNER;
 use slug_execute::directory::extract_artifact_value;
 use slug_execute::directory::insert_artifact;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use ref_cast::RefCast;
 use smallvec::SmallVec;
 use sorted_vector_map::SortedVectorMap;
 

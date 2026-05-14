@@ -10,8 +10,8 @@
 
 use std::time::Duration;
 
-use slug_error::BuckErrorContext;
 use nix::sys::signal::Signal;
+use slug_error::BuckErrorContext;
 use sysinfo::Process;
 
 use crate::kill::get_sysinfo_status;

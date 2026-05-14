@@ -10,8 +10,8 @@
 
 #![allow(dead_code)] // The code here will be used in future diffs.
 
-use slug_core::soft_error;
 use regex::Regex;
+use slug_core::soft_error;
 
 use crate::interface::HealthCheck;
 use crate::interface::HealthCheckContext;

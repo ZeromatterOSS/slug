@@ -12,9 +12,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use slug_error::BuckErrorContext;
 use parking_lot::Mutex;
 use rusqlite::Connection;
+use slug_error::BuckErrorContext;
 
 /// A generic sqlite table for storing string key-value pairs.
 pub struct KeyValueSqliteTable {

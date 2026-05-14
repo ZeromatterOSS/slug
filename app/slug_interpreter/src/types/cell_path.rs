@@ -12,9 +12,9 @@ use std::hash::Hash;
 
 use allocative::Allocative;
 use derive_more::Display;
-use slug_core::cells::cell_path::CellPath;
 use serde::Serialize;
 use serde::Serializer;
+use slug_core::cells::cell_path::CellPath;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::StarlarkHasher;
 use starlark::environment::GlobalsBuilder;

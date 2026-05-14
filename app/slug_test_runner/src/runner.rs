@@ -15,6 +15,7 @@ use futures::StreamExt;
 use futures::TryStreamExt;
 use futures::channel::mpsc::UnboundedReceiver;
 use host_sharing::HostSharingRequirements;
+use parking_lot::Mutex;
 use slug_error::BuckErrorContext;
 use slug_test_api::data::ArgValue;
 use slug_test_api::data::ArgValueContent;
@@ -30,7 +31,6 @@ use slug_test_api::data::TestResult;
 use slug_test_api::data::TestStage;
 use slug_test_api::data::TestStatus;
 use slug_test_api::grpc::TestOrchestratorClient;
-use parking_lot::Mutex;
 use sorted_vector_map::SortedVectorMap;
 
 use crate::config::Config;

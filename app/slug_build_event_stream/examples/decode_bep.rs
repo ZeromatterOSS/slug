@@ -7,8 +7,8 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-use slug_build_event_stream::build_event_stream as bep;
 use prost::Message;
+use slug_build_event_stream::build_event_stream as bep;
 
 fn main() {
     let path = env::args().nth(1).expect("usage: decode_bep <path>");

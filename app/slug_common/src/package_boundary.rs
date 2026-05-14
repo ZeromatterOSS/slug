@@ -18,6 +18,7 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use ref_cast::RefCast;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path::CellPathRef;
 use slug_core::cells::name::CellName;
@@ -26,7 +27,6 @@ use slug_core::cells::paths::CellRelativePathBuf;
 use slug_fs::paths::file_name::FileNameBuf;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use ref_cast::RefCast;
 
 #[derive(PartialEq, Allocative)]
 pub struct PackageBoundaryExceptions(HashMap<CellName, CellPackageBoundaryExceptions>);

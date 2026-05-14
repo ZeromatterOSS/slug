@@ -16,6 +16,8 @@ use derive_more::Add;
 use faccess::PathExt;
 use futures::Future;
 use futures::future::try_join;
+use once_cell::sync::Lazy;
+use pathdiff::diff_paths;
 use slug_common::file_ops::metadata::FileDigest;
 use slug_common::file_ops::metadata::FileDigestConfig;
 use slug_common::file_ops::metadata::FileMetadata;
@@ -29,8 +31,6 @@ use slug_fs::paths::abs_norm_path::AbsNormPath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::file_name::FileNameBuf;
 use slug_util::future::try_join_all;
-use once_cell::sync::Lazy;
-use pathdiff::diff_paths;
 use tokio::sync::Semaphore;
 
 use crate::directory::ActionDirectoryBuilder;

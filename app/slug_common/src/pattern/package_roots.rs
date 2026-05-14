@@ -20,9 +20,9 @@ use futures::channel::mpsc;
 use futures::future::FutureExt;
 use futures::stream::FuturesUnordered;
 use gazebo::prelude::*;
+use once_cell::sync::Lazy;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::package::PackageLabel;
-use once_cell::sync::Lazy;
 use tokio::sync::Semaphore;
 
 use crate::file_ops::trait_::DiceFileOps;

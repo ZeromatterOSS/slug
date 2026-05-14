@@ -516,9 +516,9 @@ mod tests {
     use std::sync::Arc;
 
     use dupe::Dupe;
+    use regex::Regex;
     use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
     use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-    use regex::Regex;
 
     use crate::category::CategoryRef;
     use crate::cells::CellResolver;

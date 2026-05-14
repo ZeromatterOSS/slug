@@ -18,15 +18,15 @@ use std::str;
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_data::ToProtoMessage;
-use slug_fs::paths::forward_rel_path::ForwardRelativePath;
-use slug_util::hash::BuckHasher;
 use lock_free_hashtable::atomic_value::AtomicValue;
 use pagable::Pagable;
 use ref_cast::RefCastCustom;
 use ref_cast::ref_cast_custom;
 use serde::Serialize;
 use serde::Serializer;
+use slug_data::ToProtoMessage;
+use slug_fs::paths::forward_rel_path::ForwardRelativePath;
+use slug_util::hash::BuckHasher;
 use strong_hash::StrongHash;
 use triomphe::ThinArc;
 

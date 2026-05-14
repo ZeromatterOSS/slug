@@ -22,8 +22,8 @@
 
 use std::time::SystemTime;
 
-use slug_data as data;
 use prost_types::Timestamp;
+use slug_data as data;
 
 use crate::build_event_stream as bep;
 

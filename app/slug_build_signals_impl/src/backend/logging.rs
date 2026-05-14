@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use serde::Deserialize;
+use serde::Serialize;
 use slug_build_signals::env::CriticalPathBackendName;
 use slug_build_signals::env::NodeDuration;
 use slug_build_signals::env::WaitingData;
@@ -15,8 +17,6 @@ use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_data::QuickUnstableE2eData;
 use slug_events::dispatch::EventDispatcher;
 use slug_events::span::SpanId;
-use serde::Deserialize;
-use serde::Serialize;
 use smallvec::SmallVec;
 
 use crate::BuildInfo;

@@ -11,8 +11,8 @@
 use std::fmt;
 
 use allocative::Allocative;
-use slug_error::BuckErrorContext;
 use pagable::Pagable;
+use slug_error::BuckErrorContext;
 
 use crate::attrs::attr_type::AttrType;
 

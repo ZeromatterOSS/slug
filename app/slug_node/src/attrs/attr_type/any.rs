@@ -9,8 +9,8 @@
  */
 
 use allocative::Allocative;
-use slug_util::arc_str::ArcSlice;
 use pagable::Pagable;
+use slug_util::arc_str::ArcSlice;
 
 use crate::attrs::attr_type::list::ListLiteral;
 use crate::attrs::attr_type::string::StringLiteral;

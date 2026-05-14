@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use dupe::Dupe;
+use remote_execution::TDigest;
 use slug_error::Ok;
 use slug_execute::artifact_value::ArtifactValue;
 use slug_execute::digest::CasDigestToReExt;
@@ -21,7 +22,6 @@ use slug_execute::directory::ActionDirectoryMember;
 use slug_execute::directory::ActionSharedDirectory;
 use slug_execute::re::manager::UnconfiguredRemoteExecutionClient;
 use slug_test_api::data::RemoteStorageConfig;
-use remote_execution::TDigest;
 
 type CacheKey = TDigest;
 

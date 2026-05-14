@@ -16,6 +16,7 @@ use allocative::Allocative;
 use async_trait::async_trait;
 use compact_str::CompactString;
 use dupe::Dupe;
+use once_cell::sync::Lazy;
 use slug_core::fs::project::ProjectRoot;
 use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_error::BuckErrorContext;
@@ -27,7 +28,6 @@ use slug_fs::paths::abs_path::AbsPathBuf;
 use slug_fs::paths::file_name::FileName;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use once_cell::sync::Lazy;
 use tokio::sync::Semaphore;
 
 use crate::cas_digest::CasDigestConfig;

@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
-use slug_execute::re::error::RemoteExecutionError;
 use remote_execution::TCode;
 use remote_execution::TStatus;
+use slug_execute::re::error::RemoteExecutionError;
 
 #[cfg_attr(not(fbcode_build), allow(dead_code))]
 pub(crate) trait REErrorWithCodeAndMessage {

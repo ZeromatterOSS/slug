@@ -12,10 +12,10 @@ use std::fmt;
 use std::fmt::Debug;
 
 use futures::future;
-use slug_common::file_ops::metadata::FileDigest;
-use slug_error::BuckErrorContext;
 use remote_execution::InlinedBlobWithDigest;
 use remote_execution::TDigest;
+use slug_common::file_ops::metadata::FileDigest;
+use slug_error::BuckErrorContext;
 
 use crate::digest::CasDigestConversionResultExt;
 use crate::digest::CasDigestFromReExt;

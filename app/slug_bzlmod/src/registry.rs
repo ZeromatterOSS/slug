@@ -27,12 +27,12 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use serde::Deserialize;
+use serde::Serialize;
 use slug_error::BuckErrorContext;
 use slug_http::HttpClient;
 use slug_http::HttpClientBuilder;
 use slug_http::to_bytes;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::cache::ModuleCache;
 use crate::version::Version;

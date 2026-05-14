@@ -14,10 +14,10 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::configuration::transition::id::TransitionId;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProvidersLabel;
-use pagable::Pagable;
 use starlark_map::sorted_map::SortedMap;
 
 use crate::attrs::configuration_context::AttrConfigurationContext;

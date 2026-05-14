@@ -10,13 +10,13 @@
 
 //! Schema for the structured action error within the build report.
 
+use serde::Serialize;
 use slug_data::ActionError;
 use slug_data::CommandExecutionDetails;
 use slug_data::command_execution_kind::Command;
 use slug_event_observer::display::TargetDisplayOptions;
 use slug_event_observer::display::display_action_owner;
 use slug_event_observer::display::get_action_error_reason;
-use serde::Serialize;
 
 use crate::build::build_report::BuildReportCollector;
 

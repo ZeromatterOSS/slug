@@ -16,10 +16,10 @@ use std::str;
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_data::ToProtoMessage;
 use pagable::Pagable;
 use serde::Serialize;
 use serde::Serializer;
+use slug_data::ToProtoMessage;
 use strong_hash::StrongHash;
 
 use crate::configuration::data::ConfigurationData;

@@ -1,11 +1,11 @@
 //! Verify that `make_aborted` produces a BuildFinished-scoped Aborted event
 //! suitable for closing a BEP stream on the cancel / timeout / interrupt path.
 
+use prost::Message;
 use slug_build_event_stream::build_event_stream as bep;
 use slug_build_event_stream::file_sink::Encoding;
 use slug_build_event_stream::file_sink::FileSink;
 use slug_build_event_stream::translate::make_aborted;
-use prost::Message;
 use tempfile::TempDir;
 
 #[test]

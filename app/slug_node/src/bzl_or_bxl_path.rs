@@ -9,9 +9,9 @@
  */
 
 use allocative::Allocative;
+use pagable::Pagable;
 use slug_core::bxl::BxlFilePath;
 use slug_core::bzl::ImportPath;
-use pagable::Pagable;
 use strong_hash::StrongHash;
 
 #[derive(

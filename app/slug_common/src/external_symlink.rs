@@ -15,9 +15,9 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use pagable::Pagable;
 
 type Utf8Path = String;
 

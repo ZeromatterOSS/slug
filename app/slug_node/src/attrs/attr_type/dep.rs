@@ -12,11 +12,11 @@ use std::fmt::Display;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::plugins::PluginKindSet;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProvidersLabel;
 use slug_core::provider::label::ProvidersLabelMaybeConfigured;
-use pagable::Pagable;
 use static_assertions::assert_eq_size;
 use strong_hash::StrongHash;
 

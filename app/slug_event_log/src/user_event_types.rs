@@ -9,6 +9,8 @@
  */
 
 use allocative::Allocative;
+use serde::Deserialize;
+use serde::Serialize;
 use slug_common::convert::ProstDurationExt;
 use slug_data::ActionExecutionKind;
 use slug_data::ActionKind;
@@ -17,8 +19,6 @@ use slug_data::BuckEvent;
 use slug_data::StarlarkUserEvent;
 use slug_event_observer::display::TargetDisplayOptions;
 use slug_event_observer::display::display_action_owner;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::stream_value::StreamValue;
 
@@ -191,12 +191,12 @@ pub(crate) fn try_get_user_event(buck_event: &BuckEvent) -> slug_error::Result<O
 mod tests {
     use std::collections::HashMap;
 
+    use maplit::hashmap;
     use slug_data::StarlarkUserEvent;
     use slug_data::StarlarkUserMetadataDictValue;
     use slug_data::StarlarkUserMetadataListValue;
     use slug_data::StarlarkUserMetadataValue;
     use slug_data::starlark_user_metadata_value::Value;
-    use maplit::hashmap;
 
     #[test]
     fn test_serialize_starlark_user_event() {

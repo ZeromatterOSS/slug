@@ -12,6 +12,7 @@ use std::io::Write;
 
 use async_trait::async_trait;
 use futures::StreamExt;
+use once_cell::sync::Lazy;
 use slug_cli_proto::DapRequest;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
@@ -32,7 +33,6 @@ use slug_client_ctx::subscribers::subscriber::EventSubscriber;
 use slug_event_observer::unpack_event::UnpackedBuckEvent;
 use slug_event_observer::unpack_event::unpack_event;
 use slug_events::BuckEvent;
-use once_cell::sync::Lazy;
 
 /// Run the starlark debug adapter protocol server
 ///

@@ -12,6 +12,7 @@ use std::io::Write;
 use std::time::Instant;
 
 use indexmap::IndexMap;
+use serde::Serialize;
 use slug_build_api::build::graph_properties::debug_compute_configured_graph_properties_uncached;
 use slug_cli_proto::ClientContext;
 use slug_cmd_audit_client::perf::configured_graph_size::ConfiguredGraphSizeCommand;
@@ -20,7 +21,6 @@ use slug_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use slug_server_ctx::ctx::ServerCommandContextTrait;
 use slug_server_ctx::ctx::ServerCommandDiceContext;
 use slug_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use serde::Serialize;
 
 use crate::common::configured_target_labels::audit_command_configured_target_labels;
 

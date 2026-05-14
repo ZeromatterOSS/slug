@@ -11,11 +11,11 @@
 use std::time::Duration;
 use std::time::SystemTime;
 
+use prost::Message;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
 use slug_client_ctx::exit_result::ExitResult;
 use slug_fs::fs_util;
-use prost::Message;
 
 /// Configure paranoid mode.
 ///

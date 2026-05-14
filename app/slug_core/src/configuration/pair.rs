@@ -10,9 +10,9 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_util::hash::BuckHasher;
 use once_cell::sync::Lazy;
 use pagable::Pagable;
+use slug_util::hash::BuckHasher;
 use static_interner::Intern;
 use static_interner::interner;
 use strong_hash::StrongHash;

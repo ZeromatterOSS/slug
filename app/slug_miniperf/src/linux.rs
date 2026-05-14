@@ -13,11 +13,11 @@ use std::os::unix::process::ExitStatusExt;
 use std::process::Command;
 
 use anyhow::Context as _;
+use perf_event::Builder;
+use perf_event::events::Hardware;
 use slug_miniperf_proto::MiniperfCounter;
 use slug_miniperf_proto::MiniperfCounters;
 use slug_miniperf_proto::MiniperfOutput;
-use perf_event::Builder;
-use perf_event::events::Hardware;
 use smallvec::SmallVec;
 
 struct Counters {

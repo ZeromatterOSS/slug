@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use dupe::Dupe;
+use maplit::hashmap;
 use slug_common::legacy_configs::configs::LegacyBuckConfig;
 use slug_common::package_listing::listing::PackageListing;
 use slug_common::package_listing::listing::testing::PackageListingExt;
@@ -27,7 +28,6 @@ use slug_interpreter::extra::InterpreterHostArchitecture;
 use slug_interpreter::extra::InterpreterHostPlatform;
 use slug_interpreter::file_type::StarlarkFileType;
 use slug_node::attrs::coercion_context::AttrCoercionContext;
-use maplit::hashmap;
 use starlark::environment::Globals;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;

@@ -10,9 +10,9 @@
 
 #[cfg(unix)]
 pub fn raise_file_descriptor_limits() -> slug_error::Result<()> {
-    use slug_error::BuckErrorContext;
     use nix::sys::resource;
     use nix::sys::resource::Resource;
+    use slug_error::BuckErrorContext;
 
     let (soft_limit, hard_limit) = resource::getrlimit(Resource::RLIMIT_NOFILE)?;
 

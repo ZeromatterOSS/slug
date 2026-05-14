@@ -49,11 +49,11 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
 use indexmap::IndexMap;
-use slug_error::BuckErrorContext;
 use serde::Deserialize;
 use serde::Serialize;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_error::BuckErrorContext;
 
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::AttrValue;

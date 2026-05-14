@@ -24,6 +24,7 @@ use futures::FutureExt;
 use futures::future;
 use gazebo::prelude::*;
 use indexmap::IndexMap;
+use remote_execution as RE;
 use slug_common::file_ops::metadata::FileDigest;
 use slug_common::file_ops::metadata::FileMetadata;
 use slug_common::file_ops::metadata::Symlink;
@@ -66,7 +67,6 @@ use slug_fs::paths::RelativePathBuf;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use slug_util::time_span::TimeSpan;
 use slug_util::time_span::TimeSpanBuilder;
-use remote_execution as RE;
 
 use crate::executors::local::materialize_inputs;
 use crate::re::paranoid_download::ParanoidDownloader;

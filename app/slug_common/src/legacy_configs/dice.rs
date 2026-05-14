@@ -26,10 +26,10 @@ use dice::OpaqueValue;
 use dice::ProjectionKey;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::cells::name::CellName;
 use slug_error::BuckErrorContext;
 use slug_events::dispatch::get_dispatcher;
-use pagable::Pagable;
 
 use crate::dice::cells::HasCellResolver;
 use crate::legacy_configs::cells::BuckConfigBasedCells;

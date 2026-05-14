@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::is_root_cell_name;
@@ -26,7 +27,6 @@ use slug_core::provider::label::ProvidersLabel;
 use slug_core::target::label::label::TargetLabel;
 use slug_error::internal_error;
 use slug_util::arc_str::ArcStr;
-use pagable::Pagable;
 use strong_hash::StrongHash;
 
 use crate::attrs::attr_type::configuration_dep::ConfigurationDepKind;
@@ -702,10 +702,10 @@ impl<'a> TargetNodeRef<'a> {
 }
 
 pub mod testing {
-    use slug_core::package::PackageLabel;
-    use slug_fs::paths::file_name::FileNameBuf;
     use serde_json::map::Map;
     use serde_json::value::Value;
+    use slug_core::package::PackageLabel;
+    use slug_fs::paths::file_name::FileNameBuf;
 
     use super::*;
     use crate::attrs::attr::Attribute;

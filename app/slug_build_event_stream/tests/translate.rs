@@ -7,13 +7,13 @@
 //! fields that BuildBuddy / jq / `bazel --build_event_json_file` consumers
 //! actually read.
 
+use prost_types::Timestamp;
 use slug_build_event_stream::build_event_stream as bep;
 use slug_build_event_stream::translate::BuildEventContext;
 use slug_build_event_stream::translate::make_aborted;
 use slug_build_event_stream::translate::make_progress;
 use slug_build_event_stream::translate::translate_buck_event;
 use slug_data as data;
-use prost_types::Timestamp;
 
 fn ctx() -> BuildEventContext {
     BuildEventContext {

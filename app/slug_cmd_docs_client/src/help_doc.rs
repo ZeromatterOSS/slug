@@ -12,8 +12,8 @@ use std::fmt::Write;
 
 use clap::Command;
 use clap::builder::PossibleValue;
-use slug_client_ctx::exit_result::ExitResult;
 use regex::Regex;
+use slug_client_ctx::exit_result::ExitResult;
 
 /// Common option headings that appear across multiple slug commands
 const COMMON_OPTION_HEADINGS: &[&str] = &[

@@ -11,11 +11,11 @@
 use std::env;
 use std::mem;
 
+use rand::Rng;
 use slug_fs::fs_util;
 use slug_fs::paths::abs_norm_path::AbsNormPath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::file_name::FileNameBuf;
-use rand::Rng;
 
 /// Temporary path.
 ///

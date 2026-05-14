@@ -12,6 +12,8 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::mem;
 
+use maplit::hashset;
+use once_cell::sync::Lazy;
 use slug_core::provider::label::ProvidersLabel;
 use slug_node::attrs::attr_type::arg::ArgAttrType;
 use slug_node::attrs::attr_type::arg::MacroBase;
@@ -28,8 +30,6 @@ use slug_node::attrs::attr_type::query::QueryMacroBase;
 use slug_node::attrs::coerced_attr::CoercedAttr;
 use slug_node::attrs::coercion_context::AttrCoercionContext;
 use slug_node::attrs::configurable::AttrIsConfigurable;
-use maplit::hashset;
-use once_cell::sync::Lazy;
 use starlark::typing::Ty;
 use starlark::values::Value;
 

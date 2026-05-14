@@ -12,13 +12,13 @@ use std::io;
 use std::path::Path;
 
 use allocative::Allocative;
+use regex::Regex;
+use serde::Deserialize;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_fs::fs_util;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::abs_path::AbsPath;
-use regex::Regex;
-use serde::Deserialize;
 
 #[derive(slug_error::Error, Debug)]
 #[slug(tag = Input)]

@@ -12,8 +12,8 @@ use std::fmt;
 use std::hash::Hash;
 
 use allocative::Allocative;
-use slug_util::arc_str::ArcStr;
 use pagable::Pagable;
+use slug_util::arc_str::ArcStr;
 use starlark_map::ordered_set::OrderedSet;
 
 #[derive(Debug, Pagable, Eq, PartialEq, Hash, Allocative)]

@@ -17,6 +17,8 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use futures::FutureExt;
 use indexmap::IndexMap;
+use remote_execution as RE;
+use remote_execution::TCode;
 use slug_core::execution_types::executor_config::MetaInternalExtraParams;
 use slug_core::execution_types::executor_config::RemoteExecutorDependency;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
@@ -54,8 +56,6 @@ use slug_execute::re::output_trees_download_config::OutputTreesDownloadConfig;
 use slug_execute::re::remote_action_result::ExecuteResponseWithQueueStats;
 use slug_execute::re::remote_action_result::RemoteActionResult;
 use slug_util::time_span::TimeSpan;
-use remote_execution as RE;
-use remote_execution::TCode;
 use tracing::info;
 
 use crate::incremental_actions_helper::save_content_based_incremental_state;

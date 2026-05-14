@@ -12,10 +12,10 @@ use std::os::fd::OwnedFd;
 use std::sync::Arc;
 
 use dupe::Dupe;
-use slug_error::BuckErrorContext;
-use slug_fs::paths::file_name::FileNameBuf;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
+use slug_error::BuckErrorContext;
+use slug_fs::paths::file_name::FileNameBuf;
 
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Environment)]

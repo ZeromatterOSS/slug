@@ -10,10 +10,10 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_core::package::package_relative_path::PackageRelativePath;
-use slug_util::arc_str::ArcS;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_core::package::package_relative_path::PackageRelativePath;
+use slug_util::arc_str::ArcS;
 use starlark_map::sorted_set::SortedSet;
 
 use crate::package_listing::binary_search::binary_search_by;

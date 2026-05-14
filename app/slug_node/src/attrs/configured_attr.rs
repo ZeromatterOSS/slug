@@ -12,6 +12,8 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use allocative::Allocative;
+use serde::Serialize;
+use serde::Serializer;
 use slug_core::package::PackageLabel;
 use slug_core::package::source_path::SourcePathRef;
 use slug_core::plugins::PluginKind;
@@ -21,8 +23,6 @@ use slug_core::target::label::label::TargetLabel;
 use slug_error::internal_error;
 use slug_error::slug_error;
 use slug_util::arc_str::ArcStr;
-use serde::Serialize;
-use serde::Serializer;
 use starlark_map::ordered_map::OrderedMap;
 use starlark_map::small_map;
 

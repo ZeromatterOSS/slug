@@ -20,6 +20,7 @@ use dupe::Dupe;
 use fbinit::FacebookInit;
 use gazebo::prelude::*;
 use gazebo::variants::VariantName;
+use remote::ScribeConfig;
 use slug_build_api::spawner::BuckSpawner;
 use slug_cli_proto::unstable_dice_dump_request::DiceDumpFormat;
 use slug_common::cas_digest::DigestAlgorithm;
@@ -78,7 +79,6 @@ use slug_resource_control::memory_tracker::MemoryTrackerHandle;
 use slug_server_ctx::concurrency::ConcurrencyHandler;
 use slug_server_ctx::ctx::LockedPreviousCommandData;
 use slug_wrapper_common::invocation_id::TraceId;
-use remote::ScribeConfig;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 

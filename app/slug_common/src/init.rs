@@ -12,10 +12,10 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use allocative::Allocative;
-use slug_core::slug_env;
-use slug_error::BuckErrorContext;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_core::slug_env;
+use slug_error::BuckErrorContext;
 
 use crate::legacy_configs::configs::LegacyBuckConfig;
 

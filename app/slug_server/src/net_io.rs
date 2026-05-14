@@ -29,9 +29,9 @@ mod collector {
     use std::sync::Mutex;
 
     use dupe::Dupe;
+    use psutil::network::NetIoCountersCollector;
     use slug_error::BuckErrorContext;
     use slug_error::conversion::from_any_with_tag;
-    use psutil::network::NetIoCountersCollector;
 
     use super::*;
 

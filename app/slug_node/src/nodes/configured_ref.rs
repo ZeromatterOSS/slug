@@ -13,13 +13,13 @@ use std::ops::Deref;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use ref_cast::RefCast;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_query::query::environment::QueryTarget;
 use slug_query::query::graph::node::LabeledNode;
 use slug_query::query::graph::node::NodeKey;
-use ref_cast::RefCast;
 
 use crate::attrs::attr_type::any_matches::AnyMatches;
 use crate::attrs::configured_attr::ConfiguredAttr;

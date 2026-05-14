@@ -13,10 +13,10 @@ use std::task::Context;
 use std::task::Poll;
 
 use futures::stream::Stream;
-use slug_cli_proto::CommandProgress;
-use slug_cli_proto::MultiCommandProgress;
 use pin_project::pin_project;
 use prost::Message;
+use slug_cli_proto::CommandProgress;
+use slug_cli_proto::MultiCommandProgress;
 
 const PREFERRED_MESSAGE_SIZE_BYTES: usize = 32768; // This is an approximation.
 

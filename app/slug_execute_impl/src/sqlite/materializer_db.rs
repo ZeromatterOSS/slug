@@ -191,6 +191,8 @@ mod tests {
     use assert_matches::assert_matches;
     use chrono::TimeZone;
     use itertools::Itertools;
+    use parking_lot::Mutex;
+    use rusqlite::Connection;
     use slug_common::cas_digest::TrackedCasDigest;
     use slug_common::file_ops::metadata::FileMetadata;
     use slug_common::file_ops::metadata::Symlink;
@@ -203,8 +205,6 @@ mod tests {
     use slug_execute::directory::ActionDirectoryMember;
     use slug_execute::directory::new_symlink;
     use slug_fs::paths::forward_rel_path::ForwardRelativePath;
-    use parking_lot::Mutex;
-    use rusqlite::Connection;
 
     use super::*;
     use crate::materializers::deferred::directory_metadata::DirectoryMetadata;

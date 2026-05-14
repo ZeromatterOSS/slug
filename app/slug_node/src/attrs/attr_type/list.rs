@@ -15,10 +15,10 @@ use std::ops::Deref;
 use allocative::Allocative;
 use display_container::fmt_container;
 use gazebo::prelude::SliceExt;
-use slug_util::arc_str::ArcSlice;
 use pagable::Pagable;
 use serde_json::Value;
 use serde_json::to_value;
+use slug_util::arc_str::ArcSlice;
 use strong_hash::StrongHash;
 
 use crate::attrs::attr_type::AttrType;

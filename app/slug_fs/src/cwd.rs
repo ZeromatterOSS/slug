@@ -57,9 +57,9 @@ mod unix_impl {
     use std::os::fd::OwnedFd;
 
     use allocative::Allocative;
-    use slug_error::BuckErrorContext;
     use nix::fcntl::OFlag;
     use nix::sys::stat::Mode;
+    use slug_error::BuckErrorContext;
 
     use super::WorkingDirectoryImpl;
     use crate::paths::abs_norm_path::AbsNormPath;

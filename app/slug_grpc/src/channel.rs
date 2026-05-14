@@ -14,8 +14,8 @@ use std::task::Context;
 use std::task::Poll;
 
 use futures::future;
-use slug_error::BuckErrorContext as _;
 use pin_project::pin_project;
+use slug_error::BuckErrorContext as _;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
 use tokio::io::ReadBuf;

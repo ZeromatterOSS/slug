@@ -10,10 +10,10 @@
 
 use std::fmt::Display;
 
-use slug_common::file_ops::metadata::FileDigest;
-use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use serde::Serialize;
 use serde::Serializer;
+use slug_common::file_ops::metadata::FileDigest;
+use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
 use crate::execute::request::ActionMetadataBlobData;
 

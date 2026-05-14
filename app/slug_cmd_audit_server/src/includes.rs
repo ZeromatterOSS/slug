@@ -20,6 +20,10 @@ use futures::stream::FuturesOrdered;
 use gazebo::prelude::*;
 use indexmap::indexmap;
 use itertools::Itertools;
+use ref_cast::RefCast;
+use serde::Serialize;
+use serde::Serializer;
+use serde::ser::SerializeMap;
 use slug_cli_proto::ClientContext;
 use slug_cmd_audit_client::includes::AuditIncludesCommand;
 use slug_common::dice::cells::HasCellResolver;
@@ -46,10 +50,6 @@ use slug_query::query::traversal::async_depth_first_postorder_traversal;
 use slug_server_ctx::ctx::ServerCommandContextTrait;
 use slug_server_ctx::ctx::ServerCommandDiceContext;
 use slug_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use ref_cast::RefCast;
-use serde::Serialize;
-use serde::Serializer;
-use serde::ser::SerializeMap;
 
 use crate::ServerAuditSubcommand;
 

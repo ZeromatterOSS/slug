@@ -18,6 +18,7 @@ use dice::DiceData;
 use dice::DiceDataBuilder;
 use dice::UserComputationData;
 use dupe::Dupe;
+use remote_execution as RE;
 use slug_core::execution_types::executor_config::CommandExecutorConfig;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
 use slug_error::BuckErrorContext;
@@ -27,7 +28,6 @@ use slug_execute::execute::prepared::PreparedCommandExecutor;
 use slug_execute::execute::prepared::PreparedCommandOptionalExecutor;
 use slug_execute::re::manager::UnconfiguredRemoteExecutionClient;
 use slug_execute::re::output_trees_download_config::OutputTreesDownloadConfig;
-use remote_execution as RE;
 
 use crate::actions::artifact::get_artifact_fs::GetArtifactFs;
 

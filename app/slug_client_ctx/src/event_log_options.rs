@@ -11,6 +11,7 @@
 use std::process::Stdio;
 
 use dupe::Dupe;
+use rand::Rng;
 use slug_common::init::LogDownloadMethod;
 use slug_common::temp_path::TempPath;
 use slug_error::BuckErrorContext;
@@ -25,7 +26,6 @@ use slug_fs::paths::file_name::FileNameBuf;
 use slug_util::indent::indent;
 use slug_util::process::async_background_command;
 use slug_wrapper_common::invocation_id::TraceId;
-use rand::Rng;
 
 use crate::client_ctx::ClientCommandContext;
 use crate::path_arg::PathArg;

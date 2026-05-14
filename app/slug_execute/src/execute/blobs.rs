@@ -11,8 +11,8 @@
 use std::collections::HashMap;
 
 use dupe::Dupe;
-use slug_common::file_ops::metadata::TrackedFileDigest;
 use remote_execution::InlinedBlobWithDigest;
+use slug_common::file_ops::metadata::TrackedFileDigest;
 
 use crate::digest::CasDigestToReExt;
 use crate::digest_config::DigestConfig;

@@ -10,10 +10,10 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProvidersLabel;
 use slug_core::target::label::label::TargetLabel;
-use pagable::Pagable;
 
 use crate::attrs::attr_type::configuration_dep::ConfigurationDepKind;
 use crate::attrs::configuration_context::AttrConfigurationContext;

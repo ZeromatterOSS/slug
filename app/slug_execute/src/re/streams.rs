@@ -11,8 +11,8 @@
 use derivative::Derivative;
 use dupe::Dupe;
 use futures::future;
-use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
 use remote_execution::TActionResult2;
+use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
 
 use crate::digest_config::DigestConfig;
 use crate::execute::output::ReStdStream;

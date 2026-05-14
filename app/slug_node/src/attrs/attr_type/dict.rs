@@ -14,10 +14,10 @@ use std::ops::Deref;
 
 use allocative::Allocative;
 use display_container::fmt_keyed_container;
-use slug_error::slug_error;
-use slug_util::arc_str::ArcSlice;
 use pagable::Pagable;
 use serde_json::Value;
+use slug_error::slug_error;
+use slug_util::arc_str::ArcSlice;
 use strong_hash::StrongHash;
 
 use crate::attrs::attr_type::AttrType;

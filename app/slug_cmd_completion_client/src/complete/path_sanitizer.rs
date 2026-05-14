@@ -231,9 +231,9 @@ impl PathSanitizer {
 
 #[cfg(test)]
 mod tests {
+    use paste::paste;
     use slug_common::invocation_roots::find_invocation_roots;
     use slug_common::legacy_configs::cells::BuckConfigBasedCells;
-    use paste::paste;
 
     use super::*;
 

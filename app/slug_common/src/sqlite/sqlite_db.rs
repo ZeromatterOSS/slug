@@ -16,13 +16,13 @@ use chrono::Utc;
 use derive_more::Display;
 use derive_more::From;
 use dupe::Dupe;
+use parking_lot::Mutex;
+use rusqlite::Connection;
 use slug_error::BuckErrorContext;
 use slug_fs::fs_util;
 use slug_fs::paths::abs_norm_path::AbsNormPath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::file_name::FileName;
-use parking_lot::Mutex;
-use rusqlite::Connection;
 
 use crate::sqlite::key_value_table::KeyValueSqliteTable;
 
@@ -241,10 +241,10 @@ mod tests {
     use std::sync::Arc;
 
     use dupe::Dupe;
-    use slug_core::fs::project::ProjectRootTemp;
-    use slug_core::fs::project_rel_path::ProjectRelativePath;
     use parking_lot::Mutex;
     use rusqlite::Connection;
+    use slug_core::fs::project::ProjectRootTemp;
+    use slug_core::fs::project_rel_path::ProjectRelativePath;
 
     use super::*;
 

@@ -13,6 +13,9 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use dupe::Dupe;
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use parking_lot::MutexGuard;
 use slug_event_observer::dice_state::DiceState;
 use slug_event_observer::pending_estimate::pending_estimate;
 use slug_event_observer::span_tracker;
@@ -22,9 +25,6 @@ use slug_events::BuckEvent;
 use slug_events::dispatch::EventDispatcher;
 use slug_events::span::SpanId;
 use slug_wrapper_common::invocation_id::TraceId;
-use once_cell::sync::Lazy;
-use parking_lot::Mutex;
-use parking_lot::MutexGuard;
 use tokio::sync::oneshot;
 
 static ACTIVE_COMMANDS: Lazy<Mutex<HashMap<TraceId, ActiveCommandHandle>>> =

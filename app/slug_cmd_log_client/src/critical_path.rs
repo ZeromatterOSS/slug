@@ -12,6 +12,7 @@ use std::fmt;
 use std::io::Write;
 use std::time::Duration;
 
+use serde::Serialize;
 use slug_client_ctx::client_ctx::BuckSubcommand;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
@@ -23,7 +24,6 @@ use slug_error::conversion::from_any_with_tag;
 use slug_event_log::stream_value::StreamValue;
 use slug_event_observer::display;
 use slug_event_observer::display::TargetDisplayOptions;
-use serde::Serialize;
 use tokio_stream::StreamExt;
 
 use crate::LogCommandOutputFormat;

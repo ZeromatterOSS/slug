@@ -22,6 +22,8 @@ use derive_more::Display;
 use dupe::Dupe;
 use futures::TryStreamExt;
 use futures::stream::BoxStream;
+use serde::Serialize;
+use serde_json::json;
 use slug_client_ctx::client_ctx::BuckSubcommand;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
@@ -39,8 +41,6 @@ use slug_event_observer::display;
 use slug_event_observer::display::TargetDisplayOptions;
 use slug_events::BuckEvent;
 use slug_fs::paths::abs_path::AbsPathBuf;
-use serde::Serialize;
-use serde_json::json;
 
 #[derive(Debug, clap::Parser)]
 pub struct ChromeTraceCommand {

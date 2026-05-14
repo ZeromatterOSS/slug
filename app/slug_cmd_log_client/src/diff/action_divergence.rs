@@ -10,6 +10,7 @@
 
 use futures::Stream;
 use futures::TryStreamExt;
+use linked_hash_map::LinkedHashMap;
 use slug_client_ctx::client_ctx::BuckSubcommand;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
@@ -21,7 +22,6 @@ use slug_data::get_action_digest;
 use slug_event_log::stream_value::StreamValue;
 use slug_event_observer::display::TargetDisplayOptions;
 use slug_event_observer::display::display_action_identity;
-use linked_hash_map::LinkedHashMap;
 
 use crate::diff::diff_options::DiffEventLogOptions;
 

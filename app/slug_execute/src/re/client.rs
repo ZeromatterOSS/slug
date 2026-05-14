@@ -27,24 +27,6 @@ use futures::StreamExt;
 use futures::stream::BoxStream;
 use gazebo::prelude::*;
 use itertools::Itertools;
-use slug_core::execution_types::executor_config::MetaInternalExtraParams;
-use slug_core::execution_types::executor_config::RemoteExecutorDependency;
-use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
-use slug_core::fs::project::ProjectRoot;
-use slug_core::fs::project_rel_path::ProjectRelativePath;
-use slug_core::slug_env;
-use slug_data::ReQueueAcquiringDependencies;
-use slug_data::ReQueueCancelled;
-use slug_data::ReQueueNoWorkerAvailable;
-use slug_data::ReQueueOverQuota;
-use slug_error::BuckErrorContext;
-use slug_error::conversion::from_any_with_tag;
-use slug_error::slug_error;
-use slug_fs::fs_util;
-use slug_fs::paths::abs_norm_path::AbsNormPath;
-#[cfg(fbcode_build)]
-use slug_re_configuration::CASdMode;
-use slug_re_configuration::RemoteExecutionStaticMetadataImpl;
 use prost::Message;
 use remote_execution as RE;
 use remote_execution::ActionResultRequest;
@@ -81,6 +63,24 @@ use remote_execution::TaskState;
 use remote_execution::UploadRequest;
 use remote_execution::WriteActionResultRequest;
 use remote_execution::WriteActionResultResponse;
+use slug_core::execution_types::executor_config::MetaInternalExtraParams;
+use slug_core::execution_types::executor_config::RemoteExecutorDependency;
+use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
+use slug_core::fs::project::ProjectRoot;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_core::slug_env;
+use slug_data::ReQueueAcquiringDependencies;
+use slug_data::ReQueueCancelled;
+use slug_data::ReQueueNoWorkerAvailable;
+use slug_data::ReQueueOverQuota;
+use slug_error::BuckErrorContext;
+use slug_error::conversion::from_any_with_tag;
+use slug_error::slug_error;
+use slug_fs::fs_util;
+use slug_fs::paths::abs_norm_path::AbsNormPath;
+#[cfg(fbcode_build)]
+use slug_re_configuration::CASdMode;
+use slug_re_configuration::RemoteExecutionStaticMetadataImpl;
 use tokio::sync::Semaphore;
 
 use crate::digest::CasDigestToReExt;
@@ -563,7 +563,6 @@ impl RemoteExecutionClientImpl {
             let mut persistent_cache_mode = None;
             #[cfg(fbcode_build)]
             let client = {
-                use slug_fs::fs_util;
                 use remote_execution::CASDaemonClientCfg;
                 use remote_execution::CopyPolicy;
                 use remote_execution::CurlReactorConfig;
@@ -572,6 +571,7 @@ impl RemoteExecutionClientImpl {
                 use remote_execution::TTLExtendingConfig;
                 use remote_execution::ThreadConfig;
                 use remote_execution::create_default_config;
+                use slug_fs::fs_util;
 
                 let mut re_client_config = create_default_config();
 
@@ -606,11 +606,11 @@ impl RemoteExecutionClientImpl {
                 // want to tell the RE client to rely on an external
                 // CAS daemon to manage the cache.
                 if let Some(external_casd_address) = &static_metadata.shared_casd_address {
-                    use slug_re_configuration::CASdAddress;
-                    use slug_re_configuration::CopyPolicy as SlugCopyPolicy;
                     use remote_execution::RemoteCASdAddress;
                     use remote_execution::RemoteCacheConfig;
                     use remote_execution::RemoteCacheSyncConfig;
+                    use slug_re_configuration::CASdAddress;
+                    use slug_re_configuration::CopyPolicy as SlugCopyPolicy;
 
                     let policies: slug_error::Result<(RemoteFetchPolicy, RemoteFetchPolicy)> =
                         if let Some(legacy_mode) = &static_metadata.legacy_shared_casd_mode {

@@ -10,6 +10,8 @@
 
 use async_trait::async_trait;
 use futures::stream::StreamExt;
+use lsp_server::Message;
+use once_cell::sync::Lazy;
 use slug_cli_proto::LspRequest;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
@@ -26,8 +28,6 @@ use slug_client_ctx::exit_result::ExitResult;
 use slug_client_ctx::ide_support::ide_message_stream;
 use slug_client_ctx::stream_util::reborrow_stream_for_static;
 use slug_client_ctx::streaming::StreamingCommand;
-use lsp_server::Message;
-use once_cell::sync::Lazy;
 
 #[derive(Debug, clap::Parser)]
 #[clap(about = "Start an LSP server for starlark files")]

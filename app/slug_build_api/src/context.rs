@@ -19,9 +19,9 @@ use dice::DiceComputations;
 use dice::DiceTransactionUpdater;
 use dice::InjectedKey;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::fs::buck_out_path::BuckOutPathResolver;
 use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
-use pagable::Pagable;
 
 #[async_trait]
 pub trait HasBuildContextData {

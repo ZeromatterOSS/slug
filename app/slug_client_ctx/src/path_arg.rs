@@ -13,10 +13,10 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use slug_fs::paths::abs_path::AbsPathBuf;
-use slug_fs::working_dir::AbsWorkingDir;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_fs::paths::abs_path::AbsPathBuf;
+use slug_fs::working_dir::AbsWorkingDir;
 
 /// Path arguments for clap which is either absolute or relative to current directory.
 ///

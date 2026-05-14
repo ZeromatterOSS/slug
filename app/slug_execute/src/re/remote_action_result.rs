@@ -11,9 +11,6 @@
 use std::time::Duration;
 use std::time::SystemTime;
 
-use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
-use slug_error::BuckErrorContext;
-use slug_miniperf_proto::MiniperfCounter;
 use remote_execution::ActionResultResponse;
 use remote_execution::ExecuteResponse;
 use remote_execution::TDirectory2;
@@ -22,6 +19,9 @@ use remote_execution::TFile;
 use remote_execution::TSubsysPerfCount;
 use remote_execution::TSymlink;
 use remote_execution::TTimestamp;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
+use slug_error::BuckErrorContext;
+use slug_miniperf_proto::MiniperfCounter;
 
 use crate::digest_config::DigestConfig;
 use crate::execute::kind::CommandExecutionKind;

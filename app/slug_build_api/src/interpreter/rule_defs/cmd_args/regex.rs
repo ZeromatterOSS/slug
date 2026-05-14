@@ -10,10 +10,10 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_interpreter::types::regex::StarlarkBuckRegex;
 use regex::Regex;
 use serde::Serialize;
 use serde::Serializer;
+use slug_interpreter::types::regex::StarlarkBuckRegex;
 use starlark::values::Freeze;
 use starlark::values::FreezeError;
 use starlark::values::FreezeResult;

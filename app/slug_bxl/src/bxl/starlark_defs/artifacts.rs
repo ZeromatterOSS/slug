@@ -22,6 +22,8 @@ use dupe::Dupe;
 use dupe::IterDupedExt;
 use futures::FutureExt;
 use indexmap::IndexSet;
+use serde::Serialize;
+use serde::Serializer;
 use slug_artifact::artifact::artifact_type::BaseArtifactKind;
 use slug_build_api::actions::calculation::ActionCalculation;
 use slug_build_api::actions::execute::action_executor::ActionOutputs;
@@ -33,8 +35,6 @@ use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::St
 use slug_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use slug_build_api::interpreter::rule_defs::depset::depset_to_artifact_group_inputs;
 use slug_execute::path::artifact_path::ArtifactPath;
-use serde::Serialize;
-use serde::Serializer;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallSet;
 use starlark::collections::StarlarkHasher;

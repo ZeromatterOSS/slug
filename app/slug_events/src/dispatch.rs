@@ -26,6 +26,7 @@ use std::time::SystemTime;
 
 use dupe::Dupe;
 use futures::Future;
+use pin_project::pin_project;
 use slug_core::event::EventDispatch;
 use slug_data::SpanEndEvent;
 use slug_data::SpanStartEvent;
@@ -33,7 +34,6 @@ use slug_data::buck_event;
 use slug_data::span_end_event;
 use slug_data::span_start_event;
 use slug_wrapper_common::invocation_id::TraceId;
-use pin_project::pin_project;
 use smallvec::SmallVec;
 
 use crate::BuckEvent;

@@ -9,6 +9,7 @@
  */
 
 use allocative::Allocative;
+use once_cell::sync::Lazy;
 use slug_core::fs::project::ProjectRoot;
 use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_core::slug_env;
@@ -20,7 +21,6 @@ use slug_fs::paths::abs_path::AbsPathBuf;
 use slug_fs::paths::file_name::FileName;
 use slug_fs::paths::file_name::FileNameBuf;
 use slug_fs::working_dir::AbsWorkingDir;
-use once_cell::sync::Lazy;
 
 use crate::invocation_paths::InvocationPaths;
 use crate::invocation_paths_result::InvocationPathsResult;

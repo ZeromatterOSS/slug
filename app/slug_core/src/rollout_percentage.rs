@@ -12,9 +12,9 @@ use std::ffi::OsString;
 use std::str::FromStr;
 
 use dupe::Dupe;
-use slug_error::slug_error;
 use os_str_bytes::OsStrBytes;
 use rand::Rng;
+use slug_error::slug_error;
 
 /// Returns true or false for percentage-based feature rollouts based on a configuration string.
 /// Configurations supported today are random and hostname.

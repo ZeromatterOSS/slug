@@ -219,6 +219,27 @@ use_repo_rule-generated tools such as `@toml2json_linux_amd64`, plus
 cleaning/restoring the stale stubbed crate repos in the shared external
 tree before using zeromatter `//sdk:sdk_contents` as a zstd signal again.
 
+2026-05-13 follow-up: while running Plan 58's narrow glibc shared-library
+repro from `/var/mnt/dev/zeromatter-kuro`, Slug failed before reaching the
+link action:
+
+```text
+BUILD FAILED
+File not found: `llvm+llvm_source+libunwind//src/Unwind-wasm.c`.
+```
+
+The repo was marked complete, but `bazel-external/llvm+llvm_source+libunwind`
+contained top-level absolute symlinks into the old
+`/var/mnt/dev/zeromatter-kuro` workspace. That is a cache/materialization
+correctness bug, not a C++ toolchain semantic. Extension repo materialization
+now treats a complete repo with top-level absolute symlinks outside the current
+project root as stale, removes it, and re-materializes from the current
+RepoSpec. Focused coverage:
+
+```sh
+cargo test -p slug_external_cells foreign_top_level_symlink -- --nocapture
+```
+
 2026-05-09 follow-up 10: completed the repository_ctx Label-tool
 materialization gap for `use_repo_rule()` repos. Bazel source
 `StarlarkBaseExternalContext.execute` converts Label argv entries via

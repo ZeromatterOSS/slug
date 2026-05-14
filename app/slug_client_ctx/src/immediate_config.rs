@@ -11,6 +11,7 @@
 use std::sync::OnceLock;
 use std::time::SystemTime;
 
+use prost::Message;
 use slug_common::argv::ArgFileKind;
 use slug_common::argv::ArgFilePath;
 use slug_common::init::DaemonStartupConfig;
@@ -29,7 +30,6 @@ use slug_fs::paths::abs_norm_path::AbsNormPath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::abs_path::AbsPath;
 use slug_fs::working_dir::AbsWorkingDir;
-use prost::Message;
 
 /// Limited view of the root config. This does not follow includes.
 struct ImmediateConfig {

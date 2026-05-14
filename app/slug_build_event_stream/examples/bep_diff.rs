@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 
-use slug_build_event_stream::build_event_stream as bep;
 use prost::Message;
+use slug_build_event_stream::build_event_stream as bep;
 
 fn read_events(path: &str) -> Vec<bep::BuildEvent> {
     let mut f = File::open(path).unwrap_or_else(|e| panic!("open {path}: {e}"));

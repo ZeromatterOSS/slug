@@ -26,6 +26,7 @@ use futures::channel::mpsc;
 use futures::channel::mpsc::UnboundedSender;
 use futures::pin_mut;
 use futures::select;
+use rand::Rng;
 use slug_cli_proto::DaemonProcessInfo;
 use slug_client_ctx::daemon_constraints::gen_daemon_constraints;
 use slug_client_ctx::version::BuckVersion;
@@ -34,8 +35,8 @@ use slug_common::daemon_dir::DaemonDir;
 use slug_common::init::DaemonStartupConfig;
 use slug_common::invocation_paths::InvocationPaths;
 use slug_common::memory;
-use slug_core::slug_env;
 use slug_core::logging::LogConfigurationReloadHandle;
+use slug_core::slug_env;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::clap::buck_error_clap_parser;
 use slug_events::daemon_id::DaemonId;
@@ -49,7 +50,6 @@ use slug_server::daemon::server::BuckdServerDelegate;
 use slug_server::daemon::server::BuckdServerInitPreferences;
 use slug_util::threads::thread_spawn;
 use slug_util::tokio_runtime::new_tokio_runtime;
-use rand::Rng;
 use tokio::runtime::Builder;
 
 use crate::daemon_lower_priority::daemon_lower_priority;
@@ -586,6 +586,8 @@ mod tests {
 
     use allocative::Allocative;
     use dupe::Dupe;
+    use rand::RngCore;
+    use rand::SeedableRng;
     use slug_cli_proto::DaemonProcessInfo;
     use slug_cli_proto::KillRequest;
     use slug_cli_proto::PingRequest;
@@ -604,8 +606,6 @@ mod tests {
     use slug_server::daemon::server::BuckdServer;
     use slug_server::daemon::server::BuckdServerDelegate;
     use slug_server::daemon::server::BuckdServerInitPreferences;
-    use rand::RngCore;
-    use rand::SeedableRng;
     use tokio::runtime::Handle;
 
     // `fbinit_tokio` is not on crates, so we cannot use `#[fbinit::test]`.

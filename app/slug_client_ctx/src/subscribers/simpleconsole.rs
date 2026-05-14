@@ -20,6 +20,7 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 use dupe::Dupe;
+use once_cell::sync::Lazy;
 use slug_core::slug_env;
 use slug_error::conversion::from_any_with_tag;
 use slug_event_observer::build_summary::BuildSummaryBuilder;
@@ -39,7 +40,6 @@ use slug_events::BuckEvent;
 use slug_health_check::interface::HealthCheckType;
 use slug_health_check::report::DisplayReport;
 use slug_wrapper_common::invocation_id::TraceId;
-use once_cell::sync::Lazy;
 use superconsole::DrawMode;
 use superconsole::SuperConsole;
 use tokio::sync::mpsc::Receiver;

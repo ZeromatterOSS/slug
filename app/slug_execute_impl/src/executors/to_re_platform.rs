@@ -8,8 +8,8 @@
  * above-listed licenses.
  */
 
-use slug_core::execution_types::executor_config::RePlatformFields;
 use remote_execution as RE;
+use slug_core::execution_types::executor_config::RePlatformFields;
 
 pub trait RePlatformFieldsToRePlatform {
     fn to_re_platform(&self) -> RE::Platform;

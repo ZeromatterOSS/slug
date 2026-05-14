@@ -27,6 +27,9 @@ use futures::future::Shared;
 use futures::future::join_all;
 use futures::join;
 use futures::stream::FuturesUnordered;
+use os_str_bytes::OsStrBytes;
+use siphasher::sip128::Hasher128;
+use siphasher::sip128::SipHasher24;
 use slug_build_api::configure_targets::get_compatible_targets;
 use slug_common::file_ops::dice::DiceFileComputations;
 use slug_common::file_ops::error::FileReadErrorContext;
@@ -45,9 +48,6 @@ use slug_query::query::environment::QueryTargetDepsSuccessors;
 use slug_query::query::syntax::simple::eval::set::TargetSet;
 use slug_query::query::traversal::AsyncNodeLookup;
 use slug_query::query::traversal::async_depth_first_postorder_traversal;
-use os_str_bytes::OsStrBytes;
-use siphasher::sip128::Hasher128;
-use siphasher::sip128::SipHasher24;
 
 #[derive(Clone, Dupe, derive_more::Display)]
 #[display("{:032x}", _0)]

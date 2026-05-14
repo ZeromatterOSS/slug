@@ -19,6 +19,7 @@ use dice::UserComputationData;
 use dice::testing::DiceBuilder;
 use dupe::Dupe;
 use indexmap::indexset;
+use maplit::btreemap;
 use slug_analysis::analysis::calculation::AnalysisKey;
 use slug_artifact::actions::key::ActionIndex;
 use slug_artifact::actions::key::ActionKey;
@@ -104,7 +105,6 @@ use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use slug_http::HttpClientBuilder;
 use slug_node::nodes::configured::ConfiguredTargetNode;
 use slug_util::time_span::TimeSpan;
-use maplit::btreemap;
 use sorted_vector_map::sorted_vector_map;
 
 use crate::actions::testings::SimpleAction;

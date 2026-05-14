@@ -16,6 +16,7 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use futures::FutureExt;
+use ref_cast::RefCast;
 use slug_build_api::analysis::calculation::RuleAnalysisCalculation;
 use slug_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
 use slug_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
@@ -42,7 +43,6 @@ use slug_node::nodes::frontend::TargetGraphCalculation;
 use slug_node::nodes::unconfigured::TargetNodeRef;
 use slug_node::rule_type::NativeRuleKind;
 use slug_node::rule_type::RuleType;
-use ref_cast::RefCast;
 use starlark_map::ordered_map::OrderedMap;
 use starlark_map::unordered_map::UnorderedMap;
 

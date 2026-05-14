@@ -11,12 +11,12 @@
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
+use serde::Deserialize;
 use slug_common::local_resource_state::EnvironmentVariable;
 use slug_common::local_resource_state::LocalResource;
 use slug_common::local_resource_state::LocalResourceState;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_error::ErrorTag;
-use serde::Deserialize;
 
 #[derive(Deserialize)]
 /// Represents the JSON schema for output of a local resource command setup.
@@ -71,11 +71,11 @@ impl LocalResourcesSetupResult {
 #[cfg(test)]
 mod tests {
     use indexmap::indexmap;
+    use maplit::btreemap;
     use slug_common::local_resource_state::EnvironmentVariable;
     use slug_common::local_resource_state::LocalResource;
     use slug_core::configuration::data::ConfigurationData;
     use slug_core::target::configured_target_label::ConfiguredTargetLabel;
-    use maplit::btreemap;
 
     use crate::local_resource_api::LocalResourcesSetupResult;
 

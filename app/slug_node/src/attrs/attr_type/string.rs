@@ -13,9 +13,9 @@ use std::ops::Deref;
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_util::arc_str::ArcStr;
 use pagable::Pagable;
 use serde::Serialize;
+use slug_util::arc_str::ArcStr;
 use strong_hash::StrongHash;
 
 use crate::attrs::display::AttrDisplayWithContext;

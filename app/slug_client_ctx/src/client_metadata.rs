@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
-use slug_core::slug_env;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use slug_core::slug_env;
 
 /// A key / value metadata pair provided by the client. This will be injected into Slug's logging.
 #[derive(Clone, Debug, PartialEq, Eq)]

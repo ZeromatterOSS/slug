@@ -14,9 +14,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use remote_execution as RE;
 use slug_core::execution_types::executor_config::ReGangWorker;
 use slug_core::execution_types::executor_config::RemoteExecutorDependency;
-use remote_execution as RE;
 
 use crate::digest_config::DigestConfig;
 use crate::execute::action_digest::ActionDigest;

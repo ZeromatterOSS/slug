@@ -12,12 +12,12 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
-use slug_error::BuckErrorContext;
-use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::Connection;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
+use slug_error::BuckErrorContext;
+use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use starlark_map::small_map::SmallMap;
 
 use crate::incremental_actions_helper::IncrementalPathMap;

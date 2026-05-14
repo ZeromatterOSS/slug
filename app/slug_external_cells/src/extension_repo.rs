@@ -166,6 +166,28 @@ fn build_file_has_invalid_empty_target_label(repo_path: &std::path::Path) -> boo
     })
 }
 
+fn repo_has_foreign_top_level_symlink(
+    repo_path: &std::path::Path,
+    project_root: &std::path::Path,
+) -> bool {
+    let Ok(entries) = std::fs::read_dir(repo_path) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        let path = entry.path();
+        let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+            return false;
+        };
+        if !metadata.file_type().is_symlink() {
+            return false;
+        }
+        let Ok(target) = std::fs::read_link(path) else {
+            return false;
+        };
+        target.is_absolute() && !target.starts_with(project_root)
+    })
+}
+
 fn collect_label_repairs(value: &RepoAttrValue, repairs: &mut Vec<(String, String)>) {
     match value {
         RepoAttrValue::Label(label) | RepoAttrValue::String(label) => {
@@ -627,10 +649,13 @@ pub(crate) async fn get_file_ops_delegate(
         && repo_spec_requires_build_file(&setup.repo_spec_json)
         && !source_path.join("BUILD.bazel").exists()
         && !source_path.join("BUILD").exists();
+    let is_stale_foreign_symlink = marker_contents.as_deref().is_some_and(is_complete_marker)
+        && repo_has_foreign_top_level_symlink(&source_path, &project_root_path);
     if is_stale_stub
         || is_stale_complete
         || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
         || is_stale_missing_build
+        || is_stale_foreign_symlink
     {
         tracing::info!(
             "Extension repo '{}' has stale materialization with a valid RepoSpec available; \
@@ -1164,6 +1189,27 @@ mod tests {
         assert!(is_complete_marker("complete"));
         assert!(is_complete_marker("complete:sha256-old"));
         assert!(!is_complete_marker("stub:sha256-old"));
+    }
+
+    #[test]
+    fn detects_foreign_top_level_symlink() {
+        let base =
+            std::env::temp_dir().join(format!("slug-foreign-symlink-{}", std::process::id()));
+        let project = base.join("project");
+        let repo = project.join("bazel-external/repo");
+        let foreign = base.join("other/repo");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::create_dir_all(&foreign).unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&foreign, repo.join("src")).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&foreign, repo.join("src")).unwrap();
+
+        assert!(repo_has_foreign_top_level_symlink(&repo, &project));
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

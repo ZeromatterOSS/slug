@@ -10,11 +10,11 @@
 
 use std::time::SystemTime;
 
+use once_cell::sync::Lazy;
 use slug_fs::fs_util;
 use slug_fs::paths::abs_norm_path::AbsNormPath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::file_name::FileName;
-use once_cell::sync::Lazy;
 
 use crate::invocation_roots::home_buck_dir;
 

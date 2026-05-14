@@ -28,6 +28,8 @@ use futures::future::BoxFuture;
 use futures::future::Future;
 use futures::future::FutureExt;
 use futures::future::Shared;
+use parking_lot::Mutex;
+use serde::Deserialize;
 use slug_core;
 use slug_core::fs::project::ProjectRoot;
 use slug_core::fs::project_rel_path::ProjectRelativePath;
@@ -40,8 +42,6 @@ use slug_fs::paths::abs_path::AbsPath;
 use slug_fs::paths::abs_path::AbsPathBuf;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use parking_lot::Mutex;
-use serde::Deserialize;
 use tokio::sync::Semaphore;
 
 use crate::error::ConnectAndRequestError;

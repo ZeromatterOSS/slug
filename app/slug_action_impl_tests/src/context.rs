@@ -10,6 +10,7 @@
 
 use dupe::Dupe;
 use indoc::indoc;
+use maplit::hashmap;
 use slug_build_api::analysis::registry::AnalysisRegistry;
 use slug_build_api::interpreter::rule_defs::context::AnalysisContext;
 use slug_build_api::interpreter::rule_defs::plugins::AnalysisPlugins;
@@ -21,7 +22,6 @@ use slug_core::target::label::label::TargetLabel;
 use slug_execute::digest_config::DigestConfig;
 use slug_interpreter::file_type::StarlarkFileType;
 use slug_interpreter::from_freeze::from_freeze_error;
-use maplit::hashmap;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;

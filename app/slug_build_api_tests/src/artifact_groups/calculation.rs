@@ -15,6 +15,7 @@ use dice::UserComputationData;
 use dice::testing::DiceBuilder;
 use dupe::Dupe;
 use indoc::indoc;
+use maplit::btreemap;
 use slug_analysis::analysis::calculation::AnalysisKey;
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_artifact::artifact::source_artifact::SourceArtifact;
@@ -51,7 +52,6 @@ use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_execute::artifact_value::ArtifactValue;
 use slug_execute::digest_config::DigestConfig;
 use slug_execute::digest_config::SetDigestConfig;
-use maplit::btreemap;
 use starlark::values::OwnedFrozenValue;
 use starlark::values::OwnedFrozenValueTyped;
 

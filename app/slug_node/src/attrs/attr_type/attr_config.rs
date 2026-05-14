@@ -12,8 +12,8 @@ use std::fmt::Display;
 
 use dupe::Dupe;
 use either::Either;
-use slug_core::package::source_path::SourcePathRef;
 use serde_json::to_value;
+use slug_core::package::source_path::SourcePathRef;
 
 use crate::attrs::attr_type::any_matches::AnyMatches;
 use crate::attrs::coerced_attr::CoercedAttr;

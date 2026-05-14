@@ -17,14 +17,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use dupe::Dupe;
+use ref_cast::RefCast;
+use relative_path::RelativePathBuf;
 use slug_error::BuckErrorContext;
 use slug_fs::fs_util;
 use slug_fs::paths::RelativePath;
 use slug_fs::paths::abs_norm_path::AbsNormPath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
-use ref_cast::RefCast;
-use relative_path::RelativePathBuf;
 
 #[derive(Debug, slug_error::Error)]
 #[slug(input)]

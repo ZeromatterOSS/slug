@@ -14,14 +14,14 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_error::BuckErrorContext;
-use slug_error::slug_error;
-use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use once_cell::sync::Lazy;
 use pagable::Pagable;
 use regex::Regex;
 use relative_path::RelativePath;
 use serde::Serialize;
+use slug_error::BuckErrorContext;
+use slug_error::slug_error;
+use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 
 use crate::cells::CellAliasResolver;
 use crate::cells::CellResolver;

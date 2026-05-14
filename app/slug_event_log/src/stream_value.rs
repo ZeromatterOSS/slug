@@ -9,10 +9,10 @@
  */
 
 use allocative::Allocative;
-use slug_cli_proto::CommandResult;
-use slug_cli_proto::PartialResult;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_cli_proto::CommandResult;
+use slug_cli_proto::PartialResult;
 
 #[derive(Allocative, Deserialize, Serialize)]
 #[allow(clippy::large_enum_variant)]

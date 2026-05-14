@@ -9,10 +9,10 @@
  */
 
 use async_trait::async_trait;
+use remote_execution::TActionResult2;
 use slug_action_metadata_proto::RemoteDepFile;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
 use slug_core::slug_env;
-use remote_execution::TActionResult2;
 
 use crate::digest_config::DigestConfig;
 use crate::execute::action_digest_and_blobs::ActionDigestAndBlobs;

@@ -15,6 +15,8 @@ use std::sync::atomic::AtomicU64;
 use std::time::SystemTime;
 
 use futures::future::Future;
+use prost::Message;
+use serde::Serialize;
 use slug_cli_proto::*;
 use slug_common::argv::SanitizedArgv;
 use slug_error::BuckErrorContext;
@@ -23,8 +25,6 @@ use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 use slug_fs::paths::abs_path::AbsPathBuf;
 use slug_fs::working_dir::AbsWorkingDir;
 use slug_wrapper_common::invocation_id::TraceId;
-use prost::Message;
-use serde::Serialize;
 use tokio::fs::OpenOptions;
 
 use crate::FutureChildOutput;

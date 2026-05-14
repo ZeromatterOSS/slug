@@ -124,9 +124,9 @@ impl<'a> FileExpr<'a> {
 #[cfg(test)]
 mod tests {
 
+    use maplit::hashmap;
     use slug_core::cells::alias::NonEmptyCellAlias;
     use slug_core::cells::name::CellName;
-    use maplit::hashmap;
 
     use super::*;
 

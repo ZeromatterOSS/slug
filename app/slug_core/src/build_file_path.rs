@@ -10,9 +10,9 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_fs::paths::file_name::FileName;
 use slug_fs::paths::file_name::FileNameBuf;
-use pagable::Pagable;
 
 use crate::cells::build_file_cell::BuildFileCell;
 use crate::cells::cell_path::CellPath;

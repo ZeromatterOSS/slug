@@ -14,8 +14,8 @@ use std::task::Context;
 use std::task::Poll;
 
 use futures::Stream;
-use slug_cli_proto::StreamingRequest;
 use pin_project::pin_project;
+use slug_cli_proto::StreamingRequest;
 use tonic::Status;
 
 #[derive(Debug, slug_error::Error)]

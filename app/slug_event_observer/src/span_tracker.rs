@@ -14,10 +14,10 @@ use std::sync::Arc;
 use derivative::Derivative;
 use derive_more::From;
 use dupe::Dupe;
+use linked_hash_map::LinkedHashMap;
 use slug_error::BuckErrorContext;
 use slug_events::BuckEvent;
 use slug_events::span::SpanId;
-use linked_hash_map::LinkedHashMap;
 
 use crate::what_ran::WhatRanRelevantAction;
 use crate::what_ran::WhatRanState;

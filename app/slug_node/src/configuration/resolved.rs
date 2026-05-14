@@ -13,11 +13,11 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::configuration::config_setting::ConfigSettingData;
 use slug_core::configuration::pair::ConfigurationNoExec;
 use slug_core::provider::label::ProvidersLabel;
 use slug_core::target::label::label::TargetLabel;
-use pagable::Pagable;
 use starlark_map::unordered_map::UnorderedMap;
 
 /// Key in `select` or an item in `target_compatible_with`.

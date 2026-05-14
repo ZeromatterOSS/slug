@@ -14,11 +14,11 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use dupe::Dupe;
+use regex::Regex;
 use slug_data::ActionName;
 use slug_data::SchedulingMode;
 use slug_data::re_platform::Property;
 use slug_events::span::SpanId;
-use regex::Regex;
 use superconsole::Line;
 use superconsole::Lines;
 use superconsole::SuperConsole;

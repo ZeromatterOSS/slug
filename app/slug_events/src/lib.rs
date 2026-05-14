@@ -41,10 +41,10 @@ use std::time::SystemTime;
 
 use derive_more::From;
 use gazebo::variants::UnpackVariants;
+use serde::Serialize;
 use slug_cli_proto::CommandResult;
 use slug_cli_proto::PartialResult;
 use slug_wrapper_common::invocation_id::TraceId;
-use serde::Serialize;
 
 use crate::sink::channel::ChannelEventSink;
 use crate::source::ChannelEventSource;

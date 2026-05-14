@@ -22,6 +22,7 @@ use futures::stream::FuturesUnordered;
 use gazebo::prelude::*;
 use indexmap::IndexSet;
 use itertools::Itertools;
+use ref_cast::RefCast;
 use slug_common::package_listing::dice::DicePackageListingResolver;
 use slug_common::package_listing::resolver::PackageListingResolver;
 use slug_common::pattern::resolve::ResolvedPattern;
@@ -56,7 +57,6 @@ use slug_query::query::traversal::ChildVisitor;
 use slug_query::query::traversal::async_depth_first_postorder_traversal;
 use slug_query::query::traversal::async_depth_limited_traversal;
 use slug_util::future::try_join_all;
-use ref_cast::RefCast;
 use tracing::warn;
 
 type ArcCellPath = Arc<CellPath>;

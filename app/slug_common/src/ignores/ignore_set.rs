@@ -11,10 +11,10 @@
 use allocative::Allocative;
 use globset::Candidate;
 use globset::GlobSetBuilder;
-use slug_core::cells::paths::CellRelativePath;
-use slug_error::conversion::from_any_with_tag;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use slug_core::cells::paths::CellRelativePath;
+use slug_error::conversion::from_any_with_tag;
 
 #[derive(Debug, Clone, Allocative)]
 pub struct IgnoreSet {

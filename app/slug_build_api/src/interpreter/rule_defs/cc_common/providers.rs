@@ -534,9 +534,21 @@ pub struct LibraryToLinkGen<V: ValueLifetimeless> {
     pub(crate) pic_static_library: V,
     pub(crate) dynamic_library: V,
     pub(crate) interface_library: V,
+    pub(crate) resolved_symlink_dynamic_library: V,
+    pub(crate) resolved_symlink_interface_library: V,
     pub(crate) objects: V,
     pub(crate) pic_objects: V,
     pub(crate) alwayslink: bool,
+    pub(crate) lto_bitcode_files: V,
+    pub(crate) pic_lto_bitcode_files: V,
+    pub(crate) library_identifier: V,
+    pub(crate) contains_objects: bool,
+    pub(crate) disable_whole_archive: bool,
+    pub(crate) must_keep_debug: bool,
+    pub(crate) lto_compilation_context: V,
+    pub(crate) pic_lto_compilation_context: V,
+    pub(crate) shared_non_lto_backends: V,
+    pub(crate) pic_shared_non_lto_backends: V,
 }
 
 starlark_complex_value!(pub LibraryToLink);
@@ -559,9 +571,21 @@ where
                 | "pic_static_library"
                 | "dynamic_library"
                 | "interface_library"
+                | "resolved_symlink_dynamic_library"
+                | "resolved_symlink_interface_library"
                 | "objects"
                 | "pic_objects"
                 | "alwayslink"
+                | "lto_bitcode_files"
+                | "pic_lto_bitcode_files"
+                | "_library_identifier"
+                | "_contains_objects"
+                | "_disable_whole_archive"
+                | "_must_keep_debug"
+                | "_lto_compilation_context"
+                | "_pic_lto_compilation_context"
+                | "_shared_non_lto_backends"
+                | "_pic_shared_non_lto_backends"
         )
     }
 
@@ -571,21 +595,49 @@ where
             "pic_static_library" => Some(self.pic_static_library.to_value()),
             "dynamic_library" => Some(self.dynamic_library.to_value()),
             "interface_library" => Some(self.interface_library.to_value()),
+            "resolved_symlink_dynamic_library" => {
+                Some(self.resolved_symlink_dynamic_library.to_value())
+            }
+            "resolved_symlink_interface_library" => {
+                Some(self.resolved_symlink_interface_library.to_value())
+            }
             "objects" => {
                 if self.objects.to_value().is_none() {
-                    Some(heap.alloc(starlark::values::list::AllocList::EMPTY))
+                    Some(heap.alloc(AllocList::EMPTY))
                 } else {
                     Some(self.objects.to_value())
                 }
             }
             "pic_objects" => {
                 if self.pic_objects.to_value().is_none() {
-                    Some(heap.alloc(starlark::values::list::AllocList::EMPTY))
+                    Some(heap.alloc(AllocList::EMPTY))
                 } else {
                     Some(self.pic_objects.to_value())
                 }
             }
             "alwayslink" => Some(Value::new_bool(self.alwayslink)),
+            "lto_bitcode_files" => {
+                if self.lto_bitcode_files.to_value().is_none() {
+                    Some(heap.alloc(AllocList::EMPTY))
+                } else {
+                    Some(self.lto_bitcode_files.to_value())
+                }
+            }
+            "pic_lto_bitcode_files" => {
+                if self.pic_lto_bitcode_files.to_value().is_none() {
+                    Some(heap.alloc(AllocList::EMPTY))
+                } else {
+                    Some(self.pic_lto_bitcode_files.to_value())
+                }
+            }
+            "_library_identifier" => Some(self.library_identifier.to_value()),
+            "_contains_objects" => Some(Value::new_bool(self.contains_objects)),
+            "_disable_whole_archive" => Some(Value::new_bool(self.disable_whole_archive)),
+            "_must_keep_debug" => Some(Value::new_bool(self.must_keep_debug)),
+            "_lto_compilation_context" => Some(self.lto_compilation_context.to_value()),
+            "_pic_lto_compilation_context" => Some(self.pic_lto_compilation_context.to_value()),
+            "_shared_non_lto_backends" => Some(self.shared_non_lto_backends.to_value()),
+            "_pic_shared_non_lto_backends" => Some(self.pic_shared_non_lto_backends.to_value()),
             _ => None,
         }
     }
@@ -610,12 +662,51 @@ where
                 .interface_library
                 .to_value()
                 .equals(other.interface_library.to_value())?
+            && self
+                .resolved_symlink_dynamic_library
+                .to_value()
+                .equals(other.resolved_symlink_dynamic_library.to_value())?
+            && self
+                .resolved_symlink_interface_library
+                .to_value()
+                .equals(other.resolved_symlink_interface_library.to_value())?
             && self.objects.to_value().equals(other.objects.to_value())?
             && self
                 .pic_objects
                 .to_value()
                 .equals(other.pic_objects.to_value())?
-            && self.alwayslink == other.alwayslink)
+            && self.alwayslink == other.alwayslink
+            && self
+                .lto_bitcode_files
+                .to_value()
+                .equals(other.lto_bitcode_files.to_value())?
+            && self
+                .pic_lto_bitcode_files
+                .to_value()
+                .equals(other.pic_lto_bitcode_files.to_value())?
+            && self
+                .library_identifier
+                .to_value()
+                .equals(other.library_identifier.to_value())?
+            && self.contains_objects == other.contains_objects
+            && self.disable_whole_archive == other.disable_whole_archive
+            && self.must_keep_debug == other.must_keep_debug
+            && self
+                .lto_compilation_context
+                .to_value()
+                .equals(other.lto_compilation_context.to_value())?
+            && self
+                .pic_lto_compilation_context
+                .to_value()
+                .equals(other.pic_lto_compilation_context.to_value())?
+            && self
+                .shared_non_lto_backends
+                .to_value()
+                .equals(other.shared_non_lto_backends.to_value())?
+            && self
+                .pic_shared_non_lto_backends
+                .to_value()
+                .equals(other.pic_shared_non_lto_backends.to_value())?)
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
@@ -624,9 +715,25 @@ where
         self.pic_static_library.to_value().write_hash(hasher)?;
         self.dynamic_library.to_value().write_hash(hasher)?;
         self.interface_library.to_value().write_hash(hasher)?;
+        self.resolved_symlink_dynamic_library
+            .to_value()
+            .write_hash(hasher)?;
+        self.resolved_symlink_interface_library
+            .to_value()
+            .write_hash(hasher)?;
         write_cc_hashable_value(self.objects.to_value(), hasher)?;
         write_cc_hashable_value(self.pic_objects.to_value(), hasher)?;
         self.alwayslink.hash(hasher);
+        write_cc_hashable_value(self.lto_bitcode_files.to_value(), hasher)?;
+        write_cc_hashable_value(self.pic_lto_bitcode_files.to_value(), hasher)?;
+        self.library_identifier.to_value().write_hash(hasher)?;
+        self.contains_objects.hash(hasher);
+        self.disable_whole_archive.hash(hasher);
+        self.must_keep_debug.hash(hasher);
+        write_cc_hashable_value(self.lto_compilation_context.to_value(), hasher)?;
+        write_cc_hashable_value(self.pic_lto_compilation_context.to_value(), hasher)?;
+        write_cc_hashable_value(self.shared_non_lto_backends.to_value(), hasher)?;
+        write_cc_hashable_value(self.pic_shared_non_lto_backends.to_value(), hasher)?;
         Ok(())
     }
 }
@@ -2163,6 +2270,7 @@ pub struct LinkerInputStubGen<V: ValueLifetimeless> {
     pub(crate) libraries: V,
     pub(crate) user_link_flags: V,
     pub(crate) additional_inputs: V,
+    pub(crate) linkstamps: V,
 }
 
 starlark_complex_value!(pub LinkerInputStub);
@@ -2181,7 +2289,7 @@ where
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "owner" | "libraries" | "user_link_flags" | "additional_inputs"
+            "owner" | "libraries" | "user_link_flags" | "additional_inputs" | "linkstamps"
         )
     }
 
@@ -2210,6 +2318,13 @@ where
                     Some(self.additional_inputs.to_value())
                 }
             }
+            "linkstamps" => {
+                if self.linkstamps.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.linkstamps.to_value())
+                }
+            }
             _ => None,
         }
     }
@@ -2230,7 +2345,11 @@ where
             && self
                 .additional_inputs
                 .to_value()
-                .equals(other.additional_inputs.to_value())?)
+                .equals(other.additional_inputs.to_value())?
+            && self
+                .linkstamps
+                .to_value()
+                .equals(other.linkstamps.to_value())?)
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
@@ -2239,6 +2358,7 @@ where
         write_cc_hashable_value(self.libraries.to_value(), hasher)?;
         write_cc_hashable_value(self.user_link_flags.to_value(), hasher)?;
         write_cc_hashable_value(self.additional_inputs.to_value(), hasher)?;
+        write_cc_hashable_value(self.linkstamps.to_value(), hasher)?;
         Ok(())
     }
 }
@@ -2246,6 +2366,65 @@ where
 // ============================================================================
 // LinkingContextWithInputs - Linking context with actual linker inputs
 // ============================================================================
+
+/// A minimal ExtraLinkTimeLibrariesInfo-compatible value.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
+#[repr(C)]
+pub struct ExtraLinkTimeLibrariesGen<V: ValueLifetimeless> {
+    pub(crate) libraries: V,
+}
+
+starlark_complex_value!(pub ExtraLinkTimeLibraries);
+
+impl<V: ValueLifetimeless> Display for ExtraLinkTimeLibrariesGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<ExtraLinkTimeLibraries>")
+    }
+}
+
+#[starlark::values::starlark_value(type = "ExtraLinkTimeLibraries")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for ExtraLinkTimeLibrariesGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "libraries")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "libraries" => {
+                if self.libraries.to_value().is_none() {
+                    Some(heap.alloc(AllocList::EMPTY))
+                } else {
+                    Some(self.libraries.to_value())
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some(other) = other.downcast_ref::<ExtraLinkTimeLibrariesGen<V>>() else {
+            return Ok(false);
+        };
+        self.libraries.to_value().equals(other.libraries.to_value())
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "ExtraLinkTimeLibraries".hash(hasher);
+        write_cc_hashable_value(self.libraries.to_value(), hasher)?;
+        Ok(())
+    }
+}
 
 /// A linking context that stores actual linker inputs.
 #[derive(
@@ -2260,6 +2439,7 @@ where
 #[repr(C)]
 pub struct LinkingContextWithInputsGen<V: ValueLifetimeless> {
     pub(crate) linker_inputs: V,
+    pub(crate) extra_link_time_libraries: V,
 }
 
 starlark_complex_value!(pub LinkingContextWithInputs);
@@ -2276,7 +2456,7 @@ where
     Self: ProvidesStaticType<'v>,
 {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "linker_inputs")
+        matches!(attribute, "linker_inputs" | "_extra_link_time_libraries")
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -2288,6 +2468,7 @@ where
                     Some(self.linker_inputs.to_value())
                 }
             }
+            "_extra_link_time_libraries" => Some(self.extra_link_time_libraries.to_value()),
             _ => None,
         }
     }
@@ -2295,6 +2476,7 @@ where
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "LinkingContext".hash(hasher);
         write_cc_hashable_value(self.linker_inputs.to_value(), hasher)?;
+        write_cc_hashable_value(self.extra_link_time_libraries.to_value(), hasher)?;
         Ok(())
     }
 }

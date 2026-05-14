@@ -9,8 +9,8 @@
  */
 
 use dupe::Dupe;
-use slug_common::file_ops::metadata::TrackedFileDigest;
 use remote_execution as RE;
+use slug_common::file_ops::metadata::TrackedFileDigest;
 
 use crate::digest_config::DigestConfig;
 use crate::execute::action_digest::ActionDigest;

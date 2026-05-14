@@ -14,6 +14,8 @@ use std::time::Duration;
 
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use remote_execution as RE;
+use remote_execution::TActionResult2;
 use slug_common::file_ops::metadata::TrackedFileDigest;
 use slug_core::execution_types::executor_config::CommandGenerationOptions;
 use slug_core::execution_types::executor_config::OutputPathsBehavior;
@@ -27,8 +29,6 @@ use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_directory::directory::fingerprinted_directory::FingerprintedDirectory;
 use slug_error::BuckErrorContext;
 use slug_error::slug_error;
-use remote_execution as RE;
-use remote_execution::TActionResult2;
 use sorted_vector_map::SortedVectorMap;
 
 use super::cache_uploader::CacheUploadResult;

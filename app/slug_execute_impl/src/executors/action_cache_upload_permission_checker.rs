@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use dupe::Dupe;
+use remote_execution::TCode;
 use slug_core::async_once_cell::AsyncOnceCell;
 use slug_core::execution_types::executor_config::RePlatformFields;
 use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
@@ -21,7 +22,6 @@ use slug_execute::digest_config::DigestConfig;
 use slug_execute::re::client::ActionCacheWriteType;
 use slug_execute::re::error::RemoteExecutionError;
 use slug_execute::re::manager::ManagedRemoteExecutionClient;
-use remote_execution::TCode;
 
 use crate::executors::empty_action_result::empty_action_result;
 use crate::executors::to_re_platform::RePlatformFieldsToRePlatform;

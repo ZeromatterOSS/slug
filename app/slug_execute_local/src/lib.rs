@@ -29,6 +29,7 @@ use futures::future::select;
 use futures::stream::Stream;
 use futures::stream::StreamExt;
 use futures::stream::TryStreamExt;
+use pin_project::pin_project;
 use slug_error::BuckErrorContext;
 use slug_fs::fs_util;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
@@ -36,7 +37,6 @@ use slug_fs::paths::abs_path::AbsPath;
 use slug_resource_control::ActionFreezeEventReceiver;
 use slug_resource_control::action_cgroups::ActionCgroupResult;
 use slug_resource_control::path::CgroupPathBuf;
-use pin_project::pin_project;
 use tokio_util::codec::BytesCodec;
 use tokio_util::codec::FramedRead;
 

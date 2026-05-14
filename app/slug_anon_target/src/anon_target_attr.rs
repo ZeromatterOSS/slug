@@ -13,6 +13,9 @@ use std::fmt::Debug;
 use allocative::Allocative;
 use dupe::Dupe;
 use gazebo::prelude::SliceExt;
+use serde::Serialize;
+use serde::Serializer;
+use serde_json::to_value;
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_build_api::artifact_groups::promise::PromiseArtifactAttr;
 use slug_core::package::PackageLabel;
@@ -33,9 +36,6 @@ use slug_node::attrs::display::AttrDisplayWithContext;
 use slug_node::attrs::fmt_context::AttrFmtContext;
 use slug_node::attrs::json::ToJsonWithContext;
 use slug_node::attrs::serialize::AttrSerializeWithContext;
-use serde::Serialize;
-use serde::Serializer;
-use serde_json::to_value;
 
 use crate::anon_target_attr_resolve::AnonTargetAttrTraversal;
 

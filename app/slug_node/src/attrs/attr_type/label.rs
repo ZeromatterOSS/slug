@@ -10,8 +10,8 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_core::provider::label::ProvidersLabel;
 use pagable::Pagable;
+use slug_core::provider::label::ProvidersLabel;
 
 use crate::attrs::configuration_context::AttrConfigurationContext;
 use crate::attrs::configured_attr::ConfiguredAttr;

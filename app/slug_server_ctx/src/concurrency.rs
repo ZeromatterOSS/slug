@@ -825,6 +825,7 @@ mod tests {
     use dupe::Dupe;
     use futures::pin_mut;
     use futures::poll;
+    use parking_lot::Mutex;
     use slug_build_signals::env::EXCLUSIVE_COMMAND_WAIT;
     use slug_build_signals::env::FILE_WATCHER_WAIT;
     use slug_common::legacy_configs::dice::SetLegacyConfigs;
@@ -836,7 +837,6 @@ mod tests {
     use slug_events::sink::null::NullEventSink;
     use slug_events::source::ChannelEventSource;
     use slug_events::span::SpanId;
-    use parking_lot::Mutex;
     use tokio::sync::Barrier;
     use tokio::sync::RwLock;
 

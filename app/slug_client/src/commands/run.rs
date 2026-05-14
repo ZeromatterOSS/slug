@@ -13,6 +13,7 @@ use std::fs::File;
 use std::io::Write;
 
 use async_trait::async_trait;
+use serde::Serialize;
 use slug_cli_proto::BuildRequest;
 use slug_cli_proto::build_request::BuildProviders;
 use slug_cli_proto::build_request::Materializations;
@@ -41,7 +42,6 @@ use slug_error::conversion::from_any_with_tag;
 use slug_wrapper_common::BUCK_WRAPPER_START_TIME_ENV_VAR;
 use slug_wrapper_common::BUCK_WRAPPER_UUID_ENV_VAR;
 use slug_wrapper_common::BUCK2_WRAPPER_ENV_VAR;
-use serde::Serialize;
 
 use crate::commands::build::print_build_failed;
 use crate::commands::build::print_build_result;

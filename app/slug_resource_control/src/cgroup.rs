@@ -18,10 +18,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dupe::Dupe;
-use slug_fs::paths::file_name::FileName;
-use slug_fs::paths::file_name::FileNameBuf;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
+use slug_fs::paths::file_name::FileName;
+use slug_fs::paths::file_name::FileNameBuf;
 
 use crate::cgroup_files::CgroupFile;
 use crate::cgroup_files::MemoryStat;

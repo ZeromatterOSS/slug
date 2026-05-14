@@ -19,13 +19,13 @@ use allocative::Allocative;
 use derivative::Derivative;
 use dupe::Dupe;
 use indexmap::IndexMap;
+use remote_execution::TActionResult2;
 use slug_action_metadata_proto::RemoteDepFile;
 use slug_build_signals::env::WaitingData;
 use slug_core::content_hash::ContentBasedPathHash;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
 use slug_data::SchedulingMode;
 use slug_util::time_span::TimeSpan;
-use remote_execution::TActionResult2;
 
 use crate::artifact_value::ArtifactValue;
 use crate::execute::claim::Claim;

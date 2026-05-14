@@ -19,6 +19,7 @@ use chrono::TimeZone;
 use chrono::Utc;
 use dupe::Dupe;
 use indexmap::IndexSet;
+use remote_execution as RE;
 use slug_artifact::artifact::build_artifact::BuildArtifact;
 use slug_build_api::actions::Action;
 use slug_build_api::actions::ActionExecutionCtx;
@@ -47,7 +48,6 @@ use slug_execute::directory::re_tree_to_directory;
 use slug_execute::execute::command_executor::ActionExecutionTimingData;
 use slug_execute::materialize::materializer::CasDownloadInfo;
 use slug_execute::materialize::materializer::DeclareArtifactPayload;
-use remote_execution as RE;
 use starlark::values::OwnedFrozenValue;
 
 use crate::actions::impls::offline;

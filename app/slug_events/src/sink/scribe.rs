@@ -12,6 +12,8 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use fbinit::FacebookInit;
+use prost::Message;
+pub use scribe_client::ScribeConfig;
 use slug_core::slug_env;
 use slug_data::ActionExecutionEnd;
 use slug_data::InstantEvent;
@@ -20,8 +22,6 @@ use slug_data::StructuredError;
 use slug_error::ErrorTag;
 use slug_error::conversion::from_any_with_tag;
 use slug_util::truncate::truncate;
-use prost::Message;
-pub use scribe_client::ScribeConfig;
 
 use crate::BuckEvent;
 use crate::Event;

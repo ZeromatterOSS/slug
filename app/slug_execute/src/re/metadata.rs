@@ -8,11 +8,11 @@
  * above-listed licenses.
  */
 
-use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
-use slug_events::dispatch::get_dispatcher_opt;
 use remote_execution::ActionHistoryInfo;
 use remote_execution::BuckInfo;
 use remote_execution::RemoteExecutionMetadata;
+use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
+use slug_events::dispatch::get_dispatcher_opt;
 
 use crate::re::action_identity::ReActionIdentity;
 

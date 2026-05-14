@@ -13,10 +13,10 @@ use std::ops::Deref;
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_util::arc_str::ThinArcStr;
 use pagable::Pagable;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_util::arc_str::ThinArcStr;
 use strong_hash::StrongHash;
 
 use crate::ascii_char_set::AsciiCharSet;

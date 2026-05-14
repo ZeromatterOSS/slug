@@ -13,13 +13,13 @@
 use std::fmt::Display;
 use std::path::PathBuf;
 
+use serde::Serialize;
+use serde::Serializer;
 use slug_common::cas_digest::CasDigest;
 use slug_common::cas_digest::TrackedCasDigest;
 use slug_common::file_ops::metadata::FileDigestKind;
 use slug_fs::paths::RelativePathBuf;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use serde::Serialize;
-use serde::Serializer;
 
 fn stringify<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
 where

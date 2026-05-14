@@ -16,6 +16,7 @@ use compact_str::CompactString;
 use derive_more::Display;
 use dupe::Dupe;
 use gazebo::variants::VariantName;
+use pagable::Pagable;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::slug_env;
 use slug_fs::fs_util;
@@ -24,7 +25,6 @@ use slug_fs::paths::RelativePathBuf;
 use slug_fs::paths::abs_path::AbsPath;
 use slug_fs::paths::file_name::FileName;
 use slug_fs::paths::file_name::FileNameBuf;
-use pagable::Pagable;
 
 use crate::cas_digest::CasDigest;
 use crate::cas_digest::CasDigestConfig;

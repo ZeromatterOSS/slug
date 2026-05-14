@@ -21,6 +21,8 @@ use dice::ProjectionKey;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use itertools::Itertools;
+use ref_cast::RefCast;
+use regex::Regex;
 use slug_common::pattern::parse_from_cli::parse_patterns_from_cli_args_typed;
 use slug_core::pattern::package::PackagePredicate;
 use slug_core::pattern::pattern::ParsedPatternPredicate;
@@ -28,8 +30,6 @@ use slug_core::pattern::pattern_type::ConfiguredProvidersPatternExtra;
 use slug_core::pattern::pattern_type::TargetPatternExtra;
 use slug_core::pattern::unparsed::UnparsedPatternPredicate;
 use slug_fs::paths::abs_path::AbsPathBuf;
-use ref_cast::RefCast;
-use regex::Regex;
 use starlark::eval::ProfileMode;
 
 use crate::dice::starlark_provider::StarlarkEvalKind;

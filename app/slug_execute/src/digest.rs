@@ -10,13 +10,13 @@
 
 use std::fmt;
 
+use remote_execution::Digest;
+use remote_execution::TDigest;
 use slug_common::cas_digest::CasDigest;
 use slug_common::cas_digest::CasDigestKind;
 use slug_common::cas_digest::CasDigestParseError;
 use slug_common::cas_digest::DigestAlgorithm;
 use slug_common::cas_digest::TrackedCasDigest;
-use remote_execution::Digest;
-use remote_execution::TDigest;
 
 use crate::digest_config::DigestConfig;
 

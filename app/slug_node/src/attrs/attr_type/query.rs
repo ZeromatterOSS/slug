@@ -13,10 +13,10 @@ use std::fmt::Display;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use pagable::Pagable;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProvidersLabel;
 use slug_core::provider::label::ProvidersLabelMaybeConfigured;
-use pagable::Pagable;
 use strong_hash::StrongHash;
 
 use crate::attrs::attr_type::arg::QueryExpansion;

@@ -11,8 +11,8 @@
 use std::fs::File;
 use std::sync::OnceLock;
 
-use slug_core::slug_env;
 use object::Object;
+use slug_core::slug_env;
 
 /// Provides information about this buck version.
 pub struct BuckVersion {

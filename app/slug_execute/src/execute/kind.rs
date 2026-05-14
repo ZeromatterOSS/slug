@@ -13,10 +13,10 @@ use std::time::Duration;
 use allocative::Allocative;
 use derive_more::Display;
 use gazebo::prelude::SliceExt;
+use remote_execution as RE;
 use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
 use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_data::RePlatform;
-use remote_execution as RE;
 use sorted_vector_map::SortedVectorMap;
 
 use crate::execute::action_digest::ActionDigest;

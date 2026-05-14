@@ -1,7 +1,7 @@
 //! Round-trip a sample BEP `BuildEvent` through the generated Rust types.
 
-use slug_build_event_stream::build_event_stream as bes;
 use prost::Message;
+use slug_build_event_stream::build_event_stream as bes;
 
 fn sample_build_event() -> bes::BuildEvent {
     use bes::build_event_id as beid;

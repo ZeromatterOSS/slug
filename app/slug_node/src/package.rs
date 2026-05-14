@@ -11,8 +11,8 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
-use slug_core::build_file_path::BuildFilePath;
 use pagable::Pagable;
+use slug_core::build_file_path::BuildFilePath;
 
 use crate::oncall::Oncall;
 

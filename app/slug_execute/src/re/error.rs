@@ -9,11 +9,11 @@
  */
 
 use allocative::Allocative;
-use slug_error::ErrorTag;
-use slug_error::TypedContext;
 use remote_execution::REClientError;
 use remote_execution::TCode;
 use remote_execution::TCodeReasonGroup;
+use slug_error::ErrorTag;
+use slug_error::TypedContext;
 
 pub fn get_re_error_tag(tcode: &TCode) -> ErrorTag {
     match *tcode {

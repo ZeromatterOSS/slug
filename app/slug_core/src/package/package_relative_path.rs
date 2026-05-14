@@ -15,17 +15,17 @@ use std::path::PathBuf;
 
 use allocative::Allocative;
 use gazebo::transmute;
+use ref_cast::RefCast;
+use relative_path::RelativePath;
+use relative_path::RelativePathBuf;
+use serde::Deserialize;
+use serde::Serialize;
 use slug_fs::paths::file_name::FileName;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathIter;
 use slug_util::arc_str::ArcS;
 use slug_util::arc_str::StringInside;
-use ref_cast::RefCast;
-use relative_path::RelativePath;
-use relative_path::RelativePathBuf;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::package::quoted_display;
 

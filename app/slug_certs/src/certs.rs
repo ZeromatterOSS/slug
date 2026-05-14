@@ -11,14 +11,14 @@
 use std::ffi::OsString;
 use std::path::Path;
 
-use slug_error::BuckErrorContext;
-use slug_error::conversion::from_any_with_tag;
-use slug_error::slug_error;
 use rustls::ClientConfig;
 use rustls::RootCertStore;
 use rustls_pki_types::CertificateDer;
 use rustls_pki_types::PrivateKeyDer;
 use rustls_pki_types::pem::PemObject;
+use slug_error::BuckErrorContext;
+use slug_error::conversion::from_any_with_tag;
+use slug_error::slug_error;
 
 pub fn maybe_setup_cryptography() {
     setup_cryptography().ok();

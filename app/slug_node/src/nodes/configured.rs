@@ -18,6 +18,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use dupe::Dupe;
 use either::Either;
+use once_cell::sync::Lazy;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::bzl::ImportPath;
 use slug_core::cells::cell_path::CellPath;
@@ -37,7 +38,6 @@ use slug_core::provider::label::ProvidersName;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_core::target::label::label::TargetLabel;
 use slug_util::arc_str::ArcStr;
-use once_cell::sync::Lazy;
 use starlark_map::Hashed;
 use starlark_map::ordered_map::OrderedMap;
 

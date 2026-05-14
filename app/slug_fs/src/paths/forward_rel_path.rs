@@ -18,7 +18,6 @@ use std::path::PathBuf;
 use allocative::Allocative;
 use derive_more::Display;
 use gazebo::transmute;
-use slug_util::arc_str::StringInside;
 use pagable::Pagable;
 use ref_cast::RefCastCustom;
 use ref_cast::ref_cast_custom;
@@ -27,6 +26,7 @@ use relative_path::RelativePathBuf;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
+use slug_util::arc_str::StringInside;
 use smallvec::SmallVec;
 use strong_hash::StrongHash;
 

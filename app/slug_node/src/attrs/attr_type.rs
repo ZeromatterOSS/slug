@@ -14,11 +14,11 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use once_cell::sync::Lazy;
+use pagable::Pagable;
 use slug_core::configuration::transition::id::TransitionId;
 use slug_core::plugins::PluginKind;
 use slug_core::plugins::PluginKindSet;
-use once_cell::sync::Lazy;
-use pagable::Pagable;
 
 use crate::attrs::attr_type::any::AnyAttrType;
 use crate::attrs::attr_type::arg::ArgAttrType;

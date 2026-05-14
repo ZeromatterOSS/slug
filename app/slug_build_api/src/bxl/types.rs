@@ -12,10 +12,10 @@ use std::hash::Hash;
 
 use allocative::Allocative;
 use derive_more::Display;
-use slug_core::bxl::BxlFilePath;
-use slug_data::ToProtoMessage;
 use serde::Serialize;
 use serde::Serializer;
+use slug_core::bxl::BxlFilePath;
+use slug_data::ToProtoMessage;
 
 /// The identifier used to find the implementation function for this bxl. Should point at the output of `bxl()`
 #[derive(

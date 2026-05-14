@@ -49,8 +49,8 @@ impl Decoder for ProtobufSplitter {
 #[cfg(test)]
 mod tests {
     use futures::stream::StreamExt;
-    use slug_error::BuckErrorContext;
     use prost::Message;
+    use slug_error::BuckErrorContext;
     use tokio_util::codec::FramedRead;
     use tokio_util::io::StreamReader;
 

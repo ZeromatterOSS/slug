@@ -10,8 +10,8 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
-use slug_core::plugins::PluginKind;
 use pagable::Pagable;
+use slug_core::plugins::PluginKind;
 
 #[derive(Debug, Eq, PartialEq, Hash, Pagable, Allocative, Clone, Dupe)]
 pub struct PluginDepAttrType {

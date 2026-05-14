@@ -14,6 +14,7 @@ use std::io::Write;
 
 use async_trait::async_trait;
 use gazebo::prelude::*;
+use serde_json::json;
 use slug_cli_proto::ClientContext;
 use slug_cmd_audit_client::config::AuditConfigCommand;
 use slug_cmd_audit_client::config::LocationStyle;
@@ -30,7 +31,6 @@ use slug_server_ctx::ctx::ServerCommandContextTrait;
 use slug_server_ctx::ctx::ServerCommandDiceContext;
 use slug_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use slug_server_ctx::stdout_partial_output::StdoutPartialOutput;
-use serde_json::json;
 
 use crate::ServerAuditSubcommand;
 

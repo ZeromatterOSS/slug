@@ -13,13 +13,13 @@ use std::collections::BTreeMap;
 use derive_more::Display;
 use futures::Stream;
 use futures::TryStreamExt;
+use serde::Serialize;
 use slug_client_ctx::client_ctx::BuckSubcommand;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
 use slug_client_ctx::events_ctx::EventsCtx;
 use slug_client_ctx::exit_result::ExitResult;
 use slug_event_log::stream_value::StreamValue;
-use serde::Serialize;
 
 use crate::diff::diff_options::DiffEventLogOptions;
 

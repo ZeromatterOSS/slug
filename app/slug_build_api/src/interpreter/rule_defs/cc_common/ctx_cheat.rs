@@ -18,7 +18,10 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use slug_core::provider::label::ConfiguredProvidersLabel;
+use slug_core::provider::label::ProvidersName;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
+use slug_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
 use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -152,6 +155,10 @@ pub struct CtxCheatWithActions<'v> {
     /// Configuration hash of the owning target (empty when unknown).
     #[allocative(skip)]
     pub(crate) cfg_hash: String,
+    /// Full configuration display of the owning target (empty when unknown).
+    #[allocative(skip)]
+    pub(crate) cfg_display: String,
+    pub(crate) owner_label: Option<ConfiguredTargetLabel>,
 }
 
 impl<'v> Display for CtxCheatWithActions<'v> {
@@ -179,11 +186,18 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "label" => Some(heap.alloc(CtxCheatLabelDynamic {
-                name: self.target_name.clone(),
-                package: self.pkg_path.clone(),
-                workspace_name: self.cell_name.clone(),
-            })),
+            "label" => Some(if let Some(label) = &self.owner_label {
+                heap.alloc(StarlarkConfiguredProvidersLabel::new(
+                    ConfiguredProvidersLabel::new(label.dupe(), ProvidersName::Default),
+                ))
+            } else {
+                heap.alloc(CtxCheatLabelDynamic {
+                    name: self.target_name.clone(),
+                    package: self.pkg_path.clone(),
+                    workspace_name: self.cell_name.clone(),
+                    cfg_display: self.cfg_display.clone(),
+                })
+            }),
             "bin_dir" => {
                 let path = if !self.cell_name.is_empty() && !self.cfg_hash.is_empty() {
                     format!("buck-out/v2/gen/{}/{}", self.cell_name, self.cfg_hash)
@@ -600,17 +614,44 @@ pub struct CtxCheatLabelDynamic {
     name: String,
     package: String,
     workspace_name: String,
+    cfg_display: String,
+}
+
+impl CtxCheatLabelDynamic {
+    pub(crate) fn new_configured(
+        name: String,
+        package: String,
+        workspace_name: String,
+        cfg_display: String,
+    ) -> Self {
+        Self {
+            name,
+            package,
+            workspace_name,
+            cfg_display,
+        }
+    }
 }
 
 impl Display for CtxCheatLabelDynamic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.workspace_name.is_empty() {
-            write!(f, "//{}:{}", self.package, self.name)
+        if self.cfg_display.is_empty() {
+            if self.workspace_name.is_empty() {
+                write!(f, "//{}:{}", self.package, self.name)
+            } else {
+                write!(
+                    f,
+                    "@{}//{}:{}",
+                    self.workspace_name, self.package, self.name
+                )
+            }
+        } else if self.workspace_name.is_empty() {
+            write!(f, "//{}:{} ({})", self.package, self.name, self.cfg_display)
         } else {
             write!(
                 f,
-                "@{}//{}:{}",
-                self.workspace_name, self.package, self.name
+                "{}//{}:{} ({})",
+                self.workspace_name, self.package, self.name, self.cfg_display
             )
         }
     }
@@ -642,7 +683,8 @@ impl<'v> StarlarkValue<'v> for CtxCheatLabelDynamic {
         match CtxCheatLabelDynamic::from_value(other) {
             Some(other) => Ok(self.name == other.name
                 && self.package == other.package
-                && self.workspace_name == other.workspace_name),
+                && self.workspace_name == other.workspace_name
+                && self.cfg_display == other.cfg_display),
             None => Ok(false),
         }
     }
@@ -652,6 +694,7 @@ impl<'v> StarlarkValue<'v> for CtxCheatLabelDynamic {
         self.workspace_name.hash(hasher);
         self.package.hash(hasher);
         self.name.hash(hasher);
+        self.cfg_display.hash(hasher);
         Ok(())
     }
 }
@@ -668,6 +711,7 @@ fn ctx_cheat_label_dynamic_methods(builder: &mut MethodsBuilder) {
             name: name.to_owned(),
             package: this.package.clone(),
             workspace_name: this.workspace_name.clone(),
+            cfg_display: this.cfg_display.clone(),
         }))
     }
 }

@@ -21,6 +21,9 @@ use futures::FutureExt;
 use futures::SinkExt;
 use futures::StreamExt;
 use futures::channel::mpsc::UnboundedSender;
+use lsp_server::Connection;
+use lsp_server::Message;
+use lsp_types::Url;
 use slug_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use slug_cli_proto::*;
 use slug_common::dice::cells::HasCellResolver;
@@ -58,9 +61,6 @@ use slug_server_ctx::ctx::ServerCommandContextTrait;
 use slug_server_ctx::ctx::ServerCommandDiceContext;
 use slug_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use slug_server_ctx::streaming_request_handler::StreamingRequestHandler;
-use lsp_server::Connection;
-use lsp_server::Message;
-use lsp_types::Url;
 use starlark::analysis::find_call_name::AstModuleFindCallName;
 use starlark::codemap::Span;
 use starlark::docs::DocModule;
@@ -849,9 +849,9 @@ fn handle_outgoing_lsp_message(
 
 #[cfg(test)]
 mod tests {
+    use lsp_types::Url;
     use slug_core::bzl::ImportPath;
     use slug_error::conversion::from_any_with_tag;
-    use lsp_types::Url;
     use starlark::docs::DocFunction;
     use starlark::docs::DocItem;
     use starlark::docs::DocMember;

@@ -15,6 +15,7 @@ use std::fmt::Formatter;
 use std::io::Write;
 use std::path::Path;
 
+use serde::Serialize;
 use slug_client_ctx::client_ctx::BuckSubcommand;
 use slug_client_ctx::client_ctx::ClientCommandContext;
 use slug_client_ctx::common::BuckArgMatches;
@@ -23,7 +24,6 @@ use slug_client_ctx::events_ctx::EventsCtx;
 use slug_client_ctx::exit_result::ClientIoError;
 use slug_client_ctx::exit_result::ExitResult;
 use slug_event_log::stream_value::StreamValue;
-use serde::Serialize;
 use tokio_stream::StreamExt;
 
 use crate::LogCommandOutputFormat;

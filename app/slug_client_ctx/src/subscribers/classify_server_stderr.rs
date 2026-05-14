@@ -10,8 +10,8 @@
 
 use std::ops::ControlFlow;
 
-use slug_data::error::ErrorTag;
 use once_cell::sync::Lazy;
+use slug_data::error::ErrorTag;
 
 pub(crate) fn classify_server_stderr(error: slug_error::Error, stderr: &str) -> slug_error::Error {
     let mut tag = if stderr.is_empty() {
