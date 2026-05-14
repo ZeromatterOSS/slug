@@ -1326,23 +1326,23 @@ pub fn collect_location_pool_for_ctx<'v>(
                 entries.push((label_str, paths));
             } else if let Some(source) = dep_val.downcast_ref::<SourceFileTarget>() {
                 let artifact_value = source.artifact_value(heap);
-                if let Some(art) = artifact_value.downcast_ref::<StarlarkArtifact>()
-                    && let Ok(bound) = art.get_bound_starlark_artifact()
-                {
-                    let path = bound
-                        .artifact()
-                        .get_path()
-                        .with_full_path(|p| p.as_str().to_owned());
-                    let short = bound
-                        .artifact()
-                        .get_path()
-                        .with_short_path(|p| p.as_str().to_owned());
-                    entries.push((
-                        source.label().unconfigured().to_string(),
-                        vec![path.clone()],
-                    ));
-                    if !short.is_empty() {
-                        entries.push((short, vec![path]));
+                if let Some(art) = artifact_value.downcast_ref::<StarlarkArtifact>() {
+                    if let Ok(bound) = art.get_bound_starlark_artifact() {
+                        let path = bound
+                            .artifact()
+                            .get_path()
+                            .with_full_path(|p| p.as_str().to_owned());
+                        let short = bound
+                            .artifact()
+                            .get_path()
+                            .with_short_path(|p| p.as_str().to_owned());
+                        entries.push((
+                            source.label().unconfigured().to_string(),
+                            vec![path.clone()],
+                        ));
+                        if !short.is_empty() {
+                            entries.push((short, vec![path]));
+                        }
                     }
                 }
             }
@@ -2090,7 +2090,7 @@ fn cc_toolchain_native_shim_has_attr(attribute: &str) -> bool {
 /// musl binary.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct CcToolchainInfoTargetPlatformOverlay {
-    inner: FrozenValue,
+    providers: FrozenProviderCollectionValue,
     target_platform: String,
 }
 
@@ -2098,11 +2098,29 @@ impl CcToolchainInfoTargetPlatformOverlay {
     fn is_musl_target(&self) -> bool {
         self.target_platform.contains("musl")
     }
+
+    fn inner_cc_toolchain_value<'v>(&self) -> Option<Value<'v>> {
+        let cc_toolchain_info_id =
+            crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider::provider_id();
+        self.providers
+            .provider_collection()
+            .get_provider_raw(cc_toolchain_info_id)
+            .map(|cc| {
+                // The overlay owns `providers`, which owns the frozen heap that
+                // contains this value. Reborrow the frozen value at the caller's
+                // Starlark lifetime so captured toolchain closures can safely
+                // use it after the original analysis context is gone.
+                unsafe { std::mem::transmute::<Value<'static>, Value<'v>>(cc.to_value()) }
+            })
+    }
 }
 
 impl std::fmt::Display for CcToolchainInfoTargetPlatformOverlay {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.to_value())
+        match self.inner_cc_toolchain_value() {
+            Some(cc) => write!(f, "{cc}"),
+            None => write!(f, "CcToolchainInfo(<missing>)"),
+        }
     }
 }
 
@@ -2116,18 +2134,16 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<bool> {
         let heap = eval.heap();
-        if let Ok(Some(method)) = this
-            .inner
-            .to_value()
-            .get_attr("needs_pic_for_dynamic_libraries", heap)
-        {
-            if let Ok(result) = eval.eval_function(
-                method,
-                &[],
-                &[("feature_configuration", feature_configuration)],
-            ) {
-                if let Some(value) = result.unpack_bool() {
-                    return Ok(value);
+        if let Some(inner) = this.inner_cc_toolchain_value() {
+            if let Ok(Some(method)) = inner.get_attr("needs_pic_for_dynamic_libraries", heap) {
+                if let Ok(result) = eval.eval_function(
+                    method,
+                    &[],
+                    &[("feature_configuration", feature_configuration)],
+                ) {
+                    if let Some(value) = result.unpack_bool() {
+                        return Ok(value);
+                    }
                 }
             }
         }
@@ -2140,23 +2156,23 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
-        if let Some(shim) = this
-            .inner
-            .to_value()
-            .downcast_ref::<CcToolchainInfoNativeShim>()
-        {
-            if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
-                return Ok(heap.alloc(Depset::empty()));
+        if let Some(inner) = this.inner_cc_toolchain_value() {
+            if let Some(shim) = inner.downcast_ref::<CcToolchainInfoNativeShim>() {
+                if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
+                    return Ok(heap.alloc(Depset::empty()));
+                }
+                return Ok(shim.toolchain_file_stubs_depset(&shim.static_runtime_files, heap));
             }
-            return Ok(shim.toolchain_file_stubs_depset(&shim.static_runtime_files, heap));
         }
-        if let Ok(Some(method)) = this.inner.to_value().get_attr("static_runtime_lib", heap) {
-            if let Ok(result) = eval.eval_function(
-                method,
-                &[],
-                &[("feature_configuration", feature_configuration)],
-            ) {
-                return Ok(result);
+        if let Some(inner) = this.inner_cc_toolchain_value() {
+            if let Ok(Some(method)) = inner.get_attr("static_runtime_lib", heap) {
+                if let Ok(result) = eval.eval_function(
+                    method,
+                    &[],
+                    &[("feature_configuration", feature_configuration)],
+                ) {
+                    return Ok(result);
+                }
             }
         }
         Ok(heap.alloc(Depset::empty()))
@@ -2168,23 +2184,23 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
-        if let Some(shim) = this
-            .inner
-            .to_value()
-            .downcast_ref::<CcToolchainInfoNativeShim>()
-        {
-            if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
-                return Ok(heap.alloc(Depset::empty()));
+        if let Some(inner) = this.inner_cc_toolchain_value() {
+            if let Some(shim) = inner.downcast_ref::<CcToolchainInfoNativeShim>() {
+                if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
+                    return Ok(heap.alloc(Depset::empty()));
+                }
+                return Ok(shim.toolchain_file_stubs_depset(&shim.dynamic_runtime_files, heap));
             }
-            return Ok(shim.toolchain_file_stubs_depset(&shim.dynamic_runtime_files, heap));
         }
-        if let Ok(Some(method)) = this.inner.to_value().get_attr("dynamic_runtime_lib", heap) {
-            if let Ok(result) = eval.eval_function(
-                method,
-                &[],
-                &[("feature_configuration", feature_configuration)],
-            ) {
-                return Ok(result);
+        if let Some(inner) = this.inner_cc_toolchain_value() {
+            if let Ok(Some(method)) = inner.get_attr("dynamic_runtime_lib", heap) {
+                if let Ok(result) = eval.eval_function(
+                    method,
+                    &[],
+                    &[("feature_configuration", feature_configuration)],
+                ) {
+                    return Ok(result);
+                }
             }
         }
         Ok(heap.alloc(Depset::empty()))
@@ -2200,7 +2216,9 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
     fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
         matches!(attribute, "target_gnu_system_name" | "libc")
             || cc_toolchain_native_shim_has_attr(attribute)
-            || self.inner.to_value().has_attr(attribute, heap)
+            || self
+                .inner_cc_toolchain_value()
+                .is_some_and(|inner| inner.has_attr(attribute, heap))
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -2213,11 +2231,8 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
                 _ => {}
             }
         }
-        self.inner
-            .to_value()
-            .get_attr(attribute, heap)
-            .ok()
-            .flatten()
+        self.inner_cc_toolchain_value()
+            .and_then(|inner| inner.get_attr(attribute, heap).ok().flatten())
             .or_else(|| {
                 let shim = CcToolchainInfoNativeShim {
                     toolchain_label: "@bazel_tools//tools/cpp:current_cc_toolchain".to_owned(),
@@ -2235,7 +2250,10 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        let mut attrs = self.inner.to_value().dir_attr();
+        let mut attrs = self
+            .inner_cc_toolchain_value()
+            .map(|inner| inner.dir_attr())
+            .unwrap_or_default();
         for attr in CC_TOOLCHAIN_NATIVE_SHIM_ATTRS.iter().copied() {
             if !attrs.iter().any(|existing| existing == attr) {
                 attrs.push(attr.to_owned());
@@ -2251,7 +2269,9 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "CcToolchainInfoTargetPlatformOverlay".hash(hasher);
-        self.inner.to_value().write_hash(hasher)?;
+        if let Some(inner) = self.inner_cc_toolchain_value() {
+            inner.write_hash(hasher)?;
+        }
         self.target_platform.hash(hasher);
         Ok(())
     }
@@ -2928,8 +2948,9 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
                     .provider_collection()
                     .get_provider_raw(cc_toolchain_info_id)
                 {
+                    let _ = cc_fv;
                     let cc = heap.alloc(CcToolchainInfoTargetPlatformOverlay {
-                        inner: *cc_fv,
+                        providers: providers.dupe(),
                         target_platform: self.target_platform.clone(),
                     });
                     let cc_provider_in_toolchain = heap.alloc(true);
@@ -3019,24 +3040,17 @@ fn alloc_cc_toolchain_info_shim<'v>(
     toolchain_label: &str,
     target_platform: &str,
 ) -> Value<'v> {
-    let providers = cc_toolchain_native_shim_provider_collection(
-        toolchain_label,
-        target_platform,
-        None,
-        None,
-        None,
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-    );
-    let cc_toolchain_info_id =
-        crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider::provider_id();
-    let cc = providers
-        .provider_collection()
-        .get_provider_raw(cc_toolchain_info_id)
-        .expect("native C++ toolchain shim provider collection includes CcToolchainInfo")
-        .to_value();
+    let cc = heap.alloc(CcToolchainInfoNativeShim {
+        toolchain_label: toolchain_label.to_owned(),
+        target_platform: target_platform.to_owned(),
+        toolchain_config_info: None,
+        toolchain_features: None,
+        module_map_path: None,
+        compiler_files: None,
+        linker_files: None,
+        static_runtime_files: None,
+        dynamic_runtime_files: None,
+    });
     let cc_provider_in_toolchain = heap.alloc(true);
     let fields = heap.alloc(AllocDict([
         ("cc", cc),
@@ -3046,6 +3060,12 @@ fn alloc_cc_toolchain_info_shim<'v>(
 }
 
 fn normalize_bzlmod_module_repo_name(repo: &str) -> &str {
+    if let Some((_, rest)) = repo.split_once("++") {
+        if let Some((_, internal_repo)) = rest.rsplit_once('+') {
+            return internal_repo;
+        }
+    }
+
     if let Some(module_name) = repo.strip_suffix('+') {
         return module_name;
     }
@@ -3067,6 +3087,12 @@ fn normalize_bzlmod_module_repo_name(repo: &str) -> &str {
 
 #[cfg(test)]
 mod resolved_toolchains_tests {
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::values::StarlarkValue;
+
+    use super::CcToolchainInfoTargetPlatformOverlay;
+    use super::cc_toolchain_native_shim_provider_collection;
     use super::normalize_toolchain_type_label;
 
     #[test]
@@ -3093,6 +3119,44 @@ mod resolved_toolchains_tests {
             ),
             "rules_rust+rust+rust_linux_x86_64__x86_64-unknown-linux-gnu__stable_tools//:rust_toolchain"
         );
+        assert_eq!(
+            normalize_toolchain_type_label("@rules_rs++rules_rust+rules_rust//rust:toolchain_type"),
+            "rules_rust//rust:toolchain_type"
+        );
+    }
+
+    #[test]
+    fn cc_toolchain_overlay_retains_provider_owner_for_late_attr_access() {
+        let overlay = {
+            let providers = cc_toolchain_native_shim_provider_collection(
+                "@bazel_tools//tools/cpp:current_cc_toolchain",
+                "//bazel/platforms:linux-musl",
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            );
+            CcToolchainInfoTargetPlatformOverlay {
+                providers: providers.clone(),
+                target_platform: "//bazel/platforms:linux-musl".to_owned(),
+            }
+        };
+
+        let env = Module::new();
+        let eval = Evaluator::new(&env);
+        let heap = eval.heap();
+        let libc = overlay
+            .get_attr("libc", heap)
+            .expect("overlay should expose libc");
+        assert_eq!(libc.unpack_str(), Some("musl"));
+
+        let all_files = overlay
+            .get_attr("all_files", heap)
+            .expect("overlay should still access owned inner provider attrs");
+        assert!(!all_files.is_none());
     }
 }
 

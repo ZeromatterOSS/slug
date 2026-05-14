@@ -121,8 +121,10 @@ impl ExtensionCellDefinitions {
 /// computed from the module graph topology (MODULE.bazel `use_extension()` +
 /// `use_repo()` declarations) WITHOUT executing any extensions or consulting the lockfile.
 ///
-/// Formula: `_main+{extension_name}+{repo_name}`
-/// where `extension_name` is extracted from the extension ID (after the `%`).
+/// Formula: `_main+{extension_name}+{repo_name}` for root-owned extensions and
+/// `{owner_module}++{extension_name}+{repo_name}` for dependency-owned
+/// extensions, where `extension_name` is extracted from the extension ID (after
+/// the `%`).
 ///
 /// # Arguments
 /// * `parsed_modules` - All parsed MODULE.bazel files (module_name, parsed)
@@ -178,8 +180,8 @@ pub fn pre_compute_extension_repo_cells(
 
             // The canonical name prefix is the module that OWNS the .bzl file, not
             // the module that uses the extension. For `@bazel_features//private:ext.bzl`,
-            // the owning module is `bazel_features`. For `//local:ext.bzl`, it's the
-            // current module.
+            // the owning module prefix is `bazel_features+`. For `//local:ext.bzl`,
+            // it's `_main`.
             //
             // Bazel convention: the root module uses `_main` as its canonical prefix
             // (regardless of its declared name, which is only used by OTHER modules
@@ -190,12 +192,10 @@ pub fn pre_compute_extension_repo_cells(
             // `extract_owning_module` reads the `@<module>//` prefix; a bare
             // `//` path has no prefix and falls back to `_main`, which would
             // mis-attribute every transitive dep's relative `use_extension`
-            // to the root module (e.g. `rules_java`'s toolchains extension
-            // showing up as `_main+toolchains+...` instead of
-            // `rules_java++toolchains+...`).
+            // to the root module.
             let extracted_owner = extract_owning_module(&ext_id, root_module_name);
             let owner_module = if is_root && extracted_owner == module_name {
-                "_main"
+                "_main".to_owned()
             } else {
                 extracted_owner
             };
@@ -205,7 +205,7 @@ pub fn pre_compute_extension_repo_cells(
                 for repo_name in &import.repos {
                     let canonical = crate::repo_mapping::canonical_repo_for_extension_import(
                         usage,
-                        owner_module,
+                        &owner_module,
                         &ext_name,
                         repo_name,
                     );
@@ -237,7 +237,7 @@ pub fn pre_compute_extension_repo_cells(
                 for (apparent_name, actual_name) in &import.repo_mapping {
                     let canonical = crate::repo_mapping::canonical_repo_for_extension_import(
                         usage,
-                        owner_module,
+                        &owner_module,
                         &ext_name,
                         actual_name,
                     );
@@ -705,21 +705,29 @@ fn tag_value_to_attr_value(tv: &TagValue) -> AttrValue {
 
 /// Extract the owning module name from an extension bzl file path.
 ///
-/// In Bazel, the canonical name prefix for extension repos is the module that
-/// *owns* the .bzl file, not the module that calls `use_extension()`.
-/// - `@bazel_features//private:extensions.bzl` → `bazel_features`
-/// - `//private:extensions.bzl` → current module (returned as `current_module`)
-fn extract_owning_module<'a>(extension_bzl_file: &'a str, current_module: &'a str) -> &'a str {
+/// In Bazel, the canonical name prefix for extension repos is the canonical
+/// repo name of the module that *owns* the .bzl file, not the module that calls
+/// `use_extension()`.
+/// - root-owned extensions use `_main`
+/// - dependency-owned extensions preserve Bazel 9's trailing module separator,
+///   so `@bazel_features//private:extensions.bzl` becomes `bazel_features+`
+fn extract_owning_module(extension_bzl_file: &str, current_module: &str) -> String {
     if let Some(rest) = extension_bzl_file.strip_prefix('@') {
         // @module_name//path:file.bzl → module_name
         if let Some(pos) = rest.find("//") {
             let module_name = &rest[..pos];
             if !module_name.is_empty() {
-                return module_name;
+                if !current_module.is_empty() && module_name == current_module {
+                    return "_main".to_owned();
+                }
+                if module_name.ends_with('+') {
+                    return module_name.to_owned();
+                }
+                return format!("{module_name}+");
             }
         }
     }
-    current_module
+    "_main".to_owned()
 }
 
 /// Build cell definitions from a module extension result.
@@ -1153,6 +1161,39 @@ mod tests {
         assert_eq!(
             aliases[0].canonical_name,
             "ape++toolchain_local_select+launcher"
+        );
+    }
+
+    #[test]
+    fn test_precompute_dependency_use_repo_uses_bazel9_double_plus_canonical_name() {
+        let mut module = parsed_module("bazel_lib");
+        let mut usage = ExtensionUsage::new(
+            "@bazel_lib//lib:extensions.bzl".to_owned(),
+            "toolchains".to_owned(),
+        );
+        usage
+            .imports
+            .push(UseRepo::new().add_repo("expand_template_toolchains".to_owned()));
+        module.extension_usages.push(usage);
+
+        let (cells, aliases) =
+            pre_compute_extension_repo_cells(&[("bazel_lib+3.2.2".to_owned(), module)], "zeromatter")
+                .unwrap();
+
+        assert_eq!(cells.len(), 1);
+        assert_eq!(
+            cells[0].canonical_name,
+            "bazel_lib++toolchains+expand_template_toolchains"
+        );
+        assert_eq!(
+            cells[0].path,
+            "bazel-external/bazel_lib++toolchains+expand_template_toolchains"
+        );
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].apparent_name, "expand_template_toolchains");
+        assert_eq!(
+            aliases[0].canonical_name,
+            "bazel_lib++toolchains+expand_template_toolchains"
         );
     }
 

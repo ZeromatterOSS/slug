@@ -191,10 +191,11 @@ fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
         //   - "{cell_name}+{version}"                       -- bzlmod module cell
         //     (e.g. "rules_cc+0.2.17" -> cell_name = "rules_cc")
         //   - "{owner}+{extension}+{repo_name}"             -- module-extension repo
-        //     (e.g. "_main+llvm_repos_extension+llvm-raw"
-        //      -> cell_name = "llvm-raw"; taking the first `+` segment would
-        //      yield "_main" which is the root-module canonical prefix, not
-        //      the apparent repo name used in Label() resolution)
+        //     (e.g. "_main+llvm_repos_extension+llvm-raw")
+        //
+        // For module-extension repos, keep the full canonical repo name. Bazel
+        // resolves `Label("//pkg:target")` inside the generated repo to that
+        // repo, not to the generated repo's internal/apparent name.
         if let Some(dir_end) = rest.find('/') {
             let dir_name = &rest[..dir_end];
             let plus_count = dir_name.matches('+').count();
@@ -206,7 +207,7 @@ fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
                 }
                 _ => {
                     // "{owner}+{extension}+{repo_name}[+...]"
-                    dir_name[dir_name.rfind('+').unwrap() + 1..].to_owned()
+                    dir_name.to_owned()
                 }
             };
             let cell_relative = &rest[dir_end + 1..];
@@ -981,6 +982,34 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
 /// (no prerelease suffix) compare greater than prereleases. This ensures checks
 /// like `version >= "9.0.0-pre.20250911"` return True.
 pub const SLUG_BAZEL_VERSION: &str = "9.0.1";
+
+#[cfg(test)]
+mod tests {
+    use super::extract_cell_and_package_from_filename;
+
+    #[test]
+    fn label_context_for_bzlmod_module_strips_version_suffix() {
+        assert_eq!(
+            extract_cell_and_package_from_filename(
+                "bazel-external/rules_cc+0.2.17/cc/toolchains/defs.bzl"
+            ),
+            ("rules_cc".to_owned(), "cc/toolchains".to_owned())
+        );
+    }
+
+    #[test]
+    fn label_context_for_extension_repo_keeps_canonical_repo() {
+        assert_eq!(
+            extract_cell_and_package_from_filename(
+                "bazel-external/rules_rs++rules_rust+rules_rust/rust/private/utils.bzl"
+            ),
+            (
+                "rules_rs++rules_rust+rules_rust".to_owned(),
+                "rust/private".to_owned()
+            )
+        );
+    }
+}
 
 /// Register the Bazel-compatible `native` namespace.
 pub(crate) fn register_bazel_native(globals: &mut GlobalsBuilder) {

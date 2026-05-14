@@ -351,6 +351,7 @@ The detailed implementation is split into focused sub-plans:
 | [47-aspects-completion.md](./slug-bazel-subplans/47-aspects-completion.md)                             | Finish remaining aspect parity: DICE caching, incrementality, `requires`, aspect toolchains, `apply_to_generating_rules`, and `graph_structure_aspect`. | **Proposed** |
 | [48-small-parity-gaps.md](./slug-bazel-subplans/48-small-parity-gaps.md)                               | Own small remaining parity gaps: genquery, stamping, proto action/toolchain behavior, and `target_platform_has_constraint()`. | **Proposed** |
 | [49-generated-output-hygiene.md](./slug-bazel-subplans/49-generated-output-hygiene.md)                 | Add repo hygiene checks preventing generated layout artifacts from being committed. | **Proposed** |
+| [59-analysis-parity-guardrails.md](./slug-bazel-subplans/59-analysis-parity-guardrails.md)             | Cross-plan guardrails for recurring SDK analysis failures: Bzlmod canonical identity, toolchain/provider ownership, rule-based C++ contract tests, and smoke classification. | **In Progress** |
 
 ### Remaining Stub Behavior
 

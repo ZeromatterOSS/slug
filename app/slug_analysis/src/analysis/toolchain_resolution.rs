@@ -206,6 +206,12 @@ fn normalize_constraint_label(label: &str) -> String {
 }
 
 fn normalize_bzlmod_repo_name(repo: &str) -> &str {
+    if let Some((_, rest)) = repo.split_once("++") {
+        if let Some((_, internal_repo)) = rest.rsplit_once('+') {
+            return internal_repo;
+        }
+    }
+
     if let Some(module_name) = repo.strip_suffix('+') {
         return module_name;
     }
@@ -543,6 +549,10 @@ mod tests {
                 "@rules_cc+cc_configure_extension+local_config_cc_toolchains//:cc-toolchain-k8"
             ),
             "rules_cc+cc_configure_extension+local_config_cc_toolchains//:cc-toolchain-k8"
+        );
+        assert_eq!(
+            normalize_constraint_label("@rules_rs++rules_rust+rules_rust//rust:toolchain_type"),
+            "rules_rust//rust:toolchain_type"
         );
     }
 

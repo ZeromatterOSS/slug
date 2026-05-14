@@ -263,7 +263,6 @@ pub struct FeatureConfiguration {
 pub(crate) fn default_cc_features() -> Vec<&'static str> {
     let mut features = vec![
         // Core features always enabled
-        "supports_dynamic_linker",
         "supports_start_end_lib",
         "compiler_param_file",
         "linker_param_file",
@@ -636,6 +635,31 @@ mod tests {
         assert!(!defaults.contains(&"opt"));
         assert!(!defaults.contains(&"dbg"));
         assert!(!defaults.contains(&"fastbuild"));
+    }
+
+    #[test]
+    fn supports_dynamic_linker_is_toolchain_controlled() {
+        let toolchain_features = CcToolchainFeatures::new(
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            String::new(),
+        );
+        let fc = toolchain_features.configure(Vec::new(), Vec::new());
+        assert!(!fc.is_feature_enabled("supports_dynamic_linker"));
+
+        let toolchain_features = CcToolchainFeatures::new(
+            vec!["supports_dynamic_linker".to_owned()],
+            vec!["supports_dynamic_linker".to_owned()],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            String::new(),
+        );
+        let fc = toolchain_features.configure(Vec::new(), Vec::new());
+        assert!(fc.is_feature_enabled("supports_dynamic_linker"));
     }
 
     #[test]
