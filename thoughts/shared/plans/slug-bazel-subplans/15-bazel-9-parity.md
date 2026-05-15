@@ -15,6 +15,23 @@ location that defines the target behaviour.
 
 ## Latest Slice 2026-05-10: `ctx.attr` Source-File Targets
 
+### 2026-05-14 follow-up: registry patch application on Windows
+
+Fresh Windows SDK attempts exposed an earlier Bzlmod fetch parity blocker before
+the Linux/musl SDK frontier:
+
+```text
+Failed to fetch source for google_benchmark@1.8.2:
+Failed to apply patch: module_dot_bazel.patch: failed to spawn patch command:
+program not found
+```
+
+This is a systemic registry/module source materialization boundary, not an SDK
+target workaround. Bazel applies registry patches without requiring a host Unix
+`patch` executable on PATH. Slug should do the same for BCR source patches by
+falling back to a tool available in the normal Windows Bazel/Git setup instead
+of failing module resolution before package analysis.
+
 The Plan 56 NativeShim depset-hashability slice cleared the
 `rules_rust+0.69.0/rust/private/rustc.bzl:1374 deps = depset(deps)` blocker.
 The next bounded SDK smoke advanced to:

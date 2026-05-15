@@ -34,6 +34,57 @@ use crate::cache::ModuleCache;
 use crate::integrity::verify_integrity;
 use crate::registry::SourceInfo;
 
+#[derive(Debug)]
+enum PatchToolError {
+    Spawn(std::io::Error),
+    Write(std::io::Error),
+    Wait(std::io::Error),
+    Failed(String),
+}
+
+impl std::fmt::Display for PatchToolError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Spawn(e) => write!(f, "failed to spawn patch command: {}", e),
+            Self::Write(e) => write!(f, "failed to write patch: {}", e),
+            Self::Wait(e) => write!(f, "failed to wait for patch command: {}", e),
+            Self::Failed(stderr) => write!(f, "{}", stderr),
+        }
+    }
+}
+
+fn run_patch_tool(
+    program: &str,
+    args: &[String],
+    current_dir: Option<&Path>,
+    patch_content: &[u8],
+) -> Result<(), PatchToolError> {
+    let mut cmd = Command::new(program);
+    cmd.args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    if let Some(current_dir) = current_dir {
+        cmd.current_dir(current_dir);
+    }
+
+    let mut child = cmd.spawn().map_err(PatchToolError::Spawn)?;
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin
+            .write_all(patch_content)
+            .map_err(PatchToolError::Write)?;
+    }
+
+    let output = child.wait_with_output().map_err(PatchToolError::Wait)?;
+    if !output.status.success() {
+        return Err(PatchToolError::Failed(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ));
+    }
+    Ok(())
+}
+
 /// Errors that can occur during source fetching.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -575,48 +626,57 @@ impl SourceFetcher {
             let body = to_bytes(response.into_body()).await?;
             let patch_content = body.to_vec();
 
-            // Apply patch using the `patch` command
-            let strip = source_info.patch_strip;
-            let mut cmd = Command::new("patch");
-            cmd.arg(format!("-p{}", strip))
-                .arg("--no-backup-if-mismatch")
-                .arg("-d")
-                .arg(dest_dir)
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::piped());
-
-            let mut child = cmd.spawn().map_err(|e| FetchError::PatchFailed {
-                patch: format!("{}: failed to spawn patch command: {}", patch_file, e),
-            })?;
-
-            // Write patch content to stdin
-            if let Some(mut stdin) = child.stdin.take() {
-                use std::io::Write;
-                stdin
-                    .write_all(&patch_content)
-                    .map_err(|e| FetchError::PatchFailed {
-                        patch: format!("{}: failed to write patch: {}", patch_file, e),
-                    })?;
-            }
-
-            let output = child
-                .wait_with_output()
-                .map_err(|e| FetchError::PatchFailed {
-                    patch: format!("{}: {}", patch_file, e),
-                })?;
-
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(FetchError::PatchFailed {
-                    patch: format!("{}: {}", patch_file, stderr),
-                }
-                .into());
-            }
+            self.apply_patch_content(
+                dest_dir,
+                patch_file,
+                source_info.patch_strip,
+                &patch_content,
+            )?;
 
             tracing::debug!("Applied patch: {}", patch_file);
         }
 
+        Ok(())
+    }
+
+    fn apply_patch_content(
+        &self,
+        dest_dir: &Path,
+        patch_file: &str,
+        strip: u32,
+        patch_content: &[u8],
+    ) -> slug_error::Result<()> {
+        let patch_args = [
+            format!("-p{}", strip),
+            "--no-backup-if-mismatch".to_owned(),
+            "-d".to_owned(),
+            dest_dir.to_string_lossy().into_owned(),
+        ];
+        match run_patch_tool("patch", &patch_args, None, patch_content) {
+            Ok(()) => return Ok(()),
+            Err(PatchToolError::Spawn(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => {
+                return Err(FetchError::PatchFailed {
+                    patch: format!("{}: {}", patch_file, err),
+                }
+                .into());
+            }
+        }
+
+        let git_args = [
+            "apply".to_owned(),
+            format!("-p{}", strip),
+            "--unsafe-paths".to_owned(),
+            "--whitespace=nowarn".to_owned(),
+        ];
+        run_patch_tool("git", &git_args, Some(dest_dir), patch_content).map_err(|err| {
+            FetchError::PatchFailed {
+                patch: format!(
+                    "{}: failed to apply with `patch` or `git apply`: {}",
+                    patch_file, err
+                ),
+            }
+        })?;
         Ok(())
     }
 
@@ -888,5 +948,32 @@ mod tests {
 
         let content = std::fs::read_to_string(dest.join("test.txt")).unwrap();
         assert_eq!(content, "Hello, World!");
+    }
+
+    #[test]
+    fn git_apply_patch_tool_applies_registry_patch_shape() {
+        let temp_dir = TempDir::new().unwrap();
+        let file = temp_dir.path().join("a.txt");
+        std::fs::write(&file, "old\n").unwrap();
+
+        let patch = b"diff --git a/a.txt b/a.txt\n\
+--- a/a.txt\n\
++++ b/a.txt\n\
+@@ -1 +1 @@\n\
+-old\n\
++new\n";
+        let args = [
+            "apply".to_owned(),
+            "-p1".to_owned(),
+            "--unsafe-paths".to_owned(),
+            "--whitespace=nowarn".to_owned(),
+        ];
+
+        run_patch_tool("git", &args, Some(temp_dir.path()), patch).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(file).unwrap().replace("\r\n", "\n"),
+            "new\n"
+        );
     }
 }
