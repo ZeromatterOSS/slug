@@ -12,6 +12,7 @@ use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::ops::ControlFlow;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
@@ -254,15 +255,20 @@ impl LocalExecutor {
                 ForkserverAccess::None => {
                     let _disable_miniperf = disable_miniperf;
                     let exe = maybe_absolutize_exe(exe, &working_directory)?;
-                    let mut cmd = background_command(exe.as_ref());
-                    cmd.current_dir(working_directory.as_path());
-                    cmd.args(args);
+                    let spawn_cwd = windows_spawn_path(working_directory.as_path());
+                    let spawn_exe = windows_spawn_path(exe.as_ref());
+                    let spawn_args = windows_spawn_args(args);
+                    let mut cmd = background_command(spawn_exe.as_os_str());
+                    cmd.current_dir(&spawn_cwd);
+                    cmd.args(&spawn_args);
                     apply_local_execution_environment(
                         &mut cmd,
                         &working_directory,
                         env,
                         env_inheritance,
                     );
+                    #[cfg(windows)]
+                    cmd.env("PWD", &spawn_cwd);
 
                     // Apply filesystem sandbox if requested.
                     if let Some(sandbox_spec) = sandbox {
@@ -350,6 +356,14 @@ impl LocalExecutor {
             .as_ref()
             .map(|sp| self.artifact_fs.fs().resolve(sp).as_path().to_owned())
             .unwrap_or_else(std::env::temp_dir);
+        // Plan 44 Phase 2.6: per-action execroot keyed by the action's
+        // declared input prefix set. Compute it before final argv preparation
+        // so rustc invocations can remap the physical digest execroot out of
+        // metadata while still executing from the narrowed filesystem view.
+        let prefixes =
+            crate::executors::action_execroot::collect_input_prefixes(request, &self.artifact_fs);
+        let action_execroot =
+            crate::executors::action_execroot::ensure_execroot(&self.root, &prefixes);
         let param_args_owned: Option<Vec<String>> = if request.param_files().is_empty() {
             None
         } else {
@@ -388,6 +402,12 @@ impl LocalExecutor {
                     tracing::warn!("Failed to prepare rustc linker wrapper: {e}");
                     any_failed = true;
                     break;
+                }
+                if should_add_rustc_paramfile_execroot_remap(&new_args) {
+                    add_rustc_flags_execroot_remap(
+                        &mut slot_args_for_file,
+                        action_execroot.as_deref(),
+                    );
                 }
                 let content = match slot.format {
                     ParamFileFormat::Shell => slot_args_for_file
@@ -431,6 +451,32 @@ impl LocalExecutor {
                 tracing::warn!("Failed to prepare inline rustc linker wrapper: {e}");
             }
         }
+        if let Some(args) = args_owned.as_mut() {
+            if add_rustc_execroot_remap(args, action_execroot.as_deref()) {
+                tracing::debug!("Added rustc remap for physical action execroot");
+            }
+        } else if args_owned.is_none() {
+            let mut rewritten_args = args.to_vec();
+            if add_rustc_execroot_remap(&mut rewritten_args, action_execroot.as_deref()) {
+                args_owned = Some(rewritten_args);
+                tracing::debug!("Added rustc remap for physical action execroot");
+            }
+        }
+        if cfg!(windows) {
+            let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
+            if rewrite_windows_cargo_build_script_runner_args(
+                &mut rewritten_args,
+                action_execroot.as_deref(),
+            ) {
+                args_owned = Some(rewritten_args);
+            }
+        }
+        if cfg!(windows) {
+            let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
+            if parametrize_windows_process_wrapper_rustc_tail(&mut rewritten_args, &scratch_dir) {
+                args_owned = Some(rewritten_args);
+            }
+        }
         let args: &[String] = args_owned.as_deref().unwrap_or(args);
 
         let (time_span, start_time, res) = executor_stage_async(
@@ -469,26 +515,26 @@ impl LocalExecutor {
                 let execution_start = TimeSpan::start_now();
                 let start_time = SystemTime::now();
 
-                let env = env.iter().map(|(k, v)| (k, v.into_os_str()));
-                // Plan 44 Phase 2.6: per-action execroot keyed by the
-                // action's declared input prefix set. Computed here so
-                // each `self.exec` call routes cwd through a directory
-                // containing only the symlinks the action needs.
-                let prefixes = crate::executors::action_execroot::collect_input_prefixes(
-                    request,
-                    &self.artifact_fs,
-                );
-                let action_execroot =
-                    crate::executors::action_execroot::ensure_execroot(&self.root, &prefixes);
+                let mut env: Vec<(OsString, OsString)> = env
+                    .iter()
+                    .map(|(k, v)| (OsString::from(k), v.into_os_str().to_owned()))
+                    .collect();
+                let mut args_for_exec = args.to_vec();
+                let args = if rewrite_windows_cargo_manifest_dir_env(
+                    &mut args_for_exec,
+                    &mut env,
+                    action_execroot.as_deref(),
+                ) {
+                    args_for_exec.as_slice()
+                } else {
+                    args
+                };
                 let r = if let Some(worker) = worker {
-                    let env: Vec<(OsString, OsString)> = env
-                        .into_iter()
-                        .map(|(k, v)| (OsString::from(k), v.to_owned()))
-                        .collect();
                     Ok(worker
                         .exec_cmd(request.args(), env, request.timeout())
                         .await)
                 } else {
+                    let env = env.iter().map(|(k, v)| (k.as_os_str(), v.as_os_str()));
                     self.exec(
                         &args[0],
                         &args[1..],
@@ -1078,15 +1124,15 @@ impl LocalExecutor {
             GatherOutputStatus::Cancelled => manager.cancel_claim(execution_kind, *timing),
         };
 
-        if let Some(run_action_key) = request.run_action_key()
-            && !request.outputs_cleanup
-        {
-            save_content_based_incremental_state(
-                run_action_key.clone(),
-                &self.incremental_db_state,
-                &self.artifact_fs,
-                &result,
-            );
+        if !request.outputs_cleanup {
+            if let Some(run_action_key) = request.run_action_key() {
+                save_content_based_incremental_state(
+                    run_action_key.clone(),
+                    &self.incremental_db_state,
+                    &self.artifact_fs,
+                    &result,
+                );
+            }
         }
 
         result
@@ -1764,6 +1810,539 @@ fn rewrite_inline_rustc_llvm_linker_for_compiler_rt(
     }
 }
 
+fn add_rustc_execroot_remap(
+    args: &mut Vec<String>,
+    action_execroot: Option<&slug_fs::paths::abs_norm_path::AbsNormPath>,
+) -> bool {
+    let Some(execroot) = action_execroot else {
+        return false;
+    };
+    if !is_process_wrapper_rustc_invocation(args) {
+        return false;
+    }
+    add_rustc_flags_execroot_remap(args, Some(execroot))
+}
+
+fn add_rustc_flags_execroot_remap(
+    args: &mut Vec<String>,
+    action_execroot: Option<&slug_fs::paths::abs_norm_path::AbsNormPath>,
+) -> bool {
+    let Some(execroot) = action_execroot else {
+        return false;
+    };
+    let remap = format!(
+        "--remap-path-prefix={}={}",
+        execroot.as_path().to_string_lossy(),
+        "."
+    );
+    if args.iter().any(|arg| arg == &remap) {
+        return false;
+    }
+    let insert_at = args
+        .iter()
+        .position(|arg| arg.starts_with("--remap-path-prefix="))
+        .unwrap_or(args.len());
+    args.insert(insert_at, remap);
+    true
+}
+
+fn should_add_rustc_paramfile_execroot_remap(args: &[String]) -> bool {
+    is_process_wrapper_rustc_invocation(args)
+}
+
+fn windows_spawn_path(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        windows_short_path(path).unwrap_or_else(|| path.to_path_buf())
+    }
+
+    #[cfg(not(windows))]
+    {
+        path.to_path_buf()
+    }
+}
+
+fn windows_spawn_args<'a>(args: impl IntoIterator<Item = impl AsRef<OsStr> + 'a>) -> Vec<OsString> {
+    args.into_iter()
+        .map(|arg| windows_spawn_arg(arg.as_ref()))
+        .collect()
+}
+
+fn windows_spawn_arg(arg: &OsStr) -> OsString {
+    #[cfg(windows)]
+    {
+        windows_short_path_arg(arg).unwrap_or_else(|| arg.to_os_string())
+    }
+
+    #[cfg(not(windows))]
+    {
+        arg.to_os_string()
+    }
+}
+
+#[cfg(windows)]
+fn windows_short_path(path: &Path) -> Option<PathBuf> {
+    use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::ffi::OsStringExt;
+
+    unsafe extern "system" {
+        fn GetShortPathNameW(
+            lpszLongPath: *const u16,
+            lpszShortPath: *mut u16,
+            cchBuffer: u32,
+        ) -> u32;
+    }
+
+    let wide: Vec<u16> = path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let len = unsafe { GetShortPathNameW(wide.as_ptr(), std::ptr::null_mut(), 0) };
+    if len == 0 {
+        return None;
+    }
+    let mut buf = vec![0u16; len as usize];
+    let written = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), len) };
+    if written == 0 || written >= len {
+        return None;
+    }
+    Some(PathBuf::from(OsString::from_wide(&buf[..written as usize])))
+}
+
+#[cfg(windows)]
+fn windows_short_path_arg(arg: &OsStr) -> Option<OsString> {
+    let path = Path::new(arg);
+    if path.is_absolute() {
+        return windows_short_path(path).map(OsString::from);
+    }
+
+    let text = arg.to_string_lossy();
+    for prefix in [
+        "/LIBPATH:",
+        "-LIBPATH:",
+        "/OUT:",
+        "-OUT:",
+        "/IMPLIB:",
+        "-IMPLIB:",
+        "/PDB:",
+        "-PDB:",
+    ] {
+        let Some(rest) = text.strip_prefix(prefix) else {
+            continue;
+        };
+        let rest_path = Path::new(rest);
+        if !rest_path.is_absolute() {
+            continue;
+        }
+        let short = windows_short_path(rest_path)?;
+        return Some(OsString::from(format!(
+            "{prefix}{}",
+            short.to_string_lossy()
+        )));
+    }
+
+    None
+}
+
+fn parametrize_windows_process_wrapper_rustc_tail(
+    args: &mut Vec<String>,
+    scratch_dir: &Path,
+) -> bool {
+    #[cfg(not(windows))]
+    {
+        let _ = (args, scratch_dir);
+        false
+    }
+
+    #[cfg(windows)]
+    {
+        if !is_process_wrapper_rustc_invocation(args) {
+            return false;
+        }
+        if windows_command_line_len(args) <= 30_000 {
+            return false;
+        }
+        let Some(separator) = args.iter().position(|arg| arg == "--") else {
+            return false;
+        };
+        let tail_start = separator + 2;
+        if tail_start >= args.len() {
+            return false;
+        }
+
+        let param_path = scratch_dir.join("slug-process-wrapper-rustc-tail.params");
+        let content = args[tail_start..]
+            .iter()
+            .map(|arg| encode_process_wrapper_paramfile_arg(arg))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if let Err(e) = std::fs::write(&param_path, content) {
+            tracing::warn!(
+                ?e,
+                path = %param_path.display(),
+                "failed to write process_wrapper rustc tail paramfile"
+            );
+            return false;
+        }
+        args.splice(
+            tail_start..,
+            std::iter::once(format!("@{}", param_path.to_string_lossy())),
+        );
+        true
+    }
+}
+
+#[cfg(windows)]
+fn windows_command_line_len(args: &[String]) -> usize {
+    // Conservative estimate for CreateProcessW's command-line string:
+    // arguments plus separating spaces and quotes for args that need them.
+    args.iter()
+        .map(|arg| {
+            let quote_overhead = if arg.contains([' ', '\t', '"']) { 2 } else { 0 };
+            arg.len() + quote_overhead + 1
+        })
+        .sum()
+}
+
+#[cfg(windows)]
+fn encode_process_wrapper_paramfile_arg(arg: &str) -> String {
+    let trailing_backslashes = arg.chars().rev().take_while(|c| *c == '\\').count();
+    if trailing_backslashes == 0 {
+        return arg.to_owned();
+    }
+    let split_at = arg.len() - trailing_backslashes;
+    let mut encoded = String::with_capacity(arg.len() + trailing_backslashes);
+    encoded.push_str(&arg[..split_at]);
+    for _ in 0..(trailing_backslashes * 2) {
+        encoded.push('\\');
+    }
+    encoded
+}
+
+fn rewrite_windows_cargo_manifest_dir_env(
+    args: &mut [String],
+    env: &mut [(OsString, OsString)],
+    action_execroot: Option<&slug_fs::paths::abs_norm_path::AbsNormPath>,
+) -> bool {
+    #[cfg(not(windows))]
+    {
+        let _ = (args, env, action_execroot);
+        false
+    }
+
+    #[cfg(windows)]
+    {
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        let Some(execroot) = action_execroot else {
+            return false;
+        };
+        if !is_cargo_build_script_runner_invocation(args) {
+            return false;
+        }
+
+        let Some(manifest_index) = env
+            .iter()
+            .rposition(|(key, _)| key.as_os_str() == OsStr::new("CARGO_MANIFEST_DIR"))
+        else {
+            return false;
+        };
+
+        let manifest_string = env[manifest_index].1.to_string_lossy();
+        let manifest_abs = execroot.as_path().join(manifest_string.as_ref());
+        if manifest_abs.as_os_str().len() <= 240 {
+            return false;
+        }
+        if let Some(repo) = cargo_runfiles_repo_name(manifest_string.as_ref()) {
+            let manifest_rel = PathBuf::from("external").join(repo);
+            let manifest_abs = execroot.as_path().join(&manifest_rel);
+            if manifest_abs.is_dir() && manifest_abs.as_os_str().len() <= 240 {
+                apply_windows_cargo_manifest_dir_rewrite(args, env, manifest_rel.into_os_string());
+                return true;
+            }
+        }
+        let manifest_sources = cargo_manifest_alias_source_candidates(
+            manifest_string.as_ref(),
+            execroot.as_path(),
+            slug_core::cells::get_dynamic_project_root().as_deref(),
+        );
+
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        manifest_string.hash(&mut hasher);
+        let alias_rel = PathBuf::from(".slug-cargo-manifest")
+            .join(format!("{:016x}", hasher.finish())[..8].to_owned());
+        let alias_abs = execroot.as_path().join(&alias_rel);
+        let Some(parent) = alias_abs.parent() else {
+            return false;
+        };
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::debug!(
+                ?e,
+                path = %parent.display(),
+                "failed to create short cargo manifest alias parent"
+            );
+            return false;
+        }
+        match alias_abs.symlink_metadata() {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let _ = std::fs::remove_file(&alias_abs);
+            }
+            Ok(meta) if meta.is_dir() => {}
+            Ok(_) => return false,
+            Err(_) => {}
+        }
+        if cargo_manifest_alias_needs_population(&alias_abs) {
+            if let Err(e) = copy_first_manifest_alias_source(&manifest_sources, &alias_abs) {
+                tracing::warn!(
+                    ?e,
+                    alias = %alias_abs.display(),
+                    target = %manifest_abs.display(),
+                    "failed to prepopulate short cargo manifest alias; using empty alias"
+                );
+            }
+        }
+
+        apply_windows_cargo_manifest_dir_rewrite(args, env, alias_rel.into_os_string());
+        true
+    }
+}
+
+#[cfg(windows)]
+fn apply_windows_cargo_manifest_dir_rewrite(
+    args: &mut [String],
+    env: &mut [(OsString, OsString)],
+    manifest_rel: OsString,
+) {
+    for (key, value) in env.iter_mut() {
+        if key.as_os_str() == OsStr::new("CARGO_MANIFEST_DIR") {
+            *value = manifest_rel.clone();
+        } else if key.as_os_str() == OsStr::new("RULES_RUST_SYMLINK_EXEC_ROOT") {
+            *value = OsString::from("0");
+        }
+    }
+    if let Some(rundir_arg) = args.iter_mut().find(|arg| arg.as_str() == "--rundir=") {
+        *rundir_arg = format!("--rundir={}", Path::new(&manifest_rel).to_string_lossy());
+    }
+}
+
+fn rewrite_windows_cargo_build_script_runner_args(
+    args: &mut [String],
+    action_execroot: Option<&slug_fs::paths::abs_norm_path::AbsNormPath>,
+) -> bool {
+    #[cfg(not(windows))]
+    {
+        let _ = (args, action_execroot);
+        false
+    }
+
+    #[cfg(windows)]
+    {
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        let Some(execroot) = action_execroot else {
+            return false;
+        };
+        if !is_cargo_build_script_runner_invocation(args) {
+            return false;
+        }
+
+        let Some(script_arg) = args.iter_mut().find(|arg| arg.starts_with("--script=")) else {
+            return false;
+        };
+        let script = script_arg.trim_start_matches("--script=");
+        let script_abs = execroot.as_path().join(script);
+        if script_abs.as_os_str().len() <= 240 {
+            return false;
+        }
+
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        script.hash(&mut hasher);
+        let alias_rel =
+            PathBuf::from(".slug-cargo-script").join(format!("{:016x}.exe", hasher.finish()));
+        let alias_abs = execroot.as_path().join(&alias_rel);
+        let Some(parent) = alias_abs.parent() else {
+            return false;
+        };
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::debug!(
+                ?e,
+                path = %parent.display(),
+                "failed to create short cargo build-script alias parent"
+            );
+            return false;
+        }
+        if !alias_abs.exists() {
+            if let Err(e) = std::fs::copy(&script_abs, &alias_abs) {
+                tracing::debug!(
+                    ?e,
+                    alias = %alias_abs.display(),
+                    target = %script_abs.display(),
+                    "failed to create short cargo build-script alias"
+                );
+                return false;
+            }
+        }
+
+        *script_arg = format!("--script={}", alias_rel.to_string_lossy());
+        true
+    }
+}
+
+#[cfg(windows)]
+fn cargo_manifest_alias_source_candidates(
+    manifest: &str,
+    execroot: &Path,
+    project_root: Option<&Path>,
+) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    let Some(project_root) = project_root else {
+        push_unique_path(&mut candidates, execroot.join(manifest));
+        return candidates;
+    };
+
+    if let Some(repo) = cargo_runfiles_repo_name(manifest) {
+        push_unique_path(&mut candidates, execroot.join("external").join(&repo));
+        push_unique_path(&mut candidates, project_root.join("external").join(&repo));
+        push_unique_path(
+            &mut candidates,
+            project_root.join("bazel-external").join(&repo),
+        );
+    } else if let Some(repo) = manifest_repo_path_component(manifest, "external") {
+        push_unique_path(&mut candidates, execroot.join("external").join(repo));
+        push_unique_path(&mut candidates, project_root.join("external").join(repo));
+    } else if let Some(repo) = manifest_repo_path_component(manifest, "bazel-external") {
+        push_unique_path(
+            &mut candidates,
+            project_root.join("bazel-external").join(repo),
+        );
+    }
+    push_unique_path(&mut candidates, execroot.join(manifest));
+
+    candidates
+}
+
+#[cfg(windows)]
+fn cargo_runfiles_repo_name(manifest: &str) -> Option<String> {
+    let normalized = manifest.replace('\\', "/");
+    let marker = ".cargo_runfiles/";
+    let repo_start = normalized.rfind(marker)? + marker.len();
+    let repo = normalized[repo_start..].split('/').next()?;
+    if repo.is_empty() {
+        None
+    } else {
+        Some(repo.to_owned())
+    }
+}
+
+#[cfg(windows)]
+fn manifest_repo_path_component<'a>(manifest: &'a str, prefix: &str) -> Option<&'a str> {
+    let mut components = manifest.split(['/', '\\']);
+    if components.next()? != prefix {
+        return None;
+    }
+    let repo = components.next()?;
+    if repo.is_empty() { None } else { Some(repo) }
+}
+
+#[cfg(windows)]
+fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if !paths.iter().any(|existing| existing == &path) {
+        paths.push(path);
+    }
+}
+
+#[cfg(windows)]
+fn cargo_manifest_alias_needs_population(alias: &Path) -> bool {
+    match std::fs::read_dir(alias) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(_) => true,
+    }
+}
+
+#[cfg(windows)]
+fn copy_first_manifest_alias_source(sources: &[PathBuf], alias: &Path) -> std::io::Result<()> {
+    let mut last_error = None;
+    for source in sources {
+        if !source.exists() {
+            continue;
+        }
+        match copy_dir_all_for_manifest_alias(source, alias) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                tracing::debug!(
+                    ?e,
+                    alias = %alias.display(),
+                    source = %source.display(),
+                    "failed to prepopulate short cargo manifest alias from candidate"
+                );
+                last_error = Some(e);
+            }
+        }
+    }
+    Err(last_error.unwrap_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "no cargo manifest alias source exists",
+        )
+    }))
+}
+
+#[cfg(windows)]
+fn copy_dir_all_for_manifest_alias(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let dst_path = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all_for_manifest_alias(&entry.path(), &dst_path)?;
+        } else if ty.is_symlink() {
+            let target = std::fs::read_link(entry.path())?;
+            #[cfg(windows)]
+            {
+                if entry.path().is_dir() {
+                    std::os::windows::fs::symlink_dir(target, dst_path)?;
+                } else {
+                    std::os::windows::fs::symlink_file(target, dst_path)?;
+                }
+            }
+        } else {
+            std::fs::copy(entry.path(), dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn is_cargo_build_script_runner_invocation(args: &[String]) -> bool {
+    args.first()
+        .and_then(|arg| path_file_name(arg))
+        .is_some_and(|name| name == "runner" || name == "runner.exe")
+        && args.iter().any(|arg| arg.starts_with("--script="))
+}
+
+fn is_process_wrapper_rustc_invocation(args: &[String]) -> bool {
+    let Some(separator) = args.iter().position(|arg| arg == "--") else {
+        return false;
+    };
+    args.get(separator + 1)
+        .is_some_and(|tool| path_file_name(tool).is_some_and(is_rustc_file_name))
+}
+
+fn path_file_name(path: &str) -> Option<&str> {
+    path.rsplit(['/', '\\'])
+        .next()
+        .filter(|name| !name.is_empty())
+}
+
+fn is_rustc_file_name(name: &str) -> bool {
+    name == "rustc" || name == "rustc.exe"
+}
+
+#[cfg(unix)]
 fn should_filter_rustc_implicit_gcc_s(args: &[String], linker: &str) -> bool {
     let linker_is_clangxx = linker.ends_with("/clang++") || linker == "clang++";
     linker_is_clangxx
@@ -2260,6 +2839,392 @@ mod tests {
         assert_ne!(rewritten[2], args[2]);
         assert!(rewritten[2].ends_with("slug-rustc-clangxx-filter-gcc-s"));
         assert!(temp.path().join("slug-rustc-clangxx-filter-gcc-s").exists());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rustc_execroot_remap_precedes_generic_pwd_remap() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = temp.path().join("execroot").join("7476792f9006565e");
+        std::fs::create_dir_all(&execroot)?;
+        let execroot = AbsNormPathBuf::new(execroot)?;
+        let mut args = vec![
+            "external/rules_rust/util/process_wrapper/process_wrapper".to_owned(),
+            "--subst".to_owned(),
+            "pwd=${pwd}".to_owned(),
+            "--".to_owned(),
+            "external/rust_linux_x86_64/bin/rustc".to_owned(),
+            "external/rules_rs++crate+crates__anyhow-1.0.102/src/lib.rs".to_owned(),
+            "--remap-path-prefix=${pwd}=.".to_owned(),
+        ];
+
+        assert!(add_rustc_execroot_remap(&mut args, Some(&execroot)));
+
+        let expected = format!(
+            "--remap-path-prefix={}={}",
+            execroot.as_path().to_string_lossy(),
+            "."
+        );
+        let physical = args
+            .iter()
+            .position(|arg| arg == &expected)
+            .expect("physical execroot remap");
+        let generic = args
+            .iter()
+            .position(|arg| arg == "--remap-path-prefix=${pwd}=.")
+            .expect("generic pwd remap");
+        assert!(
+            physical < generic,
+            "specific physical execroot remap must run before generic pwd remap"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rustc_flags_execroot_remap_precedes_paramfile_remap() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = temp.path().join("execroot").join("7476792f9006565e");
+        std::fs::create_dir_all(&execroot)?;
+        let execroot = AbsNormPathBuf::new(execroot)?;
+        let mut args = vec![
+            "external/rules_rs++crate+crates__anyhow-1.0.102/src/lib.rs".to_owned(),
+            "--remap-path-prefix=${pwd}=.".to_owned(),
+        ];
+
+        assert!(add_rustc_flags_execroot_remap(&mut args, Some(&execroot)));
+
+        let expected = format!(
+            "--remap-path-prefix={}={}",
+            execroot.as_path().to_string_lossy(),
+            "."
+        );
+        let physical = args
+            .iter()
+            .position(|arg| arg == &expected)
+            .expect("physical execroot remap");
+        let generic = args
+            .iter()
+            .position(|arg| arg == "--remap-path-prefix=${pwd}=.")
+            .expect("generic pwd remap");
+        assert!(
+            physical < generic,
+            "specific physical execroot remap must precede generic pwd remap in rustc paramfile"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rustc_paramfile_remap_ignores_cargo_manifest_paramfile() {
+        let args = vec![
+            "external/rules_rust/cargo/private/cargo_build_script_runner/runner".to_owned(),
+            "--script=buck-out/gen/external/crate/_bs-.exe".to_owned(),
+            "--cargo_manifest_args=@buck-out/tmp/slug-params-0".to_owned(),
+        ];
+
+        assert!(!should_add_rustc_paramfile_execroot_remap(&args));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_process_wrapper_rustc_tail_paramfile_shortens_spawn() -> slug_error::Result<()>
+    {
+        let temp = tempfile::tempdir()?;
+        let mut args = vec![
+            "external/rules_rust/util/process_wrapper/process_wrapper.exe".to_owned(),
+            "--subst".to_owned(),
+            "pwd=${pwd}".to_owned(),
+            "--".to_owned(),
+            "external/rustc/bin/rustc.exe".to_owned(),
+            "src/lib.rs".to_owned(),
+        ];
+        for idx in 0..900 {
+            args.push(format!(
+                "-Ldependency=buck-out/p44/gen/rules_rs++crate+crates__dep-{idx}/416f1912d74383a3/external/rules_rs++crate+crates__dep-{idx}"
+            ));
+        }
+
+        assert!(windows_command_line_len(&args) > 30_000);
+        assert!(parametrize_windows_process_wrapper_rustc_tail(
+            &mut args,
+            temp.path()
+        ));
+
+        assert_eq!(args.len(), 6);
+        assert_eq!(args[4], "external/rustc/bin/rustc.exe");
+        assert!(args[5].starts_with('@'));
+        let param_path = args[5].trim_start_matches('@');
+        let content = std::fs::read_to_string(param_path)?;
+        assert!(content.contains("src/lib.rs"));
+        assert!(content.contains("-Ldependency=buck-out/p44/gen/rules_rs++crate+crates__dep-899"));
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_process_wrapper_paramfile_arg_doubles_trailing_backslashes() {
+        assert_eq!(
+            encode_process_wrapper_paramfile_arg("C:\\path\\"),
+            "C:\\path\\\\"
+        );
+        assert_eq!(
+            encode_process_wrapper_paramfile_arg("C:\\path\\\\"),
+            "C:\\path\\\\\\\\"
+        );
+    }
+
+    #[test]
+    fn test_windows_cargo_manifest_dir_rewrite_ignores_non_runner() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
+        std::fs::create_dir_all(&execroot)?;
+        let mut env = vec![(
+            OsString::from("CARGO_MANIFEST_DIR"),
+            OsString::from("buck-out/very/long/generated/cargo_runfiles/crate"),
+        )];
+        let mut args = vec!["external/tools/not-runner.exe".to_owned()];
+
+        assert!(!rewrite_windows_cargo_manifest_dir_env(
+            &mut args,
+            &mut env,
+            Some(&execroot)
+        ));
+        assert_eq!(
+            env[0].1,
+            OsString::from("buck-out/very/long/generated/cargo_runfiles/crate")
+        );
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_cargo_manifest_dir_rewrite_shortens_runner_env() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
+        std::fs::create_dir_all(&execroot)?;
+        let manifest = format!(
+            "buck-out/{}/gen/crate/_bs.cargo_runfiles/crate",
+            "x".repeat(185),
+        );
+        std::fs::create_dir_all(execroot.as_path().join(&manifest))?;
+        assert!(execroot.as_path().join(&manifest).as_os_str().len() > 240);
+        let mut env = vec![
+            (
+                OsString::from("CARGO_MANIFEST_DIR"),
+                OsString::from("stale"),
+            ),
+            (
+                OsString::from("CARGO_MANIFEST_DIR"),
+                OsString::from(&manifest),
+            ),
+            (
+                OsString::from("RULES_RUST_SYMLINK_EXEC_ROOT"),
+                OsString::from("1"),
+            ),
+        ];
+        let mut args = vec![
+            "buck-out/gen/rules_rust/cargo/private/cargo_build_script_runner/runner.exe".to_owned(),
+            "--script=buck-out/gen/external/crate/_bs-.exe".to_owned(),
+            "--rundir=".to_owned(),
+        ];
+
+        assert!(rewrite_windows_cargo_manifest_dir_env(
+            &mut args,
+            &mut env,
+            Some(&execroot)
+        ));
+        assert!(
+            env[1]
+                .1
+                .to_string_lossy()
+                .starts_with(".slug-cargo-manifest")
+        );
+        assert_eq!(env[0].1, env[1].1);
+        assert!(execroot.as_path().join(Path::new(&env[1].1)).is_dir());
+        assert_eq!(
+            args[2],
+            format!("--rundir={}", Path::new(&env[1].1).to_string_lossy())
+        );
+        assert_eq!(env[2].1, OsString::from("0"));
+
+        let first_alias = env[1].1.clone();
+        args[2] = "--rundir=".to_owned();
+        env[2].1 = OsString::from("1");
+        env[0].1 = OsString::from("stale");
+        env[1].1 = OsString::from(&manifest);
+        assert!(rewrite_windows_cargo_manifest_dir_env(
+            &mut args,
+            &mut env,
+            Some(&execroot)
+        ));
+        assert_eq!(env[0].1, first_alias);
+        assert_eq!(env[1].1, first_alias);
+        assert_eq!(
+            args[2],
+            format!("--rundir={}", Path::new(&env[1].1).to_string_lossy())
+        );
+        assert_eq!(env[2].1, OsString::from("0"));
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_cargo_manifest_alias_sources_include_external_repo_fallback()
+    -> slug_error::Result<()> {
+        let execroot = PathBuf::from("C:\\s\\execroot");
+        let project_root = PathBuf::from("C:\\dev\\workspace");
+        let manifest = "buck-out/p44/gen/rules_rs++crate+crates__windows_x86_64_msvc-0.52.6/416f1912d74383a3/external/rules_rs++crate+crates__windows_x86_64_msvc-0.52.6/_bs_x86_64-pc-windows-msvc.cargo_runfiles/rules_rs++crate+crates__windows_x86_64_msvc-0.52.6";
+
+        let candidates =
+            cargo_manifest_alias_source_candidates(manifest, &execroot, Some(&project_root));
+
+        assert_eq!(
+            candidates[0],
+            execroot
+                .join("external")
+                .join("rules_rs++crate+crates__windows_x86_64_msvc-0.52.6")
+        );
+        assert!(
+            candidates.contains(
+                &project_root
+                    .join("external")
+                    .join("rules_rs++crate+crates__windows_x86_64_msvc-0.52.6")
+            )
+        );
+        assert!(
+            candidates.contains(
+                &project_root
+                    .join("bazel-external")
+                    .join("rules_rs++crate+crates__windows_x86_64_msvc-0.52.6")
+            )
+        );
+        assert_eq!(candidates.last(), Some(&execroot.join(manifest)));
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_cargo_manifest_dir_rewrite_uses_short_external_repo() -> slug_error::Result<()>
+    {
+        let temp = tempfile::tempdir()?;
+        let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
+        let repo = "rules_rs++crate+crates__windows_x86_64_msvc-0.52.6";
+        std::fs::create_dir_all(execroot.as_path().join("external").join(repo).join("lib"))?;
+        std::fs::write(
+            execroot
+                .as_path()
+                .join("external")
+                .join(repo)
+                .join("lib")
+                .join("windows.0.52.0.lib"),
+            b"native lib",
+        )?;
+        let manifest = format!(
+            "buck-out/{}/gen/{repo}/_bs_x86_64-pc-windows-msvc.cargo_runfiles/{repo}",
+            "x".repeat(185),
+        );
+        assert!(execroot.as_path().join(&manifest).as_os_str().len() > 240);
+        let mut env = vec![
+            (
+                OsString::from("CARGO_MANIFEST_DIR"),
+                OsString::from(&manifest),
+            ),
+            (
+                OsString::from("RULES_RUST_SYMLINK_EXEC_ROOT"),
+                OsString::from("1"),
+            ),
+        ];
+        let mut args = vec![
+            "buck-out/gen/rules_rust/cargo/private/cargo_build_script_runner/runner.exe".to_owned(),
+            "--script=buck-out/gen/external/crate/_bs-.exe".to_owned(),
+            "--rundir=".to_owned(),
+        ];
+
+        assert!(rewrite_windows_cargo_manifest_dir_env(
+            &mut args,
+            &mut env,
+            Some(&execroot)
+        ));
+        assert_eq!(
+            env[0].1,
+            OsString::from(PathBuf::from("external").join(repo))
+        );
+        assert_eq!(env[1].1, OsString::from("0"));
+        assert_eq!(args[2], format!("--rundir=external\\{repo}"));
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_cargo_manifest_alias_copies_first_existing_fallback() -> slug_error::Result<()>
+    {
+        let temp = tempfile::tempdir()?;
+        let missing = temp.path().join("missing");
+        let source = temp.path().join("external").join("crate");
+        let alias = temp.path().join("alias");
+        std::fs::create_dir_all(source.join("lib"))?;
+        std::fs::write(source.join("lib").join("windows.0.52.0.lib"), b"native lib")?;
+
+        copy_first_manifest_alias_source(&[missing, source], &alias)?;
+
+        assert_eq!(
+            std::fs::read(alias.join("lib").join("windows.0.52.0.lib"))?,
+            b"native lib"
+        );
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_cargo_runner_args_rewrite_shortens_script_path() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
+        std::fs::create_dir_all(&execroot)?;
+        let script = format!("buck-out/{}/gen/crate/_bs-.exe", "x".repeat(230));
+        let script_abs = execroot.as_path().join(&script);
+        std::fs::create_dir_all(script_abs.parent().unwrap())?;
+        std::fs::write(&script_abs, b"fake exe")?;
+        assert!(script_abs.as_os_str().len() > 200);
+        let mut args = vec![
+            "buck-out/gen/rules_rust/cargo/private/cargo_build_script_runner/runner.exe".to_owned(),
+            format!("--script={script}"),
+        ];
+
+        assert!(rewrite_windows_cargo_build_script_runner_args(
+            &mut args,
+            Some(&execroot)
+        ));
+        assert!(args[1].starts_with("--script=.slug-cargo-script"));
+        let alias = args[1].trim_start_matches("--script=");
+        assert!(execroot.as_path().join(alias).is_file());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rustc_execroot_remap_ignores_non_rustc_process_wrapper() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = temp.path().join("execroot").join("7476792f9006565e");
+        std::fs::create_dir_all(&execroot)?;
+        let execroot = AbsNormPathBuf::new(execroot)?;
+        let mut args = vec![
+            "external/rules_rust/util/process_wrapper/process_wrapper".to_owned(),
+            "--subst".to_owned(),
+            "pwd=${pwd}".to_owned(),
+            "--".to_owned(),
+            "external/tools/not-rustc".to_owned(),
+        ];
+
+        assert!(!add_rustc_execroot_remap(&mut args, Some(&execroot)));
+        assert_eq!(args.len(), 5);
 
         Ok(())
     }

@@ -38,7 +38,7 @@ fn paths_equal(a: &Path, b: &Path) -> bool {
 ///
 /// - If symlink already points to target: no-op
 /// - If symlink points elsewhere: replace it
-/// - If non-symlink exists: return error
+/// - If non-symlink exists: replace it
 pub(crate) fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> {
     if let Ok(existing) = std::fs::read_link(link) {
         if paths_equal(&existing, target) {
@@ -59,11 +59,12 @@ pub(crate) fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> 
             std::fs::remove_file(link)?;
         }
     } else if link.exists() {
-        tracing::warn!(
-            "bazel-external/{} is a real directory, not a symlink - skipping",
-            link.file_name().unwrap_or_default().to_string_lossy()
+        tracing::info!(
+            "ensure_symlink: replacing non-symlink bazel-external/{} with symlink to {}",
+            link.file_name().unwrap_or_default().to_string_lossy(),
+            target.display(),
         );
-        return Ok(());
+        remove_existing_path(link)?;
     }
 
     if let Some(parent) = link.parent() {
@@ -89,6 +90,25 @@ pub(crate) fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> 
                 }
             }
         }
+    }
+}
+
+fn remove_existing_path(path: &Path) -> std::io::Result<()> {
+    let metadata = std::fs::symlink_metadata(path)?;
+    if metadata.file_type().is_symlink() {
+        #[cfg(windows)]
+        {
+            return std::fs::remove_dir(path).or_else(|_| std::fs::remove_file(path));
+        }
+        #[cfg(not(windows))]
+        {
+            return std::fs::remove_file(path);
+        }
+    }
+    if metadata.is_dir() {
+        std::fs::remove_dir_all(path)
+    } else {
+        std::fs::remove_file(path)
     }
 }
 
@@ -148,4 +168,26 @@ fn is_junction(path: &Path) -> bool {
 #[cfg(not(windows))]
 fn is_junction(_path: &Path) -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ensure_symlink_replaces_existing_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("target");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("marker.txt"), "target").unwrap();
+
+        let link = temp.path().join("bazel-external").join("rules_rust+0.69.0");
+        std::fs::create_dir_all(&link).unwrap();
+        std::fs::write(link.join("stale.txt"), "stale").unwrap();
+
+        ensure_symlink(&link, &target).unwrap();
+
+        assert!(link.join("marker.txt").exists());
+        assert!(!link.join("stale.txt").exists());
+    }
 }

@@ -386,6 +386,7 @@ pub fn get_dynamic_extension_cell_setup(
 /// Set the project root for dynamic cell filesystem scanning.
 pub fn set_dynamic_project_root(root: std::path::PathBuf) {
     ensure_execroot_layout(&root);
+    repair_external_symlink_targets(&root);
     let _ = DYNAMIC_PROJECT_ROOT.set(root);
 }
 
@@ -562,11 +563,210 @@ fn module_form_priority(cell_path: &str) -> u8 {
         .and_then(|s| s.to_str())
         .unwrap_or("");
     let plus_count = basename.matches('+').count();
-    match plus_count {
-        1 => 2,
-        n if n >= 2 => 1,
-        _ => 0,
+    if plus_count == 1 {
+        3
+    } else if basename.contains("++") {
+        2
+    } else if plus_count >= 2 {
+        1
+    } else {
+        0
     }
+}
+
+fn external_symlink_relative_target(cell_path: &str) -> std::path::PathBuf {
+    let mut target = std::path::PathBuf::from("..");
+    for component in cell_path
+        .split(['/', '\\'])
+        .filter(|component| !component.is_empty())
+    {
+        target.push(component);
+    }
+    target
+}
+
+fn external_symlink_target(project_root: &std::path::Path, cell_path: &str) -> std::path::PathBuf {
+    let mut project_relative_target = std::path::PathBuf::new();
+    for component in cell_path
+        .split(['/', '\\'])
+        .filter(|component| !component.is_empty())
+    {
+        project_relative_target.push(component);
+    }
+    let project_target = project_root.join(&project_relative_target);
+    std::fs::canonicalize(project_target)
+        .unwrap_or_else(|_| external_symlink_relative_target(cell_path))
+}
+
+fn resolve_external_symlink_target(
+    external_dir: &std::path::Path,
+    target: &std::path::Path,
+) -> std::path::PathBuf {
+    if target.is_absolute() {
+        target.to_path_buf()
+    } else {
+        external_dir.join(target)
+    }
+}
+
+fn remove_external_symlink(path: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        std::fs::remove_file(path).or_else(|_| std::fs::remove_dir(path))
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::remove_file(path)
+    }
+}
+
+fn preferred_external_symlink_target(
+    project_root: &std::path::Path,
+    apparent_name: &str,
+    current_target: &std::path::Path,
+) -> std::path::PathBuf {
+    let Some(current_name) = current_target.file_name().and_then(|s| s.to_str()) else {
+        return current_target.to_path_buf();
+    };
+    let current_priority = module_form_priority(current_name);
+    if current_priority < 3 {
+        if let Some(module_target) =
+            preferred_module_form_target(project_root, apparent_name, current_priority)
+        {
+            return module_target;
+        }
+    }
+    if current_priority >= 2 {
+        return current_target.to_path_buf();
+    }
+    if !current_name.ends_with(&format!("+{apparent_name}")) {
+        return current_target.to_path_buf();
+    }
+
+    let Some((owner, rest)) = current_name.split_once('+') else {
+        return current_target.to_path_buf();
+    };
+    let canonical_name = format!("{owner}++{rest}");
+    if module_form_priority(&canonical_name) <= current_priority {
+        return current_target.to_path_buf();
+    }
+    let candidate = project_root.join("bazel-external").join(canonical_name);
+    if candidate.is_dir() {
+        return std::fs::canonicalize(&candidate).unwrap_or(candidate);
+    }
+
+    current_target.to_path_buf()
+}
+
+fn preferred_module_form_target(
+    project_root: &std::path::Path,
+    apparent_name: &str,
+    current_priority: u8,
+) -> Option<std::path::PathBuf> {
+    if current_priority >= 3 {
+        return None;
+    }
+    let bazel_external = project_root.join("bazel-external");
+    let entries = std::fs::read_dir(&bazel_external).ok()?;
+    let prefix = format!("{apparent_name}+");
+    let mut best: Option<std::path::PathBuf> = None;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !name.starts_with(&prefix) || module_form_priority(name) != 3 {
+            continue;
+        }
+        if !path.is_dir() {
+            continue;
+        }
+        let candidate = std::fs::canonicalize(&path).unwrap_or(path);
+        if best.as_ref().is_none_or(|current| candidate < *current) {
+            best = Some(candidate);
+        }
+    }
+    best
+}
+
+pub fn repair_external_symlink_targets(project_root: &std::path::Path) {
+    let external_dir = project_root.join("external");
+    let Ok(entries) = std::fs::read_dir(&external_dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let link_path = entry.path();
+        let Ok(metadata) = std::fs::symlink_metadata(&link_path) else {
+            continue;
+        };
+        if !metadata.file_type().is_symlink() {
+            continue;
+        }
+        let Ok(current_target) = std::fs::read_link(&link_path) else {
+            continue;
+        };
+        let current_abs = resolve_external_symlink_target(&external_dir, &current_target);
+        let Some(canonical_target) = resolve_symlink_chain(&current_abs) else {
+            continue;
+        };
+        let Some(apparent_name) = link_path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let repaired_target =
+            preferred_external_symlink_target(project_root, apparent_name, &canonical_target);
+        if current_abs == repaired_target {
+            continue;
+        }
+
+        if let Err(e) = remove_external_symlink(&link_path) {
+            tracing::debug!(
+                ?e,
+                link = %link_path.display(),
+                "failed to remove external symlink while repairing target"
+            );
+            continue;
+        }
+        #[cfg(unix)]
+        {
+            if let Err(e) = std::os::unix::fs::symlink(&repaired_target, &link_path) {
+                tracing::debug!(
+                    ?e,
+                    link = %link_path.display(),
+                    target = %repaired_target.display(),
+                    "failed to recreate external symlink with canonical target"
+                );
+            }
+        }
+        #[cfg(windows)]
+        {
+            if let Err(e) = std::os::windows::fs::symlink_dir(&repaired_target, &link_path) {
+                tracing::debug!(
+                    ?e,
+                    link = %link_path.display(),
+                    target = %repaired_target.display(),
+                    "failed to recreate external symlink with canonical target"
+                );
+            }
+        }
+    }
+}
+
+fn resolve_symlink_chain(path: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut current = path.to_path_buf();
+    for _ in 0..8 {
+        let metadata = std::fs::symlink_metadata(&current).ok()?;
+        if !metadata.file_type().is_symlink() {
+            return std::fs::canonicalize(&current).ok().or(Some(current));
+        }
+        let target = std::fs::read_link(&current).ok()?;
+        current = if target.is_absolute() {
+            target
+        } else {
+            current.parent()?.join(target)
+        };
+    }
+    None
 }
 
 pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
@@ -576,7 +776,7 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     };
     let external_dir = project_root.join("external");
     let link_path = external_dir.join(cell_name);
-    let desired_target = std::path::PathBuf::from("..").join(cell_path);
+    let desired_target = external_symlink_target(&project_root, cell_path);
     let desired_priority = module_form_priority(cell_path);
     match link_path.symlink_metadata() {
         Ok(meta) if meta.file_type().is_symlink() => {
@@ -590,63 +790,77 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
             match std::fs::read_link(&link_path) {
                 Ok(current) => {
                     if current == desired_target {
-                        return;
-                    }
-                    // Precedence: prefer bzlmod-module-form targets
-                    // (`name+version`) over extension-spoke targets
-                    // (`owner+ext+name`). Multiple extensions can produce
-                    // sibling spokes that share the same apparent
-                    // `cell_name`; whichever wins the race must be the
-                    // module, not a spoke, so consumers of `external/<name>`
-                    // (like template-expand actions reading
-                    // `external/rules_python/python/private/...`) find
-                    // the right files.
-                    let current_str = current.to_string_lossy();
-                    let current_priority = module_form_priority(&current_str);
-                    if current_priority > desired_priority {
-                        tracing::debug!(
-                            "ensure_external_symlink: keeping {} (was {} pri={}, would be {} pri={})",
-                            link_path.display(),
-                            current.display(),
-                            current_priority,
-                            desired_target.display(),
-                            desired_priority,
-                        );
-                        return;
-                    }
-                    match (
-                        std::fs::canonicalize(&link_path),
-                        std::fs::canonicalize(&desired_target),
-                    ) {
-                        (Ok(a), Ok(b)) if a == b => return,
-                        (Err(_), Err(_)) => {
-                            // Both targets fail to canonicalize — we can't
-                            // tell whether the existing link is really
-                            // stale. In practice two different callers
-                            // (bzlmod resolver and the dynamic extension
-                            // cell registry) pick different canonical
-                            // names for the same `apparent_name`, and
-                            // when the `bazel-external/` target hasn't
-                            // been materialized yet, both canonicalize
-                            // calls fail. Replacing the link would touch
-                            // its mtime on every invocation, the file
-                            // watcher would pick that up, and DICE would
-                            // invalidate package loads. Leave it.
-                            return;
+                        match std::fs::canonicalize(&link_path) {
+                            Ok(_) => return,
+                            Err(_) => {
+                                tracing::debug!(
+                                    "ensure_external_symlink: replacing broken link {} (target {})",
+                                    link_path.display(),
+                                    current.display(),
+                                );
+                                let _ = remove_external_symlink(&link_path);
+                            }
                         }
-                        _ => {
+                    } else {
+                        // Precedence: prefer bzlmod-module-form targets
+                        // (`name+version`) over extension-spoke targets
+                        // (`owner+ext+name`). Multiple extensions can produce
+                        // sibling spokes that share the same apparent
+                        // `cell_name`; whichever wins the race must be the
+                        // module, not a spoke, so consumers of `external/<name>`
+                        // (like template-expand actions reading
+                        // `external/rules_python/python/private/...`) find
+                        // the right files.
+                        let current_str = current.to_string_lossy();
+                        let current_priority = module_form_priority(&current_str);
+                        if current_priority > desired_priority {
                             tracing::debug!(
-                                "ensure_external_symlink: replacing stale link {} (was {} -> now {})",
+                                "ensure_external_symlink: keeping {} (was {} pri={}, would be {} pri={})",
                                 link_path.display(),
                                 current.display(),
+                                current_priority,
                                 desired_target.display(),
+                                desired_priority,
                             );
-                            let _ = std::fs::remove_file(&link_path);
+                            return;
+                        }
+                        match (
+                            std::fs::canonicalize(&link_path),
+                            std::fs::canonicalize(resolve_external_symlink_target(
+                                &external_dir,
+                                &desired_target,
+                            )),
+                        ) {
+                            (Ok(a), Ok(b)) if a == b => return,
+                            (Err(_), Err(_)) => {
+                                // Both targets fail to canonicalize — we can't
+                                // tell whether the existing link is really
+                                // stale. In practice two different callers
+                                // (bzlmod resolver and the dynamic extension
+                                // cell registry) pick different canonical
+                                // names for the same `apparent_name`, and
+                                // when the `bazel-external/` target hasn't
+                                // been materialized yet, both canonicalize
+                                // calls fail. Replacing the link would touch
+                                // its mtime on every invocation, the file
+                                // watcher would pick that up, and DICE would
+                                // invalidate package loads. Leave it.
+                                return;
+                            }
+                            _ => {
+                                tracing::debug!(
+                                    "ensure_external_symlink: replacing stale link {} (was {} -> now {})",
+                                    link_path.display(),
+                                    current.display(),
+                                    desired_target.display(),
+                                );
+                                let _ = remove_external_symlink(&link_path);
+                            }
                         }
                     }
                 }
                 Err(_) => {
-                    let _ = std::fs::remove_file(&link_path);
+                    let _ = remove_external_symlink(&link_path);
                 }
             }
         }
@@ -1670,6 +1884,182 @@ mod tests {
                 "double_owner++source+generated",
                 apparent
             )
+        );
+    }
+
+    #[test]
+    fn external_symlink_relative_target_splits_bazel_style_paths() {
+        assert_eq!(
+            external_symlink_relative_target("bazel-external/rules_rust+0.69.0"),
+            std::path::PathBuf::from("..")
+                .join("bazel-external")
+                .join("rules_rust+0.69.0")
+        );
+    }
+
+    #[test]
+    fn external_symlink_target_uses_canonical_repo_dir_when_available() {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_root = tmp.path();
+        let repo = project_root
+            .join("bazel-external")
+            .join("rules_rust+0.69.0");
+        std::fs::create_dir_all(&repo).unwrap();
+
+        assert_eq!(
+            external_symlink_target(project_root, "bazel-external/rules_rust+0.69.0"),
+            std::fs::canonicalize(repo).unwrap()
+        );
+    }
+
+    #[test]
+    fn module_form_priority_prefers_double_plus_canonical_over_collapsed_extension_repo() {
+        assert!(
+            module_form_priority("bazel-external/rules_python+1.9.0")
+                > module_form_priority("bazel-external/rules_rs++crate+crates__diplomat-tool")
+        );
+        assert!(
+            module_form_priority("bazel-external/rules_rs++crate+crates__diplomat-tool")
+                > module_form_priority("bazel-external/rules_rs+crate+crates__diplomat-tool")
+        );
+    }
+
+    #[test]
+    fn resolve_external_symlink_target_resolves_relative_to_external_dir() {
+        let external_dir = std::path::Path::new("workspace").join("external");
+        assert_eq!(
+            resolve_external_symlink_target(
+                &external_dir,
+                &std::path::PathBuf::from("..")
+                    .join("bazel-external")
+                    .join("rules_rust+0.69.0"),
+            ),
+            std::path::Path::new("workspace")
+                .join("external")
+                .join("..")
+                .join("bazel-external")
+                .join("rules_rust+0.69.0")
+        );
+    }
+
+    #[test]
+    fn repair_external_symlink_targets_collapses_symlink_chain() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let external = root.join("external");
+        let bazel_external = root.join("bazel-external");
+        let cache_repo = root.join("cache").join("rules_rust");
+        std::fs::create_dir_all(&external).unwrap();
+        std::fs::create_dir_all(&bazel_external).unwrap();
+        std::fs::create_dir_all(&cache_repo).unwrap();
+
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&cache_repo, bazel_external.join("rules_rust+0.69.0"))
+                .unwrap();
+            std::os::unix::fs::symlink(
+                std::path::PathBuf::from("..")
+                    .join("bazel-external")
+                    .join("rules_rust+0.69.0"),
+                external.join("rules_rust"),
+            )
+            .unwrap();
+        }
+        #[cfg(windows)]
+        {
+            std::os::windows::fs::symlink_dir(
+                &cache_repo,
+                bazel_external.join("rules_rust+0.69.0"),
+            )
+            .unwrap();
+            std::os::windows::fs::symlink_dir(
+                std::path::PathBuf::from("..")
+                    .join("bazel-external")
+                    .join("rules_rust+0.69.0"),
+                external.join("rules_rust"),
+            )
+            .unwrap();
+        }
+
+        repair_external_symlink_targets(root);
+
+        assert_eq!(
+            std::fs::canonicalize(external.join("rules_rust")).unwrap(),
+            std::fs::canonicalize(cache_repo).unwrap()
+        );
+    }
+
+    #[test]
+    fn repair_external_symlink_targets_prefers_double_plus_canonical_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let external = root.join("external");
+        let bazel_external = root.join("bazel-external");
+        let collapsed = bazel_external.join("rules_rs+crate+crates__foo-1.0.0");
+        let canonical = bazel_external.join("rules_rs++crate+crates__foo-1.0.0");
+        std::fs::create_dir_all(&external).unwrap();
+        std::fs::create_dir_all(&collapsed).unwrap();
+        std::fs::create_dir_all(&canonical).unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(
+            std::path::PathBuf::from("..")
+                .join("bazel-external")
+                .join("rules_rs+crate+crates__foo-1.0.0"),
+            external.join("crates__foo-1.0.0"),
+        )
+        .unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(
+            std::path::PathBuf::from("..")
+                .join("bazel-external")
+                .join("rules_rs+crate+crates__foo-1.0.0"),
+            external.join("crates__foo-1.0.0"),
+        )
+        .unwrap();
+
+        repair_external_symlink_targets(root);
+
+        assert_eq!(
+            std::fs::canonicalize(external.join("crates__foo-1.0.0")).unwrap(),
+            std::fs::canonicalize(canonical).unwrap()
+        );
+    }
+
+    #[test]
+    fn repair_external_symlink_targets_prefers_module_form_over_extension_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let external = root.join("external");
+        let bazel_external = root.join("bazel-external");
+        let extension_repo = bazel_external.join("rules_rs++rules_rust+rules_rust");
+        let module_repo = bazel_external.join("rules_rust+0.69.0");
+        std::fs::create_dir_all(&external).unwrap();
+        std::fs::create_dir_all(&extension_repo).unwrap();
+        std::fs::create_dir_all(&module_repo).unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(
+            std::path::PathBuf::from("..")
+                .join("bazel-external")
+                .join("rules_rs++rules_rust+rules_rust"),
+            external.join("rules_rust"),
+        )
+        .unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(
+            std::path::PathBuf::from("..")
+                .join("bazel-external")
+                .join("rules_rs++rules_rust+rules_rust"),
+            external.join("rules_rust"),
+        )
+        .unwrap();
+
+        repair_external_symlink_targets(root);
+
+        assert_eq!(
+            std::fs::canonicalize(external.join("rules_rust")).unwrap(),
+            std::fs::canonicalize(module_repo).unwrap()
         );
     }
 

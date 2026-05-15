@@ -11,6 +11,55 @@ Phase 2.5's shared synthesized execroot stopgap has landed and Phase 2.6's
 per-action execroot narrowing has landed through commit `16191ed9`. Phase 3
 (real Bazel-shaped execroot and external-repo layout) remains proposed.
 
+## Progress 2026-05-15: Windows per-action execroot path-length boundary
+
+Windows SDK smokes reached rules_rust cargo build-script execution and exposed
+a Plan 44 action-cwd/layout failure. With the Phase 2.6 per-action execroot
+under the workspace, cargo build-script runner actions attempted to spawn tools
+from deep generated paths while setting `CARGO_MANIFEST_DIR`-like directories as
+their working directory. On Windows those paths crossed the legacy process
+creation boundary and `Command::new(...).current_dir(...)` failed with
+`Os { code: 267, kind: NotADirectory }`.
+
+The failing class is systemic workspace/action-layout parity, not a
+rules_rust or SDK-target workaround: tools that execute from an action execroot
+must not inherit avoidable workspace-root path length. A temporary
+`<workspace>/e/<digest>` probe proved that shortening the digest segment helped
+but was still insufficient for deeper crates and also polluted the watched
+workspace root.
+
+Current local slice keeps Windows per-action execroots under the same logical
+workspace layout as other platforms:
+
+```text
+<workspace>\execroot\<input-prefix-digest>
+```
+
+The staged directory contains the same declared top-level prefixes and still
+symlinks `buck-out` and `external` back to the workspace. Windows path-length
+pressure is handled at process-spawn boundaries: existing absolute paths passed
+as the executable, current directory, or MSVC-style linker path arguments are
+converted to their Windows 8.3 short-path form when available. The on-disk
+execroot layout itself remains identical across platforms.
+
+Follow-up in the same class: a shorter execroot alone was not enough for
+rules_rust cargo build-script actions whose generated `CARGO_MANIFEST_DIR`
+still exceeded Windows process creation limits after joining with the execroot.
+Slug now rewrites only Windows cargo build-script runner invocations with an
+overlong manifest working directory to a short `.slug-cargo-manifest/<hash>`
+alias inside the action execroot. The alias is populated from the original
+manifest runfiles directory and is not a target-label or crate-name special
+case; it is an action-layout accommodation for the runner's `current_dir()`
+call.
+
+For the same Windows runner class, Slug also has a guarded fallback for
+generated build-script executable paths that are themselves overlong after
+joining with the action execroot. In that case only, Windows cargo build-script
+runner `--script=<path>` arguments are rewritten to copied
+`.slug-cargo-script/<hash>.exe` aliases inside the action execroot. The common
+case now relies on the short execroot plus manifest/rundir alias instead of
+rewriting every script path.
+
 ## Progress 2026-05-14: Rust rmeta path leakage blocks byte parity
 
 After Slug completed `zeromatter-kuro //sdk:sdk_contents`, a Bazel 9.0.1

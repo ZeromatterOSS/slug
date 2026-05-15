@@ -191,11 +191,10 @@ fn repo_has_foreign_top_level_symlink(
 fn collect_label_repairs(value: &RepoAttrValue, repairs: &mut Vec<(String, String)>) {
     match value {
         RepoAttrValue::Label(label) | RepoAttrValue::String(label) => {
-            if let Some(colon) = label.rfind(':')
-                && colon + 1 < label.len()
-                && (label.starts_with('@') || label.starts_with("//"))
-            {
-                repairs.push((label[..=colon].to_owned(), label.clone()));
+            if let Some(colon) = label.rfind(':') {
+                if colon + 1 < label.len() && (label.starts_with('@') || label.starts_with("//")) {
+                    repairs.push((label[..=colon].to_owned(), label.clone()));
+                }
             }
         }
         RepoAttrValue::StringList(items) => {
@@ -628,8 +627,7 @@ pub(crate) async fn get_file_ops_delegate(
         .exists()
         .then(|| std::fs::read_to_string(&marker_path).ok())
         .flatten();
-    let is_stale_stub =
-        !setup.repo_spec_json.is_empty() && marker_contents.as_deref().is_some_and(is_stub_marker);
+    let is_stale_stub = marker_contents.as_deref().is_some_and(is_stub_marker);
     let is_stale_complete = !setup.repo_spec_json.is_empty()
         && !setup.spec_hash.is_empty()
         && marker_contents.as_deref().is_some_and(|s| {
@@ -658,7 +656,7 @@ pub(crate) async fn get_file_ops_delegate(
         || is_stale_foreign_symlink
     {
         tracing::info!(
-            "Extension repo '{}' has stale materialization with a valid RepoSpec available; \
+            "Extension repo '{}' has stale materialization; \
              discarding it and re-materializing",
             setup.canonical_name
         );
