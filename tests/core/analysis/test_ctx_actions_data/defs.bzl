@@ -98,6 +98,20 @@ declare_file_path_shape_rule = rule(
     attrs = {},
 )
 
+def _declare_file_sibling_path_shape_impl(ctx):
+    original = ctx.actions.declare_file("bin/" + ctx.label.name + ".exe")
+    sibling = ctx.actions.declare_file(ctx.label.name + ".pdb", sibling = original)
+    marker = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(original, "exe")
+    ctx.actions.write(sibling, "pdb")
+    ctx.actions.write(marker, sibling.path)
+    return [DefaultInfo(files = depset([marker, original, sibling]))]
+
+declare_file_sibling_path_shape_rule = rule(
+    implementation = _declare_file_sibling_path_shape_impl,
+    attrs = {},
+)
+
 # === Test ctx.actions.declare_directory Bazel-shaped paths ===
 def _declare_directory_path_shape_impl(ctx):
     selected = ctx.actions.declare_directory("build/tree")

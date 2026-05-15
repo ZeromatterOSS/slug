@@ -47,10 +47,13 @@ fn sibling_to_prefix<'v>(sibling: Value<'v>) -> starlark::Result<Option<String>>
     }
 
     if let Some(artifact_like) = <&dyn StarlarkArtifactLike<'v>>::unpack_value(sibling)? {
-        // Use Cell to extract the parent dir from within the with_short_path closure
+        // Use Cell to extract the parent dir from within the rule-local path
+        // closure. `declare_file(..., sibling=...)` feeds this prefix back into
+        // declare_output, whose BazelOutput resolver adds the package path.
+        // Using File.short_path here would duplicate the package.
         let parent_dir = std::cell::Cell::new(None);
         artifact_like
-            .with_short_path(&|path| {
+            .with_rule_local_short_path(&|path| {
                 if let Some(parent) = path.parent() {
                     let s = parent.as_str();
                     if !s.is_empty() {

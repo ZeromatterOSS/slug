@@ -59,6 +59,15 @@ pub trait StarlarkArtifactLike<'v>: Display {
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
     ) -> slug_error::Result<StringValue<'v>>;
 
+    /// Returns the artifact fragment local to the declaring rule, without the
+    /// Bazel package or external-repository prefix.
+    fn with_rule_local_short_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> slug_error::Result<StringValue<'v>> {
+        self.with_short_path(f)
+    }
+
     /// Returns the display path for str()/repr() in Starlark.
     /// For source files: cell-relative path (e.g., "artifacts/DATA").
     /// For build artifacts: same as short_path.

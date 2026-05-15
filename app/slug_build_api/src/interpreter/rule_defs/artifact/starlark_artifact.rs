@@ -183,6 +183,13 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkArtifact {
         Ok(self.artifact.get_path().with_short_path(f))
     }
 
+    fn with_rule_local_short_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> slug_error::Result<StringValue<'v>> {
+        Ok(self.artifact.get_path().with_rule_local_short_path(f))
+    }
+
     fn with_display_path(
         &self,
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,

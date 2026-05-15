@@ -1,0 +1,5 @@
+load("//:defs.bzl", "declare_file_sibling_path_shape_rule")
+
+declare_file_sibling_path_shape_rule(
+    name = "sibling_path_shape",
+)

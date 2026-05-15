@@ -87,6 +87,16 @@ async def test_actions_declare_file_external_bazel_path_shape(buck: Buck) -> Non
 
 
 @buck_test(data_dir="test_ctx_actions_data")
+async def test_actions_declare_file_sibling_bazel_path_shape(buck: Buck) -> None:
+    """declare_file(sibling=...) does not duplicate the declaring package path."""
+    result = await buck.build("//pkg:sibling_path_shape")
+    output = result.get_build_report().output_for_target("//pkg:sibling_path_shape")
+    content = output.read_text().strip()
+    assert content.endswith("/pkg/bin/sibling_path_shape.pdb")
+    assert "/pkg/pkg/" not in content.replace("\\", "/")
+
+
+@buck_test(data_dir="test_ctx_actions_data")
 async def test_actions_declare_directory_bazel_path_shape(buck: Buck) -> None:
     """ctx.actions.declare_directory().path is Bazel-shaped, without __target__."""
     result = await buck.build("//:declare_directory_path_shape")

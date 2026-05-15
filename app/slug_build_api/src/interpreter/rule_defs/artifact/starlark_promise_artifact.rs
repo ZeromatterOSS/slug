@@ -191,6 +191,16 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkPromiseArtifact {
         }
     }
 
+    fn with_rule_local_short_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> slug_error::Result<StringValue<'v>> {
+        match self.artifact.get() {
+            Some(v) => Ok(v.get_path().with_rule_local_short_path(f)),
+            None => Ok(f(self.short_path_err()?)),
+        }
+    }
+
     fn with_full_path(
         &self,
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
