@@ -196,6 +196,8 @@ fn execute_http_archive(
                 // Apply patches if specified
                 apply_patches(invocation, attrs, working_dir)?;
 
+                materialize_llvm_multicall_aliases(working_dir);
+
                 // Create WORKSPACE if not present
                 if !working_dir.join("WORKSPACE").exists()
                     && !working_dir.join("WORKSPACE.bazel").exists()
@@ -229,6 +231,76 @@ fn execute_http_archive(
         .into()
     }))
 }
+
+fn materialize_llvm_multicall_aliases(working_dir: &Path) {
+    let Ok(build_file_content) = std::fs::read_to_string(working_dir.join("BUILD.bazel")) else {
+        return;
+    };
+    if !build_file_content.contains("declare_llvm_targets") {
+        return;
+    }
+
+    let llvm_exe = working_dir.join("bin").join("llvm.exe");
+    if !llvm_exe.is_file() {
+        return;
+    }
+
+    for tool in LLVM_MULTICALL_TOOLS {
+        let alias = working_dir.join("bin").join(format!("{tool}.exe"));
+        if alias.exists() {
+            continue;
+        }
+        let _ = std::fs::hard_link(&llvm_exe, &alias)
+            .or_else(|_| std::fs::copy(&llvm_exe, &alias).map(|_| ()));
+    }
+}
+
+const LLVM_MULTICALL_TOOLS: &[&str] = &[
+    "c++filt",
+    "clang",
+    "clang++",
+    "clang-cl",
+    "clang-cpp",
+    "clang-scan-deps",
+    "dsymutil",
+    "gcov",
+    "lld",
+    "ld.lld",
+    "ld64.lld",
+    "lld-link",
+    "wasm-ld",
+    "llvm-addr2line",
+    "llvm-ar",
+    "llvm-bitcode-strip",
+    "llvm-cgdata",
+    "llvm-cov",
+    "llvm-cxxfilt",
+    "llvm-debuginfod-find",
+    "llvm-dlltool",
+    "llvm-dwp",
+    "llvm-gsymutil",
+    "llvm-ifs",
+    "llvm-install-name-tool",
+    "llvm-libtool-darwin",
+    "llvm-link",
+    "llvm-lipo",
+    "llvm-ml",
+    "llvm-mt",
+    "llvm-nm",
+    "llvm-objcopy",
+    "llvm-objdump",
+    "llvm-otool",
+    "llvm-profdata",
+    "llvm-ranlib",
+    "llvm-rc",
+    "llvm-readelf",
+    "llvm-readobj",
+    "llvm-size",
+    "llvm-strip",
+    "llvm-symbolizer",
+    "llvm-windres",
+    "sancov",
+];
 
 /// Apply patches to a repository after extraction.
 ///
@@ -1007,10 +1079,48 @@ fn extract_tar_from_reader<R: std::io::Read>(
                     let _ = std::os::unix::fs::symlink(&*link_target, &dest_path);
                 }
             }
+        } else if entry_type.is_hard_link() {
+            let link_name =
+                entry
+                    .link_name()
+                    .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                        name: "extract".to_owned(),
+                        reason: e.to_string(),
+                    })?;
+            if let Some(link_target) = link_name {
+                let source_path = resolve_tar_link_target(&link_target, dest_dir, strip_prefix);
+                std::fs::hard_link(&source_path, &dest_path)
+                    .or_else(|_| std::fs::copy(&source_path, &dest_path).map(|_| ()))
+                    .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                        name: "extract".to_owned(),
+                        reason: format!(
+                            "Failed to materialize hard link {:?} -> {:?}: {}",
+                            dest_path, source_path, e
+                        ),
+                    })?;
+            }
         }
     }
 
     Ok(())
+}
+
+fn resolve_tar_link_target(
+    link_target: &Path,
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> PathBuf {
+    let target_str = link_target.to_string_lossy();
+    if let Some(prefix) = strip_prefix {
+        if let Some(stripped) = target_str.strip_prefix(prefix) {
+            return dest_dir.join(stripped.trim_start_matches('/'));
+        }
+        let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
+        if let Some(stripped) = target_str.strip_prefix(&prefix_with_slash) {
+            return dest_dir.join(stripped);
+        }
+    }
+    dest_dir.join(link_target)
 }
 
 /// Extract tar.gz archive.
@@ -1351,9 +1461,48 @@ fn create_stub_repository(
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use tempfile::TempDir;
 
     use super::*;
+
+    fn create_hard_link_tar_gz(strip_prefix: Option<&str>) -> Vec<u8> {
+        use flate2::Compression;
+        use flate2::write::GzEncoder;
+
+        let mut builder = tar::Builder::new(Vec::new());
+        let prefix = strip_prefix.unwrap_or("");
+        let prefix = if prefix.is_empty() {
+            String::new()
+        } else {
+            format!("{prefix}/")
+        };
+
+        let content = b"multicall";
+        let original = format!("{prefix}bin/tool.exe");
+        let link = format!("{prefix}bin/tool-alias.exe");
+        let mut header = tar::Header::new_gnu();
+        header.set_path(&original).unwrap();
+        header.set_size(content.len() as u64);
+        header.set_mode(0o755);
+        header.set_cksum();
+        builder.append(&header, &content[..]).unwrap();
+
+        let mut link_header = tar::Header::new_gnu();
+        link_header.set_entry_type(tar::EntryType::Link);
+        link_header.set_path(&link).unwrap();
+        link_header.set_link_name(&original).unwrap();
+        link_header.set_size(0);
+        link_header.set_mode(0o755);
+        link_header.set_cksum();
+        builder.append(&link_header, std::io::empty()).unwrap();
+
+        let tar_data = builder.into_inner().unwrap();
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&tar_data).unwrap();
+        encoder.finish().unwrap()
+    }
 
     #[test]
     fn test_prepare_working_dir() {
@@ -1422,6 +1571,45 @@ mod tests {
 
         assert!(verify_sha256(data, &expected).is_ok());
         assert!(verify_sha256(data, "wrong_hash").is_err());
+    }
+
+    #[test]
+    fn test_extract_tar_gz_materializes_hard_links() {
+        let temp_dir = TempDir::new().unwrap();
+        let dest = temp_dir.path().join("extracted");
+        std::fs::create_dir(&dest).unwrap();
+
+        let data = create_hard_link_tar_gz(Some("toolchain"));
+        extract_tar_gz(&data, &dest, Some("toolchain")).unwrap();
+
+        assert_eq!(
+            std::fs::read(dest.join("bin/tool.exe")).unwrap(),
+            b"multicall"
+        );
+        assert_eq!(
+            std::fs::read(dest.join("bin/tool-alias.exe")).unwrap(),
+            b"multicall"
+        );
+    }
+
+    #[test]
+    fn test_materialize_llvm_multicall_aliases() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = temp_dir.path();
+        std::fs::create_dir(repo.join("bin")).unwrap();
+        std::fs::write(
+            repo.join("BUILD.bazel"),
+            "load(\"@llvm//toolchain/llvm:llvm.bzl\", \"declare_llvm_targets\")\ndeclare_llvm_targets(suffix = \".exe\")\n",
+        )
+        .unwrap();
+        std::fs::write(repo.join("bin/llvm.exe"), b"multicall").unwrap();
+
+        materialize_llvm_multicall_aliases(repo);
+
+        assert_eq!(
+            std::fs::read(repo.join("bin/llvm-profdata.exe")).unwrap(),
+            b"multicall"
+        );
     }
 
     #[test]

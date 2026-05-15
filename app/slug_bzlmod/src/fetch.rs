@@ -85,6 +85,85 @@ fn run_patch_tool(
     Ok(())
 }
 
+fn patch_files_in_apply_order(
+    patches: &crate::registry::RegistryFileMap,
+) -> Vec<(&String, &String)> {
+    patches.iter().collect()
+}
+
+fn patch_already_applied(dest_dir: &Path, strip: u32, patch_content: &[u8]) -> bool {
+    let patch = String::from_utf8_lossy(patch_content).replace("\r\n", "\n");
+    let mut current_path: Option<String> = None;
+    let mut saw_hunk = false;
+    let mut files = Vec::<(String, Vec<String>, Vec<String>)>::new();
+    let mut added = Vec::<String>::new();
+    let mut removed = Vec::<String>::new();
+
+    for line in patch.lines() {
+        if let Some(path) = line.strip_prefix("+++ ") {
+            if let Some(previous_path) = current_path.take() {
+                files.push((
+                    previous_path,
+                    std::mem::take(&mut added),
+                    std::mem::take(&mut removed),
+                ));
+            }
+            current_path = patch_file_path(path, strip);
+            saw_hunk = false;
+            continue;
+        }
+        if line.starts_with("@@ ") || line == "@@" {
+            saw_hunk = true;
+            continue;
+        }
+        if current_path.is_none() || !saw_hunk || line.starts_with("\\ ") {
+            continue;
+        }
+        if line.starts_with("+++") || line.starts_with("---") {
+            continue;
+        }
+        if let Some(content) = line.strip_prefix('+') {
+            if !content.is_empty() {
+                added.push(content.to_owned());
+            }
+        } else if let Some(content) = line.strip_prefix('-') {
+            if !content.is_empty() {
+                removed.push(content.to_owned());
+            }
+        }
+    }
+
+    if let Some(previous_path) = current_path {
+        files.push((previous_path, added, removed));
+    }
+
+    if files.is_empty() {
+        return false;
+    }
+
+    files.into_iter().all(|(path, added, removed)| {
+        let file_path = dest_dir.join(path);
+        let Ok(content) = std::fs::read_to_string(file_path) else {
+            return false;
+        };
+        let content = content.replace("\r\n", "\n");
+        added.iter().all(|line| content.contains(line))
+            && removed.iter().all(|line| !content.contains(line))
+    })
+}
+
+fn patch_file_path(path: &str, strip: u32) -> Option<String> {
+    let path = path.split_whitespace().next()?;
+    if path == "/dev/null" {
+        return None;
+    }
+    let mut components = path.split('/').skip(strip as usize).peekable();
+    if components.peek().is_none() {
+        return None;
+    }
+    Some(components.collect::<Vec<_>>().join("/"))
+}
+
 /// Errors that can occur during source fetching.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -609,7 +688,7 @@ impl SourceFetcher {
             version
         );
 
-        for (patch_file, _integrity) in &source_info.patches {
+        for (patch_file, _integrity) in patch_files_in_apply_order(&source_info.patches) {
             // Download patch from registry: {base_url}/modules/{name}/{version}/patches/{patch_file}
             let patch_url = format!(
                 "{}/modules/{}/{}/patches/{}",
@@ -626,7 +705,7 @@ impl SourceFetcher {
             let body = to_bytes(response.into_body()).await?;
             let patch_content = body.to_vec();
 
-            self.apply_patch_content(
+            Self::apply_patch_content(
                 dest_dir,
                 patch_file,
                 source_info.patch_strip,
@@ -640,7 +719,6 @@ impl SourceFetcher {
     }
 
     fn apply_patch_content(
-        &self,
         dest_dir: &Path,
         patch_file: &str,
         strip: u32,
@@ -652,15 +730,11 @@ impl SourceFetcher {
             "-d".to_owned(),
             dest_dir.to_string_lossy().into_owned(),
         ];
-        match run_patch_tool("patch", &patch_args, None, patch_content) {
+        let patch_result = run_patch_tool("patch", &patch_args, None, patch_content);
+        match &patch_result {
             Ok(()) => return Ok(()),
             Err(PatchToolError::Spawn(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => {
-                return Err(FetchError::PatchFailed {
-                    patch: format!("{}: {}", patch_file, err),
-                }
-                .into());
-            }
+            Err(_) => {}
         }
 
         let git_args = [
@@ -669,15 +743,45 @@ impl SourceFetcher {
             "--unsafe-paths".to_owned(),
             "--whitespace=nowarn".to_owned(),
         ];
-        run_patch_tool("git", &git_args, Some(dest_dir), patch_content).map_err(|err| {
-            FetchError::PatchFailed {
-                patch: format!(
-                    "{}: failed to apply with `patch` or `git apply`: {}",
-                    patch_file, err
-                ),
+        match run_patch_tool("git", &git_args, Some(dest_dir), patch_content) {
+            Ok(()) => return Ok(()),
+            Err(git_err) => {
+                let reverse_check_args = [
+                    "apply".to_owned(),
+                    format!("-p{}", strip),
+                    "--reverse".to_owned(),
+                    "--check".to_owned(),
+                    "--unsafe-paths".to_owned(),
+                    "--whitespace=nowarn".to_owned(),
+                ];
+                if run_patch_tool("git", &reverse_check_args, Some(dest_dir), patch_content).is_ok()
+                {
+                    tracing::debug!(
+                        patch = patch_file,
+                        "Registry patch is already applied; treating warm cache as complete"
+                    );
+                    return Ok(());
+                }
+                if patch_already_applied(dest_dir, strip, patch_content) {
+                    tracing::debug!(
+                        patch = patch_file,
+                        "Registry patch content is already present; treating warm cache as complete"
+                    );
+                    return Ok(());
+                }
+                let patch_context = match patch_result {
+                    Ok(()) => String::new(),
+                    Err(err) => format!("patch: {}; ", err),
+                };
+                return Err(FetchError::PatchFailed {
+                    patch: format!(
+                        "{}: failed to apply with `patch` or `git apply`: {}git apply: {}",
+                        patch_file, patch_context, git_err
+                    ),
+                }
+                .into());
             }
-        })?;
-        Ok(())
+        }
     }
 
     /// Apply overlay files on top of the extracted source directory.
@@ -845,15 +949,51 @@ fn extract_tar_from_reader<R: std::io::Read>(
                     }
                     #[cfg(not(unix))]
                     {
-                        // On Windows, copy the file instead of creating a symlink
-                        let _ = &link_target;
+                        let source_path =
+                            resolve_tar_link_target(&link_target, dest_dir, strip_prefix);
+                        let _ = std::fs::copy(source_path, &dest_path);
                     }
                 }
+            }
+        } else if entry_type.is_hard_link() {
+            let link_name = entry
+                .link_name()
+                .map_err(|e| FetchError::ExtractionFailed {
+                    reason: e.to_string(),
+                })?;
+            if let Some(link_target) = link_name {
+                let source_path = resolve_tar_link_target(&link_target, dest_dir, strip_prefix);
+                std::fs::hard_link(&source_path, &dest_path)
+                    .or_else(|_| std::fs::copy(&source_path, &dest_path).map(|_| ()))
+                    .map_err(|e| FetchError::ExtractionFailed {
+                        reason: format!(
+                            "Failed to materialize hard link {:?} -> {:?}: {}",
+                            dest_path, source_path, e
+                        ),
+                    })?;
             }
         }
     }
 
     Ok(())
+}
+
+fn resolve_tar_link_target(
+    link_target: &Path,
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> PathBuf {
+    let target_str = link_target.to_string_lossy();
+    if let Some(prefix) = strip_prefix {
+        if let Some(stripped) = target_str.strip_prefix(prefix) {
+            return dest_dir.join(stripped.trim_start_matches('/'));
+        }
+        let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
+        if let Some(stripped) = target_str.strip_prefix(&prefix_with_slash) {
+            return dest_dir.join(stripped);
+        }
+    }
+    dest_dir.join(link_target)
 }
 
 #[cfg(test)]
@@ -914,6 +1054,43 @@ mod tests {
         encoder.finish().unwrap()
     }
 
+    fn create_hard_link_tar_gz(strip_prefix: Option<&str>) -> Vec<u8> {
+        use flate2::Compression;
+        use flate2::write::GzEncoder;
+
+        let mut builder = tar::Builder::new(Vec::new());
+        let prefix = strip_prefix.unwrap_or("");
+        let prefix = if prefix.is_empty() {
+            String::new()
+        } else {
+            format!("{prefix}/")
+        };
+
+        let content = b"multicall";
+        let original = format!("{prefix}bin/tool.exe");
+        let link = format!("{prefix}bin/tool-alias.exe");
+        let mut header = tar::Header::new_gnu();
+        header.set_path(&original).unwrap();
+        header.set_size(content.len() as u64);
+        header.set_mode(0o755);
+        header.set_cksum();
+        builder.append(&header, &content[..]).unwrap();
+
+        let mut link_header = tar::Header::new_gnu();
+        link_header.set_entry_type(tar::EntryType::Link);
+        link_header.set_path(&link).unwrap();
+        link_header.set_link_name(&original).unwrap();
+        link_header.set_size(0);
+        link_header.set_mode(0o755);
+        link_header.set_cksum();
+        builder.append(&link_header, std::io::empty()).unwrap();
+
+        let tar_data = builder.into_inner().unwrap();
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&tar_data).unwrap();
+        encoder.finish().unwrap()
+    }
+
     #[test]
     fn test_extract_tar_gz_no_strip() {
         let temp_dir = TempDir::new().unwrap();
@@ -951,6 +1128,26 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_tar_gz_materializes_hard_links() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let data = create_hard_link_tar_gz(Some("toolchain"));
+        let dest = temp_dir.path().join("extracted");
+        std::fs::create_dir(&dest).unwrap();
+
+        extract_tar_gz_impl(&data, &dest, Some("toolchain")).unwrap();
+
+        assert_eq!(
+            std::fs::read(dest.join("bin/tool.exe")).unwrap(),
+            b"multicall"
+        );
+        assert_eq!(
+            std::fs::read(dest.join("bin/tool-alias.exe")).unwrap(),
+            b"multicall"
+        );
+    }
+
+    #[test]
     fn git_apply_patch_tool_applies_registry_patch_shape() {
         let temp_dir = TempDir::new().unwrap();
         let file = temp_dir.path().join("a.txt");
@@ -975,5 +1172,74 @@ mod tests {
             std::fs::read_to_string(file).unwrap().replace("\r\n", "\n"),
             "new\n"
         );
+    }
+
+    #[test]
+    fn patch_files_in_apply_order_preserves_source_json_order() {
+        let mut patches = crate::registry::RegistryFileMap::new();
+        patches.insert("module_dot_bazel_version.patch".to_owned(), String::new());
+        patches.insert("MODULE.bazel.patch".to_owned(), String::new());
+        patches.insert("0001-Add-MODULE.bazel.patch".to_owned(), String::new());
+        patches.insert(
+            "0002-Add-utf8_range-dependency.patch".to_owned(),
+            String::new(),
+        );
+
+        let ordered = patch_files_in_apply_order(&patches)
+            .into_iter()
+            .map(|(patch, _)| patch.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            ordered,
+            [
+                "module_dot_bazel_version.patch",
+                "MODULE.bazel.patch",
+                "0001-Add-MODULE.bazel.patch",
+                "0002-Add-utf8_range-dependency.patch"
+            ]
+        );
+    }
+
+    #[test]
+    fn apply_patch_content_accepts_already_applied_patch_with_changed_context() {
+        let temp_dir = TempDir::new().unwrap();
+        let file = temp_dir.path().join("MODULE.bazel");
+        std::fs::write(
+            &file,
+            concat!(
+                "module(\n",
+                "    name = \"rules_proto\",\n",
+                "    version = \"7.1.0\",\n",
+                ")\n",
+                "\n",
+                "bazel_dep(name = \"protobuf\", version = \"29.1\", repo_name = \"com_google_protobuf\")\n",
+            ),
+        )
+        .unwrap();
+
+        let patch = b"diff --git a/MODULE.bazel b/MODULE.bazel\n\
+--- a/MODULE.bazel\n\
++++ b/MODULE.bazel\n\
+@@ -1 +1 @@\n\
+-    version = \"0.0.0\",\n\
++    version = \"7.1.0\",\n\
+ bazel_dep(name = \"protobuf\", version = \"27.1\", repo_name = \"com_google_protobuf\")\n";
+
+        assert_eq!(
+            patch_file_path("b/MODULE.bazel", 1).as_deref(),
+            Some("MODULE.bazel")
+        );
+        let content = std::fs::read_to_string(&file)
+            .unwrap()
+            .replace("\r\n", "\n");
+        assert!(content.contains("    version = \"7.1.0\","));
+        assert!(!content.contains("    version = \"0.0.0\","));
+        assert!(patch_already_applied(temp_dir.path(), 1, patch));
+        SourceFetcher::apply_patch_content(temp_dir.path(), "already.patch", 1, patch).unwrap();
+
+        let content = std::fs::read_to_string(file).unwrap().replace("\r\n", "\n");
+        assert!(content.contains("version = \"7.1.0\""));
+        assert!(content.contains("protobuf\", version = \"29.1\""));
     }
 }

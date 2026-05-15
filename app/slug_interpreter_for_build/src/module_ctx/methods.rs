@@ -363,11 +363,19 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         let mut cmd = Command::new(program);
         cmd.args(cmd_args);
 
-        // Set working directory
-        if !working_directory.is_empty() {
-            cmd.current_dir(working_directory);
-        } else if let Some(ref wd) = this.working_dir {
-            cmd.current_dir(wd.as_path());
+        // Set working directory. Canonicalizing avoids executing inside the
+        // workspace-root `bazel-external` symlink; Bazel runs external repos
+        // from the output base, outside the source workspace.
+        let work_dir = if !working_directory.is_empty() {
+            Some(std::path::PathBuf::from(working_directory))
+        } else {
+            this.working_dir
+                .as_ref()
+                .map(|wd| wd.as_path().to_path_buf())
+        };
+        if let Some(work_dir) = work_dir {
+            let work_dir = crate::repository_ctx::prepare_execute_working_directory(&work_dir)?;
+            cmd.current_dir(work_dir);
         }
 
         // Set environment variables if provided

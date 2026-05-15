@@ -37,6 +37,8 @@ use slug_http::to_bytes;
 use crate::cache::ModuleCache;
 use crate::version::Version;
 
+pub type RegistryFileMap = indexmap::IndexMap<String, String>;
+
 /// Default BCR URL.
 pub const DEFAULT_REGISTRY_URL: &str = "https://bcr.bazel.build";
 
@@ -123,11 +125,11 @@ pub struct SourceInfo {
     /// Keys are relative file paths, values are integrity checksums.
     /// Files are fetched from {registry}/modules/{name}/{version}/overlay/{path}
     #[serde(default)]
-    pub overlay: HashMap<String, String>,
+    pub overlay: RegistryFileMap,
 
     /// Patches to apply after extraction (and after overlays).
     #[serde(default)]
-    pub patches: HashMap<String, String>,
+    pub patches: RegistryFileMap,
 
     /// Number of leading path components to strip from patch paths.
     #[serde(default)]
@@ -409,8 +411,8 @@ mod tests {
             urls: Some(vec!["https://mirror.com/a.tar.gz".to_string()]),
             integrity: None,
             strip_prefix: None,
-            overlay: HashMap::new(),
-            patches: HashMap::new(),
+            overlay: RegistryFileMap::new(),
+            patches: RegistryFileMap::new(),
             patch_strip: 0,
             remote: None,
             commit: None,
@@ -431,8 +433,8 @@ mod tests {
             urls: None,
             integrity: Some("sha256-abc".to_string()),
             strip_prefix: None,
-            overlay: HashMap::new(),
-            patches: HashMap::new(),
+            overlay: RegistryFileMap::new(),
+            patches: RegistryFileMap::new(),
             patch_strip: 0,
             remote: None,
             commit: None,
@@ -447,8 +449,8 @@ mod tests {
             urls: None,
             integrity: None,
             strip_prefix: None,
-            overlay: HashMap::new(),
-            patches: HashMap::new(),
+            overlay: RegistryFileMap::new(),
+            patches: RegistryFileMap::new(),
             patch_strip: 0,
             remote: Some("https://github.com/example/repo.git".to_string()),
             commit: Some("abc123".to_string()),

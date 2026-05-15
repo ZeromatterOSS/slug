@@ -700,7 +700,7 @@ impl RepositoryContext {
 // Helper functions for I/O operations
 // ============================================================================
 
-fn prepare_execute_working_directory(work_dir: &Path) -> starlark::Result<()> {
+pub(crate) fn prepare_execute_working_directory(work_dir: &Path) -> starlark::Result<PathBuf> {
     std::fs::create_dir_all(work_dir).map_err(|e| {
         starlark::Error::from(slug_error::slug_error!(
             slug_error::ErrorTag::Input,
@@ -708,7 +708,8 @@ fn prepare_execute_working_directory(work_dir: &Path) -> starlark::Result<()> {
             work_dir.display(),
             e
         ))
-    })
+    })?;
+    Ok(std::fs::canonicalize(work_dir).unwrap_or_else(|_| work_dir.to_path_buf()))
 }
 
 /// Resolve a Bazel label string to a file system path.
@@ -787,12 +788,262 @@ fn apply_unified_patch(patch_path: &Path, strip: i32, working_dir: &Path) -> Res
     if output.status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "Patch failed via git apply: {}{}",
+        let git_error = format!(
+            "{}{}",
             String::from_utf8_lossy(&output.stderr),
             String::from_utf8_lossy(&output.stdout)
-        ))
+        );
+        apply_unified_patch_in_process(patch_path, strip, working_dir).map_err(|fallback_error| {
+            format!("Patch failed via git apply: {git_error}; in-process fallback failed: {fallback_error}")
+        })
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum PatchLine {
+    Context(String),
+    Remove(String),
+    Add(String),
+}
+
+#[derive(Debug)]
+struct PatchHunk {
+    old_start: usize,
+    lines: Vec<PatchLine>,
+}
+
+#[derive(Debug)]
+struct PatchFile {
+    path: PathBuf,
+    hunks: Vec<PatchHunk>,
+}
+
+fn apply_unified_patch_in_process(
+    patch_path: &Path,
+    strip: i32,
+    working_dir: &Path,
+) -> Result<(), String> {
+    let patch_content = std::fs::read_to_string(patch_path)
+        .map_err(|e| format!("Failed to read patch '{}': {e}", patch_path.display()))?;
+    let patch_files = parse_unified_patch(&patch_content, strip)?;
+    for patch_file in patch_files {
+        let target = working_dir.join(&patch_file.path);
+        let original = std::fs::read_to_string(&target)
+            .map_err(|e| format!("Failed to read patch target '{}': {e}", target.display()))?;
+        let patched = apply_patch_hunks(&original, &patch_file.hunks, &target)?;
+        std::fs::write(&target, patched)
+            .map_err(|e| format!("Failed to write patch target '{}': {e}", target.display()))?;
+    }
+    Ok(())
+}
+
+fn parse_unified_patch(content: &str, strip: i32) -> Result<Vec<PatchFile>, String> {
+    if strip < 0 {
+        return Err(format!(
+            "Negative patch strip count is unsupported: {strip}"
+        ));
+    }
+
+    let lines: Vec<&str> = content.lines().collect();
+    let mut files = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if !lines[i].starts_with("--- ") {
+            i += 1;
+            continue;
+        }
+
+        let old_path = parse_patch_path(lines[i], "--- ")?;
+        i += 1;
+        if i >= lines.len() || !lines[i].starts_with("+++ ") {
+            return Err("Unified patch file header is missing +++ line".to_owned());
+        }
+        let new_path = parse_patch_path(lines[i], "+++ ")?;
+        let patch_path = if new_path == "/dev/null" {
+            old_path
+        } else {
+            new_path
+        };
+        let path = strip_patch_path(&patch_path, strip as usize)?;
+        i += 1;
+
+        let mut hunks = Vec::new();
+        while i < lines.len() && !lines[i].starts_with("--- ") {
+            if !lines[i].starts_with("@@ ") {
+                i += 1;
+                continue;
+            }
+            let old_start = parse_hunk_old_start(lines[i])?;
+            i += 1;
+            let mut hunk_lines = Vec::new();
+            while i < lines.len() && !lines[i].starts_with("@@ ") && !lines[i].starts_with("--- ") {
+                let line = lines[i];
+                if let Some(rest) = line.strip_prefix(' ') {
+                    hunk_lines.push(PatchLine::Context(rest.to_owned()));
+                } else if let Some(rest) = line.strip_prefix('-') {
+                    hunk_lines.push(PatchLine::Remove(rest.to_owned()));
+                } else if let Some(rest) = line.strip_prefix('+') {
+                    hunk_lines.push(PatchLine::Add(rest.to_owned()));
+                } else if line == r"\ No newline at end of file" {
+                    // The line marker annotates the previous line and does not
+                    // participate in matching.
+                } else if line.is_empty() {
+                    // GNU patch accepts blank context lines without the leading
+                    // space. Git rejects these as corrupt, but Bazel's patch
+                    // semantics accept them.
+                    hunk_lines.push(PatchLine::Context(String::new()));
+                } else {
+                    return Err(format!("Unsupported unified patch line: {line}"));
+                }
+                i += 1;
+            }
+            hunks.push(PatchHunk {
+                old_start,
+                lines: hunk_lines,
+            });
+        }
+
+        files.push(PatchFile { path, hunks });
+    }
+
+    if files.is_empty() {
+        return Err("Patch did not contain any file hunks".to_owned());
+    }
+    Ok(files)
+}
+
+fn parse_patch_path(line: &str, prefix: &str) -> Result<String, String> {
+    let path = line
+        .strip_prefix(prefix)
+        .ok_or_else(|| format!("Patch header line is missing prefix {prefix}: {line}"))?
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| format!("Patch header line is missing a path: {line}"))?;
+    Ok(path.to_owned())
+}
+
+fn strip_patch_path(path: &str, strip: usize) -> Result<PathBuf, String> {
+    if path == "/dev/null" {
+        return Err("Cannot patch /dev/null with in-process fallback".to_owned());
+    }
+
+    let mut components = path.split('/').filter(|component| !component.is_empty());
+    for _ in 0..strip {
+        components
+            .next()
+            .ok_or_else(|| format!("Patch path '{path}' has fewer than {strip} components"))?;
+    }
+
+    let mut stripped = PathBuf::new();
+    for component in components {
+        if component == "." || component == ".." {
+            return Err(format!(
+                "Patch path '{path}' contains unsupported component '{component}'"
+            ));
+        }
+        stripped.push(component);
+    }
+
+    if stripped.as_os_str().is_empty() {
+        Err(format!("Patch path '{path}' became empty after -p{strip}"))
+    } else {
+        Ok(stripped)
+    }
+}
+
+fn parse_hunk_old_start(header: &str) -> Result<usize, String> {
+    let mut parts = header.split_whitespace();
+    if parts.next() != Some("@@") {
+        return Err(format!("Invalid hunk header: {header}"));
+    }
+    let old_range = parts
+        .next()
+        .ok_or_else(|| format!("Hunk header is missing old range: {header}"))?;
+    let old_range = old_range
+        .strip_prefix('-')
+        .ok_or_else(|| format!("Hunk old range is missing '-': {header}"))?;
+    let start = old_range.split(',').next().unwrap_or(old_range);
+    start
+        .parse::<usize>()
+        .map_err(|e| format!("Invalid hunk old start in '{header}': {e}"))
+}
+
+fn apply_patch_hunks(original: &str, hunks: &[PatchHunk], target: &Path) -> Result<String, String> {
+    let had_trailing_newline = original.ends_with('\n');
+    let mut lines: Vec<String> = original
+        .lines()
+        .map(|line| line.trim_end_matches('\r').to_owned())
+        .collect();
+    let mut line_delta: isize = 0;
+
+    for hunk in hunks {
+        let expected: Vec<String> = hunk
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                PatchLine::Context(s) | PatchLine::Remove(s) => Some(s.clone()),
+                PatchLine::Add(_) => None,
+            })
+            .collect();
+        let replacement: Vec<String> = hunk
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                PatchLine::Context(s) | PatchLine::Add(s) => Some(s.clone()),
+                PatchLine::Remove(_) => None,
+            })
+            .collect();
+
+        let nominal_start = hunk
+            .old_start
+            .checked_sub(1)
+            .ok_or_else(|| format!("Invalid hunk start 0 for '{}'", target.display()))?
+            as isize
+            + line_delta;
+        if nominal_start < 0 {
+            return Err(format!(
+                "Patch hunk for '{}' resolves before the start of the file",
+                target.display()
+            ));
+        }
+        let nominal_start = nominal_start as usize;
+        let start = find_hunk_start(&lines, &expected, nominal_start).ok_or_else(|| {
+            format!(
+                "Patch hunk for '{}' did not match at line {}",
+                target.display(),
+                nominal_start + 1
+            )
+        })?;
+        let end = start + expected.len();
+
+        lines.splice(start..end, replacement.clone());
+        line_delta += replacement.len() as isize - expected.len() as isize;
+    }
+
+    let mut patched = lines.join("\n");
+    if had_trailing_newline {
+        patched.push('\n');
+    }
+    Ok(patched)
+}
+
+fn find_hunk_start(lines: &[String], expected: &[String], nominal_start: usize) -> Option<usize> {
+    if expected.is_empty() {
+        return Some(nominal_start.min(lines.len()));
+    }
+    if nominal_start + expected.len() <= lines.len()
+        && lines[nominal_start..nominal_start + expected.len()] == *expected
+    {
+        return Some(nominal_start);
+    }
+
+    // Bazel's patch semantics, like GNU patch, can apply a hunk at an offset
+    // from the line number declared in the patch header. Git's parser never
+    // reaches this step for the GNU-style blank context patches that trigger
+    // this fallback.
+    (0..=lines.len().saturating_sub(expected.len()))
+        .filter(|candidate| lines[*candidate..*candidate + expected.len()] == *expected)
+        .min_by_key(|candidate| candidate.abs_diff(nominal_start))
 }
 
 fn canonical_name_from_bazel_external_path(path: &Path) -> Option<String> {
@@ -1776,7 +2027,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             this.resolve_path(working_directory)
         };
-        prepare_execute_working_directory(&work_dir)?;
+        let work_dir = prepare_execute_working_directory(&work_dir)?;
 
         // Build the command
         let mut cmd = Command::new(program);
@@ -2606,8 +2857,32 @@ mod tests {
         let work_dir = temp_dir.path().join("repo").join("subdir");
 
         assert!(!work_dir.exists());
-        prepare_execute_working_directory(&work_dir).unwrap();
+        let prepared = prepare_execute_working_directory(&work_dir).unwrap();
         assert!(work_dir.is_dir());
+        assert!(prepared.is_absolute());
+    }
+
+    #[test]
+    fn test_prepare_execute_working_directory_canonicalizes_symlink() {
+        let temp_dir = TempDir::new().unwrap();
+        let target = temp_dir.path().join("cache_repo");
+        let link = temp_dir
+            .path()
+            .join("workspace")
+            .join("bazel-external")
+            .join("repo");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        #[cfg(windows)]
+        if std::os::windows::fs::symlink_dir(&target, &link).is_err() {
+            return;
+        }
+
+        let prepared = prepare_execute_working_directory(&link).unwrap();
+        assert_eq!(prepared, std::fs::canonicalize(&target).unwrap());
     }
 
     #[test]
@@ -2649,8 +2924,56 @@ mod tests {
         apply_unified_patch(&patch, 1, &source_dir).unwrap();
 
         assert_eq!(
-            std::fs::read_to_string(source_dir.join("file.txt")).unwrap(),
+            std::fs::read_to_string(source_dir.join("file.txt"))
+                .unwrap()
+                .replace("\r\n", "\n"),
             "new\n"
+        );
+    }
+
+    #[test]
+    fn test_apply_unified_patch_accepts_blank_context_lines() {
+        let temp_dir = TempDir::new().unwrap();
+        let source_dir = temp_dir.path().join("source");
+        std::fs::create_dir(&source_dir).unwrap();
+        std::fs::write(source_dir.join("file.txt"), "before\n\nold\nafter\n").unwrap();
+        let patch = temp_dir.path().join("change.patch");
+        std::fs::write(
+            &patch,
+            "--- a/file.txt\n+++ b/file.txt\n@@ -1,4 +1,4 @@\n before\n\n-old\n+new\n after\n",
+        )
+        .unwrap();
+
+        apply_unified_patch_in_process(&patch, 1, &source_dir).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(source_dir.join("file.txt"))
+                .unwrap()
+                .replace("\r\n", "\n"),
+            "before\n\nnew\nafter\n"
+        );
+    }
+
+    #[test]
+    fn test_apply_unified_patch_accepts_hunk_offset() {
+        let temp_dir = TempDir::new().unwrap();
+        let source_dir = temp_dir.path().join("source");
+        std::fs::create_dir(&source_dir).unwrap();
+        std::fs::write(source_dir.join("file.txt"), "extra\nbefore\nold\nafter\n").unwrap();
+        let patch = temp_dir.path().join("change.patch");
+        std::fs::write(
+            &patch,
+            "--- a/file.txt\n+++ b/file.txt\n@@ -1,3 +1,3 @@\n before\n-old\n+new\n after\n",
+        )
+        .unwrap();
+
+        apply_unified_patch_in_process(&patch, 1, &source_dir).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(source_dir.join("file.txt"))
+                .unwrap()
+                .replace("\r\n", "\n"),
+            "extra\nbefore\nnew\nafter\n"
         );
     }
 }
