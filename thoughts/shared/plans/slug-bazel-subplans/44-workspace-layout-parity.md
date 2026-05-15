@@ -11,6 +11,64 @@ Phase 2.5's shared synthesized execroot stopgap has landed and Phase 2.6's
 per-action execroot narrowing has landed through commit `16191ed9`. Phase 3
 (real Bazel-shaped execroot and external-repo layout) remains proposed.
 
+## Progress 2026-05-14: Rust rmeta path leakage blocks byte parity
+
+After Slug completed `zeromatter-kuro //sdk:sdk_contents`, a Bazel 9.0.1
+comparison showed the SDK tree shape matched but four Rust/FFI ELF outputs were
+not byte-identical:
+
+- `bin/zerobuf`
+- `bin/zerosystem`
+- `bin/zm`
+- `lib/libzeromatter_ffi.so`
+
+The package comparison found matching entry count, file list, modes, symlinks,
+and dynamic deps for `libzeromatter_ffi.so`; all non-binary SDK contents matched
+byte-for-byte. The remaining difference is real ELF content/layout: the four
+files still differ after `strip --strip-all`, and their allocatable sections and
+program headers differ.
+
+A first-divergence check on `//tools/zerobuf_cli:zerobuf_bin` showed the final
+link is not the first mismatch. Every direct `--extern` rlib passed to the
+binary already differs between Bazel and Slug. A minimal leaf example is
+`anyhow`:
+
+```text
+Bazel: bazel-out/k8-fastbuild/bin/external/rules_rs++crate+crates__anyhow-1.0.102/libanyhow-148383849.rlib
+Slug:  buck-out/zerobuf-static-raw-linker-20260514-231114/gen/rules_rs++crate+crates__anyhow-1.0.102/f0849ce59884cd83/external/rules_rs++crate+crates__anyhow-1.0.102/libanyhow-415656551.rlib
+```
+
+Their `lib.rmeta` contents expose the owning semantic gap. Bazel embeds remapped
+source paths such as:
+
+```text
+external/rules_rs++crate+crates__anyhow-1.0.102/src/lib.rs
+./external/rules_rs++crate+crates__anyhow-1.0.102/src/lib.rs
+```
+
+Slug additionally embeds the Phase 2.6 per-action execroot digest:
+
+```text
+./execroot/7476792f9006565e/external/rules_rs++crate+crates__anyhow-1.0.102/src/lib.rs
+```
+
+This confirms Phase 2.6's current cwd shape is good enough for action execution
+but not for Bazel 9 byte parity. Rust metadata is sensitive to the action's
+visible path graph and `--remap-path-prefix` substitutions. Slug must not leak
+workspace-local or digest execroot paths into rmeta/rlib outputs when Bazel
+would normalize them away through its process-wrapper substitutions and
+Bazel-shaped execroot.
+
+**Owner:** Plan 44 Phase 3. Plan 34 sandboxing may enforce the final filesystem
+view later, but this plan owns the action cwd/path model and path-remap shape.
+
+**Do not fix this as a target-local workaround.** Adding a one-off
+`--remap-path-prefix` for `anyhow`, `zerobuf`, `rules_rs`, an isolation dir, or
+one observed `execroot/<digest>` would only mask the demonstrated bug class.
+The systemic fix is to make Rust actions see Bazel-shaped paths, or to implement
+the equivalent process-wrapper substitution semantics at the action path
+abstraction that owns cwd/remap rendering.
+
 ## Progress 2026-05-09: Bazel-shaped declared output paths
 
 Plan 15's latest zeromatter blocker was traced to generated output path shape:
@@ -452,6 +510,17 @@ workspace and inverts bazel's invariant.
    apparent-name aliases as its own sub-tree.
 4. Remove the workspace-root `external/` directory entirely (now in
    `.gitignore`).
+
+**Rust byte-parity acceptance criterion:** Rust actions must not embed
+Slug-specific workspace, `buck-out/<isolation>`, or `execroot/<digest>` paths in
+`rmeta`/`rlib` outputs when Bazel 9 would expose only normalized execroot
+relative forms. A focused regression should cover a leaf `rust_library`-style
+action with an external source path and assert that the produced metadata or an
+equivalent captured action/remap representation contains Bazel-shaped
+`external/<repo>/...` / `./external/<repo>/...` paths, not
+`./execroot/<digest>/external/...`. If direct rmeta inspection is too brittle
+for a unit test, test the owning command-line/cwd/remap rendering abstraction
+and keep the SDK byte comparison as broader verification.
 
 **Caveats**:
 - Slug's "single working tree" model has been a deliberate
