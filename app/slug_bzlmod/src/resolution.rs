@@ -1103,9 +1103,7 @@ impl MvsResolver {
 // Lockfile-Integrated Resolution
 // ============================================================================
 
-use crate::lockfile::Lockfile;
 use crate::lockfile::LockfileMode;
-use crate::lockfile::lockfile_path;
 
 /// Resolve dependencies with lockfile support.
 ///
@@ -1113,7 +1111,7 @@ use crate::lockfile::lockfile_path;
 /// 1. Checks for an existing lockfile and validates it
 /// 2. Uses the lockfile if valid (fast path)
 /// 3. Runs MVS resolution if lockfile is invalid or missing
-/// 4. Updates the lockfile after resolution
+/// 4. Leaves `MODULE.bazel.lock` untouched during ordinary builds
 ///
 /// # Arguments
 ///
@@ -1131,33 +1129,17 @@ pub async fn resolve_with_lockfile(
     _module_bazel_path: &Path,
     mode: LockfileMode,
 ) -> slug_error::Result<ResolvedGraph> {
-    let lock_path = lockfile_path(workspace_root);
-
     // In Bazel 9.0+ format, the lockfile no longer caches the module dependency graph.
     // Module resolution always runs fresh (it's fast - just MODULE.bazel parsing + MVS).
-    // The lockfile's primary purpose is extension result caching.
-    let write_lockfile = match mode {
-        LockfileMode::Off => false,
-        LockfileMode::Refresh => true,
-        LockfileMode::Update => true,
-        LockfileMode::Error => {
-            // In error mode, we still resolve fresh but don't update the lockfile
-            // (error mode only applies to extension caching, not module resolution)
-            false
-        }
-    };
+    // Slug may read Bazel-authored lockfile data elsewhere for extension cache
+    // hits and startup-time spoke pre-seeding, but build-time resolution must
+    // not create or rewrite `MODULE.bazel.lock`.
+    let _ = mode;
 
     // Always resolve fresh
     let cache = ModuleCache::new()?;
     let mut resolver = MvsResolver::new(cache).await?;
     let graph = resolver.resolve(root, workspace_root).await?;
-
-    // Write lockfile if needed (creates the file for extension caching)
-    if write_lockfile && !lock_path.exists() {
-        let lockfile = Lockfile::new();
-        lockfile.write(&lock_path)?;
-        tracing::info!("Created lockfile at {}", lock_path.display());
-    }
 
     Ok(graph)
 }

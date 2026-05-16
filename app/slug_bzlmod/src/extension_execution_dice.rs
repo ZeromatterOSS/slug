@@ -46,8 +46,6 @@ use fxhash::FxHashMap;
 
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
-use crate::lockfile::Lockfile;
-use crate::lockfile::lockfile_path;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 
 const MAX_EXTENSION_IDS_IN_WARNING: usize = 25;
@@ -64,7 +62,6 @@ struct ExtensionAggregationData {
 }
 
 static EXTENSION_AGGREGATIONS: Mutex<Option<ExtensionAggregationData>> = Mutex::new(None);
-static LOCKFILE_EXTENSION_UPDATE_LOCK: Mutex<()> = Mutex::new(());
 
 fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) -> String {
     let mut shown = Vec::new();
@@ -254,8 +251,7 @@ impl ModuleExtensionResult {
 /// 4. Builds module_ctx from aggregated tags
 /// 5. Executes implementation(module_ctx) with RepoSpec capture
 /// 6. Cleans up the temporary directory
-/// 7. Updates lockfile with result (if project_root is set)
-/// 8. Returns ModuleExtensionResult with captured specs
+/// 7. Returns ModuleExtensionResult with captured specs
 ///
 /// Note: NO downloads or repository materialization happens during this computation.
 /// Repositories are materialized lazily via `ExtensionRepoExecutionKey`.
@@ -280,8 +276,10 @@ pub struct ModuleExtensionExecutionKey {
     /// Root module name (needed for build_module_context).
     pub root_module_name: Arc<str>,
 
-    /// Project root for lockfile access (optional).
-    /// If set, lockfile caching will be used.
+    /// Project root for read-only lockfile access (optional).
+    /// If set, Bazel-authored lockfile caches may be read. Ordinary builds
+    /// must not write `MODULE.bazel.lock`; it is a Bazel-owned compatibility
+    /// surface, not a Slug-private extension cache.
     /// Excluded from Hash/Eq as it's runtime configuration.
     pub project_root: Option<Arc<PathBuf>>,
 }
@@ -568,42 +566,6 @@ impl Key for ModuleExtensionExecutionKey {
             result.repo_count()
         );
 
-        // 8. Update lockfile cache (if project_root is set and we have real specs)
-        // Don't cache empty results — they likely indicate a failed extension execution
-        // (graceful fallback), and caching them would poison future builds.
-        if !output.generated_repo_specs.is_empty()
-            || !matches!(
-                &output.metadata.facts,
-                serde_json::Value::Object(map) if map.is_empty()
-            )
-        {
-            if let Some(project_root) = &self.project_root {
-                let lock_path = lockfile_path(project_root);
-                match update_lockfile_extension_cache(
-                    &lock_path,
-                    &self.extension_id,
-                    &bzl_transitive_digest,
-                    &usages_digest,
-                    &output.generated_repo_specs,
-                    &output.metadata.facts,
-                ) {
-                    Ok(()) => {
-                        tracing::debug!(
-                            "Updated lockfile cache for extension '{}'",
-                            self.extension_id
-                        );
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to update lockfile cache for extension '{}': {}",
-                            self.extension_id,
-                            e
-                        );
-                    }
-                }
-            }
-        }
-
         Ok(Arc::new(result))
     }
 
@@ -801,67 +763,6 @@ pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
         "sha256-{}",
         base64::engine::general_purpose::STANDARD.encode(hash)
     )
-}
-
-/// Update the lockfile with extension cache data.
-///
-/// This reads the existing lockfile (or creates a new one), adds/updates the
-/// extension cache entry, and writes it back atomically.
-fn update_lockfile_extension_cache(
-    lock_path: &std::path::Path,
-    extension_id: &str,
-    bzl_transitive_digest: &str,
-    usages_digest: &str,
-    generated_repo_specs: &FxHashMap<String, RepoSpec>,
-    facts: &serde_json::Value,
-) -> slug_error::Result<()> {
-    let _guard = LOCKFILE_EXTENSION_UPDATE_LOCK
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-
-    // Read existing lockfile or create new one
-    let mut lockfile = if lock_path.exists() {
-        match Lockfile::read(lock_path) {
-            Ok(lf) => lf,
-            Err(_) => {
-                // If we can't read it, start fresh
-                tracing::debug!("Creating new lockfile for extension cache");
-                Lockfile::new()
-            }
-        }
-    } else {
-        Lockfile::new()
-    };
-
-    // Drop legacy bare `//pkg:file%name` keys that pre-date slug emitting
-    // canonical `@@<repo>+//...` form. They're stale (no cell info) and
-    // create duplicate entries on every write.
-    lockfile
-        .module_extensions
-        .retain(|k, _| !k.starts_with("//") && !k.starts_with(':'));
-
-    // Update the extension cache. Translate the internal extension id to
-    // bazel's canonical `@@<repo>+//...` lockfile key form so the file
-    // round-trips cleanly with `bazel mod`.
-    let lockfile_key = crate::lockfile::lockfile_canonical_extension_id(extension_id);
-    lockfile.set_extension_cache(
-        lockfile_key.clone(),
-        bzl_transitive_digest.to_owned(),
-        usages_digest.to_owned(),
-        generated_repo_specs,
-    );
-    lockfile.set_extension_facts(lockfile_key, facts.clone());
-
-    // Write back
-    lockfile.write(lock_path)?;
-
-    // Drop the cached parse so subsequent `cached_lockfile` calls see the new
-    // contents (e.g. the spec we just persisted).
-    if let Some(parent) = lock_path.parent() {
-        crate::lockfile::invalidate_cached_lockfile(parent);
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -1143,89 +1044,22 @@ mod tests {
     }
 
     #[test]
-    fn test_update_lockfile_extension_cache() {
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().unwrap();
+    fn test_lockfile_project_root_reads_without_writing() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
         let lock_path = temp_dir.path().join("MODULE.bazel.lock");
-
-        // Create test repo specs
-        let mut specs = FxHashMap::default();
-        specs.insert(
-            "numpy".to_owned(),
-            RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_owned())
-                .with_attr("version".to_owned(), AttrValue::String("1.24.0".to_owned())),
-        );
-
-        // Update lockfile
-        update_lockfile_extension_cache(
-            &lock_path,
-            "@@rules_python//pip:pip.bzl%pip",
-            "bzl-digest-123",
-            "usages-digest-456",
-            &specs,
-            &serde_json::json!({"numpy_1.24.0": {"checksum": "abc"}}),
-        )
-        .unwrap();
-
-        // Verify lockfile was created and contains the extension cache
-        let lockfile = Lockfile::read(&lock_path).unwrap();
-        assert!(lockfile.has_extension_cache());
-
-        let cached = lockfile.get_extension_cache(
-            "@@rules_python//pip:pip.bzl%pip",
-            "bzl-digest-123",
-            "usages-digest-456",
-        );
-        assert!(cached.is_some());
-        let cached_specs = cached.unwrap();
-        assert_eq!(cached_specs.len(), 1);
-        assert!(cached_specs.contains_key("numpy"));
-        assert_eq!(
-            lockfile.get_extension_facts("@@rules_python//pip:pip.bzl%pip"),
-            Some(serde_json::json!({"numpy_1.24.0": {"checksum": "abc"}}))
-        );
-    }
-
-    #[test]
-    fn test_update_lockfile_preserves_existing_data() {
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().unwrap();
-        let lock_path = temp_dir.path().join("MODULE.bazel.lock");
-
-        // Create initial lockfile with a registry hash
-        let mut lockfile = Lockfile::new();
+        let mut lockfile = crate::lockfile::Lockfile::new();
         lockfile.registry_file_hashes.insert(
             "https://bcr.bazel.build/test".to_owned(),
             "sha256-abc".to_owned(),
         );
         lockfile.write(&lock_path).unwrap();
+        let before = std::fs::read(&lock_path).unwrap();
 
-        // Update with extension cache
-        let specs = FxHashMap::default();
-        update_lockfile_extension_cache(
-            &lock_path,
-            "@@ext//ext.bzl%ext",
-            "bzl",
-            "usages",
-            &specs,
-            &serde_json::json!({"resource": "stored"}),
-        )
-        .unwrap();
+        crate::lockfile::invalidate_cached_lockfile(temp_dir.path());
+        let cached = crate::lockfile::cached_lockfile(temp_dir.path()).unwrap();
 
-        // Verify existing data is preserved
-        let lockfile = Lockfile::read(&lock_path).unwrap();
-        assert!(
-            lockfile
-                .registry_file_hashes
-                .contains_key("https://bcr.bazel.build/test")
-        );
-        assert!(lockfile.has_extension_cache());
-        assert_eq!(
-            lockfile.get_extension_facts("@@ext//ext.bzl%ext"),
-            Some(serde_json::json!({"resource": "stored"}))
-        );
+        assert_eq!(cached.registry_file_hashes.len(), 1);
+        assert_eq!(std::fs::read(&lock_path).unwrap(), before);
     }
 
     #[test]
