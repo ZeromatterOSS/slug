@@ -72,6 +72,7 @@ use crate::interpreter::rule_defs::cmd_args::SimpleCommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
 use crate::interpreter::rule_defs::nested_set::NestedSetOrder;
 use crate::interpreter::rule_defs::nested_set::collect_nested_set;
+use crate::interpreter::rule_defs::nested_set::nested_set_node_iter;
 use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
 use crate::interpreter::rule_defs::transitive_set::transitive_set_definition::builtin_definition;
 
@@ -431,19 +432,6 @@ impl Display for Depset {
     }
 }
 
-fn dedupe_values_preserving_order<'v>(
-    elements: Vec<Value<'v>>,
-) -> starlark::Result<Vec<Value<'v>>> {
-    let mut seen = HashSet::with_capacity(elements.len());
-    let mut deduped = Vec::with_capacity(elements.len());
-    for value in elements {
-        if seen.insert(value.get_hashed()?) {
-            deduped.push(value);
-        }
-    }
-    Ok(deduped)
-}
-
 fn dedupe_direct_values_preserving_order<'v>(
     elements: Vec<Value<'v>>,
 ) -> starlark::Result<Vec<Value<'v>>> {
@@ -707,29 +695,36 @@ pub fn depset_element_type_name(value: Value) -> starlark::Result<Option<String>
     Ok(depset.element_type().map(str::to_owned))
 }
 
-fn depset_to_list_raw<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
+fn depset_to_list_deduped<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
     let depset = DepsetView::from_value(value).ok_or_else(|| {
         slug_error::Error::from(DepsetError::ExpectedDepset {
             item_type: value.get_type().to_owned(),
         })
     })?;
-    let order = depset.order();
-    Ok(collect_nested_set(
+    let mut result = Vec::new();
+    let mut seen = HashSet::new();
+    for node in nested_set_node_iter(
         value,
-        order,
+        depset.order(),
         |depset| depset.identity(),
-        |depset| depset_direct_values(depset),
-        |depset| depset_child_values(depset),
-    ))
+        depset_child_values,
+    ) {
+        for direct in depset_direct_values(node) {
+            if seen.insert(direct.get_hashed()?) {
+                result.push(direct);
+            }
+        }
+    }
+    Ok(result)
 }
 
 pub fn depset_to_list<'v>(value: Value<'v>, heap: Heap<'v>) -> starlark::Result<Vec<Value<'v>>> {
     let _ = heap;
-    dedupe_values_preserving_order(depset_to_list_raw(value)?)
+    depset_to_list_deduped(value)
 }
 
 pub fn depset_to_list_without_heap<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
-    dedupe_values_preserving_order(depset_to_list_raw(value)?)
+    depset_to_list_deduped(value)
 }
 
 pub fn depset_to_artifact_inputs<'v>(
@@ -873,12 +868,11 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
         } else {
             (0, 0)
         };
-        let elements = depset_to_list_raw(this)?;
         // Bazel depsets deduplicate elements: depset(["a", "a"]).to_list() == ["a"].
         // Depset elements are validated as hashable on creation, so use the cached
         // Starlark hash and equality instead of the previous O(n^2) linear scan.
-        let collected_len = elements.len();
-        let deduped = dedupe_values_preserving_order(elements)?;
+        let deduped = depset_to_list_deduped(this)?;
+        let collected_len = deduped.len();
         depset_to_list_checkpoint(
             checkpoint,
             direct_len,

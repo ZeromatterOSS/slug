@@ -1734,6 +1734,42 @@ Classification:
   provider construction paths, then replace hot paths with graph-preserving or
   deferred depset handling where Bazel would preserve nested sets.
 
+### 2026-05-15 Phase 6 continuation: generated Rust build-script analysis frontier
+
+After the lockfile read-only fix and the workspace-root `external/` watcher
+filter, `//sdk:ffi_cpp_headers` builds successfully in isolation. A fresh full
+SDK run from `C:\dev\zeromatter-kuro`:
+
+```powershell
+C:\dev\kuro\target\debug\slug.exe --isolation-dir p60-sdk-after-ffi-1 build --no-interactive-console //sdk:sdk
+```
+
+advanced through synchronization, general Rust/CC analysis, and
+`//sdk/zeromatter_ffi:build_script`, then spent more than six minutes with CPU
+active and stable RSS around 2.8-2.9 GiB at:
+
+```text
+Waiting on workspace//zerobuf_generated/component_interface:build_script (//bazel/platforms:windows-msvc-host#40d20632a7d41aee) -- running analysis [evaluate_rule], and 31 other actions
+```
+
+The run was uninstrumented, so it cannot distinguish real Starlark work from
+redundant depset construction, action-input flattening, or a progress-frontier
+artifact. This remains a Plan 54 Phase 6 systemic performance issue because the
+frontier is high-volume rules_rust build-script/provider analysis across many
+generated crates, not an SDK-specific semantic error. Continue with an
+instrumented rerun using `SLUG_MEMORY_CHECKPOINTS=1`; if checkpoints again show
+large `depset_create_live` and `depset_to_list_*` volume, fix the responsible
+depset/action-input path before attempting output-content parity.
+
+The instrumented rerun showed active analysis work concentrated in rules_rust
+CcInfo/native-linking/runfiles provider logic, with repeated `depset.to_list()`
+calls over large nested sets. Slug's depset flattening first materialized every
+direct element from every node and then performed a second full dedupe pass.
+Bazel depsets dedupe elements, but the implementation does not need two full
+vectors. The first systemic Phase 6 fix changes depset public list conversion to
+dedupe during nested-set traversal, preserving Bazel list order while avoiding
+the extra flattened allocation and second scan.
+
 Commands for implementation PRs:
 
 - `cargo test -p slug_build_api_tests transitive_set`
