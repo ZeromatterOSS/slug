@@ -49,9 +49,10 @@ use crate::stats::FileWatcherStats;
 ///
 /// `buck-out` is slug's own output dir. The `bazel-*` entries are bazel's
 /// convenience symlinks (`bazel-bin`, `bazel-out`, `bazel-testlogs`,
-/// `bazel-bazel`, `bazel-external`). `install_filtered_watches` skips
-/// symlinks at install time so we do not recurse into the trees they point
-/// at, but some FS configurations still surface aliased events through
+/// `bazel-bazel`, `bazel-external`). `external` is Slug's Bzlmod/Bazel-style
+/// generated external-repository symlink tree. `install_filtered_watches`
+/// skips symlinks at install time so we do not recurse into the trees they
+/// point at, but some FS configurations still surface aliased events through
 /// other watches; the component filter catches those.
 const RESERVED_OUTPUT_COMPONENTS: &[&str] = &[
     "buck-out",
@@ -60,6 +61,7 @@ const RESERVED_OUTPUT_COMPONENTS: &[&str] = &[
     "bazel-testlogs",
     "bazel-bazel",
     "bazel-external",
+    "external",
     // <project_root>/execroot/<basename> is a self-symlink installed by
     // ensure_execroot_self_symlink in slug_core::cells. notify follows it
     // recursively into the project, so without this filter every change
@@ -484,6 +486,11 @@ mod tests {
     }
 
     #[test]
+    fn external_symlink_tree_at_root() {
+        assert!(check("external/abseil-cpp/absl/base/config.h"));
+    }
+
+    #[test]
     fn similar_named_source_not_filtered() {
         assert!(!check("src/buckout-tool.rs"));
         assert!(!check("src/bazel-binutils/foo.rs"));
@@ -498,6 +505,7 @@ mod tests {
             "bazel-testlogs",
             "bazel-bazel",
             "bazel-external",
+            "external",
         ] {
             assert!(check(&format!("{c}/foo")), "expected {c} to be filtered");
             assert!(

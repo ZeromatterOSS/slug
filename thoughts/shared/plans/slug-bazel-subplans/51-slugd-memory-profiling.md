@@ -2045,3 +2045,38 @@ depsets of `_ltl(...)` values, where `_ltl` returns
 pic_static_library = library)`. Slug rejects those direct `LibraryToLink`
 provider elements as mutable. Keep Plan 51 parked until Plan 54 identifies and
 fixes the remaining non-hashable provider field.
+
+## Progress 2026-05-15: post-lockfile-fix SDK analysis stall
+
+After Plan 57 removed build-time writes to `MODULE.bazel.lock`, a fresh
+ZeroMatter SDK smoke from `C:\dev\zeromatter-kuro` used:
+
+```powershell
+C:\dev\kuro\target\debug\slug.exe --isolation-dir p57-sdk-1 build --no-interactive-console //sdk:sdk
+```
+
+The run was stopped after repeated progress messages showed the frontier stuck
+in analysis rather than producing a semantic failure:
+
+```text
+Waiting on workspace//zerobuf_generated/playback:build_script (//bazel/platforms:windows-msvc-host#348cdbb38c5bfe5c) -- running analysis [evaluate_rule], and 31 other actions
+```
+
+Evidence:
+
+- Log: `C:\dev\kuro\tmp\p57-sdk-1.err.log`.
+- The daemon remained responsive and CPU-active, with RSS around 2.9 GiB.
+- `MODULE.bazel.lock` stayed at the Bazel-regenerated SHA-256
+  `E2985FF577A3F7ED1B31B873D84A8B9A7CE452A80CCE85673F853A328F3507DB`.
+- The smoke did not use `SLUG_MEMORY_CHECKPOINTS=1`, so the log lacks the
+  existing `analysis_evaluate_rule_phase`,
+  `analysis_toolchain_resolution_substep`, and Starlark heartbeat checkpoints.
+
+Classification:
+
+- This is currently a Plan 51 performance/stall investigation, not a lockfile
+  or output-parity failure. The lockfile explosion is cleared for this run.
+- The next action is an instrumented rerun with `SLUG_MEMORY_CHECKPOINTS=1`.
+  If checkpoints show a semantic wait, hand the blocker to the owning parity
+  plan. If checkpoints show repeated redundant work or a scheduler/frontier
+  issue, keep it under Plan 51 and fix the responsible analysis subsystem.

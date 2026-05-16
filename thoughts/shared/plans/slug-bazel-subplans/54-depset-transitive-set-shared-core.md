@@ -1693,6 +1693,47 @@ Memory checks:
 - If deferred depset expansion is implemented, actions should not need to
   flatten depsets of files during analysis solely to discover inputs.
 
+### 2026-05-15 Phase 6 escalation: SDK analysis depset construction cost
+
+Plan 57's lockfile-read-only fix cleared the `MODULE.bazel.lock` explosion for
+the ZeroMatter SDK smoke: the file stayed at the Bazel-regenerated SHA-256
+`E2985FF577A3F7ED1B31B873D84A8B9A7CE452A80CCE85673F853A328F3507DB`.
+
+The next blocker is performance rather than depset mutability. An instrumented
+SDK run:
+
+```powershell
+$env:SLUG_MEMORY_CHECKPOINTS='1'
+C:\dev\kuro\target\debug\slug.exe --isolation-dir p51-post-lockfile-instrumented-1 build --no-interactive-console //sdk:sdk
+```
+
+showed active Starlark evaluation and large depset construction volume instead
+of a DICE wait or terminal error:
+
+- log: `C:\dev\kuro\tmp\p51-post-lockfile-instrumented-1.err.log`
+- RSS settled around 3 GiB during analysis.
+- `depset_create_live` reached roughly 290k constructions within the sampled
+  window.
+- observed maxima included `max_direct_len=1930`, `max_transitive_len=3862`,
+  and `max_depth=19`.
+- active samples were in `rules_rust+0.69.0/rust/private/rustc.bzl`,
+  `rules_rust+0.69.0/rust/private/utils.bzl`, and
+  `rules_cc+0.2.17/cc/private/cc_info.bzl` across many Rust crate targets.
+
+Classification:
+
+- This is now a Plan 54 Phase 6 performance blocker, not a generic Plan 51
+  memory investigation. The problem class is high-volume depset construction
+  and analysis-time expansion/copying in real Rust/CC provider paths.
+- A one-off SDK target bypass would be wrong. The systemic owner is the depset
+  facade and its consumers: preserve Bazel 9 validation and traversal order,
+  but avoid flattening or copying depset graphs when constructing derived
+  depsets or passing depsets through action/runfiles/provider APIs.
+- Next implementation should first identify Slug call sites that convert depsets
+  to lists during analysis, especially Rust action command-line and CcInfo
+  provider construction paths, then replace hot paths with graph-preserving or
+  deferred depset handling where Bazel would preserve nested sets.
+
 Commands for implementation PRs:
 
 - `cargo test -p slug_build_api_tests transitive_set`
