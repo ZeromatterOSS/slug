@@ -712,6 +712,17 @@ pub(crate) fn prepare_execute_working_directory(work_dir: &Path) -> starlark::Re
     Ok(std::fs::canonicalize(work_dir).unwrap_or_else(|_| work_dir.to_path_buf()))
 }
 
+pub(crate) fn prepare_execute_program(program: &str, work_dir: &Path) -> PathBuf {
+    let path = Path::new(program);
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    if path.components().count() > 1 {
+        return work_dir.join(path);
+    }
+    path.to_path_buf()
+}
+
 /// Resolve a Bazel label string to a file system path.
 ///
 /// Given a label like "@repo//pkg:file" or "//pkg:file", returns
@@ -2029,8 +2040,10 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         };
         let work_dir = prepare_execute_working_directory(&work_dir)?;
 
-        // Build the command
-        let mut cmd = Command::new(program);
+        // Build the command. Explicit relative paths are repository-working-dir
+        // relative in Bazel; make that absolute before crossing the Windows
+        // process-spawn boundary so `./tool.bat` is not resolved elsewhere.
+        let mut cmd = Command::new(prepare_execute_program(program, &work_dir));
         cmd.args(cmd_args);
         cmd.current_dir(&work_dir);
 
@@ -2845,9 +2858,10 @@ mod tests {
         assert_eq!(format!("{root}"), temp_dir.path().to_string_lossy());
 
         let child = RepositoryPath::with_base_dir("subdir/file.txt".to_owned(), base_dir);
+        let child_path = temp_dir.path().join("subdir").join("file.txt");
         assert_eq!(
             format!("{child}"),
-            temp_dir.path().join("subdir/file.txt").to_string_lossy()
+            child_path.to_string_lossy()
         );
     }
 
@@ -2883,6 +2897,24 @@ mod tests {
 
         let prepared = prepare_execute_working_directory(&link).unwrap();
         assert_eq!(prepared, std::fs::canonicalize(&target).unwrap());
+    }
+
+    #[test]
+    fn test_prepare_execute_program_resolves_explicit_relative_to_working_dir() {
+        let work_dir = Path::new("repo").join("work");
+
+        assert_eq!(
+            prepare_execute_program("./get_env.bat", &work_dir),
+            work_dir.join("./get_env.bat")
+        );
+        assert_eq!(
+            prepare_execute_program("tools/get_env.bat", &work_dir),
+            work_dir.join("tools/get_env.bat")
+        );
+        assert_eq!(
+            prepare_execute_program("get_env.bat", &work_dir),
+            PathBuf::from("get_env.bat")
+        );
     }
 
     #[test]

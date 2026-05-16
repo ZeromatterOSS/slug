@@ -628,6 +628,34 @@ the lockfile/spoke seeding decoupling (Plan 15 Phase 3 blocker).
   + `slug build` creates no `external/` at workspace root; zeromatter
   build still passes; tests/core still pass.
 
+## 2026-05-15 SDK loop: repository_ctx relative executable paths
+
+Class: **Systemic parity fix**, owned by `repository_ctx.execute`.
+
+While rerunning `//sdk:sdk` from `C:\dev\zeromatter-kuro` with isolation
+`p54-sdk-deduped-list-1`, Slug lazily executed
+`rules_cc++cc_configure_extension+local_config_cc`. The Windows toolchain
+repository rule creates `get_env.bat` in the generated repository and invokes:
+
+```python
+repository_ctx.execute(["./get_env.bat"], environment = env)
+```
+
+The Slug log showed Windows attempting to run:
+
+```text
+C:\dev\zeromatter-kuro\buck-out\p54-sdk-deduped-list-1\get_env.bat
+```
+
+instead of the file under the repository rule working directory. Bazel resolves
+relative executable paths in `repository_ctx.execute` relative to the effective
+repository working directory. Slug already sets `current_dir`, but on Windows a
+relative `Command::new("./tool.bat")` can still be resolved by the process
+creation layer against the parent process directory. The fix is to convert
+explicit relative path executables (`./tool`, `subdir/tool`, `..\tool`) to an
+absolute path under the prepared execute working directory before spawning.
+Bare program names must remain bare so PATH/PATHEXT lookup keeps Bazel shape.
+
 ## Sources of truth (parity references)
 
 - `bazel build :foo` workspace-root listing on bazel 9.1.0 (verified
