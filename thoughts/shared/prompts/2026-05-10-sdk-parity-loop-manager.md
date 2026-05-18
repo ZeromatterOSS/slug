@@ -7,7 +7,7 @@ implementing one blocker-sized slice.
 ## Workspace
 
 - Slug source repo: `/var/mnt/dev/slug`
-- ZeroMatter SDK repro repo: `/var/mnt/dev/zeromatter`
+- ZeroMatter SDK repro repo: `/var/mnt/dev/zeromatter-kuro`
 - Target goal: make Slug build `//sdk:sdk_contents` in the zeromatter repo and
   produce output identical to the equivalent Bazel 9 invocation, with
   equivalent or better performance and memory behavior.
@@ -16,8 +16,24 @@ implementing one blocker-sized slice.
 
 You own the loop overall.
 
+You are primarily a dispatcher/integrator, not the main implementer. Your
+default action after orientation is to delegate the next bounded implementation
+iteration to a worker subagent, continue lightweight local coordination while it
+runs, review/integrate the result, then dispatch the next iteration. Doing one
+implementation slice yourself and returning a normal final summary is a process
+failure unless one of the explicit stop conditions below is true.
+
+If the current runtime does not permit subagent dispatch, or the user has not
+authorized subagents in a tool environment that requires explicit permission,
+continue as a single long-running implementer/manager instead of stopping. Record
+the delegation limitation in the active plan or final handoff, but do not treat
+it as a blocker unless it prevents all local implementation, validation, smoke,
+and planning actions. The loop owner is responsible for progress even when the
+ideal dispatch shape is unavailable.
+
 Do not stop after one local implementation slice just because that slice is
-committed. Continue until one of these is true:
+committed. Do not stop after rediscovering that the SDK frontier is an
+already-known timeout or stall. Continue until one of these is true:
 
 1. `//sdk:sdk_contents` builds under Slug and output parity has been checked
    against Bazel 9.
@@ -25,19 +41,55 @@ committed. Continue until one of these is true:
    resume prompt with the exact next action, commands, logs, and state.
 3. The user explicitly asks you to stop.
 
-A bounded timeout with ongoing progress is not a stopping condition. If a smoke
-times out without a semantic failure, either increase the bound, add focused
-instrumentation, run a narrower target, or classify the performance/stall under
-the appropriate plan. Keep managing the loop.
+A bounded timeout with ongoing progress is not a stopping condition. A repeated
+timeout at an already-known frontier is also not a stopping condition. If a
+smoke times out without a semantic failure, either increase the bound, add
+focused instrumentation, run a narrower target, or classify the
+performance/stall under the appropriate plan. Keep managing the loop.
 
-Important: do not treat a bounded-memory timeout with fresh analysis progress
-as a "real blocker" just because the current slice produced useful handoff
-notes. That is only an intermediate observation. Before ending the turn, take
-one more concrete loop action unless the user asked to stop: start a longer
-bounded smoke, launch a focused repro for the visible waiting target, add the
-next instrumentation needed to distinguish slow progress from a stall, or make
-the exact performance/stall fix implied by the evidence. Ending immediately
-after recording "bounded memory plus ongoing progress" is an unexpected stop.
+Important: do not treat a bounded-memory timeout with fresh analysis progress,
+or a rediscovered already-tracked wait such as
+`rules_rust//ffi/rs:empty_allocator_libraries`, as a "real blocker" just
+because the current slice produced useful handoff notes. That is only an
+intermediate observation. Before ending the turn, take one more concrete loop
+action unless the user asked to stop: start a longer bounded smoke, launch a
+focused repro for the visible waiting target, add the next instrumentation
+needed to distinguish slow progress from a stall, or make the exact
+performance/stall fix implied by the evidence. Ending immediately after
+recording "bounded memory plus ongoing progress" or "same known frontier" is an
+unexpected stop.
+
+Likewise, ending immediately after landing a useful subplan scaffold,
+guardrail, or focused fix is an unexpected stop. If a slice compiles and tests,
+the next manager action is to dispatch the next worker with the newly observed
+state, run the next smoke/repro, or explicitly document a true blocker that
+prevents either action.
+
+### No Partial Final Responses
+
+A normal final response is allowed only after one of the explicit stop
+conditions above. Any other "summary of what changed" belongs in the active plan
+or an interim progress update, followed by another executable loop action.
+
+Before writing a final response, ask:
+
+- Is there a known next command, test, smoke, plan section, or implementation
+  slice that can be run now?
+- Is the worktree still dirty with changes that have not been verified against
+  the relevant focused checks?
+- Is the SDK frontier still unknown because no fresh Slug `//sdk:sdk_contents`
+  or narrower equivalent smoke has been run after the last meaningful fix?
+- Is there an xfail, skip, TODO, or documented precondition that can be narrowed,
+  promoted, or converted into a stronger blocker statement?
+
+If any answer is "yes", do that next action instead of ending the turn. A
+reduced xfail count, a passing guardrail file with remaining strict xfails, or a
+compiled local slice is progress, not a stopping point.
+
+When the user asks "why did you stop?" or otherwise points out premature
+termination, do not answer with apology alone. Immediately resume the loop or
+patch this prompt/process so the same stop is harder to repeat, then take the
+next executable action.
 
 ## Context and Delegation Discipline
 
@@ -58,14 +110,44 @@ Keep prompt/context packets concise. For a delegated task, include only:
 Do not paste whole plan files or smoke logs into a subagent prompt. Point to
 files and require cited line references or short excerpts.
 
-Delegate as much of the loop as possible to subagents. Each full loop iteration
-should be assigned to a subagent as a bounded end-to-end task: inspect the
-current failure or stall, classify it, update the relevant plan, implement the
-smallest systemic fix if one is indicated, run focused verification, run or
-prepare the next SDK smoke, clean up daemons, and report exact commands,
-statuses, logs, changed files, and next blockers. The manager should avoid
-duplicating the subagent's exploration; it should review results, integrate
-patches, decide the next iteration, and spawn the next subagent.
+Delegate the loop to subagents. Each full loop iteration must be assigned to an
+implementer worker as a bounded end-to-end task: inspect the current failure or
+stall, classify it, update the relevant plan, implement the smallest systemic
+fix if one is indicated, run focused verification, run or prepare the next SDK
+smoke, clean up daemons, and report exact commands, statuses, logs, changed
+files, and next blockers. The manager should avoid duplicating the subagent's
+exploration; it should review results, integrate patches, decide the next
+iteration, and spawn the next subagent.
+
+The manager may implement locally for narrow integration work after a worker
+returns, emergency fixes needed to unblock delegation itself, tiny documentation
+corrections, or any iteration where subagent dispatch is unavailable. Local
+implementation does not satisfy the loop by itself. After local implementation,
+run focused validation, update the active plan, and continue with the next
+worker, smoke, repro, or local implementation slice.
+
+After every worker result or local integration slice, commit the clean completed
+slice before continuing, unless verification failed or the diff is explicitly
+diagnostic-only. Then perform this manager self-check before any final response:
+
+1. Did `//sdk:sdk_contents` build under Slug and did output parity with Bazel 9
+   complete? If no, continue.
+2. Is there a true blocker that prevents dispatching another implementer,
+   running a focused repro, or running the next smoke? If no, continue.
+3. Did the user explicitly ask to stop? If no, continue.
+
+A final response that says only what changed in the last slice is invalid when
+the answer to all three questions is "no".
+
+If the worktree contains a verified, commit-ready slice, creating the commit is
+part of the loop action, not optional cleanup. Do not leave verified Plan work
+dirty across a handoff unless there are unrelated user changes in the same file
+that cannot be separated safely; in that case, state the conflict and the exact
+files.
+
+In single-agent mode, replace "dispatch another implementer" in the self-check
+with "take another bounded implementation/repro/smoke action locally." Lack of a
+subagent is not by itself a true blocker.
 
 ## Required Reading Before Acting
 
@@ -246,11 +328,11 @@ zeromatter target when they exercise the same behavior. Run this after focused
 checks pass, when you need to discover the next SDK blocker, or when a change
 has enough integration risk that only the full SDK target gives useful signal.
 
-Run from `/var/mnt/dev/zeromatter`, using the Slug binary built from
+Run from `/var/mnt/dev/zeromatter-kuro`, using the Slug binary built from
 `/var/mnt/dev/slug`:
 
 ```sh
-cd /var/mnt/dev/zeromatter
+cd /var/mnt/dev/zeromatter-kuro
 
 cleanup_slugd() {
   ps -eo pid=,args= | awk '/slugd\[/ {print $1}' | xargs -r kill -TERM
@@ -266,7 +348,7 @@ set +e
 timeout 900s env SLUG_MEMORY_CHECKPOINTS=1 \
   /var/mnt/dev/slug/scripts/memory_smoke.sh \
     --interval 5 \
-    --include-pgrep "slugd\\[zeromatter\\].*${isolation}" \
+    --include-pgrep "slugd\\[zeromatter-kuro\\].*${isolation}" \
     -- \
     /var/mnt/dev/slug/target/debug/slug \
       --isolation-dir "${isolation}" \
