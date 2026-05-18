@@ -2859,10 +2859,7 @@ mod tests {
 
         let child = RepositoryPath::with_base_dir("subdir/file.txt".to_owned(), base_dir);
         let child_path = temp_dir.path().join("subdir").join("file.txt");
-        assert_eq!(
-            format!("{child}"),
-            child_path.to_string_lossy()
-        );
+        assert_eq!(format!("{child}"), child_path.to_string_lossy());
     }
 
     #[test]

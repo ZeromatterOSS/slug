@@ -44,10 +44,10 @@ use starlark::starlark_simple_value;
 use starlark::typing::Ty;
 use starlark::values::Freeze;
 use starlark::values::FreezeResult;
+use starlark::values::Freezer;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::FrozenValueTyped;
-use starlark::values::Freezer;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::OwnedFrozenValueTyped;
@@ -274,14 +274,7 @@ unsafe impl<'v> Coerce<DepsetFlattenedCache<Value<'v>>> for DepsetFlattenedCache
 /// This single representation is used for both live values and frozen values.
 /// It deliberately remains a depset facade: Buck/Slug `TransitiveSet` keeps its
 /// separate streaming representation and use-site traversal semantics.
-#[derive(
-    Debug,
-    ProvidesStaticType,
-    NoSerialize,
-    Allocative,
-    Trace,
-    Coerce,
-)]
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce)]
 #[repr(C)]
 pub struct DepsetGen<V: ValueLifetimeless> {
     /// Direct elements in this depset.
