@@ -1770,6 +1770,44 @@ vectors. The first systemic Phase 6 fix changes depset public list conversion to
 dedupe during nested-set traversal, preserving Bazel list order while avoiding
 the extra flattened allocation and second scan.
 
+### 2026-05-18 Phase 6 continuation: rules_cc `_flat_depset` repeated flattening
+
+The next focused instrumented run for `//sdk:ffi_cpp_headers` showed analysis
+completing and then moving into Rust compile actions, so the current
+"build-script analysis is taking minutes" issue is not a hang. The hot analysis
+category is repeated Starlark-visible depset materialization:
+
+- `rules_cc+0.2.17/cc/private/cc_info.bzl` `_flat_depset` calls `t.to_list()`
+  for every candidate depset and then calls `all.to_list()` to detect whether
+  the largest candidate is already a superset.
+- rules_rust build-script and Rust library analysis route many generated crates
+  through CcInfo merging, so the same approximately 1,523-element C++ provider
+  depsets are flattened thousands of times.
+- Slug had no live depset materialization cache, so every `_flat_depset` probe
+  rewalked the nested set graph and rebuilt the deduped list.
+
+This remains Plan 54 rather than an SDK-specific workaround: Bazel keeps nested
+sets cheap enough for rules_cc's public Starlark implementation, and Slug must
+make the same public depset API efficient. The current systemic fix adds a
+live-depset `to_list()` cache. The cache is cleared on freeze because it is a
+derived materialization of the direct/transitive graph, and frozen values can
+recompute if needed.
+
+Follow-up runs showed that the cache alone does not address the wrapper
+explosion: rules_cc and rules_rust create thousands of `depset(transitive =
+[child])` nodes with no direct items, then immediately call `to_list()` on those
+fresh wrappers. Slug now canonicalizes the same-order single-child case to the
+child depset itself. This preserves the flattened result while avoiding wrapper
+allocation, duplicate cache sites, and repeated one-child graph traversals.
+
+The same focused run also surfaced a separate analysis-helper laziness issue in
+Slug's Starlark facade: `ctx.expand_location` and `ctx.expand_make_variables`
+were doing implicit attribute/location and substitution-map work even for
+strings with no `$(` pattern. Those helpers are now lazy. This removed the
+`exports.bzl` heartbeat but did not bring analysis under the target by itself,
+so the remaining work stays classified here as nested-set/provider materializer
+cost rather than as an SDK-specific build-script hang.
+
 Commands for implementation PRs:
 
 - `cargo test -p slug_build_api_tests transitive_set`

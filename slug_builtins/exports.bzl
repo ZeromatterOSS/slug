@@ -242,6 +242,9 @@ def _slug_expand_make_variables(raw_ctx, attribute_name, command, additional_sub
     # unused — error messages with it are never emitted today.
     _ = attribute_name  # buildifier: disable=unused-variable
 
+    if command.find("$(") < 0:
+        return command
+
     subs = {}
     if additional_substitutions != None:
         for k, v in additional_substitutions.items():
@@ -435,15 +438,15 @@ def _slug_expand_location(raw_ctx, input, targets, short_paths):
     # same full artifact path, so the flag is a no-op.
     _ = short_paths  # buildifier: disable=unused-variable
 
-    # Build the pool: explicit targets + implicit attrs walk (Rust-side).
-    targets_val = targets if targets != None else []
-    pool = _slug_explicit_targets_location_pool(targets_val) + slug_collect_location_pool(raw_ctx, targets_val)
+    if input.find("$(") < 0:
+        return input
 
     # Parse and substitute $(verb label) patterns using a
     # for-loop-with-cursor (Starlark has no `while`).
     n = len(input)
     result = ""
     i = 0
+    pool = None
     for _step in range(n + 1):
         if i >= n:
             break
@@ -496,6 +499,12 @@ def _slug_expand_location(raw_ctx, input, targets, short_paths):
             close = input.find(")", start + label_offset)
             if close >= 0:
                 label_str = input[start + label_offset:close].strip()
+                if pool == None:
+                    # Build the pool lazily. Most rules_rust build-script env
+                    # and arg strings do not contain location verbs, and Bazel
+                    # does not pay the implicit-attrs walk for those values.
+                    targets_val = targets if targets != None else []
+                    pool = _slug_explicit_targets_location_pool(targets_val) + slug_collect_location_pool(raw_ctx, targets_val)
                 paths = _find_paths_for_label(pool, label_str)
                 if paths == None:
                     # Fall through to the lazy output-attr lookup.

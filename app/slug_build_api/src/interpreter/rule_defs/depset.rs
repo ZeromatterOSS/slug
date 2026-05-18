@@ -43,15 +43,18 @@ use starlark::starlark_module;
 use starlark::starlark_simple_value;
 use starlark::typing::Ty;
 use starlark::values::Freeze;
+use starlark::values::FreezeResult;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::FrozenValueTyped;
+use starlark::values::Freezer;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::OwnedFrozenValueTyped;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
+use starlark::values::Tracer;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueIdentity;
@@ -232,6 +235,36 @@ pub fn bazel_depset_tset_definition()
     })
 }
 
+#[derive(Debug, Default, Allocative)]
+#[repr(transparent)]
+struct DepsetFlattenedCache<V: ValueLifetimeless> {
+    #[allocative(skip)]
+    values: OnceLock<Vec<V>>,
+}
+
+unsafe impl<'v, V> Trace<'v> for DepsetFlattenedCache<V>
+where
+    V: ValueLifetimeless + Trace<'v>,
+{
+    fn trace(&mut self, tracer: &Tracer<'v>) {
+        if let Some(values) = self.values.get_mut() {
+            values.trace(tracer);
+        }
+    }
+}
+
+impl<'v> Freeze for DepsetFlattenedCache<Value<'v>> {
+    type Frozen = DepsetFlattenedCache<FrozenValue>;
+
+    fn freeze(self, _freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        Ok(DepsetFlattenedCache {
+            values: OnceLock::new(),
+        })
+    }
+}
+
+unsafe impl<'v> Coerce<DepsetFlattenedCache<Value<'v>>> for DepsetFlattenedCache<FrozenValue> {}
+
 // ============================================================================
 // DepsetGen - shared live/frozen depset facade
 // ============================================================================
@@ -248,7 +281,6 @@ pub fn bazel_depset_tset_definition()
     Allocative,
     Trace,
     Coerce,
-    Freeze
 )]
 #[repr(C)]
 pub struct DepsetGen<V: ValueLifetimeless> {
@@ -259,12 +291,18 @@ pub struct DepsetGen<V: ValueLifetimeless> {
     /// Iteration order selected at construction.
     order: NestedSetOrder,
     /// Bazel tracks the top-level Starlark element type without flattening.
-    #[freeze(identity)]
     element_type: Option<String>,
     /// O(1) truthiness/emptiness metadata.
     is_empty: bool,
     /// Approximate nested-DAG depth for future depth/error parity work.
     depth: u32,
+    /// Cached `to_list()` materialization for repeated Starlark consumers.
+    ///
+    /// Bazel's rules_cc `_flat_depset` intentionally calls `to_list()` on the
+    /// same candidate depsets while finding a largest superset. Without caching,
+    /// Rust build-script analysis repeatedly flattens identical transitive C++
+    /// contexts.
+    flattened: DepsetFlattenedCache<V>,
 }
 
 pub type LiveDepsetGen<V> = DepsetGen<V>;
@@ -297,6 +335,7 @@ impl<V: ValueLifetimeless> DepsetGen<V> {
             element_type,
             is_empty,
             depth,
+            flattened: DepsetFlattenedCache::default(),
         }
     }
 
@@ -327,6 +366,32 @@ impl<V: ValueLifetimeless> DepsetGen<V> {
     /// Check if the depset is empty.
     pub fn is_empty(&self) -> bool {
         self.is_empty
+    }
+}
+
+impl<'v> Freeze for DepsetGen<Value<'v>> {
+    type Frozen = DepsetGen<FrozenValue>;
+
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        let Self {
+            direct,
+            transitive,
+            order,
+            element_type,
+            is_empty,
+            depth,
+            flattened: _,
+        } = self;
+
+        Ok(DepsetGen {
+            direct: direct.freeze(freezer)?,
+            transitive: transitive.freeze(freezer)?,
+            order,
+            element_type,
+            is_empty,
+            depth,
+            flattened: DepsetFlattenedCache::default(),
+        })
     }
 }
 
@@ -696,6 +761,28 @@ pub fn depset_element_type_name(value: Value) -> starlark::Result<Option<String>
 }
 
 fn depset_to_list_deduped<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
+    if let Some(DepsetView::Live(depset)) = DepsetView::from_value(value) {
+        if let Some(cached) = depset.flattened.values.get() {
+            return Ok(cached.clone());
+        }
+        if depset.direct.is_empty()
+            && depset.transitive.len() == 1
+            && let Some(child) = DepsetView::from_value(depset.transitive[0].to_value())
+            && child.order() == depset.order()
+        {
+            let deduped = depset_to_list_deduped(depset.transitive[0].to_value())?;
+            let _ = depset.flattened.values.set(deduped.clone());
+            return Ok(deduped);
+        }
+        let deduped = depset_to_list_deduped_uncached(value)?;
+        let _ = depset.flattened.values.set(deduped.clone());
+        return Ok(deduped);
+    }
+
+    depset_to_list_deduped_uncached(value)
+}
+
+fn depset_to_list_deduped_uncached<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
     let depset = DepsetView::from_value(value).ok_or_else(|| {
         slug_error::Error::from(DepsetError::ExpectedDepset {
             item_type: value.get_type().to_owned(),
@@ -1069,6 +1156,14 @@ pub fn make_depset_from_lists<'v>(
     transitive: Vec<Value<'v>>,
     order: &str,
 ) -> starlark::Result<Value<'v>> {
+    if direct.is_empty()
+        && transitive.len() == 1
+        && let Some(child) = DepsetView::from_value(transitive[0])
+        && child.order().as_str() == order
+    {
+        return Ok(transitive[0]);
+    }
+
     Ok(heap.alloc(make_live_depset_from_values(direct, transitive, order)?))
 }
 
