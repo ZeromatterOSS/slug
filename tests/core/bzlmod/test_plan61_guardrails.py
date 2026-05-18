@@ -640,6 +640,64 @@ use_repo(replay, "replayed_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_valid_lockfile_replay_materializes_generated_repo_without_extension_eval(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction valid lockfile replay path."""
+    module_name = "plan61_replay_materialization"
+    extension_id = "@plan61_replay_materialization//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    replayed_repo.mkdir(exist_ok=True)
+    _write(replayed_repo / "data.txt", "replayed repo payload\n")
+    _write(
+        replayed_repo / "BUILD.bazel",
+        """exports_files(["data.txt"])
+filegroup(name = "data", srcs = ["data.txt"])
+""",
+    )
+    _write(
+        buck.cwd / "replay_ext.bzl",
+        """def _replay_ext_impl(module_ctx):
+    fail("extension should not execute when generatedRepoSpecs replay is valid")
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=module_name,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_replayed_repo")
+    after = await _bzlmod_counters(buck)
+
+    assert after["extension_replay_hit"] > before["extension_replay_hit"]
+    assert after["extension_eval"] == before["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_extension_tag_attr_edit_invalidates_or_rejects_replay(
     buck: Buck,
 ) -> None:

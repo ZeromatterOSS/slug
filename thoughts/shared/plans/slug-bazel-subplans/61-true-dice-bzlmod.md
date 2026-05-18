@@ -688,6 +688,25 @@ Implementation slice 2026-05-18, extension tag usage digest guardrail:
   with the same 16 passed / 1 xfailed pytest result. The remaining xfail is the
   same-daemon workspace isolation precondition.
 
+Implementation slice 2026-05-18, replayed generated repo materialization
+guardrail:
+
+- Added a focused Plan 61.6 guardrail proving a valid lockfile
+  `generatedRepoSpecs` entry is usable for an actual build target. The fixture
+  writes a replay lockfile for a generated `local_repository`, makes the
+  extension implementation fail if executed, then builds a root filegroup that
+  depends on `@replayed_repo//:data`.
+- The passing result proves the replay hit registers and materializes the
+  generated repo without executing the extension on that path. This strengthens
+  the earlier `audit cell` replay checks, which only proved cell visibility.
+- Validation: focused
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_valid_lockfile_replay_materializes_generated_repo_without_extension_eval
+  -rx` passed, full direct pytest passed (17 passed / 1 xfailed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` passed
+  with the same 17 passed / 1 xfailed pytest result. The remaining xfail is the
+  same-daemon workspace isolation precondition.
+
 Manager process correction 2026-05-18:
 
 - The loop manager must not stop after this scaffold. The next loop action is
