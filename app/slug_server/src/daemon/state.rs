@@ -22,6 +22,8 @@ use gazebo::prelude::*;
 use gazebo::variants::VariantName;
 use remote::ScribeConfig;
 use slug_build_api::spawner::BuckSpawner;
+use slug_cli_proto::ConfigOverride;
+use slug_cli_proto::config_override::ConfigType;
 use slug_cli_proto::unstable_dice_dump_request::DiceDumpFormat;
 use slug_common::cas_digest::DigestAlgorithm;
 use slug_common::cas_digest::DigestAlgorithmFamily;
@@ -303,7 +305,13 @@ impl DaemonState {
             }
 
             tracing::info!("Reading config...");
-            let legacy_cells = BuckConfigBasedCells::parse_with_config_args(&fs, &[]).await?;
+            let bootstrap_config = [ConfigOverride {
+                cell: None,
+                config_override: "bzlmod.lockfile_mode=off".to_owned(),
+                config_type: ConfigType::Value as i32,
+            }];
+            let legacy_cells =
+                BuckConfigBasedCells::parse_with_config_args(&fs, &bootstrap_config).await?;
 
             tracing::info!("Starting...");
 
@@ -743,6 +751,7 @@ impl DaemonState {
             project_root: self.paths.project_root().clone(),
             events: dispatcher,
             daemon: data.dupe(), // FIXME: Remove the duplicative fields.
+            daemon_dir: self.paths.daemon_dir()?.path.clone(),
             _drop_guard: drop_guard,
             spawner: data.spawner.dupe(),
         })

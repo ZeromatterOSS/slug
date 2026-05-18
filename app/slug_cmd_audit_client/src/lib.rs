@@ -28,6 +28,7 @@ use slug_client_ctx::exit_result::ExitResult;
 use slug_client_ctx::streaming::StreamingCommand;
 
 use crate::analysis_queries::AuditAnalysisQueriesCommand;
+use crate::bzlmod_counters::AuditBzlmodCountersCommand;
 use crate::cell::AuditCellCommand;
 use crate::config::AuditConfigCommand;
 use crate::configurations::AuditConfigurationsCommand;
@@ -47,6 +48,7 @@ use crate::subtargets::AuditSubtargetsCommand;
 use crate::visibility::AuditVisibilityCommand;
 
 pub mod analysis_queries;
+pub mod bzlmod_counters;
 pub mod cell;
 pub mod classpath;
 pub mod config;
@@ -87,6 +89,7 @@ pub enum AuditCommand {
     Output(AuditOutputCommand),
     Parse(AuditParseCommand),
     PackageValues(PackageValuesCommand),
+    BzlmodCounters(AuditBzlmodCountersCommand),
     #[clap(subcommand, hide = true)]
     Perf(AuditPerfCommand),
 }
@@ -105,6 +108,12 @@ pub trait AuditSubcommand: Send + Sync + 'static {
 }
 
 impl AuditCommand {
+    fn normalize_bazel_flag_positionals(&mut self) {
+        if let AuditCommand::Cell(cmd) = self {
+            cmd.normalize_bazel_flag_positionals();
+        }
+    }
+
     fn as_subcommand(&self) -> &dyn AuditSubcommand {
         match self {
             AuditCommand::Cell(cmd) => cmd,
@@ -125,6 +134,7 @@ impl AuditCommand {
             AuditCommand::Output(cmd) => cmd,
             AuditCommand::Parse(cmd) => cmd,
             AuditCommand::PackageValues(cmd) => cmd,
+            AuditCommand::BzlmodCounters(cmd) => cmd,
             AuditCommand::Perf(cmd) => cmd,
         }
     }
@@ -136,12 +146,13 @@ impl StreamingCommand for AuditCommand {
 
     /// Audit subcommands are all implemented as a generic request to the buckd server that will deserialize the command object.
     async fn exec_impl(
-        self,
+        mut self,
         buckd: &mut BuckdClientConnector,
         matches: BuckArgMatches<'_>,
         ctx: &mut ClientCommandContext<'_>,
         events_ctx: &mut EventsCtx,
     ) -> ExitResult {
+        self.normalize_bazel_flag_positionals();
         let serialized = serde_json::to_string(&self)?;
 
         let submatches = matches.unwrap_subcommand();

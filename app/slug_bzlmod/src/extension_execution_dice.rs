@@ -31,6 +31,7 @@
 //! This follows the `RepositoryRuleExecutionKey` pattern from `repository_execution.rs`.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -43,7 +44,13 @@ use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
 use fxhash::FxHashMap;
+use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
+use starlark_syntax::syntax::ast::AstStmt;
+use starlark_syntax::syntax::ast::StmtP;
 
+use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::record_bzlmod_event;
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
@@ -258,7 +265,8 @@ impl ModuleExtensionResult {
 ///
 /// Note: Hash and Eq are implemented manually because `AggregatedExtension` contains
 /// HashMap. The `input_hash` field is used for hashing, ensuring deterministic cache behavior.
-/// The `project_root` field is intentionally excluded from Hash/Eq as it's runtime configuration.
+/// `project_root` is included because it identifies the workspace whose lockfile,
+/// local `.bzl` loads, and generated repo namespace are being evaluated.
 #[derive(Clone, Debug, Display, Allocative)]
 #[display("ModuleExtensionKey({}, {})", extension_id, input_hash)]
 pub struct ModuleExtensionExecutionKey {
@@ -280,24 +288,26 @@ pub struct ModuleExtensionExecutionKey {
     /// If set, Bazel-authored lockfile caches may be read. Ordinary builds
     /// must not write `MODULE.bazel.lock`; it is a Bazel-owned compatibility
     /// surface, not a Slug-private extension cache.
-    /// Excluded from Hash/Eq as it's runtime configuration.
     pub project_root: Option<Arc<PathBuf>>,
 }
 
 impl std::hash::Hash for ModuleExtensionExecutionKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Hash the identifying fields; input_hash represents the aggregated data
-        // Note: project_root is intentionally not hashed - it's runtime configuration
         self.extension_id.hash(state);
         self.input_hash.hash(state);
+        self.root_module_name.hash(state);
+        self.project_root.hash(state);
     }
 }
 
 impl PartialEq for ModuleExtensionExecutionKey {
     fn eq(&self, other: &Self) -> bool {
         // Compare by identifying fields; input_hash represents the aggregated data
-        // Note: project_root is intentionally not compared - it's runtime configuration
-        self.extension_id == other.extension_id && self.input_hash == other.input_hash
+        self.extension_id == other.extension_id
+            && self.input_hash == other.input_hash
+            && self.root_module_name == other.root_module_name
+            && self.project_root == other.project_root
     }
 }
 
@@ -423,11 +433,16 @@ impl Key for ModuleExtensionExecutionKey {
             self.input_hash
         );
 
-        // Compute digests for lockfile cache validation
-        // Note: bzl_transitive_digest ideally hashes all .bzl files the extension depends on.
-        // For now, we use a simpler approach based on extension_id. This can be improved
-        // later when we have better access to the Starlark module dependency graph.
-        let bzl_transitive_digest = compute_bzl_transitive_digest(&self.extension_id);
+        // Compute digests for lockfile cache validation. For workspace-local
+        // extensions, include the extension .bzl file and literal transitive
+        // load() dependencies so edits reject stale replay.
+        let bzl_transitive_digest = self
+            .project_root
+            .as_deref()
+            .map(|project_root| {
+                compute_bzl_transitive_digest_for_project(&self.extension_id, project_root)
+            })
+            .unwrap_or_else(|| compute_bzl_transitive_digest(&self.extension_id));
         let usages_digest = self.input_hash.to_string();
         let mut prior_facts = serde_json::Value::Object(serde_json::Map::new());
 
@@ -459,11 +474,20 @@ impl Key for ModuleExtensionExecutionKey {
 
                     return Ok(Arc::new(result));
                 } else {
+                    record_bzlmod_event(
+                        BzlmodEventKind::ExtensionReplayMissReason,
+                        format!("{}:digest_or_entry_miss", self.extension_id),
+                    );
                     tracing::debug!(
                         "Extension '{}' cache MISS: digests don't match",
                         self.extension_id
                     );
                 }
+            } else {
+                record_bzlmod_event(
+                    BzlmodEventKind::ExtensionReplayMissReason,
+                    format!("{}:lockfile_absent_or_unreadable", self.extension_id),
+                );
             }
         }
 
@@ -483,6 +507,7 @@ impl Key for ModuleExtensionExecutionKey {
         );
 
         // 2. Create temporary working directory for module_ctx I/O
+        record_bzlmod_event(BzlmodEventKind::ExtensionEval, self.extension_id.as_ref());
         let temp_dir = create_temp_extension_dir(&self.extension_id)?;
 
         // 3-5. Execute extension via late binding to slug_interpreter_for_build
@@ -507,6 +532,10 @@ impl Key for ModuleExtensionExecutionKey {
             }
             Err(e) => {
                 // Late binding not initialized - fall back to logging only (testing mode)
+                record_bzlmod_event(
+                    BzlmodEventKind::StubFallbackAttempt,
+                    format!("extension_executor_uninitialized:{}", self.extension_id),
+                );
                 tracing::warn!(
                     "MODULE_EXTENSION_EXECUTOR_IMPL not initialized: {}. \
                      Extension execution will be a no-op.",
@@ -763,6 +792,152 @@ pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
         "sha256-{}",
         base64::engine::general_purpose::STANDARD.encode(hash)
     )
+}
+
+/// Compute a best-effort Bazel-shaped transitive digest for workspace-local
+/// extension `.bzl` files.
+///
+/// Bazel computes this from the loaded module graph. Slug does not yet expose
+/// that graph at this layer, so this function hashes files that can be resolved
+/// under `project_root` from literal `load()` statements. If the extension file
+/// cannot be resolved locally, it falls back to the old extension-id digest so
+/// external/registry cases keep their existing behavior until 61.6 owns the
+/// full Starlark load graph.
+pub fn compute_bzl_transitive_digest_for_project(
+    extension_id: &str,
+    project_root: &Path,
+) -> String {
+    let Some(root_bzl) = extension_bzl_path_under_project(extension_id, project_root) else {
+        return compute_bzl_transitive_digest(extension_id);
+    };
+    if !root_bzl.is_file() {
+        return compute_bzl_transitive_digest(extension_id);
+    }
+
+    let mut seen = std::collections::BTreeSet::new();
+    collect_bzl_transitive_files(project_root, &root_bzl, &mut seen);
+    if seen.is_empty() {
+        return compute_bzl_transitive_digest(extension_id);
+    }
+
+    use base64::Engine;
+    use sha2::Digest;
+    use sha2::Sha256;
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"bzl_transitive_v2:");
+    hasher.update(extension_id.as_bytes());
+    hasher.update([0]);
+    for path in seen {
+        let rel = path.strip_prefix(project_root).unwrap_or(path.as_path());
+        hasher.update(rel.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        match std::fs::read(&path) {
+            Ok(content) => hasher.update(content),
+            Err(e) => {
+                hasher.update(b"read_error:");
+                hasher.update(e.to_string().as_bytes());
+            }
+        }
+        hasher.update([0]);
+    }
+
+    let hash = hasher.finalize();
+    format!(
+        "sha256-{}",
+        base64::engine::general_purpose::STANDARD.encode(hash)
+    )
+}
+
+fn extension_bzl_path_under_project(extension_id: &str, project_root: &Path) -> Option<PathBuf> {
+    let label = extension_id.split('%').next().unwrap_or(extension_id);
+    label_bzl_path_under_project(label, project_root, None)
+}
+
+fn label_bzl_path_under_project(
+    label: &str,
+    project_root: &Path,
+    current_dir: Option<&Path>,
+) -> Option<PathBuf> {
+    let without_repo = if let Some(rest) = label.strip_prefix("@@") {
+        rest.split_once("//").map(|(_, target)| target)?
+    } else if let Some(rest) = label.strip_prefix('@') {
+        rest.split_once("//").map(|(_, target)| target)?
+    } else if let Some(rest) = label.strip_prefix("//") {
+        rest
+    } else if let Some(name) = label.strip_prefix(':') {
+        return current_dir.map(|dir| dir.join(name));
+    } else if label.contains("//") {
+        label.split_once("//").map(|(_, target)| target)?
+    } else {
+        return current_dir.map(|dir| dir.join(label));
+    };
+
+    let (pkg, name) = without_repo.split_once(':')?;
+    let mut path = project_root.to_path_buf();
+    if !pkg.is_empty() {
+        path.push(pkg);
+    }
+    path.push(name);
+    Some(path)
+}
+
+fn collect_bzl_transitive_files(
+    project_root: &Path,
+    path: &Path,
+    seen: &mut std::collections::BTreeSet<PathBuf>,
+) {
+    let path = path.to_path_buf();
+    if !seen.insert(path.clone()) {
+        return;
+    }
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    for load in literal_loads(&path, &content) {
+        let Some(load_path) = label_bzl_path_under_project(&load, project_root, path.parent())
+        else {
+            continue;
+        };
+        if load_path.starts_with(project_root) && load_path.is_file() {
+            collect_bzl_transitive_files(project_root, &load_path, seen);
+        }
+    }
+}
+
+fn literal_loads(path: &Path, content: &str) -> Vec<String> {
+    let filename = path.to_string_lossy().into_owned();
+    let Ok(ast) = AstModule::parse(&filename, content.to_owned(), &Dialect::Standard) else {
+        return Vec::new();
+    };
+    let mut loads = Vec::new();
+    collect_literal_loads_from_stmt(ast.statement(), &mut loads);
+    loads
+}
+
+fn collect_literal_loads_from_stmt(stmt: &AstStmt, loads: &mut Vec<String>) {
+    match &stmt.node {
+        StmtP::Statements(stmts) => {
+            for stmt in stmts {
+                collect_literal_loads_from_stmt(stmt, loads);
+            }
+        }
+        StmtP::Load(load) => loads.push(load.module.node.clone()),
+        StmtP::If(_, body) => collect_literal_loads_from_stmt(body, loads),
+        StmtP::IfElse(_, branches) => {
+            collect_literal_loads_from_stmt(&branches.0, loads);
+            collect_literal_loads_from_stmt(&branches.1, loads);
+        }
+        StmtP::For(for_stmt) => collect_literal_loads_from_stmt(&for_stmt.body, loads),
+        StmtP::Def(def) => collect_literal_loads_from_stmt(&def.body, loads),
+        StmtP::Break
+        | StmtP::Continue
+        | StmtP::Pass
+        | StmtP::Return(_)
+        | StmtP::Expression(_)
+        | StmtP::Assign(_)
+        | StmtP::AssignModify(_, _, _) => {}
+    }
 }
 
 #[cfg(test)]
@@ -1079,7 +1254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_project_root_not_in_hash_or_eq() {
+    fn test_project_root_is_in_hash_and_eq() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::Hash;
         use std::hash::Hasher;
@@ -1089,7 +1264,6 @@ mod tests {
         let aggregated1 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
         let aggregated2 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
 
-        // Create keys with different project_roots
         let key1 = ModuleExtensionExecutionKey::new_with_lockfile(
             aggregated1,
             "_main".to_owned(),
@@ -1101,15 +1275,13 @@ mod tests {
             PathBuf::from("/project2"),
         );
 
-        // Keys should be equal (project_root not in comparison)
-        assert_eq!(key1, key2);
+        assert_ne!(key1, key2);
 
-        // Hashes should be equal (project_root not in hash)
         let mut hasher1 = DefaultHasher::new();
         let mut hasher2 = DefaultHasher::new();
         key1.hash(&mut hasher1);
         key2.hash(&mut hasher2);
-        assert_eq!(hasher1.finish(), hasher2.finish());
+        assert_ne!(hasher1.finish(), hasher2.finish());
     }
 
     #[test]

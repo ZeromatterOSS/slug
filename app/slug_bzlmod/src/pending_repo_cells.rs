@@ -36,7 +36,6 @@
 //! in slug_common during cell resolver construction.
 
 use crate::extension_execution_dice::ModuleExtensionResult;
-use crate::extension_execution_dice::compute_bzl_transitive_digest;
 use crate::extension_execution_dice::extract_extension_name;
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
@@ -299,12 +298,13 @@ pub fn pre_compute_extension_repo_cells(
                     spec.attributes
                         .insert(k.clone(), tag_value_to_attr_value(v));
                 }
+                let spec_hash = spec.compute_hash();
                 let repo_spec_json = serde_json::to_string(&spec).unwrap_or_default();
                 cells.push(PendingRepoCell {
                     canonical_name: canonical.clone(),
                     extension_id: rule_source,
                     internal_name: invocation.name.clone(),
-                    spec_hash: String::new(),
+                    spec_hash,
                     repo_spec_json,
                     path,
                 });
@@ -424,7 +424,8 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             );
             continue;
         };
-        let bzl_transitive_digest = compute_bzl_transitive_digest(current_ext_id);
+        let bzl_transitive_digest =
+            crate::compute_bzl_transitive_digest_for_project(current_ext_id, project_root);
         let usages_digest = compute_extension_input_hash(current_extension);
         let Some(cached_specs) =
             lockfile.get_extension_cache(current_ext_id, &bzl_transitive_digest, &usages_digest)
@@ -996,6 +997,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
+    use crate::compute_bzl_transitive_digest;
     use crate::globals::RepoRuleInvocation;
     use crate::repo_spec::RepoSpec;
     use crate::repository_invocations::AttrValue;

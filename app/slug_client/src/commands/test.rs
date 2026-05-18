@@ -311,29 +311,6 @@ Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')"
     #[clap(long = "test-output", alias = "test_output", value_name = "MODE")]
     test_output: Option<String>,
 
-    /// Control test summary format (Bazel compatibility).
-    ///
-    /// Accepted for compatibility with Bazel's --test_summary flag.
-    #[clap(
-        long = "test-summary",
-        alias = "test_summary",
-        hide = true,
-        value_name = "FORMAT"
-    )]
-    test_summary: Option<String>,
-
-    /// Per-test timeout in seconds (Bazel compatibility).
-    ///
-    /// Accepted for compatibility with Bazel's --test_timeout flag.
-    /// Sets the maximum time each test is allowed to run.
-    #[clap(
-        long = "test-timeout",
-        alias = "test_timeout",
-        hide = true,
-        value_name = "SECONDS"
-    )]
-    test_timeout: Option<u32>,
-
     #[clap(flatten)]
     build_opts: CommonBuildOptions,
 

@@ -21,6 +21,7 @@ use slug_server_ctx::ctx::ServerCommandContextTrait;
 use slug_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 
 mod analysis_queries;
+mod bzlmod_counters;
 mod cell;
 mod classpath;
 mod common;
@@ -102,6 +103,7 @@ impl AuditCommandExt for AuditCommand {
             AuditCommand::Output(cmd) => cmd,
             AuditCommand::Parse(cmd) => cmd,
             AuditCommand::PackageValues(cmd) => cmd,
+            AuditCommand::BzlmodCounters(cmd) => cmd,
             AuditCommand::Perf(cmd) => cmd,
         }
     }

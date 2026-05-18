@@ -13,10 +13,12 @@ use std::time::SystemTime;
 
 use dupe::Dupe;
 use slug_cli_proto::ClientContext;
+use slug_cli_proto::ConfigOverride;
 use slug_cli_proto::client_context::ExitWhen as GrpcExitWhen;
 use slug_cli_proto::client_context::HostArchOverride as GrpcHostArchOverride;
 use slug_cli_proto::client_context::HostPlatformOverride as GrpcHostPlatformOverride;
 use slug_cli_proto::client_context::PreemptibleWhen as GrpcPreemptibleWhen;
+use slug_cli_proto::config_override::ConfigType;
 use slug_common::argv::Argv;
 use slug_common::init::LogDownloadMethod;
 use slug_common::invocation_paths::InvocationPaths;
@@ -184,13 +186,18 @@ impl<'a> ClientCommandContext<'a> {
         // TODO(cjhopman): Support non unicode paths?
         let config_opts = cmd.build_config_opts();
         let starlark_opts = cmd.starlark_opts();
+        let mut config_overrides =
+            config_opts.config_overrides(arg_matches, &self.immediate_config, &self.working_dir)?;
+        if let Some(mode) = self.bazel_lockfile_mode_arg() {
+            config_overrides.push(ConfigOverride {
+                cell: None,
+                config_override: format!("bzlmod.lockfile_mode={mode}"),
+                config_type: ConfigType::Value as i32,
+            });
+        }
 
         Ok(ClientContext {
-            config_overrides: config_opts.config_overrides(
-                arg_matches,
-                &self.immediate_config,
-                &self.working_dir,
-            )?,
+            config_overrides,
             host_platform: match config_opts.host_platform_override() {
                 HostPlatformOverride::Default => GrpcHostPlatformOverride::DefaultPlatform,
                 HostPlatformOverride::Linux => GrpcHostPlatformOverride::Linux,
@@ -261,6 +268,11 @@ impl<'a> ClientCommandContext<'a> {
         })
     }
 
+    fn bazel_lockfile_mode_arg(&self) -> Option<String> {
+        parse_lockfile_mode_args(self.argv.expanded_argv.args())
+            .or_else(|| parse_lockfile_mode_args(self.argv.argv.iter().map(String::as_str)))
+    }
+
     /// A client context for commands where CommonConfigOptions are not provided.
     pub fn empty_client_context(&self, command_name: &str) -> slug_error::Result<ClientContext> {
         #[derive(Debug, slug_error::Error)]
@@ -325,6 +337,26 @@ impl<'a> ClientCommandContext<'a> {
             .log_download_method
             .clone())
     }
+}
+
+fn parse_lockfile_mode_args<'a>(args: impl Iterator<Item = &'a str>) -> Option<String> {
+    let mut mode = None;
+    let mut args = args;
+    while let Some(arg) = args.next() {
+        if let Some(value) = arg
+            .strip_prefix("--lockfile_mode=")
+            .or_else(|| arg.strip_prefix("--lockfile-mode="))
+        {
+            mode = Some(value.to_owned());
+            continue;
+        }
+        if arg == "--lockfile_mode" || arg == "--lockfile-mode" {
+            if let Some(value) = args.next() {
+                mode = Some(value.to_owned());
+            }
+        }
+    }
+    mode
 }
 
 /// Provides a common interface for buck subcommands that use event subscribers for logging.

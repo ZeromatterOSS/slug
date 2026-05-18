@@ -15,11 +15,13 @@ use std::sync::Arc;
 use allocative::Allocative;
 use dice::DiceComputations;
 use dupe::Dupe;
+use slug_bzlmod::BzlmodEventKind;
 use slug_bzlmod::ModuleCache;
 use slug_bzlmod::ModuleSource;
 use slug_bzlmod::MvsResolver;
 use slug_bzlmod::ResolvedGraph;
 use slug_bzlmod::parse_module_bazel;
+use slug_bzlmod::record_bzlmod_event;
 use slug_bzlmod::resolve_local_modules;
 use slug_bzlmod::types::ParsedModuleFile;
 use slug_bzlmod::types::TagValue;
@@ -250,7 +252,9 @@ impl BuckConfigBasedCells {
         // .buckconfig [cells], [cell_aliases], and [external_cells] sections are skipped.
         let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
         if let Some(project_fs) = project_fs {
-            if let Some(bzlmod_result) = Self::resolve_bzlmod_dependencies(project_fs).await? {
+            if let Some(bzlmod_result) =
+                Self::resolve_bzlmod_dependencies(project_fs, &root_config).await?
+            {
                 has_module_bazel = true;
 
                 // Root cell comes from MODULE.bazel module(name = "...")
@@ -454,6 +458,7 @@ impl BuckConfigBasedCells {
     /// Returns cells to register and aliases from repo_name parameters.
     async fn resolve_bzlmod_dependencies(
         project_root: &ProjectRoot,
+        root_config: &LegacyBuckConfig,
     ) -> slug_error::Result<Option<BzlmodResolutionResult>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
@@ -464,6 +469,10 @@ impl BuckConfigBasedCells {
         }
 
         tracing::info!("Found MODULE.bazel, resolving bzlmod dependencies");
+        record_bzlmod_event(
+            BzlmodEventKind::BzlmodResolutionCompute,
+            module_bazel_path.display().to_string(),
+        );
 
         // Parse MODULE.bazel
         let parsed = match parse_module_bazel(module_bazel_path.as_path()) {
@@ -478,6 +487,21 @@ impl BuckConfigBasedCells {
         let mut aliases = Vec::new();
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
+        let lockfile_mode = match root_config
+            .get_section("bzlmod")
+            .and_then(|section| section.get("lockfile_mode"))
+        {
+            Some(value) => {
+                slug_bzlmod::LockfileMode::from_str(value.as_str()).ok_or_else(|| {
+                    slug_error::slug_error!(
+                        slug_error::ErrorTag::Input,
+                        "Invalid --lockfile_mode value `{}` for bzlmod",
+                        value.as_str()
+                    )
+                })?
+            }
+            None => slug_bzlmod::LockfileMode::default(),
+        };
 
         // Resolve local path overrides first
         let local_modules = resolve_local_modules(&parsed.module.overrides, workspace_root)?;
@@ -893,7 +917,9 @@ impl BuckConfigBasedCells {
         // because the only path that registers spokes (`get_file_ops_delegate`'s
         // post-extension-eval loop) is gated on the hub's `.slug_repo_complete`
         // marker.
-        if let Some(lockfile) = slug_bzlmod::cached_lockfile(project_root.root().as_path()) {
+        if let Some(lockfile) =
+            slug_bzlmod::cached_lockfile_with_mode(project_root.root().as_path(), lockfile_mode)?
+        {
             let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                 &lockfile,
                 &aggregated,
@@ -919,6 +945,36 @@ impl BuckConfigBasedCells {
                 }
             }
             pre_computed_cells.extend(extra);
+        }
+        let hidden_lockfile_path = root_config
+            .get_section("bzlmod")
+            .and_then(|section| section.get("hidden_lockfile_path"))
+            .map(|value| std::path::PathBuf::from(value.as_str()));
+        if let Some(hidden_lockfile_path) = hidden_lockfile_path {
+            if let Some(lockfile) =
+                slug_bzlmod::cached_lockfile_path_with_mode(&hidden_lockfile_path, lockfile_mode)?
+            {
+                let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
+                    &lockfile,
+                    &aggregated,
+                    root_module_name,
+                    &mut pre_computed_cells,
+                    project_root.root().as_path(),
+                );
+                for cell in &extra {
+                    slug_core::cells::register_dynamic_extension_cell(
+                        cell.canonical_name.clone(),
+                        cell.path.clone(),
+                    );
+                    if cell.internal_name != cell.canonical_name {
+                        slug_core::cells::register_dynamic_extension_cell(
+                            cell.internal_name.clone(),
+                            cell.path.clone(),
+                        );
+                    }
+                }
+                pre_computed_cells.extend(extra);
+            }
         }
         slug_util::memory_checkpoint::checkpoint(
             "legacy_cells_bzlmod_precomputed_repos",
@@ -1222,6 +1278,7 @@ impl BuckConfigBasedCells {
                                 .attributes
                                 .insert(k.clone(), tag_value_to_attr_value(v));
                         }
+                        let spec_hash = repo_spec.compute_hash();
                         let repo_spec_json = serde_json::to_string(&repo_spec).unwrap_or_default();
 
                         if let Ok(cell_name) = CellName::unchecked_new(&cell_name_str) {
@@ -1232,7 +1289,7 @@ impl BuckConfigBasedCells {
                                     canonical_name: Arc::from(cell_name_str.as_str()),
                                     extension_id: Arc::from(extension_id.as_str()),
                                     internal_name: Arc::from(cell_name_str.as_str()),
-                                    spec_hash: Arc::from(""),
+                                    spec_hash: Arc::from(spec_hash.as_str()),
                                     repo_spec_json: Arc::from(repo_spec_json.as_str()),
                                     materialized: false,
                                 };

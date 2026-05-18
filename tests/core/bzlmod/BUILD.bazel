@@ -31,3 +31,9 @@ buck2_e2e_test(
     srcs = ["test_multi_module_project.py"],
     data_dir = "test_multi_module_project_data",
 )
+
+buck2_e2e_test(
+    name = "test_plan61_guardrails",
+    srcs = ["test_plan61_guardrails.py"],
+    data_dir = "test_plan61_guardrails_data",
+)

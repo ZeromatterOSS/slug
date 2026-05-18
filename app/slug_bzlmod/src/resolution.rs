@@ -128,7 +128,7 @@ pub enum MvsResolutionError {
 // ============================================================================
 
 /// A unique key identifying a module in the dependency graph.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Allocative)]
 pub struct ModuleKey {
     /// The module name.
     pub name: String,
@@ -209,7 +209,7 @@ pub struct DiscoveredModule {
 }
 
 /// Source of a resolved module.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Allocative)]
 pub enum ModuleSource {
     /// Module from a registry.
     Registry { url: String },

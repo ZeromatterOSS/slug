@@ -1,5 +1,6 @@
 module(
     name = "gh_facebook_slug",
+    repo_name = "fbcode",
     version = "0.1.0",
 )
 
@@ -10,4 +11,21 @@ bazel_dep(name = "gh_facebook_slug_shims_meta")
 local_path_override(
     module_name = "gh_facebook_slug_shims_meta",
     path = "shim",
+)
+
+# Additional historical Meta-internal repository names used by shared test and
+# OSS shim macros. `new_local_repository` is used instead of `local_repository`
+# because Bazel 9 requires a repository marker file for `local_repository`
+# targets, while the checked-in shim tree is only a Starlark compatibility
+# overlay.
+shim_repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+shim_repo(
+    name = "fbcode_macros",
+    path = "shim",
+    build_file_content = "# Starlark shim repository root\n",
+)
+shim_repo(
+    name = "fbsource",
+    path = "shim",
+    build_file_content = "# Starlark shim repository root\n",
 )

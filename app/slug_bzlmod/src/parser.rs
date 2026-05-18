@@ -14,6 +14,7 @@
 //! the Starlark interpreter.
 
 use std::path::Path;
+use std::path::PathBuf;
 
 use slug_error::BuckErrorContext;
 use starlark::environment::Globals;
@@ -24,6 +25,9 @@ use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 use starlark::syntax::DialectTypes;
 
+use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::record_bzlmod_event;
+use crate::globals::ModuleFileContext;
 use crate::globals::new_module_file_context;
 use crate::globals::register_module_file_globals;
 use crate::types::Module as BzlModule;
@@ -41,6 +45,9 @@ pub enum ModuleParseError {
 
     #[error("Failed to evaluate MODULE.bazel: {0}")]
     EvalError(String),
+
+    #[error("Failed to include MODULE.bazel segment: {0}")]
+    IncludeError(String),
 }
 
 /// The Starlark dialect for MODULE.bazel files.
@@ -98,6 +105,26 @@ pub fn parse_module_bazel_content(
     content: &str,
     filename: &str,
 ) -> slug_error::Result<ParsedModuleFile> {
+    let context = new_module_file_context();
+    eval_module_bazel_content_into_context(content, filename, &context)?;
+
+    if !context.borrow().include_labels.is_empty() {
+        return Err(ModuleParseError::IncludeError(
+            "include() requires parsing from a filesystem MODULE.bazel path".to_owned(),
+        )
+        .into());
+    }
+
+    parsed_module_file_from_context(&context)
+}
+
+fn eval_module_bazel_content_into_context(
+    content: &str,
+    filename: &str,
+    context: &std::cell::RefCell<ModuleFileContext>,
+) -> slug_error::Result<()> {
+    record_bzlmod_event(BzlmodEventKind::ModuleFileParse, filename);
+
     // Parse the Starlark code
     let ast = AstModule::parse(filename, content.to_owned(), &module_bazel_dialect())
         .map_err(|e| ModuleParseError::ParseError(e.to_string()))?;
@@ -105,16 +132,21 @@ pub fn parse_module_bazel_content(
     // Create evaluation environment
     let module = Module::new();
     let globals = module_bazel_globals();
-    let context = new_module_file_context();
 
     // Set up evaluator with context
     let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
+    eval.extra = Some(context);
 
     // Evaluate the module
     eval.eval_module(ast, &globals)
         .map_err(|e| ModuleParseError::EvalError(e.to_string()))?;
 
+    Ok(())
+}
+
+fn parsed_module_file_from_context(
+    context: &std::cell::RefCell<ModuleFileContext>,
+) -> slug_error::Result<ParsedModuleFile> {
     // Extract results from context
     let ctx = context.borrow();
 
@@ -158,13 +190,95 @@ pub fn parse_module_bazel_content(
 pub fn parse_module_bazel(path: &Path) -> slug_error::Result<ParsedModuleFile> {
     let content = std::fs::read_to_string(path)
         .buck_error_context(format!("Failed to read MODULE.bazel at {:?}", path))?;
+    let context = new_module_file_context();
 
     let filename = path
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("MODULE.bazel");
 
-    parse_module_bazel_content(&content, filename)
+    let mut include_stack = Vec::new();
+    eval_module_bazel_file_with_includes(
+        path.parent().unwrap_or_else(|| Path::new("")),
+        &content,
+        filename,
+        &context,
+        &mut include_stack,
+    )?;
+
+    parsed_module_file_from_context(&context)
+}
+
+fn eval_module_bazel_file_with_includes(
+    module_root: &Path,
+    content: &str,
+    filename: &str,
+    context: &std::cell::RefCell<ModuleFileContext>,
+    include_stack: &mut Vec<PathBuf>,
+) -> slug_error::Result<()> {
+    let include_start = context.borrow().include_labels.len();
+    eval_module_bazel_content_into_context(content, filename, context)?;
+    let include_labels = {
+        let mut ctx = context.borrow_mut();
+        ctx.include_labels.split_off(include_start)
+    };
+
+    for label in include_labels {
+        let include_path = include_label_to_path(module_root, &label)?;
+        let canonical = include_path
+            .canonicalize()
+            .unwrap_or_else(|_| include_path.clone());
+        if include_stack.contains(&canonical) {
+            return Err(
+                ModuleParseError::IncludeError(format!("cyclic include of {}", label)).into(),
+            );
+        }
+        include_stack.push(canonical);
+        let include_content =
+            std::fs::read_to_string(&include_path).buck_error_context(format!(
+                "Failed to read included MODULE.bazel segment at {:?}",
+                include_path
+            ))?;
+        eval_module_bazel_file_with_includes(
+            module_root,
+            &include_content,
+            include_path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("MODULE.bazel"),
+            context,
+            include_stack,
+        )?;
+        include_stack.pop();
+    }
+
+    Ok(())
+}
+
+fn include_label_to_path(module_root: &Path, label: &str) -> slug_error::Result<PathBuf> {
+    if !label.starts_with("//") {
+        return Err(ModuleParseError::IncludeError(format!(
+            "bad include label '{}': include() must be called with repo-relative labels",
+            label
+        ))
+        .into());
+    }
+    let without_repo = &label[2..];
+    let (package, name) = without_repo.split_once(':').ok_or_else(|| {
+        ModuleParseError::IncludeError(format!(
+            "bad include label '{}': missing target name",
+            label
+        ))
+    })?;
+    let basename = name.rsplit('/').next().unwrap_or(name);
+    if !basename.ends_with(".MODULE.bazel") || basename.starts_with('.') {
+        return Err(ModuleParseError::IncludeError(format!(
+            "bad include label '{}': included file must end with .MODULE.bazel and not start with '.'",
+            label
+        ))
+        .into());
+    }
+    Ok(module_root.join(package).join(name))
 }
 
 #[cfg(test)]
@@ -185,6 +299,66 @@ module(
         assert_eq!(parsed.module.name, "my_project");
         assert_eq!(parsed.module.version.as_str(), "1.0.0");
         assert_eq!(parsed.module.compatibility_level, 0);
+    }
+
+    #[test]
+    fn test_parse_module_bazel_expands_root_include() {
+        let dir = tempfile::tempdir().unwrap();
+        let root_module = dir.path().join("MODULE.bazel");
+        let included = dir.path().join("deps.MODULE.bazel");
+
+        std::fs::write(
+            &root_module,
+            r#"
+module(name = "root")
+include("//:deps.MODULE.bazel")
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            &included,
+            r#"
+bazel_dep(name = "local_dep")
+local_path_override(
+    module_name = "local_dep",
+    path = "local_dep",
+)
+"#,
+        )
+        .unwrap();
+
+        let parsed = parse_module_bazel(&root_module).unwrap();
+        assert_eq!(parsed.module.name, "root");
+        assert_eq!(parsed.module.bazel_deps.len(), 1);
+        assert_eq!(parsed.module.bazel_deps[0].name, "local_dep");
+        assert_eq!(parsed.module.overrides.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_module_bazel_include_variables_do_not_leak() {
+        let dir = tempfile::tempdir().unwrap();
+        let root_module = dir.path().join("MODULE.bazel");
+        let included = dir.path().join("ext.MODULE.bazel");
+
+        std::fs::write(
+            &root_module,
+            r#"
+module(name = "root")
+include("//:ext.MODULE.bazel")
+use_repo(ext, "generated_repo")
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            &included,
+            r#"
+ext = use_extension("//:defs.bzl", "ext")
+"#,
+        )
+        .unwrap();
+
+        let err = parse_module_bazel(&root_module).unwrap_err().to_string();
+        assert!(err.contains("ext"), "{err}");
     }
 
     #[test]

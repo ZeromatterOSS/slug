@@ -1293,6 +1293,16 @@ impl CommonBuildConfigurationOptions {
             });
         }
 
+        if let Some(mode) = self.lockfile_mode.as_deref() {
+            if !mode.is_empty() {
+                result.push(ConfigOverride {
+                    cell: None,
+                    config_override: format!("bzlmod.lockfile_mode={mode}"),
+                    config_type: ConfigType::Value as i32,
+                });
+            }
+        }
+
         // `--remote_header=KEY=VALUE` (and the cache/exec-specific
         // variants) all flow into the RE client's `http_headers`.
         // Bazel uses `KEY=VALUE`; slug's `HttpHeader::from_str`

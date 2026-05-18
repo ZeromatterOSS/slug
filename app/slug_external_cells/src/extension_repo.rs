@@ -124,13 +124,6 @@ fn repo_names_summary<'a>(repo_names: impl Iterator<Item = &'a str>) -> String {
     }
 }
 
-fn stub_marker(repo_spec_json: Option<&str>) -> String {
-    match repo_spec_json.filter(|s| !s.is_empty()) {
-        Some(json) => format!("stub:{}", blake3::hash(json.as_bytes()).to_hex()),
-        None => "stub".to_owned(),
-    }
-}
-
 fn is_stub_marker(marker: &str) -> bool {
     let marker = marker.trim();
     marker == "stub" || marker.starts_with("stub:")
@@ -618,7 +611,7 @@ pub(crate) async fn get_file_ops_delegate(
     // can leave directories without the completion marker.
     //
     // Marker content distinguishes "complete" (real materialization) from
-    // "stub" (placeholder written by `materialize_stub_repo` when the
+    // "stub" (legacy placeholder written by older Slug builds when the
     // extension previously failed). When we now have a valid `repo_spec_json`
     // — typically because the lockfile pre-seed populated it — a stub from a
     // prior failed run can be discarded and re-materialized cleanly.
@@ -731,28 +724,24 @@ pub(crate) async fn get_file_ops_delegate(
                             );
                         }
                         Ok(Err(e)) => {
-                            tracing::warn!(
-                                "use_repo_rule execution failed for '{}': {}. Creating stub.",
-                                setup.canonical_name,
-                                diagnostic_summary(&e)
-                            );
-                            materialize_stub_repo(
-                                &project_root_path,
-                                &setup.canonical_name,
-                                Some(&setup.repo_spec_json),
-                            )?;
+                            return Err(ExtensionRepoError::MaterializationFailed {
+                                canonical_name: setup.canonical_name.to_string(),
+                                reason: format!(
+                                    "use_repo_rule execution failed: {}",
+                                    diagnostic_summary(&e)
+                                ),
+                            }
+                            .into());
                         }
                         Err(e) => {
-                            tracing::warn!(
-                                "DICE error for use_repo_rule '{}': {}. Creating stub.",
-                                setup.canonical_name,
-                                diagnostic_summary(&e)
-                            );
-                            materialize_stub_repo(
-                                &project_root_path,
-                                &setup.canonical_name,
-                                Some(&setup.repo_spec_json),
-                            )?;
+                            return Err(ExtensionRepoError::MaterializationFailed {
+                                canonical_name: setup.canonical_name.to_string(),
+                                reason: format!(
+                                    "DICE error during use_repo_rule execution: {}",
+                                    diagnostic_summary(&e)
+                                ),
+                            }
+                            .into());
                         }
                     }
                     // Skip the extension execution path below
@@ -776,45 +765,26 @@ pub(crate) async fn get_file_ops_delegate(
             let ext_result = match ctx.compute(&ext_key).await {
                 Ok(Ok(result)) => result,
                 Ok(Err(e)) => {
-                    tracing::warn!(
-                        "Extension '{}' execution failed for repo '{}': {}. Creating stub.",
-                        setup.extension_id,
-                        setup.canonical_name,
-                        diagnostic_summary(&e)
-                    );
-                    // Create stub repo so loading can continue
-                    materialize_stub_repo(
-                        &project_root_path,
-                        &setup.canonical_name,
-                        Some(&setup.repo_spec_json),
-                    )?;
-                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
-                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
-                        cell_name,
-                        setup.canonical_name.to_string(),
-                        source_path.clone(),
-                        digest_config,
-                    )));
+                    return Err(ExtensionRepoError::MaterializationFailed {
+                        canonical_name: setup.canonical_name.to_string(),
+                        reason: format!(
+                            "Extension '{}' execution failed: {}",
+                            setup.extension_id,
+                            diagnostic_summary(&e)
+                        ),
+                    }
+                    .into());
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Extension '{}' DICE error for repo '{}': {}. Creating stub.",
-                        setup.extension_id,
-                        setup.canonical_name,
-                        diagnostic_summary(&e)
-                    );
-                    materialize_stub_repo(
-                        &project_root_path,
-                        &setup.canonical_name,
-                        Some(&setup.repo_spec_json),
-                    )?;
-                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
-                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
-                        cell_name,
-                        setup.canonical_name.to_string(),
-                        source_path.clone(),
-                        digest_config,
-                    )));
+                    return Err(ExtensionRepoError::MaterializationFailed {
+                        canonical_name: setup.canonical_name.to_string(),
+                        reason: format!(
+                            "Extension '{}' DICE error: {}",
+                            setup.extension_id,
+                            diagnostic_summary(&e)
+                        ),
+                    }
+                    .into());
                 }
             };
 
@@ -826,29 +796,16 @@ pub(crate) async fn get_file_ops_delegate(
             match ext_result.get_repo_spec(&setup.internal_name).cloned() {
                 Some(spec) => spec,
                 None => {
-                    // Extension didn't generate this repo. This commonly happens when an
-                    // optional extension (e.g., telemetry) fails gracefully. Create a
-                    // minimal stub repo so that load() calls don't crash.
-                    tracing::warn!(
-                        "Extension '{}' did not generate repo '{}' (available: {:?}). \
-                         Creating stub repo.",
-                        setup.extension_id,
-                        setup.internal_name,
-                        repo_names_summary(ext_result.repo_names())
-                    );
-                    materialize_stub_repo(
-                        &project_root_path,
-                        &setup.canonical_name,
-                        Some(&setup.repo_spec_json),
-                    )?;
-                    // The stub repo is now on disk; create file ops delegate from it
-                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
-                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
-                        cell_name,
-                        setup.canonical_name.to_string(),
-                        source_path.clone(),
-                        digest_config,
-                    )));
+                    return Err(ExtensionRepoError::MaterializationFailed {
+                        canonical_name: setup.canonical_name.to_string(),
+                        reason: format!(
+                            "Extension '{}' did not generate repo '{}' (available: {})",
+                            setup.extension_id,
+                            setup.internal_name,
+                            repo_names_summary(ext_result.repo_names())
+                        ),
+                    }
+                    .into());
                 }
             }
         };
@@ -881,28 +838,21 @@ pub(crate) async fn get_file_ops_delegate(
                 );
             }
             Ok(Err(e)) => {
-                tracing::warn!(
-                    "Repo rule execution failed for '{}': {}. Creating stub.",
-                    setup.canonical_name,
-                    diagnostic_summary(&e)
-                );
-                materialize_stub_repo(
-                    &project_root_path,
-                    &setup.canonical_name,
-                    Some(&setup.repo_spec_json),
-                )?;
+                return Err(ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!("Repo rule execution failed: {}", diagnostic_summary(&e)),
+                }
+                .into());
             }
             Err(e) => {
-                tracing::warn!(
-                    "DICE computation failed for '{}': {}. Creating stub.",
-                    setup.canonical_name,
-                    diagnostic_summary(&e)
-                );
-                materialize_stub_repo(
-                    &project_root_path,
-                    &setup.canonical_name,
-                    Some(&setup.repo_spec_json),
-                )?;
+                return Err(ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!(
+                        "DICE computation failed during repo rule execution: {}",
+                        diagnostic_summary(&e)
+                    ),
+                }
+                .into());
             }
         }
     }
@@ -1042,122 +992,6 @@ pub(crate) async fn copy_to_destination(
 
     // Copy recursively using the same helper as repository_rule
     crate::repository_rule::copy_to_destination_impl(&source_path, dest_path).await
-}
-
-/// Create a minimal stub repo for an extension that failed to generate a repo.
-///
-/// This creates a directory with a BUILD.bazel and WORKSPACE.bazel so that
-/// load() calls referencing this repo will find valid (empty) files rather
-/// than causing "cell not found" errors.
-fn materialize_stub_repo(
-    project_root: &std::path::Path,
-    canonical_name: &str,
-    repo_spec_json: Option<&str>,
-) -> slug_error::Result<()> {
-    let dest = project_root.join("bazel-external").join(canonical_name);
-    if !dest.exists() {
-        std::fs::create_dir_all(&dest).map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to create stub repo dir for '{}': {}",
-                canonical_name,
-                e
-            )
-        })?;
-    }
-
-    // Write a minimal BUILD.bazel
-    let build_path = dest.join("BUILD.bazel");
-    if !build_path.exists() {
-        std::fs::write(
-            &build_path,
-            "# Stub repo (extension did not generate this repo)\n",
-        )
-        .map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to write stub BUILD.bazel for '{}': {}",
-                canonical_name,
-                e
-            )
-        })?;
-    }
-
-    // Write WORKSPACE.bazel
-    let ws_path = dest.join("WORKSPACE.bazel");
-    if !ws_path.exists() {
-        std::fs::write(&ws_path, "").map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to write stub WORKSPACE.bazel for '{}': {}",
-                canonical_name,
-                e
-            )
-        })?;
-    }
-
-    // Write defs.bzl with empty TELEMETRY value (common pattern for telemetry repos)
-    let defs_path = dest.join("defs.bzl");
-    if !defs_path.exists() {
-        std::fs::write(
-            &defs_path,
-            "# Stub defs.bzl (extension did not generate this repo)\nTELEMETRY = struct(enabled = False)\n",
-        )
-        .map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to write stub defs.bzl for '{}': {}",
-                canonical_name,
-                e
-            )
-        })?;
-    }
-
-    // rules_python's pythons_hub extension generates a versions.bzl listing
-    // the registered Python toolchains. Without slug actually executing the
-    // extension, stub the file with a non-empty MINOR_MAPPING /
-    // PYTHON_VERSIONS so `rules_python//python/config_settings/BUILD.bazel`
-    // (called unconditionally by several rules_python targets) doesn't
-    // crash in `construct_config_settings()` when iterating the mapping
-    // to emit compat config_setting aliases. Values chosen to cover the
-    // range of Python 3 minor versions rules_python currently references.
-    let versions_path = dest.join("versions.bzl");
-    if !versions_path.exists() {
-        std::fs::write(
-            &versions_path,
-            "# Stub versions.bzl (extension did not generate this repo)\n\
-             DEFAULT_PYTHON_VERSION = \"3.11\"\n\
-             MINOR_MAPPING = {\n\
-                 \"3.8\": \"3.8.20\",\n\
-                 \"3.9\": \"3.9.21\",\n\
-                 \"3.10\": \"3.10.16\",\n\
-                 \"3.11\": \"3.11.11\",\n\
-                 \"3.12\": \"3.12.9\",\n\
-                 \"3.13\": \"3.13.2\",\n\
-             }\n\
-             PYTHON_VERSIONS = [\n\
-                 \"3.8.20\", \"3.9.21\", \"3.10.16\", \"3.11.11\", \"3.12.9\", \"3.13.2\",\n\
-             ]\n",
-        )
-        .map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to write stub versions.bzl for '{}': {}",
-                canonical_name,
-                e
-            )
-        })?;
-    }
-
-    // Mark as a stub. For a failed repo rule with a known RepoSpec, include
-    // the spec hash for diagnostics; callers with a valid RepoSpec will
-    // discard this placeholder and retry real materialization.
-    let marker = dest.join(".slug_repo_complete");
-    let _ = std::fs::write(&marker, stub_marker(repo_spec_json));
-
-    tracing::info!("Created stub repo for '{}' at {:?}", canonical_name, dest);
-
-    Ok(())
 }
 
 #[cfg(test)]

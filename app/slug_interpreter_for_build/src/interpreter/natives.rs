@@ -499,6 +499,13 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// Records the owning oncall for targets in this BUILD file.
+    fn oncall(name: &str, eval: &mut Evaluator) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "oncall")?;
+        internals.set_oncall(name)?;
+        Ok(NoneType)
+    }
+
     // Note: toolchain() is implemented in native_rules.rs as a proper native rule
     // Note: alias() is implemented in native_rules.rs as a proper native rule
 

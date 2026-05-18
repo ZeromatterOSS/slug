@@ -1,0 +1,10 @@
+module(name = "shared_plan61_workspace")
+
+bazel_dep(name = "first_only_lib")
+local_path_override(
+    module_name = "first_only_lib",
+    path = "libs/first_only_lib",
+)
+
+shared = use_extension("//:shared_ext.bzl", "shared_ext")
+use_repo(shared, "shared_generated")

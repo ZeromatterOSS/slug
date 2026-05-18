@@ -34,6 +34,8 @@ use sha2::Sha256;
 use tar::Archive;
 use zip::ZipArchive;
 
+use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::record_bzlmod_event;
 use crate::repository_execution::InvocationAttrs;
 use crate::repository_execution::RepositoryExecutionError;
 use crate::repository_execution::RepositoryRuleResult;
@@ -58,12 +60,20 @@ pub fn execute_repository_rule(
 
     // Check if already materialized
     if is_repo_complete(&working_dir) {
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationHit,
+            invocation.name.as_str(),
+        );
         tracing::debug!("Repository '{}' already materialized", invocation.name);
         return Ok(RepositoryRuleResult::success(
             invocation.name.clone(),
             working_dir,
         ));
     }
+    record_bzlmod_event(
+        BzlmodEventKind::RepoMaterializationMissReason,
+        format!("{}:marker_absent", invocation.name),
+    );
 
     // Clean and create working directory
     prepare_working_dir(&working_dir)?;
@@ -77,14 +87,10 @@ pub fn execute_repository_rule(
         "local_repository" | "new_local_repository" => {
             execute_local_repository(invocation, &attrs, &working_dir)
         }
-        rule_name => {
-            // For unknown rules, create a minimal stub
-            tracing::warn!(
-                "Unknown repository rule '{}', creating stub repository",
-                rule_name
-            );
-            create_stub_repository(invocation, &working_dir)
+        rule_name => Err(RepositoryExecutionError::NoImplementation {
+            name: rule_name.to_owned(),
         }
+        .into()),
     };
 
     match result {
@@ -1424,37 +1430,6 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> slug_error::Result<()> {
             std::fs::copy(&path, &dest_path).ok();
         }
     }
-
-    Ok(())
-}
-
-/// Create a stub repository for unknown rules.
-fn create_stub_repository(
-    invocation: &RepositoryInvocation,
-    working_dir: &Path,
-) -> slug_error::Result<()> {
-    // Create a minimal BUILD file
-    std::fs::write(
-        working_dir.join("BUILD.bazel"),
-        format!(
-            "# Stub repository for '{}'\n# Rule '{}' not yet implemented\n",
-            invocation.name, invocation.rule_name
-        ),
-    )
-    .map_err(|e| RepositoryExecutionError::ExecutionFailed {
-        name: invocation.name.clone(),
-        reason: format!("Failed to write BUILD.bazel: {}", e),
-    })?;
-
-    // Create WORKSPACE
-    std::fs::write(
-        working_dir.join("WORKSPACE.bazel"),
-        format!("workspace(name = \"{}\")\n", invocation.name),
-    )
-    .map_err(|e| RepositoryExecutionError::ExecutionFailed {
-        name: invocation.name.clone(),
-        reason: format!("Failed to write WORKSPACE.bazel: {}", e),
-    })?;
 
     Ok(())
 }

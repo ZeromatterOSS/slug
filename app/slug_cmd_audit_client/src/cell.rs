@@ -37,7 +37,8 @@ pub struct AuditCellCommand {
 
     #[clap(
         name = "CELL_ALIASES",
-        help = "Cell aliases to query. These aliases will be resolved in the working directory cell."
+        help = "Cell aliases to query. These aliases will be resolved in the working directory cell.",
+        allow_hyphen_values = true
     )]
     pub aliases_to_resolve: Vec<String>,
 
@@ -47,6 +48,25 @@ pub struct AuditCellCommand {
 
     #[clap(flatten)]
     common_opts: CommonCommandOptions,
+}
+
+impl AuditCellCommand {
+    pub fn normalize_bazel_flag_positionals(&mut self) {
+        let mut aliases = Vec::with_capacity(self.aliases_to_resolve.len());
+        for arg in std::mem::take(&mut self.aliases_to_resolve) {
+            if let Some(mode) = arg
+                .strip_prefix("--lockfile_mode=")
+                .or_else(|| arg.strip_prefix("--lockfile-mode="))
+            {
+                if self.common_opts.config_opts.lockfile_mode.is_none() {
+                    self.common_opts.config_opts.lockfile_mode = Some(mode.to_owned());
+                }
+            } else {
+                aliases.push(arg);
+            }
+        }
+        self.aliases_to_resolve = aliases;
+    }
 }
 
 #[async_trait]

@@ -6,7 +6,12 @@
 
 ## Status
 
-Proposed.
+In progress. Phase 61.1 guardrails started 2026-05-18 and now cover the
+observable bzlmod replay/materialization bug shapes that blocked the current
+SDK parity loop. The current guardrail file has 12 passing tests and 1 strict
+xfail: same-daemon workspace isolation is not yet expressible in the local
+daemon layout. The plan is not complete, and the SDK parity loop must continue
+until the acceptance criteria below are satisfied or a real blocker is recorded.
 
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
@@ -53,7 +58,7 @@ Current anti-patterns:
 | Graph computed before DICE | `resolve_bzlmod_dependencies()` is called during legacy cell setup in `app/slug_common/src/legacy_configs/cells.rs`; `CellResolverKey` receives an injected resolver in `app/slug_common/src/dice/cells.rs`. | `BzlmodResolutionKey` and projections. |
 | Process-global semantic facts | `MODULE_VERSIONS` / toolchain globals in `app/slug_bzlmod/src/lib.rs`, dynamic cell globals in `app/slug_core/src/cells.rs`, extension/spoke globals in `extension_execution_dice.rs` / `spoke_materialization.rs`. | Workspace-scoped DICE values. |
 | Under-keyed DICE values | Current extension/repo keys carry `project_root` but exclude it from hash/equality in `extension_execution_dice.rs` and `repository_execution.rs`. | A first-class `WorkspaceId` participates in every bzlmod semantic key or parent value. |
-| Approximate replay digests | Current `compute_bzl_transitive_digest` is extension-id based; `recordedInputs` is parsed but not validated. | Bazel-shaped `bzlTransitiveDigest`, `usagesDigest`, and `RepoRecordedInput` validation. |
+| Approximate replay digests | `compute_bzl_transitive_digest_for_project` now hashes local workspace extension `.bzl` files reachable by literal `load()`s for the Plan 61 guardrail path, but full Bazel loaded-module graph ownership is not implemented and `recordedInputs` is parsed but not validated. | Bazel-shaped `bzlTransitiveDigest`, `usagesDigest`, and `RepoRecordedInput` validation. |
 | Bare marker trust | `.slug_repo_complete` is trusted by repo/external-cell paths; Plan 38 documents marker-gated warm-build failures. | Bazel-shaped marker/recorded-input validation or a Slug DICE manifest with an explicit parity experiment. |
 | Stub repos / empty specs on failure | Unknown repo rules and extension/repo-rule failures still create stubs in `repository_executor.rs` and `extension_repo.rs`. | Direct Bazel-shaped failure; no generated repo directory/marker on failure. |
 | Canonical identity reconstruction | Current code accepts fallback spellings, suffix scans, and `bazel-external` discovery. | Typed module/extension/repo identity and scoped repo mappings. |
@@ -191,6 +196,551 @@ Exit criteria:
 - A checked inventory links every current bzlmod semantic global to a DICE owner.
 - No later phase can merge without using the structured events/counters.
 
+Implementation slice 2026-05-18:
+
+- Added inert typed graph identities and value-key shapes in
+  `app/slug_bzlmod/src/dice_graph.rs`. These are not behavioral authority yet;
+  they name the future DICE values while preserving today's legacy startup path.
+- Added counters/tracing with the required event names:
+  `bzlmod_resolution_compute`, `module_file_parse`, `extension_eval`,
+  `extension_replay_hit`, `extension_replay_miss_reason`,
+  `repo_materialization_hit`, `repo_materialization_miss_reason`,
+  `lockfile_read`, `lockfile_write_attempt`, and `stub_fallback_attempt`.
+- Wired those counters into current legacy locations so later phases can prove
+  whether a path still depends on startup-built/global state.
+- Added explicit skipped Python guardrail tests in
+  `tests/core/bzlmod/test_plan61_guardrails.py` for the validation-first list:
+  root `MODULE.bazel` edit, local override edit, two workspaces in one daemon,
+  lockfile SHA/mode behavior, extension `.bzl` edit, transitive `.bzl` edit,
+  bad extension, unknown repo rule, stale marker, and broader no-stub failures.
+  These are not behavior claims; each skipped test carries a pinned Bazel
+  source/doc anchor and the current Slug bug shape to convert into xfail/passing
+  fixtures in later phases.
+- Counter observability is validated in-process by
+  `app/slug_bzlmod/src/dice_graph.rs::all_plan61_event_counters_are_observable_in_process`.
+  Follow-up slice below exposes these counters through a daemon-side audit
+  command for Python daemon tests.
+- Manager rerun validated direct collection/execution of the skipped guardrail
+  file with `python -m pytest --collect-only -q
+  tests/core/bzlmod/test_plan61_guardrails.py` and `python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (10 collected, 10 skipped), plus
+  `cargo test -p slug_bzlmod dice_graph::tests:: -- --nocapture` (3 passed).
+  `./slug test tests/core/bzlmod:test_plan61_guardrails` is currently blocked
+  before test execution by an existing Clap debug assertion: duplicate
+  `test_summary` argument/group name.
+
+Implementation slice 2026-05-18, phase 61.1/61.2 boundary:
+
+- Exposed the Plan 61 counter snapshot through daemon-side
+  `slug audit bzlmod-counters`, which prints a structured JSON object with the
+  counter fields `bzlmod_resolution_compute`, `module_file_parse`,
+  `extension_eval`, `extension_replay_hit`, `extension_replay_miss_reason`,
+  `repo_materialization_hit`, `repo_materialization_miss_reason`,
+  `lockfile_read`, `lockfile_write_attempt`, and `stub_fallback_attempt`.
+  This is intentionally observability-only and does not change bzlmod
+  resolution, replay, or materialization behavior.
+- Converted the first two skipped guardrails into focused Python daemon
+  fixtures in `tests/core/bzlmod/test_plan61_guardrails.py`: root
+  `MODULE.bazel` edit and local override `MODULE.bazel` edit. Both assert that
+  warm daemon commands observe the edited module input by checking structured
+  counter deltas through `audit bzlmod-counters`.
+- Converted the two-workspaces guardrail from a skip into a focused fixture
+  with colliding root module names, extension names, and generated repo names,
+  plus unique local-module sentinels for each workspace. The fixture now uses
+  `audit bzlmod-counters` and `debug daemon-dir`; it xfails today because the
+  daemon directory still includes `project_root`, so the two roots start
+  separate daemons before same-daemon bzlmod state sharing can be tested.
+- Seven guardrails remain skipped: lockfile SHA/mode behavior, extension `.bzl`
+  edit, transitive extension `.bzl` edit, bad extension no-stub failure,
+  unknown repo rule no-stub failure, stale repo marker, and broad no-stub
+  failures.
+- Validation used `cargo check -p slug_cmd_audit_client -p
+  slug_cmd_audit_server -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  dice_graph::tests:: -- --nocapture`, `cargo build -p slug`, direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py`, and direct
+  `./slug audit bzlmod-counters`.
+  Manager rerun confirmed the same focused validation: direct pytest returned
+  2 passed / 7 skipped / 1 xfailed after the two-workspace fixture conversion,
+  `cargo build -p slug` succeeded, and
+  `./slug audit bzlmod-counters` emitted the expected JSON counter object.
+  A second manager rerun after reviewing the two-workspace fixture again
+  confirmed `cargo build -p slug`, `cargo test -p slug_bzlmod
+  dice_graph::tests:: -- --nocapture`, pytest collection, and direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (2 passed / 7 skipped /
+  1 xfailed), with no `slugd[` processes left after cleanup.
+  `./slug test tests/core/bzlmod:test_plan61_guardrails` now gets past the
+  earlier Clap assertion after the manager-side test command fix, but this
+  checkout then fails before test execution because `tests/core/bzlmod/BUILD.bazel`
+  loads `@fbcode//buck2/tests:buck_e2e.bzl` and the local cell resolver has no
+  `fbcode` alias.
+
+Implementation slice 2026-05-18, lockfile guardrail conversion:
+
+- Converted the lockfile SHA/mode skip into focused Python fixtures using
+  `audit bzlmod-counters`.
+- Passing coverage now proves that a visible workspace `MODULE.bazel.lock` read
+  is observable through `lockfile_read`, ordinary `audit cell` leaves the file
+  SHA stable, and `lockfile_write_attempt` stays zero on this ordinary path.
+- Three strict xfail fixtures pin current missing policy boundaries:
+  hidden output-base lockfile reads are not represented, `--lockfile_mode=off`
+  is accepted but ignored instead of suppressing lockfile reads, and
+  `--lockfile_mode=error` is accepted but ignored while `cached_lockfile`
+  swallows invalid visible lockfiles as warnings.
+- Six guardrails remain skipped: extension `.bzl` edit, transitive extension
+  `.bzl` edit, bad extension no-stub failure, unknown repo rule no-stub
+  failure, stale repo marker, and broad no-stub failures.
+- Focused validation returned `python -m pytest --collect-only -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (13 collected) and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (3 passed / 6 skipped /
+  4 xfailed).
+  Manager rerun confirmed the same direct pytest result, and fixed the
+  in-process counter unit tests to use monotonic assertions because the counters
+  are process-global atomics and Rust tests can run concurrently. `cargo test
+  -p slug_bzlmod dice_graph::tests:: -- --nocapture` now passes (3 tests).
+
+Implementation slice 2026-05-18, extension `.bzl` edit guardrail conversion:
+
+- Converted the extension implementation `.bzl` edit guardrail from a skip into
+  a focused strict xfail fixture using `audit bzlmod-counters`.
+- The fixture first writes a minimal valid `MODULE.bazel.lock` extension entry
+  whose `generatedRepoSpecs` produces an observable `extension_replay_hit`, then
+  edits the extension implementation `.bzl` and asserts that replay is rejected
+  through `extension_replay_miss_reason` without a second hit.
+- Current Slug strict-xfails with the exact Plan 61 bug shape:
+  `compute_bzl_transitive_digest` hashes only the extension id, so the edited
+  implementation `.bzl` does not stale the lockfile replay entry. The expected
+  Bazel behavior is pinned to `RegularRunnableExtension.java` lines 207-210
+  (`BazelModuleContext` bzl transitive digest) and
+  `SingleExtensionEvalFunction.java` lines 318-324 (changed implementation or
+  transitive `.bzl` rejects replay).
+- Five guardrails remain skipped: transitive extension `.bzl` edit, bad
+  extension no-stub failure, unknown repo rule no-stub failure, stale repo
+  marker, and broad no-stub failures.
+- Focused validation returned `python -m pytest --collect-only -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (13 collected),
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (3 passed / 5 skipped /
+  5 xfailed), focused new-test `-rx` (1 xfailed with the digest-only bug
+  reason), and `cargo test -p slug_bzlmod dice_graph::tests:: -- --nocapture`
+  (3 passed).
+  Manager rerun confirmed the same collection/build/unit-test/focused-pytest
+  state and left no `slugd[` processes after cleanup.
+
+Implementation slice 2026-05-18, transitive extension `.bzl` edit guardrail
+conversion:
+
+- Converted the transitive extension helper `.bzl` edit guardrail from a skip
+  into a focused strict xfail fixture using the same lockfile replay and
+  `audit bzlmod-counters` pattern as the direct extension implementation edit
+  fixture.
+- The fixture writes a valid replay lockfile, proves an initial
+  `extension_replay_hit` without `extension_eval`, edits `replay_helper.bzl`
+  loaded by the extension implementation, and expects replay rejection through
+  `extension_replay_miss_reason` with no additional replay hit.
+- Current Slug strict-xfails with the same Plan 61 bug shape:
+  `compute_bzl_transitive_digest` hashes only the extension id, so edits to
+  transitive helper `.bzl` files are invisible to replay validation. Expected
+  Bazel behavior is pinned to `RegularRunnableExtension.java` lines 207-210
+  (`BazelModuleContext` bzl transitive digest) and
+  `SingleExtensionEvalFunction.java` lines 318-324 (changed implementation or
+  transitive `.bzl` rejects replay).
+- Four guardrails remain skipped: bad extension no-stub failure, unknown repo
+  rule no-stub failure, stale repo marker, and broad no-stub failures.
+  Manager rerun confirmed `python -m pytest --collect-only -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (13 collected),
+  `cargo test -p slug_bzlmod dice_graph::tests:: -- --nocapture`,
+  `cargo build -p slug`, direct full pytest (3 passed / 4 skipped /
+  6 xfailed), and focused transitive-helper `-rx` (1 xfailed with the
+  digest-only bug reason), with no `slugd[` processes left after cleanup.
+
+Implementation slice 2026-05-18, bad extension no-stub guardrail conversion:
+
+- Converted the bad module-extension failure guardrail from a skip into a
+  focused strict xfail fixture.
+- The fixture writes a root extension whose implementation fails with
+  `PLAN61_BAD_EXTENSION_EVAL`, imports `failed_repo`, and loads
+  `@failed_repo//:defs.bzl` from the root BUILD file to force extension repo
+  access. Expected behavior is a direct extension evaluation failure, no
+  generated repo directory, no `.slug_repo_complete` marker, and no
+  `stub_fallback_attempt` counter delta.
+- Current Slug strict-xfails with the exact Plan 61 bug shape: the build
+  unexpectedly succeeds, materializes
+  `bazel-external/_main+bad_ext+failed_repo/.slug_repo_complete`, and leaves
+  `stub_fallback_attempt` unchanged. Expected Bazel behavior is pinned to
+  `SingleExtensionFunction.java` lines 45-72 (validated extension value and
+  invalid import failure shape) and `SingleExtensionEvalFunction.java` lines
+  262-291 (successful evaluation is required before lockfile info/value
+  creation; failed evaluation is not converted into generated specs).
+- Three guardrails remain skipped: unknown repo rule no-stub failure, stale
+  repo marker, and broad no-stub failures.
+
+Implementation slice 2026-05-18, unknown repo-rule no-stub guardrail
+conversion:
+
+- Converted the unknown repository-rule failure guardrail from a skip into a
+  focused strict xfail fixture.
+- The fixture writes a replay lockfile entry for a generated repo whose
+  `repoRuleId` is a plain unsupported rule name, then loads that repo from the
+  root BUILD file to force repository-rule materialization. Expected behavior is
+  a direct repository rule resolution/evaluation failure, no generated
+  repository directory, no `.slug_repo_complete` marker, and no
+  `stub_fallback_attempt` counter delta.
+- Current Slug strict-xfails with the exact Plan 61 bug shape: the generated
+  repo spec reaches `repository_executor.rs`, which records
+  `StubFallbackAttempt` for the unknown rule and materializes a synthetic repo
+  before the command fails later while loading from that stub. Expected Bazel
+  behavior is pinned to `RepoDefinitionFunction.java` and
+  `RepositoryFetchFunction.java`: repository rule resolution/evaluation errors
+  are repository fetch failures, not synthetic generated repositories.
+- One guardrail remains skipped: broad no-stub failures.
+
+Implementation slice 2026-05-18, stale repo marker guardrail conversion:
+
+- Converted the stale repository marker guardrail from a skip into a focused
+  strict xfail fixture.
+- The fixture pre-seeds
+  `bazel-external/+new_local_repository+marker_repo` with a stale BUILD file,
+  a stale output, and a bare `.slug_repo_complete` marker, then declares a
+  `use_repo_rule` `new_local_repository` whose current spec expects
+  `fresh.txt`. Expected behavior is re-materialization or an explicit
+  marker/spec failure; stale output must not be reused.
+- Current Slug strict-xfails with the exact Plan 61 bug shape: repository
+  access reuses the stale BUILD file behind the bare marker and fails with
+  `Unknown target fresh.txt` while offering the stale target. The observed
+  counters do not record a `repo_materialization_hit` or
+  `repo_materialization_miss_reason` for this path, which shows that the stale
+  file path is being trusted before a Bazel-shaped marker/recorded-input
+  validation edge exists.
+- Expected Bazel behavior is pinned to `DigestWriter.java`,
+  `RepoRecordedInput.java`, and `RepositoryFetchFunction.java`: repository
+  markers encode predeclared input hashes and recorded inputs, and outdated
+  marker/input state makes the repository inconsistent instead of serving stale
+  outputs.
+
+Implementation slice 2026-05-18, broad no-stub failure guardrail conversion:
+
+- Converted `test_no_stub_failures_cover_missing_generated_repo_and_repo_rule_failure`
+  from the final skip into one focused strict xfail guardrail with two isolated
+  sub-workspaces.
+- The missing-generated-repo fixture uses a module extension that evaluates
+  successfully but does not generate the repo imported with `use_repo`, then
+  loads `@missing_repo//:defs.bzl` to force repository access. Expected Bazel 9
+  behavior is a direct missing generated repository failure from the module
+  extension path, with no generated repo directory, no `.slug_repo_complete`
+  marker, and no synthetic `BUILD.bazel` or `defs.bzl`.
+- The repo-rule-failure fixture uses `use_repo_rule` for
+  `@@bazel_tools//tools/build_defs/repo:local.bzl%local_repository` but omits
+  the required `path` attr, then loads `@broken_local_repo//:defs.bzl` to force
+  materialization. Expected Bazel 9 behavior is a direct repository rule
+  resolution/evaluation failure, with no generated repo directory, no marker,
+  and no synthetic repo files.
+- Current Slug strict-xfails with the exact Plan 61 bug shape: both builds
+  unexpectedly succeed, `extension_repo.rs` materializes stub repositories at
+  `bazel-external/_main+empty_ext+missing_repo` and
+  `bazel-external/+local_repository+broken_local_repo`, both stubs contain
+  `.slug_repo_complete`, `BUILD.bazel`, and `defs.bzl`, and both fallback
+  paths leave `stub_fallback_attempt` unchanged (`delta=0`). This is distinct
+  from the unknown repo-rule fallback in `repository_executor.rs`, which does
+  increment `stub_fallback_attempt`.
+- Expected Bazel behavior is pinned to `SingleExtensionFunction.java`,
+  `RepoDefinitionFunction.java`, and `RepositoryFetchFunction.java`: missing
+  generated repos and repository rule evaluation failures are direct bzlmod /
+  repository fetch failures, not synthetic generated repositories.
+
+Implementation slice 2026-05-18, no-stub failure enforcement:
+
+- Removed normal bzlmod stub fallback creation from
+  `app/slug_external_cells/src/extension_repo.rs`. Extension execution errors,
+  DICE errors, successful extensions that do not generate an imported repo,
+  `use_repo_rule` execution errors, and lazy generated repo-rule execution
+  errors now return `ExtensionRepoError::MaterializationFailed` instead of
+  writing synthetic `BUILD.bazel`, `defs.bzl`, `versions.bzl`, or
+  `.slug_repo_complete` files.
+- Removed unknown repository rule stub creation from
+  `app/slug_bzlmod/src/repository_executor.rs`. Unsupported rule names now
+  return `RepositoryExecutionError::NoImplementation` and do not increment the
+  `stub_fallback_attempt` counter.
+- Promoted three guardrails from strict xfail to passing expectations:
+  bad extension no-stub failure, unknown generated repo rule no-stub failure,
+  and the broad missing-generated-repo / repo-rule-failure no-stub matrix.
+- Legacy `stub` marker detection remains only as cleanup compatibility for
+  stale output trees written by older Slug builds; new normal bzlmod failure
+  paths no longer create those markers.
+- Validation: after freeing failed/generated linker artifacts in `target/`,
+  `cargo build -p slug` succeeded, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_bad_extension_fails_without_stub_repo
+  tests/core/bzlmod/test_plan61_guardrails.py::test_unknown_repo_rule_fails_without_stub_repo
+  tests/core/bzlmod/test_plan61_guardrails.py::test_no_stub_failures_cover_missing_generated_repo_and_repo_rule_failure
+  --runxfail` passed (3 passed).
+
+Implementation slice 2026-05-18, use_repo_rule stale marker enforcement:
+
+- Populated `spec_hash` for `use_repo_rule` pending cells in
+  `app/slug_bzlmod/src/pending_repo_cells.rs`, and for the legacy custom
+  repo-rule extension-cell setup in `app/slug_common/src/legacy_configs/cells.rs`.
+- This lets `app/slug_external_cells/src/extension_repo.rs` apply its existing
+  spec-hashed completion marker validation to `use_repo_rule` repos. A bare
+  `.slug_repo_complete` marker now mismatches the current spec hash, the stale
+  repo directory is discarded, and `new_local_repository` materializes the
+  current `BUILD.bazel`/output tree.
+- Promoted the stale repo marker guardrail from strict xfail to a passing
+  expectation.
+- Validation: `cargo check -p slug_bzlmod -p slug_common -p
+  slug_external_cells`, `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_stale_repo_marker_does_not_mask_changed_repo_spec_or_outputs
+  --runxfail` passed.
+
+Implementation slice 2026-05-18, local extension `.bzl` transitive digest
+enforcement:
+
+- Added `compute_bzl_transitive_digest_for_project` in
+  `app/slug_bzlmod/src/extension_execution_dice.rs` and re-exported it from
+  `app/slug_bzlmod/src/lib.rs`. Lockfile replay pre-seeding and extension
+  execution now use the project-root-aware digest when a workspace root is
+  available.
+- The new digest resolves the extension implementation label under the current
+  workspace, parses Starlark with the local parser, follows literal
+  `load()` labels to reachable workspace `.bzl` files, and hashes a stable
+  versioned digest over relative paths plus file bytes. If the root extension
+  label cannot be resolved locally, Slug falls back to the previous
+  extension-id digest instead of inventing external repository state.
+- Updated the Python guardrail lockfile writer to mirror the versioned local
+  digest shape, then promoted both direct extension implementation edit and
+  transitive helper `.bzl` edit guardrails from strict xfail to passing
+  expectations.
+- This is an incremental correctness fix, not the final 61.6 target: it covers
+  the local workspace `.bzl` replay-staleness bug shape, while a fully
+  DICE-owned Bazel-shaped loaded-module graph, external module digests,
+  `usagesDigest`, and `RepoRecordedInput` validation remain future work.
+- Validation: `cargo check -p slug_bzlmod`, `cargo build -p slug`,
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_extension_bzl_edit_invalidates_or_rejects_replay
+  tests/core/bzlmod/test_plan61_guardrails.py::test_transitive_extension_bzl_edit_invalidates_or_rejects_replay`
+  (2 passed), and full
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx` (9 passed / 4 xfailed)
+  passed before the hidden-lockfile follow-up below.
+
+Implementation slice 2026-05-18, hidden lockfile read observability:
+
+- Routed the daemon output-base path into bzlmod config as
+  `bzlmod.hidden_lockfile_path` from `ServerCommandContext`, and added
+  mode-aware lockfile-cache readers in `app/slug_bzlmod/src/lockfile.rs` for
+  both workspace and explicit hidden lockfile paths.
+- Startup bzlmod cell registration in
+  `app/slug_common/src/legacy_configs/cells.rs` now checks the hidden
+  `MODULE.bazel.lock` path after the visible workspace lockfile path, so the
+  Plan 61 hidden-lockfile guardrail observes a real `lockfile_read` event.
+- Added config-backed lockfile-mode plumbing for `bzlmod.lockfile_mode`; this
+  is enough for internal mode-aware reads, but the Bazel-shaped
+  `audit cell --lockfile_mode=off/error` CLI form is still not reaching the
+  cell-loading config path, so the two mode-policy guardrails remain strict
+  xfail.
+- Promoted `test_hidden_lockfile_read_is_observable_before_extension_replay`
+  from strict xfail to a passing expectation.
+- Validation: `cargo check -p slug_cmd_audit_client -p slug_client_ctx -p
+  slug_common -p slug_bzlmod -p slug_server`, `cargo build -p slug`, and full
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx` (10 passed / 3 xfailed)
+  passed. The three remaining xfails are same-daemon workspace isolation
+  precondition, `--lockfile_mode=off`, and `--lockfile_mode=error`.
+
+Implementation slice 2026-05-18, lockfile mode policy promotion:
+
+- Routed Bazel-shaped `--lockfile_mode` / `--lockfile-mode` CLI forms into
+  bzlmod config before client/server bootstrap cell loading, and kept bootstrap
+  bzlmod reads in `off` mode so invalid visible lockfiles do not warn or fail
+  before command policy is available.
+- Promoted `test_lockfile_mode_off_does_not_read_lockfiles` and
+  `test_lockfile_mode_error_rejects_invalid_visible_lockfile` from strict
+  xfail to passing expectations.
+- Validation: `cargo check -p slug_client_ctx -p slug_server -p slug_common -p
+  slug_bzlmod`, `cargo build -p slug`, focused
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_mode_off_does_not_read_lockfiles
+  tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_mode_error_rejects_invalid_visible_lockfile
+  --runxfail` (2 passed), and full
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx` (12 passed / 1 xfailed)
+  passed, with daemon processes cleaned up afterward.
+
+Implementation slice 2026-05-18, workspace-scoped extension/repo execution keys:
+
+- Removed the explicit under-keying where `ModuleExtensionExecutionKey` and
+  `ExtensionRepoExecutionKey` carried `project_root` but excluded it from
+  `Hash`/`Eq`. The keys now distinguish workspaces for extension lockfile/local
+  `.bzl` replay inputs and repository materialization state.
+- Added/updated unit assertions proving different project roots produce
+  distinct extension and repo execution keys. Also fixed a stale test-only
+  import for the renamed bzl transitive digest helper.
+- Validation: `cargo test -p slug_bzlmod project_root -- --nocapture` (5
+  passed), `cargo check -p slug_bzlmod -p slug_common -p slug_client_ctx -p
+  slug_server`, `cargo build -p slug`, and full
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx` (12 passed / 1 xfailed)
+  passed, with daemon processes cleaned up afterward.
+
+Implementation slice 2026-05-18, Slug test target guardrail enablement:
+
+- Made `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
+  runnable in this OSS checkout instead of relying only on direct pytest.
+- Declared the root module's historical apparent repo name with
+  `module(repo_name = "fbcode")`, and exposed the existing Starlark shim tree as
+  Bazel-9-compatible innate `new_local_repository` repos for `fbcode_macros` and
+  `fbsource`. This avoids a `.buckconfig`/cell-alias workaround while keeping
+  the repository visibility in `MODULE.bazel`.
+- Added a focused `@fbcode//buck2/tests:buck_e2e.bzl` OSS shim for
+  `buck2_e2e_test` that returns `ExternalRunnerTestInfo` and runs the existing
+  pytest files through Slug's test runner. The wrapper discovers the real
+  checkout root from the execroot before setting `TEST_EXECUTABLE`, so the
+  Plan 61 guardrails exercise the freshly built `target/debug/slug`.
+- Added missing lightweight OSS shim macros for `python_pytest` and `ci_hint`,
+  and registered the existing `oncall` package metadata function as a BUILD
+  global.
+- Validation: `cargo build -p slug` passed, and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` now passes
+  with the same expected guardrail result as direct pytest: 12 passed and 1
+  xfailed.
+
+Implementation slice 2026-05-18, root MODULE.bazel include inputs:
+
+- Added root `MODULE.bazel` include expansion for literal repo-relative labels
+  such as `include("//:deps.MODULE.bazel")`, constrained to Bazel 9's root
+  include shape: labels must start with `//`, name a target, and the included
+  basename must end in `.MODULE.bazel` without starting with `.`.
+- Included module segments are read as filesystem inputs before MODULE
+  evaluation and recorded with bzlmod parse counters, so editing a root include
+  segment invalidates the graph instead of silently reusing the prior parse.
+- Added a Rust parser unit test and promoted a Plan 61 guardrail that edits an
+  included `deps.MODULE.bazel` file to add a local override module, then asserts
+  bzlmod parse/resolution counters advance and the new module appears.
+- Validation: `cargo test -p slug_bzlmod
+  test_parse_module_bazel_expands_root_include -- --nocapture`, `cargo build
+  -p slug`, focused
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_included_module_segment_edit_invalidates_bzlmod_graph
+  -rx`, full direct pytest (13 passed / 1 xfailed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (13
+  passed / 1 xfailed inside pytest, Slug test pass) all passed, with daemon
+  processes cleaned up afterward.
+
+Implementation slice 2026-05-18, include variable-scope parity:
+
+- Replaced the first include implementation's textual pre-expansion with an
+  actual `include()` MODULE global. It records include labels during file
+  evaluation, then the parser evaluates each included segment in a fresh
+  Starlark module while accumulating directives into the same module parse
+  context.
+- This matches the Bazel 9 `ModuleFileGlobals.include` contract that included
+  files behave like segment placement for directives, but variable bindings
+  such as `use_extension` proxies are local to the file where they occur.
+- Added Rust coverage proving an extension proxy defined in an included segment
+  is not visible to `use_repo()` in the root module, and promoted the same
+  behavior as a Plan 61 guardrail.
+- Validation: `cargo test -p slug_bzlmod parse_module_bazel -- --nocapture`,
+  `cargo build -p slug`, focused
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_included_module_segment_variables_do_not_leak_to_root
+  -rx`, full direct pytest (14 passed / 1 xfailed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (14
+  passed / 1 xfailed inside pytest, Slug test pass) all passed, with daemon
+  processes cleaned up afterward.
+
+Implementation slice 2026-05-18, include create/delete guardrail:
+
+- Promoted a Plan 61 guardrail for create/delete of an included root
+  `*.MODULE.bazel` segment. The fixture first observes the expected failure
+  when the included file is absent, creates the segment with a local override
+  module and verifies bzlmod resolution succeeds, then deletes the segment and
+  verifies the daemon no longer reuses the successful graph.
+- This covers the 61.2 input lifecycle requirement for included module files
+  beyond ordinary content edits.
+- Validation: focused
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_included_module_segment_create_delete_invalidates_bzlmod_graph
+  -rx`, full direct pytest (15 passed / 1 xfailed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (15
+  passed / 1 xfailed inside pytest, Slug test pass) all passed, with daemon
+  processes cleaned up afterward.
+
+Manager process correction 2026-05-18:
+
+- The loop manager must not stop after this scaffold. The next loop action is
+  to dispatch an implementer worker for the remaining 61.1 validation-first
+  work, then continue with 61.2/61.3 workers or the next SDK smoke failure.
+- A final summary after a single slice is not a valid stop condition for this
+  plan. Valid stop conditions are full `//sdk:sdk_contents` Slug-vs-Bazel 9
+  output parity, an explicit user stop, or a blocker-grade resume prompt with
+  exact commands/logs/state.
+
+Previous implementer delegation prompt, completed by the stale-marker slice:
+
+```text
+Repo: /var/mnt/dev/slug. Active plan:
+thoughts/shared/plans/slug-bazel-subplans/61-true-dice-bzlmod.md, phase 61.1/61.2 boundary.
+Preserve existing dirty work unless it is yours to integrate.
+
+Task: convert
+`test_stale_repo_marker_does_not_mask_changed_repo_spec_or_outputs` into a
+focused stale-marker fixture. The fixture should exercise repository
+materialization reuse with a changed generated repo spec or changed expected
+outputs, assert that a bare `.slug_repo_complete` marker is insufficient, and
+pin expected Bazel behavior to Bazel 9 `DigestWriter`, `RepoRecordedInput`, and
+`RepositoryFetchFunction` sources. If current Slug trusts the marker, convert
+to strict xfail with the exact current bug shape. Do not start broad 61.3
+graph-resolution work and do not convert the broad no-stub guardrail.
+
+Current validation state: `cargo check -p slug_cmd_audit_client -p
+slug_cmd_audit_server -p slug_bzlmod`, `cargo test -p slug_bzlmod
+dice_graph::tests:: -- --nocapture`, `cargo build -p slug`,
+`TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+tests/core/bzlmod/test_plan61_guardrails.py` (3 passed / 2 skipped / 8 xfailed), and
+focused unknown-repo-rule `-rx` (1 xfailed with the unknown generated repo spec
+stub fallback reason) all pass. `./slug test
+tests/core/bzlmod:test_plan61_guardrails` is not a blocker for this slice; it
+fails before test execution because the local cell resolver lacks the
+`@fbcode` alias used by the repo's e2e test macro load.
+
+Before broad Slug commands, clean slugd with the targeted cleanup from the loop
+manager prompt. Run focused tests and report exact commands, statuses, changed
+files, converted guardrail behavior, remaining skips, final daemon state, and
+the next worker-sized task.
+```
+
+Class boundary for this slice:
+
+- Missing Bazel semantic: DICE-owned bzlmod graph identity and observable
+  invalidation/replay/materialization events.
+- Owning Slug subsystem: `slug_bzlmod` graph/replay/materialization keys, with
+  legacy startup integration in `slug_common::legacy_configs::cells`.
+- Other affected targets/features: any MODULE.bazel build using remote modules,
+  local overrides, module extensions, generated repos, repository rules,
+  lockfile replay, or warm daemon reuse.
+- One-off workaround rejected: adding SDK-specific labels, repo-name aliases,
+  marker repairs, or repository stubs to advance `//sdk:sdk_contents`.
+
+Checked inventory for current semantic authorities:
+
+| Current authority / anti-pattern | Current call sites | Future owner |
+|---|---|---|
+| Pre-DICE root parse/resolution | `app/slug_common/src/legacy_configs/cells.rs::resolve_bzlmod_dependencies` calls `parse_module_bazel`, `resolve_local_modules`, `MvsResolver::resolve`, extension aggregation, repo mapping, and cell registration before injecting `CellResolverKey`. | `RootModuleFileKey`, `ModuleFileKey`, `BzlmodResolutionKey`, `BzlmodCellGraphKey`. |
+| Injected cell resolver | `app/slug_common/src/dice/cells.rs::CellResolverKey` stores the already-built resolver. | `BzlmodCellGraphKey { workspace_id, resolution_digest }` consumed by `CellResolverKey`. |
+| Module version global | `app/slug_bzlmod/src/lib.rs::MODULE_VERSIONS`, set by `set_module_versions`, read by `get_module_version`. | `ResolvedModuleIdentity` projection keyed by workspace and module key. |
+| Toolchain/platform globals | `REGISTERED_TOOLCHAINS` and `REGISTERED_EXECUTION_PLATFORMS` in `app/slug_bzlmod/src/lib.rs`. | `RegisteredToolchainsKey` and `RegisteredExecutionPlatformsKey` projections from `BzlmodResolutionKey`. |
+| Extension aggregation global | `app/slug_bzlmod/src/extension_execution_dice.rs::EXTENSION_AGGREGATIONS`, set by `set_extension_aggregations`, read by `create_extension_execution_key`. | `ModuleExtensionAggregationKey`. |
+| Partially scoped extension execution key | `ModuleExtensionExecutionKey` now includes `project_root` in `Hash`/`Eq`, but still lacks the final typed `workspace_id`, command policy digest, and replay input digest shape. | `ModuleExtensionExecutionIdentity { workspace_id, extension_instance_id, command_policy_digest, replay_inputs_digest }`. |
+| Partially scoped repo execution key | `ExtensionRepoExecutionKey` now includes `project_root` in `Hash`/`Eq`, but still lacks the final typed `workspace_id`, repo rule implementation digest, and replay/recorded-input identity. | `ExtensionRepoExecutionIdentity` plus `RepoMaterializationManifestKey`. |
+| Lockfile process cache | `app/slug_bzlmod/src/lockfile.rs::LOCKFILE_CACHE` and `cached_lockfile`. | `LockfileContentKey` and `LockfileExtensionEntryKey`. |
+| Bare marker trust | `.slug_repo_complete` checks in `repository_executor.rs`, `repository_execution.rs`, `spoke_materialization.rs`, and `pending_repo_cells.rs` comments/bridges. | `RepoMaterializationManifestKey` or Bazel-shaped marker/recorded-input validation. |
+| Stub fallback | Unknown rule fallback in `repository_executor.rs`; extension executor uninitialized fallback in `extension_execution_dice.rs`. | Direct Bazel-shaped failure, counted by `stub_fallback_attempt` until removed. |
+| Dynamic cell globals | `DYNAMIC_PROJECT_ROOT`, `DYNAMIC_EXTENSION_CELLS`, `DYNAMIC_EXTENSION_CELL_SETUPS`, `DYNAMIC_EXTENSION_CELL_ALIASES`, `SCOPED_BZLMOD_REPO_ALIASES`, and `BZLMOD_APPARENT_ALIAS_CACHE` in `app/slug_core/src/cells.rs`. | `BzlmodCellGraphKey`, `RepoMappingKey`, `ExternalSymlinkLayoutKey`. |
+| Stale local-path repair | `repository_execution.rs::repair_stale_local_path_attrs`. | `LocalOverrideSourceKey` and repo-rule recorded input validation. |
+
 ### 61.2 Parsed Module Inputs As DICE Keys
 
 - Move root/transitive `MODULE.bazel` parsing, include files, registry module
@@ -282,8 +832,10 @@ Exit criteria:
 ### 61.6 DICE-Owned Extension Aggregation And Replay Inputs
 
 - Replace `EXTENSION_AGGREGATIONS` with workspace-scoped DICE values.
-- Compute real `.bzl` transitive digest from loaded extension modules; current
-  extension-id-based digest is unsound.
+- Compute real `.bzl` transitive digest from loaded extension modules. The
+  current project-root-aware digest now catches local workspace direct and
+  literal transitive `.bzl` edits, but the final value still needs Bazel-shaped
+  loaded-module ownership across external/module repos and command semantics.
 - Match pinned Bazel `usagesDigest` serialization, including module keys, eval
   factors, isolate status, and tag order where Bazel treats order as relevant.
 - Include Bazel release id, Starlark semantics, repo env, non-strict repo env,

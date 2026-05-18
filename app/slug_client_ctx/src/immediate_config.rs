@@ -12,6 +12,8 @@ use std::sync::OnceLock;
 use std::time::SystemTime;
 
 use prost::Message;
+use slug_cli_proto::ConfigOverride;
+use slug_cli_proto::config_override::ConfigType;
 use slug_common::argv::ArgFileKind;
 use slug_common::argv::ArgFilePath;
 use slug_common::init::DaemonStartupConfig;
@@ -44,9 +46,14 @@ impl ImmediateConfig {
     /// an empty mapping if the root `.buckconfig` does not contain the cell definitions.
     fn parse(roots: &InvocationRoots) -> slug_error::Result<ImmediateConfig> {
         // This function is non-reentrant, and blocking for a bit should be ok
+        let bootstrap_config = [ConfigOverride {
+            cell: None,
+            config_override: "bzlmod.lockfile_mode=off".to_owned(),
+            config_type: ConfigType::Value as i32,
+        }];
         let cells = futures::executor::block_on(BuckConfigBasedCells::parse_with_config_args(
             &roots.project_root,
-            &[],
+            &bootstrap_config,
         ))?;
 
         let cwd_cell_alias_resolver = futures::executor::block_on(

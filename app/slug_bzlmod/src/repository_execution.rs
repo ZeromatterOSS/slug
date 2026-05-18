@@ -41,6 +41,8 @@ use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
 
+use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::record_bzlmod_event;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::AttrValue;
 use crate::repository_invocations::RepositoryInvocation;
@@ -230,21 +232,20 @@ pub struct ExtensionRepoExecutionKey {
 impl std::hash::Hash for ExtensionRepoExecutionKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Hash the identifying fields; spec_hash represents the repo_spec
-        // Note: project_root is intentionally not hashed - it's a runtime configuration
-        // that doesn't affect cache identity
         self.canonical_name.hash(state);
         self.extension_id.hash(state);
         self.spec_hash.hash(state);
+        self.project_root.hash(state);
     }
 }
 
 impl PartialEq for ExtensionRepoExecutionKey {
     fn eq(&self, other: &Self) -> bool {
         // Compare by identifying fields; spec_hash represents the repo_spec
-        // Note: project_root is intentionally not compared - it's a runtime configuration
         self.canonical_name == other.canonical_name
             && self.extension_id == other.extension_id
             && self.spec_hash == other.spec_hash
+            && self.project_root == other.project_root
     }
 }
 
@@ -348,11 +349,27 @@ impl Key for ExtensionRepoExecutionKey {
             .as_deref()
             .is_some_and(|marker| complete_marker_matches(marker, &self.spec_hash))
         {
+            record_bzlmod_event(
+                BzlmodEventKind::RepoMaterializationHit,
+                self.canonical_name.as_ref(),
+            );
             return Ok(Arc::new(RepositoryRuleResult::success(
                 self.canonical_name.to_string(),
                 working_dir,
             )));
         }
+
+        let miss_reason = if marker_contents.is_some() {
+            "marker_digest_mismatch"
+        } else if marker_path.exists() {
+            "marker_unreadable"
+        } else {
+            "marker_absent"
+        };
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationMissReason,
+            format!("{}:{miss_reason}", self.canonical_name),
+        );
 
         if working_dir.exists() {
             tracing::debug!(
@@ -884,8 +901,8 @@ mod tests {
     }
 
     #[test]
-    fn test_extension_repo_key_hash_ignores_project_root() {
-        // Same spec with different project roots should have same hash
+    fn test_extension_repo_key_hash_includes_project_root() {
+        // Same spec with different project roots belongs to different workspace state.
         let spec = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned());
 
         let key1 = ExtensionRepoExecutionKey::new(
@@ -901,8 +918,7 @@ mod tests {
             PathBuf::from("/project2"),
         );
 
-        // Keys should be equal (project_root not in comparison)
-        assert_eq!(key1, key2);
+        assert_ne!(key1, key2);
     }
 
     // Tests for repo_spec_to_invocation

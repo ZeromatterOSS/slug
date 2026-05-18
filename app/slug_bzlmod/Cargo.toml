@@ -26,6 +26,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 starlark = { workspace = true }
+starlark_syntax = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true }
 xz2 = { workspace = true }

@@ -55,6 +55,8 @@ use sha2::Digest;
 use sha2::Sha256;
 use slug_error::BuckErrorContext;
 
+use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::record_bzlmod_event;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::AttrValue;
 
@@ -409,6 +411,8 @@ impl Lockfile {
 
     /// Read a lockfile from disk.
     pub fn read(path: &Path) -> slug_error::Result<Self> {
+        record_bzlmod_event(BzlmodEventKind::LockfileRead, path.display().to_string());
+
         if !path.exists() {
             return Err(LockfileError::NotFound(path.display().to_string()).into());
         }
@@ -441,6 +445,11 @@ impl Lockfile {
 
     /// Write the lockfile to disk.
     pub fn write(&self, path: &Path) -> slug_error::Result<()> {
+        record_bzlmod_event(
+            BzlmodEventKind::LockfileWriteAttempt,
+            path.display().to_string(),
+        );
+
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| LockfileError::WriteError(format!("JSON serialization failed: {}", e)))?;
 
@@ -551,6 +560,10 @@ impl Lockfile {
 
         let Some((selected_key, ext_data)) = selected else {
             if saw_candidate {
+                record_bzlmod_event(
+                    BzlmodEventKind::ExtensionReplayMissReason,
+                    format!("{extension_id}:digest_mismatch"),
+                );
                 tracing::debug!(
                     "Extension cache miss for '{}': all candidate digests mismatched",
                     extension_id
@@ -568,6 +581,10 @@ impl Lockfile {
         // before extension execution was implemented). Re-executing the
         // extension may produce real repos now.
         if repo_specs.is_empty() {
+            record_bzlmod_event(
+                BzlmodEventKind::ExtensionReplayMissReason,
+                format!("{extension_id}:empty_generated_repo_specs"),
+            );
             tracing::debug!(
                 "Extension cache miss for '{}': empty generatedRepoSpecs (forcing re-execution)",
                 extension_id
@@ -581,6 +598,12 @@ impl Lockfile {
             .collect();
 
         if let Some((repo_name, attr_name, label)) = first_invalid_empty_target_label(&result) {
+            record_bzlmod_event(
+                BzlmodEventKind::ExtensionReplayMissReason,
+                format!(
+                    "{extension_id}:invalid_empty_target_label:{repo_name}:{attr_name}:{label}"
+                ),
+            );
             tracing::debug!(
                 "Extension cache miss for '{}': cached RepoSpec '{}' attr '{}' contains invalid empty-target label '{}'",
                 extension_id,
@@ -596,6 +619,13 @@ impl Lockfile {
             extension_id,
             selected_key,
             repo_specs.len()
+        );
+        record_bzlmod_event(
+            BzlmodEventKind::ExtensionReplayHit,
+            format!(
+                "{extension_id}:{selected_key}:{} repo specs",
+                repo_specs.len()
+            ),
         );
 
         Some(result)
@@ -800,18 +830,21 @@ fn lockfile_cache()
     LOCKFILE_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 
-/// Read `MODULE.bazel.lock` from `workspace_root`, returning a process-wide
-/// cached `Arc<Lockfile>`. `None` means the file is absent or failed to
-/// parse. Use `invalidate_cached_lockfile` to drop the cached entry when the
-/// lockfile is known to have changed (e.g. after writing a new one).
-pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>> {
-    let path = lockfile_path(workspace_root);
+fn cached_lockfile_at_path(
+    path: PathBuf,
+    mode: LockfileMode,
+) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
+    if mode == LockfileMode::Off {
+        return Ok(None);
+    }
+
     let key = path.clone();
 
-    {
-        let cache = lockfile_cache().lock().ok()?;
+    if let Ok(cache) = lockfile_cache().lock() {
         if let Some(entry) = cache.get(&key) {
-            return entry.clone();
+            if mode != LockfileMode::Error || entry.is_some() || !path.exists() {
+                return Ok(entry.clone());
+            }
         }
     }
 
@@ -825,6 +858,9 @@ pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>
                 Some(std::sync::Arc::new(l))
             }
             Err(e) => {
+                if mode == LockfileMode::Error {
+                    return Err(e);
+                }
                 tracing::warn!(
                     "Failed to read MODULE.bazel.lock at {}: {}",
                     path.display(),
@@ -840,7 +876,34 @@ pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>
     if let Ok(mut cache) = lockfile_cache().lock() {
         cache.insert(key, parsed.clone());
     }
-    parsed
+    Ok(parsed)
+}
+
+/// Read a lockfile path with explicit Bazel lockfile policy.
+pub fn cached_lockfile_path_with_mode(
+    path: &Path,
+    mode: LockfileMode,
+) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
+    cached_lockfile_at_path(path.to_path_buf(), mode)
+}
+
+/// Read `MODULE.bazel.lock` from `workspace_root` with explicit Bazel
+/// lockfile policy.
+pub fn cached_lockfile_with_mode(
+    workspace_root: &Path,
+    mode: LockfileMode,
+) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
+    cached_lockfile_at_path(lockfile_path(workspace_root), mode)
+}
+
+/// Read `MODULE.bazel.lock` from `workspace_root`, returning a process-wide
+/// cached `Arc<Lockfile>`. `None` means the file is absent or failed to
+/// parse. Use `invalidate_cached_lockfile` to drop the cached entry when the
+/// lockfile is known to have changed (e.g. after writing a new one).
+pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>> {
+    cached_lockfile_with_mode(workspace_root, LockfileMode::Update)
+        .ok()
+        .flatten()
 }
 
 /// Drop the cached `Arc<Lockfile>` for `workspace_root`. Call after writing a

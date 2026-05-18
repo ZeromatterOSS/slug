@@ -88,6 +88,12 @@ pub struct ModuleFileContext {
 
     /// Execution platform labels from register_execution_platforms() calls, with dev_dependency tracking.
     pub registered_execution_platforms: Vec<RegisteredItem>,
+
+    /// MODULE.bazel include labels encountered while evaluating the current
+    /// file. The parser consumes these after each file evaluation and evaluates
+    /// the included file in a fresh Starlark module so variable bindings do not
+    /// cross include boundaries.
+    pub include_labels: Vec<String>,
 }
 
 /// A repository rule invocation from MODULE.bazel (via use_repo_rule).
@@ -314,6 +320,21 @@ pub fn register_module_file_globals(globals: &mut GlobalsBuilder) {
 
 #[starlark_module]
 fn register_module_globals(globals: &mut GlobalsBuilder) {
+    /// Includes another MODULE.bazel segment.
+    ///
+    /// The parser resolves and evaluates the included file after this
+    /// Starlark file finishes evaluating. Included files contribute directives
+    /// to the same module context, but their variable bindings are isolated to
+    /// match Bazel 9 include semantics.
+    fn include<'v>(
+        #[starlark(require = pos)] label: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let ctx = get_module_context(eval)?;
+        ctx.borrow_mut().include_labels.push(label.to_owned());
+        Ok(NoneType)
+    }
+
     /// Declares the identity of the Bazel module.
     ///
     /// This should be called at most once in a MODULE.bazel file.

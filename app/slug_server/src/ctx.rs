@@ -157,6 +157,9 @@ pub struct BaseServerCommandContext {
     pub events: EventDispatcher,
     /// Underlying data that isn't command-level.
     pub(crate) daemon: Arc<DaemonStateData>,
+    /// Daemon metadata/output-base directory. Bazel's hidden MODULE.bazel.lock
+    /// lives under the output base; Slug's matching location is the daemon dir.
+    pub(crate) daemon_dir: AbsNormPathBuf,
     /// Removes this command from the set of active commands when dropped.
     pub _drop_guard: ActiveCommandDropGuard,
     /// Spawner
@@ -532,9 +535,19 @@ impl ServerCommandContext<'_> {
         &self,
         dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<BuckConfigBasedCells> {
+        let mut config_overrides = self.config_overrides.clone();
+        config_overrides.push(ConfigOverride {
+            cell: None,
+            config_override: format!(
+                "bzlmod.hidden_lockfile_path={}/MODULE.bazel.lock",
+                self.base_context.daemon_dir
+            ),
+            config_type: ConfigType::Value as i32,
+        });
+
         let new_configs = BuckConfigBasedCells::parse_with_config_args(
             &self.base_context.project_root,
-            &self.config_overrides,
+            &config_overrides,
         )
         .await?;
 

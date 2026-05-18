@@ -24,6 +24,7 @@ dupe = { workspace = true }
 gazebo = { workspace = true }
 
 slug_analysis = { workspace = true }
+slug_bzlmod = { workspace = true }
 slug_build_api = { workspace = true }
 slug_cli_proto = { workspace = true }
 slug_client_ctx = { workspace = true }
