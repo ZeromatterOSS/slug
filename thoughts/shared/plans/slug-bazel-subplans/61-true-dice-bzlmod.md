@@ -668,6 +668,26 @@ Implementation slice 2026-05-18, include create/delete guardrail:
   passed / 1 xfailed inside pytest, Slug test pass) all passed, with daemon
   processes cleaned up afterward.
 
+Implementation slice 2026-05-18, extension tag usage digest guardrail:
+
+- Added a focused Plan 61.6 guardrail for module-extension tag attr changes.
+  The fixture writes a valid replay lockfile whose `usagesDigest` matches the
+  initial tag kwargs, proves the entry replays without executing the extension,
+  edits the tag attr in `MODULE.bazel`, and asserts that the stale lockfile
+  entry is rejected through `extension_replay_miss_reason` without another
+  replay hit.
+- Added a Python mirror of Slug's current versioned tag-input hash shape for
+  this fixture. This is validation-only; the final 61.6 target still needs
+  pinned Bazel-shaped `SingleExtensionUsagesValue` serialization, eval factors,
+  and recorded-input validation.
+- Validation: focused
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_extension_tag_attr_edit_invalidates_or_rejects_replay
+  -rx` passed, full direct pytest passed (16 passed / 1 xfailed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` passed
+  with the same 16 passed / 1 xfailed pytest result. The remaining xfail is the
+  same-daemon workspace isolation precondition.
+
 Manager process correction 2026-05-18:
 
 - The loop manager must not stop after this scaffold. The next loop action is

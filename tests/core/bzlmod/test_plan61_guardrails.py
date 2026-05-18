@@ -144,6 +144,67 @@ def _slug_usages_digest_without_tags(extension_id: str, module_name: str) -> str
     return "sha256-" + base64.b64encode(digest).decode()
 
 
+def _slug_usages_digest(
+    extension_id: str,
+    tags_by_module: dict[str, list[tuple[str, dict[str, object]]]],
+) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(extension_id.encode())
+    for module_name in sorted(tags_by_module):
+        hasher.update(module_name.encode())
+        tags = tags_by_module[module_name]
+        for tag_name, kwargs in sorted(tags, key=_tag_hash_input):
+            hasher.update(_tag_hash_input((tag_name, kwargs)))
+    return "sha256-" + base64.b64encode(hasher.digest()).decode()
+
+
+def _tag_hash_input(tag: tuple[str, dict[str, object]]) -> bytes:
+    tag_name, kwargs = tag
+    out = bytearray()
+    out.extend(b"tag:")
+    out.extend(tag_name.encode())
+    out.extend(b"\0")
+    for key, value in sorted(kwargs.items()):
+        out.extend(b"kw:")
+        out.extend(key.encode())
+        out.extend(b"=")
+        out.extend(_tag_value_hash_input(value))
+        out.extend(b"\0")
+    return bytes(out)
+
+
+def _tag_value_hash_input(value: object) -> bytes:
+    if isinstance(value, bool):
+        return b"bool:" + bytes([int(value)])
+    if isinstance(value, int):
+        return b"int:" + value.to_bytes(8, byteorder="little", signed=True)
+    if isinstance(value, str):
+        if value.startswith(("//", "@", ":")):
+            return b"label:" + value.encode()
+        return b"string:" + value.encode()
+    if value is None:
+        return b"none"
+    if isinstance(value, list):
+        out = bytearray()
+        out.extend(b"list:")
+        out.extend(len(value).to_bytes(8, byteorder="little", signed=False))
+        for item in value:
+            out.extend(_tag_value_hash_input(item))
+            out.extend(b"\0")
+        return bytes(out)
+    if isinstance(value, dict):
+        out = bytearray()
+        out.extend(b"dict:")
+        out.extend(len(value).to_bytes(8, byteorder="little", signed=False))
+        for key, item in sorted(value.items()):
+            out.extend(str(key).encode())
+            out.extend(b"=")
+            out.extend(_tag_value_hash_input(item))
+            out.extend(b"\0")
+        return bytes(out)
+    raise TypeError(f"unsupported tag value for Plan 61 digest: {value!r}")
+
+
 def _write_replay_lockfile(
     path: Path,
     *,
@@ -568,6 +629,114 @@ use_repo(replay, "replayed_repo")
     _write(
         buck.cwd / "replay_helper.bzl",
         """HELPER_SENTINEL = "edited helper digest input"
+""",
+    )
+
+    await buck.audit("cell")
+    second = await _bzlmod_counters(buck)
+
+    assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_extension_tag_attr_edit_invalidates_or_rejects_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: SingleExtensionUsagesValue and SingleExtensionEvalFunction."""
+    module_name = "plan61_tag_replay"
+    extension_id = "@plan61_tag_replay//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    replayed_repo.mkdir(exist_ok=True)
+    _write(replayed_repo / "BUILD.bazel", "filegroup(name = \"data\")\n")
+    _write(
+        buck.cwd / "replay_ext.bzl",
+        """def _generated_repo_impl(rctx):
+    pass
+
+generated_repo = repository_rule(
+    implementation = _generated_repo_impl,
+)
+
+def _replay_ext_impl(module_ctx):
+    generated_repo(name = "replayed_repo")
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+    tag_classes = {
+        "config": tag_class(attrs = {"name": attr.string()}),
+    },
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+replay.config(name = "initial")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {},
+                "selectedYankedVersions": {},
+                "moduleExtensions": {
+                    extension_id: {
+                        "general": {
+                            "bzlTransitiveDigest": _slug_bzl_transitive_digest(
+                                extension_id,
+                                buck.cwd,
+                            ),
+                            "usagesDigest": _slug_usages_digest(
+                                extension_id,
+                                {
+                                    module_name: [
+                                        ("config", {"name": "initial"}),
+                                    ],
+                                },
+                            ),
+                            "recordedInputs": [],
+                            "generatedRepoSpecs": {
+                                "replayed_repo": {
+                                    "repoRuleId": (
+                                        "@@bazel_tools//tools/build_defs/repo:"
+                                        "local.bzl%local_repository"
+                                    ),
+                                    "attributes": {
+                                        "path": str(replayed_repo),
+                                    },
+                                },
+                            },
+                            "moduleExtensionMetadata": None,
+                        },
+                    },
+                },
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.audit("cell")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+replay.config(name = "edited")
+use_repo(replay, "replayed_repo")
 """,
     )
 
