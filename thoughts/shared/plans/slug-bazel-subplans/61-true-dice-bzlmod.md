@@ -1048,6 +1048,65 @@ Exit criteria:
   assert no unchanged module resolution, extension evaluation, or repo
   materialization reruns.
 
+Implementation slice 2026-05-18, SDK performance frontier:
+
+- After the apparent-repo symlink fix, `//sdk:sdk_contents` no longer fails in
+  `rules_python` template expansion, but Slug analysis remains non-parity. The
+  bounded smoke `sdk-parity-20260518-155728` entered execution only after
+  minutes of analysis and the resumed run still spent roughly 8 minutes between
+  daemon connection and first execution progress. Bazel completes analysis for
+  this repository in under 10 seconds, so an excessively long Slug analysis run
+  is now classified as a semantic SDK parity failure, not a timeout to wait out.
+- The same smoke showed configuration multiplication: log aggregation found
+  many distinct output hashes for the same logical platform, especially
+  `//bazel/platforms:linux-gnu-host` and `//bazel/platforms:linux-musl`, and
+  repeated analysis of LLVM/runtime labels such as
+  `llvm++llvm_source+libcxx//:headers`,
+  `llvm++llvm_source+compiler-rt//:builtins`, and rust toolchain labels across
+  those hashes. The next implementation slice must focus on configuration
+  canonicalization/transition ownership before any longer SDK smoke.
+- Loop policy update: SDK smokes and focused repros must be bounded tightly
+  enough to expose analysis stalls. A long run with ongoing compilation is still
+  useful after analysis parity is restored, but a long pre-execution analysis
+  phase is its own failure mode.
+
+Implementation slice 2026-05-18, transitioned `flag_values` and cold-start
+frontier:
+
+- Fixed native `config_setting(flag_values = ...)` analysis so select matching
+  analyzes the `config_setting` in the configuration being matched, not in
+  Slug's unbound configuration-rule analysis cfg. This matches the existing
+  alias/config-setting-group path and lets transitioned build settings affect
+  `select()` keys. Regression coverage:
+  `test_config_string_build_setting_after_transition` uses a Starlark
+  transition to set `//:my_string_flag` and verifies the transitioned
+  `config_setting` wins.
+- Repaired the previous apparent external symlink fix's startup cost by
+  indexing preferred `bazel-external/<module>+<version>` targets once per
+  `external/` repair pass instead of rescanning `bazel-external` for each
+  symlink. The focused Rust symlink tests cover the module-form preference and
+  chain repair behavior.
+- Validation for this slice: `cargo fmt --check`; `cargo test -p slug_core
+  external_symlink -- --nocapture`; `cargo check -p slug_core -p
+  slug_configured`; `cargo build -p slug`; and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug timeout 120s python -m
+  pytest -q tests/core/analysis/test_native_rules.py -k
+  'config_string_build_setting'`.
+- Fresh zeromatter probe `sdk-connect-probe-165019` still took 23 seconds
+  between `Starting new slug daemon...` and `Connected to new slug daemon`
+  (`/tmp/sdk-connect-probe-165019.log`) before returning
+  `audit bzlmod-counters`. The counters show one bzlmod resolution and 428
+  module parses. Top-level filesystem walks are not the remaining cost:
+  `find external -maxdepth 1 -type l` counted 12,827 symlinks in 0.010s and
+  `find bazel-external -maxdepth 1` counted 7,425 entries in 0.013s.
+- Hard frontier: cold daemon startup still performs full legacy bzlmod
+  resolution before the client can connect. Because Bazel completes analysis for
+  this repository in under 10 seconds, a 23-second Slug startup for a read-only
+  audit command is a parity failure. The next slice must move or cache this
+  resolution behind DICE-owned workspace/command keys, or otherwise prove a
+  Bazel-shaped replay path that avoids reparsing hundreds of module files on
+  cold client connect.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

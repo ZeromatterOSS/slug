@@ -620,17 +620,22 @@ fn remove_external_symlink(path: &std::path::Path) -> std::io::Result<()> {
     }
 }
 
-fn preferred_external_symlink_target(
+fn preferred_external_symlink_target_with_module_forms(
     project_root: &std::path::Path,
     apparent_name: &str,
     current_target: &std::path::Path,
+    module_forms: Option<&std::collections::HashMap<String, std::path::PathBuf>>,
 ) -> std::path::PathBuf {
     let Some(current_name) = current_target.file_name().and_then(|s| s.to_str()) else {
         return current_target.to_path_buf();
     };
     let current_priority = module_form_priority(current_name);
     if current_priority < 3 {
-        if let Some(module_target) =
+        if let Some(module_forms) = module_forms {
+            if let Some(module_target) = module_forms.get(apparent_name) {
+                return module_target.clone();
+            }
+        } else if let Some(module_target) =
             preferred_module_form_target(project_root, apparent_name, current_priority)
         {
             return module_target;
@@ -656,6 +661,54 @@ fn preferred_external_symlink_target(
     }
 
     current_target.to_path_buf()
+}
+
+fn preferred_external_symlink_target(
+    project_root: &std::path::Path,
+    apparent_name: &str,
+    current_target: &std::path::Path,
+) -> std::path::PathBuf {
+    preferred_external_symlink_target_with_module_forms(
+        project_root,
+        apparent_name,
+        current_target,
+        None,
+    )
+}
+
+fn collect_preferred_module_form_targets(
+    project_root: &std::path::Path,
+) -> std::collections::HashMap<String, std::path::PathBuf> {
+    let bazel_external = project_root.join("bazel-external");
+    let Ok(entries) = std::fs::read_dir(&bazel_external) else {
+        return std::collections::HashMap::new();
+    };
+    let mut module_forms = std::collections::HashMap::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|s| s.to_str()).map(str::to_owned) else {
+            continue;
+        };
+        if module_form_priority(&name) != 3 {
+            continue;
+        }
+        let Some((apparent, _version)) = name.split_once('+') else {
+            continue;
+        };
+        if !path.is_dir() {
+            continue;
+        }
+        let candidate = std::fs::canonicalize(&path).unwrap_or(path);
+        module_forms
+            .entry(apparent.to_owned())
+            .and_modify(|current: &mut std::path::PathBuf| {
+                if candidate < *current {
+                    *current = candidate.clone();
+                }
+            })
+            .or_insert(candidate);
+    }
+    module_forms
 }
 
 fn preferred_module_form_target(
@@ -713,6 +766,7 @@ pub fn repair_external_symlink_targets(project_root: &std::path::Path) {
     let Ok(entries) = std::fs::read_dir(&external_dir) else {
         return;
     };
+    let module_forms = collect_preferred_module_form_targets(project_root);
 
     for entry in entries.flatten() {
         let link_path = entry.path();
@@ -732,8 +786,12 @@ pub fn repair_external_symlink_targets(project_root: &std::path::Path) {
         let Some(apparent_name) = link_path.file_name().and_then(|s| s.to_str()) else {
             continue;
         };
-        let repaired_target =
-            preferred_external_symlink_target(project_root, apparent_name, &canonical_target);
+        let repaired_target = preferred_external_symlink_target_with_module_forms(
+            project_root,
+            apparent_name,
+            &canonical_target,
+            Some(&module_forms),
+        );
         if current_abs == repaired_target {
             continue;
         }

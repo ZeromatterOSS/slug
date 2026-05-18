@@ -392,6 +392,22 @@ async def test_config_string_build_setting(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_config_string_build_setting_after_transition(buck: Buck) -> None:
+    """flag_values in config_setting sees transition-updated build settings."""
+    result = await buck.build(
+        "//:select_by_transitioned_string_flag",
+        "--target-platforms=//:linux_platform",
+    )
+    output = result.get_build_report().output_for_target(
+        "//:select_by_transitioned_string_flag"
+    )
+    content = output.read_text().strip()
+    assert content == "transitioned_selected", (
+        f"Expected 'transitioned_selected', got: {content!r}"
+    )
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_label_flag_with_flag_values(buck: Buck) -> None:
     """label_flag build settings work with flag_values in config_setting for select()."""
     result = await buck.build("//:select_by_label_flag")
@@ -1667,4 +1683,3 @@ async def test_symbolic_macro(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:macro_greeting")
     content = output.read_text().strip()
     assert "hello from macro" in content, f"Expected greeting in output: {content}"
-

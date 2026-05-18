@@ -269,12 +269,16 @@ async fn get_configuration_key_providers(
 
     if matches!(
         target_node.rule_type(),
-        RuleType::Native(NativeRuleKind::Alias)
+        RuleType::Native(NativeRuleKind::Alias | NativeRuleKind::ConfigSetting)
     ) {
         // Bazel allows alias targets in select keys. For an alias-backed
         // config_setting_group, the alias `actual` attribute may itself be a
         // select(), so it must be resolved in the configuration currently being
         // matched, not in Slug's unbound configuration-rule analysis cfg.
+        //
+        // Native config_setting also has to be analyzed in the configuration
+        // currently being matched so flag_values observes transition-updated
+        // build settings. An unbound analysis only sees defaults/CLI globals.
         let configured =
             cfg_target.configure_pair_no_exec(ConfigurationNoExec::new(target_cfg.dupe()));
         return Ok(ctx.get_providers(&configured).await?.require_compatible()?);

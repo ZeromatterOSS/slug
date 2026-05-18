@@ -346,6 +346,26 @@ string_flag = rule(
     build_setting = config.string(flag = True),
 )
 
+def _transition_string_flag_impl(settings, attr):
+    return {"//:my_string_flag": "transitioned_val"}
+
+transition_string_flag = transition(
+    implementation = _transition_string_flag_impl,
+    inputs = [],
+    outputs = ["//:my_string_flag"],
+)
+
+def _transition_string_flag_target_impl(ctx):
+    out = ctx.actions.copy_file(ctx.label.name + ".txt", ctx.files.dep[0])
+    return [DefaultInfo(default_output = out)]
+
+transition_string_flag_target = rule(
+    implementation = _transition_string_flag_target_impl,
+    attrs = {
+        "dep": attr.label(cfg = transition_string_flag),
+    },
+)
+
 def _cc_command_line_test_impl(ctx):
     """Tests cc_common.get_tool_for_action() and get_memory_inefficient_command_line()."""
     fc = cc_common.configure_features(cc_toolchain = None, ctx = ctx)
