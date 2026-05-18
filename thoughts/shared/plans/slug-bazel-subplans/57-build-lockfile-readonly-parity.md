@@ -1,4 +1,4 @@
-# Plan 57: Build-Time MODULE.bazel.lock Read-Only Parity
+# Plan 57: Build-Time MODULE.bazel.lock Read-Only Safety Policy
 
 > Parent: [15-bazel-9-parity.md](15-bazel-9-parity.md)
 >
@@ -7,9 +7,9 @@
 
 ## Status
 
-In progress.
+Code-level implemented; external SHA smoke verification still pending.
 
-## Current Blocker
+## Original Blocker
 
 A fresh `bazel mod deps` in `C:\dev\zeromatter-kuro` regenerated
 `MODULE.bazel.lock` with SHA256:
@@ -18,7 +18,7 @@ A fresh `bazel mod deps` in `C:\dev\zeromatter-kuro` regenerated
 E2985FF577A3F7ED1B31B873D84A8B9A7CE452A80CCE85673F853A328F3507DB
 ```
 
-Starting a Slug `//sdk:sdk` build mutated that same file within a few minutes:
+Starting a Slug `//sdk:sdk` build previously mutated that same file within a few minutes:
 
 ```text
 58273E0D359026FC94A98AC9E716F112252FAB104FFEEC1CC36B5C32320824EF
@@ -40,10 +40,11 @@ when it serializes the lockfile back out.
 
 ## Classification
 
-This is a Plan 15 Bazel 9 lockfile parity issue, not an SDK target workaround.
-The owning abstraction is `slug_bzlmod` lockfile/extension execution policy.
+This is a Plan 15 Bazel 9 lockfile compatibility issue, not an SDK target
+workaround. The owning abstraction is `slug_bzlmod` lockfile/extension
+execution policy.
 
-Slug currently treats `MODULE.bazel.lock` as both:
+At the time this plan was written, Slug treated `MODULE.bazel.lock` as both:
 
 - a Bazel-compatible input used for startup-time extension repo pre-seeding and
   extension cache hits; and
@@ -52,11 +53,23 @@ Slug currently treats `MODULE.bazel.lock` as both:
 Those roles conflict. Even when Slug can deserialize Bazel's file, writing it
 back through Slug's model is not semantics-preserving: it expands the file with
 Slug-observed extension results and can canonicalize fields differently from
-Bazel. Ordinary `slug build` must not mutate the Bazel-owned lockfile.
+Bazel.
+
+This read-only policy is an interim Slug safety policy, not a direct Bazel
+parity claim. Bazel itself may update `MODULE.bazel.lock` in update/refresh
+lockfile modes (`RepositoryOptions.java`, `BazelLockFileModule.java`,
+`SingleExtensionEvalFunction.java`). Slug ordinary build/query/audit paths stay
+read-only until Slug has an explicit Bazel-parity lockfile update command.
+
+2026-05-18 update: ordinary resolution/extension execution code now documents
+and tests read-only behavior. Lockfile writer APIs still exist for tests and
+future explicit `slug mod update`-style commands; they must not be called from
+ordinary build/query/audit paths.
 
 ## Systemic Fix
 
-Make ordinary build-time Slug lockfile access read-only:
+Make ordinary build-time Slug lockfile access read-only until exact
+mode-aware lockfile writes are implemented:
 
 - Continue reading `MODULE.bazel.lock` for Bazel-authored extension caches,
   facts, registry hashes, and startup-time spoke pre-seeding.
@@ -65,6 +78,8 @@ Make ordinary build-time Slug lockfile access read-only:
 - Keep any future Slug-specific extension-result persistence out of
   `MODULE.bazel.lock` unless a separate explicit command implements exact
   Bazel lockfile write parity.
+- Plan 61 owns the mode-aware target shape: default/update, refresh, error, and
+  off must be validated against pinned Bazel before Slug claims parity.
 
 This rejects the one-off workaround of deleting `MODULE.bazel.lock` before Slug
 or post-restoring it after Slug. The build engine itself must be read-only with
@@ -80,4 +95,3 @@ Required before continuing SDK parity:
 - `cargo build -p slug -j 1`
 - Regenerate `MODULE.bazel.lock` with Bazel, record SHA256, run Slug smoke, then
   verify the SHA256 is unchanged after Slug exits or is interrupted.
-

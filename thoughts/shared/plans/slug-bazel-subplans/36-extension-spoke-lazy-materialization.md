@@ -22,6 +22,12 @@ Phases 1-3 landed and zeromatter now reaches deep analysis with lazily
 materialized crate spokes. This plan remains high-priority because the
 remaining follow-ups are extension correctness gaps, not cleanup:
 
+2026-05-18 correction: current behavior is hybrid. All spokes can be
+registered and Label access can synchronously materialize a needed spoke, but
+extension execution still may eagerly materialize every missing generated repo
+after an extension evaluates. The lazy-path work here is useful, but it is not
+yet proof that only Label-referenced spokes materialize in every path.
+
 1. Phase 3b: audit `repository_ctx.path(Label)` /
    `repository_ctx.read(Label)` for the same materialization guarantee.
 2. Phase 4: backfill `repository_rule_attr` accessors surfaced by real
@@ -407,9 +413,10 @@ After this plan:
    passes to its repository rules (`auth_patterns`,
    `_rules_python_workspace`, plus whatever else surfaces during
    verification).
-4. No regression on `bazel-external/` count from Plan 13 — only
-   Label-referenced spokes get pulled in, not the full transitive
-   closure.
+4. No regression on `bazel-external/` count from Plan 13. The intended end
+   state is that only semantically referenced spokes get materialized; today
+   some extension-evaluation paths still eagerly materialize missing generated
+   repos, so this remains a Plan 61 cleanup item.
 
 ### Verification criteria
 
@@ -617,15 +624,12 @@ this plan's scope get linked back to their owning subplan.
   already; nested compute calls must dedup correctly. The existing
   per-spoke `ExtensionRepoExecutionKey` is keyed on canonical name, so
   this should be safe, but verify on the first nested call.
-- **Bazel test parity**: real Bazel allows `mctx.path(Label)` on
-  cells that don't exist yet *without* failing — it returns the path
-  for use with `.dirname` etc. and only triggers fetch on the next
-  filesystem operation. We may need to lazy-trigger only on
-  `mctx.read` and let `mctx.path` return a "promise" path. If we get
-  that wrong, we'll trigger fetches for paths that were only being
-  queried for `.dirname`. Mitigation: instrument the first
-  implementation, count how often `path` is called *without* a
-  follow-up fs op, only optimize if the metric warrants.
+- **Bazel `path(Label)` behavior**: needs validation before optimization.
+  Bazel's `StarlarkBaseExternalContext.getPathFromLabel` requests package lookup
+  through Skyframe and returns null to force a restart when values are missing;
+  for remote external overlays it explicitly calls `ensureMaterialized`. Do not
+  assume Bazel merely returns a promise path and fetches only on a later
+  filesystem operation without a focused repro/source citation.
 - **Plan 13 budget**: this plan re-introduces fetches that Plan 13
   deferred. Each fetch must be well-justified (i.e. an extension
   actually reached for it via Label), not transitive eager fetching.

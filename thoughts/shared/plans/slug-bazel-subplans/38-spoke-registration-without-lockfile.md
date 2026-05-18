@@ -4,6 +4,11 @@
 
 Landed in commit `Plans 37+38: spoke registration without lockfile dependency`.
 
+2026-05-18 correction: this plan is complete as a tactical warm-build/spoke
+registration fix, not as true DICE bzlmod. The process-global cached lockfile,
+seeded-extension set, and spoke registry are transitional bridges. Plan 61 owns
+moving those facts under workspace-scoped DICE keys.
+
 ## Context
 
 Plan 36 introduced lazy spoke materialization on `mctx.path(Label)`. After
@@ -35,6 +40,11 @@ Three converging changes so spokes are always registered before BUILD
 file evaluation needs them:
 
 1. **Lockfile pre-seed at startup**
+   - This startup lockfile pre-seed is a Slug-specific bridge for the current
+     cell resolver. Bazel does not need a startup cell-registration pass from
+     `generatedRepoSpecs`; repository mapping for extension-generated repos is
+     resolved through Skyframe, and same-extension internal mappings depend on
+     `SingleExtensionValue`.
    - New `pre_compute_extension_repo_cells_from_lockfile` in
      `pending_repo_cells.rs`: walks every extension's
      `generatedRepoSpecs`, synthesises a `PendingRepoCell` per repo with
@@ -65,9 +75,10 @@ file evaluation needs them:
    - `cells.rs` (startup seed) and `extension_execution_dice.rs` (cache
      lookup at line 414) both go through it. The zeromatter lockfile (~160
      KB) parses once per daemon instead of twice.
-   - `update_lockfile_extension_cache` calls
-     `invalidate_cached_lockfile` after writing so the next read sees
-     the new contents.
+   - `cached_lockfile` is shared by startup seed and extension cache lookup.
+     Ordinary builds no longer rely on a build-time lockfile write invalidation
+     path; lockfile mutation helpers are only appropriate for explicit future
+     lockfile-update commands or tests.
 
 ### Plus collateral fixes uncovered by re-materialising stuck stubs
 
@@ -107,8 +118,7 @@ file evaluation needs them:
 - `app/slug_bzlmod/src/lib.rs` — exports
 - `app/slug_bzlmod/src/lockfile.rs` — `cached_lockfile`,
   `invalidate_cached_lockfile`
-- `app/slug_bzlmod/src/extension_execution_dice.rs` — share cache,
-  invalidate after write
+- `app/slug_bzlmod/src/extension_execution_dice.rs` — share read-only cache
 - `app/slug_bzlmod/src/pending_repo_cells.rs` —
   `pre_compute_extension_repo_cells_from_lockfile`
 - `app/slug_bzlmod/src/spoke_materialization.rs` —

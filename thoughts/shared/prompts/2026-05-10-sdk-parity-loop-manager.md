@@ -47,6 +47,17 @@ logs, long source files, or broad search results into the manager context when
 a subagent can inspect them and report the small set of facts needed for the
 next decision.
 
+Keep prompt/context packets concise. For a delegated task, include only:
+
+- repo paths and current branch/worktree status;
+- the active plan section and one or two source/doc anchors;
+- the exact failing command, status, and log path;
+- the focused validation expected before any broad smoke;
+- the required final report shape.
+
+Do not paste whole plan files or smoke logs into a subagent prompt. Point to
+files and require cited line references or short excerpts.
+
 Delegate as much of the loop as possible to subagents. Each full loop iteration
 should be assigned to a subagent as a bounded end-to-end task: inspect the
 current failure or stall, classify it, update the relevant plan, implement the
@@ -56,22 +67,16 @@ statuses, logs, changed files, and next blockers. The manager should avoid
 duplicating the subagent's exploration; it should review results, integrate
 patches, decide the next iteration, and spawn the next subagent.
 
-When delegating, pass only the minimal necessary context: repo paths, current
-commit/worktree status, the active plan(s), the exact command/log/status from
-the latest smoke, and the expected output format. For large logs, pass file
-paths and ask the subagent to extract line references and summaries rather than
-pasting log bodies into the manager thread.
-
 ## Required Reading Before Acting
 
 Read these first from `/var/mnt/dev/slug`:
 
 - `AGENTS.md`
-- `thoughts/shared/plans/slug-bazel-subplans/15-bazel-9-parity.md`
-- `thoughts/shared/plans/slug-bazel-subplans/54-depset-transitive-set-shared-core.md`
-- `thoughts/shared/plans/slug-bazel-subplans/55-symbolic-macro-inherit-attrs.md`
-- `thoughts/shared/plans/slug-bazel-subplans/56-native-intrinsic-provider-shims.md`
-- Any other plan referenced by the newest SDK failure.
+- `thoughts/shared/plans/2026-01-21-slug-bazel-compatible-build-tool.md`
+- The status, validation, and acceptance sections of the active failure's plan
+  only. Use the roadmap's plan table and dependency map to find the right
+  subplan; do not preload unrelated plans into context.
+- Any source/doc anchors cited by that active plan section.
 
 Then rediscover current state instead of trusting stale prompt details:
 
@@ -122,6 +127,9 @@ daemon sessions alive when handing off.
 - Prefer `Native`, `Intrinsic`, or `NativeShim` terminology. Do not introduce
   new `Synthetic` or `Stub` terminology for valid provider/API facades.
 - Use Bazel source or focused Bazel 9 probes for parity decisions.
+- Treat the selected active plan as controlling. Ground structural claims in
+  the evidence that plan requires: pinned Bazel source/docs, Slug source/plans,
+  or named local Bazel-vs-Slug experiments.
 
 ## Systemic-Fix Bias
 
@@ -170,6 +178,18 @@ assertion that would have failed before the fix, and record why a narrower unit
 test was not practical in the active plan. Do not rely on the full SDK smoke as
 the only regression test for a semantic bug class.
 
+Do not add duplicate tests. Before adding coverage, search for existing tests
+that already exercise the semantic and extend the narrowest existing fixture
+when that is clearer than creating a new one. If existing coverage already
+proves the behavior, cite the test and run it instead of adding another.
+
+For any plan with a validation matrix, start there. Prefer focused Rust unit
+tests for data structures, keys, parsers, and subsystem-local semantics. Prefer
+focused Python/fixture integration tests when daemon state, filesystem layout,
+external repos, toolchains, or cross-crate command execution are required. Use
+the full `//sdk:sdk_contents` smoke to advance or confirm the frontier, not as
+the first or only proof of a semantic.
+
 The following are not acceptable parity fixes unless explicitly approved by the
 user as temporary diagnostics:
 
@@ -189,12 +209,12 @@ For every new SDK failure or stall:
 1. Capture the exact command, isolation dir, log path, exit status, elapsed
    time, and memory summary.
 2. Classify the failure:
-   - depset/frozen/hashability/provider boundary: Plan 54, and possibly Plan 56.
-   - native/intrinsic provider/API boundary: Plan 56.
-   - Bazel 9 globals/toolchain/config/bazel_tools parity: Plan 15.
-   - symbolic macro inherited attrs: Plan 55.
-   - repo/materialization/layout/path issues: Plan 36 or Plan 44.
-   - memory/profiling behavior: Plan 51.
+   - Use the roadmap plan table, dependency map, and newest failure evidence to
+     choose one active plan.
+   - If multiple plans plausibly apply, pick the plan that owns the missing
+     semantic and cite the others as references, not co-owners.
+   - If no plan owns the failure class, create or update a numbered subplan
+     before implementing.
 3. Update or create the relevant plan before implementing.
 4. If it is a bug class, search for other instances of the same class.
 5. Identify the owning abstraction and explicitly reject symptom-only patches.
@@ -202,18 +222,29 @@ For every new SDK failure or stall:
    fix whenever feasible. Prefer a unit test in the subsystem that owns the
    semantic; use a focused integration-style test only when the bug cannot be
    expressed at a narrower boundary.
-7. Implement the narrowest systemic fix in the plan scope and make the new test
-   pass. The test should encode the Bazel 9 semantic, not the SDK target name,
-   current isolation directory, or observed configuration hash.
-8. Add any additional Bazel 9 parity tests or source-cited assertions needed
+7. First search for existing coverage. If an existing test already covers the
+   class, run it and update it only if the new case exposes a missing assertion.
+8. Implement the narrowest systemic fix in the plan scope and make the focused
+   test pass. The test should encode the Bazel 9 semantic, not the SDK target
+   name, current isolation directory, or observed configuration hash.
+9. Add any additional Bazel 9 parity tests or source-cited assertions needed
    for confidence in the broader bug class.
-9. Run focused verification, then broader verification appropriate to the
+10. Run focused verification, then broader verification appropriate to the
    blast radius.
-10. Rerun the SDK smoke from `/var/mnt/dev/zeromatter`.
-11. Commit each clean completed slice with a clear message.
-12. Continue the loop.
+11. Rerun a narrower zeromatter target or fixture when it exercises the same
+    frontier faster than `//sdk:sdk_contents`; rerun full `//sdk:sdk_contents`
+    only when focused checks pass and you need to advance or confirm the SDK
+    frontier.
+12. Commit each clean completed slice with a clear message.
+13. Continue the loop.
 
-## Recommended SDK Smoke
+## Frontier SDK Smoke
+
+This is the broad frontier check, not the default validation for every local
+change. Prefer focused unit tests, focused integration fixtures, or a narrower
+zeromatter target when they exercise the same behavior. Run this after focused
+checks pass, when you need to discover the next SDK blocker, or when a change
+has enough integration risk that only the full SDK target gives useful signal.
 
 Run from `/var/mnt/dev/zeromatter`, using the Slug binary built from
 `/var/mnt/dev/slug`:
@@ -251,7 +282,7 @@ If this times out while still making progress, do not stop. Use the log to
 choose one of:
 
 - run a longer bounded smoke;
-- run a narrower build for the visible waiting target;
+- run a narrower build or focused fixture for the visible waiting target;
 - add or refine Plan 51 instrumentation;
 - classify a repeated wait as a performance/stall blocker and continue.
 
@@ -262,7 +293,7 @@ above options.
 
 ## Baseline Verification After Meaningful Code Changes
 
-Use the narrowest useful checks first, then broaden:
+Use the narrowest useful checks first, then broaden only as needed:
 
 ```sh
 cd /var/mnt/dev/slug
@@ -277,25 +308,21 @@ Run relevant pytest fixtures under `tests/core/...` when pytest is available.
 If pytest is unavailable, state that and use direct Slug fixture builds where
 practical.
 
-Always rerun a bounded zeromatter SDK smoke after meaningful changes.
+Do not spend minutes on the full SDK smoke when a focused unit or smaller
+integration test proves the same semantic. After meaningful changes, run:
+
+1. The focused test that failed before the fix or would have failed without it.
+2. Existing nearby tests that already cover the touched abstraction.
+3. `cargo check -p slug` or a touched-crate check when API boundaries changed.
+4. A narrower zeromatter target or fixture if the bug only appears through
+   repository/toolchain integration.
+5. Full `//sdk:sdk_contents` only to advance/confirm the frontier or before a
+   handoff claiming SDK progress.
 
 ## Known Recent Frontier Pattern
 
-Do not assume this is still current; verify with a fresh run.
-
-Recent work advanced past:
-
-- C++ toolchain `ctx.toolchains` recursion by using a C++ NativeShim boundary.
-- `rules_rust` `depset(deps)` mutable-value failure by making relevant C++
-  provider/native-shim values depset-hashable.
-- `ctx.attr` source-file File/Target mismatch by exposing source files in
-  `attr.label/list(..., allow_files=True)` as Bazel-like `Target` values.
-- Bazel 9 target-name punctuation for generated Rust source paths such as
-  `src/output_tests/expected/into_bytes_enum.repr(C).expected.rs`.
-
-The last bounded smoke may have timed out during ongoing Rust/Arrow/AWS SDK
-analysis rather than failing. Treat that as a cue to continue the loop with a
-longer or more instrumented run, not as completion.
+Do not assume any frontier note is current. Rediscover with a fresh focused
+check or smoke, then classify the observed blocker against the active plan.
 
 ## Handoff Requirements
 

@@ -3,6 +3,14 @@
 > **Parent Plan**: [Slug Bazel-Compatible Build Tool](../2026-01-21-slug-bazel-compatible-build-tool.md)
 > **Research**: [Sync Extension Executor Architecture Analysis](../../research/2026-02-18-sync-extension-executor-architecture-analysis.md)
 
+> **2026-05-18 correction**: This is a historical plan. It successfully
+> removed the pre-DICE sync executor and `.buckconfig` cell bootstrap, and it
+> made the lockfile schema much closer to Bazel 9. It did not produce true
+> DICE-owned bzlmod. Ordinary builds now treat `MODULE.bazel.lock` as read-only;
+> missing extension results execute in DICE memory and are not written back to
+> the Bazel-owned lockfile. Plan 61 owns the remaining graph-ownership and replay
+> correctness work.
+
 ## Motivation
 
 Slug currently has **4 distinct .bzl loading paths**, a **synchronous pre-DICE extension executor** with a subset of Starlark globals, and **deep dependency on `.buckconfig` files** for cell definitions. This diverges from Bazel's unified Skyframe-based architecture where:
@@ -14,7 +22,7 @@ Slug currently has **4 distinct .bzl loading paths**, a **synchronous pre-DICE e
 
 Additionally, Slug's lockfile format diverges from Bazel 9.0's actual format in several ways that break cross-tool compatibility.
 
-This plan unifies Slug's execution environments to match Bazel's architecture and ensures lockfile format compatibility.
+This plan was intended to unify Slug's execution environments to match Bazel's architecture and ensure lockfile format compatibility. The useful parts landed, but later audits showed that true bzlmod ownership still requires a dedicated DICE graph plan.
 
 ---
 
@@ -57,8 +65,10 @@ Extension repos accessed → DICE-based execution (full globals)
 MODULE.bazel parsed (all modules in dep graph)
        │
        ▼
-Pre-compute ALL canonical names from module graph topology
-  (deterministic: _main~{ext_name}~{repo_name} from use_repo() declarations)
+Compute module repo identities and extension unique names from the resolved
+module graph. Pre-register only the extension repos knowable from
+`use_repo()` / `use_repo_rule()` declarations; repos generated but not imported
+through declarations become visible after extension evaluation.
        │
        ▼
 Register ALL cells (bzlmod deps + extension repo placeholders) in CellResolver
@@ -70,13 +80,18 @@ DICE starts with complete CellResolver
 Extension repo first accessed → SingleExtensionExecutionKey::compute()
        │
        ├── Lockfile HIT → return cached RepoSpecs (no .bzl loading)
-       └── Lockfile MISS → load extension .bzl via DICE → execute → cache in lockfile
+       └── Lockfile MISS → load extension .bzl via DICE → execute → cache in DICE memory only
        │
        ▼
 Repo rule execution → StarlarkRepoRuleExecutor (DICE-based, full globals)
 ```
 
-**Key insight**: `use_repo(pip, "numpy")` in `MODULE.bazel` tells us the canonical name `_main~pip~numpy` WITHOUT running the pip extension. We just need the module graph topology.
+**2026-05-18 correction**: Bazel computes extension unique names from the
+resolved module graph before extension evaluation, but the canonical repo name
+is `{extensionUniqueName}+{internalRepoName}`. Do not use stale formulas such as
+`_main~pip~numpy` without validating against the pinned Bazel source
+(`BazelDepGraphFunction`, `BazelDepGraphValue`, and
+`ModuleExtensionRepoMappingEntriesFunction`) and a local Bazel repro.
 
 ---
 
@@ -97,7 +112,7 @@ Repo rule execution → StarlarkRepoRuleExecutor (DICE-based, full globals)
 
 ### Goal
 
-Make Slug's `MODULE.bazel.lock` format match Bazel 9.0's lockfile format exactly. A lockfile written by Slug should be parseable by Bazel, and vice versa.
+Make Slug's `MODULE.bazel.lock` reader match Bazel 9.0's lockfile format. The current code is a read-compatible, schema-shaped subset; exact Bazel lockfile writing belongs to a future explicit lockfile-generation command, not ordinary builds.
 
 ### Current vs Bazel 9.0 Format
 
@@ -160,8 +175,8 @@ Make Slug's `MODULE.bazel.lock` format match Bazel 9.0's lockfile format exactly
 | `recordedInputs` | Missing from extensions | Present as string array | Add field |
 | `moduleExtensionMetadata` | Missing from extensions | Present (nullable) | Add field |
 | Extension ID separator | `~` (e.g. `@@rules_python~//...`) | `+` (e.g. `@@rules_python+//...`) | Update separator |
-| Registry file hashes | SRI format (`sha256-base64`) | Hex format (`sha256-hex-string`) | Match Bazel's format |
-| `recordedInputs` format | N/A | `REPO_MAPPING:mod+,name canonical`, `FILE:@@mod+//path sha256-hex`, `ENV:VAR_NAME` | Implement |
+| Registry file hashes | SRI format (`sha256-base64`) | Plain lowercase SHA-256 hex string, or `"not found"` for absent higher-precedence registry entries | Match Bazel's `Optional<Checksum>` JSON adapter (`BazelLockFileValue`, `GsonTypeAdapterUtil`, `Checksum`) |
+| `recordedInputs` format | N/A | `RepoRecordedInput.WithValue` strings | Implement Bazel parser/serializer exactly |
 
 ### Implementation
 
@@ -209,10 +224,10 @@ Add the `facts` top-level field. Initially empty, used by some extensions for me
 
 **File**: `app/slug_bzlmod/src/lockfile.rs`
 
-Bazel 9.0 stores `recordedInputs` as a list of strings in each extension's general data. Three formats:
-- `REPO_MAPPING:<module>+,<apparent_name> <canonical_name>`
-- `FILE:@@<module>+//<path> <sha256-hex>`
-- `ENV:<VARIABLE_NAME>`
+Bazel 9.0 stores `recordedInputs` as `RepoRecordedInput.WithValue` strings:
+`<escaped-input> <escaped-value>`. Known prefixes include `FILE`, `DIRENTS`,
+`DIRTREE`, `ENV`, and `REPO_MAPPING`; values may be escaped strings or `\0` for
+null. Grounding: Bazel `RepoRecordedInput.java`.
 
 - [x] Add `recorded_inputs: Vec<String>` field to `LockfileExtensionGeneral` with `#[serde(default)]`
 - [ ] Populate `recordedInputs` during extension execution (repo mappings used, files read, env vars accessed) — deferred to 9c
@@ -228,12 +243,14 @@ Bazel 9.0 stores `recordedInputs` as a list of strings in each extension's gener
 
 **Files**: Multiple
 
-Bazel 9.0 uses `+` as the separator in canonical names and extension IDs:
+Bazel 9.0 uses `+` in module and extension repo canonical names. The exact
+identity is not just a string separator rule; it is derived from typed module
+keys, extension ids, and extension unique names:
 - `@@rules_python+//python/extensions:pip.bzl%pip`
 - Canonical repo names: `rules_python+pip+numpy`
 
-Slug currently uses `~`:
-- `_main~pip~numpy`
+Slug historically used `~`-based formulas such as `_main~pip~numpy`; treat those
+as stale unless a pinned Bazel repro proves the exact behavior.
 
 - [x] Audit all canonical name construction to use `+` instead of `~`
 - [x] Update `build_canonical_names()` in `extension_execution_dice.rs`
@@ -265,11 +282,14 @@ Since we're changing the format, ensure old lockfiles can still be read (and wil
 **Automated:**
 - [x] `cargo build -p slug` succeeds
 - [x] `cargo test -p slug_bzlmod` passes (update lockfile tests for new format) — all 158 tests pass
-- [x] Lockfile written by Slug matches Bazel 9.0 JSON structure (validate with `jq` or test)
+- [~] Lockfile reader/writer structs are Bazel 9-shaped, but exact Slug-authored
+      write parity is not established and ordinary builds must not write this
+      file
 - [x] Old-format lockfiles are read without error (treated as needing refresh)
 
 **Manual:**
-- [ ] Generate a lockfile with Slug, validate the JSON structure matches Bazel 9.0
+- [ ] For a future explicit lockfile-update command, generate a lockfile with
+      Slug and validate the JSON structure matches Bazel 9.0
 - [ ] Compare field names, nesting, and value formats with a real Bazel 9.0 lockfile
 - [ ] Verify Bazel 9.0 can read a Slug-generated lockfile (at least without error)
 
@@ -279,15 +299,21 @@ Since we're changing the format, ensure old lockfiles can still be read (and wil
 
 ### Goal
 
-Register extension-generated repo cells in the CellResolver using ONLY information from `MODULE.bazel` parsing (the `use_extension()` and `use_repo()` declarations), without executing any extensions or consulting the lockfile for cell registration purposes.
+Register the extension-generated repo cells knowable from `MODULE.bazel`
+imports (`use_repo()` and `use_repo_rule()`) in the CellResolver without
+executing extensions. Repos generated but not imported through declarations are
+discovered after extension evaluation.
 
 ### How Bazel Does It
 
-`BazelDepGraphFunction` (`BazelDepGraphFunction.java`) processes all MODULE.bazel files and generates canonical names via `makeUniqueNameCandidate()`:
+`BazelDepGraphFunction` computes extension unique names from the resolved module
+graph. Generated repo canonical names are based on:
 ```
-canonical_name = <root_module>+<extension_name>+<repo_name>
+canonical_name = <extensionUniqueName>+<internal_repo_name>
 ```
-This is purely deterministic from the module graph topology. No extension execution needed.
+The module graph can tell Slug about imported repos declared by `use_repo()` /
+`use_repo_rule()`. It cannot enumerate every repo an extension may generate
+until extension evaluation produces `generatedRepoSpecs`.
 
 ### Implementation
 
@@ -308,15 +334,18 @@ For each `use_extension()` + `use_repo()` combination across all parsed modules:
 
 1. Extract the extension name from the extension ID (e.g., `pip` from `@@rules_python//python/extensions:pip.bzl%pip`)
 2. For each repo in `use_repo()`:
-   - **Positional**: `use_repo(pip, "numpy")` → canonical name `_main+pip+numpy`
-   - **Keyword**: `use_repo(pip, np = "numpy")` → canonical name `_main+pip+numpy`, alias `np` → `_main+pip+numpy`
+   - **Positional**: `use_repo(pip, "numpy")` → canonical name derived from
+     Bazel's extension unique name plus `numpy`
+   - **Keyword**: `use_repo(pip, np = "numpy")` → same canonical repo, scoped
+     apparent alias `np`
 3. Register the cell with path `bazel-external/{canonical_name}` and origin `ExternalCellOrigin::ExtensionRepo(setup)`
 4. Register aliases
 
 The canonical name construction must match `build_canonical_names()` in `extension_execution_dice.rs:556-568` (after 9a updates the separator to `+`).
 
 - [x] Create `pre_compute_extension_repo_cells()` function
-- [x] Use deterministic canonical name formula: `{root_module}+{ext_name}+{repo_name}`
+- [x] Use deterministic canonical name formula for the then-current Slug model
+      (superseded by Plan 61's typed extension-unique-name model)
 - [x] Register placeholder cells in CellsAggregator
 - [x] Register `use_repo()` aliases
 - [x] Handle keyword args in `use_repo()` (alias → canonical mapping)
@@ -390,11 +419,11 @@ Currently the DICE path requires that cells are already registered. With 9b's pr
 
 1. Check lockfile first (existing behavior)
 2. If lockfile miss: load extension .bzl via DICE, execute, capture RepoSpecs
-3. Cache results in lockfile
+3. Return results through DICE without mutating `MODULE.bazel.lock` during ordinary builds
 4. Return RepoSpecs to the repo execution key
 
 - [x] Verify `ModuleExtensionExecutionKey::compute()` works without prior sync execution
-- [x] Ensure lockfile caching works correctly in DICE-only path
+- [x] Ensure read-only lockfile cache hits work in the DICE-only path
 - [ ] Handle the case where extension generates different repos than `use_repo()` declared (validation) — deferred
 
 #### Step 2: Update `ExtensionRepoExecutionKey` for deferred resolution
@@ -449,8 +478,8 @@ When an extension finishes executing, validate that:
 
 **Manual:**
 - [ ] Verify no sync extension execution occurs (check logs for "synchronously" messages)
-- [ ] Verify lockfile is written after DICE extension execution
-- [ ] Verify second build uses lockfile cache (no re-execution)
+- [ ] Verify `MODULE.bazel.lock` is unchanged after DICE extension execution
+- [ ] Verify a second build reuses DICE state or existing Bazel-authored lockfile entries without Slug-authored lockfile writes
 
 ---
 
@@ -659,7 +688,8 @@ Path 2 is just a thin wrapper around Path 1, which is the correct architecture (
 **Manual:**
 - [x] Code review confirms only 2 .bzl loading paths remain (DICE-based + module extension executor)
 - [x] No references to sync extension executor in codebase (grep confirms)
-- [ ] Lockfile format matches Bazel 9.0 exactly — mostly complete, registry hash format TBD
+- [ ] Exact Bazel 9.0 lockfile write parity — deferred to an explicit
+      lockfile-update command; ordinary builds must remain read-only
 
 ---
 

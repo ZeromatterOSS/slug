@@ -4,6 +4,12 @@
 
 This sub-plan covers the bzlmod module system implementation. Each phase has its own detailed file.
 
+> **2026-05-18 correction**: This plan records the functional bzlmod bootstrap
+> that exists today. It is not proof of true DICE-owned bzlmod semantics. The
+> structural work to make parsed modules, resolution, repo mappings, extension
+> aggregation/results, lockfile replay inputs, and repo materialization DICE-owned
+> is tracked in [Plan 61](./61-true-dice-bzlmod.md).
+
 ---
 
 ## Phase Status
@@ -13,13 +19,13 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | **4a** | Workspace Recognition | Complete | [Link](./02-bzlmod-phase-4.md#phase-4a-workspace-recognition) |
 | **4b** | Local Dependencies | Complete | [Link](./02-bzlmod-phase-4.md#phase-4b-local-dependencies) |
 | **4c** | BCR Integration | Complete | [Link](./02-bzlmod-phase-4.md#phase-4c-bcr-integration) |
-| **4d** | Resolution & Lockfile | Complete | [Link](./02-bzlmod-phase-4.md#phase-4d-resolution-and-lockfile) |
-| **5** | Module Extensions | Complete | [Link](./02-bzlmod-phase-5-overview.md) |
+| **4d** | Resolution & Lockfile | Partial (not DICE-owned) | [Link](./02-bzlmod-phase-4.md#phase-4d-resolution-and-lockfile) |
+| **5** | Module Extensions | Partial | [Link](./02-bzlmod-phase-5-overview.md) |
 | **5a** | Extension Parsing | Complete | [Link](./02-bzlmod-phase-5-overview.md#phase-5a-extension-parsing) |
 | **5b** | Build Integration | Complete | [Link](./02-bzlmod-phase-5b.md) |
 | **5c** | Bundle @bazel_tools | Complete | [Link](./02-bzlmod-phase-5c.md) |
-| **5d** | DICE Integration | Complete | [Link](./02-bzlmod-phase-5d.md) |
-| **5e** | Extension Execution | Complete | [Link](./02-bzlmod-phase-5e.md) |
+| **5d** | DICE Integration | Foundational complete; true ownership deferred | [Link](./02-bzlmod-phase-5d.md) |
+| **5e** | Extension Execution | Partial | [Link](./02-bzlmod-phase-5e.md) |
 | **6** | Starlark Migration | Complete (N/A) | [Link](./02-bzlmod-phase-6.md) - Architectural constraint: must stay native |
 | **7** | Proto Support | Future | [Link](./02-bzlmod-phase-7.md) |
 | **8** | Full subrule() | Future | [Link](./02-bzlmod-phase-8-subrule.md) |
@@ -32,11 +38,11 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | 4a | MODULE.bazel parsed via Starlark interpreter; `slug_bzlmod/src/parser.rs` |
 | 4b | `local_path_override()` works; local modules integrated via cell system |
 | 4c | Modules fetched to `~/.cache/slug/`; SRI integrity verification works |
-| 4d | MVS algorithm in `resolution.rs`; lockfile format compatible with Bazel 9.0 |
+| 4d | MVS algorithm and Bazel-shaped lockfile parsing exist in `resolution.rs`/`lockfile.rs`, but the authoritative graph is still built before DICE and some Bazel MVS errors/replay inputs remain incomplete |
 | 5b | BCR modules fetched and registered as cells; cross-cell `load()` works; `@bazel_skylib`, `@rules_cc` load successfully |
 | 5c | `@bazel_tools` bundled from Bazel 9.0.0; automatically registered; `http.bzl`, `cache.bzl` load successfully |
-| 5d | DICE key in `repository_execution.rs`; actual execution in `repository_executor.rs` with http_archive/git support |
-| 5e | **Deferred execution**: Extensions capture RepoSpecs (not execute); repos materialize lazily on first access; module_ctx uses temp dir (deleted after) |
+| 5d | DICE keys exist for repository and extension execution, but global aggregation/alias/spoke state still bridges into DICE |
+| 5e | **Functional execution**: Extensions capture RepoSpecs and repos can materialize on access, but current behavior is hybrid: some repos are eagerly materialized, marker files/stubs still exist, and replay validation is approximate |
 | 6 | **N/A**: Modules must stay native due to global injection architecture (external cells only see base globals) |
 | 9 | **Planned**: Create `bazel-external/` symlinks to cache; required for external tools and some code paths that bypass `FileOpsDelegate` |
 
@@ -69,7 +75,7 @@ A manual test project is maintained at `tests/manual_test/` for validating bzlmo
 | Version comparison        | `targets root//:` | version >= 9.0.0-pre.20250911 is True                    |
 | @bazel_tools bundled      | `audit cell`      | bazel_tools registered without .buckconfig entry         |
 | @bazel_tools file loads   | `targets root//:` | cache.bzl loaded: True (visibility() function works)     |
-| Synthetic extension repos | `targets root//:` | bazel_features_version, bazel_features_globals created   |
+| Extension-generated repos | `targets root//:` | Real extension path or explicit bundled/toolchain repos load; synthetic hardcoded repo behavior should not be treated as parity |
 | **rules_cc loading**      | `targets root//:` | Test 14c - rules_cc loaded successfully: True            |
 | **repository_rule()**     | `targets root//:` | Test 21 - repository_rule type shown                     |
 | **@bazel_tools http.bzl** | `targets root//:` | Test 22 - http_archive type: repository_rule             |
@@ -96,7 +102,7 @@ When implementing new features:
 - Simple @bazel_skylib .bzl files load and execute
 - `visibility()` function implemented (no-op stub for now)
 - @bazel_tools files using `visibility("public")` can now be loaded (e.g., cache.bzl)
-- **Synthetic extension repos** for `bazel_features` work
+- Extension-generated repos and compatibility/bundled repos work for the currently tested rulesets, but this is not the same as full DICE-owned extension replay
 - **Version comparison works**: `bazel_features` version checks return True for 9.0.0
 - **Synthetic cc_compatibility_proxy repo** created for rules_cc
 
@@ -104,7 +110,7 @@ When implementing new features:
 
 - ~~**@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx`~~ **RESOLVED** (Phase 5)
 - ~~**Repository rule execution**: `repository_rule()` and `repository_ctx` implemented, but rules are not actually invoked~~ **RESOLVED** (Phase 5d) - DICE key + executor implemented
-- **Module extensions**: Parsing complete, execution requires DICE integration - see **Phase 5e**
+- **Module extensions**: Functional real execution exists, but true DICE ownership/replay correctness remains open in [Plan 61](./61-true-dice-bzlmod.md)
 - **rules_cc loading**: **COMPLETE** - rules_cc now loads successfully!
 - **cc_library instantiation**: **COMPLETE** (Phase 8g) - `cc_library()` targets register successfully!
   - Analysis fails with provider checking issue (`DefaultInfo in artifact`) - separate from loading/instantiation

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Slug is a Bazel 9.0-compatible build tool that leverages Buck2's high-performance Rust internals (DICE incremental computation, starlark-rust interpreter, remote execution architecture) while providing full compatibility with Bazel's BUILD.bazel files, bzlmod module system, and the rules\_\* ecosystem.
+Slug is a Bazel 9.0-compatible build tool that leverages Buck2's high-performance Rust internals (DICE incremental computation, starlark-rust interpreter, remote execution architecture). It already supports substantial Bazel BUILD.bazel, bzlmod, and rules\_\* workflows, but the remaining work is tracked as parity gaps rather than treated as full compatibility.
 
 Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiella_kuroshimae) (the "leaf sheep" sea slug), slug aims to be a small, efficient alternative to Bazel that "eats" the same build files but runs faster.
 
@@ -241,11 +241,12 @@ tables below preserve historical coverage and per-plan status.
 
 | Priority | Plan | Why now | Exit criteria |
 |----------|------|---------|---------------|
-| 1 | [46-directory-paths-in-filegroup-srcs.md](./slug-bazel-subplans/46-directory-paths-in-filegroup-srcs.md) | Unblocks LLVM toolchain analysis reached during zeromatter/rules_rust verification. | Directory paths in `filegroup.srcs` coerce as source directories; zeromatter advances past `llvm-toolchain-minimal...//:lib/clang/22`. |
-| 2 | [45-per-args-paramfile-and-cargo-runfiles.md](./slug-bazel-subplans/45-per-args-paramfile-and-cargo-runfiles.md) | Unblocks rules_rust `cargo_build_script_runner` by honoring nested `args.use_param_file(use_always=True)`. | `cargo_build_script` runfiles args arrive via `--cargo_manifest_args=@...`; the local cargo-runfiles heuristic is deleted. |
-| 3 | [44-workspace-layout-parity.md](./slug-bazel-subplans/44-workspace-layout-parity.md) Phase 2.6 | Replaces the frozen shared-execroot collision allowlist with per-action prefix narrowing. | Action cwd exposes only declared top-level prefixes; no new collision-name entries are added. |
-| 4 | [36-extension-spoke-lazy-materialization.md](./slug-bazel-subplans/36-extension-spoke-lazy-materialization.md) follow-ups | Extension materialization is a recurring zeromatter blocker; Phases 3b/4/5 are still open. | `repository_ctx` Label-path audit complete, missing `repository_rule_attr` accessors backfilled, stubbed sub-extension failures are loud and direct. |
-| 5 | [31-bazel-perf-parity.md](./slug-bazel-subplans/31-bazel-perf-parity.md) | After correctness blockers, warm-RE perf parity is the next measured gap. | Persistent action cache + watcher filter + daemon-resident BES meet the plan's gap-closing targets. |
+| 1 | [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md) | Current bzlmod is functional, but the semantic graph is still partly computed outside DICE and supported by globals, lockfile caches, markers, stubs, and repair paths. | Parsed modules, resolved graph, repo mappings, extension aggregation/results, repo specs, and materialization manifests are DICE-owned; process globals and bzlmod stub/repair paths are retired. |
+| 2 | [46-directory-paths-in-filegroup-srcs.md](./slug-bazel-subplans/46-directory-paths-in-filegroup-srcs.md) | Unblocks LLVM toolchain analysis reached during zeromatter/rules_rust verification. | Directory paths in `filegroup.srcs` coerce as source directories; zeromatter advances past `llvm-toolchain-minimal...//:lib/clang/22`. |
+| 3 | [45-per-args-paramfile-and-cargo-runfiles.md](./slug-bazel-subplans/45-per-args-paramfile-and-cargo-runfiles.md) | Unblocks rules_rust `cargo_build_script_runner` by honoring nested `args.use_param_file(use_always=True)`. | `cargo_build_script` runfiles args arrive via `--cargo_manifest_args=@...`; the local cargo-runfiles heuristic is deleted. |
+| 4 | [44-workspace-layout-parity.md](./slug-bazel-subplans/44-workspace-layout-parity.md) Phase 2.6 | Replaces the frozen shared-execroot collision allowlist with per-action prefix narrowing. | Action cwd exposes only declared top-level prefixes; no new collision-name entries are added. |
+| 5 | [36-extension-spoke-lazy-materialization.md](./slug-bazel-subplans/36-extension-spoke-lazy-materialization.md) follow-ups | Extension materialization is a recurring zeromatter blocker; Phases 3b/4/5 are still open. | `repository_ctx` Label-path audit complete, missing `repository_rule_attr` accessors backfilled, stubbed sub-extension failures are loud and direct. |
+| 6 | [31-bazel-perf-parity.md](./slug-bazel-subplans/31-bazel-perf-parity.md) | After correctness blockers, warm-RE perf parity is the next measured gap. | Persistent action cache + watcher filter + daemon-resident BES meet the plan's gap-closing targets. |
 
 ### Dependency Map
 
@@ -261,6 +262,7 @@ tables below preserve historical coverage and per-plan status.
 | 47 | Plan 06 aspect base | Full aspects parity | Owns DICE caching, incrementality, aspect chains, aspect toolchains, and `graph_structure_aspect`. |
 | 48 | Existing stub inventory | Small parity-gap closure | Groups genquery, stamping, proto, and platform-fragment gaps until any item needs a standalone plan. |
 | 49 | Plan 44 layout policy | Repo hygiene | Adds checks so generated layout artifacts do not re-enter commits. |
+| 61 | Plan 57 lockfile read-only policy, Plan 36/38 spoke materialization, Plan 09/10 historical extension execution work | Replay-correct bzlmod, daemon/watch correctness, and future explicit `slug mod` commands | Owns structural bzlmod DICE ownership; does not re-open the already-useful functional extension path except where globals/stubs/markers undermine correctness. |
 
 ### Plan Hygiene Rules
 
@@ -295,6 +297,7 @@ declared done:
 | `target_platform_has_constraint()` real constraint query | Remaining Stub Behavior / Medium Priority | [Plan 48](./slug-bazel-subplans/48-small-parity-gaps.md) |
 | C++ fragment sysroot/FDO values | Remaining Stub Behavior / Medium Priority | [Plan 48](./slug-bazel-subplans/48-small-parity-gaps.md) |
 | aspect DICE caching, incremental recomputation, `requires`, aspect toolchains, `apply_to_generating_rules` | Plan 06 | [Plan 47](./slug-bazel-subplans/47-aspects-completion.md) |
+| true DICE-owned bzlmod semantics and replay correctness | Plans 02/09/10/36/38/57 | [Plan 61](./slug-bazel-subplans/61-true-dice-bzlmod.md) |
 
 ---
 
@@ -305,12 +308,12 @@ The detailed implementation is split into focused sub-plans:
 | Sub-Plan                                                                           | Phases | Description                                                   | Status          |
 | ---------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------- | --------------- |
 | [01-foundation.md](./slug-bazel-subplans/01-foundation.md)                         | 1-3    | Fork, rebrand, Starlark dialect, BUILD.bazel detection        | **Complete**    |
-| [02-bzlmod.md](./slug-bazel-subplans/02-bzlmod.md)                                 | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **Complete**    |
+| [02-bzlmod.md](./slug-bazel-subplans/02-bzlmod.md)                                 | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **Partial** (functional parser/resolver/BCR/extension support; true DICE ownership and replay correctness move to Plan 61) |
 | [03-rule-primitives.md](./slug-bazel-subplans/03-rule-primitives.md)               | 6a,6c  | ctx/actions/providers API alignment + repository_ctx          | **Complete** (Tier 1-3 done, Tier 4 stubs adequate for rules_*) |
 | [04-prelude-architecture.md](./slug-bazel-subplans/04-prelude-architecture.md)     | 6b     | Prelude preservation, Bazel shim migration, cleanup           | **Complete** (6b.1-6b.3 done, 6b.4 partial)  |
 | [05-builtins-compatibility.md](./slug-bazel-subplans/05-builtins-compatibility.md) | 7a-7d  | Bazel native rules, global functions, modules, Buck2 removal  | **Complete** (all native rules, globals, modules done; documentation items remain) |
 | [06-aspects.md](./slug-bazel-subplans/06-aspects.md)                               | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **Partial / functional** (core execution and propagation work; DICE caching, incremental recomputation, and some advanced features remain open) |
-| [09-unified-execution-architecture.md](./slug-bazel-subplans/09-unified-execution-architecture.md) | 9a-9f  | Lockfile compat, unified DICE execution, .buckconfig removal  | **Complete**    |
+| [09-unified-execution-architecture.md](./slug-bazel-subplans/09-unified-execution-architecture.md) | 9a-9f  | Lockfile compat, unified DICE execution, .buckconfig removal  | **Superseded/Historical** (sync executor and `.buckconfig` paths removed; true DICE bzlmod is Plan 61) |
 | [07-rules-integration.md](./slug-bazel-subplans/07-rules-integration.md)           | 10-14  | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | **Complete**    |
 | [08-infrastructure.md](./slug-bazel-subplans/08-infrastructure.md)                 | 16-18  | Sandboxing, platform support, query                           | **Functional**  |
 
@@ -318,7 +321,7 @@ The detailed implementation is split into focused sub-plans:
 
 | Sub-Plan                                                                                             | Description                                                      | Status          |
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------- |
-| [10-module-extension-execution.md](./slug-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **Complete** (extensions execute end-to-end; follow-up spoke materialization moved to Plan 36; Phase 6.3 cell-registration cleanup deferred) |
+| [10-module-extension-execution.md](./slug-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **Partial** (real extension execution path exists; eager materialization, stubs, globals, and replay gaps remain; Plan 61 owns structural cleanup) |
 | [11-toolchain-resolution.md](./slug-bazel-subplans/11-toolchain-resolution.md)                       | Replace ToolchainsStub with real Bazel toolchain resolution algorithm | **Phase 1–7 Complete; Phase 8 implemented** (alias resolution for `toolchain_type` labels — code+unit tests landed 2026-05-04; runtime exercise gated on Plan 13 Phase 3) |
 | [12-stub-cleanup-and-exec-groups.md](./slug-bazel-subplans/12-stub-cleanup-and-exec-groups.md)       | Rename remaining stubs, real BuildConfiguration, exec group resolution | **Complete** (automated; manual verification remaining) |
 | [13-lazy-toolchain-loading.md](./slug-bazel-subplans/13-lazy-toolchain-loading.md)                   | Filter dev_dependency, make toolchain loading resilient, reduce eager loading | **Partial** (Phase 3 landed and zeromatter gets past the 30-min wall; focused smoke harness still open) |
@@ -352,6 +355,7 @@ The detailed implementation is split into focused sub-plans:
 | [48-small-parity-gaps.md](./slug-bazel-subplans/48-small-parity-gaps.md)                               | Own small remaining parity gaps: genquery, stamping, proto action/toolchain behavior, and `target_platform_has_constraint()`. | **Proposed** |
 | [49-generated-output-hygiene.md](./slug-bazel-subplans/49-generated-output-hygiene.md)                 | Add repo hygiene checks preventing generated layout artifacts from being committed. | **Proposed** |
 | [59-analysis-parity-guardrails.md](./slug-bazel-subplans/59-analysis-parity-guardrails.md)             | Cross-plan guardrails for recurring SDK analysis failures: Bzlmod canonical identity, toolchain/provider ownership, rule-based C++ contract tests, and smoke classification. | **In Progress** |
+| [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md)                                 | Rebuild bzlmod as a DICE-owned graph: parsed modules, resolved graph, repo mappings, extension aggregation/results, replay inputs, repo specs, and materialization manifests. | **Proposed** |
 
 ### Remaining Stub Behavior
 
@@ -427,7 +431,7 @@ Quick reference to all phases and their locations:
 | 4b    | bzlmod - Local Dependencies      | [x] Complete                                  |
 | 4c    | bzlmod - BCR Integration         | [x] Complete                                  |
 | 4d    | bzlmod - Resolution and Lockfile | [x] Complete                                  |
-| 5     | Module Extensions                | [x] Complete (see 02-bzlmod.md phases 5-5e)   |
+| 5     | Module Extensions                | [~] Partial (functional; true DICE ownership and replay correctness move to Plan 61) |
 | 5b    | bzlmod Build Integration         | [x] Complete                                  |
 | 5c    | Bundle @bazel_tools Repository   | [x] Bundled (file loading blocked by APIs)    |
 
@@ -469,9 +473,9 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
-| 9a    | Lockfile Format Compatibility      | [x] Complete (Bazel 9.0 format, version 26) |
+| 9a    | Lockfile Format Compatibility      | [~] Partial (Bazel 9.0 version 26 reader/schema-shaped subset; exact write parity deferred to explicit lockfile-update work) |
 | 9b    | Pre-Computed Canonical Names       | [x] Complete (pre_compute_extension_repo_cells) |
-| 9c    | DICE-Only Extension Execution      | [x] Complete (sync executor removed) |
+| 9c    | DICE-Only Extension Execution      | [x] Complete for sync-executor removal; [~] not complete for full DICE bzlmod ownership |
 | 9d    | .buckconfig Elimination for Cells  | [x] Complete (cells from MODULE.bazel only) |
 | 9e    | Configuration Migration (.bazelrc) | [x] Complete (bazelrc parser + injection; 2026-02-25) |
 | 9f    | Cleanup and Unification            | [x] Complete (dead code removed) |
@@ -495,11 +499,11 @@ Quick reference to all phases and their locations:
 | 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment/CoverageFragment; 60+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-12) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; slug test //... runs 4 tests; slug version/shutdown/fetch Bazel-compat commands; ctx.workspace_name/build_file_path attrs; 2026-03-12) |
 
-### Real-World Compatibility and Bazel 9 Follow-ups (Plans 19-46) — CURRENT
+### Real-World Compatibility and Bazel 9 Follow-ups (Plans 19-61) — CURRENT
 
 | Phase | Title                                  | Sub-Plan | Status          |
 | ----- | -------------------------------------- | -------- | --------------- |
-| 19    | Module Extension Execution             | [10-module-extension-execution.md](./slug-bazel-subplans/10-module-extension-execution.md) | [x] Complete (extensions execute end-to-end; follow-up spoke materialization lives in Plan 36) |
+| 19    | Module Extension Execution             | [10-module-extension-execution.md](./slug-bazel-subplans/10-module-extension-execution.md) | [~] Partial (extensions execute end-to-end; eager materialization, fallback stubs, and replay ownership remain) |
 | 20    | Toolchain Resolution                   | [11-toolchain-resolution.md](./slug-bazel-subplans/11-toolchain-resolution.md) | [~] Phase 1–7 done; **Phase 8 implemented** (alias resolution; runtime gated on Plan 13 Phase 3) |
 | 21    | Lazy Toolchain Loading & dev_dep      | [13-lazy-toolchain-loading.md](./slug-bazel-subplans/13-lazy-toolchain-loading.md) | [~] Partial: Phase 3 landed and zeromatter gets past the 30-min toolchain-loading wall; focused smoke harness still open |
 | 22    | CLI Flag Compatibility                 | [22-cli-flag-compat.md](./slug-bazel-subplans/22-cli-flag-compat.md) | [~] In Progress |
@@ -519,6 +523,7 @@ Quick reference to all phases and their locations:
 | 36    | Extension Spoke Lazy Materialization   | [36-extension-spoke-lazy-materialization.md](./slug-bazel-subplans/36-extension-spoke-lazy-materialization.md) | [~] Phases 1–3 done (2026-05-05). `zeromatter//sdk:sdk_contents` reaches deep analysis with ~550 crate spokes lazily materialized; new blocker is a package-file-tree-loading hang on a zeromatter-specific local-vendored crate (`crates__rstar-0.12.2-zm`), out of plan scope. Phases 3b (`repository_ctx` audit), 4 (`repository_rule_attr` backfill), 5 (stubbed sub-extension loud-fail) still open. |
 | 37    | Canonical-cell-prefix routing          | [37-canonical-cell-prefix-routing.md](./slug-bazel-subplans/37-canonical-cell-prefix-routing.md) | [x] Complete |
 | 38    | Spoke registration without lockfile    | [38-spoke-registration-without-lockfile.md](./slug-bazel-subplans/38-spoke-registration-without-lockfile.md) | [x] Complete |
+| 61    | True DICE-owned bzlmod                 | [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md) | [ ] Proposed |
 | 39    | Preserve `.git` from `git_repository`  | [39-git-repository-keep-dot-git.md](./slug-bazel-subplans/39-git-repository-keep-dot-git.md) | [~] Partial: git worktree path works; Starlark override of native built-in remains open |
 | 40    | bazel_lib `relative_file`              | [40-bazel-lib-relative-file.md](./slug-bazel-subplans/40-bazel-lib-relative-file.md) | [x] Complete |
 | 41    | Transition allowlist cfg resolution    | [41-config-transition-allowlist-resolution.md](./slug-bazel-subplans/41-config-transition-allowlist-resolution.md) | [x] Complete |

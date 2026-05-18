@@ -2,26 +2,38 @@
 
 > **Main Plan**: [2026-01-21-slug-bazel-compatible-build-tool.md](../2026-01-21-slug-bazel-compatible-build-tool.md)
 
+> **2026-05-18 correction**: This is a functional/historical plan, not a clean
+> true-DICE bzlmod design. The real extension execution path exists, but current
+> code still has eager materialization, fallback stubs, process-global extension
+> and spoke state, marker-file validity, and approximate lockfile replay inputs.
+> Plan 61 owns the structural cleanup. Plan 36 remains the tactical spoke
+> materialization follow-up.
+
 ## Overview
 
 Remove the entire synthetic repository system and let ALL module extensions
 execute via DICE. The synthetic repos were a stopgap during early development —
 they are a crutch that must be removed entirely. The DICE-based extension
-execution infrastructure already exists and works. The only thing blocking real
-execution is that `synthetic_repos.rs` intercepts known extensions and
-short-circuits them with hardcoded stubs.
+execution infrastructure exists and is useful. At the time this plan was
+written, the major blocker was `synthetic_repos.rs` intercepting known
+extensions. That specific shape has moved on, but equivalent parity risks still
+exist wherever extension/repository failures degrade into stubs or empty specs.
 
 ## Current State Analysis
 
 ### What Works
 
 - `ModuleExtensionExecutionKey::compute()` in `extension_execution_dice.rs` —
-  full DICE pipeline with lockfile caching
+  DICE execution path that can consume existing Bazel lockfile entries; Slug
+  does not persist new extension results to `MODULE.bazel.lock` during ordinary
+  builds
 - `ConcreteModuleExtensionExecutor::try_execute_starlark()` — loads `.bzl` files,
   evaluates extension implementations, captures `RepoSpec` objects
-- `ModuleContext` in `module_ctx.rs` — complete Bazel-compatible `module_ctx` with
-  `path()`, `execute()`, `download()`, `download_and_extract()`, `read()`,
-  `which()`, `os.name/arch`, `modules`, etc.
+- `ModuleContext` in `module_ctx.rs` — implements a broad Slug subset of
+  Bazel's `module_ctx` surface (`path()`, `execute()`, downloads, `read()`,
+  `which()`, `os`, `modules`, `facts`, etc.). Exact parity remains API-by-API
+  and should be checked against Bazel `ModuleExtensionContext` and
+  `StarlarkBaseExternalContext`.
 - `repository_rule.rs:403-424` — `in_extension_context()` correctly captures
   `RepoSpec` instead of executing downloads
 - `ExtensionRepoExecutionKey` in `repository_execution.rs` — lazy materialization
@@ -31,11 +43,11 @@ short-circuits them with hardcoded stubs.
 
 ### What's Broken
 
-`synthetic_repos.rs` line 99-187 (`generate_synthetic_repos_for_extension`)
-intercepts ALL known extensions and returns hardcoded `SyntheticRepo` objects.
-These are materialized as regular cells (not `ExtensionRepo` cells), which means
-they never trigger DICE execution. The crate extension was already changed to
-return `None`, but it fails because its dependencies are still stubbed.
+The original `synthetic_repos.rs` interception described here is historical.
+The current risks are broader: unknown or failing repository rules can still
+create stubs, some extension failures return empty specs, generated repos may be
+eagerly materialized after extension evaluation, and bzlmod semantic facts are
+still bridged through globals rather than owned by DICE keys.
 
 ### The Extension Dependency Chain (zeromatter)
 
@@ -190,8 +202,9 @@ exist.
 1. **Not implementing full toolchain resolution** — host-detected stubs remain as
    fallbacks for `ctx.toolchains[]` until real toolchain resolution is wired
 2. **Not implementing sandboxed execution** — extensions run with full host access
-3. **Not implementing lockfile-based caching initially** — extensions re-execute
-   on daemon restart (lockfile support exists but may need debugging)
+3. **Not implementing build-time lockfile writes** — DICE execution can consume
+   existing Bazel lockfile entries, but Slug does not persist new extension
+   results to `MODULE.bazel.lock` during ordinary builds
 
 ## Phase 0: Clean Up Investigation Artifacts
 
@@ -1321,8 +1334,12 @@ Verified:
 - Phase 7.1 (parallel toolchain package loading): complete (commit
   2b0f50a)
 - Phase 7 real-world verification: complete (commit 04176ec)
-- Phase 7.2 (on-demand spoke materialization): **not required**.
-  Amplification (214 repos) is wasteful in disk/time but not a hang
+- Phase 7.2 (on-demand spoke materialization): **superseded by Plan 36**.
+  Later zeromatter verification proved this was a correctness issue for
+  extensions that call `mctx.path(Label)`/`mctx.read(Label)` on internal spoke
+  repos. The blocking route landed through `with_extension_dice` plus
+  `materialize_spoke_sync`; Plan 36 still owns the broader repository_ctx audit,
+  attr backfill, and loud-fail cleanup.
   source. Defer indefinitely; reassess if disk-usage or first-build
   wall-time becomes a user complaint.
 - Plans 14a / 14b / 14c: drafted during investigation, retained as

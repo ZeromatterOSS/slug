@@ -16,23 +16,29 @@ downloads reproducible across extension evaluations.
 - `../bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionContext.java`
   exposes `module_ctx.facts` as a Starlark struct field and accepts
   `facts` in `extension_metadata(...)`.
+- `../bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Facts.java`
+  defines the supported JSON-like facts shape and validation.
 - `../bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java`
-  reads facts from extension metadata, writes them to the lockfile value, and
-  deliberately does not use fact contents as an invalidation input.
+  reads facts from workspace/hidden lockfiles, writes facts in update/refresh
+  modes, validates changed facts in error mode after execution, and deliberately
+  does not use fact contents as a normal replay invalidation input.
 - `zeromatter-slug/bazel-external/rules_rs+override/rs/private/downloader.bzl`
   skips sparse-index fetches when a key is present in `mctx.facts`.
 
 ## Current Slug Gap
 
-- `app/slug_bzlmod/src/lockfile.rs` already has a top-level `facts` field, but
-  the extension execution path does not populate or consume it.
-- `app/slug_interpreter_for_build/src/module_ctx/context.rs` does not expose a
-  `facts` field on `module_ctx`.
-- `app/slug_interpreter_for_build/src/module_ctx/methods.rs` has an
-  `extension_metadata` stub that accepts kwargs but discards them.
-- `app/slug_bzlmod/src/extension_execution_dice.rs` caches generated repository
-  specs, but does not pass prior facts into extension execution or persist newly
-  returned facts.
+2026-05-18 status: this plan is partly implemented. Slug can read top-level
+lockfile facts, pass prior facts into extension execution, expose
+`module_ctx.facts`, and accept/return `extension_metadata(facts = ...)`.
+
+The remaining gaps are propagation and persistence policy. Returned metadata is
+not written back to `MODULE.bazel.lock` during ordinary builds, which follows
+Plan 57's Slug safety policy rather than Bazel's update/refresh write behavior.
+Returned metadata also needs to remain available in a DICE value
+(`ModuleExtensionResult` or a sibling value) so a future explicit lockfile
+update command can persist it. Future persistence must happen through an
+explicit Bazel-parity lockfile update command or a separate Slug-owned cache,
+not lazy build-time mutation of the Bazel-owned lockfile.
 
 ## Implementation
 
@@ -43,7 +49,8 @@ downloads reproducible across extension evaluations.
    Bazel metadata can be added without rewriting the execution API.
 
    Facts must be JSON-like values only. Validate and normalize at the Starlark
-   boundary before storing them in the lockfile.
+   boundary using Bazel `Facts.java` semantics before storing them in any DICE
+   value or lockfile update.
 
 2. Pass prior facts into module contexts
 
@@ -62,10 +69,11 @@ downloads reproducible across extension evaluations.
    implementation. If the implementation returns `None`, preserve current
    behavior and treat it as empty metadata.
 
-4. Persist facts
+4. Persist facts through an explicit update path
 
-   After a successful extension execution, store returned facts at the top-level
-   lockfile facts key for that extension id.
+   After a successful extension execution in an explicit future lockfile update
+   command, store returned facts at the top-level lockfile facts key for that
+   extension id. Ordinary `slug build` must not mutate `MODULE.bazel.lock`.
 
    Keep the existing `moduleExtensions` repository-spec cache. Facts complement
    that cache; they do not replace it.
@@ -82,7 +90,8 @@ downloads reproducible across extension evaluations.
 
 6. Add focused tests
 
-   Add a lockfile roundtrip test proving `facts` survive load/save.
+   Add a lockfile roundtrip test proving `facts` survive load/save for the
+   explicit lockfile-update path.
 
    Add a small Starlark extension test where the first execution returns facts
    and the second execution observes them via `mctx.facts`.
@@ -98,19 +107,22 @@ downloads reproducible across extension evaluations.
 ## Risks
 
 - Facts come from a previous extension execution and must not be treated as
-  invalidation inputs. Bazel intentionally does not diff fact contents before
-  reusing the lockfile value.
+  normal replay invalidation inputs. Bazel intentionally does not diff fact
+  contents before reusing the lockfile value, but in `--lockfile_mode=error` it
+  validates newly returned facts against the workspace lockfile after execution.
 - Facts need Starlark-to-JSON conversion parity. Reject arbitrary providers,
   artifacts, functions, or other non-JSON values at `extension_metadata`.
-- Lockfile merge behavior can be deferred unless Slug already has a lockfile
-  merge workflow. The first implementation should store the exact returned facts
-  for each extension id.
+- Lockfile merge/write behavior belongs to an explicit lockfile-update workflow.
+  Ordinary build/test/query/audit commands should read facts but leave
+  `MODULE.bazel.lock` byte-for-byte unchanged.
 
 ## Acceptance Criteria
 
 - `hasattr(mctx, "facts")` is true for module extensions.
-- `module_ctx.extension_metadata(facts = ...)` persists facts into
-  `MODULE.bazel.lock`.
+- `module_ctx.extension_metadata(facts = ...)` returns/captures facts without
+  mutating `MODULE.bazel.lock` during ordinary builds.
+- An explicit future lockfile-update command can persist facts into
+  `MODULE.bazel.lock` with Bazel-shaped serialization.
 - A stale extension repo-spec cache re-executes with prior facts available.
 - The zeromatter `rules_rs` build no longer refetches the same sparse registry
   metadata on the second run.
