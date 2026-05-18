@@ -689,6 +689,25 @@ fn preferred_module_form_target(
     best
 }
 
+fn desired_external_symlink_target(
+    project_root: &std::path::Path,
+    cell_name: &str,
+    cell_path: &str,
+) -> (std::path::PathBuf, u8) {
+    let target = external_symlink_target(project_root, cell_path);
+    let priority = module_form_priority(cell_path);
+    if cell_name.contains('+') {
+        return (target, priority);
+    }
+    if let Some(module_target) = preferred_module_form_target(project_root, cell_name, priority) {
+        return (module_target, 3);
+    }
+    (
+        preferred_external_symlink_target(project_root, cell_name, &target),
+        priority,
+    )
+}
+
 pub fn repair_external_symlink_targets(project_root: &std::path::Path) {
     let external_dir = project_root.join("external");
     let Ok(entries) = std::fs::read_dir(&external_dir) else {
@@ -776,8 +795,8 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     };
     let external_dir = project_root.join("external");
     let link_path = external_dir.join(cell_name);
-    let desired_target = external_symlink_target(&project_root, cell_path);
-    let desired_priority = module_form_priority(cell_path);
+    let (desired_target, desired_priority) =
+        desired_external_symlink_target(&project_root, cell_name, cell_path);
     match link_path.symlink_metadata() {
         Ok(meta) if meta.file_type().is_symlink() => {
             // Replace symlink only if it points to a different target.
@@ -1910,6 +1929,46 @@ mod tests {
             external_symlink_target(project_root, "bazel-external/rules_rust+0.69.0"),
             std::fs::canonicalize(repo).unwrap()
         );
+    }
+
+    #[test]
+    fn desired_external_symlink_target_prefers_module_form_for_apparent_alias() {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_root = tmp.path();
+        let bazel_external = project_root.join("bazel-external");
+        let module_repo = bazel_external.join("rules_python+1.9.0");
+        let extension_repo = bazel_external.join("rules_foreign_cc++ext+rules_python");
+        std::fs::create_dir_all(&module_repo).unwrap();
+        std::fs::create_dir_all(&extension_repo).unwrap();
+
+        let (target, priority) = desired_external_symlink_target(
+            project_root,
+            "rules_python",
+            "bazel-external/rules_foreign_cc++ext+rules_python",
+        );
+
+        assert_eq!(priority, 3);
+        assert_eq!(target, std::fs::canonicalize(module_repo).unwrap());
+    }
+
+    #[test]
+    fn desired_external_symlink_target_keeps_canonical_extension_cell() {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_root = tmp.path();
+        let bazel_external = project_root.join("bazel-external");
+        let module_repo = bazel_external.join("rules_python+1.9.0");
+        let extension_repo = bazel_external.join("rules_foreign_cc++ext+rules_python");
+        std::fs::create_dir_all(&module_repo).unwrap();
+        std::fs::create_dir_all(&extension_repo).unwrap();
+
+        let (target, priority) = desired_external_symlink_target(
+            project_root,
+            "rules_foreign_cc++ext+rules_python",
+            "bazel-external/rules_foreign_cc++ext+rules_python",
+        );
+
+        assert_eq!(priority, 2);
+        assert_eq!(target, std::fs::canonicalize(extension_repo).unwrap());
     }
 
     #[test]

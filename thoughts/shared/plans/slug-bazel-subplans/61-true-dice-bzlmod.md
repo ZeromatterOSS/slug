@@ -717,6 +717,56 @@ Manager process correction 2026-05-18:
   output parity, an explicit user stop, or a blocker-grade resume prompt with
   exact commands/logs/state.
 
+SDK parity frontier 2026-05-18:
+
+- The bounded SDK smoke progressed through bzlmod analysis and failed during
+  execution of `reactor//sdk:license_comment` because action inputs under
+  `external/rules_python/python/private/...` resolved through
+  `external/rules_python -> bazel-external/rules_foreign_cc++ext+rules_python`
+  instead of the direct module repo
+  `bazel-external/rules_python+1.9.0`.
+- Missing semantic: `external/<apparent>` layout for a name that is both a
+  direct module repo and an extension-generated repo must prefer the Bazel
+  module-form repository for source-file action paths. Extension spokes still
+  keep their canonical symlinks; the apparent symlink is not an extension
+  identity.
+- Owning subsystem: `slug_core::cells` external symlink layout, currently
+  reached from legacy bzlmod cell setup in
+  `slug_common::legacy_configs::cells`; the target Plan 61 owner is
+  `ExternalSymlinkLayoutKey { workspace_id, output_base, cell_graph_digest }`.
+- Other affected targets/features: any action input path under
+  `external/<module>` when a module name collides with a generated repo apparent
+  name, including `rules_python` templates and similar ruleset source files.
+- One-off workaround rejected: manually relinking
+  `zeromatter-kuro/external/rules_python` or adding an SDK-specific alias.
+
+Implementation slice 2026-05-18, external apparent symlink collision:
+
+- Added a layout regression in `app/slug_core/src/cells.rs` proving
+  `external/rules_python` chooses the direct module-form repository
+  `rules_python+1.9.0` when an extension spoke
+  `rules_foreign_cc++ext+rules_python` also exists, while the canonical
+  extension symlink still points at the extension repo.
+- Updated `ensure_external_symlink` to compute the preferred apparent target
+  before comparing or creating symlinks. Apparent names with a module-form
+  repo now select that module target; canonical extension cell names are left
+  untouched.
+- Added a final `repair_external_symlink_targets` pass after legacy bzlmod cell
+  and alias symlink setup so stale links from previous ordering are corrected
+  once all module and extension repositories are visible.
+- Validation: `cargo test -p slug_core external_symlink -- --nocapture`
+  passed, `cargo fmt --check` passed, `cargo check -p slug_core -p
+  slug_common` passed, and `cargo build -p slug` passed. The focused
+  `zeromatter-kuro` build
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir
+  sdk-license-20260518-155252 build //sdk:license_comment` passed and repaired
+  `external/rules_python` to the `rules_python+1.9.0` source tree.
+- Full SDK smoke with `scripts/memory_smoke.sh` and isolation
+  `sdk-parity-20260518-155728` no longer hit the previous `rules_python`
+  template-read failure. It timed out after 900s while actively executing
+  LLVM/libcxx/musl/compiler-rt actions, with about 2,560 actions remaining and
+  peak sampled RSS above 6.8 GiB. This is progress evidence, not acceptance.
+
 Previous implementer delegation prompt, completed by the stale-marker slice:
 
 ```text

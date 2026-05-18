@@ -1379,6 +1379,7 @@ impl BuckConfigBasedCells {
                     slug_core::cells::ensure_external_symlink(alias_str, path.as_str());
                 }
             }
+            slug_core::cells::repair_external_symlink_targets(project_root.root().as_path());
         }
 
         Ok(Some(BzlmodResolutionResult {
