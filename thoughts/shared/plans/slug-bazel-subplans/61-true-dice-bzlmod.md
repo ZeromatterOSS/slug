@@ -1616,6 +1616,58 @@ Continuation 2026-05-18/19 on Windows checkout:
   build_script` successfully in 18m48s with 699 local commands and no daemon
   left running afterward. Next class boundary: rerun full `//sdk:sdk` and
   classify the next frontier beyond generated workspace build scripts.
+- Full SDK rerun `sdk-target-sdk-after-cargo-paths-20260519-001-rerun2`
+  advanced beyond generated build scripts and failed in
+  `//sdk/zeromatter_ffi:zeromatter_ffi` during the Windows MSVC Rust link. The
+  `rust-lld` invocation reports undefined imported UCRT symbols from
+  `libaws_lc_sys-3256947194.rlib` (`strtol`, `getenv`, stdio/file APIs,
+  `_setmode`) and notes that the found `libucrt.lib` cannot be used because it
+  is not an import library. The printed link command includes
+  `/defaultlib:msvcrt` plus MSVC UCRT/UM `-LIBPATH` entries. Next class
+  boundary: Bazel 9/rules_rust parity for Windows MSVC CRT default libraries
+  and link action construction for Rust targets that consume C/C++ static
+  archives. Own this in Slug's Rust/C++ toolchain link-flag and environment
+  modeling, not as a `zeromatter_ffi` or `aws-lc-sys` workaround.
+- Focused rerun `zeromatter-ffi-link-crt-20260519-002` confirmed that adding
+  CRT import libraries inside Slug's generic `cc_common` command-line expansion
+  does not reach this direct `rules_rust`/`rust-lld` path: the failing command
+  still contains only `/defaultlib:msvcrt` plus `LIBPATH` entries. Implementation
+  boundary for the next slice: patch Slug's Windows Rust action argv preparation
+  for process-wrapper `rustc` invocations that use `rust-lld` for MSVC targets,
+  adding the missing dynamic CRT import libraries before the long Rust tail is
+  parameterized. Do not keep a broad `cc_common` behavior change unless later
+  evidence shows Bazel/rules_cc emits those libraries there too.
+- Focused rerun `zeromatter-ffi-rust-lld-crt-20260519-003` showed the first
+  Rust argv rewrite did not reach `zeromatter_ffi`: Slug had already moved the
+  target's Rust arguments into the action-local generic `slug-params-0` file.
+  The file contains `--target=x86_64-pc-windows-msvc`, `-Clinker=rust-lld.exe`,
+  and MSVC `LIBPATH` link args, but no explicit CRT import-library link args.
+  Extend the same Windows MSVC/rust-lld CRT insertion to generic Rust paramfile
+  materialization, beside the existing Rust execroot-remap rewrite.
+- Focused rerun `zeromatter-ffi-rust-param-crt-20260519-004` verified the
+  paramfile insertion reached `rust-lld` and moved past the previous
+  `zeromatter_ffi` UCRT unresolved symbols. The next failure is later, in
+  `//sdk/sdk_builder:sdk_builder_bin`, with duplicate `__report_gsfailure`
+  between explicit `vcruntime.lib` and the already-present `/defaultlib:msvcrt`.
+  Narrow the insertion to the missing UCRT import library plus `oldnames.lib`;
+  do not override the runtime flavor selected by the toolchain defaults.
+- Focused rerun `zeromatter-ffi-rust-ucrt-crt-20260519-005` shows explicit
+  `ucrt.lib` and `oldnames.lib` reach `rust-lld`, but Rust's default MSVC link
+  still brings in static `libucrt.lib`, producing duplicate UCRT symbols
+  (`_invalid_parameter_noinfo`, `_wctype`, `__pctype_func`). Pair the explicit
+  UCRT import library with `/nodefaultlib:libucrt` so the dynamic import library
+  replaces the static default rather than adding a second UCRT.
+- Verified rerun `zeromatter-ffi-rust-ucrt-nodefault-20260519-006` succeeded
+  for `//sdk/zeromatter_ffi:zeromatter_ffi` in 71m48s with 2247 local commands.
+  The successful slice adds Windows Rust paramfile/argv rewriting for MSVC
+  `rust-lld` links: if a Rust action targets `windows-msvc`, uses `rust-lld`,
+  and has not already specified the dynamic UCRT fixup, Slug appends
+  `/nodefaultlib:libucrt`, `ucrt.lib`, and `oldnames.lib` as rustc link args.
+  This preserves the toolchain's existing `/defaultlib:msvcrt` runtime choice
+  while making C archives that import UCRT symbols link under `rust-lld`. The
+  smoke left one `slug.exe` daemon for the isolation dir; clean it before the
+  next run. Next class boundary: commit this verified CRT slice, then run full
+  `//sdk:sdk` again.
 
 Exit criteria:
 

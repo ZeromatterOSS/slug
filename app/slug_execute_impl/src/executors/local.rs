@@ -409,6 +409,9 @@ impl LocalExecutor {
                         action_execroot.as_deref(),
                     );
                 }
+                if cfg!(windows) {
+                    add_windows_msvc_rust_lld_crt_args(&mut slot_args_for_file);
+                }
                 let content = match slot.format {
                     ParamFileFormat::Shell => slot_args_for_file
                         .iter()
@@ -478,6 +481,12 @@ impl LocalExecutor {
                 action_execroot.as_deref(),
                 self.root.as_path(),
             ) {
+                args_owned = Some(rewritten_args);
+            }
+        }
+        if cfg!(windows) {
+            let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
+            if add_windows_msvc_rust_lld_crt_link_args(&mut rewritten_args) {
                 args_owned = Some(rewritten_args);
             }
         }
@@ -2019,6 +2028,84 @@ fn parametrize_windows_process_wrapper_rustc_tail(
     }
 }
 
+fn add_windows_msvc_rust_lld_crt_link_args(args: &mut Vec<String>) -> bool {
+    #[cfg(not(windows))]
+    {
+        let _ = args;
+        false
+    }
+
+    #[cfg(windows)]
+    {
+        if !is_process_wrapper_rustc_invocation(args) {
+            return false;
+        }
+        let Some(separator) = args.iter().position(|arg| arg == "--") else {
+            return false;
+        };
+        let Some(missing) = missing_windows_msvc_rust_lld_crt_args(&args[(separator + 2)..]) else {
+            return false;
+        };
+        args.extend(missing);
+        true
+    }
+}
+
+fn add_windows_msvc_rust_lld_crt_args(args: &mut Vec<String>) -> bool {
+    #[cfg(not(windows))]
+    {
+        let _ = args;
+        false
+    }
+
+    #[cfg(windows)]
+    {
+        let Some(missing) = missing_windows_msvc_rust_lld_crt_args(args) else {
+            return false;
+        };
+        args.extend(missing);
+        true
+    }
+}
+
+#[cfg(windows)]
+fn missing_windows_msvc_rust_lld_crt_args(args: &[String]) -> Option<Vec<String>> {
+    if !args.iter().any(|arg| {
+        matches!(
+            arg.as_str(),
+            "-Clinker=rust-lld"
+                | "-Clinker=rust-lld.exe"
+                | "--codegen=linker=rust-lld"
+                | "--codegen=linker=rust-lld.exe"
+        )
+    }) {
+        return None;
+    }
+    if !args
+        .iter()
+        .any(|arg| arg.contains("windows-msvc") || arg.contains("\\msvc") || arg.contains("/msvc"))
+    {
+        return None;
+    }
+
+    let missing: Vec<String> = ["/nodefaultlib:libucrt", "ucrt.lib", "oldnames.lib"]
+        .into_iter()
+        .map(|lib| format!("--codegen=link-arg={lib}"))
+        .filter(|link_arg| !args.iter().any(|arg| arg == link_arg))
+        .collect();
+    if missing.is_empty() {
+        None
+    } else {
+        Some(missing)
+    }
+}
+
+#[cfg(not(windows))]
+fn missing_windows_msvc_rust_lld_crt_args(args: &[String]) -> Option<Vec<String>> {
+    let _ = args;
+    None
+}
+
 fn rewrite_windows_process_wrapper_child_tool_path(
     args: &mut [String],
     action_execroot: Option<&slug_fs::paths::abs_norm_path::AbsNormPath>,
@@ -3209,6 +3296,47 @@ mod tests {
         assert!(content.contains("-Ldependency=buck-out/p44/gen/rules_rs++crate+crates__dep-899"));
 
         Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_msvc_rust_lld_gets_dynamic_crt_link_args() {
+        let mut args = vec![
+            "external/rules_rust/util/process_wrapper/process_wrapper.exe".to_owned(),
+            "--".to_owned(),
+            "external/rustc/bin/rustc.exe".to_owned(),
+            "src/lib.rs".to_owned(),
+            "--sysroot=buck-out/gen/toolchains/windows_x86_64_rust_toolchain".to_owned(),
+            "-Clinker=rust-lld.exe".to_owned(),
+            "-Lnative=buck-out/gen/lib/rustlib/x86_64-pc-windows-msvc/lib".to_owned(),
+        ];
+
+        assert!(add_windows_msvc_rust_lld_crt_link_args(&mut args));
+        assert!(args.contains(&"--codegen=link-arg=/nodefaultlib:libucrt".to_owned()));
+        assert!(args.contains(&"--codegen=link-arg=ucrt.lib".to_owned()));
+        assert!(args.contains(&"--codegen=link-arg=oldnames.lib".to_owned()));
+        assert!(!args.contains(&"--codegen=link-arg=vcruntime.lib".to_owned()));
+        assert!(!args.contains(&"--codegen=link-arg=msvcrt.lib".to_owned()));
+        let len = args.len();
+        assert!(!add_windows_msvc_rust_lld_crt_link_args(&mut args));
+        assert_eq!(len, args.len());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_msvc_rust_lld_paramfile_gets_dynamic_crt_link_args() {
+        let mut args = vec![
+            "--target=x86_64-pc-windows-msvc".to_owned(),
+            "-Lbuck-out/gen/toolchains/windows_x86_64_rust_toolchain/lib/rustlib/x86_64-pc-windows-msvc/lib".to_owned(),
+            "-Clinker=rust-lld.exe".to_owned(),
+        ];
+
+        assert!(add_windows_msvc_rust_lld_crt_args(&mut args));
+        assert!(args.contains(&"--codegen=link-arg=/nodefaultlib:libucrt".to_owned()));
+        assert!(args.contains(&"--codegen=link-arg=ucrt.lib".to_owned()));
+        assert!(args.contains(&"--codegen=link-arg=oldnames.lib".to_owned()));
+        assert!(!args.contains(&"--codegen=link-arg=vcruntime.lib".to_owned()));
+        assert!(!args.contains(&"--codegen=link-arg=msvcrt.lib".to_owned()));
     }
 
     #[cfg(windows)]
