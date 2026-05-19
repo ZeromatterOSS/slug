@@ -1509,6 +1509,30 @@ Continuation 2026-05-18/19 on Windows checkout:
   provider/native provider depset field that is read and flattened repeatedly,
   then implement the smallest Bazel-shaped provider-field optimization or
   cached flattening improvement. Do not special-case `rules_rust`.
+- Frozen transitive depset cache slice implemented next: frozen depsets with
+  transitive children now cache their flattened frozen result after the first
+  `to_list()` when all elements are frozen, matching the existing live-depset
+  cache without changing traversal order. Validation:
+  `cargo fmt --check`, `cargo test -p slug_build_api_tests
+  interpreter::rule_defs::depset -- --nocapture` (6 passed),
+  `cargo check -p slug_build_api`, and `cargo build -p slug` passed with
+  existing warnings. Bounded SDK smoke
+  `target\debug\slug.exe --isolation-dir
+  sdk-target-sdk-frozen-cache-20260519-002 build //sdk:sdk` timed out at the
+  185s harness cap. Log:
+  `C:\Users\WALTER~1\AppData\Local\Temp\sdk-target-sdk-frozen-cache-20260519-002.log`.
+  It advanced from 240 active analysis keys after the previous slice to 224,
+  while peak RSS dropped from about 708 MiB to about 704 MiB. `to_list` reached
+  about 70,196 versus 74,456 in the previous run, at a farther analysis point;
+  `create_count` reached about 81,184. Hot samples still point at
+  rules_rust `rust/private/rustc.bzl` line 295 (`linker_inputs.to_list()`) and
+  neighboring link-provider code.
+- Next class boundary after frozen-cache: reduce live depset construction and
+  repeated list materialization in rules_rust link provider plumbing. Candidate
+  fixes must stay Bazel-shaped: compact/native provider-field storage for
+  depset-typed fields, or a depset/list bridge that avoids reconstructing
+  large direct-only depsets from already-flattened linker input lists. Avoid
+  label-specific handling.
 
 Exit criteria:
 

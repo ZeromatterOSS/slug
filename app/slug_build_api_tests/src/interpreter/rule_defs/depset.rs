@@ -114,6 +114,8 @@ fn depset_to_list_dedupes_hashable_values_preserving_order() -> slug_error::Resu
     tester.run_starlark_bzl_test(indoc!(
         r#"
         frozen_dedup = depset([("z", 3), ("z", 3)])
+        frozen_child = depset(["child"])
+        frozen_parent = depset(["parent"], transitive = [frozen_child])
 
         def test():
             assert_eq(
@@ -125,6 +127,8 @@ fn depset_to_list_dedupes_hashable_values_preserving_order() -> slug_error::Resu
                 depset([("x", 1)], transitive = [depset([("y", 2), ("x", 1), ("y", 2)])]).to_list(),
             )
             assert_eq([("z", 3)], frozen_dedup.to_list())
+            assert_eq(["child", "parent"], frozen_parent.to_list())
+            assert_eq(["child", "parent"], frozen_parent.to_list())
         "#
     ))
 }

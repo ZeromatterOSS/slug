@@ -833,7 +833,11 @@ fn depset_to_list_deduped<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v
                 let _ = depset.flattened.values.set(direct);
                 return Ok(result);
             }
-            depset_to_list_deduped_uncached(value)
+            let deduped = depset_to_list_deduped_uncached(value)?;
+            if let Some(frozen) = values_as_frozen(&deduped) {
+                let _ = depset.flattened.values.set(frozen);
+            }
+            Ok(deduped)
         }
         Some(DepsetView::Frozen(depset)) => {
             if let Some(cached) = depset.inner.flattened.values.get() {
@@ -845,10 +849,18 @@ fn depset_to_list_deduped<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v
                 let _ = depset.inner.flattened.values.set(direct);
                 return Ok(result);
             }
-            depset_to_list_deduped_uncached(value)
+            let deduped = depset_to_list_deduped_uncached(value)?;
+            if let Some(frozen) = values_as_frozen(&deduped) {
+                let _ = depset.inner.flattened.values.set(frozen);
+            }
+            Ok(deduped)
         }
         None => depset_to_list_deduped_uncached(value),
     }
+}
+
+fn values_as_frozen(values: &[Value<'_>]) -> Option<Vec<FrozenValue>> {
+    values.iter().map(|value| value.unpack_frozen()).collect()
 }
 
 fn depset_to_list_deduped_uncached<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
