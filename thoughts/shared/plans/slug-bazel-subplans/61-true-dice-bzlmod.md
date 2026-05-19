@@ -1712,6 +1712,15 @@ Implementation slice 2026-05-19, Bazel-shaped extension lockfile digests:
   a Bazel-valid lockfile again. The next concrete action is to rerun Bazel and
   Slug on `//sdk:sdk_contents` / `//sdk:sdk` after the workspace cleanup or
   lockfile regeneration, then compare the staged output/archive against Bazel 9.
+- Blocker verified after the zeromatter cleanup: `bazel build --nobuild
+  //sdk:sdk_contents` still fails before repository mapping with
+  `Illegal base64 character 2d` from `MODULE.bazel.lock`, and patched Slug now
+  fails before analysis on the same malformed visible lockfile with
+  `Failed to parse lockfile ... invalid bzlTransitiveDigest ... Invalid byte
+  45, offset 6`. The zeromatter checkout still has a user-modified
+  `MODULE.bazel.lock`, so continuing SDK output/archive parity is blocked
+  unless that lockfile is regenerated/restored or a separate clean checkout is
+  used.
 
 Exit criteria:
 
