@@ -3219,6 +3219,7 @@ mod resolved_toolchains_tests {
     use starlark::values::StarlarkValue;
 
     use super::CcToolchainInfoTargetPlatformOverlay;
+    use super::ResolvedToolchains;
     use super::cc_toolchain_native_shim_provider_collection;
     use super::cc_toolchain_runtime_solib_dir_base;
     use super::cc_toolchain_runtime_solib_path;
@@ -3287,6 +3288,37 @@ mod resolved_toolchains_tests {
             .get_attr("all_files", heap)
             .expect("overlay should still access owned inner provider attrs");
         assert!(!all_files.is_none());
+    }
+
+    #[test]
+    fn optional_cpp_toolchain_without_eager_provider_still_returns_shim() {
+        let mut toolchains = std::collections::HashMap::new();
+        toolchains.insert("@bazel_tools//tools/cpp:toolchain_type".to_owned(), None);
+        let resolved = ResolvedToolchains {
+            toolchains,
+            exec_platform: "//bazel/platforms:linux-gnu-host".to_owned(),
+            target_platform: "//bazel/platforms:linux-musl".to_owned(),
+        };
+
+        let env = Module::new();
+        let eval = Evaluator::new(&env);
+        let heap = eval.heap();
+        let key = heap.alloc_str("@bazel_tools//tools/cpp:toolchain_type");
+        let value = resolved
+            .at(key.to_value(), heap)
+            .expect("C++ toolchain lookup should return the lazy native shim");
+        assert!(!value.is_none());
+        let cc = value
+            .get_attr("cc", heap)
+            .expect("toolchain lookup should succeed")
+            .expect("toolchain should expose cc field");
+        assert_eq!(
+            cc.get_attr("libc", heap)
+                .expect("libc lookup should succeed")
+                .expect("musl overlay should expose libc")
+                .unpack_str(),
+            Some("musl")
+        );
     }
 
     #[test]

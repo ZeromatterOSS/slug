@@ -3529,6 +3529,22 @@ async fn run_analysis_with_env_underlying(
                                     let use_cpp_native_shim =
                                         is_cpp_toolchain_type_label(type_label);
                                     if use_cpp_native_shim {
+                                        if !is_mandatory {
+                                            analysis_ctx_toolchain_provider_checkpoint(
+                                                &analysis_env.label,
+                                                type_label,
+                                                &tc.toolchain_impl,
+                                                Some(&configured),
+                                                toolchain_index,
+                                                toolchain_count,
+                                                is_mandatory,
+                                                is_self_dependency,
+                                                9,
+                                                "optional_cc_toolchain_native_shim_deferred",
+                                                evaluate_rule_started,
+                                            );
+                                            None
+                                        } else {
                                         let toolchain_config_info = None;
                                         let toolchain_metadata_label = tc
                                             .cc_toolchain_config
@@ -3612,7 +3628,8 @@ async fn run_analysis_with_env_underlying(
 	                                            linker_data,
 	                                            static_runtime_data,
 	                                            dynamic_runtime_data,
-	                                        ))
+                                        ))
+                                        }
                                     } else {
                                         let analysis_result =
                                             dice.get_analysis_result(&configured).await;

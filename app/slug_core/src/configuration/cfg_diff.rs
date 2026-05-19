@@ -122,6 +122,9 @@ pub fn cfg_diff(a: &ConfigurationData, b: &ConfigurationData) -> Result<(), Stri
 
         fn diff_cfg_data(&mut self, a: &ConfigurationDataData, b: &ConfigurationDataData) {
             self.diff_constraints(&a.constraints, &b.constraints);
+            self.diff_btree_map(&a.build_settings, &b.build_settings, |k, v| {
+                format!("build setting: {k} = {v}")
+            });
         }
 
         fn diff_cfg_data_result(

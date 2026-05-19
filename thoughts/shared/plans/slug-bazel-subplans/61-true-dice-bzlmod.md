@@ -1170,6 +1170,58 @@ Implementation slice 2026-05-18, lockfile spoke preseed performance:
   analysis multiplication, using the isolated allocator repro and memory
   checkpoints rather than long SDK waits.
 
+Implementation slice 2026-05-18, optional C++ toolchain shim deferral:
+
+- Root caused the remaining focused allocator stall to eager optional C++
+  native-shim metadata materialization. `rules_rust//ffi/rs:empty_allocator_libraries`
+  declares `@bazel_tools//tools/cpp:toolchain_type` with `mandatory = False`
+  and its implementation only asks for the Rust toolchain, but Slug eagerly
+  analyzed the optional C++ native-shim provider while constructing
+  `ctx.toolchains`. Memory checkpoints from
+  `rules-rust-empty-lazy-lockfile-mem-172841` showed the target stuck in
+  `ctx_toolchain_provider_analysis_start` / `analysis_deps_start`, with fanout
+  through LLVM, compiler-rt, libcxx, musl, and `rules_cc` link metadata before
+  the rule implementation needed those providers.
+- Added build-setting visibility to `audit configurations` and to `cfg_diff`.
+  The direct allocator configuration `41d9087ec4cb7f34` and SDK-style
+  `f9d25665faba5414` had the same musl constraints; the SDK-style hash only
+  added `slug_settings//command_line_option:platforms =
+  reactor//bazel/platforms:linux-musl`. A third configuration,
+  `6992643dfb6c8fa2`, carried the LLVM/C++ build-setting envelope. This
+  disproved the hidden-constraints theory and made the remaining discrepancy
+  visible as build-setting/toolchain analysis fanout.
+- Changed optional C++ native-shim toolchain entries to defer provider
+  construction by storing `None` for that optional entry. Mandatory C++
+  toolchains still use the eager metadata/runtime path. Existing
+  `ResolvedToolchains::at` behavior returns the target-platform native shim on
+  Starlark access, so optional users that actually query
+  `ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"]` still receive the
+  native shim; the new unit test
+  `optional_cpp_toolchain_without_eager_provider_still_returns_shim` covers
+  that fallback and checks the musl libc overlay.
+- Validation: `cargo fmt --check`; `cargo check -p slug_analysis -p
+  slug_build_api -p slug_cmd_audit_client -p slug_cmd_audit_server -p
+  slug_core`; `cargo test -p slug_build_api
+  optional_cpp_toolchain_without_eager_provider_still_returns_shim --
+  --nocapture`; and `cargo build -p slug` passed. The focused SDK-style
+  allocator repro
+  `@rules_rust//ffi/rs:empty_allocator_libraries --target-platforms=//bazel/platforms:linux-musl --//command_line_option:platforms=reactor//bazel/platforms:linux-musl`
+  passed in bounded isolation (`allocator-f9-defer-174441`, 14.5s end to end,
+  down from 21.6s before this slice and 43.4s before lazy lockfile spokes).
+  The follow-up memory run `allocator-f9-defer-mem-174513` showed the root
+  allocator target's toolchain-provider phase lasting only same-second
+  milliseconds and no LLVM/libcxx/compiler-rt fanout in the active snapshots.
+- Bounded SDK smoke `sdk-build-defer-183959` still timed out at 45s, but the
+  frontier moved from allocator analysis to `zstd//:zstd`
+  `(//bazel/platforms:linux-musl#f9d25665faba5414)`. The focused zstd repro
+  `zstd-f9-repro-184103` reached local C compilation
+  (`Compiling external/zstd/lib/decompress/zstd_decompress.c`) and timed out
+  with execution actions in flight, not analysis. This resolves the allocator
+  analysis hang class. The next loop action should classify the remaining SDK
+  delay as execution throughput versus any new analysis frontier; longer
+  smokes remain bounded, and any future pre-execution analysis over the Bazel
+  <10s baseline is still a Plan 61 performance failure.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

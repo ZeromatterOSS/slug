@@ -66,6 +66,9 @@ fn print_cfg(stdout: &mut impl Write, cfg: &ConfigurationData) -> slug_error::Re
             constraint_key
         )?;
     }
+    for (setting, value) in data.build_settings.iter().sorted_by_key(|(k, _)| *k) {
+        writeln!(stdout, "  build setting {:<43} = {}", setting, value)?;
+    }
 
     Ok(())
 }

@@ -17,7 +17,7 @@ use crate::AuditSubcommand;
 #[derive(Debug, clap::Parser, serde::Serialize, serde::Deserialize)]
 #[clap(
     name = "audit-configuration",
-    about = "prints the constraints for configuration IDs"
+    about = "prints the constraints and build settings for configuration IDs"
 )]
 pub struct AuditConfigurationsCommand {
     #[clap(
