@@ -2180,6 +2180,14 @@ fn rewrite_windows_cargo_manifest_dir_env(
                     target = %manifest_abs.display(),
                     "failed to prepopulate short cargo manifest alias; using empty alias"
                 );
+                if let Err(e) = std::fs::create_dir_all(&alias_abs) {
+                    tracing::debug!(
+                        ?e,
+                        alias = %alias_abs.display(),
+                        "failed to create empty short cargo manifest alias"
+                    );
+                    return changed;
+                }
             }
         }
 
@@ -2312,6 +2320,9 @@ fn rewrite_windows_cargo_manifest_args_sources(
     replacements: &[(PathBuf, PathBuf)],
 ) -> bool {
     rewrite_windows_cargo_manifest_args_file(args, Some(execroot), |lines| {
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
         let mut changed = false;
         for line in lines.iter_mut().skip(2) {
             let quoted = line.starts_with('\'') && line.ends_with('\'') && line.len() >= 2;
@@ -2323,10 +2334,36 @@ fn rewrite_windows_cargo_manifest_args_sources(
             let Some((src, dest)) = body.split_once('=') else {
                 continue;
             };
-            let Some((_, replacement)) = replacements
+            let replacement = replacements
                 .iter()
                 .find(|(original, _)| Path::new(src) == original.as_path())
-            else {
+                .map(|(_, replacement)| replacement.clone())
+                .or_else(|| {
+                    let src_path = Path::new(src);
+                    if src_path.is_absolute() {
+                        return None;
+                    }
+                    let src_abs = execroot.join(src_path);
+                    if src_abs.as_os_str().len() <= 240 || !src_abs.is_file() {
+                        return None;
+                    }
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    src.hash(&mut hasher);
+                    let alias_rel = PathBuf::from(".slug-cargo-runfile-src")
+                        .join(format!("{:016x}", hasher.finish()))
+                        .join(src_path.file_name()?);
+                    let alias_abs = execroot.join(&alias_rel);
+                    if let Some(parent) = alias_abs.parent() {
+                        if std::fs::create_dir_all(parent).is_err() {
+                            return None;
+                        }
+                    }
+                    if !alias_abs.exists() && std::fs::copy(&src_abs, &alias_abs).is_err() {
+                        return None;
+                    }
+                    Some(alias_rel)
+                });
+            let Some(replacement) = replacement else {
                 continue;
             };
             let rewritten = format!("{}={dest}", replacement.to_string_lossy());
@@ -2398,13 +2435,20 @@ fn cargo_manifest_alias_source_candidates(
         return candidates;
     };
 
-    if let Some(repo) = cargo_runfiles_repo_name(manifest) {
-        push_unique_path(&mut candidates, execroot.join("external").join(&repo));
-        push_unique_path(&mut candidates, project_root.join("external").join(&repo));
-        push_unique_path(
-            &mut candidates,
-            project_root.join("bazel-external").join(&repo),
-        );
+    if let Some((repo, repo_relative_path)) = cargo_runfiles_repo_and_path(manifest) {
+        if repo == "_main" {
+            if !repo_relative_path.as_os_str().is_empty() {
+                push_unique_path(&mut candidates, project_root.join(&repo_relative_path));
+            }
+            push_unique_path(&mut candidates, project_root.to_path_buf());
+        } else {
+            push_unique_path(&mut candidates, execroot.join("external").join(&repo));
+            push_unique_path(&mut candidates, project_root.join("external").join(&repo));
+            push_unique_path(
+                &mut candidates,
+                project_root.join("bazel-external").join(&repo),
+            );
+        }
     } else if let Some(repo) = manifest_repo_path_component(manifest, "external") {
         push_unique_path(&mut candidates, execroot.join("external").join(repo));
         push_unique_path(&mut candidates, project_root.join("external").join(repo));
@@ -2421,14 +2465,24 @@ fn cargo_manifest_alias_source_candidates(
 
 #[cfg(windows)]
 fn cargo_runfiles_repo_name(manifest: &str) -> Option<String> {
+    cargo_runfiles_repo_and_path(manifest).map(|(repo, _)| repo)
+}
+
+#[cfg(windows)]
+fn cargo_runfiles_repo_and_path(manifest: &str) -> Option<(String, PathBuf)> {
     let normalized = manifest.replace('\\', "/");
     let marker = ".cargo_runfiles/";
     let repo_start = normalized.rfind(marker)? + marker.len();
     let repo = normalized[repo_start..].split('/').next()?;
     if repo.is_empty() {
-        None
+        return None;
+    }
+    let rest_start = repo_start + repo.len();
+    let rest = normalized[rest_start..].trim_start_matches('/');
+    if rest.is_empty() {
+        Some((repo.to_owned(), PathBuf::new()))
     } else {
-        Some(repo.to_owned())
+        Some((repo.to_owned(), PathBuf::from(rest)))
     }
 }
 
@@ -3343,6 +3397,27 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn test_windows_cargo_manifest_alias_sources_include_main_workspace_package()
+    -> slug_error::Result<()> {
+        let execroot = PathBuf::from("C:\\s\\execroot");
+        let project_root = PathBuf::from("C:\\dev\\workspace");
+        let manifest = "buck-out/iso/gen/reactor/a08fa8f28613e62e/zerobuf_generated/component_animation_types/build_script.cargo_runfiles/_main/zerobuf_generated/component_animation_types";
+
+        let candidates =
+            cargo_manifest_alias_source_candidates(manifest, &execroot, Some(&project_root));
+
+        assert_eq!(
+            candidates[0],
+            project_root.join("zerobuf_generated/component_animation_types")
+        );
+        assert!(candidates.contains(&project_root));
+        assert_eq!(candidates.last(), Some(&execroot.join(manifest)));
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn test_windows_cargo_manifest_dir_rewrite_uses_short_external_repo() -> slug_error::Result<()>
     {
         let temp = tempfile::tempdir()?;
@@ -3487,14 +3562,17 @@ mod tests {
         let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
         std::fs::create_dir_all(&execroot)?;
         let script = format!("buck-out/{}/gen/crate/_bs-.exe", "x".repeat(230));
+        let companion = format!("buck-out/{}/gen/crate/_bs_.exe", "x".repeat(230));
         let script_abs = execroot.as_path().join(&script);
+        let companion_abs = execroot.as_path().join(&companion);
         std::fs::create_dir_all(script_abs.parent().unwrap())?;
         std::fs::write(&script_abs, b"fake exe")?;
+        std::fs::write(&companion_abs, b"fake companion exe")?;
         let param = execroot.as_path().join("cargo-manifest.params");
         std::fs::write(
             &param,
             format!(
-                "buck-out/long/gen/crate/_bs.cargo_runfiles\n.lib,.so\n{script}=crate/_bs-.exe\nexternal/crate/Cargo.toml=crate/Cargo.toml"
+                "buck-out/long/gen/crate/_bs.cargo_runfiles\n.lib,.so\n{script}=crate/_bs-.exe\n{companion}=crate/_bs_.exe\nexternal/crate/Cargo.toml=crate/Cargo.toml"
             ),
         )?;
         let mut args = vec![
@@ -3509,7 +3587,9 @@ mod tests {
         ));
         let rewritten = std::fs::read_to_string(&param)?;
         assert!(rewritten.contains(".slug-cargo-script"));
+        assert!(rewritten.contains(".slug-cargo-runfile-src"));
         assert!(!rewritten.contains(&script));
+        assert!(!rewritten.contains(&companion));
 
         Ok(())
     }

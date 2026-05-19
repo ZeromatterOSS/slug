@@ -1599,6 +1599,23 @@ Continuation 2026-05-18/19 on Windows checkout:
   18m41s with 699 local commands and no daemon left running afterward. Next
   class boundary: return from focused build-script validation to the full
   `//sdk:sdk` SDK smoke and classify the next real-world frontier.
+- Workspace `_main` cargo-manifest alias slice completed after the full SDK
+  smoke reached a generated workspace build script:
+  `sdk-target-sdk-after-cargo-paths-20260519-001` advanced for 68m12s and failed
+  in `//zerobuf_generated/component_animation_types:build_script` because the
+  short `CARGO_MANIFEST_DIR` alias had no source for `_main/...`, leaving the
+  runner's working directory invalid. The fix maps `_main` runfiles manifests to
+  the workspace package path, creates an empty alias directory if all source
+  candidates are absent, and aliases any long generated executable runfile
+  source in `--cargo_manifest_args` rather than only the exact `--script`
+  executable. Validation: `cargo fmt --check`, focused
+  `cargo_manifest_alias_sources` and `cargo_runner` tests, `cargo check -p
+  slug_execute_impl`, `cargo build -p slug`, and focused smoke
+  `component-animation-build-script-runfile-src-20260519-001` all passed. The
+  focused smoke built `//zerobuf_generated/component_animation_types:
+  build_script` successfully in 18m48s with 699 local commands and no daemon
+  left running afterward. Next class boundary: rerun full `//sdk:sdk` and
+  classify the next frontier beyond generated workspace build scripts.
 
 Exit criteria:
 
