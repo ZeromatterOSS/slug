@@ -40,6 +40,21 @@ impl BuildSettingLabel {
         &self.0
     }
 
+    pub fn command_line_option_name(&self) -> Option<&str> {
+        let pkg = self.0.pkg();
+        if pkg.cell_name().as_str() == "slug_settings"
+            && pkg.cell_relative_path().as_str() == "command_line_option"
+        {
+            Some(self.0.name().as_str())
+        } else {
+            None
+        }
+    }
+
+    pub fn is_command_line_option(&self) -> bool {
+        self.command_line_option_name().is_some()
+    }
+
     /// Canonicalises a Bazel-style label string into a `BuildSettingLabel`.
     ///
     /// Transitions declare inputs/outputs as raw strings (`"//:my_flag"`,

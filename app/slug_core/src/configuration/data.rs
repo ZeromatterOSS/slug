@@ -278,6 +278,21 @@ impl ConfigurationData {
         )
     }
 
+    pub fn without_build_setting(&self, label: &BuildSettingLabel) -> slug_error::Result<Self> {
+        let label_str = self.label()?.to_owned();
+        let data = self.data()?;
+        let mut constraints = BTreeMap::new();
+        for (k, v) in &data.constraints {
+            constraints.insert(k.dupe(), v.dupe());
+        }
+        let mut build_settings = data.build_settings.clone();
+        build_settings.remove(label);
+        Self::from_platform(
+            label_str,
+            ConfigurationDataData::new_with_build_settings(constraints, build_settings),
+        )
+    }
+
     pub fn label(&self) -> slug_error::Result<&str> {
         match &self.0.configuration_platform {
             ConfigurationPlatform::Bound(label, _) => Ok(label.as_str()),

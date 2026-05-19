@@ -396,15 +396,12 @@ fn write_depset_identity_hash<T>(depset: &T, hasher: &mut StarlarkHasher) {
 impl Depset {
     /// Create an empty depset.
     pub fn empty() -> Self {
+        Self::empty_with_order(NestedSetOrder::Default)
+    }
+
+    fn empty_with_order(order: NestedSetOrder) -> Self {
         Self {
-            inner: DepsetGen::from_validated_parts(
-                Vec::new(),
-                Vec::new(),
-                NestedSetOrder::Default,
-                None,
-                true,
-                0,
-            ),
+            inner: DepsetGen::from_validated_parts(Vec::new(), Vec::new(), order, None, true, 0),
         }
     }
 
@@ -470,6 +467,33 @@ impl Depset {
     }
 }
 
+fn frozen_empty_depset(order: NestedSetOrder) -> &'static OwnedFrozenValueTyped<Depset> {
+    fn init(order: NestedSetOrder) -> OwnedFrozenValueTyped<Depset> {
+        let heap = FrozenHeap::new();
+        let value = FrozenValueTyped::new(heap.alloc_simple(Depset::empty_with_order(order)))
+            .expect("frozen empty depset");
+        unsafe { OwnedFrozenValueTyped::new(heap.into_ref(), value) }
+    }
+
+    static DEFAULT: OnceLock<OwnedFrozenValueTyped<Depset>> = OnceLock::new();
+    static POSTORDER: OnceLock<OwnedFrozenValueTyped<Depset>> = OnceLock::new();
+    static PREORDER: OnceLock<OwnedFrozenValueTyped<Depset>> = OnceLock::new();
+    static TOPOLOGICAL: OnceLock<OwnedFrozenValueTyped<Depset>> = OnceLock::new();
+
+    match order {
+        NestedSetOrder::Default => DEFAULT.get_or_init(|| init(NestedSetOrder::Default)),
+        NestedSetOrder::Postorder => POSTORDER.get_or_init(|| init(NestedSetOrder::Postorder)),
+        NestedSetOrder::Preorder => PREORDER.get_or_init(|| init(NestedSetOrder::Preorder)),
+        NestedSetOrder::Topological => {
+            TOPOLOGICAL.get_or_init(|| init(NestedSetOrder::Topological))
+        }
+    }
+}
+
+fn empty_depset_value<'v>(order: NestedSetOrder) -> Value<'v> {
+    frozen_empty_depset(order).to_value()
+}
+
 impl<V: ValueLifetimeless> Display for DepsetGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty {
@@ -493,6 +517,15 @@ impl Display for Depset {
 fn dedupe_direct_values_preserving_order<'v>(
     elements: Vec<Value<'v>>,
 ) -> starlark::Result<Vec<Value<'v>>> {
+    if elements.len() <= 1 {
+        for value in &elements {
+            value
+                .get_hashed()
+                .map_err(|_| slug_error::Error::from(DepsetError::MutableElement))?;
+        }
+        return Ok(elements);
+    }
+
     let mut seen = HashSet::with_capacity(elements.len());
     let mut deduped = Vec::with_capacity(elements.len());
     for value in elements {
@@ -509,6 +542,15 @@ fn dedupe_direct_values_preserving_order<'v>(
 fn dedupe_frozen_values_preserving_order(
     elements: Vec<FrozenValue>,
 ) -> starlark::Result<Vec<FrozenValue>> {
+    if elements.len() <= 1 {
+        for value in &elements {
+            value
+                .get_hashed()
+                .map_err(|_| slug_error::Error::from(DepsetError::MutableElement))?;
+        }
+        return Ok(elements);
+    }
+
     let mut seen = HashSet::with_capacity(elements.len());
     let mut deduped = Vec::with_capacity(elements.len());
     for value in elements {
@@ -754,25 +796,50 @@ pub fn depset_element_type_name(value: Value) -> starlark::Result<Option<String>
 }
 
 fn depset_to_list_deduped<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
-    if let Some(DepsetView::Live(depset)) = DepsetView::from_value(value) {
-        if let Some(cached) = depset.flattened.values.get() {
-            return Ok(cached.clone());
-        }
-        if depset.direct.is_empty()
-            && depset.transitive.len() == 1
-            && let Some(child) = DepsetView::from_value(depset.transitive[0].to_value())
-            && child.order() == depset.order()
-        {
-            let deduped = depset_to_list_deduped(depset.transitive[0].to_value())?;
+    match DepsetView::from_value(value) {
+        Some(DepsetView::Live(depset)) => {
+            if let Some(cached) = depset.flattened.values.get() {
+                return Ok(cached.clone());
+            }
+            if depset.direct.is_empty()
+                && depset.transitive.len() == 1
+                && let Some(child) = DepsetView::from_value(depset.transitive[0].to_value())
+                && child.order() == depset.order()
+            {
+                let deduped = depset_to_list_deduped(depset.transitive[0].to_value())?;
+                let _ = depset.flattened.values.set(deduped.clone());
+                return Ok(deduped);
+            }
+            let deduped = depset_to_list_deduped_uncached(value)?;
             let _ = depset.flattened.values.set(deduped.clone());
-            return Ok(deduped);
+            Ok(deduped)
         }
-        let deduped = depset_to_list_deduped_uncached(value)?;
-        let _ = depset.flattened.values.set(deduped.clone());
-        return Ok(deduped);
+        Some(DepsetView::FrozenLive(depset)) => {
+            if let Some(cached) = depset.flattened.values.get() {
+                return Ok(cached.iter().map(|v| v.to_value()).collect());
+            }
+            if depset.transitive.is_empty() {
+                let direct = depset.direct.clone();
+                let result = direct.iter().map(|v| v.to_value()).collect();
+                let _ = depset.flattened.values.set(direct);
+                return Ok(result);
+            }
+            depset_to_list_deduped_uncached(value)
+        }
+        Some(DepsetView::Frozen(depset)) => {
+            if let Some(cached) = depset.inner.flattened.values.get() {
+                return Ok(cached.iter().map(|v| v.to_value()).collect());
+            }
+            if depset.inner.transitive.is_empty() {
+                let direct = depset.inner.direct.clone();
+                let result = direct.iter().map(|v| v.to_value()).collect();
+                let _ = depset.inner.flattened.values.set(direct);
+                return Ok(result);
+            }
+            depset_to_list_deduped_uncached(value)
+        }
+        None => depset_to_list_deduped_uncached(value),
     }
-
-    depset_to_list_deduped_uncached(value)
 }
 
 fn depset_to_list_deduped_uncached<'v>(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
@@ -781,6 +848,10 @@ fn depset_to_list_deduped_uncached<'v>(value: Value<'v>) -> starlark::Result<Vec
             item_type: value.get_type().to_owned(),
         })
     })?;
+    if depset.child_values().is_empty() {
+        return Ok(depset.direct_values());
+    }
+
     let mut result = Vec::new();
     let mut seen = HashSet::new();
     for node in nested_set_node_iter(
@@ -996,11 +1067,57 @@ fn validate_depset_order<'v>(
     Ok(parsed_order)
 }
 
-fn validate_direct_depset_element(value: Value) -> starlark::Result<String> {
-    value
-        .get_hashed()
-        .map_err(|_| slug_error::Error::from(DepsetError::MutableElement))?;
-    Ok(value.get_type().to_owned())
+fn validate_depset_child_order<'v>(
+    order: NestedSetOrder,
+    order_str: &str,
+    child: Value<'v>,
+    index: usize,
+) -> starlark::Result<DepsetView<'v>> {
+    let Some(item_depset) = DepsetView::from_value(child) else {
+        return Err(slug_error::Error::from(DepsetError::TransitiveNotDepset {
+            index,
+            item_type: child.get_type().to_owned(),
+        })
+        .into());
+    };
+    let item_order = item_depset.order();
+    if !order.is_compatible_with_child(item_order) {
+        return Err(slug_error::Error::from(DepsetError::OrderIncompatible {
+            order: order_str.to_owned(),
+            transitive_order: item_order.as_str().to_owned(),
+        })
+        .into());
+    }
+    Ok(item_depset)
+}
+
+fn normalize_transitive_values<'v>(
+    order: NestedSetOrder,
+    order_str: &str,
+    transitive: Vec<Value<'v>>,
+) -> starlark::Result<Vec<Value<'v>>> {
+    if transitive.is_empty() {
+        return Ok(transitive);
+    }
+
+    let mut normalized = Vec::with_capacity(transitive.len());
+    let mut seen = HashSet::with_capacity(transitive.len());
+    for (index, child_value) in transitive.into_iter().enumerate() {
+        let child = validate_depset_child_order(order, order_str, child_value, index)?;
+        if child.is_empty() {
+            continue;
+        }
+
+        // Bazel's LINK_ORDER builder deduplicates after reversing its inputs.
+        // Keep topological input shape unchanged until Slug's topological
+        // traversal is represented with the same physical order model.
+        if order != NestedSetOrder::Topological && !seen.insert(child_value.identity()) {
+            continue;
+        }
+
+        normalized.push(child_value);
+    }
+    Ok(normalized)
 }
 
 fn merge_depset_element_type(
@@ -1055,7 +1172,7 @@ fn validate_depset_elements<'v>(
 ) -> starlark::Result<(Option<String>, bool, u32)> {
     let mut element_type = None;
     for item in direct {
-        merge_depset_element_type(&mut element_type, validate_direct_depset_element(*item)?)?;
+        merge_depset_element_type(&mut element_type, item.get_type().to_owned())?;
     }
     let mut is_empty = direct.is_empty();
     let mut max_child_depth = 0;
@@ -1069,6 +1186,10 @@ fn validate_depset_elements<'v>(
         };
         is_empty &= child_depset.is_empty();
         max_child_depth = max_child_depth.max(child_depset.depth());
+        if let Some(child_type) = child_depset.element_type() {
+            merge_depset_element_type(&mut element_type, child_type.to_owned())?;
+            continue;
+        }
         let mut visited = HashSet::new();
         if let Some(child_type) = depset_element_type(*child, &mut visited)? {
             merge_depset_element_type(&mut element_type, child_type)?;
@@ -1097,9 +1218,15 @@ fn make_live_depset_from_values<'v>(
     order: &str,
 ) -> starlark::Result<LiveDepsetGen<Value<'v>>> {
     let direct_len = direct.len();
-    let transitive_len = transitive.len();
     let direct = dedupe_direct_values_preserving_order(direct)?;
-    let effective_order = validate_depset_order(order, &transitive)?;
+    let Some(effective_order) = NestedSetOrder::parse(order) else {
+        return Err(slug_error::Error::from(DepsetError::InvalidOrder {
+            order: order.to_owned(),
+        })
+        .into());
+    };
+    let transitive = normalize_transitive_values(effective_order, order, transitive)?;
+    let transitive_len = transitive.len();
     let (element_type, is_empty, depth) = validate_depset_elements(&direct, &transitive)?;
     depset_create_checkpoint(
         direct_len,
@@ -1149,12 +1276,41 @@ pub fn make_depset_from_lists<'v>(
     transitive: Vec<Value<'v>>,
     order: &str,
 ) -> starlark::Result<Value<'v>> {
-    if direct.is_empty()
-        && transitive.len() == 1
-        && let Some(child) = DepsetView::from_value(transitive[0])
-        && child.order().as_str() == order
-    {
-        return Ok(transitive[0]);
+    let Some(parsed_order) = NestedSetOrder::parse(order) else {
+        return Err(slug_error::Error::from(DepsetError::InvalidOrder {
+            order: order.to_owned(),
+        })
+        .into());
+    };
+    let transitive = normalize_transitive_values(parsed_order, order, transitive)?;
+
+    if direct.is_empty() {
+        if transitive.is_empty() {
+            return Ok(empty_depset_value(parsed_order));
+        }
+
+        let mut only_non_empty_child = None;
+        for child_value in &transitive {
+            let Some(child) = DepsetView::from_value(*child_value) else {
+                only_non_empty_child = None;
+                break;
+            };
+            if child.is_empty() {
+                continue;
+            }
+            if only_non_empty_child
+                .replace((*child_value, child.order()))
+                .is_some()
+            {
+                only_non_empty_child = None;
+                break;
+            }
+        }
+        if let Some((child_value, child_order)) = only_non_empty_child
+            && child_order.as_str() == order
+        {
+            return Ok(child_value);
+        }
     }
 
     Ok(heap.alloc(make_live_depset_from_values(direct, transitive, order)?))

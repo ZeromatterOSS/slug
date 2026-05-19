@@ -40,8 +40,11 @@ use slug_interpreter::factory::BuckStarlarkModule;
 use slug_interpreter::factory::StarlarkEvaluatorProvider;
 use slug_interpreter::print_handler::EventDispatcherPrintHandler;
 use slug_interpreter::soft_error::SlugStarlarkSoftErrorHandler;
+use slug_node::attrs::coerced_attr::CoercedAttr;
 use slug_node::attrs::configured_attr::ConfiguredAttr;
 use slug_node::attrs::display::AttrDisplayWithContextExt;
+use slug_node::attrs::inspect_options::AttrInspectOptions;
+use slug_node::nodes::frontend::TargetGraphCalculation;
 use starlark::eval::Evaluator;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
@@ -75,7 +78,9 @@ enum ApplyTransitionError {
 }
 
 fn call_transition_function<'v>(
+    transition_id: &TransitionId,
     transition: &TransitionData,
+    output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
     conf: &ConfigurationData,
     refs: Value<'v>,
     attrs: Option<Value<'v>>,
@@ -83,7 +88,14 @@ fn call_transition_function<'v>(
 ) -> slug_error::Result<TransitionApplied> {
     // Bazel-style transitions have inputs/outputs and use (settings, attr) signature
     if transition.is_bazel_style() {
-        return call_bazel_transition_function(transition, conf, attrs, eval);
+        return call_bazel_transition_function(
+            transition_id,
+            transition,
+            output_defaults,
+            conf,
+            attrs,
+            eval,
+        );
     }
 
     let mut args = vec![(
@@ -144,7 +156,9 @@ fn call_transition_function<'v>(
 /// `ConfigurationData::with_build_setting`), `None` / `{}` for a no-op, or
 /// a `PlatformInfo` for legacy mixed-style transitions.
 fn call_bazel_transition_function<'v>(
+    transition_id: &TransitionId,
     transition: &TransitionData,
+    output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
     conf: &ConfigurationData,
     attrs: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
@@ -161,7 +175,7 @@ fn call_bazel_transition_function<'v>(
     let inputs = transition.inputs();
     let mut settings_entries: Vec<(&str, Value<'v>)> = Vec::new();
     for input in inputs {
-        let value = resolve_setting_value(input, conf, eval)?;
+        let value = resolve_setting_value(input, transition_id, conf, eval)?;
         settings_entries.push((eval.heap().alloc_str(input).as_str(), value));
     }
     let settings_dict = eval.heap().alloc(starlark::values::dict::AllocDict(
@@ -199,13 +213,25 @@ fn call_bazel_transition_function<'v>(
                         split_key
                     )
                 })?;
-                let branch_cfg = apply_setting_dict_to_cfg(conf, &inner, transition.outputs())?;
+                let branch_cfg = apply_setting_dict_to_cfg(
+                    conf,
+                    transition_id,
+                    output_defaults,
+                    &inner,
+                    transition.outputs(),
+                )?;
                 split.insert(split_key, branch_cfg);
             }
             return Ok(TransitionApplied::Split(SortedMap::from(split)));
         }
 
-        let new_cfg = apply_setting_dict_to_cfg(conf, &dict, transition.outputs())?;
+        let new_cfg = apply_setting_dict_to_cfg(
+            conf,
+            transition_id,
+            output_defaults,
+            &dict,
+            transition.outputs(),
+        )?;
         return Ok(TransitionApplied::Single(new_cfg));
     }
 
@@ -222,6 +248,8 @@ fn call_bazel_transition_function<'v>(
 /// no global side effect is needed.
 fn apply_setting_dict_to_cfg(
     conf: &ConfigurationData,
+    transition_id: &TransitionId,
+    output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
     dict: &DictRef<'_>,
     declared_outputs: &[String],
 ) -> slug_error::Result<ConfigurationData> {
@@ -242,11 +270,57 @@ fn apply_setting_dict_to_cfg(
                 declared_outputs
             ));
         }
-        let label = BuildSettingLabel::from_bazel_label(key_str)?;
+        let label = build_setting_label_from_transition_label(key_str, transition_id)?;
         let value = build_setting_value_from_starlark(v)?;
+        if is_default_command_line_option_setting(&label, &value) {
+            out = out.without_build_setting(&label)?;
+            continue;
+        }
+        if output_defaults
+            .iter()
+            .any(|(default_label, default_value)| {
+                default_label == &label && default_value == &value
+            })
+        {
+            out = out.without_build_setting(&label)?;
+            continue;
+        }
         out = out.with_build_setting(label, value)?;
     }
     Ok(out)
+}
+
+fn build_setting_label_from_transition_label(
+    raw: &str,
+    transition_id: &TransitionId,
+) -> slug_error::Result<BuildSettingLabel> {
+    if raw.starts_with("//command_line_option:") || raw.starts_with('@') {
+        return BuildSettingLabel::from_bazel_label(raw);
+    }
+
+    if raw.starts_with("//") {
+        if let TransitionId::MagicObject { path, .. } | TransitionId::AnonymousBazel { path, .. } =
+            transition_id
+        {
+            return BuildSettingLabel::from_bazel_label(&format!("@{}{}", path.cell(), raw));
+        }
+    }
+
+    BuildSettingLabel::from_bazel_label(raw)
+}
+
+fn is_default_command_line_option_setting(
+    label: &BuildSettingLabel,
+    value: &BuildSettingValue,
+) -> bool {
+    if !label.is_command_line_option() {
+        return false;
+    }
+    match value {
+        BuildSettingValue::String(s) => s.is_empty(),
+        BuildSettingValue::StringList(xs) | BuildSettingValue::StringSet(xs) => xs.is_empty(),
+        BuildSettingValue::Bool(_) | BuildSettingValue::Int(_) => false,
+    }
 }
 
 /// Converts a Starlark value returned by a transition into a typed
@@ -325,6 +399,60 @@ fn build_setting_value_from_configured_attr(
     }))
 }
 
+fn build_setting_value_from_coerced_attr(attr: &CoercedAttr) -> Option<BuildSettingValue> {
+    Some(match attr {
+        CoercedAttr::OneOf(inner, _) => return build_setting_value_from_coerced_attr(inner),
+        CoercedAttr::None => return None,
+        CoercedAttr::Bool(v) => BuildSettingValue::Bool(v.0),
+        CoercedAttr::Int(v) => BuildSettingValue::Int(*v),
+        CoercedAttr::String(v) | CoercedAttr::EnumVariant(v) => {
+            BuildSettingValue::String(v.0.as_str().to_owned())
+        }
+        CoercedAttr::List(v) => {
+            let mut values = Vec::with_capacity(v.0.len());
+            for item in v.0.iter() {
+                match item {
+                    CoercedAttr::String(v) | CoercedAttr::EnumVariant(v) => {
+                        values.push(v.0.as_str().to_owned());
+                    }
+                    CoercedAttr::Int(v) => values.push(v.to_string()),
+                    CoercedAttr::Bool(v) => {
+                        values.push(if v.0 { "True" } else { "False" }.to_owned());
+                    }
+                    _ => return None,
+                }
+            }
+            BuildSettingValue::StringList(values)
+        }
+        _ => return None,
+    })
+}
+
+async fn transition_output_defaults(
+    ctx: &mut DiceComputations<'_>,
+    transition_id: &TransitionId,
+    outputs: &[String],
+) -> slug_error::Result<Vec<(BuildSettingLabel, BuildSettingValue)>> {
+    let mut defaults = Vec::new();
+    for output in outputs {
+        let label = build_setting_label_from_transition_label(output, transition_id)?;
+        if label.is_command_line_option() {
+            continue;
+        }
+        let Ok(node) = ctx.get_target_node(label.target()).await else {
+            continue;
+        };
+        let Some(attr) = node.attr_or_none("build_setting_default", AttrInspectOptions::All) else {
+            continue;
+        };
+        let Some(default_value) = build_setting_value_from_coerced_attr(&attr.value) else {
+            continue;
+        };
+        defaults.push((label, default_value));
+    }
+    Ok(defaults)
+}
+
 fn make_valid_identifier_suffix(name: &str) -> String {
     name.chars()
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
@@ -374,6 +502,8 @@ fn anonymous_bazel_attr_name_for_output<'a>(
 
 fn apply_anonymous_bazel_transition(
     conf: &ConfigurationData,
+    transition_id: &TransitionId,
+    output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
     outputs: &[String],
     bazel_all_attrs: Option<&[(String, Arc<ConfiguredAttr>)]>,
 ) -> slug_error::Result<TransitionApplied> {
@@ -394,7 +524,20 @@ fn apply_anonymous_bazel_transition(
         let Some(value) = build_setting_value_from_configured_attr(attr)? else {
             continue;
         };
-        let label = BuildSettingLabel::from_bazel_label(output)?;
+        let label = build_setting_label_from_transition_label(output, transition_id)?;
+        if is_default_command_line_option_setting(&label, &value) {
+            out = out.without_build_setting(&label)?;
+            continue;
+        }
+        if output_defaults
+            .iter()
+            .any(|(default_label, default_value)| {
+                default_label == &label && default_value == &value
+            })
+        {
+            out = out.without_build_setting(&label)?;
+            continue;
+        }
         out = out.with_build_setting(label, value)?;
     }
     Ok(TransitionApplied::Single(out))
@@ -411,10 +554,11 @@ fn apply_anonymous_bazel_transition(
 /// 4. Empty string fallback.
 fn resolve_setting_value<'v>(
     setting_label: &str,
+    transition_id: &TransitionId,
     conf: &ConfigurationData,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> slug_error::Result<Value<'v>> {
-    if let Ok(label) = BuildSettingLabel::from_bazel_label(setting_label) {
+    if let Ok(label) = build_setting_label_from_transition_label(setting_label, transition_id) {
         if let Ok(Some(value)) = conf.get_build_setting(&label) {
             return Ok(build_setting_value_to_starlark(value, eval));
         }
@@ -434,7 +578,10 @@ fn resolve_setting_value<'v>(
                     "unknown".to_owned()
                 }
             }
-            "crosstool_top" | "compiler" | "platforms" | "host_platform" => String::new(),
+            "platforms" => {
+                return Ok(eval.heap().alloc(starlark::values::list::AllocList::EMPTY));
+            }
+            "crosstool_top" | "compiler" | "host_platform" => String::new(),
             _ => slug_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&format!(
                 "//command_line_option:{option_name}"
             ))
@@ -486,7 +633,14 @@ async fn do_apply_transition(
     }
 
     if let TransitionId::AnonymousBazel { outputs, .. } = transition_id {
-        return apply_anonymous_bazel_transition(conf, outputs, bazel_all_attrs);
+        let output_defaults = transition_output_defaults(ctx, transition_id, outputs).await?;
+        return apply_anonymous_bazel_transition(
+            conf,
+            transition_id,
+            &output_defaults,
+            outputs,
+            bazel_all_attrs,
+        );
     }
 
     // Legacy anonymous transitions are not bound to module-level globals and
@@ -499,6 +653,11 @@ async fn do_apply_transition(
     }
 
     let transition = ctx.fetch_transition(transition_id).await?;
+    let output_defaults = if transition.is_bazel_style() {
+        transition_output_defaults(ctx, transition_id, transition.outputs()).await?
+    } else {
+        Vec::new()
+    };
     let mut refs = Vec::new();
     let mut refs_refs = Vec::new();
     for (s, t) in transition.refs() {
@@ -566,20 +725,34 @@ async fn do_apply_transition(
                         }
                     }
                 };
-                match call_transition_function(&transition, conf, refs, attrs, eval)? {
+                match call_transition_function(
+                    transition_id,
+                    &transition,
+                    &output_defaults,
+                    conf,
+                    refs,
+                    attrs,
+                    eval,
+                )? {
                     TransitionApplied::Single(new) => {
-                        let new_2 =
-                            match call_transition_function(&transition, &new, refs, attrs, eval)
-                                .buck_error_context(
-                                    "applying transition again on transition output",
-                                )? {
-                                TransitionApplied::Single(new_2) => new_2,
-                                TransitionApplied::Split(_) => {
-                                    unreachable!(
-                                        "split transition filtered out in call_transition_function"
-                                    )
-                                }
-                            };
+                        let new_2 = match call_transition_function(
+                            transition_id,
+                            &transition,
+                            &output_defaults,
+                            &new,
+                            refs,
+                            attrs,
+                            eval,
+                        )
+                        .buck_error_context("applying transition again on transition output")?
+                        {
+                            TransitionApplied::Single(new_2) => new_2,
+                            TransitionApplied::Split(_) => {
+                                unreachable!(
+                                    "split transition filtered out in call_transition_function"
+                                )
+                            }
+                        };
                         if let Err(diff) = cfg_diff(&new, &new_2) {
                             return Err(
                                 ApplyTransitionError::SplitTransitionAgainDifferentPlatformInfo(
@@ -767,10 +940,30 @@ impl TransitionCalculation for TransitionCalculationImpl {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use slug_core::bzl::ImportPath;
     use slug_core::configuration::build_setting::BuildSettingLabel;
     use slug_core::configuration::build_setting::BuildSettingValue;
     use slug_core::configuration::data::ConfigurationData;
     use slug_core::configuration::data::ConfigurationDataData;
+    use slug_core::configuration::transition::id::TransitionId;
+    use slug_node::attrs::configured_attr::ConfiguredAttr;
+
+    fn llvm_transition_id() -> TransitionId {
+        TransitionId::MagicObject {
+            path: ImportPath::testing_new("llvm//toolchain/bootstrap:bootstrap_binary.bzl"),
+            name: "bootstrap_transition".to_owned(),
+        }
+    }
+
+    fn anonymous_llvm_transition_id(outputs: Vec<String>) -> TransitionId {
+        TransitionId::AnonymousBazel {
+            path: ImportPath::testing_new("llvm//toolchain/runtimes:with_cfg.bzl"),
+            name: "_anonymous_bazel_transition".to_owned(),
+            outputs: outputs.into_boxed_slice().into(),
+        }
+    }
 
     #[test]
     fn bazel_label_parses_unprefixed() {
@@ -811,6 +1004,10 @@ mod tests {
         )?;
         let applied = super::apply_anonymous_bazel_transition(
             &base,
+            &anonymous_llvm_transition_id(vec![
+                "@@rules_python//python/config_settings:add_srcs_to_runfiles".to_owned(),
+            ]),
+            &[],
             &["@@rules_python//python/config_settings:add_srcs_to_runfiles".to_owned()],
             Some(&[]),
         )?;
@@ -837,6 +1034,135 @@ mod tests {
             Some(&BuildSettingValue::String("baz".to_owned()))
         );
         assert_eq!(base.get_build_setting(&label)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn platforms_transition_input_defaults_to_empty_list() -> slug_error::Result<()> {
+        let base = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::empty(),
+        )?;
+        let module = starlark::environment::Module::new();
+        let mut eval = starlark::eval::Evaluator::new(&module);
+        let value = super::resolve_setting_value(
+            "//command_line_option:platforms",
+            &llvm_transition_id(),
+            &base,
+            &mut eval,
+        )?;
+        let list = starlark::values::list::ListRef::from_value(value)
+            .expect("platforms should be exposed as a list option");
+        assert_eq!(list.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn transition_relative_build_setting_labels_use_defining_cell() -> slug_error::Result<()> {
+        let label = super::build_setting_label_from_transition_label(
+            "//config:ubsan",
+            &llvm_transition_id(),
+        )?;
+        let expected = BuildSettingLabel::from_bazel_label("@llvm//config:ubsan")?;
+        assert_eq!(label, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn anonymous_relative_build_setting_labels_use_defining_cell() -> slug_error::Result<()> {
+        let transition_id = anonymous_llvm_transition_id(vec!["//config:ubsan".to_owned()]);
+        let label =
+            super::build_setting_label_from_transition_label("//config:ubsan", &transition_id)?;
+        let expected = BuildSettingLabel::from_bazel_label("@llvm//config:ubsan")?;
+        assert_eq!(label, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn empty_platforms_transition_output_is_default_cfg() -> slug_error::Result<()> {
+        let platforms = BuildSettingLabel::from_bazel_label("//command_line_option:platforms")?;
+        let base = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::empty(),
+        )?
+        .with_build_setting(
+            platforms.clone(),
+            BuildSettingValue::String("reactor//bazel/platforms:linux-musl".to_owned()),
+        )?;
+
+        let module = starlark::environment::Module::new();
+        let eval = starlark::eval::Evaluator::new(&module);
+        let heap = eval.heap();
+        let key = heap.alloc_str("//command_line_option:platforms").to_value();
+        let value = heap.alloc(starlark::values::list::AllocList::EMPTY);
+        let dict = heap.alloc(starlark::values::dict::AllocDict([(key, value)]));
+        let dict_ref =
+            starlark::values::dict::DictRef::from_value(dict).expect("dict should unpack");
+
+        let updated = super::apply_setting_dict_to_cfg(
+            &base,
+            &llvm_transition_id(),
+            &[],
+            &dict_ref,
+            &["//command_line_option:platforms".to_owned()],
+        )?;
+        assert_eq!(updated.get_build_setting(&platforms)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn transition_output_equal_to_rule_default_is_default_cfg() -> slug_error::Result<()> {
+        let asan = BuildSettingLabel::from_bazel_label("@llvm//config:asan")?;
+        let base = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::empty(),
+        )?
+        .with_build_setting(asan.clone(), BuildSettingValue::Bool(true))?;
+
+        let module = starlark::environment::Module::new();
+        let eval = starlark::eval::Evaluator::new(&module);
+        let heap = eval.heap();
+        let key = heap.alloc_str("//config:asan").to_value();
+        let value = heap.alloc(false);
+        let dict = heap.alloc(starlark::values::dict::AllocDict([(key, value)]));
+        let dict_ref =
+            starlark::values::dict::DictRef::from_value(dict).expect("dict should unpack");
+
+        let updated = super::apply_setting_dict_to_cfg(
+            &base,
+            &llvm_transition_id(),
+            &[(asan.clone(), BuildSettingValue::Bool(false))],
+            &dict_ref,
+            &["//config:asan".to_owned()],
+        )?;
+        assert_eq!(updated.get_build_setting(&asan)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn anonymous_transition_output_equal_to_rule_default_is_default_cfg() -> slug_error::Result<()>
+    {
+        let asan = BuildSettingLabel::from_bazel_label("@llvm//config:asan")?;
+        let base = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::empty(),
+        )?
+        .with_build_setting(asan.clone(), BuildSettingValue::Bool(true))?;
+        let transition_id = anonymous_llvm_transition_id(vec!["//config:asan".to_owned()]);
+        let attr = Arc::new(ConfiguredAttr::Bool(
+            slug_node::attrs::attr_type::bool::BoolLiteral(false),
+        ));
+        let updated = super::apply_anonymous_bazel_transition(
+            &base,
+            &transition_id,
+            &[(asan.clone(), BuildSettingValue::Bool(false))],
+            &["//config:asan".to_owned()],
+            Some(&[("s_123_asan".to_owned(), attr)]),
+        )?;
+        assert_eq!(
+            updated,
+            super::TransitionApplied::Single(base.without_build_setting(&asan)?)
+        );
         Ok(())
     }
 }

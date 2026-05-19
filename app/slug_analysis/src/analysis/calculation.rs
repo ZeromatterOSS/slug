@@ -813,18 +813,29 @@ async fn check_config_setting_flag_values(
         //     default is the full tool name list. Every
         //     `driver-tools-include-<tool>` config_setting should match
         //     against the default because each tool is in the list.
-        let cfg_value: Option<BuildSettingValue> =
-            BuildSettingLabel::from_bazel_label(&flag_label_str)
+        let cfg_value: Option<BuildSettingValue> = {
+            let canonical_label = BuildSettingLabel::new(flag_target_label.dupe());
+            configured_node
+                .label()
+                .cfg()
+                .get_build_setting(&canonical_label)
                 .ok()
-                .and_then(|l| {
-                    configured_node
-                        .label()
-                        .cfg()
-                        .get_build_setting(&l)
+                .flatten()
+                .cloned()
+                .or_else(|| {
+                    BuildSettingLabel::from_bazel_label(&flag_label_str)
                         .ok()
-                        .flatten()
-                        .cloned()
-                });
+                        .and_then(|l| {
+                            configured_node
+                                .label()
+                                .cfg()
+                                .get_build_setting(&l)
+                                .ok()
+                                .flatten()
+                                .cloned()
+                        })
+                })
+        };
 
         let (scalar_actual, list_actual): (Option<String>, Option<Vec<String>>) =
             if let Some(value) = &cfg_value {

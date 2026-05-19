@@ -1222,6 +1222,229 @@ Implementation slice 2026-05-18, optional C++ toolchain shim deferral:
   smokes remain bounded, and any future pre-execution analysis over the Bazel
   <10s baseline is still a Plan 61 performance failure.
 
+Post-commit SDK frontier 2026-05-18:
+
+- A longer bounded SDK smoke after `aad0f68b`
+  (`sdk-build-post-defer-184554`) still timed out at 90s. It connected in
+  about 4.2s, then repeatedly reported `zstd//:zstd`
+  `(//bazel/platforms:linux-musl#f9d25665faba5414)` in `evaluate_rule` from
+  18:46:35 through 18:47:18. This confirms the allocator fix did not finish
+  SDK analysis parity and that long analysis remains an error, not a run to
+  wait out.
+- The focused checkpoint smoke `sdk-zstd-analysis-mem-184805` timed out at 45s
+  after recording roughly 22k completed analyses and hundreds of active
+  analyses. The final snapshots showed the oldest root waiting on broad SDK
+  dependency chains (`sdk_contents`, `sdk_with_configs`,
+  `sdk_with_data_configs`, `sdk/config_install`, `sdk/zeromatter_ffi`,
+  `tools/zerobuf_cli`, `zm_cli`) rather than a single zstd local action.
+- The hot configuration hashes in the checkpoint log were four host hashes
+  plus the musl hash: `70eb5fc63ec6a4d3`, `8c57282663e321e1`,
+  `097238d3cfd5694a`, `8973e623602a72ce`, and `f9d25665faba5414`. Many Rust
+  crate targets and the default Rust toolchain appeared under multiple hashes,
+  with Starlark samples dominated by `rules_rust` and `rules_cc`
+  `cc_info.bzl` / `create_library_to_link.bzl`. The optional C++ deferral is
+  active in this run (`optional_cc_toolchain_native_shim_deferred` appears for
+  crate targets), so the next root cause is configuration multiplication and
+  Rust/CC provider analysis cost, not the previous eager optional-shim path.
+- Next action: use `audit configurations` / `cfg_diff` on the hot host hashes
+  to identify which build settings are splitting otherwise equivalent host
+  configurations, then create the narrowest focused repro around that
+  transition/config-setting boundary. Do not proceed to broader 61.2/61.3
+  ownership work until this SDK analysis multiplication is classified or
+  clearly proven to be resolved by the DICE-owned bzlmod phase itself.
+
+Transition/config canonicalization and SDK performance frontier
+2026-05-18/2026-05-19:
+
+- Empty `//command_line_option:platforms` transition inputs are now exposed to
+  Bazel-style Starlark transitions as an empty list, and empty platform
+  transition outputs are pruned from `ConfigurationData`. Non-empty platform
+  outputs remain explicit build settings.
+- Bazel-style transition output labels are now contextualized through the
+  defining `.bzl` cell for magic-object transitions, so LLVM outputs such as
+  `//config:ubsan` resolve to `llvm//config:ubsan` instead of the synthetic
+  storage cell `slug_settings//config:ubsan`.
+- Empty command-line-option values from process-global Starlark flags are
+  pruned before entering configurations. Transition outputs equal to a
+  build-setting rule's `build_setting_default` are also pruned. Default lookup
+  is based on the output target's `build_setting_default` attr instead of the
+  earlier rule-kind guard, because the SDK LLVM flags prove the attr is the
+  semantic default source Slug can currently observe.
+- Focused diagnostics proved sanitizer defaults are pruned at the transition
+  frontier: direct `zstd//:zstd` analysis logged default hits/prunes for
+  `llvm//config:{asan,ubsan,...}` and completed in about 21s wall clock with
+  reported phases `load=7.8s analyze=5.5s execute=2.9s materialize=1.1s
+  total=13.1s`. The full SDK timeout is therefore not an isolated zstd
+  transition hang.
+- SDK smoke/audit progression after the config fixes:
+  `default-pruned-settings-191619` timed out at 45s with 271 interned
+  configurations, 198 host / 73 musl, zero empty command-line settings, and
+  zero `slug_settings//config:*` settings. Removing the default-attr
+  `is_build_setting` guard left the same 271-config frontier. The earlier
+  pre-fix audits were 448 then 297 configurations, so the current remaining
+  failure is no longer the empty-platform or synthetic-LLVM-label class.
+- The active timeout frontier remains
+  `zstd//:zstd (//bazel/platforms:linux-musl#f9d25665faba5414) -- running
+  analysis [evaluate_rule]`, but auditing that config shows no sanitizer
+  defaults. It contains non-default LLVM settings
+  `empty_sysroot=False` and `experimental_stub_libgcc_s=True`, rules_rust
+  settings from `.bazelrc`, `compilation_mode=fastbuild`, and a non-empty
+  `slug_settings//command_line_option:platforms` value.
+- Memory checkpoints before and after the depset fast-path both classify the
+  timeout as broad Starlark analysis pressure, not deadlock: about 18,160
+  analyses completed, 352 analyses remained active, and the oldest root
+  request was `reactor//sdk:sdk_contents` waiting through SDK/Rust dependency
+  chains. Hot samples are dominated by `rules_rust+0.69.0` files
+  `rust/private/rust.bzl`, `rust/private/utils.bzl`, and
+  `rust/private/rustc.bzl`, with some `rules_cc` provider construction. The
+  post-fast-path checkpoint still reached about 358k depset creations, max
+  direct length 2359, max transitive length 3866, and max depth 20.
+- Implemented one safe depset validation fast path: if a transitive child
+  depset already carries `element_type`, Slug merges that recorded type
+  directly instead of allocating a new visited set and recursively walking the
+  child. This preserves the empty/unknown-type path and mutable direct-element
+  validation, but it did not move the 45s SDK frontier enough to complete.
+- Additional focused depset hot-path fixes were validated after the checkpoint:
+  empty/single direct lists no longer allocate dedupe state, direct element
+  hashability is not checked twice after creation-time dedupe already validated
+  it, direct-only `to_list()` bypasses nested traversal and hash-set
+  deduplication, and frozen direct-only depsets can reuse the existing flattened
+  cache. These preserve depset immutability, hashability validation, order, and
+  transitive traversal semantics.
+- Added one more constructor shortcut for the `rules_cc` `_flat_depset` shape:
+  `depset(transitive = [...])` with exactly one non-empty child of the same
+  order now returns that child directly instead of wrapping it with many empty
+  children. Validation still parses and checks every transitive child order.
+- Found and fixed a second transition/default-retention bug after the depset
+  work: `TransitionId::AnonymousBazel` bypassed the default-output pruning used
+  by assigned Bazel-style transitions. This kept default LLVM settings such as
+  sanitizer `false`, `source=prebuilt`, and `linkmode=dynamic` in many configs.
+  Anonymous Bazel transitions now resolve relative outputs through the defining
+  `.bzl` cell and prune outputs equal to build-setting defaults.
+- Also pruned default `@bazel_tools//tools/cpp:compilation_mode=fastbuild` at
+  CLI build-setting ingestion. Absence still reads as fastbuild via the existing
+  fallback; explicit `opt`/`dbg` remain configuration-distinct.
+- Validation for the depset hot-path series: `cargo fmt --check`,
+  `cargo check -p slug_build_api`, `cargo build -p slug`,
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/analysis/test_depset_order.py`, and `git diff --check` passed.
+  Repeated bounded SDK smokes still timed out at 45s:
+  `depset-fastpath-sdk-193438`, `depset-direct-fastpath-sdk-193935`,
+  `depset-tolist-fastpath-sdk-194229`, `depset-frozen-cache-sdk-194525`, and
+  `depset-emptychild-sdk-195120`. The frozen-cache smoke audit dropped from
+  271 to 265 interned configurations (198 host / 67 musl), but the latest fresh
+  single-child-constructor smoke was back at 271 configurations (198 host /
+  73 musl), zero `slug_settings//config:*`, 27 non-empty
+  `slug_settings//command_line_option:platforms`, and still waited on the same
+  `zstd//:zstd (//bazel/platforms:linux-musl#f9d25665faba5414)` analysis
+  frontier.
+- Post anonymous-default pruning smoke `anon-default-prune-sdk-195658` still
+  timed out at 45s, but the audit dropped from 271 configs to 41 (16 host /
+  25 musl) with only 4 non-empty `platforms` settings and no retained
+  sanitizer/source/linkmode defaults. Post fastbuild-default pruning smoke
+  `fastbuild-default-prune-sdk-200115` still timed out at 45s, but the audit
+  dropped again to 39 configs (15 host / 24 musl), zero explicit
+  `compilation_mode=fastbuild`, and the frontier stayed
+  `zstd//:zstd (//bazel/platforms:linux-musl#145d4b2ad2508b2a) -- running
+  analysis [evaluate_rule]`.
+- Fresh memory-checkpoint run after anonymous-default pruning
+  `anon-default-prune-mem-195830` showed the remaining timeout is not the fixed
+  config-default explosion: about 18,080 analyses completed, 352 analyses were
+  still active, and the oldest root remained `reactor//sdk:sdk_contents` waiting
+  through SDK/Rust dependency chains. Hot samples are rules_rust dependency and
+  action setup (`rust/private/rust.bzl`, `rustc.bzl`, `utils.bzl`) plus rules_cc
+  compilation-context merging (`cc/private/cc_info.bzl` lines around
+  `_merge_compilation_contexts` / `merge_cc_infos`). Depset counters remain
+  high at about 360k creations and 131k `to_list()` calls, but the active graph
+  shape is broad Rust/C++ analysis throughput under the reduced real config set,
+  not a single zstd deadlock.
+- Decision: Plan 61 true DICE-owned bzlmod is still required for graph
+  correctness, workspace isolation, replay invalidation, and materialization
+  semantics, but it will not by itself resolve the current SDK performance
+  discrepancy. Keep the performance lane active before broader 61.2/61.3
+  implementation. The fixed default-retention bugs explain the 271-config
+  explosion, but not the remaining 45s SDK timeout; the next concrete
+  investigation must target Slug's rules_rust/rules_cc Starlark analysis
+  throughput and repeated depset/provider operations under the remaining
+  39 real configurations.
+
+Pause handoff 2026-05-19, SDK performance lane:
+
+- Direct Bazel baseline was measured in `/var/mnt/dev/zeromatter-kuro` with
+  the local Bazel 9 binary at `/usr/local/bin/bazel`. The working tree's
+  visible `MODULE.bazel.lock` is currently modified and invalid for Bazel 9
+  (`Illegal base64 character 2d`); it was temporarily moved or replaced and
+  restored for these measurements. With the committed `HEAD:MODULE.bazel.lock`,
+  `bazel shutdown && bazel build --nobuild //sdk:sdk_contents --profile=...`
+  completed successfully in `ELAPSED_MS=10814` / Bazel elapsed `10.535s`,
+  configuring `102,262` targets and `118` aspect applications. Profile:
+  `/tmp/bazel-sdk-nobuild-headlock-200812.json.gz`; log:
+  `/tmp/bazel-sdk-nobuild-headlock-200812.log`. A warm repeat with the visible
+  lock moved aside and `--lockfile_mode=off` completed in `0.719s` elapsed with
+  zero packages loaded and zero targets configured; profile:
+  `/tmp/bazel-sdk-nobuild-nolock-warm-200752.json.gz`. A no-lock cold-ish run
+  completed in `23.881s`, dominated by module-extension fetching, so the
+  committed-lockfile run is the better analysis baseline.
+- Parsed Bazel profile hotspots for the committed-lockfile baseline show the
+  critical path is analysis, not execution: `skyframeExecutor.configureTargets`
+  about `7.84s`, `runAnalysisPhase` about `8.29s`, and
+  `ParallelEvaluator.eval` about `7.79s`. Top Starlark user-function samples
+  include `_cc_library_impl` about `5.16s`, `_compile` / `compile` about
+  `2.33s`, `_create_cc_compile_actions` about `1.96s`,
+  `_rust_library_common` about `1.56s`, and `_rust_library_impl` about
+  `1.35s`. This grounds the performance target: Slug should not spend 45s to
+  finish only about 18k analyses when Bazel configures the whole 102k-target
+  graph in about 10.5s.
+- Bazel source inspection at `/var/mnt/dev/bazel` identified the high-payoff
+  data-structure differences to keep targeting:
+  `collect/nestedset/Depset.java`, `NestedSet.java`, and
+  `NestedSetBuilder.java` use order-owned canonical empty depsets, compact
+  single-object-or-array child storage, empty-child pruning, singleton child
+  reuse, transitive child dedupe, weak cached flattening for transitive DAG
+  nodes, and identity-array visited sets during flattening. `packages/
+  StarlarkProvider.java`, `StarlarkInfoWithSchema.java`, and
+  `StarlarkInfoNoSchema.java` store provider fields in compact sorted arrays;
+  schemaful providers also unwrap matching depset fields to raw `NestedSet`
+  values and reconstruct `Depset` wrappers on read.
+- A follow-up depset patch is currently in the dirty worktree, validated by
+  `cargo fmt --check`, `cargo check -p slug_build_api`, and
+  `cargo test -p slug_build_api_tests interpreter::rule_defs::depset --
+  --nocapture` (6 passed). It adds Bazel-shaped canonical empty depsets per
+  order, construction-time empty-child pruning, and identity dedupe of
+  non-topological transitive depset children, while preserving the earlier
+  direct-only and frozen-cache fast paths. No post-patch SDK smoke was started
+  because the user requested a pause at the next reasonable opportunity.
+- Immediate next implementation steps for the next agent:
+  1. Review the current dirty depset patch in
+     `app/slug_build_api/src/interpreter/rule_defs/depset.rs`, especially
+     `normalize_transitive_values`. Decide whether topological transitive child
+     identity dedupe can also be enabled by first matching Bazel's LINK_ORDER /
+     topological physical-order model; do not enable it without a focused
+     Bazel-vs-Slug order probe.
+  2. Run the remaining non-SDK validation for the dirty patch:
+     `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+     tests/core/analysis/test_depset_order.py`, `cargo build -p slug`, and
+     `git diff --check`.
+  3. Clean `slugd` before and after a bounded SDK smoke, then run a 45s smoke
+     with memory checkpoints using the same shape as
+     `anon-default-prune-mem-195830`. Treat another 45s timeout as a
+     performance failure to compare, not as a wait. Record completed/active
+     analysis counts, depset create/to_list counters, and `audit
+     configurations` counts. Expected question: did canonical empty/deduped
+     children reduce the 360k depset creations or advance beyond the zstd
+     frontier?
+  4. If the smoke still times out with similar depset counters, implement the
+     next Bazel-shaped data-structure fix rather than broad Plan 61 work:
+     schemaful `UserProvider` depset-field unwrapping or another compact
+     provider-field optimization modeled on Bazel's
+     `StarlarkProvider.optimizeField` / `retrieveOptimizedField`. Start with a
+     focused unit test for a provider that stores a depset field and repeatedly
+     reads/flattens it, then rerun the SDK memory smoke.
+  5. Separately, keep the invalid visible SDK `MODULE.bazel.lock` finding as a
+     Plan 61 lockfile-parity item: Bazel 9 hard-fails that lockfile parse, while
+     Slug's current ordinary paths have historically been more permissive. Do
+     not "fix" this by masking Bazel's failure.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

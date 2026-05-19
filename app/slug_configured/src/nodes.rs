@@ -1597,12 +1597,24 @@ async fn normalize_platforms_transition_cfg(
     }
 
     let platforms_label = BuildSettingLabel::from_bazel_label("//command_line_option:platforms")?;
-    let Some(BuildSettingValue::String(platform)) = cfg.get_build_setting(&platforms_label)? else {
+    let Some(platform_value) = cfg.get_build_setting(&platforms_label)? else {
         return Ok(cfg.dupe());
     };
-    if platform.is_empty() {
-        return Ok(cfg.dupe());
-    }
+    let platform = match platform_value {
+        BuildSettingValue::String(platform) if platform.is_empty() => {
+            return cfg.without_build_setting(&platforms_label);
+        }
+        BuildSettingValue::String(platform) => platform.as_str(),
+        BuildSettingValue::StringList(platforms) | BuildSettingValue::StringSet(platforms)
+            if platforms.is_empty() =>
+        {
+            return cfg.without_build_setting(&platforms_label);
+        }
+        BuildSettingValue::StringList(platforms) | BuildSettingValue::StringSet(platforms) => {
+            platforms[0].as_str()
+        }
+        BuildSettingValue::Bool(_) | BuildSettingValue::Int(_) => return Ok(cfg.dupe()),
+    };
 
     let cell_resolver = ctx.get_cell_resolver().await?;
     let root_cell = cell_resolver.root_cell();
@@ -1618,6 +1630,18 @@ async fn normalize_platforms_transition_cfg(
             format!("Resolving transitioned platform `{platform_label}`")
         })?;
     for (label, value) in &cfg.data()?.build_settings {
+        if label == &platforms_label {
+            match value {
+                BuildSettingValue::String(platform) if platform.is_empty() => continue,
+                BuildSettingValue::StringList(platforms)
+                | BuildSettingValue::StringSet(platforms)
+                    if platforms.is_empty() =>
+                {
+                    continue;
+                }
+                _ => {}
+            }
+        }
         out = out.with_build_setting(label.dupe(), value.clone())?;
     }
     Ok(out)

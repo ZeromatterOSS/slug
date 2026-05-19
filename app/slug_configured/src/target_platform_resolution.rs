@@ -163,11 +163,13 @@ fn apply_cli_build_settings_with(
         return Ok(cfg);
     }
     let mut out = cfg;
-    let compile_label = BuildSettingLabel::from_bazel_label(COMPILATION_MODE_LABEL)?;
-    out = out.with_build_setting(
-        compile_label,
-        BuildSettingValue::String(compilation_mode.to_owned()),
-    )?;
+    if compilation_mode != "fastbuild" {
+        let compile_label = BuildSettingLabel::from_bazel_label(COMPILATION_MODE_LABEL)?;
+        out = out.with_build_setting(
+            compile_label,
+            BuildSettingValue::String(compilation_mode.to_owned()),
+        )?;
+    }
 
     for (raw_label, raw_values) in starlark_flags {
         let canonical_label = canonicalize_cell_alias(raw_label, aliases);
@@ -178,6 +180,12 @@ fn apply_cli_build_settings_with(
                 continue;
             }
         };
+        if label.is_command_line_option()
+            && (raw_values.is_empty()
+                || raw_values.len() == 1 && raw_values.first().is_some_and(|v| v.is_empty()))
+        {
+            continue;
+        }
         // CLI flags are strings at parse time; user build-setting rules
         // that expect bool/int/list will coerce at consumption time
         // (e.g. in `ctx.build_setting_value`). Preserve repeated flags so
@@ -304,6 +312,14 @@ mod tests {
             cfg.get_build_setting(&label)?,
             Some(&BuildSettingValue::String("opt".to_owned()))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn default_cli_compilation_mode_is_not_stored() -> slug_error::Result<()> {
+        let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &[], None)?;
+        let label = BuildSettingLabel::from_bazel_label(COMPILATION_MODE_LABEL)?;
+        assert_eq!(cfg.get_build_setting(&label)?, None);
         Ok(())
     }
 
