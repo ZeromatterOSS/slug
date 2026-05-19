@@ -219,56 +219,56 @@ where
         match attribute {
             "headers" => {
                 if self.headers.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.headers.to_value())
                 }
             }
             "includes" => {
                 if self.includes.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.includes.to_value())
                 }
             }
             "quote_includes" => {
                 if self.quote_includes.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.quote_includes.to_value())
                 }
             }
             "system_includes" => {
                 if self.system_includes.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.system_includes.to_value())
                 }
             }
             "external_includes" => {
                 if self.external_includes.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.external_includes.to_value())
                 }
             }
             "framework_includes" => {
                 if self.framework_includes.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.framework_includes.to_value())
                 }
             }
             "defines" => {
                 if self.defines.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.defines.to_value())
                 }
             }
             "local_defines" => {
                 if self.local_defines.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.local_defines.to_value())
                 }
@@ -277,15 +277,13 @@ where
             | "direct_public_headers"
             | "direct_private_headers"
             | "direct_textual_headers" => Some(heap.alloc(AllocList::EMPTY)),
-            "validation_artifacts" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "validation_artifacts" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "_header_info" => Some(heap.alloc(HeaderInfoStub)),
             "_exporting_module_map_files"
             | "module_map"
             | "loose_hdrs_dirs"
             | "virtual_to_original_headers" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                Some(crate::interpreter::rule_defs::depset::empty_depset())
             }
             "purpose" => Some(Value::new_none()),
             _ => None,
@@ -977,7 +975,7 @@ where
                 }
             }
             "_legacy_transitive_native_libraries" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                Some(crate::interpreter::rule_defs::depset::empty_depset())
             }
             "_debug_context" => Some(heap.alloc(CcDebugContext)),
             _ => None,
@@ -1044,7 +1042,7 @@ impl<'v> StarlarkValue<'v> for CcInfoInstanceStub {
             })),
             "linking_context" => Some(heap.alloc(EmptyLinkingContext)),
             "_legacy_transitive_native_libraries" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                Some(crate::interpreter::rule_defs::depset::empty_depset())
             }
             "_debug_context" => Some(heap.alloc(CcDebugContext)),
             _ => None,
@@ -1067,10 +1065,10 @@ fn cc_info_instance_methods(builder: &mut MethodsBuilder) {
     /// Returns transitive native libraries as a depset.
     fn transitive_native_libraries<'v>(
         this: &CcInfoInstanceStub,
-        heap: Heap<'v>,
+        _heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+        Ok(crate::interpreter::rule_defs::depset::empty_depset())
     }
 
     /// Returns the debug context for this CcInfo.
@@ -1103,11 +1101,9 @@ impl<'v> StarlarkValue<'v> for CcDebugContext {
         matches!(attribute, "files" | "pic_files")
     }
 
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "files" | "pic_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "files" | "pic_files" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             _ => None,
         }
     }
@@ -2306,21 +2302,21 @@ where
             }
             "user_link_flags" => {
                 if self.user_link_flags.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.user_link_flags.to_value())
                 }
             }
             "additional_inputs" => {
                 if self.additional_inputs.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.additional_inputs.to_value())
                 }
             }
             "linkstamps" => {
                 if self.linkstamps.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.linkstamps.to_value())
                 }
@@ -2459,11 +2455,11 @@ where
         matches!(attribute, "linker_inputs" | "_extra_link_time_libraries")
     }
 
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "linker_inputs" => {
                 if self.linker_inputs.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                    Some(crate::interpreter::rule_defs::depset::empty_depset())
                 } else {
                     Some(self.linker_inputs.to_value())
                 }

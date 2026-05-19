@@ -48,7 +48,6 @@ use starlark::values::list::AllocList;
 use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 
-use crate::interpreter::rule_defs::depset::Depset;
 use crate::interpreter::rule_defs::py_common::NativeProviderInstance;
 use crate::interpreter::rule_defs::py_common::create_native_provider_instance;
 
@@ -177,7 +176,7 @@ fn java_common_module_methods(builder: &mut MethodsBuilder) {
         let neverlink_val = Value::new_bool(neverlink.into_option().unwrap_or(false));
 
         // Create empty depsets for transitive jars (would be populated by real compilation)
-        let empty_depset = heap.alloc(Depset::empty());
+        let empty_depset = crate::interpreter::rule_defs::depset::empty_depset();
 
         let pairs: Vec<(Value<'v>, Value<'v>)> = vec![
             (heap.alloc_str("compile_jar").to_value(), output_val),
@@ -383,7 +382,7 @@ fn java_common_internal_methods(builder: &mut MethodsBuilder) {
         libraries: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(eval.heap().alloc(Depset::empty()))
+        Ok(crate::interpreter::rule_defs::depset::empty_depset())
     }
 
     #[allow(unused_variables)]
@@ -393,7 +392,7 @@ fn java_common_internal_methods(builder: &mut MethodsBuilder) {
         excluded_jars: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(eval.heap().alloc(Depset::empty()))
+        Ok(crate::interpreter::rule_defs::depset::empty_depset())
     }
 }
 

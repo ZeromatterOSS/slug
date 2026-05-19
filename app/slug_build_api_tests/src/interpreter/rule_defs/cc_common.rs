@@ -994,6 +994,26 @@ fn cc_common_public_configure_features_preserves_toolchain_flag_sets() -> slug_e
 }
 
 #[test]
+fn cc_common_empty_provider_fields_are_depsets() -> slug_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            cc = CcInfo()
+            assert_eq([], cc.compilation_context.headers.to_list())
+            assert_eq([], cc.compilation_context.includes.to_list())
+            assert_eq([], cc.compilation_context.defines.to_list())
+            assert_eq([], cc.linking_context.linker_inputs.to_list())
+            assert_eq([], cc._legacy_transitive_native_libraries.to_list())
+
+            header_info = cc_common.internal_DO_NOT_USE.create_header_info()
+            assert_eq([], header_info.modular_public_headers)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
 fn cc_info_values_are_depset_eligible_inside_rust_dep_variant_shape() -> slug_error::Result<()> {
     let mut positive_tester = tester()?;
     positive_tester.run_starlark_bzl_test(indoc!(

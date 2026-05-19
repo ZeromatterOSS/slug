@@ -494,6 +494,15 @@ fn empty_depset_value<'v>(order: NestedSetOrder) -> Value<'v> {
     frozen_empty_depset(order).to_value()
 }
 
+/// Return the canonical empty depset value for default order.
+///
+/// Bazel keeps one empty nested set per order. Reusing the default empty value
+/// avoids allocating fresh empty depset wrappers in provider accessors that are
+/// called repeatedly during rules_cc and rules_rust analysis.
+pub fn empty_depset<'v>() -> Value<'v> {
+    empty_depset_value(NestedSetOrder::Default)
+}
+
 impl<V: ValueLifetimeless> Display for DepsetGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty {

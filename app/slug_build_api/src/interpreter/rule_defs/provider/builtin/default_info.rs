@@ -881,7 +881,7 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
                 let exe_runfiles = create_runfiles(
                     heap,
                     heap.alloc(AllocList([exe_val])),
-                    heap.alloc(Depset::empty()),
+                    crate::interpreter::rule_defs::depset::empty_depset(),
                     heap.alloc(AllocDict::EMPTY),
                     heap.alloc(AllocDict::EMPTY),
                 )?;
@@ -1131,7 +1131,7 @@ fn normalize_runfiles_files<'v>(
     }
 
     if direct_items.is_empty() && transitive_items.is_empty() {
-        return Ok(heap.alloc(Depset::empty()));
+        return Ok(crate::interpreter::rule_defs::depset::empty_depset());
     }
 
     make_depset_from_lists(heap, direct_items, transitive_items, "default")
@@ -1159,7 +1159,7 @@ fn normalize_runfiles_dict<'v>(
 
 fn union_depsets<'v>(heap: Heap<'v>, depsets: Vec<Value<'v>>) -> starlark::Result<Value<'v>> {
     if depsets.is_empty() {
-        return Ok(heap.alloc(Depset::empty()));
+        return Ok(crate::interpreter::rule_defs::depset::empty_depset());
     }
     if depsets.len() == 1 {
         return Ok(depsets[0]);
@@ -1234,10 +1234,10 @@ fn merge_runfiles<'v>(
 }
 
 pub fn empty_runfiles_value<'v>(heap: Heap<'v>) -> Value<'v> {
-    let files = heap.alloc(Depset::empty());
+    let files = crate::interpreter::rule_defs::depset::empty_depset();
     let symlinks = heap.alloc(AllocDict::EMPTY);
     let root_symlinks = heap.alloc(AllocDict::EMPTY);
-    let empty_filenames = heap.alloc(Depset::empty());
+    let empty_filenames = crate::interpreter::rule_defs::depset::empty_depset();
     heap.alloc(RunfilesGen {
         files,
         symlinks,
@@ -1269,7 +1269,7 @@ pub fn create_runfiles<'v>(
     let normalized_files = normalize_runfiles_files(files, transitive_files, heap)?;
     let normalized_symlinks = normalize_runfiles_dict("symlinks", symlinks, heap)?;
     let normalized_root_symlinks = normalize_runfiles_dict("root_symlinks", root_symlinks, heap)?;
-    let empty_filenames = heap.alloc(Depset::empty());
+    let empty_filenames = crate::interpreter::rule_defs::depset::empty_depset();
 
     Ok(heap.alloc(RunfilesGen {
         files: normalized_files,

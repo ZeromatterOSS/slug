@@ -1445,6 +1445,71 @@ Pause handoff 2026-05-19, SDK performance lane:
      Slug's current ordinary paths have historically been more permissive. Do
      not "fix" this by masking Bazel's failure.
 
+Continuation 2026-05-18/19 on Windows checkout:
+
+- Rediscovered that the local zeromatter checkout at
+  `C:\dev\zeromatter-kuro` (`383ac963cb`) no longer contains
+  `//sdk:sdk_contents`; `sdk/BUILD.bazel` now defines the SDK tarball target as
+  `//sdk:sdk`. A direct Slug run of the stale target failed correctly with
+  `Unknown target sdk_contents` and listed `reactor//sdk:sdk` as the close
+  target. Log: `C:\Users\WALTER~1\AppData\Local\Temp\sdk-parity-long-20260518-202811.log`.
+- Post-depset-patch non-SDK validation on Windows: `cargo fmt --check`
+  passed; `cargo check -p slug_build_api` passed with existing warnings;
+  `cargo build -p slug` passed with existing warnings; `git diff --check`
+  passed. `python -m pytest -q tests/core/analysis/test_depset_order.py`
+  could not run because this Python environment has no `pytest` module.
+- Bounded SDK smoke against the renamed target
+  `target\debug\slug.exe --isolation-dir sdk-target-sdk-20260518-202942 build
+  //sdk:sdk` timed out at 180s. Log:
+  `C:\Users\WALTER~1\AppData\Local\Temp\sdk-target-sdk-20260518-202942.log`.
+  The smoke reached analysis rather than a semantic failure: about 11,040
+  analysis keys had completed with 448 still active near the final checkpoint,
+  peak RSS was about 758 MiB, depset creation reached about 70,974, and
+  depset `to_list()` reached about 58,042. Oldest active roots stayed under
+  `reactor//sdk:sdk` and SDK/Rust tool dependencies. Hot Starlark samples again
+  pointed at rules_rust `rust/private/rustc.bzl` and `rust/private/utils.bzl`.
+- Class boundary for the next local patch: missing Bazel-shaped canonical empty
+  depset reuse at provider accessor boundaries. The owner is Slug's depset
+  facade plus Bazel provider shims, not the SDK target. A symptom-only patch
+  would special-case `//sdk:sdk` or a particular `rules_rust` label; that is
+  rejected. The intended patch is a systemic performance/parity fix: provider
+  accessors that synthesize absent depset fields should return the canonical
+  default-order empty depset instead of allocating fresh empty wrappers.
+- Provider-accessor empty-depset slice implemented on 2026-05-18/19:
+  `depset::empty_depset()` exposes the canonical default-order empty depset,
+  and CcInfo/linking/debug, ctx empty linking context, JavaInfo defaults, and
+  DefaultInfo/runfiles accessors now use it where they synthesize absent depset
+  fields. Focused regression:
+  `cargo test -p slug_build_api_tests
+  interpreter::rule_defs::cc_common::cc_common_empty_provider_fields_are_depsets
+  -- --nocapture` passed. `cargo fmt --check`, `cargo check -p slug_build_api`,
+  `cargo build -p slug`, and `git diff --check` passed. The broader
+  `cargo test -p slug_build_api_tests interpreter::rule_defs::cc_common --
+  --nocapture` currently has four pre-existing Windows toolchain expectation
+  failures (`/nologo` and `/OUT:out` vs Unix-style expected flags), unrelated to
+  depset accessor reuse.
+- Post-slice bounded SDK smoke:
+  `target\debug\slug.exe --isolation-dir
+  sdk-target-sdk-empty-depset-20260519-002 build //sdk:sdk` timed out at the
+  185s harness cap. Log:
+  `C:\Users\WALTER~1\AppData\Local\Temp\sdk-target-sdk-empty-depset-20260519-002.log`.
+  It still did not complete, but it advanced farther than the previous 180s
+  run: final checkpoint showed completed analysis keys about 11,248 and active
+  keys 240, versus about 11,040 completed and 448 active before this slice.
+  Peak RSS dropped from about 758 MiB to about 708 MiB. Depset `create_count`
+  reached about 79,403 and `to_list` reached about 74,456, so the next
+  bottleneck is not merely fresh empty-wrapper allocation. Hot samples continue
+  to concentrate in rules_rust `rust/private/rustc.bzl` around
+  `linker_inputs.to_list()` and adjacent provider plumbing.
+- Next class boundary: repeated flattening/boxing of provider-stored depsets in
+  schemaful and native provider fields. Bazel optimizes provider fields by
+  storing raw `NestedSet` values for depset-typed fields and reconstructing
+  `Depset` wrappers on read (`StarlarkProvider.optimizeField` /
+  `retrieveOptimizedField`). Slug should first add a focused unit test around a
+  provider/native provider depset field that is read and flattened repeatedly,
+  then implement the smallest Bazel-shaped provider-field optimization or
+  cached flattening improvement. Do not special-case `rules_rust`.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

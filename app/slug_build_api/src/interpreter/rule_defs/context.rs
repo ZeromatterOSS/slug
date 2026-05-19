@@ -87,7 +87,6 @@ use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::cmd_args::CommandLineBuilder;
 use crate::interpreter::rule_defs::cmd_args::CommandLineContext;
 use crate::interpreter::rule_defs::cmd_args::command_line_arg_like_type::command_line_arg_like_impl;
-use crate::interpreter::rule_defs::depset::Depset;
 use crate::interpreter::rule_defs::depset::make_depset_from_lists;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::fragments::CppFragment;
@@ -2160,7 +2159,7 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
         if let Some(inner) = this.inner_cc_toolchain_value() {
             if let Some(shim) = inner.downcast_ref::<CcToolchainInfoNativeShim>() {
                 if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
-                    return Ok(heap.alloc(Depset::empty()));
+                    return Ok(crate::interpreter::rule_defs::depset::empty_depset());
                 }
                 return Ok(shim.toolchain_file_stubs_depset(&shim.static_runtime_files, heap));
             }
@@ -2176,7 +2175,7 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
                 }
             }
         }
-        Ok(heap.alloc(Depset::empty()))
+        Ok(crate::interpreter::rule_defs::depset::empty_depset())
     }
 
     fn dynamic_runtime_lib<'v>(
@@ -2188,7 +2187,7 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
         if let Some(inner) = this.inner_cc_toolchain_value() {
             if let Some(shim) = inner.downcast_ref::<CcToolchainInfoNativeShim>() {
                 if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
-                    return Ok(heap.alloc(Depset::empty()));
+                    return Ok(crate::interpreter::rule_defs::depset::empty_depset());
                 }
                 return Ok(shim.toolchain_file_stubs_depset(&shim.dynamic_runtime_files, heap));
             }
@@ -2204,7 +2203,7 @@ fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
                 }
             }
         }
-        Ok(heap.alloc(Depset::empty()))
+        Ok(crate::interpreter::rule_defs::depset::empty_depset())
     }
 }
 
@@ -2614,7 +2613,7 @@ impl CcToolchainInfoNativeShim {
         heap: Heap<'v>,
     ) -> Value<'v> {
         if std::env::var_os("SLUG_DISABLE_CC_TOOLCHAIN_FILE_SHIM").is_some() {
-            return heap.alloc(Depset::empty());
+            return crate::interpreter::rule_defs::depset::empty_depset();
         }
         files
             .as_ref()
@@ -2625,7 +2624,7 @@ impl CcToolchainInfoNativeShim {
                 make_depset_from_lists(heap, vec![carrier], vec![], "default")
                     .expect("toolchain file carrier depset should be valid")
             })
-            .unwrap_or_else(|| heap.alloc(Depset::empty()))
+            .unwrap_or_else(|| crate::interpreter::rule_defs::depset::empty_depset())
     }
 
     fn toolchain_file_stubs_depset<'v>(
@@ -2649,7 +2648,7 @@ impl CcToolchainInfoNativeShim {
                 make_depset_from_lists(heap, direct, vec![], "default")
                     .expect("toolchain file stub depset should be valid")
             })
-            .unwrap_or_else(|| heap.alloc(Depset::empty()))
+            .unwrap_or_else(|| crate::interpreter::rule_defs::depset::empty_depset())
     }
 
     fn cpp_runtime_feature_enabled(feature_configuration: Value) -> bool {
@@ -2678,7 +2677,7 @@ fn cc_toolchain_native_shim_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
-            return Ok(heap.alloc(Depset::empty()));
+            return Ok(crate::interpreter::rule_defs::depset::empty_depset());
         }
         Ok(this.toolchain_file_stubs_depset(&this.static_runtime_files, heap))
     }
@@ -2689,7 +2688,7 @@ fn cc_toolchain_native_shim_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         if !CcToolchainInfoNativeShim::cpp_runtime_feature_enabled(feature_configuration) {
-            return Ok(heap.alloc(Depset::empty()));
+            return Ok(crate::interpreter::rule_defs::depset::empty_depset());
         }
         Ok(this.toolchain_file_stubs_depset(&this.dynamic_runtime_files, heap))
     }
@@ -2706,7 +2705,7 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        let empty_depset = || heap.alloc(Depset::empty());
+        let empty_depset = || crate::interpreter::rule_defs::depset::empty_depset();
         let empty_list = || heap.alloc(Vec::<Value<'v>>::new());
         let empty_dict = || heap.alloc(AllocDict::EMPTY);
         let empty_string = || heap.alloc_str("").to_value();
@@ -3408,64 +3407,38 @@ impl<'v> StarlarkValue<'v> for EmptyCompilationContext {
             } else {
                 Value::new_none()
             }),
-            "headers" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "system_includes" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "quote_includes" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "defines" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "local_defines" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "framework_includes" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "external_includes" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_non_code_inputs" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "headers" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "system_includes" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "includes" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "quote_includes" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "defines" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "local_defines" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "framework_includes" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "external_includes" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "_non_code_inputs" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "_virtual_to_original_headers" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                Some(crate::interpreter::rule_defs::depset::empty_depset())
             }
-            "validation_artifacts" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_transitive_modules" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "validation_artifacts" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "_transitive_modules" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "_transitive_pic_modules" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                Some(crate::interpreter::rule_defs::depset::empty_depset())
             }
-            "_modules_info_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "_modules_info_files" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "_pic_modules_info_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                Some(crate::interpreter::rule_defs::depset::empty_depset())
             }
-            "_module_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_pic_module_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_direct_module_maps" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_exporting_module_maps" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "_module_files" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "_pic_module_files" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "_direct_module_maps" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "_exporting_module_maps" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "direct_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_public_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_private_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_textual_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "_header_info" => Some(heap.alloc(EmptyHeaderInfo)),
             "_exporting_module_map_files" | "loose_hdrs_dirs" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                Some(crate::interpreter::rule_defs::depset::empty_depset())
             }
             "purpose" => Some(Value::new_none()),
             _ => None,
@@ -3584,11 +3557,9 @@ impl<'v> StarlarkValue<'v> for EmptyLinkingContext {
         matches!(attribute, "linker_inputs" | "_extra_link_time_libraries")
     }
 
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "linker_inputs" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "linker_inputs" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "_extra_link_time_libraries" => Some(Value::new_none()),
             _ => None,
         }
