@@ -473,6 +473,16 @@ impl LocalExecutor {
         }
         if cfg!(windows) {
             let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
+            if rewrite_windows_process_wrapper_child_tool_path(
+                &mut rewritten_args,
+                action_execroot.as_deref(),
+                self.root.as_path(),
+            ) {
+                args_owned = Some(rewritten_args);
+            }
+        }
+        if cfg!(windows) {
+            let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
             if parametrize_windows_process_wrapper_rustc_tail(&mut rewritten_args, &scratch_dir) {
                 args_owned = Some(rewritten_args);
             }
@@ -1882,9 +1892,6 @@ fn windows_spawn_arg(arg: &OsStr) -> OsString {
 
 #[cfg(windows)]
 fn windows_short_path(path: &Path) -> Option<PathBuf> {
-    use std::os::windows::ffi::OsStrExt;
-    use std::os::windows::ffi::OsStringExt;
-
     unsafe extern "system" {
         fn GetShortPathNameW(
             lpszLongPath: *const u16,
@@ -1893,21 +1900,40 @@ fn windows_short_path(path: &Path) -> Option<PathBuf> {
         ) -> u32;
     }
 
-    let wide: Vec<u16> = path
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-    let len = unsafe { GetShortPathNameW(wide.as_ptr(), std::ptr::null_mut(), 0) };
-    if len == 0 {
-        return None;
+    fn get_short_path(path: &Path) -> Option<PathBuf> {
+        use std::os::windows::ffi::OsStrExt;
+        use std::os::windows::ffi::OsStringExt;
+
+        let wide: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let len = unsafe { GetShortPathNameW(wide.as_ptr(), std::ptr::null_mut(), 0) };
+        if len == 0 {
+            return None;
+        }
+        let mut buf = vec![0u16; len as usize];
+        let written = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), len) };
+        if written == 0 || written >= len {
+            return None;
+        }
+        Some(PathBuf::from(OsString::from_wide(&buf[..written as usize])))
     }
-    let mut buf = vec![0u16; len as usize];
-    let written = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), len) };
-    if written == 0 || written >= len {
-        return None;
-    }
-    Some(PathBuf::from(OsString::from_wide(&buf[..written as usize])))
+
+    get_short_path(path).or_else(|| {
+        let text = path.as_os_str().to_string_lossy();
+        if text.starts_with(r"\\?\") || !path.is_absolute() {
+            return None;
+        }
+        let prefixed = PathBuf::from(format!(r"\\?\{text}"));
+        let short = get_short_path(&prefixed)?;
+        let short_text = short.as_os_str().to_string_lossy();
+        short_text
+            .strip_prefix(r"\\?\")
+            .map(PathBuf::from)
+            .or(Some(short))
+    })
 }
 
 #[cfg(windows)]
@@ -1989,6 +2015,57 @@ fn parametrize_windows_process_wrapper_rustc_tail(
             tail_start..,
             std::iter::once(format!("@{}", param_path.to_string_lossy())),
         );
+        true
+    }
+}
+
+fn rewrite_windows_process_wrapper_child_tool_path(
+    args: &mut [String],
+    action_execroot: Option<&slug_fs::paths::abs_norm_path::AbsNormPath>,
+    project_root: &Path,
+) -> bool {
+    #[cfg(not(windows))]
+    {
+        let _ = (args, action_execroot, project_root);
+        false
+    }
+
+    #[cfg(windows)]
+    {
+        if !is_process_wrapper_rustc_invocation(args) {
+            return false;
+        }
+        let Some(separator) = args.iter().position(|arg| arg == "--") else {
+            return false;
+        };
+        let Some(tool) = args.get_mut(separator + 1) else {
+            return false;
+        };
+        let tool_path = Path::new(tool.as_str());
+        if tool_path.is_absolute() {
+            return false;
+        }
+
+        let mut candidates = Vec::new();
+        if let Some(execroot) = action_execroot {
+            let absolute = execroot.as_path().join(tool_path);
+            if absolute.exists() {
+                candidates.push(absolute);
+            }
+        }
+        let project_absolute = project_root.join(tool_path);
+        if project_absolute.exists() {
+            candidates.push(project_absolute);
+        }
+
+        let Some(replacement) = candidates
+            .into_iter()
+            .map(|path| windows_short_path(&path).unwrap_or(path))
+            .min_by_key(|path| path.as_os_str().len())
+        else {
+            return false;
+        };
+        *tool = replacement.to_string_lossy().into_owned();
         true
     }
 }
@@ -2959,6 +3036,45 @@ mod tests {
         let content = std::fs::read_to_string(param_path)?;
         assert!(content.contains("src/lib.rs"));
         assert!(content.contains("-Ldependency=buck-out/p44/gen/rules_rs++crate+crates__dep-899"));
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_process_wrapper_child_tool_path_uses_execroot_absolute_path()
+    -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
+        let tool_rel = PathBuf::from("buck-out")
+            .join("iso")
+            .join("gen")
+            .join("rules_rs++toolchains+default_rust_toolchains")
+            .join("cfg")
+            .join("external")
+            .join("rules_rs++toolchains+default_rust_toolchains")
+            .join("windows_x86_64_rust_toolchain")
+            .join("bin")
+            .join("rustc.exe");
+        let tool_abs = execroot.as_path().join(&tool_rel);
+        std::fs::create_dir_all(tool_abs.parent().unwrap())?;
+        std::fs::write(&tool_abs, b"")?;
+
+        let mut args = vec![
+            "external/rules_rust/util/process_wrapper/process_wrapper.exe".to_owned(),
+            "--".to_owned(),
+            tool_rel.to_string_lossy().into_owned(),
+            "src/lib.rs".to_owned(),
+        ];
+
+        assert!(rewrite_windows_process_wrapper_child_tool_path(
+            &mut args,
+            Some(&execroot),
+            execroot.as_path()
+        ));
+        assert!(Path::new(&args[2]).is_absolute());
+        assert!(Path::new(&args[2]).exists());
+        assert!(args[2].ends_with("rustc.exe"));
 
         Ok(())
     }

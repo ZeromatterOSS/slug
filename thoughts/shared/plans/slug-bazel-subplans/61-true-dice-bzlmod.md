@@ -1551,6 +1551,38 @@ Continuation 2026-05-18/19 on Windows checkout:
   224 active analysis keys, but peak RSS dropped to about 696 MiB. This is a
   checkpoint fidelity/perf fix rather than a semantic bzlmod fix; keep it
   because Plan 61 relies on memory-checkpoint smokes for performance decisions.
+- No-checkpoint SDK smokes after the depset slices advance materially farther
+  than the checkpointed runs but still do not finish: `sdk-target-sdk-no-
+  checkpoints-20260519-001` timed out at 300s near the generated build-script
+  tail, and `sdk-target-sdk-no-checkpoints-20260519-002` timed out at 600s with
+  about 31 analysis actions still active, centered on generated build scripts
+  such as `reactor//zerobuf_generated/playback:build_script`.
+- Focused execution frontier: `target\debug\slug.exe --isolation-dir playback-
+  build-script-checkpoints-20260519-001 build //zerobuf_generated/playback:
+  build_script` reached execution and failed compiling
+  `rules_rust++i+rules_rust_tinyjson//:tinyjson` with
+  `bootstrap_process_wrapper: _spawnvp: No such file or directory`. The printed
+  command runs the generated `bootstrap_process_wrapper.exe` successfully, then
+  passes a relative `buck-out\...\rustc.exe` child path to the wrapper. Next
+  class boundary: Windows action command-line path semantics for executable
+  artifacts consumed by process wrappers. Own this in Slug's action command
+  expansion / local execution path handling, not as a rules_rust or target-
+  specific workaround.
+- Process-wrapper path slice completed: local execution now rewrites the child
+  `rustc.exe` path in Windows process-wrapper invocations to the shortest
+  existing absolute path, including `GetShortPathNameW` retry through the
+  long-path prefix. Validation: `cargo fmt --check`, `cargo test -p
+  slug_execute_impl process_wrapper -- --nocapture`, `cargo check -p
+  slug_execute_impl`, `cargo build -p slug`, and focused smoke
+  `playback-build-script-process-wrapper-final-20260519-001`. The focused smoke
+  advanced past the prior `_spawnvp` failure, ran 296 local commands, and failed
+  later in `crates__windows_x86_64_msvc-0.42.2//:_bs_x86_64-pc-windows-msvc`
+  when `cargo_build_script_runner` tried to link a generated script executable
+  from an absolute short execroot source to a relative runfiles destination and
+  Windows returned `Os { code: 87, kind: InvalidInput }`. Next class boundary:
+  Windows runfiles link path semantics for cargo build-script runner actions.
+  Own this in local action/runfiles materialization or argument path rewriting,
+  not as a rules_rust crate-specific workaround.
 
 Exit criteria:
 
