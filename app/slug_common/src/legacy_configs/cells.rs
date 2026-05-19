@@ -70,6 +70,57 @@ const BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS: &[&str] = &[
     "@local_config_python//:host_launcher_maker_toolchain",
 ];
 
+fn register_lockfile_seeded_dynamic_cells(
+    project_root: &ProjectRoot,
+    cells: &[slug_bzlmod::PendingRepoCell],
+) {
+    for cell in cells {
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(cell.canonical_name.as_str()),
+            extension_id: Arc::from(cell.extension_id.as_str()),
+            internal_name: Arc::from(cell.internal_name.as_str()),
+            spec_hash: Arc::from(cell.spec_hash.as_str()),
+            repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
+            materialized: false,
+        };
+        slug_core::cells::register_dynamic_extension_cell_with_setup_lazy(
+            cell.canonical_name.clone(),
+            cell.path.clone(),
+            setup.clone(),
+        );
+        if cell.internal_name != cell.canonical_name {
+            slug_core::cells::register_dynamic_extension_cell_with_setup_lazy(
+                cell.internal_name.clone(),
+                cell.path.clone(),
+                setup.clone(),
+            );
+        }
+        if cell.repo_spec_json.is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<slug_bzlmod::RepoSpec>(&cell.repo_spec_json) {
+            Ok(repo_spec) => {
+                let registration = slug_bzlmod::SpokeRegistration {
+                    extension_id: Arc::from(cell.extension_id.as_str()),
+                    repo_spec: Arc::new(repo_spec),
+                    project_root: Arc::new(project_root.root().to_path_buf()),
+                };
+                slug_bzlmod::register_spoke(cell.canonical_name.clone(), registration.clone());
+                if cell.internal_name != cell.canonical_name {
+                    slug_bzlmod::register_spoke(cell.internal_name.clone(), registration);
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse lockfile-seeded RepoSpec for '{}': {}",
+                    cell.canonical_name,
+                    e
+                );
+            }
+        }
+    }
+}
+
 /// The module name used by the canonical rules_python Bazel module. Matched
 /// against `ParsedModuleFile::module.name` (the declared `module(name = ...)`
 /// value), not against cell names.
@@ -927,24 +978,7 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
             );
-            // Mirror lockfile-seeded cells into the dynamic-extension-cell
-            // registry so `resolve_label_to_path` (used by `rctx.path`)
-            // finds them before any materialization has run on disk. The
-            // pending cells flow through the static aggregator further
-            // down; this registration is just the parallel dynamic mapping.
-            for cell in &extra {
-                slug_core::cells::register_dynamic_extension_cell(
-                    cell.canonical_name.clone(),
-                    cell.path.clone(),
-                );
-                if cell.internal_name != cell.canonical_name {
-                    slug_core::cells::register_dynamic_extension_cell(
-                        cell.internal_name.clone(),
-                        cell.path.clone(),
-                    );
-                }
-            }
-            pre_computed_cells.extend(extra);
+            register_lockfile_seeded_dynamic_cells(project_root, &extra);
         }
         let hidden_lockfile_path = root_config
             .get_section("bzlmod")
@@ -961,19 +995,7 @@ impl BuckConfigBasedCells {
                     &mut pre_computed_cells,
                     project_root.root().as_path(),
                 );
-                for cell in &extra {
-                    slug_core::cells::register_dynamic_extension_cell(
-                        cell.canonical_name.clone(),
-                        cell.path.clone(),
-                    );
-                    if cell.internal_name != cell.canonical_name {
-                        slug_core::cells::register_dynamic_extension_cell(
-                            cell.internal_name.clone(),
-                            cell.path.clone(),
-                        );
-                    }
-                }
-                pre_computed_cells.extend(extra);
+                register_lockfile_seeded_dynamic_cells(project_root, &extra);
             }
         }
         slug_util::memory_checkpoint::checkpoint(

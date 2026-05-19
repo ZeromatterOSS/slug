@@ -372,6 +372,25 @@ pub fn register_dynamic_extension_cell_with_setup(
     register_dynamic_extension_cell(canonical_name, path);
 }
 
+/// Register a dynamic extension cell without creating its `external/` symlink.
+///
+/// Lockfile replay can expose thousands of extension-internal spokes. Creating
+/// every symlink during daemon startup regresses cold analysis; the resolver
+/// installs the symlink when the cell is first requested.
+pub fn register_dynamic_extension_cell_with_setup_lazy(
+    canonical_name: String,
+    path: String,
+    setup: crate::cells::external::ExtensionRepoCellSetup,
+) {
+    if let Ok(mut setups) = DYNAMIC_EXTENSION_CELL_SETUPS.lock() {
+        setups.insert(canonical_name.clone(), setup);
+    }
+    if let Ok(mut cells) = DYNAMIC_EXTENSION_CELLS.lock() {
+        cells.insert(canonical_name.clone(), path);
+    }
+    cache_bzlmod_apparent_alias_for_canonical_name(&canonical_name);
+}
+
 /// Lookup the `ExtensionRepoCellSetup` for a dynamic extension cell, if
 /// one was registered alongside the path mapping.
 pub fn get_dynamic_extension_cell_setup(

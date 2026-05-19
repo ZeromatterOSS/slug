@@ -1125,6 +1125,51 @@ frontier:
   isolated unit/integration fixtures and keep real-world zeromatter smokes
   bounded until this remaining startup work is proven not to regress.
 
+Implementation slice 2026-05-18, lockfile spoke preseed performance:
+
+- Root caused the post-watchfix narrow-target stall to legacy lockfile spoke
+  preseeding. With `SLUG_MEMORY_CHECKPOINTS=1`, the focused
+  `@rules_rust//ffi/rs:empty_allocator_libraries --target-platforms=//bazel/platforms:linux-musl`
+  repro showed startup parsing `MODULE.bazel.lock`, then
+  `bzlmod_pre_compute_extension_repo_cells_from_lockfile` adding 2,350
+  extension-internal repos to the static pre-DICE cell graph. The follow-on
+  `legacy_cells_bzlmod_precomputed_repos` checkpoint built 2,730 precomputed
+  cells and 3,181 aliases before target analysis. This was the dominant
+  "Synchronizing slug internal state" cost and is a Plan 61 ownership bug:
+  lockfile-generated spokes are lazy extension/repo materialization state, not
+  startup cell-graph authority.
+- Changed lockfile-only generated spokes to register in the dynamic
+  extension-cell/spoke registries with their `ExtensionRepoCellSetup` and
+  `RepoSpec`, without appending them to the static startup `CellResolver` or
+  creating every `external/` symlink up front. Explicit `use_repo()` cells still
+  remain in the static precomputed list. When an internal spoke is actually
+  referenced, `CellResolver::get` promotes the dynamic entry and installs the
+  symlink on demand.
+- Validation: `cargo fmt --check`; `cargo check -p slug_core -p slug_common`;
+  `cargo test -p slug_core dynamic_extension_cell -- --nocapture`; `cargo
+  build -p slug`; focused replay guardrail
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py::test_valid_lockfile_replay_materializes_generated_repo_without_extension_eval
+  -rx`; checkpointed audit `sdk-audit-lazy-lockfile-mem-172738`; and focused
+  zeromatter repro `rules-rust-empty-lazy-lockfile-mem-172841`.
+- Post-fix checkpoints show `legacy_cells_bzlmod_precomputed_repos` remains at
+  380 precomputed cells / 401 precomputed aliases, and the final cell resolver
+  is 458 cells / 831 aliases instead of 2,808 cells / 3,181 aliases. The
+  focused Rust allocator target still succeeds and dropped from 43.4s to about
+  22.1s end to end. Remaining non-parity cost is duplicated legacy bzlmod/cell
+  setup around daemon bootstrap plus real target/toolchain analysis; longer SDK
+  smokes must remain bounded and should not be treated as progress if analysis
+  exceeds the <10s Bazel baseline.
+- Bounded SDK smoke `sdk-build-lazy-lockfile-173003` still timed out at 45s
+  after connecting in about 4.1s. It reached the same analysis frontier:
+  `rules_rust//ffi/rs:empty_allocator_libraries`
+  `(//bazel/platforms:linux-musl#f9d25665faba5414)` running in `evaluate_rule`
+  with 37-38 other analyses. This confirms the static lockfile-cell fanout was
+  one root cause of the hang, but not the whole performance discrepancy. The
+  next performance slice should focus on the remaining SDK cfg/toolchain
+  analysis multiplication, using the isolated allocator repro and memory
+  checkpoints rather than long SDK waits.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
