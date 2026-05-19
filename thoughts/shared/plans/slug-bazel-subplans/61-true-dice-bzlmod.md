@@ -1533,6 +1533,24 @@ Continuation 2026-05-18/19 on Windows checkout:
   depset-typed fields, or a depset/list bridge that avoids reconstructing
   large direct-only depsets from already-flattened linker input lists. Avoid
   label-specific handling.
+- Rejected experiment: enabling exact identity dedupe for topological
+  transitive children passed depset tests but regressed the SDK smoke
+  (`sdk-target-sdk-topo-dedupe-20260519-001`) to about 751 MiB peak RSS and
+  about 76,100 `to_list` calls while still stopping at 224 active analysis
+  keys. The experiment was reverted before commit. Keep the earlier caution:
+  topological/LINK_ORDER child normalization needs a deliberate physical-order
+  parity change, not a quick identity-dedupe toggle.
+- Checkpoint overhead cleanup: `depset.to_list()` memory checkpoints now read
+  direct/transitive lengths from `DepsetSummary` instead of cloning direct and
+  transitive vectors through `depset_direct_and_transitive()` only to compute
+  lengths. Validation: `cargo fmt --check`, `cargo test -p
+  slug_build_api_tests interpreter::rule_defs::depset -- --nocapture`,
+  `cargo check -p slug_build_api`, and `cargo build -p slug` passed with
+  existing warnings. Bounded SDK smoke
+  `sdk-target-sdk-checkpoint-summary-20260519-001` timed out at 185s, again at
+  224 active analysis keys, but peak RSS dropped to about 696 MiB. This is a
+  checkpoint fidelity/perf fix rather than a semantic bzlmod fix; keep it
+  because Plan 61 relies on memory-checkpoint smokes for performance decisions.
 
 Exit criteria:
 

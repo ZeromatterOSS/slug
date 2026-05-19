@@ -1034,8 +1034,11 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
             None => "depset_to_list_live",
         };
         let (direct_len, transitive_len) = if slug_util::memory_checkpoint::enabled() {
-            depset_direct_and_transitive(this, heap)
-                .map(|(direct, transitive)| (direct.len(), transitive.len()))
+            DepsetView::from_value(this)
+                .map(|depset| {
+                    let summary = depset.summary();
+                    (summary.direct_len, summary.transitive_len)
+                })
                 .unwrap_or((0, 0))
         } else {
             (0, 0)
