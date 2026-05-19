@@ -294,9 +294,9 @@ impl NotifyFileData {
 ///
 /// The post-fix walk uses `walkdir` with `follow_links(false)` and
 /// installs a `RecursiveMode::NonRecursive` watch on each kept
-/// directory. Newly-created directories surface as `Create` events on
-/// the parent; the event processor can install watches for them on
-/// demand (follow-up).
+/// directory. Build-system output trees are also filtered here, matching
+/// the event-time filter above, so stale/generated directories do not
+/// dominate daemon startup.
 fn install_filtered_watches(
     watcher: &mut RecommendedWatcher,
     root: &ProjectRoot,
@@ -335,6 +335,14 @@ fn install_filtered_watches(
             };
             if rel_str.is_empty() {
                 return true;
+            }
+            let rel_path = match slug_core::fs::project_rel_path::ProjectRelativePath::new(rel_str)
+            {
+                Ok(path) => path,
+                Err(_) => return true,
+            };
+            if is_reserved_output_path(rel_path) {
+                return false;
             }
             let ignored = root_ignore.is_some_and(|ignores| {
                 ignores.is_match(slug_core::cells::paths::CellRelativePath::unchecked_new(
@@ -506,6 +514,7 @@ mod tests {
             "bazel-bazel",
             "bazel-external",
             "external",
+            "execroot",
         ] {
             assert!(check(&format!("{c}/foo")), "expected {c} to be filtered");
             assert!(

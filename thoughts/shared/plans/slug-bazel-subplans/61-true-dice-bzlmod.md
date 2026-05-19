@@ -1096,21 +1096,41 @@ frontier:
   between `Starting new slug daemon...` and `Connected to new slug daemon`
   (`/tmp/sdk-connect-probe-165019.log`) before returning
   `audit bzlmod-counters`. The counters show one bzlmod resolution and 428
-  module parses. Top-level filesystem walks are not the remaining cost:
-  `find external -maxdepth 1 -type l` counted 12,827 symlinks in 0.010s and
-  `find bazel-external -maxdepth 1` counted 7,425 entries in 0.013s.
-- Hard frontier: cold daemon startup still performs full legacy bzlmod
-  resolution before the client can connect. Because Bazel completes analysis for
-  this repository in under 10 seconds, a 23-second Slug startup for a read-only
-  audit command is a parity failure. The next slice must move or cache this
-  resolution behind DICE-owned workspace/command keys, or otherwise prove a
-  Bazel-shaped replay path that avoids reparsing hundreds of module files on
-  cold client connect.
+  module parses. Top-level `external`/`bazel-external` max-depth walks alone
+  were not enough to explain the delay: `find external -maxdepth 1 -type l`
+  counted 12,827 symlinks in 0.010s and `find bazel-external -maxdepth 1`
+  counted 7,425 entries in 0.013s.
+- Follow-up timing probes split that startup delay into two costs. First,
+  legacy bzlmod/cell startup was roughly 4.0s, dominated by pre-DICE extension
+  cell registration and external symlink repair. Second, the open-source
+  `notify` file watcher spent roughly 4.6s recursively walking generated
+  workspace trees before the daemon became ready. The zeromatter workspace's
+  `.bazelignore` did not ignore `buck-out`, `bazel-external`, or `external`;
+  local counts found roughly 84,959 directories under `bazel-external` and more
+  than 209,299 directories under the current `buck-out` tree.
+- Fixed the immediate startup hang by applying the existing reserved-output
+  component filter during `notify` watch installation, not only when processing
+  events. The watcher no longer descends into `buck-out`, `bazel-*`, `external`,
+  or `execroot` during daemon startup. Validation: `cargo fmt --check`; `cargo
+  test -p slug_file_watcher notify -- --nocapture`; `cargo build -p slug`; and
+  bounded zeromatter probe `sdk-connect-post-watchfix-171305`.
+- After the watcher fix, `sdk-connect-post-watchfix-171305` completed
+  `audit bzlmod-counters` in 8.8s end to end and connected the daemon in about
+  4.35s (`/tmp/sdk-connect-post-watchfix-171305.log`). This removes the
+  generated-tree startup hang and brings the read-only audit command under the
+  10s analysis budget. Remaining known cost: about 4s of legacy bzlmod/cell
+  setup still happens before daemon readiness. Plan 61's DICE-owned bzlmod graph
+  should retire that startup work by moving semantic module/extension state
+  behind workspace/command keys, but further Plan 61 implementation should use
+  isolated unit/integration fixtures and keep real-world zeromatter smokes
+  bounded until this remaining startup work is proven not to regress.
 
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
-- Real-world smokes stay usable throughout the migration.
+- Real-world smokes stay usable throughout the migration; cold read-only audit
+  startup for zeromatter must stay below 10s, and any regression is a Plan 61
+  performance failure rather than a smoke to wait out.
 
 ## Acceptance Criteria
 
