@@ -2298,7 +2298,8 @@ fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
             continue;
         };
         let is_llvm_toolchain = name.starts_with("llvm-toolchain-minimal-")
-            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-");
+            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-")
+            || name.starts_with("llvm++http_archive+llvm-toolchain-minimal-");
         if !is_llvm_toolchain || !name.ends_with(&suffix) {
             continue;
         }

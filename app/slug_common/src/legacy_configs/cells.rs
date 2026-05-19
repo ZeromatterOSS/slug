@@ -1219,9 +1219,10 @@ impl BuckConfigBasedCells {
         // second cell identity.
         let mut ext_aliases = Vec::new();
         for alias in pre_computed_aliases {
-            if let Some((owner_module, _, _)) =
+            if let Some(owner_module) = alias.declaring_module.as_deref().or_else(|| {
                 slug_bzlmod::parse_canonical_name(&alias.canonical_name)
-            {
+                    .map(|(owner_module, _, _)| owner_module)
+            }) {
                 slug_core::cells::register_scoped_bzlmod_repo_alias(
                     owner_module.to_owned(),
                     alias.apparent_name.clone(),

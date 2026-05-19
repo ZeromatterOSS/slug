@@ -9,6 +9,7 @@
  */
 
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::OnceLock;
 
 use dupe::Dupe;
@@ -44,6 +45,7 @@ use slug_execute::execute::prepared::PreparedCommandExecutor;
 use slug_execute::execute::prepared::PreparedCommandOptionalExecutor;
 use slug_execute::execute::request::ExecutorPreference;
 use slug_execute::execute::request::IncompatibleExecutorPreferences;
+use slug_execute::execute::testing_dry_run::DryRunExecutor;
 use slug_execute::knobs::ExecutorGlobalKnobs;
 use slug_execute::materialize::materializer::Materializer;
 use slug_execute::re::manager::ManagedRemoteExecutionClient;
@@ -193,6 +195,20 @@ impl HasCommandExecutor for CommandExecutorFactory {
                 self.daemon_id.dupe(),
             )
         };
+
+        if matches!(self.strategy, ExecutionStrategy::NoExecution) {
+            return Ok(CommandExecutorResponse {
+                executor: Arc::new(DryRunExecutor::new(
+                    Arc::new(Mutex::new(Vec::new())),
+                    artifact_fs.clone(),
+                )),
+                platform: Default::default(),
+                action_cache_checker: Arc::new(NoOpCommandOptionalExecutor {}),
+                remote_dep_file_cache_checker: Arc::new(NoOpCommandOptionalExecutor {}),
+                cache_uploader: Arc::new(NoOpCacheUploader {}),
+                output_trees_download_config: self.output_trees_download_config.dupe(),
+            });
+        }
 
         if !slug_core::is_open_source() && !cfg!(fbcode_build) {
             static WARN: OnceLock<()> = OnceLock::new();

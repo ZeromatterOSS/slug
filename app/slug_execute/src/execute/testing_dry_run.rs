@@ -27,6 +27,7 @@ use crate::execute::prepared::PreparedCommand;
 use crate::execute::prepared::PreparedCommandExecutor;
 use crate::execute::request::CommandExecutionOutput;
 use crate::execute::request::ExecutorPreference;
+use crate::execute::request::OutputType;
 use crate::execute::result::CommandExecutionMetadata;
 use crate::execute::result::CommandExecutionResult;
 
@@ -86,9 +87,24 @@ impl PreparedCommandExecutor for DryRunExecutor {
         match request
             .outputs()
             .map(|x| {
-                let path = x.resolve(&self.fs, None)?.into_path();
-                self.fs.fs().write_file(&path, "", false)?;
-                Ok((x.cloned(), ArtifactValue::file(digest_config.empty_file())))
+                let resolved = x.resolve(&self.fs, None)?;
+                let output_type = resolved.output_type;
+                let path = resolved.into_path();
+                let value = match output_type {
+                    OutputType::Directory => {
+                        let rel_path: &slug_core::fs::project_rel_path::ProjectRelativePath =
+                            path.as_ref();
+                        let abs_path = self.fs.fs().root().join(rel_path);
+                        slug_fs::fs_util::remove_all(&abs_path)?;
+                        slug_fs::fs_util::create_dir_all(&abs_path)?;
+                        ArtifactValue::dir(digest_config.empty_directory())
+                    }
+                    OutputType::File | OutputType::FileOrDirectory => {
+                        self.fs.fs().write_file(&path, "", false)?;
+                        ArtifactValue::file(digest_config.empty_file())
+                    }
+                };
+                Ok((x.cloned(), value))
             })
             .collect::<slug_error::Result<_>>()
         {

@@ -285,9 +285,13 @@ pub fn resolve_scoped_bzlmod_repo_alias_for_current_cell(
             .cloned()
     };
 
+    if let Some(canonical) = lookup(current_cell).or_else(|| lookup(&format!("{current_cell}+"))) {
+        return Some(canonical);
+    }
+
     if let Some((owner, _rest)) = current_cell.split_once("++") {
         let owner_module = &current_cell[..owner.len() + 1];
-        return lookup(owner_module);
+        return lookup(owner_module).or_else(|| owner_module.strip_suffix('+').and_then(lookup));
     }
 
     let mut parts = current_cell.splitn(3, '+');
@@ -1980,6 +1984,41 @@ mod tests {
                 "double_owner++source+generated",
                 apparent
             )
+        );
+    }
+
+    #[test]
+    fn scoped_bzlmod_repo_alias_resolves_double_plus_owner_without_separator() {
+        let apparent = "scoped_alias_test_double_plus_project_no_separator";
+        let wanted = "double_owner_no_separator++toolchain+scoped_alias_test_double_plus_project";
+        register_scoped_bzlmod_repo_alias(
+            "double_owner_no_separator".to_owned(),
+            apparent.to_owned(),
+            wanted.to_owned(),
+        );
+
+        assert_eq!(
+            Some(wanted.to_owned()),
+            resolve_scoped_bzlmod_repo_alias_for_current_cell(
+                "double_owner_no_separator++source+generated",
+                apparent
+            )
+        );
+    }
+
+    #[test]
+    fn scoped_bzlmod_repo_alias_resolves_ordinary_module_owner() {
+        let apparent = "scoped_alias_test_module_project";
+        let wanted = "tar.bzl++toolchains+scoped_alias_test_module_project";
+        register_scoped_bzlmod_repo_alias(
+            "ordinary_owner".to_owned(),
+            apparent.to_owned(),
+            wanted.to_owned(),
+        );
+
+        assert_eq!(
+            Some(wanted.to_owned()),
+            resolve_scoped_bzlmod_repo_alias_for_current_cell("ordinary_owner", apparent)
         );
     }
 

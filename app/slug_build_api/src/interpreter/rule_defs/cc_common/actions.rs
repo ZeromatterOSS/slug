@@ -238,7 +238,8 @@ fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
             continue;
         };
         let is_llvm_toolchain = name.starts_with("llvm-toolchain-minimal-")
-            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-");
+            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-")
+            || name.starts_with("llvm++http_archive+llvm-toolchain-minimal-");
         if !is_llvm_toolchain || !name.ends_with(&suffix) {
             continue;
         }
@@ -253,6 +254,32 @@ fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
 
 fn has_host_llvm_toolchain() -> bool {
     host_llvm_toolchain_bin("clang++").is_some()
+}
+
+fn default_host_c_compiler(is_cpp: bool) -> String {
+    match std::env::consts::OS {
+        "windows" => {
+            if let Some(tools) = get_msvc_tool_paths() {
+                tools.cl.clone()
+            } else {
+                "cl.exe".to_owned()
+            }
+        }
+        "macos" => {
+            if is_cpp {
+                "/usr/bin/clang++".to_owned()
+            } else {
+                "/usr/bin/clang".to_owned()
+            }
+        }
+        _ => {
+            if is_cpp {
+                host_llvm_toolchain_bin("clang++").unwrap_or_else(|| "/usr/bin/g++".to_owned())
+            } else {
+                host_llvm_toolchain_bin("clang").unwrap_or_else(|| "/usr/bin/gcc".to_owned())
+            }
+        }
+    }
 }
 
 fn is_musl_cc_toolchain_target(
@@ -2150,25 +2177,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             .unwrap_or_default();
         let has_feature_args = !feature_args.is_empty();
 
-        // Get compiler path from toolchain if available, otherwise use platform default
-        let default_compiler = match std::env::consts::OS {
-            "windows" => {
-                // On Windows, resolve cl.exe to its full MSVC path
-                if let Some(tools) = get_msvc_tool_paths() {
-                    tools.cl.as_str()
-                } else {
-                    "cl.exe"
-                }
-            }
-            "macos" => "/usr/bin/clang++",
-            _ => {
-                if is_cpp {
-                    "/usr/bin/g++"
-                } else {
-                    "/usr/bin/gcc"
-                }
-            }
-        };
+        // Get compiler path from toolchain if available, otherwise use platform default.
+        let default_compiler = default_host_c_compiler(is_cpp);
         let compiler_path = if !cc_toolchain.is_none() {
             // Try to get compiler path from toolchain
             let raw = cc_toolchain
@@ -2176,7 +2186,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 .ok()
                 .flatten()
                 .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
-                .unwrap_or_else(|| default_compiler.to_owned());
+                .unwrap_or_else(|| default_compiler.clone());
             // Resolve bare "cl.exe" to full path on Windows
             if is_windows_host() {
                 resolve_windows_compiler(&raw)
@@ -2184,7 +2194,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 raw
             }
         } else {
-            default_compiler.to_owned()
+            default_compiler
         };
         let compiler_path =
             source_backed_toolchain_executable_path(&compiler_path).unwrap_or(compiler_path);
@@ -4278,19 +4288,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                 .unwrap_or(pic_out);
 
                             // Build compile command: <compiler> [flags] -c src -o output
-                            let host_compiler = match std::env::consts::OS {
-                                "windows" => "cl.exe",
-                                "macos" => "/usr/bin/clang",
-                                _ => "/usr/bin/gcc",
-                            };
-
                             // Determine C vs C++ specific flags
                             let is_cxx = src_path.ends_with(".cc")
                                 || src_path.ends_with(".cpp")
                                 || src_path.ends_with(".cxx");
+                            let host_compiler = default_host_c_compiler(is_cxx);
 
                             let mut args_vec: Vec<Value<'v>> = Vec::new();
-                            args_vec.push(heap.alloc_str(host_compiler).to_value());
+                            args_vec.push(heap.alloc_str(&host_compiler).to_value());
 
                             // Add extra flags (includes, defines, user flags)
                             for flag in &extra_flags {
@@ -4351,7 +4356,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             let run_result = eval.eval_function(run, &[args], &run_kwargs);
                             // Register PIC compile action with unique identifier
                             let mut pic_args_vec: Vec<Value<'v>> = Vec::new();
-                            pic_args_vec.push(heap.alloc_str(host_compiler).to_value());
+                            pic_args_vec.push(heap.alloc_str(&host_compiler).to_value());
                             for flag in &extra_flags {
                                 pic_args_vec.push(heap.alloc_str(flag).to_value());
                             }
@@ -5741,23 +5746,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             .map(|n| n.contains("c++") || n.contains("cpp"))
             .unwrap_or(false);
 
-        let default_compiler = match std::env::consts::OS {
-            "windows" => {
-                if let Some(tools) = get_msvc_tool_paths() {
-                    tools.cl.clone()
-                } else {
-                    "cl.exe".to_owned()
-                }
-            }
-            "macos" => "/usr/bin/clang++".to_owned(),
-            _ => {
-                if is_cpp {
-                    "/usr/bin/g++".to_owned()
-                } else {
-                    "/usr/bin/gcc".to_owned()
-                }
-            }
-        };
+        let default_compiler = default_host_c_compiler(is_cpp);
 
         let compiler_path = if !cc_toolchain.is_none() {
             cc_toolchain

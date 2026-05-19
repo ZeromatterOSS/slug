@@ -422,16 +422,8 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                 match self.providers.get(&provider_id) {
                     Some(v) => Ok(Either::Left(v.to_value())),
                     None => {
-                        // Fall back to name-only matching when paths don't match.
-                        // Handles both directions:
-                        // 1. Query has path=None → match Starlark-defined provider by name
-                        // 2. Query has a path → match native provider (path=None) by name
-                        for (k, v) in self.providers.iter() {
-                            if k.name == provider_id.name
-                                && (provider_id.path.is_none() || k.path.is_none())
-                            {
-                                return Ok(Either::Left(v.to_value()));
-                            }
+                        if let Some(v) = self.unique_provider_with_same_name(&provider_id.name) {
+                            return Ok(Either::Left(v.to_value()));
                         }
                         Ok(Either::Right(provider_id))
                     }
@@ -439,6 +431,16 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
             }
             None => Err(ProviderCollectionError::AtTypeNotProvider(op, index.get_type()).into()),
         }
+    }
+
+    fn unique_provider_with_same_name(&self, provider_name: &str) -> Option<V> {
+        let mut matches = self
+            .providers
+            .iter()
+            .filter(|(k, _)| k.name == provider_name)
+            .map(|(_, v)| *v);
+        let first = matches.next()?;
+        matches.next().is_none().then_some(first)
     }
 
     /// `.get` function implementation.
@@ -557,13 +559,12 @@ impl FrozenProviderCollection {
         if self.providers.contains_key(provider_id) {
             return true;
         }
-        // Fall back to name-only matching when paths don't match.
-        // This handles two cases:
-        // 1. Query has path=None (native provider) looking for Starlark-defined provider
-        // 2. Query has a path (Starlark provider) looking for native provider (path=None)
         self.providers
             .keys()
-            .any(|k| k.name == provider_id.name && (provider_id.path.is_none() || k.path.is_none()))
+            .filter(|k| k.name == provider_id.name)
+            .take(2)
+            .count()
+            == 1
     }
 
     pub fn builtin_provider<'a, T: FrozenBuiltinProviderLike>(

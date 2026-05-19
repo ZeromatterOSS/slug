@@ -743,10 +743,8 @@ fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> P
         .unwrap_or_else(|| PathBuf::from(label_str));
     if path.is_absolute() {
         path
-    } else if let Some(root) = slug_core::cells::get_dynamic_project_root() {
-        root.join(path)
     } else {
-        path
+        workspace_root.join(path)
     }
 }
 
@@ -769,24 +767,23 @@ pub(crate) fn ensure_label_path_materialized(path: &Path) {
 }
 
 fn apply_unified_patch(patch_path: &Path, strip: i32, working_dir: &Path) -> Result<(), String> {
-    match Command::new("patch")
+    let patch_error = match Command::new("patch")
         .args(["-p", &strip.to_string(), "-i"])
         .arg(patch_path)
         .current_dir(working_dir)
         .output()
     {
         Ok(output) if output.status.success() => return Ok(()),
-        Ok(output) => {
-            return Err(format!(
-                "Patch failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
+        Ok(output) => Some(format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        )),
         Err(e) if e.kind() != ErrorKind::NotFound => {
             return Err(format!("Failed to execute patch: {e}"));
         }
-        Err(_) => {}
-    }
+        Err(_) => None,
+    };
 
     let strip_arg = format!("-p{strip}");
     let output = Command::new("git")
@@ -805,7 +802,10 @@ fn apply_unified_patch(patch_path: &Path, strip: i32, working_dir: &Path) -> Res
             String::from_utf8_lossy(&output.stdout)
         );
         apply_unified_patch_in_process(patch_path, strip, working_dir).map_err(|fallback_error| {
-            format!("Patch failed via git apply: {git_error}; in-process fallback failed: {fallback_error}")
+            let patch_error = patch_error
+                .as_deref()
+                .unwrap_or("patch(1) was not available");
+            format!("Patch failed via patch(1): {patch_error}; git apply: {git_error}; in-process fallback failed: {fallback_error}")
         })
     }
 }
@@ -2980,6 +2980,35 @@ mod tests {
                 .unwrap()
                 .replace("\r\n", "\n"),
             "before\n\nnew\nafter\n"
+        );
+    }
+
+    #[test]
+    fn test_apply_unified_patch_falls_back_for_git_create_index_on_existing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let source_dir = temp_dir.path().join("source");
+        std::fs::create_dir(&source_dir).unwrap();
+        std::fs::write(source_dir.join("file.txt"), "old\n").unwrap();
+        let patch = temp_dir.path().join("change.patch");
+        std::fs::write(
+            &patch,
+            "diff --git a/file.txt b/file.txt\n\
+             index 000000000000..111111111111 100644\n\
+             --- a/file.txt\n\
+             +++ b/file.txt\n\
+             @@ -1 +1 @@\n\
+             -old\n\
+             +new\n",
+        )
+        .unwrap();
+
+        apply_unified_patch(&patch, 1, &source_dir).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(source_dir.join("file.txt"))
+                .unwrap()
+                .replace("\r\n", "\n"),
+            "new\n"
         );
     }
 

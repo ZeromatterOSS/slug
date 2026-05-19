@@ -13,6 +13,36 @@ xfail: same-daemon workspace isolation is not yet expressible in the local
 daemon layout. The plan is not complete, and the SDK parity loop must continue
 until the acceptance criteria below are satisfied or a real blocker is recorded.
 
+SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
+materialization failures to full execution:
+
+- Restored ZeroMatter's dirty invalid `MODULE.bazel.lock` from HEAD after
+  backing up the bad file to `/tmp/zeromatter-MODULE.bazel.lock.bad-20260519-135335`.
+  Bazel 9.0.1 then passed `bazel build --nobuild //sdk:sdk_contents`
+  (`/tmp/slug-plan61/bazel-sdk-contents-restored-lock-20260519-135345.log`).
+- Fixed Slug bzlmod analysis/materialization issues discovered by the SDK
+  smoke: scoped `use_repo` aliases now retain their declaring module,
+  double-plus extension-owner alias lookup resolves, unique same-name provider
+  lookup handles the Rust `StdLibInfo` identity split, extension repo execution
+  writes spec-hash completion markers, `--unstable-no-execution` always uses
+  the dry-run executor, `repository_ctx.patch` label paths anchor at the
+  workspace root and fall back past GNU `patch` create-file mismatches, dry-run
+  directory outputs materialize as directories, and host LLVM toolchain
+  discovery recognizes Bazel 9 double-plus `llvm++http_archive+...` repos.
+- Slug now passes the SDK analysis/materialization smoke:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-sdk-contents-noexec-drydir-20260519-145242 build --unstable-no-execution //sdk:sdk_contents`
+  succeeded with 3,765 dry-run commands
+  (`/tmp/slug-plan61/slug-sdk-contents-noexec-drydir-20260519-145242.log`).
+- Full execution now reaches Rust execution and stops at a new hard blocker:
+  `crates__const_format-0.2.35//:const_format` fails with
+  `error[E0463]: can't find crate for const_format_proc_macros` while rustc is
+  passed
+  `--extern=const_format_proc_macros=.../libconst_format_proc_macros-1197439997.so`.
+  The referenced `.so` exists, is executable, and exports
+  `__rustc_proc_macro_decls_*` plus `rust_metadata_const_format_proc_macros_*`.
+  Evidence log:
+  `/tmp/slug-plan61/slug-sdk-contents-normal-clang2-20260519-150339.log`.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module

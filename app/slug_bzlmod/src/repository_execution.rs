@@ -467,6 +467,17 @@ impl Key for ExtensionRepoExecutionKey {
         let result =
             crate::repository_executor::execute_repository_rule(&invocation, &self.project_root)?;
 
+        std::fs::write(
+            result.repo_path.join(".slug_repo_complete"),
+            complete_marker(&self.spec_hash),
+        )
+        .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
+            reason: format!(
+                "Failed to write spec-hashed completion marker for '{}': {}",
+                self.canonical_name, e
+            ),
+        })?;
+
         tracing::info!(
             "Successfully materialized repository '{}' at {:?}",
             self.canonical_name,
