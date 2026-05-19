@@ -1668,6 +1668,13 @@ Continuation 2026-05-18/19 on Windows checkout:
   smoke left one `slug.exe` daemon for the isolation dir; clean it before the
   next run. Next class boundary: commit this verified CRT slice, then run full
   `//sdk:sdk` again.
+- Full SDK rerun `sdk-target-sdk-after-ucrt-nodefault-20260519-001` succeeded
+  for `//sdk:sdk` in 80m32s with 2281 local commands. This completes the current
+  SDK parity batch: after Windows process-wrapper path shortening, cargo build
+  script path shortening, workspace cargo manifest alias handling, and the
+  MSVC/rust-lld dynamic UCRT fix, the full SDK archive target builds under Slug
+  on the Windows checkout. The run left one `slug.exe` daemon for the isolation
+  dir; clean it before pausing or starting the next batch.
 
 Exit criteria:
 
