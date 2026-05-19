@@ -316,10 +316,7 @@ pub fn compute_extension_input_hash(extension: &AggregatedExtension) -> String {
     }
 
     let hash = hasher.finalize();
-    format!(
-        "sha256-{}",
-        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, hash)
-    )
+    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, hash)
 }
 
 fn canonical_tag_hash_input(tag: &ExtensionTag) -> Vec<u8> {
@@ -466,7 +463,12 @@ mod tests {
         agg.add_module_tags("mod", vec![ExtensionTag::new("tag".to_string())]);
 
         let hash = compute_extension_input_hash(&agg);
-        assert!(hash.starts_with("sha256-"));
+        assert_eq!(
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, hash)
+                .unwrap()
+                .len(),
+            32
+        );
     }
 
     #[test]

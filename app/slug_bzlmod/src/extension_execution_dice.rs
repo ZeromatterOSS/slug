@@ -788,10 +788,7 @@ pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
     hasher.update(extension_id.as_bytes());
 
     let hash = hasher.finalize();
-    format!(
-        "sha256-{}",
-        base64::engine::general_purpose::STANDARD.encode(hash)
-    )
+    base64::engine::general_purpose::STANDARD.encode(hash)
 }
 
 /// Compute a best-effort Bazel-shaped transitive digest for workspace-local
@@ -843,10 +840,7 @@ pub fn compute_bzl_transitive_digest_for_project(
     }
 
     let hash = hasher.finalize();
-    format!(
-        "sha256-{}",
-        base64::engine::general_purpose::STANDARD.encode(hash)
-    )
+    base64::engine::general_purpose::STANDARD.encode(hash)
 }
 
 fn extension_bzl_path_under_project(extension_id: &str, project_root: &Path) -> Option<PathBuf> {
@@ -1083,7 +1077,15 @@ mod tests {
         let key = ModuleExtensionExecutionKey::new(aggregated, "_main".to_owned());
 
         assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
-        assert!(key.input_hash.starts_with("sha256-"));
+        assert_eq!(
+            base64::Engine::decode(
+                &base64::engine::general_purpose::STANDARD,
+                key.input_hash.as_ref()
+            )
+            .unwrap()
+            .len(),
+            32
+        );
         assert_eq!(key.root_module_name.as_ref(), "_main");
     }
 
@@ -1214,8 +1216,12 @@ mod tests {
         assert_eq!(digest1, digest2);
         // Different extension ID should produce different digest
         assert_ne!(digest1, digest3);
-        // Should be in SRI format
-        assert!(digest1.starts_with("sha256-"));
+        assert_eq!(
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, digest1)
+                .unwrap()
+                .len(),
+            32
+        );
     }
 
     #[test]

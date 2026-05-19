@@ -8,7 +8,7 @@
 
 In progress. Phase 61.1 guardrails started 2026-05-18 and now cover the
 observable bzlmod replay/materialization bug shapes that blocked the current
-SDK parity loop. The current guardrail file has 12 passing tests and 1 strict
+SDK parity loop. The current guardrail file has 18 passing tests and 1 strict
 xfail: same-daemon workspace isolation is not yet expressible in the local
 daemon layout. The plan is not complete, and the SDK parity loop must continue
 until the acceptance criteria below are satisfied or a real blocker is recorded.
@@ -1675,6 +1675,43 @@ Continuation 2026-05-18/19 on Windows checkout:
   MSVC/rust-lld dynamic UCRT fix, the full SDK archive target builds under Slug
   on the Windows checkout. The run left one `slug.exe` daemon for the isolation
   dir; clean it before pausing or starting the next batch.
+
+Implementation slice 2026-05-19, Bazel-shaped extension lockfile digests:
+
+- Fresh Linux parity probing found the current zeromatter visible
+  `MODULE.bazel.lock` malformed for Bazel 9.0.1: Bazel stops while computing
+  the main repository mapping with `Illegal base64 character 2d`, because some
+  extension `bzlTransitiveDigest` / `usagesDigest` entries use SRI-style
+  `sha256-...` strings. Slug previously accepted the same file and continued
+  into analysis, which would mask a Bazel 9 failure.
+- Tightened `Lockfile::read` so every mode that reads lockfiles (`update`,
+  `refresh`, and `error`) rejects unreadable, unparsable, or semantically
+  invalid visible/hidden lockfiles. `off` remains the only mode that skips
+  lockfile reads. The process cache now rechecks a prior negative miss if the
+  file exists later.
+- Changed Slug's extension replay digest writers to Bazel-shaped raw Base64
+  SHA-256 bytes for `bzlTransitiveDigest` and `usagesDigest`, instead of
+  SRI-style `sha256-...`. Updated the Python Plan 61 guardrail lockfile writer
+  to mirror that shape so valid replay still materializes generated repos
+  without extension evaluation.
+- Added Rust coverage for malformed JSON, invalid SRI-prefixed extension
+  digests, wrong decoded digest length, refresh-mode errors, and off-mode
+  suppression. Added a Python guardrail proving default lockfile mode rejects a
+  visible extension digest that Bazel rejects.
+- Validation: `cargo fmt --check`, `cargo test -p slug_bzlmod lockfile --
+  --nocapture` (32 passed), `cargo test -p slug_bzlmod
+  test_compute_extension_input_hash -- --nocapture` (3 passed), `cargo test -p
+  slug_bzlmod test_compute_bzl_transitive_digest -- --nocapture` (1 passed),
+  `cargo build -p slug`, focused direct pytest for the new invalid-digest and
+  replay-materialization guardrails (2 passed), full direct pytest
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx` (18 passed / 1 xfailed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (18 passed
+  / 1 xfailed inside pytest, Slug test pass). Daemons were cleaned afterward.
+- Real-world SDK output parity remains pending until the zeromatter checkout has
+  a Bazel-valid lockfile again. The next concrete action is to rerun Bazel and
+  Slug on `//sdk:sdk_contents` / `//sdk:sdk` after the workspace cleanup or
+  lockfile regeneration, then compare the staged output/archive against Bazel 9.
 
 Exit criteria:
 

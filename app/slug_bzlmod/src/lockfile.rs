@@ -48,6 +48,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
+use base64::Engine;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use serde::Serialize;
@@ -291,6 +292,31 @@ impl LockfileRepoSpec {
     }
 }
 
+fn validate_base64_sha256_lockfile_digest(
+    path: &Path,
+    extension_id: &str,
+    field: &str,
+    value: &str,
+) -> slug_error::Result<()> {
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(value)
+        .map_err(|e| {
+            LockfileError::ParseError(format!(
+                "{}: invalid {field} for {extension_id}: {e}",
+                path.display()
+            ))
+        })?;
+    if decoded.len() != 32 {
+        return Err(LockfileError::ParseError(format!(
+            "{}: invalid {field} for {extension_id}: decoded {} bytes, expected 32",
+            path.display(),
+            decoded.len()
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 /// Convert an AttrValue to a serde_json::Value for lockfile storage.
 pub fn attr_value_to_json(value: &AttrValue) -> serde_json::Value {
     match value {
@@ -422,6 +448,7 @@ impl Lockfile {
 
         let lockfile: Lockfile = serde_json::from_str(&content)
             .map_err(|e| LockfileError::ParseError(format!("{}: {}", path.display(), e)))?;
+        lockfile.validate_extension_digests(path)?;
         slug_util::memory_checkpoint::checkpoint(
             "bzlmod_lockfile_read",
             [
@@ -441,6 +468,27 @@ impl Lockfile {
         }
 
         Ok(lockfile)
+    }
+
+    fn validate_extension_digests(&self, path: &Path) -> slug_error::Result<()> {
+        for (extension_id, data) in &self.module_extensions {
+            let Some(general) = &data.general else {
+                continue;
+            };
+            validate_base64_sha256_lockfile_digest(
+                path,
+                extension_id,
+                "bzlTransitiveDigest",
+                &general.bzl_transitive_digest,
+            )?;
+            validate_base64_sha256_lockfile_digest(
+                path,
+                extension_id,
+                "usagesDigest",
+                &general.usages_digest,
+            )?;
+        }
+        Ok(())
     }
 
     /// Write the lockfile to disk.
@@ -819,8 +867,10 @@ pub fn lockfile_canonical_extension_id(internal_id: &str) -> String {
 /// same lockfile; without this cache they each pay the parse cost (~160KB
 /// JSON for zeromatter's lockfile).
 ///
-/// Returns `None` if the lockfile is absent or unreadable. The negative result
-/// is also cached so repeated misses don't re-stat the filesystem.
+/// Returns `None` if the lockfile is absent. Existing lockfiles that cannot be
+/// read or parsed are hard errors in every mode that reads lockfiles, matching
+/// Bazel 9's default lockfile behavior. The negative result is also cached so
+/// repeated misses don't re-stat the filesystem.
 static LOCKFILE_CACHE: std::sync::OnceLock<
     std::sync::Mutex<std::collections::HashMap<PathBuf, Option<std::sync::Arc<Lockfile>>>>,
 > = std::sync::OnceLock::new();
@@ -842,7 +892,7 @@ fn cached_lockfile_at_path(
 
     if let Ok(cache) = lockfile_cache().lock() {
         if let Some(entry) = cache.get(&key) {
-            if mode != LockfileMode::Error || entry.is_some() || !path.exists() {
+            if entry.is_some() || !path.exists() {
                 return Ok(entry.clone());
             }
         }
@@ -857,17 +907,7 @@ fn cached_lockfile_at_path(
                 );
                 Some(std::sync::Arc::new(l))
             }
-            Err(e) => {
-                if mode == LockfileMode::Error {
-                    return Err(e);
-                }
-                tracing::warn!(
-                    "Failed to read MODULE.bazel.lock at {}: {}",
-                    path.display(),
-                    e
-                );
-                None
-            }
+            Err(e) => return Err(e),
         }
     } else {
         None
@@ -897,9 +937,11 @@ pub fn cached_lockfile_with_mode(
 }
 
 /// Read `MODULE.bazel.lock` from `workspace_root`, returning a process-wide
-/// cached `Arc<Lockfile>`. `None` means the file is absent or failed to
-/// parse. Use `invalidate_cached_lockfile` to drop the cached entry when the
-/// lockfile is known to have changed (e.g. after writing a new one).
+/// cached `Arc<Lockfile>`. `None` means the file is absent or failed to parse.
+/// New command paths should prefer `cached_lockfile_with_mode` so parse errors
+/// can propagate with Bazel-shaped lockfile policy. Use
+/// `invalidate_cached_lockfile` to drop the cached entry when the lockfile is
+/// known to have changed (e.g. after writing a new one).
 pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>> {
     cached_lockfile_with_mode(workspace_root, LockfileMode::Update)
         .ok()
@@ -923,6 +965,10 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    fn raw_sha256_digest(byte: u8) -> String {
+        base64::engine::general_purpose::STANDARD.encode([byte; 32])
+    }
 
     #[test]
     fn test_lockfile_roundtrip() {
@@ -1048,6 +1094,115 @@ mod tests {
         assert_eq!(LockfileMode::from_str("error"), Some(LockfileMode::Error));
         assert_eq!(LockfileMode::from_str("off"), Some(LockfileMode::Off));
         assert_eq!(LockfileMode::from_str("invalid"), None);
+    }
+
+    #[test]
+    fn malformed_lockfile_errors_in_default_update_mode() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+        fs::write(&path, "{ this is not json }\n").unwrap();
+
+        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("Failed to parse lockfile"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn malformed_lockfile_errors_in_refresh_mode() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+        fs::write(&path, "{ this is not json }\n").unwrap();
+
+        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Refresh).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("Failed to parse lockfile"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn malformed_lockfile_is_not_read_in_off_mode() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+        fs::write(&path, "{ this is not json }\n").unwrap();
+
+        let result = cached_lockfile_with_mode(dir.path(), LockfileMode::Off).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn extension_digest_with_sri_prefix_is_rejected() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+        let valid_digest = raw_sha256_digest(0);
+        fs::write(
+            &path,
+            format!(
+                r#"{{
+                    "lockFileVersion": 26,
+                    "registryFileHashes": {{}},
+                    "selectedYankedVersions": {{}},
+                    "moduleExtensions": {{
+                        "@@ext+//:ext.bzl%ext": {{
+                            "general": {{
+                                "bzlTransitiveDigest": "sha256-{valid_digest}",
+                                "usagesDigest": "{valid_digest}",
+                                "recordedInputs": [],
+                                "generatedRepoSpecs": {{}},
+                                "moduleExtensionMetadata": null
+                            }}
+                        }}
+                    }},
+                    "facts": {{}}
+                }}"#
+            ),
+        )
+        .unwrap();
+
+        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("invalid bzlTransitiveDigest"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn extension_digest_must_decode_to_sha256_bytes() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+        let short_digest = base64::engine::general_purpose::STANDARD.encode([0u8; 16]);
+        let valid_digest = raw_sha256_digest(0);
+        fs::write(
+            &path,
+            format!(
+                r#"{{
+                    "lockFileVersion": 26,
+                    "registryFileHashes": {{}},
+                    "selectedYankedVersions": {{}},
+                    "moduleExtensions": {{
+                        "@@ext+//:ext.bzl%ext": {{
+                            "general": {{
+                                "bzlTransitiveDigest": "{valid_digest}",
+                                "usagesDigest": "{short_digest}",
+                                "recordedInputs": [],
+                                "generatedRepoSpecs": {{}},
+                                "moduleExtensionMetadata": null
+                            }}
+                        }}
+                    }},
+                    "facts": {{}}
+                }}"#
+            ),
+        )
+        .unwrap();
+
+        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("invalid usagesDigest"),
+            "{err:#}"
+        );
     }
 
     // =========================================================================
@@ -1408,8 +1563,8 @@ mod tests {
 
         lockfile.set_extension_cache(
             "@@rules_python//pip:pip.bzl%pip".to_string(),
-            "sha256-bzl-digest".to_string(),
-            "sha256-usages-digest".to_string(),
+            raw_sha256_digest(1),
+            raw_sha256_digest(2),
             &repo_specs,
         );
 
@@ -1423,8 +1578,8 @@ mod tests {
         // Verify cache hit
         let cached = loaded.get_extension_cache(
             "@@rules_python//pip:pip.bzl%pip",
-            "sha256-bzl-digest",
-            "sha256-usages-digest",
+            &raw_sha256_digest(1),
+            &raw_sha256_digest(2),
         );
         assert!(cached.is_some());
 

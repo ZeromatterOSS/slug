@@ -101,10 +101,10 @@ def _slug_bzl_transitive_digest(
                     hasher.update(b"\0")
                     hasher.update(path.read_bytes())
                     hasher.update(b"\0")
-                return "sha256-" + base64.b64encode(hasher.digest()).decode()
+                return base64.b64encode(hasher.digest()).decode()
 
     digest = hashlib.sha256(b"bzl_transitive_v1:" + extension_id.encode()).digest()
-    return "sha256-" + base64.b64encode(digest).decode()
+    return base64.b64encode(digest).decode()
 
 
 def _extension_bzl_path(extension_id: str, project_root: Path) -> Path | None:
@@ -141,7 +141,7 @@ def _label_bzl_path(
 
 def _slug_usages_digest_without_tags(extension_id: str, module_name: str) -> str:
     digest = hashlib.sha256(extension_id.encode() + module_name.encode()).digest()
-    return "sha256-" + base64.b64encode(digest).decode()
+    return base64.b64encode(digest).decode()
 
 
 def _slug_usages_digest(
@@ -155,7 +155,7 @@ def _slug_usages_digest(
         tags = tags_by_module[module_name]
         for tag_name, kwargs in sorted(tags, key=_tag_hash_input):
             hasher.update(_tag_hash_input((tag_name, kwargs)))
-    return "sha256-" + base64.b64encode(hasher.digest()).decode()
+    return base64.b64encode(hasher.digest()).decode()
 
 
 def _tag_hash_input(tag: tuple[str, dict[str, object]]) -> bytes:
@@ -515,6 +515,42 @@ async def test_lockfile_mode_error_rejects_invalid_visible_lockfile(
 
     with pytest.raises(BuckException):
         await buck.audit("cell", "--lockfile_mode=error")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_default_lockfile_mode_rejects_invalid_extension_digest(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelLockFileFunction rejects non-Base64 extension digests."""
+    digest = base64.b64encode(bytes(32)).decode()
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {},
+                "selectedYankedVersions": {},
+                "moduleExtensions": {
+                    "@@plan61_guardrails+//:replay_ext.bzl%replay_ext": {
+                        "general": {
+                            "bzlTransitiveDigest": f"sha256-{digest}",
+                            "usagesDigest": digest,
+                            "recordedInputs": [],
+                            "generatedRepoSpecs": {},
+                            "moduleExtensionMetadata": None,
+                        },
+                    },
+                },
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    with pytest.raises(BuckException):
+        await buck.audit("cell")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
