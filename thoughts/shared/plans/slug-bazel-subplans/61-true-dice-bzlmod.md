@@ -1583,6 +1583,22 @@ Continuation 2026-05-18/19 on Windows checkout:
   Windows runfiles link path semantics for cargo build-script runner actions.
   Own this in local action/runfiles materialization or argument path rewriting,
   not as a rules_rust crate-specific workaround.
+- Cargo build-script runner Windows path slice completed: local execution now
+  rewrites generated build-script runfile sources in the runner's
+  `--cargo_manifest_args=@...` file to the short script alias, and rewrites
+  existing `CARGO`, `RUSTC`, and `RUSTDOC` env tool paths to absolute short
+  paths before the runner re-joins them against the action execroot. The
+  intermediate `playback-build-script-runfiles-param-20260519-001` smoke proved
+  that rewriting the runfiles output directory is wrong because the declared
+  `_bs.cargo_runfiles` output must remain at its original path; that experiment
+  was reverted before validation. Final validation: `cargo fmt --check`,
+  focused `cargo_tool` and `cargo_runner` tests in `slug_execute_impl`,
+  `cargo check -p slug_execute_impl`, `cargo build -p slug`, and focused smoke
+  `playback-build-script-cargo-tool-env-20260519-002` all passed. The focused
+  smoke built `//zerobuf_generated/playback:build_script` successfully in
+  18m41s with 699 local commands and no daemon left running afterward. Next
+  class boundary: return from focused build-script validation to the full
+  `//sdk:sdk` SDK smoke and classify the next real-world frontier.
 
 Exit criteria:
 

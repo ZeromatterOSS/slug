@@ -2120,17 +2120,19 @@ fn rewrite_windows_cargo_manifest_dir_env(
             return false;
         }
 
+        let mut changed = rewrite_windows_cargo_tool_env_paths(env, execroot.as_path());
+
         let Some(manifest_index) = env
             .iter()
             .rposition(|(key, _)| key.as_os_str() == OsStr::new("CARGO_MANIFEST_DIR"))
         else {
-            return false;
+            return changed;
         };
 
         let manifest_string = env[manifest_index].1.to_string_lossy();
         let manifest_abs = execroot.as_path().join(manifest_string.as_ref());
         if manifest_abs.as_os_str().len() <= 240 {
-            return false;
+            return changed;
         }
         if let Some(repo) = cargo_runfiles_repo_name(manifest_string.as_ref()) {
             let manifest_rel = PathBuf::from("external").join(repo);
@@ -2182,8 +2184,37 @@ fn rewrite_windows_cargo_manifest_dir_env(
         }
 
         apply_windows_cargo_manifest_dir_rewrite(args, env, alias_rel.into_os_string());
-        true
+        changed = true;
+        changed
     }
+}
+
+#[cfg(windows)]
+fn rewrite_windows_cargo_tool_env_paths(env: &mut [(OsString, OsString)], execroot: &Path) -> bool {
+    let mut changed = false;
+    for key in ["CARGO", "RUSTC", "RUSTDOC"] {
+        for (_, value) in env
+            .iter_mut()
+            .filter(|(env_key, _)| env_key.as_os_str() == OsStr::new(key))
+        {
+            let value_path = Path::new(value);
+            let absolute = if value_path.is_absolute() {
+                value_path.to_path_buf()
+            } else {
+                execroot.join(value_path)
+            };
+            if !absolute.exists() {
+                continue;
+            }
+            let replacement = windows_short_path(&absolute).unwrap_or(absolute);
+            if replacement.as_os_str() == value.as_os_str() {
+                continue;
+            }
+            *value = replacement.into_os_string();
+            changed = true;
+        }
+    }
+    changed
 }
 
 #[cfg(windows)]
@@ -2230,7 +2261,8 @@ fn rewrite_windows_cargo_build_script_runner_args(
             return false;
         };
         let script = script_arg.trim_start_matches("--script=");
-        let script_abs = execroot.as_path().join(script);
+        let script = script.to_owned();
+        let script_abs = execroot.as_path().join(&script);
         if script_abs.as_os_str().len() <= 240 {
             return false;
         }
@@ -2264,7 +2296,92 @@ fn rewrite_windows_cargo_build_script_runner_args(
         }
 
         *script_arg = format!("--script={}", alias_rel.to_string_lossy());
+        rewrite_windows_cargo_manifest_args_sources(
+            args,
+            execroot.as_path(),
+            &[(PathBuf::from(script), alias_rel)],
+        );
         true
+    }
+}
+
+#[cfg(windows)]
+fn rewrite_windows_cargo_manifest_args_sources(
+    args: &mut [String],
+    execroot: &Path,
+    replacements: &[(PathBuf, PathBuf)],
+) -> bool {
+    rewrite_windows_cargo_manifest_args_file(args, Some(execroot), |lines| {
+        let mut changed = false;
+        for line in lines.iter_mut().skip(2) {
+            let quoted = line.starts_with('\'') && line.ends_with('\'') && line.len() >= 2;
+            let body = if quoted {
+                &line[1..line.len() - 1]
+            } else {
+                line.as_str()
+            };
+            let Some((src, dest)) = body.split_once('=') else {
+                continue;
+            };
+            let Some((_, replacement)) = replacements
+                .iter()
+                .find(|(original, _)| Path::new(src) == original.as_path())
+            else {
+                continue;
+            };
+            let rewritten = format!("{}={dest}", replacement.to_string_lossy());
+            *line = if quoted {
+                format!("'{rewritten}'")
+            } else {
+                rewritten
+            };
+            changed = true;
+        }
+        changed
+    })
+}
+
+#[cfg(windows)]
+fn rewrite_windows_cargo_manifest_args_file<F>(
+    args: &mut [String],
+    execroot: Option<&Path>,
+    rewrite: F,
+) -> bool
+where
+    F: FnOnce(&mut Vec<String>) -> bool,
+{
+    let Some(arg) = args
+        .iter()
+        .find(|arg| arg.starts_with("--cargo_manifest_args=@"))
+    else {
+        return false;
+    };
+    let param_path = arg.trim_start_matches("--cargo_manifest_args=@");
+    let param_path = Path::new(param_path);
+    let param_path = if param_path.is_absolute() {
+        param_path.to_path_buf()
+    } else if let Some(execroot) = execroot {
+        execroot.join(param_path)
+    } else {
+        param_path.to_path_buf()
+    };
+    let Ok(content) = std::fs::read_to_string(&param_path) else {
+        return false;
+    };
+    let mut lines: Vec<String> = content.lines().map(str::to_owned).collect();
+    if !rewrite(&mut lines) {
+        return false;
+    }
+    match std::fs::write(&param_path, lines.join("\n")) {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::debug!(
+                ?e,
+                path = %param_path.display(),
+                "failed to rewrite cargo manifest args file"
+            );
+            false
+        }
     }
 }
 
@@ -3300,6 +3417,43 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn test_windows_cargo_tool_env_paths_use_existing_absolute_paths() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
+        let rustc_rel = PathBuf::from("buck-out")
+            .join("toolchains")
+            .join("rust")
+            .join("bin")
+            .join("rustc.exe");
+        let rustc_abs = execroot.as_path().join(&rustc_rel);
+        std::fs::create_dir_all(rustc_abs.parent().unwrap())?;
+        std::fs::write(&rustc_abs, b"fake rustc")?;
+        let mut env = vec![
+            (
+                OsString::from("RUSTC"),
+                OsString::from(rustc_rel.as_os_str()),
+            ),
+            (
+                OsString::from("UNRELATED"),
+                OsString::from("buck-out/toolchains/rust/bin/rustc.exe"),
+            ),
+        ];
+
+        assert!(rewrite_windows_cargo_tool_env_paths(
+            &mut env,
+            execroot.as_path()
+        ));
+        assert!(Path::new(&env[0].1).is_absolute());
+        assert_eq!(
+            env[1].1,
+            OsString::from("buck-out/toolchains/rust/bin/rustc.exe")
+        );
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn test_windows_cargo_runner_args_rewrite_shortens_script_path() -> slug_error::Result<()> {
         let temp = tempfile::tempdir()?;
         let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
@@ -3321,6 +3475,41 @@ mod tests {
         assert!(args[1].starts_with("--script=.slug-cargo-script"));
         let alias = args[1].trim_start_matches("--script=");
         assert!(execroot.as_path().join(alias).is_file());
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_cargo_runner_args_rewrite_updates_manifest_runfile_source()
+    -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = AbsNormPathBuf::new(temp.path().join("execroot"))?;
+        std::fs::create_dir_all(&execroot)?;
+        let script = format!("buck-out/{}/gen/crate/_bs-.exe", "x".repeat(230));
+        let script_abs = execroot.as_path().join(&script);
+        std::fs::create_dir_all(script_abs.parent().unwrap())?;
+        std::fs::write(&script_abs, b"fake exe")?;
+        let param = execroot.as_path().join("cargo-manifest.params");
+        std::fs::write(
+            &param,
+            format!(
+                "buck-out/long/gen/crate/_bs.cargo_runfiles\n.lib,.so\n{script}=crate/_bs-.exe\nexternal/crate/Cargo.toml=crate/Cargo.toml"
+            ),
+        )?;
+        let mut args = vec![
+            "buck-out/gen/rules_rust/cargo/private/cargo_build_script_runner/runner.exe".to_owned(),
+            format!("--script={script}"),
+            format!("--cargo_manifest_args=@{}", param.display()),
+        ];
+
+        assert!(rewrite_windows_cargo_build_script_runner_args(
+            &mut args,
+            Some(&execroot)
+        ));
+        let rewritten = std::fs::read_to_string(&param)?;
+        assert!(rewritten.contains(".slug-cargo-script"));
+        assert!(!rewritten.contains(&script));
 
         Ok(())
     }
