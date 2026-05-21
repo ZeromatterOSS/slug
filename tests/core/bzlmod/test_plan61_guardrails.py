@@ -321,6 +321,19 @@ def _skip(reason: str) -> pytest.MarkDecorator:
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_warm_noop_audit_cell_reuses_bzlmod_resolution(buck: Buck) -> None:
+    """Bazel anchor: BazelModuleResolutionValue is a Skyframe cut-off point."""
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert "plan61_guardrails" in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, second = await _audit_cells_and_counters(buck)
+    assert "plan61_guardrails" in output
+    assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_module_bazel_edit_invalidates_bzlmod_graph(buck: Buck) -> None:
     """Bazel anchors: ModuleFileFunction.java and BazelModuleResolutionFunction.java."""
     before = await _bzlmod_counters(buck)

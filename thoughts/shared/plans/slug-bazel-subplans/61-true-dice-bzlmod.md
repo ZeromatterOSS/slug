@@ -3377,6 +3377,51 @@ Implementation update 2026-05-21, visible lockfile read through DICE:
   isolation tree was cleaned after preserving logs; ZeroMatter `buck-out` was
   back to about 3.3M and `execroot` removed.
 
+Implementation update 2026-05-21, transitional DICE bzlmod resolution bridge:
+
+- Bazel ground truth: `BazelModuleResolutionFunction` consumes the root
+  `ModuleFileValue` and returns `BazelModuleResolutionValue`, while
+  `BazelDepGraphFunction` consumes that value to derive repo specs, repo
+  mappings, and extension usage tables. Local anchors for this slice:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java:99`,
+  `:113`,
+  `:143`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java`,
+  and `BazelDepGraphValue.java`.
+- Blocker reflection: caching the existing legacy resolver as one DICE key was
+  not sound because it returned a value and also mutated process-local bzlmod
+  runtime state. A cache hit skipped dynamic state reset, lockfile-seeded repo
+  cells, extension spokes, scoped/global repo aliases, external symlinks, and
+  eager built-in repo-rule materialization. The systemic fix for this slice is
+  to make the bridge result replayable: the DICE-facing value records runtime
+  state that must be reinstalled on every config load, and config loading calls
+  `replay_runtime_state()` before constructing the cell resolver.
+- The server config path now builds a `LegacyBzlmodResolutionDiceKey` from the
+  DICE-read root module, visible lockfile, hidden lockfile, CLI bzlmod policy,
+  and local override input summary. Hidden lockfile contents are modeled through
+  `LockfileContentKey`; the hidden lockfile path itself is excluded from the
+  policy digest when no content exists, because it is daemon/output-base
+  plumbing rather than a semantic bzlmod input.
+- Because extension replay validation still depends on inputs that are not yet
+  represented in the full-resolution key, the persisted bridge cache is
+  deliberately narrow. It is enabled only for root modules with no
+  `bazel_dep`, no overrides, no extension usages, no repo-rule invocations, and
+  no extension/facts entries in either visible or hidden lockfile. Workspaces
+  outside that shape recompute through the direct legacy path instead of
+  seeding a stale DICE value.
+- Validation passed:
+  `cargo fmt --check`, `git diff --check`,
+  `cargo check -p slug_common -p slug_server`, `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (29 tests).
+- Remaining Plan 61 work: move extension-bearing bzlmod graphs behind
+  cacheable DICE keys by representing extension `.bzl` transitive digests,
+  extension usage tables, recorded env/file/dir/tree/repo-mapping inputs,
+  lockfile facts, and recursive local-override module inputs in those keys.
+  Until then, the ZeroMatter warm audit remains expected to recompute the
+  extension-bearing legacy graph and miss the <10s cold-audit performance
+  target.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

@@ -76,7 +76,6 @@ use slug_core::pattern::pattern::ParsedPattern;
 use slug_core::pattern::pattern::ParsedPatternWithModifiers;
 use slug_core::pattern::pattern_type::ConfiguredProvidersPatternExtra;
 use slug_core::target::label::interner::ConcurrentTargetLabelInterner;
-use slug_error::BuckErrorContext;
 use slug_events::dispatch::EventDispatcher;
 use slug_events::metadata;
 use slug_events::schedule_type::SandcastleScheduleType;
@@ -548,7 +547,7 @@ impl<'a> ServerCommandContext<'a> {
 impl ServerCommandContext<'_> {
     async fn load_new_configs(
         &self,
-        dice_ctx: &mut DiceComputations<'_>,
+        dice_ctx: &mut DiceTransactionUpdater,
     ) -> slug_error::Result<BuckConfigBasedCells> {
         let mut config_overrides = self.config_overrides.clone();
         config_overrides.push(ConfigOverride {
@@ -560,48 +559,17 @@ impl ServerCommandContext<'_> {
             config_type: ConfigType::Value as i32,
         });
 
-        let project_root_path = self.base_context.project_root.root().to_path_buf();
-        let workspace_id = slug_bzlmod::WorkspaceId::new(
-            project_root_path.clone(),
-            project_root_path.join("buck-out/v2"),
-        );
-        let root_module_file = dice_ctx
-            .compute(&slug_bzlmod::RootModuleFileKey { workspace_id })
-            .await?
-            .buck_error_context("Computing root MODULE.bazel through DICE")?;
-        let visible_lockfile_mode =
-            BuckConfigBasedCells::bzlmod_lockfile_mode_from_config_args(&config_overrides)?;
-        let visible_lockfile = if root_module_file.parsed.is_some()
-            && visible_lockfile_mode != slug_bzlmod::LockfileMode::Off
-        {
-            let workspace_id = slug_bzlmod::WorkspaceId::new(
-                project_root_path.clone(),
-                project_root_path.join("buck-out/v2"),
-            );
-            Some(
-                dice_ctx
-                    .compute(&slug_bzlmod::LockfileContentKey {
-                        workspace_id,
-                        kind: slug_bzlmod::LockfileContentKind::Workspace,
-                        path: Arc::new(slug_bzlmod::lockfile_path(&project_root_path)),
-                    })
-                    .await?
-                    .buck_error_context("Computing visible MODULE.bazel.lock through DICE")?,
+        let new_configs =
+            BuckConfigBasedCells::parse_with_config_args_and_persisted_dice_bzlmod_resolution(
+                &self.base_context.project_root,
+                &config_overrides,
+                dice_ctx,
             )
-        } else {
-            None
-        };
-
-        let new_configs = BuckConfigBasedCells::parse_with_config_args_and_bzlmod_inputs(
-            &self.base_context.project_root,
-            &config_overrides,
-            root_module_file,
-            visible_lockfile,
-        )
-        .await?;
+            .await?;
 
         if self.reuse_current_config {
-            if dice_ctx
+            let mut existing_state = dice_ctx.existing_state().await;
+            if existing_state
                 .is_injected_external_buckconfig_data_key_set()
                 .await?
             {
@@ -626,7 +594,9 @@ impl ServerCommandContext<'_> {
                 Ok(BuckConfigBasedCells {
                     cell_resolver: new_configs.cell_resolver,
                     root_config: new_configs.root_config,
-                    external_data: (*dice_ctx.get_injected_external_buckconfig_data().await?)
+                    external_data: (*existing_state
+                        .get_injected_external_buckconfig_data()
+                        .await?)
                         .clone(),
                     is_bzlmod: new_configs.is_bzlmod,
                     bzlmod_session_data: new_configs.bzlmod_session_data,
@@ -681,8 +651,7 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
         mut ctx: DiceTransactionUpdater,
         early_timings: &mut EarlyCommandTimingBuilder,
     ) -> slug_error::Result<(DiceTransactionUpdater, UserComputationData)> {
-        let existing_state = &mut ctx.existing_state().await.clone();
-        let mut cells_and_configs = self.cmd_ctx.load_new_configs(existing_state).await?;
+        let mut cells_and_configs = self.cmd_ctx.load_new_configs(&mut ctx).await?;
         let is_bzlmod = cells_and_configs.is_bzlmod;
         let cell_resolver = cells_and_configs.cell_resolver;
         cells_and_configs.bzlmod_session_data.repo_env =
