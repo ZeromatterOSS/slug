@@ -344,8 +344,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     /// * `name` - The name of the module. Required for modules that will be
     ///   published to a registry.
     /// * `version` - The version of the module (relaxed SemVer format).
-    /// * `compatibility_level` - The compatibility level. Modules with different
-    ///   compatibility levels cannot coexist unless explicitly allowed.
+    /// * `compatibility_level` - Deprecated Bazel 9 no-op accepted for parsing
+    ///   parity. The stored compatibility level is always 0.
     /// * `repo_name` - The repository name for the module (defaults to `name`).
     /// * `bazel_compatibility` - List of Bazel version constraints (currently ignored).
     ///
@@ -386,7 +386,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         ctx.module = Some(ModuleDecl {
             name: name.to_owned(),
             version: parsed_version,
-            compatibility_level: compatibility_level as u32,
+            compatibility_level: 0,
             repo_name: if repo_name.is_empty() {
                 None
             } else {
@@ -394,6 +394,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             },
         });
 
+        // Bazel 9 accepts compatibility_level but ModuleFileGlobals stores 0.
+        let _ = compatibility_level;
         // bazel_compatibility is currently accepted for parsing parity only.
         let _ = bazel_compatibility;
 

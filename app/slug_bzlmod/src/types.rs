@@ -44,10 +44,10 @@ pub struct Module {
     /// Parsed according to Bazel's relaxed SemVer format.
     pub version: Version,
 
-    /// The compatibility level (from `module(compatibility_level = N)`).
-    /// Modules with different compatibility levels cannot coexist in the
-    /// dependency graph unless explicitly allowed via `multiple_version_override`.
-    /// Defaults to 0.
+    /// The compatibility level used during MVS selection.
+    /// Bazel 9's `module(compatibility_level = N)` attribute is a deprecated
+    /// no-op and stores 0; nonzero values are retained only for sources that
+    /// Bazel's resolver actually models with a compatibility level.
     pub compatibility_level: u32,
 
     /// The repository name this module uses to refer to itself

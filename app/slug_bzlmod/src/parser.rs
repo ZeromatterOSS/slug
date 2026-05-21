@@ -362,7 +362,7 @@ ext = use_extension("//:defs.bzl", "ext")
     }
 
     #[test]
-    fn test_parse_module_with_compatibility_level() {
+    fn test_parse_module_compatibility_level_is_bazel9_noop() {
         let content = r#"
 module(
     name = "my_project",
@@ -372,7 +372,7 @@ module(
 "#;
 
         let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
-        assert_eq!(parsed.module.compatibility_level, 2);
+        assert_eq!(parsed.module.compatibility_level, 0);
     }
 
     #[test]
@@ -723,7 +723,7 @@ bazel_dep(
 "#;
         let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
         assert_eq!(parsed.module.name, "bazel_lib");
-        assert_eq!(parsed.module.compatibility_level, 1);
+        assert_eq!(parsed.module.compatibility_level, 0);
 
         // Should have multiple bazel_deps including dev dependencies
         assert!(parsed.module.bazel_deps.len() >= 6);

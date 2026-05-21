@@ -189,6 +189,25 @@ Implementation update 2026-05-20, module compatibility-level conflicts:
   `cargo build -p slug`, and
   `cargo test -p slug_bzlmod resolution -- --nocapture` all pass.
 
+Blocker reflection 2026-05-20, `module(compatibility_level)` is no longer a
+source of compatibility-level facts in Bazel 9:
+
+- Bazel ground truth: Bazel 9 `ModuleFileGlobals.module()` accepts the
+  deprecated `compatibility_level` attribute but stores compatibility level `0`
+  unconditionally. Local source anchor:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java:188`.
+- The prior compatibility-conflict fix remains useful for any resolver input
+  that Bazel actually models with nonzero compatibility levels, but Slug must
+  not synthesize those nonzero levels from a deprecated no-op `module()`
+  attribute. Doing so would let Slug fail MODULE files that Bazel 9 only warns
+  about.
+- Slug now parses and accepts `module(compatibility_level = N)` while storing
+  `0`, matching Bazel 9. Validation:
+  `cargo test -p slug_bzlmod compatibility_level -- --nocapture`,
+  `cargo test -p slug_bzlmod parser::tests -- --nocapture`,
+  `cargo test -p slug_bzlmod resolution -- --nocapture`, and
+  `cargo fmt --check` all pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
