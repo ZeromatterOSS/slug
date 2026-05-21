@@ -1528,7 +1528,9 @@ Exit criteria:
 - `module_ctx.path(Label)` / `module_ctx.read(Label)` and
   `repository_ctx.path(Label)` / `repository_ctx.read(Label)` plus
   Label-accepting operations such as `symlink`, `template`, `patch`,
-  `load_wasm`, and `execute_wasm` propagate materialization failure. Plain
+  `load_wasm`, and `execute_wasm` propagate materialization failure only when
+  the matching Bazel semantics flag exposes the method. In default Bazel 9,
+  wasm methods are hidden and direct calls fail before repo generation. Plain
   `execute()` has string args; tests should cover environment, `PATH`, and
   working-directory recording separately rather than claiming `execute(Label)`.
 - Symlink tests cover relative symlink, absolute in-workspace symlink, absolute
@@ -3865,6 +3867,34 @@ Implementation update 2026-05-21, retired stale stub fallback telemetry:
   (36 tests); and `./target/debug/slug test
   tests/core/bzlmod:test_plan61_guardrails` (36 tests).
 
+Ground-truth correction 2026-05-21, `load_wasm` / `execute_wasm`:
+
+- Bazel source anchors: `StarlarkBaseExternalContext.java` defines
+  `load_wasm` and `execute_wasm` with
+  `enableOnlyWithFlag = BuildLanguageOptions.EXPERIMENTAL_REPOSITORY_CTX_EXECUTE_WASM`;
+  `BuildLanguageOptions.java` gives `experimental_repository_ctx_execute_wasm`
+  `defaultValue = "false"`.
+- Local Bazel 9.0.1 probes:
+  `/tmp/slug-plan61-wasm-default.VbYvvR/bazel.log` shows the methods are hidden
+  by default and a normal extension build succeeds when `hasattr(module_ctx,
+  "load_wasm")` / `hasattr(module_ctx, "execute_wasm")` are false;
+  `/tmp/slug-plan61-wasm-disabled-call.0DB6yR/bazel.log` shows a direct default
+  call fails with `'module_ctx' value has no field or method 'load_wasm'`;
+  `/tmp/slug-plan61-wasm-flag.UjvX2y/bazel.log` shows
+  `--experimental_repository_ctx_execute_wasm` exposes `load_wasm`.
+- Slug must not add always-visible wasm methods as a Plan 61 shortcut. The
+  default-parity guardrail now asserts `module_ctx.load_wasm(Label(...))` fails
+  directly and leaves no generated repo marker. Supporting wasm execution is a
+  separate semantics-flag feature: first add Bazel-shaped flag plumbing, then
+  implement label/path materialization for the enabled methods.
+- Validation passed: `python3 -m py_compile
+  tests/core/bzlmod/test_plan61_guardrails.py`; focused direct pytest for
+  `test_module_ctx_wasm_methods_are_disabled_by_default`; full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (37 tests); and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (37
+  tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
@@ -3888,7 +3918,7 @@ Exit criteria:
 | Recorded env/file/dir/tree/repo-mapping input mismatches reject replay. | Bazel `RepoRecordedInput`, `StarlarkBaseExternalContext`, `SingleExtensionEvalFunction`; experiment mutates each input class. |
 | Valid lockfile `generatedRepoSpecs` can register and materialize generated repos without executing the extension. | Bazel `SingleExtensionEvalFunction` lockfile hit path; Slug Plan 38 current lockfile preseed bridge. |
 | Missing lockfile entries execute the extension once in DICE, then reuse DICE state inside the daemon. | Bazel lockfile miss execution path; Slug DICE counter `extension_eval` proves one execution on warm daemon. |
-| Label-taking `module_ctx` / `repository_ctx` operations materialize needed extension repos or fail directly. | Bazel `ModuleExtensionContext` extends `StarlarkBaseExternalContext`; source shows `path`, `read`, `watch`, `symlink`, `template`, `patch`, `load_wasm`, and `execute_wasm` accept labels, while plain `execute()` records env/PATH/working-directory effects separately. Plan 36 bug shape; experiments split path/read/watch/write-like operations. |
+| Label-taking `module_ctx` / `repository_ctx` operations materialize needed extension repos or fail directly. | Bazel `ModuleExtensionContext` extends `StarlarkBaseExternalContext`; source shows default-visible `path`, `read`, `watch`, `symlink`, `template`, and `patch` accept labels. `load_wasm` and `execute_wasm` also accept labels, but only when `--experimental_repository_ctx_execute_wasm` exposes them; default Bazel 9 hides both methods. Plain `execute()` records env/PATH/working-directory effects separately. Plan 36 bug shape; experiments split path/read/watch/write-like operations plus default-disabled wasm methods. |
 | Unknown repo rule, extension failure, repo-rule failure, missing generated repo, and invalid override fail directly with no stub repo. | Bazel `SingleExtensionFunction`, `RepoDefinitionFunction`, `RepositoryFetchFunction`; current Slug stub paths; no-stub tests assert no repo directory/marker. |
 | Repo materialization reuse is not based on bare `.slug_repo_complete`. | Bazel marker/recorded-input semantics or Slug manifest experiment; current Slug marker bug shape in Plan 38 and source. |
 | Two workspaces with colliding module/repo names do not share bzlmod state. | Bazel has one server per output base and defaults output base from the workspace root; Slug daemon dirs include project root. Guardrail uses identical extension/repo names with different workspace roots and lockfiles, and validates the appropriate per-daemon or same-daemon counter baseline. |
@@ -3901,7 +3931,7 @@ Exit criteria:
 | Lockfile policy | Valid lockfile cold/warm repo, stale digest, stale recorded input, failed build, interrupted materialization, create/delete/edit after prior daemon miss/hit; grounded in Bazel lockfile docs/source and Plan 57. |
 | DICE invalidation | Root module edit, include edit, local override edit, registry metadata edit, extension `.bzl` edit, tag attr edit, recorded input edit, facts availability on re-execution but not facts invalidation; grounded in Bazel `SingleExtensionEvalFunction` facts behavior. |
 | Extension execution | Simple extension hub/spoke generation, valid replay hit, miss execution, no eager full-closure materialization unless pinned Bazel does the same; grounded in Bazel Skyframe extension execution and Plan 36 eager-materialization correction. |
-| Label materialization | Separate tests for `path`, `read`, `watch`, `symlink`, `template`, `patch`, `load_wasm`, and `execute_wasm`; plain `execute()` tests cover env, `PATH`, and working-directory invalidation, not `execute(Label)`. Grounded in `ModuleExtensionContext`, `StarlarkBaseExternalContext`, and Plan 36. |
+| Label materialization | Separate tests for `path`, `read`, `watch`, `symlink`, `template`, and `patch`; default-disabled tests for `load_wasm` / `execute_wasm`; future semantics-flag tests for enabled wasm label materialization if Slug adds the Bazel flag. Plain `execute()` tests cover env, `PATH`, and working-directory invalidation, not `execute(Label)`. Grounded in `ModuleExtensionContext`, `StarlarkBaseExternalContext`, and Plan 36. |
 | Repo mapping | Apparent/canonical names, module repo identity, multiple-version identity, same-extension internal repos, `use_repo`, `inject_repo`, `override_repo`, `use_repo_rule`, isolated extensions; grounded in Bazel docs/source listed above. |
 | Failure behavior | Bad extension, unknown repo rule, wrong symbol type, repo-rule failure, invalid repo spec, stale marker, missing generated target, invalid override; grounded in Bazel failure sources and current Slug stub fallbacks. |
 | Materialization | Stale marker with changed `RepoSpec`, changed content with same marker, deleted file, corrupted file, changed mode, stale/broken symlink, local path missing, cache corruption; grounded in current Slug success-by-marker paths and Bazel marker docs. |

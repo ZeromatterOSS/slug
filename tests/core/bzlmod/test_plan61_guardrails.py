@@ -1341,6 +1341,63 @@ use_repo(watch, "watch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_wasm_methods_are_disabled_by_default(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: BuildLanguageOptions and StarlarkBaseExternalContext."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+wasm_ext+wasm_repo"
+    (buck.cwd / "probe.wasm").write_bytes(b"\0asm\x01\0\0\0")
+    _write(
+        buck.cwd / "wasm_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "wasm payload\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+wasm_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _wasm_ext_impl(module_ctx):
+    module_ctx.load_wasm(Label("//:probe.wasm"))
+    wasm_repo_rule(name = "wasm_repo")
+
+wasm_ext = module_extension(
+    implementation = _wasm_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_wasm_default_disabled")
+
+wasm = use_extension("//:wasm_ext.bzl", "wasm_ext")
+use_repo(wasm, "wasm_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_wasm_repo",
+    srcs = ["@wasm_repo//:data"],
+)
+""",
+    )
+
+    failure_stderr: str | None = None
+    try:
+        await buck.build("//:uses_wasm_repo")
+    except BuckException as e:
+        failure_stderr = e.stderr
+
+    if failure_stderr is None:
+        pytest.fail("module_ctx.load_wasm unexpectedly succeeded by default")
+
+    assert "load_wasm" in failure_stderr
+    assert not (repo_dir / ".slug_repo_complete").exists()
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_file_input_edit_rejects_cache(
     buck: Buck,
 ) -> None:
