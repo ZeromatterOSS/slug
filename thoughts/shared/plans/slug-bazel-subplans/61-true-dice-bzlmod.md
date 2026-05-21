@@ -4146,6 +4146,15 @@ Implementation update 2026-05-21, generated repo mappings and Bazel 9 load canon
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (42 tests); and
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (42
   tests); and the ZeroMatter SDK no-exec smoke above.
+- Post-check against the warm-audit exit criterion: fresh isolation
+  `plan61-audit-cell-post-genrepo-map-20260521-173007` passed `audit cell`
+  cold in `elapsed=0:09.91 maxrss_kb=85768`; same-daemon warm rerun passed in
+  `elapsed=0:04.98 maxrss_kb=85076`. Final counters in
+  `/tmp/slug-plan61/plan61-audit-cell-post-genrepo-map-20260521-173007-counters.json`
+  were `bzlmod_resolution_compute=2`, `module_file_parse=717`,
+  `extension_eval=0`, `extension_replay_miss_reason=13`, and
+  `lockfile_read=2`. This confirms the generated-repo mapping fix did not
+  regress the validated warm same-daemon reuse boundary.
 
 Exit criteria:
 
