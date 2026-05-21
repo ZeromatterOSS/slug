@@ -470,6 +470,46 @@ Implementation update 2026-05-21, registry file hashes are enforced in
   `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`,
   `git diff --check`, and `cargo build -p slug` pass.
 
+Blocker reflection 2026-05-21, registry hash encoding:
+
+- Fresh ZeroMatter no-exec SDK smoke after the first checksum-enforcement
+  checkpoint failed during MVS with a false mismatch:
+  `expected f46e8ddad60aef170ee92b2f3d00ef66c147ceafea68b6877cb45bd91737f5f8, got sha256-9G6N2tYK7xcO6SsvPQDvZsFHzq/qaLaHfLRb2Rc39fg=`
+  for
+  `https://bcr.bazel.build/modules/apple_support/1.24.1/MODULE.bazel`.
+  Evidence log:
+  `/tmp/slug-plan61/plan61-noexec-after-registry-guardrails-20260521-004500.log`.
+- Class boundary: checksum enforcement was correct, but Slug generated the
+  wrong lockfile hash encoding. Bazel `registryFileHashes` values are raw
+  SHA-256 hex strings from `Checksum.toString()`, not SRI `sha256-<base64>`
+  strings. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFileDownloadEvent.java:45`
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/Checksum.java:132`.
+- Rejected workaround: accepting both encodings would hide non-Bazel lockfile
+  data. Slug now computes registry file hashes as Bazel-compatible
+  hex-encoded SHA-256; SRI encoding remains separate for archive integrity
+  uses.
+- Validation:
+  `cargo test -p slug_bzlmod registry -- --nocapture`,
+  `cargo test -p slug_bzlmod resolution -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`,
+  `git diff --check`, and `cargo build -p slug` pass.
+
+SDK smoke checkpoint 2026-05-21, registry hash encoding:
+
+- Fresh ZeroMatter no-exec SDK smoke passed after switching registry file
+  hashes to Bazel's hex encoding:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-noexec-after-hex-registry-hashes-20260521-005500 build --unstable-no-execution //sdk:sdk_contents`.
+- Evidence log:
+  `/tmp/slug-plan61/plan61-noexec-after-hex-registry-hashes-20260521-005500.log`.
+  The run reported 6,008 local commands, `load=34.8s`, `analyze=2m24s`,
+  `execute=1m07s`, `total=3m41s`, and `BUILD SUCCEEDED`.
+- The known `rules_rust//ffi/rs:empty_allocator_libraries` wait recurred with
+  moving action counts and then completed. `slugd` was killed afterward. The
+  generated ZeroMatter `buck-out` tree reached about 213M during the smoke and
+  was removed after the log was preserved; `execroot` was also removed.
+
 Validation checkpoint 2026-05-21, Plan 61 guardrails:
 
 - Direct Python guardrails passed:

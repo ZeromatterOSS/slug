@@ -35,7 +35,7 @@ use slug_http::HttpClientBuilder;
 use slug_http::to_bytes;
 
 use crate::cache::ModuleCache;
-use crate::lockfile::compute_sri_hash;
+use crate::lockfile::compute_sha256_hex;
 use crate::version::Version;
 
 pub type RegistryFileMap = indexmap::IndexMap<String, String>;
@@ -156,13 +156,14 @@ pub struct RegistryFileContent {
     /// UTF-8 file content.
     pub content: String,
 
-    /// SRI SHA-256 hash of `content`.
+    /// Hex-encoded SHA-256 hash of `content`, matching Bazel's
+    /// `registryFileHashes` lockfile encoding.
     pub hash: String,
 }
 
 impl RegistryFileContent {
     fn new(url: String, content: String) -> Self {
-        let hash = compute_sri_hash(content.as_bytes());
+        let hash = compute_sha256_hex(content.as_bytes());
         Self { url, content, hash }
     }
 }
@@ -563,7 +564,7 @@ mod tests {
             file.url,
             "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"
         );
-        assert_eq!(file.hash, compute_sri_hash(content.as_bytes()));
+        assert_eq!(file.hash, compute_sha256_hex(content.as_bytes()));
     }
 
     #[test]
@@ -582,7 +583,7 @@ mod tests {
             source.file.url,
             "https://bcr.bazel.build/modules/rules_cc/0.0.9/source.json"
         );
-        assert_eq!(source.file.hash, compute_sri_hash(content.as_bytes()));
+        assert_eq!(source.file.hash, compute_sha256_hex(content.as_bytes()));
         assert_eq!(
             source.source_info.url.as_deref(),
             Some("https://example.com/rules_cc.tar.gz")

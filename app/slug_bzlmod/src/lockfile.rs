@@ -23,7 +23,7 @@
 //! {
 //!   "lockFileVersion": 26,
 //!   "registryFileHashes": {
-//!     "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel": "sha256-hex"
+//!     "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel": "hex-encoded-sha256"
 //!   },
 //!   "selectedYankedVersions": {},
 //!   "moduleExtensions": {
@@ -811,7 +811,7 @@ impl Lockfile {
 
     /// Add a registry file hash to the lockfile.
     pub fn add_registry_hash(&mut self, url: &str, content: &str) {
-        let hash = compute_sri_hash(content.as_bytes());
+        let hash = compute_sha256_hex(content.as_bytes());
         self.registry_file_hashes.insert(url.to_string(), hash);
     }
 
@@ -1183,6 +1183,13 @@ pub fn compute_sri_hash(data: &[u8]) -> String {
     )
 }
 
+/// Compute SHA256 hash of bytes and return Bazel lockfile registry hash format.
+pub fn compute_sha256_hex(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hex::encode(hasher.finalize())
+}
+
 /// Lockfile mode for controlling resolution behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Allocative)]
 pub enum LockfileMode {
@@ -1427,6 +1434,15 @@ mod tests {
         assert!(hash.starts_with("sha256-"));
         // SHA256 of "hello world" in base64
         assert!(hash.len() > 7); // "sha256-" + base64
+    }
+
+    #[test]
+    fn test_compute_sha256_hex_matches_bazel_registry_hash_format() {
+        let data = b"hello world";
+        assert_eq!(
+            compute_sha256_hex(data),
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
     }
 
     #[test]
