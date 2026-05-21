@@ -254,6 +254,22 @@ Implementation update 2026-05-20, registry file hash propagation:
   `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`, and
   `cargo build -p slug` all pass.
 
+Implementation update 2026-05-20, non-registry override failures fail at
+resolution:
+
+- Bazel ground truth: non-registry override module files/sources are resolved
+  through Bazel's module-file/repository-directory path; a missing or
+  unreadable override source is a module resolution error, not a warning that
+  falls back to the registry. This follows the same `ModuleFileFunction` /
+  `RepoSpecFunction` failure boundary used for selected module sources.
+- Previous Slug MVS discovery warned and skipped a failing local/git/archive
+  override, allowing later registry resolution or a truncated graph to mask the
+  real override failure. Slug now propagates the override resolution error with
+  module context.
+- Validation:
+  `cargo test -p slug_bzlmod resolution -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common`, and `cargo fmt --check` pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module

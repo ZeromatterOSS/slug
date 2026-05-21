@@ -410,25 +410,17 @@ impl MvsResolver {
 
         // Resolve non-registry overrides
         for override_ in &override_modules {
-            match self
-                .resolve_override_module(override_, workspace_root)
+            let name = match override_ {
+                Override::LocalPath(lp) => &lp.module_name,
+                Override::Git(g) => &g.module_name,
+                Override::Archive(a) => &a.module_name,
+                _ => "unknown",
+            };
+            self.resolve_override_module(override_, workspace_root)
                 .await
-            {
-                Ok(()) => {}
-                Err(e) => {
-                    let name = match override_ {
-                        Override::LocalPath(lp) => &lp.module_name,
-                        Override::Git(g) => &g.module_name,
-                        Override::Archive(a) => &a.module_name,
-                        _ => "unknown",
-                    };
-                    tracing::warn!(
-                        "Failed to resolve override module '{}': {}. Skipping.",
-                        name,
-                        e
-                    );
-                }
-            }
+                .with_buck_error_context(|| {
+                    format!("Failed to resolve non-registry override module '{name}'")
+                })?;
         }
 
         // Queue transitive deps of overridden modules (they won't be visited
