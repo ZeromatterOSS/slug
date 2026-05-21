@@ -333,6 +333,22 @@ Implementation update 2026-05-20, yanked-version command policy:
   `cargo check -p slug_client_ctx -p slug_common`, `cargo fmt --check`,
   `git diff --check`, and `cargo build -p slug` pass.
 
+SDK smoke checkpoint 2026-05-21:
+
+- Fresh ZeroMatter no-exec SDK smoke passed after the yanked-version command
+  policy checkpoint:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-noexec-after-yanked-policy-20260521-000755 build --unstable-no-execution //sdk:sdk_contents`.
+- Evidence log:
+  `/tmp/slug-plan61/plan61-noexec-after-yanked-policy-20260521-000755.log`.
+  The run reported 6,008 local commands, `load=29.5s`, `analyze=2m28s`,
+  `execute=1m14s`, `total=3m52s`, and `BUILD SUCCEEDED`.
+- The run again revisited the known
+  `rules_rust//ffi/rs:empty_allocator_libraries` wait, but the queued action
+  count moved and analysis advanced to Rust dry-run execution, so this was not
+  a blocker. `slugd` was killed afterward. The generated ZeroMatter
+  `buck-out` tree reached about 213M during the smoke and was removed after the
+  log was preserved; `execroot` was also removed.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
