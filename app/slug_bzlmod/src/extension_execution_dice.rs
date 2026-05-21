@@ -608,10 +608,7 @@ impl Key for ModuleExtensionExecutionKey {
         if self.lockfile_mode != LockfileMode::Off
             && let Some(hidden_lockfile_path) = &self.hidden_lockfile_path
         {
-            match crate::lockfile::read_lockfile_path_with_mode(
-                hidden_lockfile_path,
-                LockfileMode::Update,
-            ) {
+            match crate::lockfile::read_hidden_lockfile_path(hidden_lockfile_path) {
                 Ok(Some(lockfile)) => {
                     if !workspace_lockfile_facts_present {
                         prior_facts = lockfile
@@ -648,13 +645,7 @@ impl Key for ModuleExtensionExecutionKey {
                     }
                 }
                 Ok(None) => {}
-                Err(e) => {
-                    tracing::warn!(
-                        "Ignoring unreadable hidden lockfile '{}': {}",
-                        hidden_lockfile_path.display(),
-                        e
-                    );
-                }
+                Err(e) => return Err(e),
             }
         }
 

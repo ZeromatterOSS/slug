@@ -1105,9 +1105,7 @@ impl BuckConfigBasedCells {
             .and_then(|section| section.get("hidden_lockfile_path"))
             .map(|value| std::path::PathBuf::from(value.as_str()));
         if let Some(hidden_lockfile_path) = hidden_lockfile_path.as_ref() {
-            if let Some(lockfile) =
-                slug_bzlmod::read_lockfile_path_with_mode(hidden_lockfile_path, lockfile_mode)?
-            {
+            if let Some(lockfile) = slug_bzlmod::read_hidden_lockfile_path(hidden_lockfile_path)? {
                 let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                     &lockfile,
                     &aggregated,

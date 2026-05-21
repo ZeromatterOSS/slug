@@ -1272,6 +1272,27 @@ pub fn read_lockfile_path_with_mode(
     read_lockfile_at_path(path.to_path_buf(), mode)
 }
 
+/// Read a hidden lockfile using Bazel's hidden-lockfile policy.
+///
+/// Bazel parses the hidden output-base lockfile as `update` regardless of the
+/// command's visible lockfile mode, and treats read/parse failures as an empty
+/// hidden lockfile. Visible workspace lockfile failures remain hard errors.
+pub fn read_hidden_lockfile_path(
+    path: &Path,
+) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
+    match read_lockfile_at_path(path.to_path_buf(), LockfileMode::Update) {
+        Ok(lockfile) => Ok(lockfile),
+        Err(e) => {
+            tracing::warn!(
+                "Ignoring unreadable hidden lockfile '{}': {}",
+                path.display(),
+                e
+            );
+            Ok(None)
+        }
+    }
+}
+
 /// Read `MODULE.bazel.lock` from `workspace_root` with explicit Bazel
 /// lockfile policy.
 pub fn read_lockfile_with_mode(
@@ -1454,6 +1475,34 @@ mod tests {
 
         let result = read_lockfile_with_mode(dir.path(), LockfileMode::Off).unwrap();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn malformed_hidden_lockfile_is_treated_as_empty() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+        fs::write(&path, "{ this is not json }\n").unwrap();
+
+        let result = read_hidden_lockfile_path(&path).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn valid_hidden_lockfile_is_read_with_update_policy() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+        let mut lockfile = Lockfile::new();
+        lockfile.set_extension_facts(
+            "@@ext+//:ext.bzl%ext".to_owned(),
+            serde_json::json!({"source": "hidden"}),
+        );
+        lockfile.write(&path).unwrap();
+
+        let result = read_hidden_lockfile_path(&path).unwrap().unwrap();
+        assert_eq!(
+            result.get_extension_facts("@@ext+//:ext.bzl%ext"),
+            Some(serde_json::json!({"source": "hidden"}))
+        );
     }
 
     #[test]

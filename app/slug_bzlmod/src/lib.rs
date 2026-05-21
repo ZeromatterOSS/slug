@@ -113,6 +113,7 @@ pub use integrity::verify_integrity;
 pub use lockfile::Lockfile;
 pub use lockfile::LockfileMode;
 pub use lockfile::lockfile_path;
+pub use lockfile::read_hidden_lockfile_path;
 pub use lockfile::read_lockfile_path_with_mode;
 pub use lockfile::read_lockfile_with_mode;
 pub use module_extension_executor::ExtensionExecutionOutput;

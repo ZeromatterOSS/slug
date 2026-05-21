@@ -557,6 +557,25 @@ async def test_hidden_lockfile_read_is_observable_before_extension_replay(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_malformed_hidden_lockfile_is_ignored(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelLockFileFunction treats hidden parse failures as empty."""
+    daemon_dir = Path((await buck.debug("daemon-dir")).stdout.strip())
+    hidden_lockfile = daemon_dir / "MODULE.bazel.lock"
+    before = await _bzlmod_counters(buck, "--lockfile_mode=off")
+
+    hidden_lockfile.parent.mkdir(parents=True, exist_ok=True)
+    _write(hidden_lockfile, "{ this is not json }\n")
+
+    output = (await buck.audit("cell")).stdout
+    after = await _bzlmod_counters(buck, "--lockfile_mode=off")
+
+    assert "plan61_guardrails" in output
+    assert after["lockfile_read"] > before["lockfile_read"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_mode_off_does_not_read_lockfiles(buck: Buck) -> None:
     """Bazel anchor: SingleExtensionEvalFunction skips lockfiles in OFF mode."""
     _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")

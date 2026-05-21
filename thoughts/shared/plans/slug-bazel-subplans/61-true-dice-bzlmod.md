@@ -2313,6 +2313,29 @@ Implementation slice 2026-05-19, Bazel-shaped extension lockfile digests:
   tests/core/bzlmod:test_plan61_guardrails` (26 passed inside pytest). The
   Slug daemon was killed afterward; `/var/mnt/dev/slug/buck-out` was about
   3.5M and ZeroMatter `buck-out` remained about 3.3M.
+- Implementation slice 2026-05-20, hidden lockfile parse policy: Bazel ground
+  truth is `BazelLockFileFunction`, which reads the hidden output-base
+  `MODULE.bazel.lock` with `LockfileMode.UPDATE` and treats hidden
+  read/parse/value failures as `EMPTY_LOCKFILE`, while visible workspace
+  lockfile parse failures remain hard errors. Slug now has an explicit
+  `read_hidden_lockfile_path` helper with that policy; legacy cell preseed and
+  DICE module extension execution both use it for hidden lockfiles instead of
+  applying the visible lockfile mode/error behavior. This is still not final
+  `LockfileContentKey` ownership: hidden and visible lockfile bytes are read
+  directly during the transitional startup/DICE path, but the externally
+  observable failure policy now matches Bazel's hidden-vs-visible split.
+  Validation passed: `python3 -m py_compile
+  tests/core/bzlmod/test_plan61_guardrails.py`, `cargo fmt --check`, `cargo
+  test -p slug_bzlmod hidden_lockfile -- --nocapture` (2 passed), `cargo check
+  -p slug_bzlmod -p slug_common`, `cargo build -p slug`, focused direct pytest
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k
+  'hidden_lockfile' --tb=short` (2 passed), `cargo test -p slug_bzlmod
+  lockfile -- --nocapture` (54 passed), full direct pytest
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py --tb=short` (27
+  passed), and `./target/debug/slug test
+  tests/core/bzlmod:test_plan61_guardrails` (27 passed inside pytest). The
+  Slug daemon was killed afterward; `/var/mnt/dev/slug/buck-out` was about
+  3.5M and ZeroMatter `buck-out` remained about 3.3M.
 - Historical note, superseded on 2026-05-20: real-world SDK output parity was
   still pending until the zeromatter checkout had a Bazel-valid lockfile again.
   Later validation restored the lockfile, reran Bazel and Slug on
