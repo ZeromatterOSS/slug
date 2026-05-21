@@ -10,6 +10,8 @@
 
 //! Core dice computations relating to cells
 
+use std::collections::HashMap;
+
 use allocative::Allocative;
 use async_trait::async_trait;
 use derive_more::Display;
@@ -144,14 +146,18 @@ impl Key for CellAliasResolverKey {
 
         if is_bzlmod {
             // Bazel 9/Bzlmod does not read per-repository .buckconfig alias
-            // sections. Keep the per-cell current-cell resolver, but do not
-            // materialize one LegacyBuckConfigForCellKey per external repo.
-            return CellAliasResolver::new_for_non_root_cell(
-                self.0,
-                root_aliases,
-                std::iter::empty(),
-            )
-            .map_err(Into::into);
+            // sections, and root MODULE.bazel apparent names must not leak
+            // into other modules. Keep canonical cell-name aliases available
+            // for Slug's current cell model; module-scoped apparent names are
+            // resolved by the temporary scoped bzlmod alias adapter.
+            if self.0 == root_aliases.resolve_self() {
+                return Ok(root_aliases.dupe());
+            }
+            let canonical_aliases: HashMap<_, _> = root_aliases
+                .mappings()
+                .filter(|(alias, name)| alias.as_str() == name.as_str())
+                .collect();
+            return CellAliasResolver::new(self.0, canonical_aliases).map_err(Into::into);
         }
 
         let config = ctx.get_legacy_config_for_cell(self.0).await?;

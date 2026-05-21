@@ -1631,10 +1631,6 @@ impl BuckConfigBasedCells {
                 continue;
             }
             tracing::info!("Adding bzlmod repo_name alias: {} -> {}", alias, target);
-            slug_core::cells::register_dynamic_extension_cell_alias(
-                alias.as_str().to_owned(),
-                target.as_str().to_owned(),
-            );
             root_aliases.insert(alias, target_alias);
         }
 
@@ -1676,7 +1672,11 @@ impl BuckConfigBasedCells {
             }
         }
 
-        let cell_resolver = aggregator.make_cell_resolver()?;
+        let cell_resolver = if has_module_bazel {
+            aggregator.make_bzlmod_cell_resolver()?
+        } else {
+            aggregator.make_cell_resolver()?
+        };
 
         Ok(Self {
             cell_resolver,

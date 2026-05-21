@@ -131,6 +131,17 @@ impl CellsAggregator {
     }
 
     pub(crate) fn make_cell_resolver(self) -> slug_error::Result<CellResolver> {
+        self.make_cell_resolver_with_root_alias_cell_lookup(true)
+    }
+
+    pub(crate) fn make_bzlmod_cell_resolver(self) -> slug_error::Result<CellResolver> {
+        self.make_cell_resolver_with_root_alias_cell_lookup(false)
+    }
+
+    fn make_cell_resolver_with_root_alias_cell_lookup(
+        self,
+        resolve_root_alias_cell_names: bool,
+    ) -> slug_error::Result<CellResolver> {
         let all_cell_roots_for_nested_cells: Vec<_> = self
             .cell_infos
             .iter()
@@ -161,7 +172,11 @@ impl CellsAggregator {
             ],
         );
 
-        CellResolver::new(instances, root_cell_alias_resolver)
+        if resolve_root_alias_cell_names {
+            CellResolver::new(instances, root_cell_alias_resolver)
+        } else {
+            CellResolver::new_without_root_alias_cell_lookup(instances, root_cell_alias_resolver)
+        }
     }
 }
 

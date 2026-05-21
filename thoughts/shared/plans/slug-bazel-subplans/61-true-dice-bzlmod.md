@@ -8,7 +8,7 @@
 
 In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
 observable bzlmod replay/materialization bug shapes that blocked the current SDK
-parity loop. The current guardrail file has 40 passing tests and no xfails. The
+parity loop. The current guardrail file has 41 passing tests and no xfails. The
 broader DICE-owned bzlmod plan is not complete until the acceptance criteria
 below are satisfied or a real blocker is recorded.
 
@@ -4017,6 +4017,42 @@ Implementation update 2026-05-21, command repo env is part of the bridge policy:
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (40 tests); and
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (40
+  tests).
+
+Implementation update 2026-05-21, root apparent aliases do not leak to other modules:
+
+- Bazel ground truth: `BazelDepGraphValue.getFullRepoMapping(ModuleKey)`
+  computes a repository mapping for one module key at a time, starting from
+  that module's `getRepoMappingWithBazelDepsOnly(...)` and adding only that
+  module's extension imports. A local Bazel 9.1.0 probe saved at
+  `/tmp/slug-plan61/bazel-root-alias-scope-20260521.log` confirms a root
+  `bazel_dep(name = "b", repo_name = "root_b_alias")` is not visible from
+  module `a`: Bazel fails `@a//:uses_root_alias` with
+  `No repository visible as '@root_b_alias' from repository '@@a+'`.
+- Blocker reflection: Slug's root `repo_name` alias fix for root-module labels
+  was still registered through root alias data that `CellResolver::get` and
+  bzlmod non-root alias resolvers could consult without a requesting-module
+  scope. That let current Slug build the same fixture Bazel rejects, masking a
+  missing `RepoMappingKey` boundary.
+- Systemic fix: bzlmod non-root cell alias resolvers now retain only canonical
+  self aliases plus the temporary scoped bzlmod alias adapter, and bzlmod
+  `CellResolver` instances disable the legacy "root aliases are cell names"
+  fallback. Root-module aliases remain available through the root
+  `CellAliasResolver`; legacy non-bzlmod resolvers keep the old fallback.
+  Root `repo_name` aliases are also no longer inserted into the dynamic
+  extension alias table.
+- Guardrail added:
+  `test_root_repo_name_alias_does_not_leak_to_transitive_module`, which proves
+  `//:root_uses_alias` still accepts the root apparent name while
+  `@a//:uses_root_alias` fails instead of resolving the root-only alias.
+- Validation passed:
+  `python3 -m py_compile tests/core/bzlmod/test_plan61_guardrails.py`;
+  `cargo fmt --check`; `cargo check -p slug_common -p slug_core`;
+  `cargo build -p slug`; `git diff --check`; focused direct pytest for the new
+  guardrail; full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (41 tests); and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (41
   tests).
 
 Exit criteria:

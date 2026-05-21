@@ -1444,12 +1444,28 @@ struct CellResolverInternals {
     path_mappings: SequenceTrie<FileNameBuf, CellName>,
     root_cell: CellName,
     root_cell_alias_resolver: CellAliasResolver,
+    resolve_root_alias_cell_names: bool,
 }
 
 impl CellResolver {
     pub fn new(
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
+    ) -> slug_error::Result<CellResolver> {
+        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, true)
+    }
+
+    pub fn new_without_root_alias_cell_lookup(
+        cells: Vec<CellInstance>,
+        root_cell_alias_resolver: CellAliasResolver,
+    ) -> slug_error::Result<CellResolver> {
+        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, false)
+    }
+
+    fn new_with_root_alias_cell_lookup(
+        cells: Vec<CellInstance>,
+        root_cell_alias_resolver: CellAliasResolver,
+        resolve_root_alias_cell_names: bool,
     ) -> slug_error::Result<CellResolver> {
         let input_cell_count = cells.len();
         let mut path_mappings: SequenceTrie<FileNameBuf, CellName> = SequenceTrie::new();
@@ -1512,6 +1528,7 @@ impl CellResolver {
             root_cell,
             path_mappings,
             root_cell_alias_resolver,
+            resolve_root_alias_cell_names,
         })))
     }
 
@@ -1526,10 +1543,12 @@ impl CellResolver {
         // extension repo cell exists under a canonical name (e.g.,
         // "rules_rs+crate+crates__typenum-1.19.0") but is referenced by its
         // apparent name ("crates__typenum-1.19.0").
-        if let Ok(aliased) = self.0.root_cell_alias_resolver.resolve(cell.as_str()) {
-            if aliased != cell {
-                if let Some(instance) = self.0.cells.get(&aliased) {
-                    return Ok(instance);
+        if self.0.resolve_root_alias_cell_names {
+            if let Ok(aliased) = self.0.root_cell_alias_resolver.resolve(cell.as_str()) {
+                if aliased != cell {
+                    if let Some(instance) = self.0.cells.get(&aliased) {
+                        return Ok(instance);
+                    }
                 }
             }
         }

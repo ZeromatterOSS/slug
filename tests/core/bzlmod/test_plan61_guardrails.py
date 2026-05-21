@@ -1917,6 +1917,57 @@ local_path_override(module_name = "d", path = "d")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_repo_name_alias_does_not_leak_to_transitive_module(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelDepGraphValue.getFullRepoMapping(ModuleKey)."""
+    a = buck.cwd / "a"
+    b = buck.cwd / "b"
+    a.mkdir()
+    b.mkdir()
+    _write(a / "MODULE.bazel", 'module(name = "a", version = "1.0")\n')
+    _write(
+        a / "BUILD.bazel",
+        """filegroup(
+    name = "uses_root_alias",
+    srcs = ["@root_b_alias//:b_only"],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(b / "MODULE.bazel", 'module(name = "b", version = "1.0")\n')
+    _write(
+        b / "BUILD.bazel",
+        """filegroup(name = "b_only", visibility = ["//visibility:public"])
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_root_alias_scope")
+bazel_dep(name = "a", version = "1.0")
+bazel_dep(name = "b", version = "1.0", repo_name = "root_b_alias")
+local_path_override(module_name = "a", path = "a")
+local_path_override(module_name = "b", path = "b")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "root_uses_alias",
+    srcs = ["@root_b_alias//:b_only"],
+)
+""",
+    )
+
+    await buck.build("//:root_uses_alias")
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("@a//:uses_root_alias")
+
+    assert "root_b_alias" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source(
     buck: Buck,
 ) -> None:
