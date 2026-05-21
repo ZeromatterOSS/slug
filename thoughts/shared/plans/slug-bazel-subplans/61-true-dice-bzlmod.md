@@ -3940,6 +3940,39 @@ Implementation update 2026-05-21, materialized local repository validation:
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (38
   tests).
 
+Implementation update 2026-05-21, transitive `repo_name` aliases are scoped:
+
+- Bazel ground truth: bzlmod repository mappings are scoped to the module that
+  declares the apparent name. The local Bazel 9.1.0 probe at
+  `/tmp/slug-plan61-scoped-repo-names.eJM5D6` builds a root that depends on
+  modules `a` and `b`; both modules use the apparent repo name `shared`, but
+  `a` maps it to module `c` and `b` maps it to module `d`. Bazel builds
+  `//:uses_transitive_scoped_aliases`, proving the two apparent names do not
+  collide globally.
+- Blocker reflection: Slug's transitive `bazel_dep(repo_name = ...)` bridge
+  still registered only a legacy global alias. That can make whichever module
+  registered `shared` first win for every other module, masking or creating
+  failures that Bazel's `RepositoryMappingValue` avoids. The systemic fix is
+  to register transitive apparent names as owner-module-scoped mappings and to
+  parse local-path override modules into the same parsed-module list used for
+  repo mappings and extension aggregation.
+- Slug now registers scoped repo aliases for transitive `repo_name` entries
+  from parsed module files, including local-path override modules. The legacy
+  global alias remains as a temporary fallback for older lookup paths, but
+  normal cell resolution checks the owner-scoped mapping first.
+- Guardrail added:
+  `test_transitive_repo_name_aliases_are_scoped_to_declaring_module`.
+- Validation passed:
+  Bazel 9.1.0 local probe
+  `/tmp/slug-plan61-scoped-repo-names.eJM5D6`; `python3 -m py_compile
+  tests/core/bzlmod/test_plan61_guardrails.py`; `cargo fmt --check`; `cargo
+  check -p slug_common -p slug_bzlmod`; `cargo build -p slug`; `git diff
+  --check`; focused direct pytest for the new guardrail; full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (39 tests); and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (39
+  tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

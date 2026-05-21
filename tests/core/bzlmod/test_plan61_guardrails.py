@@ -1751,6 +1751,84 @@ use_repo(replay, "replayed_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_transitive_repo_name_aliases_are_scoped_to_declaring_module(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: apparent repo names are module-scoped repository mappings."""
+
+    def write_module(name: str, module_bazel: str, build_bazel: str) -> None:
+        module_dir = buck.cwd / name
+        module_dir.mkdir()
+        _write(module_dir / "MODULE.bazel", module_bazel)
+        _write(module_dir / "BUILD.bazel", build_bazel)
+
+    write_module(
+        "a",
+        """module(name = "a", version = "1.0")
+bazel_dep(name = "c", version = "1.0", repo_name = "shared")
+""",
+        """filegroup(
+    name = "uses_shared",
+    srcs = ["@shared//:c_only"],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    write_module(
+        "b",
+        """module(name = "b", version = "1.0")
+bazel_dep(name = "d", version = "1.0", repo_name = "shared")
+""",
+        """filegroup(
+    name = "uses_shared",
+    srcs = ["@shared//:d_only"],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    write_module(
+        "c",
+        """module(name = "c", version = "1.0")
+""",
+        """filegroup(name = "c_only", visibility = ["//visibility:public"])
+""",
+    )
+    write_module(
+        "d",
+        """module(name = "d", version = "1.0")
+""",
+        """filegroup(name = "d_only", visibility = ["//visibility:public"])
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_scoped_repo_names")
+bazel_dep(name = "a", version = "1.0")
+bazel_dep(name = "b", version = "1.0")
+bazel_dep(name = "c", version = "1.0")
+bazel_dep(name = "d", version = "1.0")
+local_path_override(module_name = "a", path = "a")
+local_path_override(module_name = "b", path = "b")
+local_path_override(module_name = "c", path = "c")
+local_path_override(module_name = "d", path = "d")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_transitive_scoped_aliases",
+    srcs = [
+        "@a//:uses_shared",
+        "@b//:uses_shared",
+    ],
+)
+""",
+    )
+
+    await buck.build("//:uses_transitive_scoped_aliases")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source(
     buck: Buck,
 ) -> None:

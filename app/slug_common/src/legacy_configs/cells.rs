@@ -2081,6 +2081,7 @@ impl BuckConfigBasedCells {
                 &resolved_graph,
                 &parsed.module.name,
                 &mut aliases,
+                &mut scoped_repo_aliases,
             )
             .await;
         }
@@ -2089,43 +2090,55 @@ impl BuckConfigBasedCells {
         let mut parsed_modules: Vec<(String, ParsedModuleFile)> = Vec::new();
         parsed_modules.push((parsed.module.name.clone(), parsed.clone()));
         for (cell_name, _cell_path, setup) in &cells {
-            if let Some(bzlmod_setup) = setup {
-                let module_bazel_path = std::path::PathBuf::from(bzlmod_setup.source_path.as_ref())
-                    .join("MODULE.bazel");
-                if module_bazel_path.exists() {
-                    if let Ok(dep_parsed) = parse_module_bazel(&module_bazel_path) {
-                        // Use the module's declared name for aggregation, not the cell name
-                        // (which includes version suffix like "bazel_features+1.42.0").
-                        // This ensures extension IDs are consistent: "//private:ext.bzl" from
-                        // bazel_features resolves to "@bazel_features//private:ext.bzl", matching
-                        // what other modules use when referencing this extension.
-                        let module_key = if dep_parsed.module.name.is_empty() {
-                            cell_name.as_str().to_string()
-                        } else {
-                            dep_parsed.module.name.clone()
-                        };
-                        parsed_modules.push((module_key, dep_parsed));
-                    }
+            let module_bazel_path = if let Some(bzlmod_setup) = setup {
+                std::path::PathBuf::from(bzlmod_setup.source_path.as_ref()).join("MODULE.bazel")
+            } else {
+                project_root
+                    .root()
+                    .as_path()
+                    .join(_cell_path.as_project_relative_path().as_str())
+                    .join("MODULE.bazel")
+            };
+            if module_bazel_path.exists() {
+                if let Ok(dep_parsed) = parse_module_bazel(&module_bazel_path) {
+                    // Use the module's declared name for aggregation, not the cell name
+                    // (which includes version suffix like "bazel_features+1.42.0").
+                    // This ensures extension IDs are consistent: "//private:ext.bzl" from
+                    // bazel_features resolves to "@bazel_features//private:ext.bzl", matching
+                    // what other modules use when referencing this extension.
+                    let module_key = if dep_parsed.module.name.is_empty() {
+                        cell_name.as_str().to_string()
+                    } else {
+                        dep_parsed.module.name.clone()
+                    };
+                    parsed_modules.push((module_key, dep_parsed));
                 }
             }
         }
 
         if let Some(resolved_graph) = &resolved_graph_for_aliases {
-            for (_module_name, parsed_mod) in &parsed_modules {
+            for (module_name, parsed_mod) in &parsed_modules {
                 for dep in &parsed_mod.module.bazel_deps {
                     let apparent_name = dep.apparent_name();
-                    if aliases
-                        .iter()
-                        .any(|(alias, _)| alias.as_str() == apparent_name)
-                    {
-                        continue;
-                    }
                     let Some(target_name) =
                         selected_bzlmod_cell_name_for_dep(&cells, &dep.name, resolved_graph)
                     else {
                         continue;
                     };
                     if apparent_name == target_name {
+                        continue;
+                    }
+                    if module_name != &parsed.module.name {
+                        scoped_repo_aliases.push(BzlmodScopedRepoAlias {
+                            owner_module: module_name.clone(),
+                            apparent_name: apparent_name.to_owned(),
+                            target_name: target_name.to_owned(),
+                        });
+                    }
+                    if aliases
+                        .iter()
+                        .any(|(alias, _)| alias.as_str() == apparent_name)
+                    {
                         continue;
                     }
                     let alias_name = NonEmptyCellAlias::new(apparent_name.to_owned())?;
@@ -2601,6 +2614,7 @@ impl BuckConfigBasedCells {
         resolved_graph: &ResolvedGraph,
         root_module_name: &str,
         aliases: &mut Vec<(NonEmptyCellAlias, CellName)>,
+        scoped_repo_aliases: &mut Vec<BzlmodScopedRepoAlias>,
     ) {
         for (module_name, module_info) in &resolved_graph.modules {
             // Skip root module (already handled)
@@ -2641,7 +2655,19 @@ impl BuckConfigBasedCells {
                                     );
                                     continue;
                                 }
-                                // Create alias: repo_name -> dep.name
+                                // Bazel scopes repo_name to the declaring module.
+                                // Keep the legacy global alias below as a
+                                // fallback for older Slug paths, but register
+                                // the scoped mapping first so label resolution
+                                // from this module does not collide with another
+                                // module's same apparent name.
+                                scoped_repo_aliases.push(BzlmodScopedRepoAlias {
+                                    owner_module: module_name.clone(),
+                                    apparent_name: repo_name.clone(),
+                                    target_name: dep.name.clone(),
+                                });
+
+                                // Create legacy global alias: repo_name -> dep.name.
                                 match (
                                     NonEmptyCellAlias::new(repo_name.clone()),
                                     CellName::unchecked_new(&dep.name),
