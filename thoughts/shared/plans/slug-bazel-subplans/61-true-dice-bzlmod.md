@@ -270,6 +270,18 @@ resolution:
   `cargo test -p slug_bzlmod resolution -- --nocapture`,
   `cargo check -p slug_bzlmod -p slug_common`, and `cargo fmt --check` pass.
 
+Validation checkpoint 2026-05-20:
+
+- After the registry hash propagation and override-failure checkpoints, direct
+  Plan 61 guardrails passed with
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
+  (`27 passed`).
+- Slug's own test runner also passed
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
+  (`27 passed` inside the test action). The generated `bash.runfiles` tree was
+  removed afterward, `slugd` was killed, local `buck-out` was 3.6M, and
+  `/var/mnt/dev/zeromatter-kuro/buck-out` was 3.3M.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
