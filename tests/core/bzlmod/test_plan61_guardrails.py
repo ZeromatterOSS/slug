@@ -1678,6 +1678,82 @@ use_repo(replay, "replayed_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_lockfile_replay_recorded_env_input_change_rejects_mixed_graph_cache(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepoRecordedInput.EnvVar and SingleExtensionEvalFunction."""
+    module_name = "plan61_recorded_env_mixed"
+    dep_module_name = "plan61_recorded_env_dep"
+    extension_id = f"@{module_name}//:replay_ext.bzl%replay_ext"
+    dep = buck.cwd / "dep"
+    dep.mkdir(exist_ok=True)
+    _write(dep / "MODULE.bazel", f'module(name = "{dep_module_name}", version = "1.0")\n')
+    _write(dep / "BUILD.bazel", "")
+    replayed_repo = buck.cwd / "replayed_repo"
+    replayed_repo.mkdir(exist_ok=True)
+    _write(replayed_repo / "data.txt", "replayed repo payload\n")
+    _write(
+        replayed_repo / "BUILD.bazel",
+        """exports_files(["data.txt"])
+filegroup(name = "data", srcs = ["data.txt"])
+""",
+    )
+    _write(
+        buck.cwd / "replay_ext.bzl",
+        """def _replay_ext_impl(module_ctx):
+    fail("recorded env replay rejected")
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+    environ = ["PLAN61_REPO_ENV"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+bazel_dep(name = "{dep_module_name}", version = "1.0")
+local_path_override(module_name = "{dep_module_name}", path = "dep")
+
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=module_name,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+        recorded_inputs=["ENV:PLAN61_REPO_ENV first"],
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    first_args = ("--repo_env=PLAN61_REPO_ENV=first",)
+    second_args = ("--repo_env=PLAN61_REPO_ENV=second",)
+    before = await _bzlmod_counters(buck, *first_args)
+    await buck.audit("cell", *first_args)
+    first = await _bzlmod_counters(buck, *first_args)
+
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    await buck.audit("cell", *second_args)
+    second = await _bzlmod_counters(buck, *second_args)
+
+    assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_repo_mapping_change_rejects_cache(
     buck: Buck,
 ) -> None:

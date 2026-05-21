@@ -527,6 +527,7 @@ struct BzlmodResolutionOptions {
     allow_yanked_versions_env: Option<String>,
     allow_yanked_versions_flags: Vec<String>,
     hidden_lockfile_path: Option<PathBuf>,
+    repo_env_digest: String,
 }
 
 impl BzlmodResolutionOptions {
@@ -544,6 +545,7 @@ impl BzlmodResolutionOptions {
             hidden_lockfile_path: bzlmod_section
                 .and_then(|section| section.get("hidden_lockfile_path"))
                 .map(|value| PathBuf::from(value.as_str())),
+            repo_env_digest: repo_env_policy_digest(&slug_bzlmod::legacy_bzlmod_repo_env()),
         })
     }
 
@@ -559,8 +561,23 @@ impl BzlmodResolutionOptions {
             hasher.update(value.as_bytes());
             hasher.update([0]);
         }
+        hasher.update(self.repo_env_digest.as_bytes());
+        hasher.update([0]);
         hex::encode(hasher.finalize())
     }
+}
+
+fn repo_env_policy_digest(repo_env: &BTreeMap<String, String>) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"repo-env-policy-v1");
+    hasher.update([0]);
+    for (name, value) in repo_env {
+        hasher.update(name.as_bytes());
+        hasher.update([0]);
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+    hex::encode(hasher.finalize())
 }
 
 #[derive(Clone, Debug, Display, Allocative)]
@@ -649,6 +666,7 @@ fn bzlmod_resolution_options_policy_eq(
     left.lockfile_mode == right.lockfile_mode
         && left.allow_yanked_versions_env == right.allow_yanked_versions_env
         && left.allow_yanked_versions_flags == right.allow_yanked_versions_flags
+        && left.repo_env_digest == right.repo_env_digest
 }
 
 fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
@@ -658,6 +676,7 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
     value.lockfile_mode.hash(state);
     value.allow_yanked_versions_env.hash(state);
     value.allow_yanked_versions_flags.hash(state);
+    value.repo_env_digest.hash(state);
 }
 
 fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey) -> bool {

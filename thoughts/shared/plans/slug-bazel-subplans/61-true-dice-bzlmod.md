@@ -8,7 +8,7 @@
 
 In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
 observable bzlmod replay/materialization bug shapes that blocked the current SDK
-parity loop. The current guardrail file has 32 passing tests and no xfails. The
+parity loop. The current guardrail file has 40 passing tests and no xfails. The
 broader DICE-owned bzlmod plan is not complete until the acceptance criteria
 below are satisfied or a real blocker is recorded.
 
@@ -3976,6 +3976,47 @@ Implementation update 2026-05-21, transitive `repo_name` aliases are scoped:
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (39 tests); and
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (39
+  tests).
+
+Implementation update 2026-05-21, command repo env is part of the bridge policy:
+
+- Bazel ground truth: recorded extension/repository environment inputs are
+  Skyframe dependencies. `RepoRecordedInput.EnvVar` returns
+  `RepoEnvironmentFunction.key(name)`, `RepoEnvironmentFunction` reads the
+  command's `repo_env` precomputed value, `RegularRunnableExtension` obtains the
+  extension's declared environment view before execution, and
+  `SingleExtensionEvalFunction.didRecordedInputsChange` rejects a lockfile hit
+  when the recorded env value is outdated.
+- Blocker reflection: Slug's transitional `LegacyBzlmodResolutionDiceKey`
+  included a root-only replay summary that already hashed repo env, but mixed
+  graphs with `bazel_dep` / `local_path_override` and extension usages could
+  still be bridge-cacheable without that summary. That let a cached bzlmod
+  result carry stale `BzlmodSessionData.repo_env` across commands even though
+  Bazel would re-check the `RepoEnvironmentFunction` dependency.
+- Systemic fix: `BzlmodResolutionOptions` now records a stable digest of
+  `slug_bzlmod::legacy_bzlmod_repo_env()` and includes it in both the
+  `BzlmodResolutionKey.command_policy_digest` and the legacy key equality/hash
+  policy. This is still a transitional bridge over the global repo-env adapter,
+  but the cache now invalidates at the same command-environment boundary that
+  Bazel models for recorded env inputs.
+- Guardrail added:
+  `test_lockfile_replay_recorded_env_input_change_rejects_mixed_graph_cache`.
+  The fixture combines a local-path override dependency with an extension
+  replay lockfile whose `recordedInputs` contains
+  `ENV:PLAN61_REPO_ENV first`; the first command hits replay and the second
+  command with `--repo_env=PLAN61_REPO_ENV=second` records a replay miss rather
+  than reusing the stale bridge result.
+- Subagent note: the manager attempted to delegate the Bazel-grounding research,
+  but the runtime returned `agent thread limit reached`; this slice was completed
+  in single-agent mode per the loop prompt.
+- Validation passed:
+  `python3 -m py_compile tests/core/bzlmod/test_plan61_guardrails.py`;
+  `cargo fmt --check`; `cargo check -p slug_common -p slug_bzlmod`;
+  `cargo build -p slug`; `git diff --check`; focused direct pytest for the new
+  mixed-graph guardrail; full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (40 tests); and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (40
   tests).
 
 Exit criteria:
