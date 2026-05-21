@@ -510,6 +510,33 @@ SDK smoke checkpoint 2026-05-21, registry hash encoding:
   generated ZeroMatter `buck-out` tree reached about 213M during the smoke and
   was removed after the log was preserved; `execroot` was also removed.
 
+Implementation update 2026-05-21, root `MODULE.bazel` parsing routes through
+`RootModuleFileKey` on server commands:
+
+- Bazel ground truth: root module-file parsing is a Skyframe
+  `ModuleFileValue.KEY_FOR_ROOT_MODULE`, and `BazelModuleResolutionFunction`
+  depends on that root value before discovery/selection. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileValue.java:33`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileValue.java:68`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java:163`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java:99`.
+- Slug now implements the previously inert `RootModuleFileKey` as a DICE key
+  that reads, digests, and parses the root `MODULE.bazel` file. Normal server
+  command config loading computes this key before invoking the existing legacy
+  cell/resolution bridge, so the direct root parse in `resolve_bzlmod_dependencies`
+  is removed from the build/query/audit command path.
+- Guardrail: `RootModuleFileKey` is intentionally non-cacheable until root
+  module-file reads are backed by tracked DICE filesystem inputs. Bootstrap and
+  completion paths without a DICE transaction still use the old direct fallback;
+  MVS, transitive module files, and `BzlmodCellGraphKey` remain future slices.
+- Validation:
+  `cargo test -p slug_bzlmod root_module_file -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
+  `cargo fmt --check`, `git diff --check`, `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
+  (`27 passed`) pass.
+
 Validation checkpoint 2026-05-21, Plan 61 guardrails:
 
 - Direct Python guardrails passed:

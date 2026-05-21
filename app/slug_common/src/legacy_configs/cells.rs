@@ -354,16 +354,30 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs))
+        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs), None)
             .await
             .buck_error_context("Parsing cells")
+    }
+
+    pub async fn parse_with_config_args_and_root_module(
+        project_fs: &ProjectRoot,
+        config_args: &[slug_cli_proto::ConfigOverride],
+        root_module_file: Arc<slug_bzlmod::RootModuleFileValue>,
+    ) -> slug_error::Result<Self> {
+        Self::parse_with_file_ops_and_options_inner(
+            config_args,
+            Some(project_fs),
+            Some(root_module_file),
+        )
+        .await
+        .buck_error_context("Parsing cells")
     }
 
     /// Testing entry point: equivalent to `parse_with_config_args` with no project root.
     pub async fn testing_parse(
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, None)
+        Self::parse_with_file_ops_and_options_inner(config_args, None, None)
             .await
             .buck_error_context("Parsing cells")
     }
@@ -371,6 +385,7 @@ impl BuckConfigBasedCells {
     async fn parse_with_file_ops_and_options_inner(
         config_args: &[slug_cli_proto::ConfigOverride],
         project_fs: Option<&ProjectRoot>,
+        root_module_file: Option<Arc<slug_bzlmod::RootModuleFileValue>>,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
         let processed_config_args = resolve_config_args(config_args).await?;
@@ -393,8 +408,12 @@ impl BuckConfigBasedCells {
         // .buckconfig [cells], [cell_aliases], and [external_cells] sections are skipped.
         let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
         if let Some(project_fs) = project_fs {
-            if let Some(bzlmod_result) =
-                Self::resolve_bzlmod_dependencies(project_fs, &root_config).await?
+            if let Some(bzlmod_result) = Self::resolve_bzlmod_dependencies(
+                project_fs,
+                &root_config,
+                root_module_file.as_deref(),
+            )
+            .await?
             {
                 has_module_bazel = true;
                 bzlmod_session_data = bzlmod_result.session_data;
@@ -602,30 +621,46 @@ impl BuckConfigBasedCells {
     async fn resolve_bzlmod_dependencies(
         project_root: &ProjectRoot,
         root_config: &LegacyBuckConfig,
+        root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
     ) -> slug_error::Result<Option<BzlmodResolutionResult>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
 
-        // Check if MODULE.bazel exists
-        if !fs_util::try_exists(&module_bazel_path)? {
-            return Ok(None);
-        }
+        let parsed = if let Some(root_module_file) = root_module_file {
+            let Some(parsed) = root_module_file.parsed.clone() else {
+                return Ok(None);
+            };
+            tracing::info!(
+                "Found MODULE.bazel through RootModuleFileKey, resolving bzlmod dependencies"
+            );
+            record_bzlmod_event(
+                BzlmodEventKind::BzlmodResolutionCompute,
+                root_module_file.path.display().to_string(),
+            );
+            parsed
+        } else {
+            // Check if MODULE.bazel exists. This direct fallback remains for
+            // bootstrap and completion paths that do not yet have a DICE
+            // transaction available.
+            if !fs_util::try_exists(&module_bazel_path)? {
+                return Ok(None);
+            }
 
-        tracing::info!("Found MODULE.bazel, resolving bzlmod dependencies");
-        record_bzlmod_event(
-            BzlmodEventKind::BzlmodResolutionCompute,
-            module_bazel_path.display().to_string(),
-        );
+            tracing::info!("Found MODULE.bazel, resolving bzlmod dependencies");
+            record_bzlmod_event(
+                BzlmodEventKind::BzlmodResolutionCompute,
+                module_bazel_path.display().to_string(),
+            );
 
-        // Parse MODULE.bazel. Bazel treats root module-file parse/compile
-        // errors as bzlmod failures, not as a signal to disable bzlmod.
-        let parsed =
+            // Parse MODULE.bazel. Bazel treats root module-file parse/compile
+            // errors as bzlmod failures, not as a signal to disable bzlmod.
             parse_module_bazel(module_bazel_path.as_path()).with_buck_error_context(|| {
                 format!(
                     "Failed to parse root MODULE.bazel at {}",
                     module_bazel_path.display()
                 )
-            })?;
+            })?
+        };
 
         let mut cells = Vec::new();
         let mut aliases = Vec::new();

@@ -91,6 +91,7 @@ pub use dice_graph::RepoMaterializationManifestKey;
 pub use dice_graph::RepoOriginKind;
 pub use dice_graph::ResolvedModuleIdentity;
 pub use dice_graph::RootModuleFileKey;
+pub use dice_graph::RootModuleFileValue;
 pub use dice_graph::WorkspaceId;
 pub use dice_graph::bzlmod_event_counters;
 pub use dice_graph::record_bzlmod_event;

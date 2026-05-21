@@ -76,6 +76,7 @@ use slug_core::pattern::pattern::ParsedPattern;
 use slug_core::pattern::pattern::ParsedPatternWithModifiers;
 use slug_core::pattern::pattern_type::ConfiguredProvidersPatternExtra;
 use slug_core::target::label::interner::ConcurrentTargetLabelInterner;
+use slug_error::BuckErrorContext;
 use slug_events::dispatch::EventDispatcher;
 use slug_events::metadata;
 use slug_events::schedule_type::SandcastleScheduleType;
@@ -559,9 +560,20 @@ impl ServerCommandContext<'_> {
             config_type: ConfigType::Value as i32,
         });
 
-        let new_configs = BuckConfigBasedCells::parse_with_config_args(
+        let project_root_path = self.base_context.project_root.root().to_path_buf();
+        let workspace_id = slug_bzlmod::WorkspaceId::new(
+            project_root_path.clone(),
+            project_root_path.join("buck-out/v2"),
+        );
+        let root_module_file = dice_ctx
+            .compute(&slug_bzlmod::RootModuleFileKey { workspace_id })
+            .await?
+            .buck_error_context("Computing root MODULE.bazel through DICE")?;
+
+        let new_configs = BuckConfigBasedCells::parse_with_config_args_and_root_module(
             &self.base_context.project_root,
             &config_overrides,
+            root_module_file,
         )
         .await?;
 
