@@ -40,9 +40,10 @@ async def _bzlmod_counters(
 async def _audit_cells_and_counters(
     buck: Buck,
     rel_cwd: Path | None = None,
+    env: dict[str, str] | None = None,
 ) -> tuple[str, BzlmodCounters]:
-    result = await buck.audit("cell", rel_cwd=rel_cwd)
-    return result.stdout, await _bzlmod_counters(buck, rel_cwd=rel_cwd)
+    result = await buck.audit("cell", rel_cwd=rel_cwd, env=env)
+    return result.stdout, await _bzlmod_counters(buck, rel_cwd=rel_cwd, env=env)
 
 
 def _write(path: Path, content: str) -> None:
@@ -360,6 +361,76 @@ local_path_override(
 
     output, second = await _audit_cells_and_counters(buck)
     assert "local_lib" in output
+    assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_warm_noop_locked_registry_dep_reuses_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: selected registry modules are in BazelModuleResolutionValue."""
+    module_name = "remote_lib"
+    module_version = "1.0.0"
+    cache_home = buck.cwd / "cache_home"
+    module_cache = (
+        cache_home
+        / "slug"
+        / "registry"
+        / "bcr.bazel.build"
+        / "modules"
+        / module_name
+        / module_version
+    )
+    source_dir = module_cache / "source"
+    source_dir.mkdir(parents=True)
+    _write(
+        module_cache / "MODULE.bazel",
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    _write(module_cache / "source.json", "{}\n")
+    _write(source_dir / ".complete", "")
+    _write(source_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_registry_warm")
+
+bazel_dep(name = "{module_name}", version = "{module_version}")
+""",
+    )
+
+    module_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel"
+    )
+    source_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
+    )
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    module_url: _sha256(module_cache / "MODULE.bazel"),
+                    source_url: _sha256(module_cache / "source.json"),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    before = await _bzlmod_counters(buck, env=env)
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, second = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
     assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
 

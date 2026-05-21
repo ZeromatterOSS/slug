@@ -8,7 +8,7 @@
 
 In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
 observable bzlmod replay/materialization bug shapes that blocked the current SDK
-parity loop. The current guardrail file has 31 passing tests and no xfails. The
+parity loop. The current guardrail file has 32 passing tests and no xfails. The
 broader DICE-owned bzlmod plan is not complete until the acceptance criteria
 below are satisfied or a real blocker is recorded.
 
@@ -3606,6 +3606,25 @@ Implementation update 2026-05-21, local override graph bridge cache:
   `cargo build -p slug`, focused direct pytest for the new guardrail, and full
   direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest
   -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (31 tests).
+
+Validation update 2026-05-21, locked registry graph reuse guardrail:
+
+- Added
+  `test_warm_noop_locked_registry_dep_reuses_bzlmod_resolution`, a focused
+  no-network fixture that pre-seeds Slug's module cache under a per-test
+  `XDG_CACHE_HOME`, writes visible lockfile registry hashes for the selected
+  registry module, and proves the second same-daemon `audit cell` does not
+  increment `bzlmod_resolution_compute`.
+- Bazel grounding: selected registry modules are part of
+  `BazelModuleResolutionValue` and `BazelDepGraphValue`, with registry file
+  hashes carried through lockfile/module-resolution inputs. This test is a
+  focused counterpart to the ZeroMatter transitive graph smoke and guards the
+  widened bridge cache for locked registry deps without depending on BCR
+  network availability.
+- Validation passed:
+  focused direct pytest for the new guardrail, `git diff --check`, and full
+  direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest
+  -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (32 tests).
 
 Exit criteria:
 
