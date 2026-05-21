@@ -30,11 +30,10 @@
 //!
 //! This follows the `RepositoryRuleExecutionKey` pattern from `repository_execution.rs`.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -49,26 +48,17 @@ use starlark::syntax::Dialect;
 use starlark_syntax::syntax::ast::AstStmt;
 use starlark_syntax::syntax::ast::StmtP;
 
+use crate::BzlmodSessionData;
+use crate::RepoMappingOverrides;
+use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::record_bzlmod_event;
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
+use crate::lockfile::LockfileMode;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 
 const MAX_EXTENSION_IDS_IN_WARNING: usize = 25;
-
-/// Global storage for extension aggregation data, populated during cell resolution.
-///
-/// This data is needed when extension repos are lazily executed inside DICE.
-/// It contains the aggregated tags from all modules for each extension,
-/// plus the root module name and project root needed to create execution keys.
-struct ExtensionAggregationData {
-    aggregations: HashMap<String, AggregatedExtension>,
-    root_module_name: String,
-    project_root: PathBuf,
-}
-
-static EXTENSION_AGGREGATIONS: Mutex<Option<ExtensionAggregationData>> = Mutex::new(None);
 
 fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) -> String {
     let mut shown = Vec::new();
@@ -92,45 +82,21 @@ fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) ->
     )
 }
 
-/// Store aggregated extension data for later DICE-based execution.
-///
-/// Called during cell resolution after aggregating all extension usages
-/// from MODULE.bazel files across the dependency graph.
-pub fn set_extension_aggregations(
-    aggregations: HashMap<String, AggregatedExtension>,
-    root_module_name: String,
-    project_root: PathBuf,
-) {
-    let mut guard = EXTENSION_AGGREGATIONS.lock().unwrap();
-    *guard = Some(ExtensionAggregationData {
-        aggregations,
-        root_module_name,
-        project_root,
-    });
-}
-
 /// Look up the aggregated extension data and create a `ModuleExtensionExecutionKey`.
 ///
-/// Returns `None` if the extension is not found or aggregation data hasn't been set.
-pub fn create_extension_execution_key(extension_id: &str) -> Option<ModuleExtensionExecutionKey> {
-    let guard = EXTENSION_AGGREGATIONS.lock().unwrap();
-    let data = match guard.as_ref() {
-        Some(d) => d,
-        None => {
-            tracing::warn!(
-                "create_extension_execution_key: EXTENSION_AGGREGATIONS not set (extension_id='{}')",
-                extension_id
-            );
-            return None;
-        }
-    };
-    let aggregated = match data.aggregations.get(extension_id) {
+/// Returns `None` if the extension is not found in the current command's
+/// DICE-injected bzlmod session data.
+pub fn create_extension_execution_key(
+    data: &BzlmodSessionData,
+    extension_id: &str,
+) -> Option<ModuleExtensionExecutionKey> {
+    let aggregated = match data.extension_aggregations.get(extension_id) {
         Some(a) => a,
         None => {
             tracing::warn!(
                 "create_extension_execution_key: extension '{}' not found in aggregations. Available: {}",
                 extension_id,
-                extension_ids_summary(data.aggregations.keys())
+                extension_ids_summary(data.extension_aggregations.keys())
             );
             return None;
         }
@@ -139,6 +105,10 @@ pub fn create_extension_execution_key(extension_id: &str) -> Option<ModuleExtens
         aggregated.clone(),
         data.root_module_name.clone(),
         data.project_root.clone(),
+        data.lockfile_mode,
+        data.repo_env.clone(),
+        data.repo_mappings.clone(),
+        data.repo_mapping_overrides.clone(),
     ))
 }
 use crate::repo_spec::RepoSpec;
@@ -289,6 +259,21 @@ pub struct ModuleExtensionExecutionKey {
     /// must not write `MODULE.bazel.lock`; it is a Bazel-owned compatibility
     /// surface, not a Slug-private extension cache.
     pub project_root: Option<Arc<PathBuf>>,
+
+    /// Lockfile policy for extension replay reads.
+    ///
+    /// This is part of the key identity because Bazel lockfile mode changes
+    /// whether replay data can be read at all.
+    pub lockfile_mode: LockfileMode,
+
+    /// Effective Bazel repository environment used for ENV recorded-input replay.
+    pub repo_env: Arc<BTreeMap<String, String>>,
+
+    /// Current scoped repository mappings used for REPO_MAPPING recorded-input replay.
+    pub repo_mappings: Arc<RepoMappingSnapshot>,
+
+    /// Root-module override_repo rows used for extension-generated repo mappings.
+    pub repo_mapping_overrides: Arc<RepoMappingOverrides>,
 }
 
 impl std::hash::Hash for ModuleExtensionExecutionKey {
@@ -298,6 +283,10 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
         self.input_hash.hash(state);
         self.root_module_name.hash(state);
         self.project_root.hash(state);
+        self.lockfile_mode.hash(state);
+        self.repo_env.hash(state);
+        self.repo_mappings.hash(state);
+        self.repo_mapping_overrides.hash(state);
     }
 }
 
@@ -308,6 +297,10 @@ impl PartialEq for ModuleExtensionExecutionKey {
             && self.input_hash == other.input_hash
             && self.root_module_name == other.root_module_name
             && self.project_root == other.project_root
+            && self.lockfile_mode == other.lockfile_mode
+            && self.repo_env == other.repo_env
+            && self.repo_mappings == other.repo_mappings
+            && self.repo_mapping_overrides == other.repo_mapping_overrides
     }
 }
 
@@ -322,6 +315,10 @@ impl Dupe for ModuleExtensionExecutionKey {
             aggregated: self.aggregated.dupe(),
             root_module_name: self.root_module_name.dupe(),
             project_root: self.project_root.clone(),
+            lockfile_mode: self.lockfile_mode,
+            repo_env: self.repo_env.clone(),
+            repo_mappings: self.repo_mappings.clone(),
+            repo_mapping_overrides: self.repo_mapping_overrides.clone(),
         }
     }
 }
@@ -337,6 +334,10 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: None,
+            lockfile_mode: LockfileMode::Update,
+            repo_env: Arc::new(BTreeMap::new()),
+            repo_mappings: Arc::new(RepoMappingSnapshot::new()),
+            repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
         }
     }
 
@@ -345,6 +346,10 @@ impl ModuleExtensionExecutionKey {
         aggregated: AggregatedExtension,
         root_module_name: String,
         project_root: PathBuf,
+        lockfile_mode: LockfileMode,
+        repo_env: BTreeMap<String, String>,
+        repo_mappings: RepoMappingSnapshot,
+        repo_mapping_overrides: RepoMappingOverrides,
     ) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
@@ -354,6 +359,10 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: Some(Arc::new(project_root)),
+            lockfile_mode,
+            repo_env: Arc::new(repo_env),
+            repo_mappings: Arc::new(repo_mappings),
+            repo_mapping_overrides: Arc::new(repo_mapping_overrides),
         }
     }
 
@@ -370,6 +379,10 @@ impl ModuleExtensionExecutionKey {
             aggregated,
             root_module_name,
             project_root: None,
+            lockfile_mode: LockfileMode::Update,
+            repo_env: Arc::new(BTreeMap::new()),
+            repo_mappings: Arc::new(RepoMappingSnapshot::new()),
+            repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
         }
     }
 
@@ -380,6 +393,10 @@ impl ModuleExtensionExecutionKey {
         aggregated: Arc<AggregatedExtension>,
         root_module_name: Arc<str>,
         project_root: Arc<PathBuf>,
+        lockfile_mode: LockfileMode,
+        repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<RepoMappingSnapshot>,
+        repo_mapping_overrides: Arc<RepoMappingOverrides>,
     ) -> Self {
         Self {
             extension_id,
@@ -387,6 +404,10 @@ impl ModuleExtensionExecutionKey {
             aggregated,
             root_module_name,
             project_root: Some(project_root),
+            lockfile_mode,
+            repo_env,
+            repo_mappings,
+            repo_mapping_overrides,
         }
     }
 
@@ -399,6 +420,10 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(AggregatedExtension::default()),
             root_module_name: Arc::from("_main"),
             project_root: None,
+            lockfile_mode: LockfileMode::Update,
+            repo_env: Arc::new(BTreeMap::new()),
+            repo_mappings: Arc::new(RepoMappingSnapshot::new()),
+            repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
         }
     }
 
@@ -446,18 +471,25 @@ impl Key for ModuleExtensionExecutionKey {
         let usages_digest = self.input_hash.to_string();
         let mut prior_facts = serde_json::Value::Object(serde_json::Map::new());
 
-        // 1. Check lockfile cache (if project_root is set). Lockfile parse
-        //    is shared with `cached_lockfile` callers (e.g. startup spoke
-        //    seeding) so zeromatter-sized lockfiles only get parsed once.
+        // 1. Read lockfile facts if project_root is set. This is a read-only
+        //    operation; normal extension replay must not mutate the visible
+        //    lockfile.
         if let Some(project_root) = &self.project_root {
-            if let Some(lockfile) = crate::lockfile::cached_lockfile(project_root) {
+            if let Some(lockfile) =
+                crate::lockfile::read_lockfile_with_mode(project_root, self.lockfile_mode)?
+            {
                 prior_facts = lockfile
                     .get_extension_facts(&self.extension_id)
                     .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
-                if let Some(cached_specs) = lockfile.get_extension_cache(
+                if let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
                     &self.extension_id,
                     &bzl_transitive_digest,
                     &usages_digest,
+                    Some(project_root),
+                    Some(self.repo_env.as_ref()),
+                    Some(self.repo_mappings.as_ref()),
+                    Some(self.root_module_name()),
+                    Some(self.repo_mapping_overrides.as_ref()),
                 ) {
                     tracing::info!(
                         "Extension '{}' cache HIT: using {} cached repo specs",
@@ -530,41 +562,11 @@ impl Key for ModuleExtensionExecutionKey {
                     )
                     .await
             }
-            Err(e) => {
-                // Late binding not initialized - fall back to logging only (testing mode)
-                record_bzlmod_event(
-                    BzlmodEventKind::StubFallbackAttempt,
-                    format!("extension_executor_uninitialized:{}", self.extension_id),
-                );
-                tracing::warn!(
-                    "MODULE_EXTENSION_EXECUTOR_IMPL not initialized: {}. \
-                     Extension execution will be a no-op.",
-                    e
-                );
-                tracing::debug!(
-                    "Extension '{}' execution context (stub mode):",
-                    self.extension_id
-                );
-                tracing::debug!("  - BZL file: {}", self.aggregated.extension_bzl_file);
-                tracing::debug!("  - Extension name: {}", self.aggregated.extension_name);
-                tracing::debug!("  - Root module: {}", self.root_module_name);
-                tracing::debug!("  - Temp working dir: {:?}", temp_dir);
-                tracing::debug!("  - Imported repos: {:?}", self.aggregated.imported_repos);
-
-                // Log tags by module in stub mode
-                for (module_name, tags) in &self.aggregated.tags_by_module {
-                    tracing::debug!("  - Module '{}' tags:", module_name);
-                    for tag in tags {
-                        tracing::debug!("    - {}: {} kwarg(s)", tag.tag_name, tag.kwargs.len());
-                    }
-                }
-
-                // Return empty result in stub mode
-                Ok(crate::module_extension_executor::ExtensionExecutionOutput {
-                    generated_repo_specs: FxHashMap::default(),
-                    metadata: Default::default(),
-                })
+            Err(e) => Err(ModuleExtensionError::ExecutionFailed {
+                extension_id: self.extension_id.to_string(),
+                reason: format!("module extension executor is not initialized: {e}"),
             }
+            .into()),
         };
 
         // 6. Clean up temporary working directory
@@ -1236,8 +1238,10 @@ mod tests {
         lockfile.write(&lock_path).unwrap();
         let before = std::fs::read(&lock_path).unwrap();
 
-        crate::lockfile::invalidate_cached_lockfile(temp_dir.path());
-        let cached = crate::lockfile::cached_lockfile(temp_dir.path()).unwrap();
+        let cached =
+            crate::lockfile::read_lockfile_with_mode(temp_dir.path(), LockfileMode::Update)
+                .unwrap()
+                .unwrap();
 
         assert_eq!(cached.registry_file_hashes.len(), 1);
         assert_eq!(std::fs::read(&lock_path).unwrap(), before);
@@ -1252,6 +1256,10 @@ mod tests {
             aggregated,
             "_main".to_owned(),
             PathBuf::from("/tmp/project"),
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
         );
 
         assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
@@ -1274,11 +1282,19 @@ mod tests {
             aggregated1,
             "_main".to_owned(),
             PathBuf::from("/project1"),
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
         );
         let key2 = ModuleExtensionExecutionKey::new_with_lockfile(
             aggregated2,
             "_main".to_owned(),
             PathBuf::from("/project2"),
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
         );
 
         assert_ne!(key1, key2);
@@ -1306,10 +1322,53 @@ mod tests {
             aggregated,
             root_module_name,
             project_root,
+            LockfileMode::Update,
+            Arc::new(BTreeMap::new()),
+            Arc::new(crate::RepoMappingSnapshot::new()),
+            Arc::new(crate::RepoMappingOverrides::new()),
         );
 
         assert!(key.project_root.is_some());
         assert_eq!(key.project_root().unwrap(), &PathBuf::from("/tmp/test"));
+    }
+
+    #[test]
+    fn test_lockfile_mode_is_in_hash_and_eq() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        use crate::extensions::AggregatedExtension;
+
+        let aggregated1 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+        let aggregated2 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+
+        let key1 = ModuleExtensionExecutionKey::new_with_lockfile(
+            aggregated1,
+            "_main".to_owned(),
+            PathBuf::from("/project"),
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
+        );
+        let key2 = ModuleExtensionExecutionKey::new_with_lockfile(
+            aggregated2,
+            "_main".to_owned(),
+            PathBuf::from("/project"),
+            LockfileMode::Off,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
+        );
+
+        assert_ne!(key1, key2);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+        key1.hash(&mut hasher1);
+        key2.hash(&mut hasher2);
+        assert_ne!(hasher1.finish(), hasher2.finish());
     }
 
     #[test]

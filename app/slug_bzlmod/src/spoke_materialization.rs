@@ -22,9 +22,9 @@
 //!
 //! This module provides:
 //!
-//! 1. A global `SPOKE_REGISTRY` populated when extensions register their
-//!    captured `RepoSpec`s. Maps `canonical_name -> (extension_id, RepoSpec,
-//!    project_root)`.
+//! 1. A temporary root-scoped `SPOKE_REGISTRY` populated when extensions
+//!    register their captured `RepoSpec`s. Maps
+//!    `canonical_name -> (extension_id, RepoSpec, project_root)`.
 //! 2. A thread-local DICE pointer scoped to the duration of an extension's
 //!    Starlark eval (`with_extension_dice`).
 //! 3. `materialize_spoke_sync()` — synchronous bridge that takes a
@@ -61,6 +61,7 @@ pub struct SpokeRegistration {
 /// extension's spec capture loop. Read by `materialize_spoke_sync` when
 /// a sibling extension dereferences a spoke via `mctx.path(Label)`.
 static SPOKE_REGISTRY: RwLock<Option<FxHashMap<String, SpokeRegistration>>> = RwLock::new(None);
+static SPOKE_PROJECT_ROOT: RwLock<Option<PathBuf>> = RwLock::new(None);
 
 /// Register a spoke for potential lazy materialization.
 ///
@@ -93,6 +94,31 @@ pub fn lookup_spoke(canonical_name: &str) -> Option<SpokeRegistration> {
 /// triggers extension eval (DICE-cached), registers all sibling spokes, and
 /// marks the extension here so subsequent calls short-circuit.
 static SEEDED_EXTENSIONS: RwLock<Option<std::collections::HashSet<String>>> = RwLock::new(None);
+
+fn clear_spoke_state_for_new_root() {
+    *SPOKE_REGISTRY.write().unwrap() = None;
+    *SEEDED_EXTENSIONS.write().unwrap() = None;
+}
+
+/// Set the workspace root for the temporary spoke-materialization adapter.
+///
+/// Plan 61's final owner is a DICE value, not process state. Until that
+/// migration is complete, root transitions must discard spoke registrations
+/// and seeded-extension markers from the previous workspace.
+pub fn set_spoke_materialization_project_root(root: PathBuf) {
+    let mut current_root = SPOKE_PROJECT_ROOT.write().unwrap();
+    if current_root.as_ref() != Some(&root) {
+        clear_spoke_state_for_new_root();
+        *current_root = Some(root);
+    }
+}
+
+/// Reset spoke registrations for a fresh bzlmod resolution of `root`, even
+/// when the daemon is already serving that root.
+pub fn reset_spoke_materialization_project_root(root: PathBuf) {
+    clear_spoke_state_for_new_root();
+    *SPOKE_PROJECT_ROOT.write().unwrap() = Some(root);
+}
 
 /// Mark `extension_id`'s sibling spokes as already registered. Idempotent.
 pub fn mark_extension_spokes_seeded(extension_id: &str) {
@@ -240,13 +266,18 @@ fn complete_marker(spec_hash: &str) -> String {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn lookup_returns_none_for_unknown() {
+        let _guard = TEST_LOCK.lock().unwrap();
         assert!(lookup_spoke("definitely_not_registered_xyz_123").is_none());
     }
 
     #[test]
     fn register_and_lookup_roundtrip() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-roundtrip"));
         let canonical = "test+ext+roundtrip_spoke".to_owned();
         let spec = RepoSpec::new("@@ext//pkg:file.bzl%test_rule".to_owned());
         register_spoke(
@@ -259,5 +290,30 @@ mod tests {
         );
         let found = lookup_spoke(&canonical).expect("spoke registered");
         assert_eq!(&*found.extension_id, "@@ext//pkg:file.bzl%test");
+    }
+
+    #[test]
+    fn root_transition_clears_spoke_registrations_and_seeded_extensions() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-a"));
+        let canonical = "test+ext+root_transition_spoke".to_owned();
+        let extension_id: Arc<str> = Arc::from("@@ext//pkg:file.bzl%test");
+        register_spoke(
+            canonical.clone(),
+            SpokeRegistration {
+                extension_id: extension_id.clone(),
+                repo_spec: Arc::new(RepoSpec::new("@@ext//pkg:file.bzl%test_rule".to_owned())),
+                project_root: Arc::new(PathBuf::from("/tmp")),
+            },
+        );
+        mark_extension_spokes_seeded(&extension_id);
+
+        assert!(lookup_spoke(&canonical).is_some());
+        assert!(extension_spokes_seeded(&extension_id));
+
+        set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-b"));
+
+        assert!(lookup_spoke(&canonical).is_none());
+        assert!(!extension_spokes_seeded(&extension_id));
     }
 }

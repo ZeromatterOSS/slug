@@ -52,9 +52,14 @@ pub mod version;
 // ============================================================================
 // Module version registry
 // ============================================================================
+use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::LazyLock;
 use std::sync::RwLock;
 
+use allocative::Allocative;
 pub use cache::ModuleCache;
 pub use dice_graph::BzlmodCellGraphKey;
 pub use dice_graph::BzlmodCommandPolicyKey;
@@ -88,6 +93,7 @@ pub use dice_graph::RootModuleFileKey;
 pub use dice_graph::WorkspaceId;
 pub use dice_graph::bzlmod_event_counters;
 pub use dice_graph::record_bzlmod_event;
+use dupe::Dupe;
 pub use extension_execution_dice::ModuleExtensionError;
 pub use extension_execution_dice::ModuleExtensionExecutionKey;
 pub use extension_execution_dice::ModuleExtensionResult;
@@ -97,20 +103,18 @@ pub use extension_execution_dice::compute_bzl_transitive_digest_for_project;
 pub use extension_execution_dice::create_extension_execution_key;
 pub use extension_execution_dice::extract_extension_name;
 pub use extension_execution_dice::extract_owning_module;
-pub use extension_execution_dice::set_extension_aggregations;
 pub use extensions::AggregatedExtension;
 pub use extensions::aggregate_extensions;
 pub use extensions::aggregate_extensions_with_root;
+pub use extensions::canonical_extension_id;
 pub use extensions::compute_extension_input_hash;
 pub use fetch::SourceFetcher;
 pub use integrity::verify_integrity;
 pub use lockfile::Lockfile;
 pub use lockfile::LockfileMode;
-pub use lockfile::cached_lockfile;
-pub use lockfile::cached_lockfile_path_with_mode;
-pub use lockfile::cached_lockfile_with_mode;
-pub use lockfile::invalidate_cached_lockfile;
 pub use lockfile::lockfile_path;
+pub use lockfile::read_lockfile_path_with_mode;
+pub use lockfile::read_lockfile_with_mode;
 pub use module_extension_executor::ExtensionExecutionOutput;
 pub use module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 pub use module_extension_executor::ModuleExtensionExecutorImpl;
@@ -136,6 +140,7 @@ pub use repo_mapping::BzlmodRepoMapping;
 pub use repo_mapping::CanonicalLabel;
 pub use repo_mapping::CanonicalRepoName;
 pub use repo_mapping::ExtensionImportCanonicalization;
+pub use repo_mapping::add_extension_generated_repo_mappings;
 pub use repo_mapping::canonical_repo_for_extension_import;
 pub use repo_mapping::canonicalize_label_with_package_context;
 pub use repo_mapping::canonicalize_label_with_package_context_and_repo_resolver;
@@ -149,6 +154,7 @@ pub use repository_execution::RepositoryRuleExecutionKey;
 pub use repository_execution::RepositoryRuleResult;
 pub use repository_execution::repo_spec_to_invocation;
 pub use repository_executor::execute_repository_rule;
+pub use repository_executor::repo_layout_is_valid_for_invocation;
 pub use repository_invocations::AttrValue as RepoAttrValue;
 pub use repository_invocations::RegistryGuard;
 pub use repository_invocations::RepositoryInvocation;
@@ -174,6 +180,8 @@ pub use spoke_materialization::lookup_spoke;
 pub use spoke_materialization::mark_extension_spokes_seeded;
 pub use spoke_materialization::materialize_spoke_sync;
 pub use spoke_materialization::register_spoke;
+pub use spoke_materialization::reset_spoke_materialization_project_root;
+pub use spoke_materialization::set_spoke_materialization_project_root;
 pub use spoke_materialization::with_extension_dice;
 pub use starlark_repo_rule_executor::STARLARK_REPO_RULE_EXECUTOR_IMPL;
 pub use starlark_repo_rule_executor::StarlarkRepoRuleExecutorImpl;
@@ -183,38 +191,15 @@ pub use types::Module;
 pub use types::UseRepo;
 pub use version::Version;
 
-/// Global registry mapping cell/module names to their resolved versions.
-/// Populated during bzlmod resolution, read by module_version() builtin.
-static MODULE_VERSIONS: RwLock<Option<HashMap<String, String>>> = RwLock::new(None);
+pub type RepoMappingSnapshot = BTreeMap<String, BTreeMap<String, String>>;
 
-/// Set the module version map (module_name -> version string).
-/// Called after bzlmod resolution completes.
-pub fn set_module_versions(versions: HashMap<String, String>) {
-    if let Ok(mut map) = MODULE_VERSIONS.write() {
-        *map = if versions.is_empty() {
-            None
-        } else {
-            Some(versions)
-        };
-    }
-}
-
-/// Get the version of a module by its cell/module name.
-/// Returns None if no version is known for this cell.
-pub fn get_module_version(cell_name: &str) -> Option<String> {
-    MODULE_VERSIONS
-        .read()
-        .ok()
-        .and_then(|map| map.as_ref().and_then(|m| m.get(cell_name).cloned()))
-}
-
-// ============================================================================
-// Toolchain and Execution Platform Registrations
-// ============================================================================
+/// Root-module `override_repo()` rows, keyed by extension id then generated
+/// repo internal name.
+pub type RepoMappingOverrides = BTreeMap<String, BTreeMap<String, String>>;
 
 /// A registered toolchain entry, tracking its origin module so Plan 13
 /// Phase 3's lazy fallback can filter the deferred pool by relevance.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RegisteredToolchain {
     /// Origin module name (root module is marked `is_root = true`).
     pub module: String,
@@ -224,43 +209,71 @@ pub struct RegisteredToolchain {
     pub is_root: bool,
 }
 
-/// Global priority-ordered list of registered toolchains.
-/// Populated during cell resolution from register_toolchains() calls in MODULE.bazel.
-/// Order: root module first, then BFS order of dep graph (Bazel priority).
-static REGISTERED_TOOLCHAINS: RwLock<Vec<RegisteredToolchain>> = RwLock::new(Vec::new());
+/// Bzlmod facts produced by startup resolution and injected into DICE for the
+/// current command. This is the transitional Plan 61 boundary between legacy
+/// cell parsing and DICE-owned bzlmod values.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Allocative)]
+pub struct BzlmodSessionData {
+    pub module_versions: HashMap<String, String>,
+    pub registered_toolchains: Vec<RegisteredToolchain>,
+    pub registered_execution_platforms: Vec<String>,
+    pub extension_aggregations: HashMap<String, AggregatedExtension>,
+    pub root_module_name: String,
+    pub project_root: PathBuf,
+    pub lockfile_mode: LockfileMode,
+    pub repo_env: BTreeMap<String, String>,
+    pub repo_mappings: RepoMappingSnapshot,
+    pub repo_mapping_overrides: RepoMappingOverrides,
+}
 
-/// Global priority-ordered list of registered execution platforms.
-static REGISTERED_EXECUTION_PLATFORMS: RwLock<Vec<String>> = RwLock::new(Vec::new());
+static LEGACY_COMMAND_REPO_ENV: LazyLock<RwLock<BTreeMap<String, String>>> =
+    LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
-/// Set the global ordered list of registered toolchains.
-/// Called after bzlmod resolution collects registrations from all modules.
-pub fn set_registered_toolchains(toolchains: Vec<RegisteredToolchain>) {
-    if let Ok(mut guard) = REGISTERED_TOOLCHAINS.write() {
-        *guard = toolchains;
+/// Transitional command-scoped repo-env bridge for legacy pre-DICE bzlmod setup.
+///
+/// Final Plan 61 ownership belongs in `BzlmodCommandPolicyKey`; this exists so
+/// lockfile replay performed during legacy cell setup uses the same Bazel
+/// repository environment as DICE extension execution.
+pub fn set_legacy_bzlmod_repo_env(repo_env: BTreeMap<String, String>) {
+    if let Ok(mut guard) = LEGACY_COMMAND_REPO_ENV.write() {
+        *guard = repo_env;
     }
 }
 
-/// Set the global ordered list of registered execution platforms.
-pub fn set_registered_execution_platforms(platforms: Vec<String>) {
-    if let Ok(mut guard) = REGISTERED_EXECUTION_PLATFORMS.write() {
-        *guard = platforms;
+pub fn legacy_bzlmod_repo_env() -> BTreeMap<String, String> {
+    LEGACY_COMMAND_REPO_ENV
+        .read()
+        .map(|guard| guard.clone())
+        .unwrap_or_default()
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodSessionDataKey")]
+pub struct BzlmodSessionDataKey;
+
+impl dice::InjectedKey for BzlmodSessionDataKey {
+    type Value = Arc<BzlmodSessionData>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
     }
 }
 
-/// Get the priority-ordered list of registered toolchains.
-pub fn get_registered_toolchains() -> Vec<RegisteredToolchain> {
-    REGISTERED_TOOLCHAINS
-        .read()
-        .ok()
-        .map(|v| v.clone())
-        .unwrap_or_default()
+pub trait SetBzlmodSessionData {
+    fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()>;
 }
 
-/// Get the priority-ordered list of registered execution platform labels.
-pub fn get_registered_execution_platforms() -> Vec<String> {
-    REGISTERED_EXECUTION_PLATFORMS
-        .read()
-        .ok()
-        .map(|v| v.clone())
-        .unwrap_or_default()
+impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
+    fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
+        Ok(self.changed_to(vec![(BzlmodSessionDataKey, Arc::new(data))])?)
+    }
 }

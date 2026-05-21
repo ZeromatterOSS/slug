@@ -23,26 +23,24 @@
 use std::collections::BTreeSet;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use slug_core::content_hash::ContentBasedPathHash;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
 use slug_execute::execute::request::CommandExecutionInput;
 use slug_execute::execute::request::CommandExecutionRequest;
 use slug_fs::paths::abs_norm_path::AbsNormPath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 
-/// Names that should always be available in the execroot regardless
-/// of whether the action explicitly declared an input under them.
-///
-/// `buck-out` is needed because tool paths in command lines reference
-/// `buck-out/v2/gen/...` directly (rules_rust runner, process wrapper,
-/// rustc, etc.); without it the cwd-relative path can't resolve.
-/// `external` is needed because the bzlmod apparent-name alias dir at
-/// `<workspace>/external/<apparent>` is how slug routes
-/// `external/<repo>/...` paths to the actual `bazel-external/...`
-/// canonical repos.
-const ALWAYS_INCLUDE_PREFIXES: &[&str] = &["buck-out", "external"];
+#[derive(Debug, Default, Eq, PartialEq)]
+pub(crate) struct ActionExecrootPlan {
+    top_level_prefixes: BTreeSet<String>,
+    external_repos: BTreeSet<String>,
+    buck_out_inputs: BTreeSet<String>,
+    buck_out_writable_dirs: BTreeSet<String>,
+}
 
 /// Compute the sorted set of top-level workspace path components
 /// that an action's inputs and tools refer to.
@@ -51,14 +49,16 @@ const ALWAYS_INCLUDE_PREFIXES: &[&str] = &["buck-out", "external"];
 /// (e.g. `buck-out/v2/gen/foo/bar` → `buck-out`,
 /// `external/crates__zerocopy-0.8.42/src/lib.rs` → `external`,
 /// `lib/units/build.rs` → `lib`).
-pub(crate) fn collect_input_prefixes(
+pub(crate) fn collect_execroot_plan(
     request: &CommandExecutionRequest,
     artifact_fs: &ArtifactFs,
-) -> BTreeSet<String> {
-    let mut prefixes: BTreeSet<String> = ALWAYS_INCLUDE_PREFIXES
-        .iter()
-        .map(|s| (*s).to_owned())
-        .collect();
+) -> ActionExecrootPlan {
+    let mut plan = ActionExecrootPlan {
+        top_level_prefixes: BTreeSet::new(),
+        buck_out_inputs: BTreeSet::new(),
+        buck_out_writable_dirs: BTreeSet::new(),
+        external_repos: BTreeSet::new(),
+    };
 
     let inputs_iter = request.inputs().iter().chain(
         request
@@ -73,24 +73,75 @@ pub(crate) fn collect_input_prefixes(
             CommandExecutionInput::Artifact(group) => {
                 for (artifact, _value) in group.iter() {
                     if let Ok(path) = artifact.resolve_configuration_hash_path(artifact_fs) {
-                        if let Some(prefix) = top_level_component(path.as_str()) {
-                            prefixes.insert(prefix.to_owned());
-                        }
+                        add_execroot_path(&mut plan, path.as_str(), false);
                     }
                 }
             }
             CommandExecutionInput::IncrementalRemoteOutput(path, _) => {
-                if let Some(prefix) = top_level_component(path.as_str()) {
-                    prefixes.insert(prefix.to_owned());
+                add_execroot_path(&mut plan, path.as_str(), false);
+            }
+            CommandExecutionInput::ActionMetadata(metadata) => {
+                if let Ok(path) = artifact_fs
+                    .buck_out_path_resolver()
+                    .resolve_gen(&metadata.path, Some(&metadata.content_hash))
+                {
+                    add_execroot_path(&mut plan, path.as_str(), false);
                 }
             }
-            // Metadata blobs and scratch paths don't surface workspace
-            // prefixes — they live under buck-out (already included).
-            CommandExecutionInput::ActionMetadata(_) | CommandExecutionInput::ScratchPath(_) => {}
+            CommandExecutionInput::ScratchPath(path) => {
+                if let Ok(path) = artifact_fs.buck_out_path_resolver().resolve_scratch(path) {
+                    add_execroot_path(&mut plan, path.as_str(), true);
+                }
+            }
         }
     }
 
-    prefixes
+    for output in request.outputs() {
+        if let Ok(resolved) = output.resolve(
+            artifact_fs,
+            Some(&ContentBasedPathHash::for_output_artifact()),
+        ) {
+            if let Some(path) = resolved.path_to_create() {
+                add_execroot_path(&mut plan, path.as_str(), true);
+            }
+        }
+    }
+
+    plan
+}
+
+fn add_execroot_path(plan: &mut ActionExecrootPlan, path: &str, writable_dir: bool) {
+    if let Some(buck_out_rel) = strip_buck_out_prefix(path) {
+        if writable_dir {
+            plan.buck_out_writable_dirs.insert(buck_out_rel.to_owned());
+        } else {
+            plan.buck_out_inputs.insert(buck_out_rel.to_owned());
+        }
+    } else if let Some(external_rel) = strip_external_prefix(path) {
+        if let Some(repo) = top_level_component(external_rel) {
+            plan.external_repos.insert(repo.to_owned());
+        } else {
+            plan.top_level_prefixes.insert("external".to_owned());
+        }
+    } else if let Some(prefix) = top_level_component(path) {
+        plan.top_level_prefixes.insert(prefix.to_owned());
+    }
+}
+
+fn strip_buck_out_prefix(path: &str) -> Option<&str> {
+    let rest = path.trim_start_matches('/').strip_prefix("buck-out")?;
+    if rest.is_empty() {
+        return Some("");
+    }
+    rest.strip_prefix('/')
+}
+
+fn strip_external_prefix(path: &str) -> Option<&str> {
+    let rest = path.trim_start_matches('/').strip_prefix("external")?;
+    if rest.is_empty() {
+        return Some("");
+    }
+    rest.strip_prefix('/')
 }
 
 /// Extract the first path component of a project-relative path.
@@ -113,13 +164,29 @@ fn top_level_component(path: &str) -> Option<&str> {
 /// Stable digest for a sorted prefix set. Used as the per-action
 /// execroot directory name. Not security-sensitive — just needs to
 /// dedupe identical input shapes — so the standard hasher is fine.
-fn digest_prefixes(prefixes: &BTreeSet<String>) -> String {
+fn digest_plan(plan: &ActionExecrootPlan) -> String {
     // Use SipHasher with fixed keys for stability across processes
     // (the std DefaultHasher uses a randomized key).
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    for prefix in prefixes {
+    "prefixes".hash(&mut hasher);
+    for prefix in &plan.top_level_prefixes {
         prefix.hash(&mut hasher);
         0u8.hash(&mut hasher); // separator
+    }
+    "external-repos".hash(&mut hasher);
+    for repo in &plan.external_repos {
+        repo.hash(&mut hasher);
+        0u8.hash(&mut hasher);
+    }
+    "buck-out-inputs".hash(&mut hasher);
+    for path in &plan.buck_out_inputs {
+        path.hash(&mut hasher);
+        0u8.hash(&mut hasher);
+    }
+    "buck-out-writable-dirs".hash(&mut hasher);
+    for path in &plan.buck_out_writable_dirs {
+        path.hash(&mut hasher);
+        0u8.hash(&mut hasher);
     }
     format!("{:016x}", hasher.finish())
 }
@@ -150,16 +217,20 @@ struct MaterializedSet {
 /// silently skipped — actions reference real paths only.
 pub(crate) fn ensure_execroot(
     project_root: &AbsNormPath,
-    prefixes: &BTreeSet<String>,
+    plan: &ActionExecrootPlan,
 ) -> Option<AbsNormPathBuf> {
-    if prefixes.is_empty() {
+    if plan.top_level_prefixes.is_empty()
+        && plan.external_repos.is_empty()
+        && plan.buck_out_inputs.is_empty()
+        && plan.buck_out_writable_dirs.is_empty()
+    {
         return None;
     }
-    if prefixes.contains("external") {
+    if !plan.external_repos.is_empty() || plan.top_level_prefixes.contains("external") {
         slug_core::cells::repair_external_symlink_targets(project_root.as_path());
     }
 
-    let digest = digest_prefixes(prefixes);
+    let digest = digest_plan(plan);
     let execroot_abs: PathBuf = project_root.as_path().join("execroot").join(&digest);
 
     let mut guard = MATERIALIZED_EXECROOTS.lock().ok()?;
@@ -182,14 +253,24 @@ pub(crate) fn ensure_execroot(
         return None;
     }
 
-    for prefix in prefixes {
+    for prefix in &plan.top_level_prefixes {
         let target = project_root.as_path().join(prefix);
         if !target.exists() {
             continue;
         }
         let link = execroot_abs.join(prefix);
         if prefix == "external" {
-            if !materialize_external_prefix(&target, &link) {
+            let repos = project_root
+                .as_path()
+                .join("external")
+                .read_dir()
+                .ok()
+                .into_iter()
+                .flatten()
+                .filter_map(|entry| entry.ok())
+                .filter_map(|entry| entry.file_name().into_string().ok())
+                .collect();
+            if !materialize_external_prefix(project_root.as_path(), &target, &link, &repos) {
                 return None;
             }
             continue;
@@ -223,13 +304,119 @@ pub(crate) fn ensure_execroot(
         }
     }
 
+    if !plan.external_repos.is_empty() {
+        let project_external = project_root.as_path().join("external");
+        let execroot_external = execroot_abs.join("external");
+        if !materialize_external_prefix(
+            project_root.as_path(),
+            &project_external,
+            &execroot_external,
+            &plan.external_repos,
+        ) {
+            return None;
+        }
+    }
+
+    if !plan.buck_out_inputs.is_empty() || !plan.buck_out_writable_dirs.is_empty() {
+        let buck_out_root = execroot_abs.join("buck-out");
+        if !ensure_directory_path(&buck_out_root) {
+            return None;
+        }
+
+        for rel in &plan.buck_out_writable_dirs {
+            let dir = buck_out_root.join(rel);
+            if !ensure_directory_path(&dir) {
+                return None;
+            }
+        }
+
+        for rel in &plan.buck_out_inputs {
+            let target = project_root.as_path().join("buck-out").join(rel);
+            if !target.exists() {
+                continue;
+            }
+            if !link_buck_out_path(&buck_out_root, rel, &target, false) {
+                return None;
+            }
+        }
+    }
+
     entry.digests.insert(digest);
     AbsNormPathBuf::new(execroot_abs).ok()
 }
 
+fn link_buck_out_path(buck_out_root: &Path, rel: &str, target: &Path, target_is_dir: bool) -> bool {
+    let link = buck_out_root.join(rel);
+    let Some(parent) = link.parent() else {
+        return false;
+    };
+    if !ensure_directory_path(parent) {
+        return false;
+    }
+    match link.symlink_metadata() {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            let current = std::fs::read_link(&link).ok();
+            if current.as_deref() == Some(target) {
+                return true;
+            }
+            if !remove_symlink_path(&link) {
+                return false;
+            }
+        }
+        Ok(_) => return true,
+        Err(_) => {}
+    }
+
+    #[cfg(unix)]
+    let r = std::os::unix::fs::symlink(target, &link);
+    #[cfg(windows)]
+    let r = if target_is_dir {
+        std::os::windows::fs::symlink_dir(target, &link)
+    } else {
+        std::os::windows::fs::symlink_file(target, &link)
+    };
+    if let Err(e) = r {
+        if e.kind() != std::io::ErrorKind::AlreadyExists {
+            tracing::debug!(
+                ?e,
+                link = %link.display(),
+                target = %target.display(),
+                "failed to populate filtered buck-out execroot path"
+            );
+            return false;
+        }
+    }
+    let _ = target_is_dir;
+    true
+}
+
+fn ensure_directory_path(path: &Path) -> bool {
+    match path.symlink_metadata() {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            if !remove_symlink_path(path) {
+                return false;
+            }
+        }
+        Ok(meta) if meta.is_dir() => return true,
+        Ok(_) => return false,
+        Err(_) => {}
+    }
+    if let Err(e) = std::fs::create_dir_all(path) {
+        tracing::debug!(
+            ?e,
+            path = %path.display(),
+            "failed to create execroot directory"
+        );
+        return false;
+    }
+    true
+}
+
 fn materialize_external_prefix(
+    project_root: &std::path::Path,
     project_external: &std::path::Path,
     execroot_external: &std::path::Path,
+    repos: &BTreeSet<String>,
 ) -> bool {
     match execroot_external.symlink_metadata() {
         Ok(meta) if meta.file_type().is_symlink() => {
@@ -254,13 +441,53 @@ fn materialize_external_prefix(
         return false;
     }
 
+    for repo in repos {
+        let Some(target) = external_repo_target(project_root, project_external, repo) else {
+            continue;
+        };
+        if !link_external_entry(execroot_external, repo.into(), &target) {
+            return false;
+        }
+        if !link_external_aliases_for_target(project_external, execroot_external, &target) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn external_repo_target(
+    project_root: &std::path::Path,
+    project_external: &std::path::Path,
+    repo: &str,
+) -> Option<std::path::PathBuf> {
+    let apparent = project_external.join(repo);
+    if apparent.symlink_metadata().is_ok() {
+        return Some(
+            canonical_external_entry_target(project_external, &apparent).unwrap_or(apparent),
+        );
+    }
+
+    let canonical = project_root.join("bazel-external").join(repo);
+    if canonical.symlink_metadata().is_ok() {
+        return Some(std::fs::canonicalize(&canonical).unwrap_or(canonical));
+    }
+
+    None
+}
+
+fn link_external_aliases_for_target(
+    project_external: &std::path::Path,
+    execroot_external: &std::path::Path,
+    selected_target: &std::path::Path,
+) -> bool {
     let entries = match std::fs::read_dir(project_external) {
         Ok(entries) => entries,
         Err(e) => {
             tracing::debug!(
                 ?e,
                 path = %project_external.display(),
-                "failed to read project external directory"
+                "failed to read project external aliases"
             );
             return false;
         }
@@ -269,20 +496,11 @@ fn materialize_external_prefix(
     for entry in entries.flatten() {
         let target = canonical_external_entry_target(project_external, &entry.path())
             .unwrap_or_else(|| entry.path());
-        if !link_external_entry(execroot_external, entry.file_name(), &target) {
-            return false;
+        if target != selected_target {
+            continue;
         }
-    }
-
-    if let Some(project_root) = project_external.parent() {
-        let bazel_external = project_root.join("bazel-external");
-        if let Ok(entries) = std::fs::read_dir(&bazel_external) {
-            for entry in entries.flatten() {
-                let target = std::fs::canonicalize(entry.path()).unwrap_or_else(|_| entry.path());
-                if !link_external_entry(execroot_external, entry.file_name(), &target) {
-                    return false;
-                }
-            }
+        if !link_external_entry(execroot_external, entry.file_name(), selected_target) {
+            return false;
         }
     }
 
@@ -380,6 +598,20 @@ pub(crate) fn reset_cache_for_test() {
 mod tests {
     use super::*;
 
+    fn test_plan(prefixes: BTreeSet<String>) -> ActionExecrootPlan {
+        ActionExecrootPlan {
+            top_level_prefixes: prefixes,
+            ..Default::default()
+        }
+    }
+
+    fn digest_prefixes(prefixes: &BTreeSet<String>) -> String {
+        digest_plan(&ActionExecrootPlan {
+            top_level_prefixes: prefixes.clone(),
+            ..Default::default()
+        })
+    }
+
     #[test]
     fn top_level_component_strips_slashes() {
         assert_eq!(top_level_component(""), None);
@@ -429,7 +661,7 @@ mod tests {
         let mut prefixes = BTreeSet::new();
         prefixes.insert("buck-out".to_owned());
 
-        let execroot = ensure_execroot(&project_norm, &prefixes).unwrap();
+        let execroot = ensure_execroot(&project_norm, &test_plan(prefixes)).unwrap();
 
         assert!(execroot.as_path().starts_with(project.join("execroot")));
     }
@@ -440,20 +672,17 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let project = tmp.path();
         std::fs::create_dir(project.join("buck-out")).unwrap();
-        std::fs::create_dir(project.join("external")).unwrap();
         std::fs::create_dir(project.join("lib")).unwrap();
         let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
 
         let mut prefixes = BTreeSet::new();
         prefixes.insert("buck-out".to_owned());
-        prefixes.insert("external".to_owned());
         prefixes.insert("lib".to_owned());
 
-        let exec = ensure_execroot(&project_norm, &prefixes).unwrap();
+        let exec = ensure_execroot(&project_norm, &test_plan(prefixes)).unwrap();
 
         assert!(exec.as_path().is_dir());
         assert!(exec.as_path().join("buck-out").is_dir());
-        assert!(exec.as_path().join("external").is_dir());
         assert!(exec.as_path().join("lib").is_dir());
 
         // Workspace dirs not in the prefix set are absent.
@@ -472,7 +701,7 @@ mod tests {
         prefixes.insert("buck-out".to_owned());
         prefixes.insert("does-not-exist".to_owned());
 
-        let exec = ensure_execroot(&project_norm, &prefixes).unwrap();
+        let exec = ensure_execroot(&project_norm, &test_plan(prefixes)).unwrap();
 
         assert!(exec.as_path().join("buck-out").is_dir());
         assert!(!exec.as_path().join("does-not-exist").exists());
@@ -519,10 +748,11 @@ mod tests {
         }
 
         let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
-        let mut prefixes = BTreeSet::new();
-        prefixes.insert("external".to_owned());
+        let mut plan = ActionExecrootPlan::default();
+        plan.external_repos.insert("rules_rust".to_owned());
+        plan.external_repos.insert("rules_rust+0.69.0".to_owned());
 
-        let exec = ensure_execroot(&project_norm, &prefixes).unwrap();
+        let exec = ensure_execroot(&project_norm, &plan).unwrap();
 
         assert!(exec.as_path().join("external").is_dir());
         assert_eq!(
@@ -546,15 +776,200 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let project = tmp.path();
         std::fs::create_dir(project.join("buck-out")).unwrap();
-        std::fs::create_dir(project.join("external")).unwrap();
         let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
 
         let mut prefixes = BTreeSet::new();
         prefixes.insert("buck-out".to_owned());
-        prefixes.insert("external".to_owned());
 
-        let a = ensure_execroot(&project_norm, &prefixes).unwrap();
-        let b = ensure_execroot(&project_norm, &prefixes).unwrap();
+        let a = ensure_execroot(&project_norm, &test_plan(prefixes.clone())).unwrap();
+        let b = ensure_execroot(&project_norm, &test_plan(prefixes)).unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn external_paths_track_only_referenced_repos() {
+        let mut plan = ActionExecrootPlan::default();
+
+        add_execroot_path(
+            &mut plan,
+            "external/rules_rs++crate+crates__serde-1.0.228/src/lib.rs",
+            false,
+        );
+        add_execroot_path(
+            &mut plan,
+            "external/crates__proc-macro2-1.0.106/src/lib.rs",
+            false,
+        );
+        add_execroot_path(&mut plan, "lib/units/src/lib.rs", false);
+
+        assert!(plan.top_level_prefixes.contains("lib"));
+        assert!(!plan.top_level_prefixes.contains("external"));
+        assert!(
+            plan.external_repos
+                .contains("rules_rs++crate+crates__serde-1.0.228")
+        );
+        assert!(plan.external_repos.contains("crates__proc-macro2-1.0.106"));
+    }
+
+    #[test]
+    fn ensure_execroot_materializes_sparse_external_repos() {
+        reset_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path();
+        let external = project.join("external");
+        let bazel_external = project.join("bazel-external");
+        let serde_repo = project.join("repos").join("serde");
+        let quote_repo = project.join("repos").join("quote");
+        std::fs::create_dir_all(&external).unwrap();
+        std::fs::create_dir_all(&bazel_external).unwrap();
+        std::fs::create_dir_all(&serde_repo).unwrap();
+        std::fs::create_dir_all(&quote_repo).unwrap();
+
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&serde_repo, external.join("crates__serde-1.0.228"))
+                .unwrap();
+            std::os::unix::fs::symlink(
+                &quote_repo,
+                bazel_external.join("rules_rs++crate+crates__quote-1.0.42"),
+            )
+            .unwrap();
+            std::os::unix::fs::symlink(&quote_repo, external.join("crates__quote-1.0.42")).unwrap();
+        }
+        #[cfg(windows)]
+        {
+            std::os::windows::fs::symlink_dir(&serde_repo, external.join("crates__serde-1.0.228"))
+                .unwrap();
+            std::os::windows::fs::symlink_dir(
+                &quote_repo,
+                bazel_external.join("rules_rs++crate+crates__quote-1.0.42"),
+            )
+            .unwrap();
+            std::os::windows::fs::symlink_dir(&quote_repo, external.join("crates__quote-1.0.42"))
+                .unwrap();
+        }
+
+        let mut plan = ActionExecrootPlan::default();
+        plan.external_repos
+            .insert("crates__serde-1.0.228".to_owned());
+        plan.external_repos
+            .insert("rules_rs++crate+crates__quote-1.0.42".to_owned());
+
+        let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
+        let exec = ensure_execroot(&project_norm, &plan).unwrap();
+
+        assert_eq!(
+            std::fs::canonicalize(exec.as_path().join("external/crates__serde-1.0.228")).unwrap(),
+            std::fs::canonicalize(&serde_repo).unwrap()
+        );
+        assert_eq!(
+            std::fs::canonicalize(
+                exec.as_path()
+                    .join("external/rules_rs++crate+crates__quote-1.0.42")
+            )
+            .unwrap(),
+            std::fs::canonicalize(&quote_repo).unwrap()
+        );
+        assert_eq!(
+            std::fs::canonicalize(exec.as_path().join("external/crates__quote-1.0.42")).unwrap(),
+            std::fs::canonicalize(&quote_repo).unwrap()
+        );
+        assert!(
+            !exec
+                .as_path()
+                .join("external/crates__unreferenced-1.0.0")
+                .exists()
+        );
+    }
+
+    #[test]
+    fn ensure_execroot_filters_buck_out_inputs() {
+        reset_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path();
+        std::fs::create_dir_all(project.join("buck-out/root/gen/pkg")).unwrap();
+        std::fs::write(project.join("buck-out/root/gen/pkg/declared.rlib"), b"ok").unwrap();
+        std::fs::write(
+            project.join("buck-out/root/gen/pkg/undeclared_meta.rlib"),
+            b"bad",
+        )
+        .unwrap();
+        std::fs::create_dir_all(project.join("buck-out/root/gen/out")).unwrap();
+        let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
+
+        let mut plan = ActionExecrootPlan::default();
+        plan.buck_out_inputs
+            .insert("root/gen/pkg/declared.rlib".to_owned());
+        plan.buck_out_writable_dirs
+            .insert("root/gen/out".to_owned());
+
+        let exec = ensure_execroot(&project_norm, &plan).unwrap();
+
+        assert!(
+            exec.as_path()
+                .join("buck-out/root/gen/pkg/declared.rlib")
+                .exists()
+        );
+        assert!(
+            !exec
+                .as_path()
+                .join("buck-out/root/gen/pkg/undeclared_meta.rlib")
+                .exists()
+        );
+        assert!(exec.as_path().join("buck-out/root/gen/out").is_dir());
+        assert!(
+            !exec
+                .as_path()
+                .join("buck-out/root/gen/out")
+                .symlink_metadata()
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+    }
+
+    #[test]
+    fn buck_out_paths_preserve_isolation_dir_component() {
+        let mut plan = ActionExecrootPlan::default();
+
+        add_execroot_path(&mut plan, "buck-out/plan61-smoke/gen/pkg/out.txt", true);
+        add_execroot_path(&mut plan, "buck-out/plan61-smoke/gen/pkg/input.rlib", false);
+
+        assert!(
+            plan.buck_out_writable_dirs
+                .contains("plan61-smoke/gen/pkg/out.txt")
+        );
+        assert!(
+            plan.buck_out_inputs
+                .contains("plan61-smoke/gen/pkg/input.rlib")
+        );
+    }
+
+    #[test]
+    fn writable_buck_out_parent_does_not_expose_undeclared_siblings() {
+        reset_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path();
+        std::fs::create_dir_all(project.join("buck-out/plan61/gen/pkg")).unwrap();
+        std::fs::write(
+            project.join("buck-out/plan61/gen/pkg/undeclared.txt"),
+            b"bad",
+        )
+        .unwrap();
+        let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
+
+        let mut plan = ActionExecrootPlan::default();
+        plan.buck_out_writable_dirs
+            .insert("plan61/gen/pkg".to_owned());
+
+        let exec = ensure_execroot(&project_norm, &plan).unwrap();
+
+        assert!(exec.as_path().join("buck-out/plan61/gen/pkg").is_dir());
+        assert!(
+            !exec
+                .as_path()
+                .join("buck-out/plan61/gen/pkg/undeclared.txt")
+                .exists()
+        );
     }
 }

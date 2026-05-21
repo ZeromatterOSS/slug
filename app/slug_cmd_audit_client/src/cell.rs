@@ -35,6 +35,9 @@ pub struct AuditCellCommand {
     )]
     pub aliases: bool,
 
+    #[clap(flatten)]
+    common_opts: CommonCommandOptions,
+
     #[clap(
         name = "CELL_ALIASES",
         help = "Cell aliases to query. These aliases will be resolved in the working directory cell.",
@@ -45,22 +48,30 @@ pub struct AuditCellCommand {
     /// Command doesn't need these flags, but they are used in mode files, so we need to keep them.
     #[clap(flatten)]
     _target_cfg: TargetCfgUnusedOptions,
-
-    #[clap(flatten)]
-    common_opts: CommonCommandOptions,
 }
 
 impl AuditCellCommand {
     pub fn normalize_bazel_flag_positionals(&mut self) {
         let mut aliases = Vec::with_capacity(self.aliases_to_resolve.len());
+        let mut repo_env_value = false;
         for arg in std::mem::take(&mut self.aliases_to_resolve) {
-            if let Some(mode) = arg
+            if repo_env_value {
+                self.common_opts.config_opts.repo_env.push(arg);
+                repo_env_value = false;
+            } else if let Some(mode) = arg
                 .strip_prefix("--lockfile_mode=")
                 .or_else(|| arg.strip_prefix("--lockfile-mode="))
             {
                 if self.common_opts.config_opts.lockfile_mode.is_none() {
                     self.common_opts.config_opts.lockfile_mode = Some(mode.to_owned());
                 }
+            } else if let Some(value) = arg
+                .strip_prefix("--repo_env=")
+                .or_else(|| arg.strip_prefix("--repo-env="))
+            {
+                self.common_opts.config_opts.repo_env.push(value.to_owned());
+            } else if arg == "--repo_env" || arg == "--repo-env" {
+                repo_env_value = true;
             } else {
                 aliases.push(arg);
             }

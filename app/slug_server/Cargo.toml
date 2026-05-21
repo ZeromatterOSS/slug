@@ -45,6 +45,7 @@ starlark = { workspace = true }
 starlark_lsp = { workspace = true }
 
 slug_analysis = { workspace = true }
+slug_bzlmod = { workspace = true }
 slug_build_api = { workspace = true }
 slug_build_signals = { workspace = true }
 slug_certs = { workspace = true }

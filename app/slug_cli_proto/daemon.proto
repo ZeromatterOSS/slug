@@ -241,6 +241,10 @@ message ClientContext {
   /// Bazel-compatible --experimental_cc_implementation_deps /
   /// --noexperimental_cc_implementation_deps flag.
   bool experimental_cc_implementation_deps = 40;
+
+  /// Bazel-compatible --repo_env NAME=VALUE, NAME, or =NAME entries.
+  /// Used by repository rules and module extensions.
+  repeated string repo_env = 41;
 }
 
 message TargetsRequest {

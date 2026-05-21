@@ -760,7 +760,10 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
             .cell_info()
             .name()
             .to_string();
-        match slug_bzlmod::get_module_version(&cell_name) {
+        match BuildContext::from_context(eval)?
+            .cell_info()
+            .bzlmod_module_version(&cell_name)
+        {
             Some(version) => Ok(NoneOr::Other(version)),
             None => Ok(NoneOr::None),
         }

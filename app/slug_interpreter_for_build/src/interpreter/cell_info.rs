@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use allocative::Allocative;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::CellResolver;
@@ -18,6 +21,7 @@ pub struct InterpreterCellInfo {
     cell_name: BuildFileCell,
     cell_resolver: CellResolver,
     cell_alias_resolver: CellAliasResolver,
+    bzlmod_module_versions: Arc<HashMap<String, String>>,
 }
 
 impl InterpreterCellInfo {
@@ -26,10 +30,25 @@ impl InterpreterCellInfo {
         cell_resolver: CellResolver,
         cell_alias_resolver: CellAliasResolver,
     ) -> slug_error::Result<Self> {
+        Self::new_with_bzlmod_module_versions(
+            cell_name,
+            cell_resolver,
+            cell_alias_resolver,
+            Arc::new(HashMap::new()),
+        )
+    }
+
+    pub(crate) fn new_with_bzlmod_module_versions(
+        cell_name: BuildFileCell,
+        cell_resolver: CellResolver,
+        cell_alias_resolver: CellAliasResolver,
+        bzlmod_module_versions: Arc<HashMap<String, String>>,
+    ) -> slug_error::Result<Self> {
         Ok(Self {
             cell_name,
             cell_resolver,
             cell_alias_resolver,
+            bzlmod_module_versions,
         })
     }
 
@@ -43,5 +62,9 @@ impl InterpreterCellInfo {
 
     pub fn cell_alias_resolver(&self) -> &CellAliasResolver {
         &self.cell_alias_resolver
+    }
+
+    pub(crate) fn bzlmod_module_version(&self, cell_name: &str) -> Option<String> {
+        self.bzlmod_module_versions.get(cell_name).cloned()
     }
 }

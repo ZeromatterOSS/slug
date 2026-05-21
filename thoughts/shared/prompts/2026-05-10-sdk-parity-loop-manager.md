@@ -36,7 +36,10 @@ committed. Do not stop after rediscovering that the SDK frontier is an
 already-known timeout or stall. Continue until one of these is true:
 
 1. `//sdk:sdk_contents` builds under Slug and output parity has been checked
-   against Bazel 9.
+   against Bazel 9. If the only remaining differences are user-approved
+   output-root strings embedded in ELF/debug/build metadata, record the exact
+   files and evidence in the active plan and treat them as an accepted known
+   difference, not as an automatic hard blocker.
 2. A real blocker prevents forward progress and you leave a clean, explicit
    resume prompt with the exact next action, commands, logs, and state.
 3. The user explicitly asks you to stop.
@@ -128,7 +131,17 @@ worker, smoke, repro, or local implementation slice.
 
 After every worker result or local integration slice, commit the clean completed
 slice before continuing, unless verification failed or the diff is explicitly
-diagnostic-only. Then perform this manager self-check before any final response:
+diagnostic-only. A "valid checkpoint" means the slice has its focused
+validation, any required prompt/plan notes are updated, generated output trees
+and slugd state have been cleaned as appropriate, and the diff is no longer
+diagnostic-only. At every valid checkpoint, create a git commit before
+dispatching another worker, starting a new local implementation slice, or
+running a broad smoke whose result would be hard to separate from the completed
+slice. Do not batch multiple verified checkpoints into one later commit unless
+the worktree already contains inseparable user edits in the same files; if that
+happens, record the exact conflict in the plan before continuing.
+
+Then perform this manager self-check before any final response:
 
 1. Did `//sdk:sdk_contents` build under Slug and did output parity with Bazel 9
    complete? If no, continue.
@@ -191,6 +204,34 @@ ps -eo pid,ppid,stat,etime,rss,args | rg 'slugd\[' || true
 Always report final daemon state. Do not leave long-running Slug, smoke, or
 daemon sessions alive when handing off.
 
+## Standing Output-Tree Cleanup Rule
+
+SDK parity smokes create one `buck-out/<isolation-dir>` tree per run in
+`/var/mnt/dev/zeromatter-kuro`. Local action-execroot debugging can also create
+large generated `execroot/<digest>` trees. Monitor both before and after broad
+smokes:
+
+```sh
+cd /var/mnt/dev/zeromatter-kuro
+du -sh buck-out execroot 2>/dev/null || true
+find buck-out -maxdepth 1 -type d -name 'plan61-*' -o -name 'sdk-parity-*' 2>/dev/null
+find execroot -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -40
+```
+
+When old isolation trees are no longer needed for the current evidence trail,
+delete them. Preserve logs under `/tmp/slug-plan61` and any explicitly named
+output tree needed for comparison, but do not let `buck-out` or staged
+`execroot` trees grow unbounded across loop iterations. If disk pressure is
+visible and no Slug process is running, removing the whole generated
+`buck-out` and `execroot` trees in the ZeroMatter repo is acceptable; the next
+Slug smoke will recreate them. If cleanup hits read-only generated files, use
+`chmod -R u+w buck-out execroot 2>/dev/null || true` before removing the stale
+trees.
+
+If a local action sees undeclared sibling paths only because a broad generated
+tree is visible, treat that as an execution isolation bug, not as cleanup-only
+noise. Clean disk usage, then fix the action input/execroot model systemically.
+
 ## Parity Rules
 
 - Bazel 9 parity only. No Bazel 8 compatibility and no WORKSPACE support.
@@ -208,7 +249,25 @@ daemon sessions alive when handing off.
   intrinsic boundary.
 - Prefer `Native`, `Intrinsic`, or `NativeShim` terminology. Do not introduce
   new `Synthetic` or `Stub` terminology for valid provider/API facades.
+- Always ensure the implementation direction is based on Bazel's
+  ground-truth behavior, not on Slug's current shape or the first plausible
+  interpretation of a smoke failure.
 - Use Bazel source or focused Bazel 9 probes for parity decisions.
+- Before choosing or implementing a direction, verify that the proposed
+  behavior is something Bazel 9 actually does or requires. Ground the direction
+  in pinned Bazel source/docs or a focused Bazel 9 probe, and record that
+  evidence in the active plan. If the evidence is missing, contradictory, or
+  merely inferred from Slug's current shape or a smoke symptom, treat the idea
+  as diagnostic only and do not advance it as a fix.
+- Do not infer filesystem mechanisms such as hardlinks, symlink fanout,
+  sandbox-local path substitutions, or output-tree retention from symptoms
+  alone. First establish Bazel's actual behavior for the relevant action class,
+  then implement the smallest Slug-owned semantic that matches it.
+- Treat `buck-out` as Slug's legacy/generated output-tree name, not as a Bazel
+  parity target. If output-root string differences matter, prefer designing an
+  optional Bazel-compatible `bazel-out` storage/execution mode over post-build
+  string rewriting or hardlink/path assumptions, and ground the design in Bazel
+  output path behavior.
 - Treat the selected active plan as controlling. Ground structural claims in
   the evidence that plan requires: pinned Bazel source/docs, Slug source/plans,
   or named local Bazel-vs-Slug experiments.
@@ -298,27 +357,51 @@ For every new SDK failure or stall:
    - If no plan owns the failure class, create or update a numbered subplan
      before implementing.
 3. Update or create the relevant plan before implementing.
-4. If it is a bug class, search for other instances of the same class.
-5. Identify the owning abstraction and explicitly reject symptom-only patches.
-6. Reproduce the failure class in a focused unit or regression test before the
+4. Verify the proposed direction against Bazel 9 ground truth before coding:
+   cite pinned Bazel source/docs or run a focused Bazel 9 probe, then record
+   the evidence in the plan. If the proposed mechanism is only a Slug
+   implementation detail, name it as such and prove it preserves Bazel's
+   observable behavior instead of inventing new semantics. Do not proceed on a
+   direction that is only a plausible Slug hypothesis; first tie it back to
+   Bazel's source, docs, or executable behavior.
+5. If it is a bug class, search for other instances of the same class.
+6. Identify the owning abstraction and explicitly reject symptom-only patches.
+7. Reproduce the failure class in a focused unit or regression test before the
    fix whenever feasible. Prefer a unit test in the subsystem that owns the
    semantic; use a focused integration-style test only when the bug cannot be
    expressed at a narrower boundary.
-7. First search for existing coverage. If an existing test already covers the
+8. First search for existing coverage. If an existing test already covers the
    class, run it and update it only if the new case exposes a missing assertion.
-8. Implement the narrowest systemic fix in the plan scope and make the focused
+9. Implement the narrowest systemic fix in the plan scope and make the focused
    test pass. The test should encode the Bazel 9 semantic, not the SDK target
    name, current isolation directory, or observed configuration hash.
-9. Add any additional Bazel 9 parity tests or source-cited assertions needed
+10. Add any additional Bazel 9 parity tests or source-cited assertions needed
    for confidence in the broader bug class.
-10. Run focused verification, then broader verification appropriate to the
+11. Run focused verification, then broader verification appropriate to the
    blast radius.
-11. Rerun a narrower zeromatter target or fixture when it exercises the same
+12. Rerun a narrower zeromatter target or fixture when it exercises the same
     frontier faster than `//sdk:sdk_contents`; rerun full `//sdk:sdk_contents`
     only when focused checks pass and you need to advance or confirm the SDK
     frontier.
-12. Commit each clean completed slice with a clear message.
-13. Continue the loop.
+13. Check generated output-tree size and remove stale `buck-out` / `execroot`
+    trees once their logs or named evidence have been preserved.
+14. Commit each clean completed slice with a clear message.
+15. Continue the loop.
+
+### Reflect-And-Proceed Rule
+
+When a blocker is analyzed deeply enough to identify a systemic bug class,
+pause briefly before coding and record that reflection in the active plan. The
+note must name the missing Bazel semantic, the Slug owner abstraction, the
+broader target/rule class affected, and the symptom-only fixes that are
+explicitly rejected. Then proceed with the systemic fix and the next validation
+step; do not stop merely because the reflection produced a useful diagnosis.
+
+Repeat this for each new blocker discovered while advancing the SDK frontier.
+The reflection is a guardrail for implementation quality, not a handoff point.
+If subagents are available and the next step has separable uncertainty, assign
+bounded exploration or implementation slices to them while the manager updates
+the plan, validates returned patches, and continues the loop.
 
 ## Frontier SDK Smoke
 
@@ -344,6 +427,7 @@ isolation="sdk-parity-$(date +%Y%m%d-%H%M%S)"
 log="/tmp/${isolation}.log"
 
 cleanup_slugd
+du -sh buck-out execroot 2>/dev/null || true
 set +e
 timeout 900s env SLUG_MEMORY_CHECKPOINTS=1 \
   /var/mnt/dev/slug/scripts/memory_smoke.sh \
@@ -356,6 +440,7 @@ timeout 900s env SLUG_MEMORY_CHECKPOINTS=1 \
 status=$?
 cleanup_slugd
 ps -eo pid,ppid,stat,etime,rss,args | rg 'slugd\[' || true
+du -sh buck-out execroot 2>/dev/null || true
 tail -220 "${log}"
 exit "${status}"
 ```
@@ -416,6 +501,10 @@ When ending a turn, leave the next agent or user with:
 - New blocker classification and linked plan section.
 - What was implemented and verified.
 - Whether Bazel 9 output parity has been checked.
+- Any accepted output-root byte differences, especially `buck-out`/`slug-out`
+  vs `bazel-out` strings embedded in ELF outputs, and whether a follow-up
+  `bazel-out` storage/execution mode is needed.
+- Final `buck-out` / `execroot` size or cleanup status for the repro checkout.
 - Final `slugd[...]` process status.
 
 If you cannot complete the overall goal, make the next action unambiguous.

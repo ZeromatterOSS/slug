@@ -6,12 +6,37 @@
 
 ## Status
 
-In progress. Phase 61.1 guardrails started 2026-05-18 and now cover the
-observable bzlmod replay/materialization bug shapes that blocked the current
-SDK parity loop. The current guardrail file has 18 passing tests and 1 strict
-xfail: same-daemon workspace isolation is not yet expressible in the local
-daemon layout. The plan is not complete, and the SDK parity loop must continue
-until the acceptance criteria below are satisfied or a real blocker is recorded.
+In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
+observable bzlmod replay/materialization bug shapes that blocked the current SDK
+parity loop. The current guardrail file has 25 passing tests and no xfails. The
+broader DICE-owned bzlmod plan is not complete until the acceptance criteria
+below are satisfied or a real blocker is recorded.
+
+Current SDK parity checkpoint 2026-05-20: complete under the user-approved
+output-root exception. Slug builds `//sdk:sdk_contents`; directory/file
+manifests and modes match Bazel 9 exactly; all non-ELF file hashes match; the
+only remaining byte differences are the four ELF outputs `bin/zm`,
+`bin/zerobuf`, `bin/zerosystem`, and `lib/libzeromatter_ffi.so`. Those four
+differences are accepted for this checkpoint because the demonstrated remaining
+class is output-root strings embedded in ELF/debug/build metadata
+(`buck-out`/future `slug-out` versus Bazel's `bazel-out`). Exact-byte parity
+remains a follow-up design item: add a Bazel-grounded optional output-root mode
+that stores or exposes generated artifacts under `bazel-out` instead of
+post-link string rewriting.
+
+Current evidence:
+
+- Slug full SDK build log:
+  `/tmp/slug-plan61/plan61-sdk-contents-after-cc-all-files-20260520-150740.log`.
+- Bazel/Slug mode manifests:
+  `/tmp/slug-plan61/bazel-sdk-contents-modes-after-cc-all-files.txt` and
+  `/tmp/slug-plan61/slug-sdk-contents-modes-after-cc-all-files.txt`.
+- Bazel/Slug SHA manifests:
+  `/tmp/slug-plan61/bazel-sdk-contents-sha-after-cc-all-files.txt` and
+  `/tmp/slug-plan61/slug-sdk-contents-sha-after-cc-all-files.txt`.
+- `/var/mnt/dev/zeromatter-kuro/execroot` was removed after validation;
+  `/var/mnt/dev/zeromatter-kuro/buck-out` was retained as the current evidence
+  tree and was about 21G at the last check.
 
 SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
 materialization failures to full execution:
@@ -42,6 +67,110 @@ materialization failures to full execution:
   `__rustc_proc_macro_decls_*` plus `rust_metadata_const_format_proc_macros_*`.
   Evidence log:
   `/tmp/slug-plan61/slug-sdk-contents-normal-clang2-20260519-150339.log`.
+
+Blocker reflection 2026-05-19, Rust proc-macro execution semantics:
+
+- Class boundary: this is not an SDK-specific missing file and not a C/C++
+  toolchain frontier. It is a Rust action execution/modeling bug: rustc is
+  asked to load a host proc-macro dynamic library via `--extern`, but the full
+  Slug execution environment does not yet prove that every rustc-loadable
+  artifact is a declared, materialized action input in the correct host/exec
+  configuration and at a path valid from the action execroot.
+- Bazel semantic: proc macros are execution-time compiler plugins. A consumer
+  Rust action may target `x86_64-unknown-linux-musl`, but the proc macro must be
+  built for and loaded by the host/exec rustc. The owning Slug abstractions are
+  plugin propagation/configuration, `ctx.actions.run` input tracking, command
+  line artifact rendering, and the local executor's per-action execroot.
+- Other affected cases: any `rules_rust`/`rules_rs` crate graph with
+  transitive proc macros, build-script produced Rust helpers loaded by rustc,
+  cross-target Rust builds that mix target rlibs with host proc macros, and any
+  action whose tool loads a dependency named only by a rendered argv path.
+- Rejected workarounds: copying the observed `.so`, broadening the execroot to
+  hide undeclared inputs, hardcoding `const_format_proc_macros`, hardcoding a
+  `rules_rs++crate+...` path, or adding a path remap for the observed isolation
+  directory/configuration hash. The systemic fix must make rustc-loadable
+  artifacts first-class inputs and validate/rewrite their paths at the owning
+  abstraction.
+
+Blocker reflection 2026-05-19, git repository materialization integrity:
+
+- Fresh post-cleanup SDK smoke
+  `/tmp/slug-plan61/plan61-sdk-rust-repro-20260519-153221.log` failed before
+  Rust execution while materializing
+  `rules_rs++crate+crates__ts-rs-12.0.1`. The Starlark
+  `crate_git_repository` implementation tried to fan out from the master
+  `rules_rs++crate+https___github.com_Aleph-Alpha_ts-rs.git_a6bbbd...`
+  clone and git reported `fatal: not a git repository: .../.git`. Bazel 9.0.1
+  still passes `bazel build --nobuild //sdk:sdk_contents`
+  (`/tmp/slug-plan61/bazel-sdk-after-git-clean-20260519-153414.log`).
+- Class boundary: this is not a `ts-rs` target bug. It is a repository
+  materialization integrity bug: Slug accepts a `.slug_repo_complete` marker
+  without validating the layout invariants required by the repo rule result.
+- Bazel semantic / Slug owner: repository fetch/materialization must reject or
+  repair stale/corrupted output directories. For git repository rules, the
+  materialized repository must still contain the `.git` state that downstream
+  repository rules use for worktree fan-out. The owning Slug abstractions are
+  `ExtensionRepoExecutionKey` marker-hit handling and the native
+  `repository_executor` marker check.
+- Other affected cases: any `git_repository` / `new_git_repository` repo whose
+  working tree is partially deleted while its completion marker remains, and
+  any downstream repo rule that uses the upstream clone as a git source.
+- Rejected workarounds: manually restoring this one `.git` directory, deleting
+  only the observed `ts-rs` repo, special-casing the Aleph-Alpha URL, or making
+  `crate_git_repository` ignore git fan-out failures. The systemic fix is to
+  validate git repo layout before treating a completion marker as a hit, then
+  force a clean re-materialization on invalid layout.
+
+Blocker reflection 2026-05-19, local repository source layout integrity:
+
+- Patched SDK smoke
+  `/tmp/slug-plan61/plan61-sdk-git-layout-fix-20260519-154850.log` advanced
+  past the git repository failure and stopped in LLVM libcxx analysis:
+  `llvm++llvm_source+libcxx//:src/filesystem/time_utils.h` was an unknown
+  target. Inspection showed the materialized repo contained only
+  `.slug_repo_complete`, `BUILD.bazel`, and `WORKSPACE.bazel`, while the source
+  file existed under the source repository
+  `llvm++llvm_source+llvm-raw/libcxx/src/filesystem/time_utils.h`.
+  Deleting only the generated `llvm++llvm_source+libcxx` repo and rerunning a
+  focused `targets` lookup caused current Slug to rematerialize the expected
+  top-level symlinks and resolve the source label.
+- Class boundary: this is another repository materialization integrity bug, not
+  an LLVM target bug and not an implicit source-file target bug. Slug trusted a
+  stale completion marker for a `new_local_repository`-style repo after the
+  source-tree symlink layout had been lost.
+- Bazel semantic / Slug owner: local repository rules expose the local source
+  tree plus generated BUILD metadata as the repository contents. A completion
+  marker is valid only if the materialized repo still reflects the local source
+  directory entries that downstream package loading and `glob()` depend on. The
+  owning Slug abstractions are native repository execution and
+  `ExtensionRepoExecutionKey` marker-hit handling.
+- Other affected cases: any `local_repository` or `new_local_repository` whose
+  top-level source symlinks/files are partially deleted while its completion
+  marker remains, especially large overlay repos such as LLVM where generated
+  BUILD files reference source-tree paths.
+- Rejected workarounds: deleting only the observed `libcxx` repo, special-casing
+  LLVM/libcxx, synthesizing missing source targets, or teaching analysis to
+  ignore absent source files. The systemic fix is to validate local repository
+  source layout against the declared source path before accepting a marker hit.
+
+Implementation update 2026-05-19:
+
+- Added marker layout validation before trusting native repository execution,
+  extension repo execution, extension repo file access, and eager extension
+  materialization fast paths. The validator now rejects missing `.git` state for
+  git repos, missing top-level source entries for local repos, and LLVM
+  `_llvm_subproject_repository` outputs whose sibling `llvm-raw/<dir>` source
+  tree is not reflected in the materialized repo.
+- Focused tests pass:
+  `git_repository_marker_requires_git_layout`,
+  `new_local_repository_marker_requires_source_layout`, and
+  `llvm_subproject_marker_requires_source_layout`.
+- Focused stale-layout repro passed with patched Slug:
+  `/tmp/slug-plan61/plan61-llvm-layout-fix2-20260519-160556.log`.
+  The run started from a `llvm++llvm_source+libcxx` repo containing only
+  `.slug_repo_complete`, `BUILD.bazel`, and `WORKSPACE.bazel`; Slug
+  rematerialized the symlinked source tree and resolved
+  `llvm++llvm_source+libcxx//:src/filesystem/time_utils.h`.
 
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
@@ -88,7 +217,7 @@ Current anti-patterns:
 | Graph computed before DICE | `resolve_bzlmod_dependencies()` is called during legacy cell setup in `app/slug_common/src/legacy_configs/cells.rs`; `CellResolverKey` receives an injected resolver in `app/slug_common/src/dice/cells.rs`. | `BzlmodResolutionKey` and projections. |
 | Process-global semantic facts | `MODULE_VERSIONS` / toolchain globals in `app/slug_bzlmod/src/lib.rs`, dynamic cell globals in `app/slug_core/src/cells.rs`, extension/spoke globals in `extension_execution_dice.rs` / `spoke_materialization.rs`. | Workspace-scoped DICE values. |
 | Under-keyed DICE values | Current extension/repo keys carry `project_root` but exclude it from hash/equality in `extension_execution_dice.rs` and `repository_execution.rs`. | A first-class `WorkspaceId` participates in every bzlmod semantic key or parent value. |
-| Approximate replay digests | `compute_bzl_transitive_digest_for_project` now hashes local workspace extension `.bzl` files reachable by literal `load()`s for the Plan 61 guardrail path, but full Bazel loaded-module graph ownership is not implemented and `recordedInputs` is parsed but not validated. | Bazel-shaped `bzlTransitiveDigest`, `usagesDigest`, and `RepoRecordedInput` validation. |
+| Approximate replay digests | `compute_bzl_transitive_digest_for_project` now hashes local workspace extension `.bzl` files reachable by literal `load()`s for the Plan 61 guardrail path, and lockfile replay validates absolute/main-workspace `FILE`, `DIRENTS`, `DIRTREE`, command-scoped `ENV`, module-scope `REPO_MAPPING`, and extension-generated source `REPO_MAPPING` recorded inputs. Full Bazel loaded-module graph ownership, typed DICE `RepoMappingKey` ownership, and complete `RepoRecordedInput` coverage are not implemented. | Bazel-shaped `bzlTransitiveDigest`, `usagesDigest`, and `RepoRecordedInput` validation. |
 | Bare marker trust | `.slug_repo_complete` is trusted by repo/external-cell paths; Plan 38 documents marker-gated warm-build failures. | Bazel-shaped marker/recorded-input validation or a Slug DICE manifest with an explicit parity experiment. |
 | Stub repos / empty specs on failure | Unknown repo rules and extension/repo-rule failures still create stubs in `repository_executor.rs` and `extension_repo.rs`. | Direct Bazel-shaped failure; no generated repo directory/marker on failure. |
 | Canonical identity reconstruction | Current code accepts fallback spellings, suffix scans, and `bazel-external` discovery. | Typed module/extension/repo identity and scoped repo mappings. |
@@ -122,7 +251,7 @@ bug shape.
 
 | Key / value | Owns | Grounding |
 |---|---|---|
-| `BzlmodWorkspaceKey { canonical_project_root, output_base } -> WorkspaceId` | Stable workspace identity used by all bzlmod semantic keys. | Current Slug under-keys by excluding `project_root`; daemon isolation acceptance requires this. Do not include command mode in `WorkspaceId`, or the same workspace becomes a different identity when flags change. |
+| `BzlmodWorkspaceKey { canonical_project_root, output_base } -> WorkspaceId` | Stable workspace identity used by all bzlmod semantic keys. | Current Slug under-keys by excluding `project_root`; Bazel scopes server/output-base state by workspace/output-base, and Slug daemon dirs include project root. Do not include command mode in `WorkspaceId`, or the same workspace becomes a different identity when flags change. |
 | `BzlmodCommandPolicyKey { workspace_id, bazel_release_id, starlark_semantics_digest, bzlmod_flags, lockfile_mode, registry_config_digest, repository_cache_config, network_policy, repo_env_digest, nonstrict_repo_env_digest, ignore_dev_dependency, allow_yanked_versions, bazel_compatibility_policy, isolated_extension_usages_flag } -> BzlmodCommandPolicy` | Command-scoped policy and options that affect resolution, replay, and side effects. | Bazel 9 lockfile docs say lockfiles are specific to the Bazel version; Bazel `RepositoryOptions`, `ModuleFileFunction.IGNORE_DEV_DEPENDENCY`, `ModuleFileGlobals` dev-dependency/isolate handling, `RegularRunnableExtension` repo env inputs, and `SingleExtensionEvalFunction` Starlark semantics use. |
 | `RootModuleFileKey { workspace_id } -> ParsedModuleFile` | Root `MODULE.bazel` parse and digest. | Bazel `ModuleFileValue` / `ModuleFileFunction`; current Slug parses in legacy `cells.rs`. |
 | `ModuleSourceKey { workspace_id, command_policy_digest, module_key, registry_or_override_identity } -> ModuleSource` | Registry/local/archive source identity, registry order, patches/overlays, yanked state, auth/offline/cache policy. | Bazel `IndexRegistry`, `RepoSpecFunction`, module docs; current registry/cache code performs side effects. |
@@ -199,7 +328,7 @@ the final state must make these globals unnecessary.
 Plan 61 must add proof infrastructure before moving ownership:
 
 - Baseline xfail/known-bad fixtures for root edit, local override edit, two
-  workspaces in one daemon, lockfile SHA stability/mode behavior, extension
+  workspaces with colliding module/repo names, lockfile SHA stability/mode behavior, extension
   `.bzl` edit, transitive `.bzl` edit, bad extension, unknown repo rule, stale
   marker, and no-stub failures.
 - Structured events/counters: `bzlmod_resolution_compute`, `module_file_parse`,
@@ -849,16 +978,16 @@ Checked inventory for current semantic authorities:
 |---|---|---|
 | Pre-DICE root parse/resolution | `app/slug_common/src/legacy_configs/cells.rs::resolve_bzlmod_dependencies` calls `parse_module_bazel`, `resolve_local_modules`, `MvsResolver::resolve`, extension aggregation, repo mapping, and cell registration before injecting `CellResolverKey`. | `RootModuleFileKey`, `ModuleFileKey`, `BzlmodResolutionKey`, `BzlmodCellGraphKey`. |
 | Injected cell resolver | `app/slug_common/src/dice/cells.rs::CellResolverKey` stores the already-built resolver. | `BzlmodCellGraphKey { workspace_id, resolution_digest }` consumed by `CellResolverKey`. |
-| Module version global | `app/slug_bzlmod/src/lib.rs::MODULE_VERSIONS`, set by `set_module_versions`, read by `get_module_version`. | `ResolvedModuleIdentity` projection keyed by workspace and module key. |
-| Toolchain/platform globals | `REGISTERED_TOOLCHAINS` and `REGISTERED_EXECUTION_PLATFORMS` in `app/slug_bzlmod/src/lib.rs`. | `RegisteredToolchainsKey` and `RegisteredExecutionPlatformsKey` projections from `BzlmodResolutionKey`. |
-| Extension aggregation global | `app/slug_bzlmod/src/extension_execution_dice.rs::EXTENSION_AGGREGATIONS`, set by `set_extension_aggregations`, read by `create_extension_execution_key`. | `ModuleExtensionAggregationKey`. |
+| Module version adapter | Process-global `MODULE_VERSIONS` / `set_module_versions` / `get_module_version` were removed on 2026-05-20. Current startup resolution returns `BzlmodSessionData::module_versions`, injected through `BzlmodSessionDataKey` and read by interpreter cell info. This is command-scoped, but still produced by pre-DICE legacy resolution. | `ResolvedModuleIdentity` projection keyed by workspace and module key. |
+| Toolchain/platform adapter | Process-global `REGISTERED_TOOLCHAINS` and `REGISTERED_EXECUTION_PLATFORMS` were removed on 2026-05-20. Current startup resolution stores them in `BzlmodSessionData`, and toolchain/execution-platform consumers compute `BzlmodSessionDataKey`. This is command-scoped, but still produced by pre-DICE legacy resolution. | `RegisteredToolchainsKey` and `RegisteredExecutionPlatformsKey` projections from `BzlmodResolutionKey`. |
+| Extension aggregation adapter | Process-global `EXTENSION_AGGREGATIONS` and `set_extension_aggregations` were removed on 2026-05-20. Current startup resolution stores aggregations in `BzlmodSessionData`; lazy extension repo paths compute `BzlmodSessionDataKey` before constructing `ModuleExtensionExecutionKey`. | `ModuleExtensionAggregationKey`. |
 | Partially scoped extension execution key | `ModuleExtensionExecutionKey` now includes `project_root` in `Hash`/`Eq`, but still lacks the final typed `workspace_id`, command policy digest, and replay input digest shape. | `ModuleExtensionExecutionIdentity { workspace_id, extension_instance_id, command_policy_digest, replay_inputs_digest }`. |
 | Partially scoped repo execution key | `ExtensionRepoExecutionKey` now includes `project_root` in `Hash`/`Eq`, but still lacks the final typed `workspace_id`, repo rule implementation digest, and replay/recorded-input identity. | `ExtensionRepoExecutionIdentity` plus `RepoMaterializationManifestKey`. |
-| Lockfile process cache | `app/slug_bzlmod/src/lockfile.rs::LOCKFILE_CACHE` and `cached_lockfile`. | `LockfileContentKey` and `LockfileExtensionEntryKey`. |
+| Lockfile direct reader | Process-global `LOCKFILE_CACHE` and `cached_lockfile` were removed on 2026-05-20. Current readers are explicit `read_lockfile_with_mode` / `read_lockfile_path_with_mode`; they honor `LockfileMode::Off` and re-read disk, but are not yet DICE `LockfileContentKey` values. | `LockfileContentKey` and `LockfileExtensionEntryKey`. |
 | Bare marker trust | `.slug_repo_complete` checks in `repository_executor.rs`, `repository_execution.rs`, `spoke_materialization.rs`, and `pending_repo_cells.rs` comments/bridges. | `RepoMaterializationManifestKey` or Bazel-shaped marker/recorded-input validation. |
-| Stub fallback | Unknown rule fallback in `repository_executor.rs`; extension executor uninitialized fallback in `extension_execution_dice.rs`. | Direct Bazel-shaped failure, counted by `stub_fallback_attempt` until removed. |
-| Dynamic cell globals | `DYNAMIC_PROJECT_ROOT`, `DYNAMIC_EXTENSION_CELLS`, `DYNAMIC_EXTENSION_CELL_SETUPS`, `DYNAMIC_EXTENSION_CELL_ALIASES`, `SCOPED_BZLMOD_REPO_ALIASES`, and `BZLMOD_APPARENT_ALIAS_CACHE` in `app/slug_core/src/cells.rs`. | `BzlmodCellGraphKey`, `RepoMappingKey`, `ExternalSymlinkLayoutKey`. |
-| Stale local-path repair | `repository_execution.rs::repair_stale_local_path_attrs`. | `LocalOverrideSourceKey` and repo-rule recorded input validation. |
+| Stub fallback | Normal bzlmod stub fallback paths and the `stub_fallback_attempt` counter were removed on 2026-05-20. Guardrails now assert direct extension/repo-rule failures and no generated stub repo directories/markers. | Keep direct Bazel-shaped failure; no replacement compatibility path. |
+| Dynamic cell globals | `DYNAMIC_PROJECT_ROOT`, `DYNAMIC_EXTENSION_CELLS`, `DYNAMIC_EXTENSION_CELL_SETUPS`, `DYNAMIC_EXTENSION_CELL_ALIASES`, `SCOPED_BZLMOD_REPO_ALIASES`, and `BZLMOD_APPARENT_ALIAS_CACHE` in `app/slug_core/src/cells.rs` remain temporary adapters. They are now cleared when the project root changes. `ROOT_CELL_NAME` is no longer write-once; `SPOKE_REGISTRY` / `SEEDED_EXTENSIONS` in `spoke_materialization.rs` are also root-scoped. | `BzlmodCellGraphKey`, `RepoMappingKey`, `ExternalSymlinkLayoutKey`, and `ExtensionSpokesKey`. |
+| Stale local-path repair | `repository_execution.rs::repair_stale_local_path_attrs` and its suffix-search helper were removed on 2026-05-20; stale absolute paths now fail in the owning repo-rule execution path. | `LocalOverrideSourceKey` and repo-rule recorded input validation. |
 
 ### 61.2 Parsed Module Inputs As DICE Keys
 
@@ -1738,10 +1867,406 @@ Implementation slice 2026-05-19, Bazel-shaped extension lockfile digests:
   tests/core/bzlmod/test_plan61_guardrails.py -rx` (18 passed / 1 xfailed), and
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (18 passed
   / 1 xfailed inside pytest, Slug test pass). Daemons were cleaned afterward.
-- Real-world SDK output parity remains pending until the zeromatter checkout has
-  a Bazel-valid lockfile again. The next concrete action is to rerun Bazel and
-  Slug on `//sdk:sdk_contents` / `//sdk:sdk` after the workspace cleanup or
-  lockfile regeneration, then compare the staged output/archive against Bazel 9.
+- Ground-truth correction 2026-05-20, cross-workspace bzlmod isolation
+  guardrail: Bazel source documents and implements one server per output base,
+  and the default output base is derived from the workspace root
+  (`BlazeServerStartupOptions.java` option help, `startup_options.h`, and
+  `startup_options.cc::UpdateConfiguration` calling `GetHashedBaseDir` on the
+  workspace; `blaze_util_posix.cc::GetHashedBaseDir` hashes the workspace
+  string). Slug's daemon directory likewise includes the project root in
+  `InvocationPaths::daemon_dir`. Therefore Plan 61 should not require a
+  same-daemon two-workspace precondition as a Bazel parity claim. Updated
+  `test_two_workspaces_do_not_share_bzlmod_state` to assert the observable
+  requirement: workspaces with colliding module/repo names do not see each
+  other's bzlmod state, and counters advance relative to the appropriate daemon
+  baseline. Validation passed: focused direct pytest
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_two_workspaces_do_not_share_bzlmod_state -rx`,
+  full direct pytest
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (19 passed
+  inside pytest, Slug test pass). Daemons were cleaned afterward.
+- Manager process note 2026-05-20: subagent dispatch was attempted for the next
+  Phase 61.8 lockfile-cache slice, but the runtime reported the agent thread
+  limit was reached. Per the loop-manager prompt, continued locally and did not
+  treat delegation unavailability as a blocker.
+- Manager process note 2026-05-20: after the DICE session-data, extension
+  aggregation, lockfile-cache, dynamic-root, stub-counter, and stale-path-repair
+  slices, subagent dispatch was retried for remaining-work classification. The
+  runtime again reported the agent thread limit was reached, so remaining
+  classification and implementation continued locally.
+- Implementation slice 2026-05-20, lockfile cache as content-fingerprint
+  adapter: Bazel ground truth keeps workspace and hidden lockfiles as
+  `BazelLockFileValue.KEY` and `BazelLockFileValue.HIDDEN_KEY` SkyValues
+  (`BazelLockFileValue.java` lines 44-105), and
+  `BazelLockFileFunction` reads lockfile contents into those values. Slug's
+  temporary process-wide cache keyed existing parsed lockfiles by path alone, so
+  an edited existing `MODULE.bazel.lock` could be hidden by the cached
+  `Arc<Lockfile>` until explicit invalidation. Updated the cache to treat the
+  file content digest as the reuse key: it still avoids reparsing unchanged
+  JSON, but it re-reads and reparses when the file bytes change and re-reads a
+  file created after a prior missing lookup. This does not finish
+  `LockfileContentKey`, but it removes path-only cache authority and matches the
+  Plan 61 direction. Validation passed: `cargo fmt --check`, focused
+  `cargo test -p slug_bzlmod cached_lockfile -- --nocapture` (2 passed), and
+  `cargo test -p slug_bzlmod lockfile -- --nocapture` (34 passed).
+- Implementation slice 2026-05-20, extension replay lockfile mode propagation:
+  after the content-fingerprint cache fix, extension execution still read
+  `cached_lockfile(project_root)` with implicit default/update behavior. That
+  meant a later lazy extension replay could bypass `--lockfile_mode=off` even
+  though startup spoke preseed honored the explicit mode. Threaded
+  `LockfileMode` through the temporary `EXTENSION_AGGREGATIONS` adapter into
+  `ModuleExtensionExecutionKey`, included it in key hash/equality, and changed
+  extension replay to call `cached_lockfile_with_mode`. This is still a
+  transitional global-backed path, but the command policy now participates in
+  the DICE key identity and lockfile reads are suppressed in `off` mode.
+  Validation passed: `cargo fmt --check`,
+  `cargo test -p slug_bzlmod lockfile -- --nocapture` (35 passed), and
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed).
+- Implementation slice 2026-05-20, explicit lockfile write capability:
+  `Lockfile::write` was still a public normal-build API even though current
+  non-test paths do not call it. Converted the normal API to
+  `write_for_purpose(path, LockfileWritePurpose::ExplicitModUpdate)` and left
+  the old `write(path)` helper available only under `cfg(test)`. This does not
+  implement future `slug mod update`, but it narrows the ordinary build/query
+  surface so visible Bazel lockfile writes require an explicit capability
+  instead of an incidental method call. Validation passed: `cargo fmt --check`,
+  `cargo check -p slug_bzlmod`, and
+  `cargo test -p slug_bzlmod lockfile -- --nocapture` (35 passed).
+- Follow-up cleanup 2026-05-20: removed the legacy `cached_lockfile()` wrapper
+  and export after extension execution switched to explicit
+  `cached_lockfile_with_mode`. `rg "cached_lockfile\\(" app tests -g '*.rs'`
+  now finds no mode-less lockfile readers. Validation passed:
+  `cargo fmt --check` and
+  `cargo test -p slug_bzlmod lockfile -- --nocapture` (35 passed).
+- Implementation slice 2026-05-20, module extension failure is direct: removed
+  the normal-path fallback that converted a failed Starlark module extension
+  execution into empty generated specs, and removed the DICE late-binding
+  fallback that returned an empty result when the concrete executor was not
+  initialized. This matches the Plan 61/Bazel direction that extension failures
+  fail at the owning extension boundary instead of producing downstream unknown
+  repo/target failures. Validation passed:
+  `cargo test -p slug_bzlmod extension_execution_dice -- --nocapture` (20
+  passed) and focused no-stub guardrails
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_bad_extension_fails_without_stub_repo tests/core/bzlmod/test_plan61_guardrails.py::test_no_stub_failures_cover_missing_generated_repo_and_repo_rule_failure -rx`
+  (2 passed).
+- Implementation slice 2026-05-20, generic invalid marker handling: removed
+  the remaining normal-path stub-marker interpretation in
+  `app/slug_external_cells/src/extension_repo.rs`. Non-complete marker contents
+  now mean only "this generated repository is not currently trusted"; they are
+  not semantic authority for a stub repository shape. This keeps the
+  materializer on the Plan 61 path: stale/invalid materialization state must
+  rematerialize from the owning repo spec or fail directly, not create or bless
+  a synthetic repo. Validation passed: `cargo fmt --check`,
+  `cargo test -p slug_external_cells complete_marker -- --nocapture` (1
+  passed), and
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed). A follow-up search for
+  `Creating stub|materialize_stub_repo|stub_marker|stubbed out|falling back to empty specs|is_stub_marker|stale stub`
+  finds no normal bzlmod path remaining; the only code-side stub fallback name
+  left is the intentionally idle `stub_fallback_attempt` event counter used by
+  guardrails to assert that removed paths stay removed.
+- Implementation slice 2026-05-20, module/register globals moved to DICE
+  session data: removed the process-global `MODULE_VERSIONS`,
+  `REGISTERED_TOOLCHAINS`, and `REGISTERED_EXECUTION_PLATFORMS` registries from
+  `app/slug_bzlmod/src/lib.rs`. Startup bzlmod resolution now returns
+  `BzlmodSessionData`, the server injects it into DICE for the command, Starlark
+  interpreter cell info receives the module-version map from that injected
+  value, and toolchain/execution-platform resolution reads registrations from
+  DICE rather than global state. This is still a transitional adapter around
+  legacy cell parsing, but the facts now invalidate with the command graph
+  instead of process lifetime. Validation passed: `cargo fmt --check`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_interpreter_for_build -p slug_analysis -p slug_configured`,
+  `cargo test -p slug_bzlmod lockfile -- --nocapture` (35 passed),
+  `cargo test -p slug_bzlmod dice_graph -- --nocapture` (3 passed),
+  `python -m pytest -q tests/core/analysis/test_build_globals.py -rx` (15
+  passed), and
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed). A follow-up search for the removed global names and getter/setter
+  APIs returns no matches.
+- Implementation slice 2026-05-20, extension aggregation global moved to DICE
+  session data: removed the process-wide `EXTENSION_AGGREGATIONS` mutex and
+  `set_extension_aggregations` API. The legacy startup resolver now stores
+  extension aggregations, root module name, project root, and lockfile mode in
+  `BzlmodSessionData`; lazy extension repo paths compute the injected
+  `BzlmodSessionDataKey` before constructing `ModuleExtensionExecutionKey`.
+  This preserves the current lazy execution behavior while making extension
+  replay input selection command-scoped rather than process-scoped. Validation
+  passed: `cargo fmt --check`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`,
+  `cargo test -p slug_bzlmod extension_execution_dice -- --nocapture` (20
+  passed), `cargo test -p slug_external_cells complete_marker -- --nocapture`
+  (1 passed), and
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed). A follow-up search for `EXTENSION_AGGREGATIONS` and
+  `set_extension_aggregations` returns no matches.
+- Implementation slice 2026-05-20, lockfile process cache removed: after the
+  earlier content-fingerprint adapter proved the stale-read failure mode, the
+  remaining process-wide `LOCKFILE_CACHE` was deleted rather than further
+  elaborated. The public lockfile readers are now explicitly named
+  `read_lockfile_with_mode` / `read_lockfile_path_with_mode`; they honor
+  `LockfileMode::Off`, return `None` for absent files, and otherwise read the
+  file bytes from disk as the current authority. This is a conservative
+  transition toward `LockfileContentKey`: it trades a small parse-cache
+  optimization for eliminating another daemon-lifetime semantic fact.
+  Validation passed: `cargo fmt --check`,
+  `cargo check -p slug_bzlmod -p slug_common`,
+  `cargo test -p slug_bzlmod lockfile -- --nocapture` (35 passed), and
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed). A follow-up search for `cached_lockfile`,
+  `invalidate_cached_lockfile`, `LOCKFILE_CACHE`, `lockfile_cache`, and
+  `LockfileCacheEntry` returns no matches.
+- Implementation slice 2026-05-20, dynamic bzlmod adapter root reset: the
+  temporary dynamic extension-cell globals in `app/slug_core/src/cells.rs` are
+  still not the final `BzlmodCellGraphKey`, but they no longer use a
+  write-once project root. `set_dynamic_project_root` now updates the current
+  root through a lock and clears dynamic extension cells, setups, aliases,
+  scoped repo aliases, and apparent-alias cache when the root changes. The
+  bzlmod resolver now sets this root before any lockfile or precomputed
+  extension cells are registered, so the current workspace's registrations are
+  not wiped after seeding. This prevents stale daemon-lifetime dynamic state
+  from surviving a root transition while keeping the adapter behavior intact
+  for the current workspace. Validation passed: `cargo fmt --check`,
+  `cargo check -p slug_core -p slug_common`,
+  `cargo test -p slug_core bzlmod -- --nocapture` (6 passed), and
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed).
+- Implementation slice 2026-05-20, stub fallback counter deleted: production
+  code no longer records stub fallback attempts, and the normal stub fallback
+  paths have been removed, so the idle `StubFallbackAttempt` event kind and
+  `stub_fallback_attempt` JSON counter were deleted from `dice_graph.rs`.
+  Guardrails now assert the behavior directly: failed extension/repo-rule paths
+  fail with the owning error and leave no repo dir, marker, BUILD file, or
+  defs.bzl behind. Validation passed: `cargo fmt --check`,
+  `cargo test -p slug_bzlmod dice_graph -- --nocapture` (3 passed), and
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed). A follow-up search for `StubFallbackAttempt`, `stub_fallback`, and
+  `stub_fallback_attempt` returns no matches.
+- Implementation slice 2026-05-20, stale absolute repo-path repair removed:
+  deleted `repository_execution.rs::repair_stale_local_path_attrs` and its
+  suffix-search helper. Extension repo execution now uses the `RepoSpec`
+  attributes as recorded; if a repository rule contains a stale absolute
+  `path`, the owning repository rule execution fails instead of Slug rewriting
+  it to a guessed path under the current project. This matches the Plan 61
+  policy that recorded inputs must be validated or re-executed, not silently
+  repaired. Validation passed: `cargo fmt --check`,
+  `cargo test -p slug_bzlmod repository_execution -- --nocapture` (16 passed),
+  and `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (19
+  passed). A follow-up search for `repair_stale_local_path_attrs`,
+  `existing_suffix_under_project_root`, and `Rewriting stale absolute` returns
+  no matches.
+- Validation/fix slice 2026-05-20, DICE session injection and root-cell
+  adapter state: after moving bzlmod session facts into DICE, the Slug-level
+  guardrail target exposed a real integration bug:
+  `BzlmodSessionDataKey` was marked changed twice in the same transaction.
+  The systemic fix was to keep default session data injection only in
+  `setup_interpreter_basic` and let server command setup inject the real
+  startup-produced session data once. Full `cargo build -p slug` then passed,
+  and `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
+  passed with 19 pytest cases. A follow-up slice removed write-once
+  `ROOT_CELL_NAME` behavior in `app/slug_core/src/cells.rs`; the temporary
+  root-cell adapter now tracks the current resolver through a mutable
+  process-level value instead of preserving the first root cell built in the
+  process. This is still not final `BzlmodCellGraphKey` ownership, but it
+  removes another daemon-lifetime stale fact from the normal path. Validation
+  passed: `cargo fmt --check`, `cargo check -p slug_core -p slug_common -p
+  slug_interpreter_for_build -p slug_execute -p slug_build_api -p
+  slug_analysis`, `cargo test -p slug_core cells -- --nocapture` (31 passed),
+  `cargo build -p slug`, and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (19
+  passed inside pytest). Daemons were cleaned afterward; `/var/mnt/dev/slug/buck-out`
+  was about 3.5M and the retained ZeroMatter evidence tree remained about 21G.
+- Manager process note 2026-05-20: subagent dispatch was retried for the next
+  remaining-work classification after the guardrail validation, but the runtime
+  again reported the agent thread limit was reached. Per the loop-manager
+  prompt, this was recorded and local implementation continued.
+- Implementation slice 2026-05-20, spoke registry root scoping: the remaining
+  `SPOKE_REGISTRY` / `SEEDED_EXTENSIONS` adapter in
+  `app/slug_bzlmod/src/spoke_materialization.rs` is still temporary process
+  state, but it now tracks the current project root and clears spoke
+  registrations plus seeded-extension markers when bzlmod setup moves to a
+  different workspace. `app/slug_common/src/legacy_configs/cells.rs` calls
+  `set_spoke_materialization_project_root` immediately after
+  `set_dynamic_project_root`, before lockfile/precomputed spokes are seeded for
+  the current workspace. This keeps lazy spoke materialization behavior while
+  preventing previous-workspace spoke specs from surviving as daemon-lifetime
+  facts. Validation passed: `cargo fmt --check`,
+  `cargo test -p slug_bzlmod spoke_materialization -- --nocapture` (3 passed),
+  `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`,
+  `cargo build -p slug`, and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (19
+  passed inside pytest).
+- Implementation slice 2026-05-20, lockfile recorded file input replay
+  validation: Bazel ground truth is `RepoRecordedInput.WithValue` parsing and
+  `RepoRecordedInput.File.fileValueToMarkerValue` (`DIR`, `ENOENT`, or
+  lowercase SHA-256 hex) plus `SingleExtensionEvalFunction` replay checking of
+  recorded inputs before accepting cached extension results. Slug now validates
+  absolute `FILE:<path> <value>` and main-workspace `FILE:@@//path <value>`
+  recorded inputs before accepting `generatedRepoSpecs`; malformed entries,
+  unsupported recorded input kinds, unsupported external-repo path spellings,
+  stat failures, and changed file markers are conservative replay misses rather
+  than cache hits. The
+  guardrail exposed that same-root warm commands could also retain stale
+  lockfile-seeded dynamic repo setups in the temporary adapter, so bzlmod
+  startup now resets dynamic extension cells and spoke registrations for every
+  fresh bzlmod resolution, not only when the project root changes. This remains
+  a transition toward `LockfileContentKey` / `RepoRecordedInput` DICE values,
+  but it removes another stale replay path without masking Bazel failures.
+  Validation passed: `cargo fmt --check`, `cargo test -p slug_bzlmod recorded
+  -- --nocapture` (4 passed), `cargo test -p slug_bzlmod lockfile --
+  --nocapture` (39 passed), `cargo check -p slug_bzlmod -p slug_common`,
+  `cargo build -p slug`, focused direct pytest
+  `test_lockfile_replay_recorded_file_input_edit_rejects_cache`, full direct
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (20
+  passed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (20
+  passed inside pytest). Daemons were cleaned afterward; `/var/mnt/dev/slug/buck-out`
+  was about 3.5M and the retained ZeroMatter evidence tree remained about 21G.
+- Implementation slice 2026-05-20, lockfile recorded directory-entry replay
+  validation: Bazel ground truth is `RepoRecordedInput.Dirents`, which records
+  the sorted directory entry names and fingerprints them with
+  `Fingerprint.addStrings` / SHA-256 before `SingleExtensionEvalFunction`
+  accepts replay. Slug now validates absolute and main-workspace
+  `DIRENTS:<path> <value>` recorded inputs with the same count/string framing
+  before accepting cached `generatedRepoSpecs`; malformed values, unsupported
+  external-repo path spellings, stat failures, non-UTF-8 entry names, and
+  changed directory entry sets are conservative replay misses. This is another
+  partial `RepoRecordedInput` slice: `DIRTREE`, `ENV`, and `REPO_MAPPING`
+  remain unsupported and must miss until their Bazel semantics are implemented.
+  Validation passed: `cargo fmt --check`, `cargo test -p slug_bzlmod recorded
+  -- --nocapture` (6 passed), `cargo test -p slug_bzlmod lockfile --
+  --nocapture` (41 passed), `cargo build -p slug`, focused direct pytest
+  `test_lockfile_replay_recorded_dirents_input_edit_rejects_cache`, full direct
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (21
+  passed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (21
+  passed inside pytest). Daemons were cleaned afterward. Stale generated
+  ZeroMatter output `buck-out/plan61-optional-cc-fix-20260520` was removed
+  after preserving logs/manifests under `/tmp/slug-plan61`; ZeroMatter
+  `buck-out` dropped from about 21G to about 3.3M.
+- Implementation slice 2026-05-20, lockfile recorded directory-tree replay
+  validation: Bazel ground truth is `RepoRecordedInput.DirTree` plus
+  `DirectoryTreeDigestFunction`, which recursively fingerprints sorted entry
+  names, sorted subdirectory digests, `FileStateType` ordinals, and raw file
+  content digests with `Fingerprint` / SHA-256. Slug now validates absolute and
+  main-workspace `DIRTREE:<path> <value>` recorded inputs before accepting
+  cached `generatedRepoSpecs`; malformed values, unsupported external-repo path
+  spellings, stat/digest failures, and changed nested files or entries are
+  conservative replay misses. The implementation matches Bazel's ordinary
+  regular-file/directory behavior and follows symlink targets via filesystem
+  metadata; special files are treated as the Bazel `SPECIAL_FILE` ordinal for
+  the replay marker. `ENV` and `REPO_MAPPING` remain unsupported by design
+  because Bazel validates them through repository environment and repository
+  mapping Skyframe values, not raw process env or ad hoc label resolution.
+  Validation passed: `cargo fmt --check`, `cargo test -p slug_bzlmod recorded
+  -- --nocapture` (8 passed), `cargo test -p slug_bzlmod lockfile --
+  --nocapture` (43 passed), `cargo build -p slug`, focused direct pytest
+  `test_lockfile_replay_recorded_dirtree_input_edit_rejects_cache`, full direct
+  `python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx` (22
+  passed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (22
+  passed inside pytest). Daemons were cleaned afterward; `/var/mnt/dev/slug/buck-out`
+  was about 3.5M and ZeroMatter `buck-out` remained about 3.3M.
+- Implementation slice 2026-05-20, lockfile recorded environment replay
+  validation: Bazel ground truth is `RepoRecordedInput.EnvVar` and
+  `RepoEnvironmentFunction`: module extensions observe the command-scoped
+  repository environment, with `--repo_env` overlaying the effective client
+  environment before `SingleExtensionEvalFunction` accepts or rejects replay.
+  Slug now validates `ENV:<name> <value>` recorded inputs against the effective
+  repository environment before accepting cached `generatedRepoSpecs`, including
+  unset values represented by the Bazel lockfile `\0` marker. The guardrail
+  initially exposed a systemic command-boundary bug: using the daemon process
+  environment made the first command's environment persist into later commands,
+  and `audit cell`'s hyphen-accepting alias positional shape did not reliably
+  carry Bazel-style `--repo_env` through Clap. The fix moved repo-env transport
+  to the shared client context by scanning raw Bazel-shaped argv
+  (`--repo_env`, `--repo-env`, and `--flag=value` forms), merging that with
+  parsed config options, and storing the resulting command-scoped repo env in
+  `BzlmodSessionData` / `ModuleExtensionExecutionKey` / lockfile preseed
+  replay. `module_ctx.getenv`, `repository_ctx.getenv`, and
+  `repository_ctx.os.environ` now read the same command-scoped repo env. This is
+  still a transition toward `BzlmodCommandPolicyKey`; strict repo env,
+  action-env interaction, nonstrict repo env digests, and complete policy
+  ownership are not finished. `REPO_MAPPING` recorded inputs remain unsupported
+  by design until repo mapping is owned by typed DICE values.
+  Validation passed: `cargo fmt --check`, `cargo check -p slug_client_ctx -p
+  slug_cmd_audit_client`, `cargo check -p slug_cli_proto -p slug_client_ctx -p
+  slug_server -p slug_interpreter_for_build -p slug_bzlmod`, `cargo test -p
+  slug_bzlmod recorded -- --nocapture` (11 passed), `cargo test -p slug_bzlmod
+  lockfile -- --nocapture` (46 passed), `cargo build -p slug`, focused direct
+  pytest `test_lockfile_replay_recorded_env_input_change_rejects_cache`, full
+  direct `pytest -q tests/core/bzlmod/test_plan61_guardrails.py --tb=short`
+  (23 passed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (23
+  passed inside pytest).
+- Implementation slice 2026-05-20, lockfile recorded repository-mapping replay
+  validation: Bazel ground truth is `RepoRecordedInput.RecordedRepoMapping` in
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/repository/RepoRecordedInput.java`,
+  `StarlarkBaseExternalContext` recording of canonical repository visibility,
+  `RepositoryMapping.get()`'s non-visible apparent-name fallback, and
+  `BazelDepGraphValue.getFullRepoMapping` for module repository mappings.
+  Bazel records lockfile entries as `REPO_MAPPING:<source_repo>,<apparent>
+  <canonical_or_\0>` with repository names written without `@` prefixes; the
+  main/root source repository name is the empty string. Slug now carries a
+  command/session `RepoMappingSnapshot` into lockfile replay, validates
+  module-scope recorded repo mappings before accepting cached
+  `generatedRepoSpecs`, treats missing source scopes as conservative replay
+  misses, and compares missing apparent names against Bazel's non-visible
+  apparent-name value rather than accepting a stale null marker. The guardrail
+  mutates a root `bazel_dep(..., repo_name = ...)` mapping and proves stale
+  lockfile replay is rejected. This is still a transition toward typed
+  `RepoMappingKey` / `ModuleExtensionRepoMappingEntriesFunction` ownership:
+  extension-generated repo source scopes are intentionally conservative misses
+  until their host-module, generated-repo, `inject_repo`, and `override_repo`
+  mappings are produced by DICE-owned values.
+  Validation passed: `cargo fmt --check`, `cargo test -p slug_bzlmod recorded
+  -- --nocapture` (15 passed), `cargo test -p slug_bzlmod lockfile --
+  --nocapture` (50 passed), `cargo check -p slug_bzlmod -p slug_common -p
+  slug_server -p slug_client_ctx -p slug_cmd_audit_client`, `cargo build -p
+  slug`, focused direct pytest
+  `test_lockfile_replay_recorded_repo_mapping_change_rejects_cache`, full
+  direct `pytest -q tests/core/bzlmod/test_plan61_guardrails.py --tb=short`
+  (24 passed), and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (24
+  passed inside pytest). Daemons were cleaned afterward; `/var/mnt/dev/slug/buck-out`
+  was about 3.5M and ZeroMatter `buck-out` remained about 3.3M.
+- Implementation slice 2026-05-20, extension-generated repository mapping for
+  recorded-input replay: Bazel ground truth is
+  `ModuleExtensionRepoMappingEntriesFunction`, which computes the mapping
+  visible from every repo generated by one extension as the host module's full
+  mapping plus all repos generated by the same extension plus root
+  `override_repo()` rows, with later entries winning. Slug now derives the
+  same shape for the transitional `RepoMappingSnapshot`: module rows are
+  extended with source rows for extension-generated repositories, lockfile
+  replay can build candidate source rows from the cached `generatedRepoSpecs`
+  before validating that same cache, and root override rows are threaded into
+  `BzlmodSessionData` / `ModuleExtensionExecutionKey` so DICE lockfile replay
+  uses the same mapping semantics. This removes the previous conservative miss
+  for `REPO_MAPPING:<extension_generated_repo>,<apparent>` when the apparent
+  repo is a same-extension sibling or overridden generated repo. This is still
+  transitional: the mapping is assembled during legacy bzlmod cell setup and
+  carried through DICE; final Plan 61 still needs a typed DICE `RepoMappingKey`
+  / `BzlmodResolutionKey` owner rather than injected startup snapshots.
+  Validation passed: `cargo fmt --check`, `cargo test -p slug_bzlmod
+  repo_mapping -- --nocapture` (23 passed), `cargo test -p slug_bzlmod
+  recorded_repo_mapping -- --nocapture` (6 passed), `cargo test -p
+  slug_bzlmod recorded -- --nocapture` (17 passed), `cargo test -p
+  slug_bzlmod lockfile -- --nocapture` (52 passed), `cargo check -p
+  slug_bzlmod -p slug_common -p slug_server -p slug_client_ctx -p
+  slug_cmd_audit_client`, `cargo build -p slug`, focused direct pytest
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k 'extension_repo_source or recorded_repo_mapping'
+  --tb=short` (2 passed), full direct pytest
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py --tb=short` (25
+  passed), and `./target/debug/slug test
+  tests/core/bzlmod:test_plan61_guardrails` (25 passed inside pytest). Daemons
+  were cleaned afterward; `/var/mnt/dev/slug/buck-out` was about 3.5M and
+  ZeroMatter `buck-out` remained about 3.3M.
+- Historical note, superseded on 2026-05-20: real-world SDK output parity was
+  still pending until the zeromatter checkout had a Bazel-valid lockfile again.
+  Later validation restored the lockfile, reran Bazel and Slug on
+  `//sdk:sdk_contents`, and accepted only the documented output-root ELF string
+  differences for the SDK checkpoint.
 - Blocker verified after the zeromatter cleanup: `bazel build --nobuild
   //sdk:sdk_contents` still fails before repository mapping with
   `Illegal base64 character 2d` from `MODULE.bazel.lock`, and patched Slug now
@@ -1751,6 +2276,557 @@ Implementation slice 2026-05-19, Bazel-shaped extension lockfile digests:
   `MODULE.bazel.lock`, so continuing SDK output/archive parity is blocked
   unless that lockfile is regenerated/restored or a separate clean checkout is
   used.
+
+Implementation slice 2026-05-19, staged local execroot isolation:
+
+- After zeromatter cleanup produced a Bazel-valid lockfile again, the broad
+  Slug `//sdk:sdk_contents` smoke reached local Rust compilation and exposed an
+  execution-isolation bug. `crates__binary-stream-9.1.0//:_bs_` linked against
+  metadata-only sibling outputs because local execution exposed the shared
+  project `buck-out` through the per-action execroot. Bazel's action input tree
+  hides undeclared siblings. `--sandbox` was not usable in this environment
+  because bind mount setup failed with `Operation not permitted`, so the
+  systemic owner is Slug's local action execroot model, not SDK code or the
+  Rust crate.
+- Replaced top-level `buck-out` exposure in `slug_execute_impl` with an
+  `ActionExecrootPlan`: declared non-output inputs are linked into a digest
+  execroot, declared writable `buck-out` parents are created as staging
+  directories, and declared outputs are moved back to the real project
+  `buck-out` after successful execution. The plan hash includes top-level input
+  prefixes, exact declared `buck-out` inputs, and staged writable output dirs,
+  preserving the isolation-dir component of generated paths.
+- Reflection: the missing Bazel semantic is that local actions see only their
+  declared inputs plus declared output directories, even when the workspace has
+  large stale generated trees. The Slug owner is
+  `app/slug_execute_impl/src/executors/action_execroot.rs` and
+  `local.rs`. The broader class includes all local actions whose correctness can
+  change when undeclared `buck-out` siblings leak into the execution tree.
+  Rejected symptom fixes: deleting the sibling metadata rlib only for this run,
+  special-casing `binary-stream`, forcing sandbox mode in an environment where
+  it cannot mount, or adding SDK-specific cleanup before one target.
+- Validation: `cargo test -p slug_execute_impl action_execroot --
+  --nocapture` passed with the new staged-execroot coverage, `cargo build -p
+  slug_execute_impl` passed, `cargo build -p slug` passed, and the previous
+  binary-stream failure did not recur in the next broad smoke.
+
+Implementation slice 2026-05-19, process-wrapper execroot substitutions:
+
+- The next broad Slug smoke
+  `/tmp/slug-plan61/plan61-sdk-staged-execroot-20260519-164034.log` advanced to
+  `reactor//lib/units:units` and failed reading a build-script generated
+  `OUT_DIR` file from a doubled path:
+  `/var/mnt/dev/zeromatter-kuro/execroot/<hash>/execroot/<hash>/buck-out/...`.
+  The generated file existed in the real project `buck-out`, and the staged
+  action execroot had the declared `build_script.out_dir` input linked
+  correctly.
+- Reflection: the missing Bazel semantic is that `rules_rust`'s
+  `process_wrapper` substitutions for `${exec_root}` and `${output_base}` must
+  resolve to the action's Bazel-shaped execroot/output-base values. Slug's
+  staged execroot materializes `external/` as a real directory containing both
+  project `external` and `bazel-external` entries; the wrapper derives
+  `output_base` from `cwd/external`, so it inferred
+  `<project>/execroot/<hash>` as output base and then appended
+  `execroot/<hash>` again. The Slug owner is the local executor command-line
+  preparation path. The broader class is every `rules_rust` action using
+  wrapper-managed `${exec_root}` or `${output_base}` substitutions in env, args,
+  arg files, or generated include paths. Rejected symptom fixes: copying
+  `acceleration.rs`, changing `lib/units` sources, symlinking the doubled path,
+  deleting only the stale `build_script.out_dir`, or special-casing the
+  `reactor` target.
+- Implemented a local-executor rewrite for `process_wrapper` `--subst` entries
+  when an action execroot is active: `exec_root=${exec_root}` is replaced with
+  the actual staged execroot, and `output_base=${output_base}` is replaced with
+  the project output base before the wrapper runs. `pwd=${pwd}` is left for the
+  wrapper to resolve from its actual cwd. This keeps SDK-independent
+  `process_wrapper` templates intact while avoiding wrapper inference from
+  Slug's synthetic `external/` layout.
+- Validation so far: `cargo fmt --check`, `cargo test -p slug_execute_impl
+  process_wrapper -- --nocapture` (3 passed), `cargo test -p slug_execute_impl
+  action_execroot -- --nocapture` (12 passed), and `cargo build -p slug`
+  passed. Before the next smoke, stale zeromatter `buck-out` and `execroot`
+  generated trees were removed after cleaning the idle Slug daemon; `execroot`
+  had grown to about 73G, so future broad smokes must report and prune both
+  trees as part of the loop.
+
+Implementation slice 2026-05-20, stable Rust remap substitutions:
+
+- The focused rerun
+  `/tmp/slug-plan61/plan61-units-subst-fix-20260520-100606.log` proved the
+  `reactor//lib/units:units` `OUT_DIR` failure was fixed, then advanced to a
+  Rust proc-macro failure in
+  `crates__postgres-derive-0.4.7//:postgres-derive`: rustc reported it could
+  not find `syn`, `proc_macro2`, and `quote` even though the declared `--extern`
+  rlibs existed in the staged action execroot and in project `buck-out`.
+- Reflection: the missing Bazel semantic is that Rust's logical execroot path
+  is stable across actions. Slug's staged execroot digest is intentionally
+  different per input/output view, but `rules_rust` passes
+  `--remap-path-prefix=${pwd}=.`, `${exec_root}=.`, and `${output_base}=.` into
+  rustc. Rust includes remap flags in crate metadata, so substituting each
+  action's physical digest execroot made crates compiled in different staged
+  views metadata-incompatible. The local executor owns this because it creates
+  the staged cwd and rewrites wrapper substitutions. The broader class is every
+  Rust compile action whose dependencies are built in different staged
+  execroots. Rejected symptom fixes: rebuilding only `postgres-derive`, copying
+  or relinking the dependency rlibs, removing the proc-macro target, or adding
+  crate-specific `--extern` paths.
+- Implemented stable Unix process-wrapper substitutions under a staged
+  execroot: `pwd` and `exec_root` map to `/proc/self/cwd`, and `output_base`
+  maps to `/proc/self/cwd/../..`. Runtime paths such as
+  `OUT_DIR=${exec_root}/buck-out/...` still resolve inside the current action
+  cwd, while remap flags have stable text across actions. The extra local
+  rustc execroot remap now skips existing generic `${pwd}` / `${exec_root}`
+  remaps and otherwise uses the stable `/proc/self/cwd` alias on Unix instead
+  of the physical digest path.
+- Validation: `cargo fmt --check`, `cargo test -p slug_execute_impl
+  rustc_flags_execroot_remap -- --nocapture` (2 passed), `cargo test -p
+  slug_execute_impl process_wrapper -- --nocapture` (3 passed), `cargo test -p
+  slug_execute_impl action_execroot -- --nocapture` (12 passed), and `cargo
+  build -p slug` passed. The previous failed smoke left about 651M in
+  `buck-out` and 14G in staged `execroot`; remove both before the next fresh
+  focused rerun so old rlibs compiled with physical digest remaps cannot
+  contaminate validation.
+- The fresh rerun
+  `/tmp/slug-plan61/plan61-units-stable-remap-20260520-102047.log` still
+  failed at a proc-macro (`crates__clap_derive-4.5.55`) with the same
+  `syn`/`proc_macro2`/`quote` visibility shape. Manual rustc probes from the
+  failed action execroot showed `E0460` version mismatches: downstream rustc
+  saw direct dependency rlibs through the staged execroot path while dependency
+  crate metadata referred to the same generated rlibs through their resolved
+  shared project `buck-out` paths.
+- Grounding correction after user challenge: treating generated file inputs as
+  hardlinks/copies was only an implementation hypothesis, not a demonstrated
+  Bazel 9 requirement. It was tested diagnostically, then rejected. The fresh
+  rerun
+  `/tmp/slug-plan61/plan61-units-hardlink-inputs-20260520-102847.log` failed
+  earlier than the Rust proc-macro frontier in
+  `llvm//runtimes/glibc:glibc_library_search_directory`: a generated archive
+  input resolved through a dangling symlink under `buck-out/.../external/...`.
+  That shows the hardlink/copy direction changes Slug's input-tree semantics
+  without Bazel ground-truth support and can break symlinked generated
+  artifacts. The hardlink/copy change was reverted; retain it only as evidence
+  that the proc-macro blocker needs a Bazel-grounded investigation.
+- Reflection before the next fix: the active blocker is still the
+  `syn`/`proc_macro2`/`quote` proc-macro visibility/version shape from
+  `/tmp/slug-plan61/plan61-units-stable-remap-20260520-102047.log`, but the
+  implementation direction must first be verified against Bazel/rules_rust
+  ground truth. Candidate areas are Bazel action input-tree materialization,
+  rules_rust `process_wrapper` substitution semantics, and rules_rust Rust
+  metadata/full-rlib provider selection for proc-macro compilation. Rejected
+  symptom fixes remain: rewriting only `--extern` flags to absolute project
+  paths, adding metadata rlibs to this one proc-macro action, disabling Rust
+  metadata builds, special-casing `clap_derive`, or changing Slug input files
+  to hardlinks/copies unless Bazel 9 evidence requires that behavior.
+- Next action: inspect pinned Bazel source/local Bazel action output and the
+  local `rules_rust` sources before any new code change. Record exact evidence
+  here, then implement only the smallest systemic fix that preserves Bazel's
+  observable action semantics.
+- Ground-truth evidence 2026-05-20:
+  - Bazel source `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/sandbox/SymlinkedSandboxedSpawn.java`
+    lines 35-39 and 127-130 shows the normal sandbox action input tree creates
+    input files as symlinks. `HardlinkedSandboxedSpawn.java` lines 35-39 and
+    74-102 plus `SandboxOptions.java` lines 333-344 show hardlinks are only
+    the opt-in `--experimental_use_hermetic_linux_sandbox` behavior, not a
+    general Bazel requirement.
+  - `rules_rust` process wrapper source
+    `/var/mnt/dev/zeromatter-kuro/bazel-external/rules_rs++rules_rust+rules_rust/util/process_wrapper/options.rs`
+    lines 128-154 derives `output_base` by canonicalizing `cwd/external` and
+    derives `exec_root` from that real output base. `rust/private/rustc.bzl`
+    lines 1013-1017 and 1104-1108 prove `rules_rust` relies on those
+    substitutions for `--remap-path-prefix=${pwd}`, `${exec_root}`, and
+    `${output_base}`.
+  - Focused Bazel 9.0.1 probe:
+    `bazel aquery --include_commandline --output=textproto 'mnemonic("Rustc", deps(//lib/units:units))'`
+    saved to `/tmp/slug-plan61/bazel-aquery-lib-units-rustc.textproto`.
+    The `clap_derive` action at lines 134532-134606 uses full `.rlib`
+    `--extern` inputs for `proc_macro2`, `quote`, and `syn`, so switching
+    proc-macro direct deps to metadata rlibs would not match Bazel.
+- Systemic fix slice: keep Slug's symlinked declared-input execroot. Change
+  only process-wrapper substitution rewriting so Unix `${pwd}` remains the
+  stable action cwd alias `/proc/self/cwd`, while `${exec_root}` and
+  `${output_base}` expand to Slug's real project/output base path. This matches
+  the Bazel/rules_rust requirement that `${output_base}` be a canonical path
+  capable of remapping symlink-resolved generated inputs back to stable
+  workspace-relative metadata paths. The previous `/proc/self/cwd/../..`
+  output-base value was lexically correct but did not match canonical
+  `/var/.../zeromatter-kuro/buck-out/...` symlink targets recorded by rustc.
+- The fresh rerun
+  `/tmp/slug-plan61/plan61-units-output-base-remap-20260520-174649.log`
+  passed the previous `clap_derive` frontier and failed later at
+  `crates__zeroize_derive-1.4.3//:zeroize_derive`, where rustc reported it
+  could not find `proc_macro2`, `quote`, and `syn`. A manual rustc probe from
+  the failed action execroot (`/tmp/slug-plan61/zeroize_probe.log`) showed
+  `E0460` crate hash mismatches rather than missing files.
+- Ground-truth correction 2026-05-20:
+  - Bazel 9.0.1 aquery
+    `/tmp/slug-plan61/bazel-aquery-lib-units-rustc.textproto` shows
+    proc-macro actions such as `zeroize_derive` and `clap_derive` use full
+    rlibs for direct `proc_macro2`, `quote`, and `syn` deps, while normal Rust
+    library actions use metadata rlibs under `_meta/`.
+  - The same Bazel action graph uses the root override-selected
+    `external/rules_rust+/.../util/process_wrapper/process_wrapper`, and the
+    selected override source
+    `/home/wgray/.cache/kuro/overrides/rules_rust/archive-349c75fc87e6a58/rust/private/rust.bzl`
+    declares metadata outputs under `_meta/`.
+  - Slug's failed action instead used
+    `rules_rs++rules_rust+rules_rust//util/process_wrapper`, whose materialized
+    source declared sibling `*_meta.rlib` outputs without the `_meta/`
+    directory. That source shape disagrees with Bazel's selected override and
+    explains the full-vs-metadata crate hash split.
+- Reflection: the missing Bazel semantic is `override_repo()` visibility for
+  repositories owned by a module extension. In ZeroMatter,
+  `override_repo(rules_rust_ext, rules_rust = "rules_rust")` must make the
+  extension-generated repo name resolve to the root module's selected
+  `rules_rust` dependency, even when labels are evaluated from repos owned by
+  `@rules_rs//rs/experimental:rules_rust.bzl`. The Slug owner is Bzlmod repo
+  mapping/cell alias precomputation, specifically
+  `pending_repo_cells::pre_compute_extension_repo_cells` and
+  `legacy_configs::cells` alias registration. The broader class is every module
+  extension that overrides a generated repo with a selected module dependency,
+  not only `rules_rust`. Rejected symptom fixes: hardlinking generated inputs,
+  switching this one proc-macro to metadata deps, patching the generated
+  `rules_rs++rules_rust+rules_rust` repository contents, hardcoding
+  `rules_rust`, or special-casing `zeroize_derive`/`clap_derive`.
+- Implementation update: `pre_compute_extension_repo_cells` now emits both the
+  owner-scoped apparent alias (`generated -> actual_dep`) and the generated
+  canonical repo alias (`owner++ext+generated -> actual_dep`) for
+  `override_repo()` entries, independent of whether `use_repo()` imports the
+  same repo. `legacy_configs::cells` now resolves raw override targets such as
+  `rules_rust` through the selected bzlmod graph before registering global or
+  scoped aliases, so the alias points at the selected Slug cell
+  (`rules_rust+<version>`) instead of a non-existent raw dep name.
+- Validation so far: `cargo fmt`, `cargo test -p slug_bzlmod
+  test_precompute_use_repo_honors_override_repo -- --nocapture`,
+  `cargo check -p slug_common`, and `cargo build -p slug` pass. Before the next
+  focused smoke, remove ZeroMatter's stale `buck-out` and staged `execroot`
+  trees; the previous failed run left roughly 670M and 14G respectively.
+- Follow-up smoke
+  `/tmp/slug-plan61/plan61-units-override-repo-20260520-110302.log`
+  confirms the override direction: the next failure path is under
+  `gen/rules_rust/.../external/rules_rust/...`, and the materialized selected
+  `rules_rust/0.69.0` source contains the Bazel-observed `_meta/` metadata
+  output layout. The run stopped before the Rust frontier because the deferred
+  materializer panicked inserting an already-declared path into SQLite:
+  `.../external/rules_rust/util/process_wrapper/private/bootstrap_process_wrapper`.
+- Reflection: the missing semantic is that materializer state updates must be
+  replacement-safe for a declared artifact path. Bazel's observable build graph
+  has one artifact path for the selected `rules_rust` output; Slug's aliasing
+  and local execution may notify the materializer about that path more than
+  once, but the materializer must keep one current state entry rather than crash
+  on a duplicate persistence row. The Slug owner is the deferred materializer's
+  SQLite state mirror, not Bzlmod selection or Rust action construction. The
+  broader class includes any duplicate or replacement `declare_existing` /
+  materialization update for the same artifact path, especially when aliases or
+  repeated local output declarations converge on one project-relative output.
+  Rejected symptom fixes: deleting this one SQLite row by hand, turning off the
+  materializer database, special-casing `rules_rust`, or ignoring the corrected
+  override alias.
+- Implementation update: `MaterializerStateSqliteTable::insert` now replaces
+  existing state for the artifact path inside the same transaction before
+  inserting current metadata, deleting both the prior root row and any persisted
+  full-directory member rows. Regression coverage
+  `test_insert_replaces_existing_artifact_state` replaces a full directory
+  artifact with a file artifact to catch duplicate primary-key rows and stale
+  child rows. Validation: `cargo fmt`, `cargo test -p slug_execute_impl
+  test_insert_replaces_existing_artifact_state -- --nocapture`,
+  `cargo test -p slug_bzlmod test_precompute_use_repo_honors_override_repo --
+  --nocapture`, and `cargo build -p slug` pass. The failed smoke left about
+  205M in `buck-out` and 7.0G in staged `execroot`; clean those generated trees
+  before the next rerun.
+- Follow-up smoke
+  `/tmp/slug-plan61/plan61-units-materializer-replace-20260520-110926.log`
+  reaches the Rust frontier and fails compiling
+  `crates__serde_derive-1.0.228//:serde_derive` with E0460 "possibly newer
+  version" errors for `unicode_ident` / `proc_macro2`, then unresolved imports
+  from `quote`. The materializer duplicate-row panic is gone. The Slug rustc
+  command now uses the selected `rules_rust` process wrapper path under
+  `gen/rules_rust/.../external/rules_rust/...`, but Slug's generated outputs
+  for `proc_macro2` include `libproc_macro2-923445808.rlib` and
+  `libproc_macro2-923445808_meta.rlib` in the same directory, with no
+  `_meta/libproc_macro2-..._meta.rlib`.
+- Bazel ground truth: Bazel 9.0.1 aquery for
+  `mnemonic("Rustc", deps(//lib/units:units))` in ZeroMatter writes the
+  metadata action output under
+  `bazel-out/.../bin/external/rules_rs++crate+crates__proc-macro2-1.0.106/_meta/libproc_macro2-..._meta.rlib`.
+  The selected override source
+  `buck-out/.../external_cells/bzlmod/rules_rust/0.69.0/rust/private/rust.bzl`
+  declares `_meta/` outputs, while the stale generated repository source under
+  `bazel-external/rules_rs++rules_rust+rules_rust/rust/private/rust.bzl`
+  declares sibling metadata without `_meta/`. Bazel's `serde_derive` proc-macro
+  action does not set `RUSTC_BOOTSTRAP=1`; adding that env var is not a
+  grounded fix.
+- Reflection: the next systemic fix must determine whether Slug loses the
+  `_meta/` subdirectory while implementing `ctx.actions.declare_file("_meta/...",
+  sibling=...)`, or whether Slug still loads rule implementation files from the
+  stale generated `rules_rs++rules_rust+rules_rust` repository despite the
+  corrected override alias for action/tool labels. The owner is therefore
+  either declare-file path joining or Bzlmod canonical repo resolution for
+  extension-generated repos overridden to selected module repos. Rejected
+  symptom fixes: hardlinking action inputs, injecting `_meta` into Rust command
+  lines, switching only `serde_derive`/`proc_macro2` dependency paths,
+  hand-patching the generated repository, or adding `RUSTC_BOOTSTRAP` to
+  proc-macro actions.
+- Bazel source grounding for the override direction: local Bazel 9 source
+  `BazelDepGraphFunction.java` lines 220-247 builds extension repo overrides
+  from root usages only and resolves override targets through the root module
+  mapping. `ModuleExtensionRepoMappingEntriesFunction.java` lines 58-78 adds
+  those override entries to the repository mapping visible from extension
+  repos, and `SingleExtensionUsagesFunction.java` lines 53-65 carries the same
+  override row with the collected extension usages. This means a root
+  `override_repo()` must affect owner modules and extension-generated repo
+  mappings even when the owner module itself does not declare that override.
+- Implementation update: `pending_repo_cells::pre_compute_extension_repo_cells`
+  now aggregates root-owned extension repo overrides and applies them when
+  precomputing owner-module `use_repo()` aliases. `repo_mapping::for_module`
+  also maps generated canonical override names such as
+  `rules_rs++rules_rust+rules_rust` to the selected dependency, and apparent
+  repo canonicalization consults repo mapping before treating `+`-containing
+  names as already canonical. `legacy_configs::cells` registers dynamic
+  generated-canonical aliases for these override entries even when an old
+  generated extension cell with the same name exists.
+- Validation for that slice: `cargo fmt`, `cargo test -p slug_bzlmod
+  test_root_override_repo_applies_to_owner_module_use_repo -- --nocapture`,
+  `cargo test -p slug_bzlmod test_precompute_use_repo_honors_override_repo --
+  --nocapture`, `cargo test -p slug_bzlmod
+  canonicalizes_override_generated_repo_name_to_selected_dep -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  canonicalizes_keyword_use_repo_and_override_repo -- --nocapture`, `cargo test
+  -p slug_core dynamic_alias_overrides_existing_generated_extension_cell --
+  --nocapture`, `cargo check -p slug_common`, and `cargo build -p slug` pass.
+- Follow-up smoke
+  `/tmp/slug-plan61/plan61-units-root-override-aggregate-20260520-113738.log`
+  confirms the stale generated `rules_rs++rules_rust+rules_rust` rule-source
+  path is no longer the active frontier: waits now reference the selected
+  `rules_rust//util/process_wrapper...` path, and generated crate outputs now
+  include Bazel-shaped metadata directories such as
+  `.../rules_rs++crate+crates__proc-macro2-1.0.106/_meta/libproc_macro2-923445808_meta.rlib`.
+  The smoke still fails compiling
+  `crates__thiserror-impl-2.0.18//:thiserror-impl` with E0463 for
+  `proc_macro2`, `quote`, and `syn`, while the full `--extern` rlibs exist in
+  project `buck-out` and contain valid archive entries. The `_meta/` topology
+  blocker is therefore resolved, and the next blocker is the visibility or
+  validity of full proc-macro dependency rlibs as action inputs.
+- Reflection before the next fix: the missing semantic must be tied to Bazel's
+  Rust action graph and sandbox/input behavior, not to hardlinking or metadata
+  path reshaping. Candidate owners are Slug's action input declaration/staging,
+  rustc command construction, or process-wrapper working-directory
+  substitutions. Rejected symptom fixes remain: hardlinking action inputs,
+  adding `_meta` paths to proc-macro `--extern` arguments, adding
+  `RUSTC_BOOTSTRAP`, special-casing `thiserror-impl` or `serde_derive`, and
+  changing generated repository contents without a Bazel source/probe anchor.
+- Ground-truth correction 2026-05-20: manual rustc metadata probes classify the
+  current `thiserror-impl` E0463 as a Rust crate hash split, not as a missing
+  file. Slug's full `unicode_ident` rlib has hash
+  `47513d36c8f4abbbc36b5fb2378c8b78`, while Slug's metadata rlib has hash
+  `8d901924550e221a6bb1369b7f2dee51`; `proc_macro2` was compiled expecting
+  the metadata hash. A focused Bazel 9.0.1 probe for the same crates shows
+  Bazel's full `unicode_ident` rlib hash
+  `3f9553724e0ff545bbb34e4c51cd80a9`, and Bazel's `proc_macro2` full rlib
+  expects that same full hash. Bazel therefore keeps full and metadata Rust
+  actions for the same crate SVH-compatible; Slug does not.
+- `rules_rust` process-wrapper source
+  `/var/mnt/dev/zeromatter-kuro/buck-out/plan61-units-root-override-aggregate-20260520-113738/external_cells/bzlmod/rules_rust/0.69.0/util/process_wrapper/options.rs`
+  lines 137-178 explains the owning semantic: `${output_base}` may be
+  sandbox-local for path remapping, but `${exec_root}` is resolved to the
+  stable Bazel execroot so `CARGO_MANIFEST_DIR` / `OUT_DIR` values embedded in
+  rustc metadata are identical across Rustc and RustcMetadata actions. The
+  next systemic fix is to preserve Slug's narrowed action cwd while expanding
+  `${exec_root}` to a stable shared Slug execroot path, not to the per-action
+  digest execroot and not to the project root.
+- Follow-up smoke
+  `/tmp/slug-plan61/plan61-units-stable-execroot-20260520-120400.log` proves
+  the first stable `${exec_root}` fix was incomplete: it still fails
+  `crates__serde_derive-1.0.228//:serde_derive` with E0460. Manual metadata
+  probes show Slug's full `unicode_ident` hash is
+  `e2d027c3656756157431f7ba8ba51207`, the metadata hash is
+  `3c75e5f1cd47aad079043321602d881e`, and `proc_macro2` expects the metadata
+  hash. Re-reading the selected `rules_rust` process-wrapper source lines
+  132-194 corrects the implementation direction: `${pwd}` is the actual action
+  current directory, and `${output_base}` is the sandbox-local output base used
+  by `--remap-path-prefix` to strip that directory from rustc metadata. Only
+  `${exec_root}` should be the stable shared execroot. The next fix is
+  therefore to expand `${pwd}` and `${output_base}` to Slug's per-action
+  execroot while keeping `${exec_root}` stable.
+- Implementation update: `local.rs` now rewrites `process_wrapper` substitutions
+  to match the selected `rules_rust` behavior: Unix `${pwd}` and
+  `${output_base}` expand to Slug's per-action execroot for
+  `--remap-path-prefix`, while `${exec_root}` expands to the stable shared
+  `<project>/execroot/<workspace>` path used by `CARGO_MANIFEST_DIR` and
+  `OUT_DIR`. The auxiliary direct rustc execroot remap also uses the
+  per-action execroot rather than `/proc/self/cwd`.
+- Validation: `cargo fmt`, `cargo test -p slug_execute_impl process_wrapper --
+  --nocapture`, `cargo test -p slug_execute_impl rustc_flags_execroot_remap --
+  --nocapture`, and `cargo build -p slug` pass. Fresh focused smoke
+  `/tmp/slug-plan61/plan61-units-wrapper-pwd-outputbase-20260520-121217.log`
+  succeeds for `reactor//lib/units:units` after 684 local commands. This
+  resolves the observed Rust proc-macro full-vs-metadata crate-hash blocker.
+  The successful smoke left about 998M in ZeroMatter `buck-out` and 15G in
+  staged `execroot`; clean those generated trees before the next broad
+  `//sdk:sdk_contents` smoke.
+- Reflection during full SDK smoke 2026-05-20 12:34 PDT: `execroot` growth is
+  caused by repeated per-action `external/` fanout, not by hardlinks. Each
+  narrowed execroot materialized a real `external/` directory with every
+  apparent and canonical bzlmod repo symlink; a live sample showed roughly
+  1,196 per-action execroot directories, many with about 22M of symlink entries
+  under `external/`. Bazel ground truth from the local Bazel 9.0.1 sandbox
+  stash
+  `~/.cache/bazel/_bazel_wgray/.../sandbox/sandbox_stash/Rustc/335/execroot/_main/external`
+  showed a sparse action external tree for that Rust action: 62 external
+  entries, not the full bzlmod repo universe. Systemic direction: keep Slug's
+  narrowed execroot cwd model, but track external repo names from declared
+  paths and link only those repos into `external/`.
+- Focused smoke
+  `/tmp/slug-plan61/plan61-units-sparse-external-20260520-124720.log` failed
+  quickly with `clang: error: no such file or directory:
+  'external/llvm/runtimes/empty.c'` while disk stayed bounded (`execroot`
+  about 2.1M). The failure is a refinement of the sparse-external fix:
+  declared inputs may select a canonical module repo such as
+  `external/llvm+0.7.0`, while action argv uses the apparent alias
+  `external/llvm`. Ground truth from the local `external/` alias tree and
+  Bazel sandbox behavior is to expose aliases for selected repos, not every
+  repo. Next fix: when a selected external repo target is linked, also link
+  any `external/<apparent>` entries that resolve to the same target.
+- Focused smoke
+  `/tmp/slug-plan61/plan61-units-sparse-external-alias-20260520-125041.log`
+  passed after alias-refined sparse external materialization. It progressed
+  through the prior `external/llvm/runtimes/empty.c` action, compiled LLVM
+  runtime and Rust crates, and finished with `BUILD SUCCEEDED`, 684 local
+  commands, and final disk use of about 998M `buck-out` plus 233M `execroot`.
+  This keeps the per-action execroot model aligned with the observed Bazel
+  9.0.1 sparse sandbox rather than relying on full `external/` fanout.
+- Full SDK smoke
+  `/tmp/slug-plan61/plan61-sdk-contents-sparse-external-20260520-125322.log`
+  timed out at the 20 minute bound, but did not expose a semantic failure. The
+  queue was still draining and reached 5 remaining actions at cutoff after
+  compiling high-level `reactor//...` Rust targets; disk ended around 14G
+  `buck-out`, 3.8G `execroot`, and 11,201 first-level/two-level action dirs.
+  This is not the previous unbounded `external/` fanout: the growth is
+  proportional to broad SDK action output/staging. Next action is to continue
+  from the warmed outputs with a larger bounded smoke and only classify a
+  performance blocker if progress stalls or the same small frontier repeats.
+- Full SDK resume
+  `/tmp/slug-plan61/plan61-sdk-contents-sparse-external-resume-20260520-1315.log`
+  passed with `BUILD SUCCEEDED` for `//sdk:sdk_contents` under Slug. The run
+  completed 3,759 local commands in 25m36s (`load=1m22s`,
+  `analyze=6m27s`, `execute=18m57s`, `materialize=18m57s`), with top mnemonics
+  `rustc=14m16s/1655`, `rustc_metadata=8m28s/1473`, and
+  `c_compile=47.5s/376`. Final disk use was about 21G `buck-out` and 4.0G
+  `execroot`; action directory count stayed bounded at roughly 11.2k rather
+  than growing through full `external/` fanout. At this point the remaining SDK
+  checkpoint criterion was output parity against Bazel 9 for the same target;
+  that checkpoint is superseded by the later accepted-difference result below.
+- Ground-truth correction 2026-05-20, optional C++ toolchain handling:
+  Bazel/rules_rust evidence from
+  `/tmp/slug-plan61/bazel-aquery-zeromatter-ffi-rustc.txt` shows the final
+  `zeromatter_ffi` Rust link action receives LLVM C++ toolchain link flags from
+  `cc_common.get_memory_inefficient_command_line`, including
+  `-target x86_64-linux-gnu`, `-fuse-ld=lld`, `-resource-dir`, crt/glibc
+  directories, and native C++ runtime libraries. Slug's previous optional C++
+  native-shim deferral was therefore too broad: `mandatory=False` in
+  `rules_rust` means the toolchain may be absent, not that a successfully
+  resolved C++ toolchain should be replaced by a featureless fallback. The
+  systemic fix is to build the metadata-backed C++ native shim whenever
+  toolchain resolution returns a C++ toolchain, and reserve `None` for an actual
+  optional miss. Rejected symptom fixes: appending link flags in Rust rules,
+  target-specific `zeromatter_ffi` handling, or featureless fallback expansion.
+  Validation passed: `cargo test -p slug_build_api
+  optional_cpp_toolchain_without_resolved_provider_returns_none -- --nocapture`,
+  `cargo test -p slug_build_api
+  cc_toolchain_overlay_retains_provider_owner_for_late_attr_access --
+  --nocapture`, `cargo test -p slug_build_api_tests
+  cc_common_dynamic_library_uses_feature_args_instead_of_fallback_prefix --
+  --nocapture`, `cargo test -p slug_build_api_tests
+  cc_common_flag_sets_expand_action_configs_before_features -- --nocapture`,
+  `cargo test -p slug_execute_impl action_execroot -- --nocapture`, and
+  `cargo build -p slug`.
+- Focused Slug smoke after that correction
+  `/tmp/slug-plan61/plan61-zeromatter-ffi-optional-cc-fix-20260520-141458.log`
+  advanced past the previous missing-link-flags blocker and exposed a new
+  `CargoBuildScriptRun` failure in
+  `crates__aws-lc-sys-0.38.0//:_bs`: clang/lld could not open
+  `buck-out/.../external/llvm/runtimes/resource_directory/lib/x86_64-unknown-linux-gnu/libclang_rt.builtins.a`
+  inside the per-action execroot. The same file exists in the shared Slug
+  `buck-out` tree, while the per-action execroot was missing the entire
+  `resource_directory` path. Current generated-tree size after the failed
+  smoke was about 2.7G `buck-out` and 940M `execroot`.
+- Bazel 9.0.1 ground truth for that new blocker:
+  `/tmp/slug-plan61/bazel-aquery-aws-lc-sys-bs.txt` for
+  `@@rules_rs++crate+crates__aws-lc-sys-0.38.0//:_bs` reports mnemonic
+  `CargoBuildScriptRun`, the same C/C++/link flag shape, and explicitly lists
+  `bazel-out/k8-fastbuild/bin/external/llvm+/runtimes/resource_directory` as an
+  action input alongside the other LLVM runtime directories. That proves the
+  correct direction is declared input propagation/materialization for generated
+  directory artifacts, not changing `LDFLAGS`, removing `-resource-dir`, relying
+  on hardlinks, or exposing broad `buck-out` siblings.
+- Systemic fix 2026-05-20: Bazel/rules_rust source shows
+  `cargo/private/cargo_build_script.bzl` appends `cc_toolchain.all_files` to
+  build-script tools when a C++ toolchain is present, and the LLVM toolchain
+  declares the `resource_directory` output as data on the link-action
+  `resource_dir` arg. Slug's metadata-backed native C++ toolchain shim exposed
+  only `compiler_files` through `all_files`, so downstream build scripts never
+  received the Bazel-declared linker/runtime directory inputs. The fix is at
+  the C++ toolchain provider boundary: `CcToolchainInfo.all_files` now merges
+  compiler, linker, static-runtime, and dynamic-runtime toolchain files, while
+  `_compiler_files` and `_linker_files` remain scoped to their specific
+  providers. Rejected symptom fixes: hardlinking action inputs, broadening the
+  per-action execroot to all `buck-out` siblings, editing `aws-lc-sys`
+  `LDFLAGS`, or special-casing `resource_directory`.
+- Validation for the `all_files` fix: `cargo test -p slug_build_api
+  native_cc_toolchain_all_files_includes_linker_and_runtime_inputs --
+  --nocapture`, `cargo test -p slug_build_api
+  optional_cpp_toolchain_without_resolved_provider_returns_none -- --nocapture`,
+  `cargo test -p slug_build_api
+  cc_toolchain_overlay_retains_provider_owner_for_late_attr_access --
+  --nocapture`, and `cargo build -p slug` all passed. Focused Slug smoke
+  `/tmp/slug-plan61/plan61-zeromatter-ffi-cc-all-files-20260520-144226.log`
+  then built `//sdk/zeromatter_ffi:zeromatter_ffi` successfully in 24m11s,
+  including `llvm//runtimes:resource_directory`, `aws-lc-sys` build-script
+  execution, and final `libzeromatter_ffi.so` linking. Generated-tree size
+  after the successful focused run was about 11G `buck-out` and 2.9G staged
+  `execroot`; keep warmed `buck-out` for full SDK parity, then clean staged
+  execroots after validation.
+- Full SDK validation after the `all_files` fix:
+  `/tmp/slug-plan61/plan61-sdk-contents-after-cc-all-files-20260520-150740.log`
+  built `//sdk:sdk_contents` successfully in 12m06s. Directory/file manifest
+  and modes match Bazel 9 output exactly, and all non-ELF file hashes match.
+  The only remaining differences are still the four ELF outputs:
+  `bin/zm`, `bin/zerobuf`, `bin/zerosystem`, and
+  `lib/libzeromatter_ffi.so`
+  (`/tmp/slug-plan61/*-sdk-contents-*-after-cc-all-files.txt`).
+- Accepted known byte difference 2026-05-20, Bazel logical derived-artifact
+  exec paths:
+  ELF strings show Bazel embeds generated-source paths like
+  `./bazel-out/k8-fastbuild.../build_script.out_dir/...`, while Slug embeds
+  `./buck-out/plan61-optional-cc-fix-20260520/gen/.../build_script.out_dir/...`.
+  This is not a binary post-processing issue. Bazel source
+  `ArtifactRoot.java` lines 72-82 defines derived artifact exec paths under
+  `$EXEC_ROOT/bazel-out/<output-dir>/bin/...`; `OutputPathMnemonicComputer.java`
+  lines 158-175 and 365-374 compute `<output-dir>` from CPU, compilation mode,
+  platform suffix, fragment contributions, and ST transition hashes. The local
+  Bazel aquery for `deps(//sdk:sdk_contents)` confirms the concrete values used
+  here: GNU target actions use `bazel-out/k8-fastbuild/bin/...`, and musl
+  target actions use `bazel-out/k8-fastbuild-ST-43014ebae176/bin/...`.
+- User decision 2026-05-20: output-root string differences embedded in ELF
+  debug/build metadata are acceptable for this Plan 61 SDK parity checkpoint
+  when the SDK builds, tree shape/modes match, and only the known path-root
+  strings explain byte differences in the four ELF outputs. Therefore this is
+  no longer a Plan 61 hard blocker. It remains a follow-up parity/design item:
+  Slug should support a Bazel-compatible output-root mode that stores or
+  exposes generated artifacts under `bazel-out`, not `buck-out`, and `slug-out`
+  is a more accurate non-Bazel-compatible root name if/when a non-Bazel mode is
+  retained.
+- rules_rust source explains why the follow-up matters for exact byte parity:
+  `rust/private/rustc.bzl` lines 1031-1044 deliberately sets `OUT_DIR` to
+  `${exec_root}/<Bazel exec path>` because `env!("OUT_DIR")` is baked into Rust
+  crates and `--remap-path-prefix` does not normalize that raw env value; lines
+  1118-1122 add the remap flags only as a separate debug-path mechanism. Slug
+  currently has only Slug configuration hashes in artifact paths
+  (`buck-out/<isolation>/gen/<cell>/<cfg_hash>/...`) and does not model Bazel's
+  output-directory mnemonic/ST-hash computation. Implementing a correct fix
+  requires a Bazel-grounded artifact exec-path layer that can expose
+  `bazel-out/<output-dir>/bin/...` to actions and optionally store outputs
+  there. Rejected symptom fixes: replacing strings after link, stripping debug
+  info, mapping every Slug config hash to a hand-written `k8-fastbuild` value,
+  or adding Rust-only remap flags that leave `env!("OUT_DIR")` wrong.
 
 Exit criteria:
 
@@ -1775,7 +2851,7 @@ Exit criteria:
 | Label-taking `module_ctx` / `repository_ctx` operations materialize needed extension repos or fail directly. | Bazel `ModuleExtensionContext` extends `StarlarkBaseExternalContext`; source shows `path`, `read`, `watch`, `symlink`, `template`, `patch`, `load_wasm`, and `execute_wasm` accept labels, while plain `execute()` records env/PATH/working-directory effects separately. Plan 36 bug shape; experiments split path/read/watch/write-like operations. |
 | Unknown repo rule, extension failure, repo-rule failure, missing generated repo, and invalid override fail directly with no stub repo. | Bazel `SingleExtensionFunction`, `RepoDefinitionFunction`, `RepositoryFetchFunction`; current Slug stub paths; no-stub tests assert no repo directory/marker. |
 | Repo materialization reuse is not based on bare `.slug_repo_complete`. | Bazel marker/recorded-input semantics or Slug manifest experiment; current Slug marker bug shape in Plan 38 and source. |
-| Two workspaces in one daemon do not share bzlmod state. | Current process globals and under-keyed tests are known-bad; experiment uses identical extension/repo names with different workspace roots and lockfiles. |
+| Two workspaces with colliding module/repo names do not share bzlmod state. | Bazel has one server per output base and defaults output base from the workspace root; Slug daemon dirs include project root. Guardrail uses identical extension/repo names with different workspace roots and lockfiles, and validates the appropriate per-daemon or same-daemon counter baseline. |
 | Ordinary Slug read-only paths do not mutate `MODULE.bazel.lock`; future write path matches Bazel modes. | Bazel `RepositoryOptions` / `BazelLockFileModule`; Slug policy is explicit interim safety, validated by `plan61-lockfile-modes`. |
 
 ## Test Matrix
@@ -1789,7 +2865,7 @@ Exit criteria:
 | Repo mapping | Apparent/canonical names, module repo identity, multiple-version identity, same-extension internal repos, `use_repo`, `inject_repo`, `override_repo`, `use_repo_rule`, isolated extensions; grounded in Bazel docs/source listed above. |
 | Failure behavior | Bad extension, unknown repo rule, wrong symbol type, repo-rule failure, invalid repo spec, stale marker, missing generated target, invalid override; grounded in Bazel failure sources and current Slug stub fallbacks. |
 | Materialization | Stale marker with changed `RepoSpec`, changed content with same marker, deleted file, corrupted file, changed mode, stale/broken symlink, local path missing, cache corruption; grounded in current Slug success-by-marker paths and Bazel marker docs. |
-| Daemon isolation | Two workspaces with different module graphs, same extension id, same generated repo names, and different lockfiles/facts in one daemon; grounded in current global registry bug shape. |
+| Daemon isolation | Two workspaces with different module graphs, same extension id, same generated repo names, and different lockfiles/facts do not share bzlmod state; grounded in Bazel output-base scoping and current Slug global registry bug shape. |
 | Real-world | rules_cc, rules_python, rules_rs/rules_rust, bazel_features, bounded zeromatter target; grounded in Plans 02, 36, and 57. |
 | Performance guardrail | Named experiment `plan61-warm-daemon-noop` compares trace counters before/after a no-op warm invocation. |
 

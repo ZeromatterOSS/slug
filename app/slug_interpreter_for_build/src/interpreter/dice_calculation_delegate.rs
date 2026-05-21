@@ -153,10 +153,12 @@ impl<'c, 'd> HasCalculationDelegate<'c, 'd> for DiceComputations<'d> {
                 let dirs_allowing_relative_paths =
                     ctx.dirs_allowing_relative_paths(self.0.clone()).await?;
 
-                let cell_info = InterpreterCellInfo::new(
+                let bzlmod_session_data = ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await?;
+                let cell_info = InterpreterCellInfo::new_with_bzlmod_module_versions(
                     self.1,
                     ctx.get_cell_resolver().await?,
                     cell_alias_resolver,
+                    Arc::new(bzlmod_session_data.module_versions.clone()),
                 )?;
 
                 // Compute package_dir by finding nearest ancestor with a BUILD file.

@@ -950,7 +950,16 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         return;
     }
 
-    let registered = slug_bzlmod::get_registered_toolchains();
+    let registered = match dice.compute(&slug_bzlmod::BzlmodSessionDataKey).await {
+        Ok(data) => data.registered_toolchains.clone(),
+        Err(e) => {
+            tracing::warn!(
+                "Bzlmod session data unavailable while loading registered toolchains: {}",
+                e
+            );
+            Vec::new()
+        }
+    };
     if registered.is_empty() {
         TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
         set_deferred_toolchains(Vec::new());
@@ -3529,22 +3538,6 @@ async fn run_analysis_with_env_underlying(
                                     let use_cpp_native_shim =
                                         is_cpp_toolchain_type_label(type_label);
                                     if use_cpp_native_shim {
-                                        if !is_mandatory {
-                                            analysis_ctx_toolchain_provider_checkpoint(
-                                                &analysis_env.label,
-                                                type_label,
-                                                &tc.toolchain_impl,
-                                                Some(&configured),
-                                                toolchain_index,
-                                                toolchain_count,
-                                                is_mandatory,
-                                                is_self_dependency,
-                                                9,
-                                                "optional_cc_toolchain_native_shim_deferred",
-                                                evaluate_rule_started,
-                                            );
-                                            None
-                                        } else {
                                         let toolchain_config_info = None;
                                         let toolchain_metadata_label = tc
                                             .cc_toolchain_config
@@ -3629,7 +3622,6 @@ async fn run_analysis_with_env_underlying(
 	                                            static_runtime_data,
 	                                            dynamic_runtime_data,
                                         ))
-                                        }
                                     } else {
                                         let analysis_result =
                                             dice.get_analysis_result(&configured).await;

@@ -2628,6 +2628,29 @@ impl CcToolchainInfoNativeShim {
             .unwrap_or_else(|| crate::interpreter::rule_defs::depset::empty_depset())
     }
 
+    fn all_toolchain_files(&self) -> Option<Arc<[ToolchainInputFile]>> {
+        let groups = [
+            &self.compiler_files,
+            &self.linker_files,
+            &self.static_runtime_files,
+            &self.dynamic_runtime_files,
+        ];
+        let total = groups
+            .iter()
+            .filter_map(|files| files.as_ref())
+            .map(|files| files.len())
+            .sum::<usize>();
+        if total == 0 {
+            return None;
+        }
+
+        let mut merged = Vec::with_capacity(total);
+        for files in groups.into_iter().filter_map(|files| files.as_ref()) {
+            merged.extend(files.iter().copied());
+        }
+        Some(merged.into())
+    }
+
     fn toolchain_file_stubs_depset<'v>(
         &self,
         files: &Option<Arc<[ToolchainInputFile]>>,
@@ -2741,7 +2764,8 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
                     .to_value(),
             ),
             "built_in_include_directories" => Some(empty_list()),
-            "all_files" | "_compiler_files" | "_builtin_include_files" => {
+            "all_files" => Some(self.toolchain_files_depset(&self.all_toolchain_files(), heap)),
+            "_compiler_files" | "_builtin_include_files" => {
                 Some(self.toolchain_files_depset(&self.compiler_files, heap))
             }
             "_linker_files" => Some(self.toolchain_files_depset(&self.linker_files, heap)),
@@ -2750,10 +2774,12 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             | "_strip_files"
             | "_coverage_files"
             | "_dwp_files"
-            | "_all_files_including_libc"
             | "_build_info_files"
             | "_compiler_files_without_includes"
             | "_objcopy_files" => Some(empty_depset()),
+            "_all_files_including_libc" => {
+                Some(self.toolchain_files_depset(&self.all_toolchain_files(), heap))
+            }
             "_static_runtime_lib_depset" => {
                 Some(self.toolchain_file_stubs_depset(&self.static_runtime_files, heap))
             }
@@ -3067,32 +3093,37 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
         });
 
         if is_cpp_toolchain_type_label_for_lookup(&normalized) {
-            if let Some(Some(providers)) = entry {
-                let cc_toolchain_info_id =
-                    crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider::provider_id(
-                    );
-                if let Some(cc_fv) = providers
-                    .provider_collection()
-                    .get_provider_raw(cc_toolchain_info_id)
-                {
-                    let _ = cc_fv;
-                    let cc = heap.alloc(CcToolchainInfoTargetPlatformOverlay {
-                        providers: providers.dupe(),
-                        target_platform: self.target_platform.clone(),
-                    });
-                    let cc_provider_in_toolchain = heap.alloc(true);
-                    let fields = heap.alloc(AllocDict([
-                        ("cc", cc),
-                        ("cc_provider_in_toolchain", cc_provider_in_toolchain),
-                    ]));
-                    return Ok(heap.alloc(ToolchainInfoInstanceGen::new(fields)));
+            match entry {
+                Some(Some(providers)) => {
+                    let cc_toolchain_info_id =
+                        crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider::provider_id(
+                        );
+                    if let Some(cc_fv) = providers
+                        .provider_collection()
+                        .get_provider_raw(cc_toolchain_info_id)
+                    {
+                        let _ = cc_fv;
+                        let cc = heap.alloc(CcToolchainInfoTargetPlatformOverlay {
+                            providers: providers.dupe(),
+                            target_platform: self.target_platform.clone(),
+                        });
+                        let cc_provider_in_toolchain = heap.alloc(true);
+                        let fields = heap.alloc(AllocDict([
+                            ("cc", cc),
+                            ("cc_provider_in_toolchain", cc_provider_in_toolchain),
+                        ]));
+                        return Ok(heap.alloc(ToolchainInfoInstanceGen::new(fields)));
+                    }
+                    return Ok(alloc_cc_toolchain_info_shim(
+                        heap,
+                        &key,
+                        &self.target_platform,
+                    ));
                 }
+                Some(None) => return Ok(Value::new_none()),
+                None if self.toolchains.is_empty() => return Ok(Value::new_none()),
+                None => {}
             }
-            return Ok(alloc_cc_toolchain_info_shim(
-                heap,
-                &key,
-                &self.target_platform,
-            ));
         }
 
         match entry {
@@ -3214,17 +3245,30 @@ fn normalize_bzlmod_module_repo_name(repo: &str) -> &str {
 
 #[cfg(test)]
 mod resolved_toolchains_tests {
+    use dupe::Dupe;
+    use slug_core::configuration::data::ConfigurationData;
+    use slug_core::target::configured_target_label::ConfiguredTargetLabel;
     use starlark::environment::Module;
     use starlark::eval::Evaluator;
     use starlark::values::StarlarkValue;
 
+    use super::CcToolchainInfoNativeShim;
     use super::CcToolchainInfoTargetPlatformOverlay;
     use super::ResolvedToolchains;
+    use super::ToolchainInputFile;
     use super::cc_toolchain_native_shim_provider_collection;
     use super::cc_toolchain_runtime_solib_dir_base;
     use super::cc_toolchain_runtime_solib_path;
     use super::normalize_toolchain_type_label;
     use super::relative_symlink_target;
+
+    fn leaked_toolchain_input_target(label: &str) -> &'static ConfiguredTargetLabel {
+        let cfg = ConfigurationData::testing_new();
+        Box::leak(Box::new(ConfiguredTargetLabel::testing_parse(
+            label,
+            cfg.dupe(),
+        )))
+    }
 
     #[test]
     fn toolchain_type_lookup_normalizes_bzlmod_module_versions() {
@@ -3291,7 +3335,50 @@ mod resolved_toolchains_tests {
     }
 
     #[test]
-    fn optional_cpp_toolchain_without_eager_provider_still_returns_shim() {
+    fn native_cc_toolchain_all_files_includes_linker_and_runtime_inputs() {
+        let compiler = ToolchainInputFile {
+            path: "buck-out/gen/toolchain/clang",
+            symlink_target: None,
+            input_target: leaked_toolchain_input_target("cell//toolchain:clang"),
+        };
+        let linker = ToolchainInputFile {
+            path: "buck-out/gen/llvm/runtimes/resource_directory",
+            symlink_target: None,
+            input_target: leaked_toolchain_input_target("cell//toolchain:resource_directory"),
+        };
+        let static_runtime = ToolchainInputFile {
+            path: "buck-out/gen/llvm/runtimes/libcxx/libc++.a",
+            symlink_target: None,
+            input_target: leaked_toolchain_input_target("cell//toolchain:libcxx_static"),
+        };
+        let shim = CcToolchainInfoNativeShim {
+            toolchain_label: "@llvm//toolchain:linux_x86_64_cc_toolchain".to_owned(),
+            target_platform: "//bazel/platforms:linux-gnu-host".to_owned(),
+            toolchain_config_info: None,
+            toolchain_features: None,
+            module_map_path: None,
+            compiler_files: Some(vec![compiler].into()),
+            linker_files: Some(vec![linker].into()),
+            static_runtime_files: Some(vec![static_runtime].into()),
+            dynamic_runtime_files: None,
+        };
+
+        let all_files = shim
+            .all_toolchain_files()
+            .expect("all_files should include populated toolchain inputs");
+        let paths: Vec<_> = all_files.iter().map(|file| file.path).collect();
+        assert_eq!(
+            paths,
+            vec![
+                "buck-out/gen/toolchain/clang",
+                "buck-out/gen/llvm/runtimes/resource_directory",
+                "buck-out/gen/llvm/runtimes/libcxx/libc++.a",
+            ]
+        );
+    }
+
+    #[test]
+    fn optional_cpp_toolchain_without_resolved_provider_returns_none() {
         let mut toolchains = std::collections::HashMap::new();
         toolchains.insert("@bazel_tools//tools/cpp:toolchain_type".to_owned(), None);
         let resolved = ResolvedToolchains {
@@ -3306,19 +3393,8 @@ mod resolved_toolchains_tests {
         let key = heap.alloc_str("@bazel_tools//tools/cpp:toolchain_type");
         let value = resolved
             .at(key.to_value(), heap)
-            .expect("C++ toolchain lookup should return the lazy native shim");
-        assert!(!value.is_none());
-        let cc = value
-            .get_attr("cc", heap)
-            .expect("toolchain lookup should succeed")
-            .expect("toolchain should expose cc field");
-        assert_eq!(
-            cc.get_attr("libc", heap)
-                .expect("libc lookup should succeed")
-                .expect("musl overlay should expose libc")
-                .unpack_str(),
-            Some("musl")
-        );
+            .expect("C++ toolchain lookup should not raise for optional miss");
+        assert!(value.is_none());
     }
 
     #[test]

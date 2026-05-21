@@ -24,6 +24,7 @@ static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     compilation_mode: None,
     defines: None,
     action_env: None,
+    repo_env: None,
     test_env: None,
     copts: None,
     cxxopts: None,
@@ -45,6 +46,8 @@ struct BuildConfig {
     defines: Option<HashMap<String, String>>,
     /// --action_env NAME=VALUE pairs from the command line.
     action_env: Option<HashMap<String, String>>,
+    /// Effective Bazel repository environment for repository rules and module extensions.
+    repo_env: Option<HashMap<String, String>>,
     /// --test_env NAME=VALUE pairs from the command line.
     test_env: Option<HashMap<String, String>>,
     /// --copt flags (C/C++ compilation flags).
@@ -152,6 +155,56 @@ pub fn get_action_env() -> HashMap<String, String> {
         .ok()
         .and_then(|c| c.action_env.clone())
         .unwrap_or_default()
+}
+
+/// Compute Slug's current effective repository environment.
+///
+/// Bazel's default repository environment starts from the client environment
+/// and applies --repo_env on top. Slug currently uses the daemon process
+/// environment as the available client-env approximation.
+pub fn effective_repo_env_from_flags(
+    env_values: &[String],
+    workspace_root: &str,
+) -> HashMap<String, String> {
+    let mut map: HashMap<String, String> = std::env::vars().collect();
+    for entry in env_values {
+        if let Some(name) = entry.strip_prefix('=') {
+            map.remove(name);
+        } else if let Some((key, value)) = entry.split_once('=') {
+            map.insert(
+                key.to_owned(),
+                value.replace("%bazel_workspace%", workspace_root),
+            );
+        } else if let Ok(value) = std::env::var(entry) {
+            map.insert(entry.to_owned(), value);
+        }
+    }
+    map
+}
+
+/// Set the effective repository environment for the current command.
+pub fn set_repo_env(env_values: &[String], workspace_root: &str) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.repo_env = Some(effective_repo_env_from_flags(env_values, workspace_root));
+    }
+}
+
+/// Get the effective repository environment for repository rules and module extensions.
+pub fn get_repo_env() -> HashMap<String, String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.repo_env.clone())
+        .unwrap_or_else(|| std::env::vars().collect())
+}
+
+/// Get one value from the effective repository environment.
+pub fn get_repo_env_var(name: &str) -> Option<String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.repo_env.as_ref().and_then(|env| env.get(name).cloned()))
+        .or_else(|| std::env::var(name).ok())
 }
 
 /// Set --copt values for the current build.

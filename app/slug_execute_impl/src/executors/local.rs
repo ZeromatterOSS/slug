@@ -360,10 +360,10 @@ impl LocalExecutor {
         // declared input prefix set. Compute it before final argv preparation
         // so rustc invocations can remap the physical digest execroot out of
         // metadata while still executing from the narrowed filesystem view.
-        let prefixes =
-            crate::executors::action_execroot::collect_input_prefixes(request, &self.artifact_fs);
+        let execroot_plan =
+            crate::executors::action_execroot::collect_execroot_plan(request, &self.artifact_fs);
         let action_execroot =
-            crate::executors::action_execroot::ensure_execroot(&self.root, &prefixes);
+            crate::executors::action_execroot::ensure_execroot(&self.root, &execroot_plan);
         let param_args_owned: Option<Vec<String>> = if request.param_files().is_empty() {
             None
         } else {
@@ -452,6 +452,17 @@ impl LocalExecutor {
             Ok(None) => {}
             Err(e) => {
                 tracing::warn!("Failed to prepare inline rustc linker wrapper: {e}");
+            }
+        }
+        if let Some(execroot) = action_execroot.as_deref() {
+            let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
+            if rewrite_process_wrapper_execroot_substitutions(
+                &mut rewritten_args,
+                execroot,
+                self.root.as_path(),
+            ) {
+                args_owned = Some(rewritten_args);
+                tracing::debug!("Rewrote process_wrapper execroot substitutions");
             }
         }
         if let Some(args) = args_owned.as_mut() {
@@ -569,6 +580,17 @@ impl LocalExecutor {
                         action_execroot.as_deref(),
                     )
                     .await
+                };
+
+                let r = match (r, action_execroot.as_deref()) {
+                    (Ok(res), Some(execroot)) => sync_outputs_from_action_execroot(
+                        execroot.as_path(),
+                        self.root.as_path(),
+                        request,
+                        &self.artifact_fs,
+                    )
+                    .map(|()| res),
+                    (other, _) => other,
                 };
 
                 let time_span = execution_start.end_now();
@@ -1842,6 +1864,90 @@ fn add_rustc_execroot_remap(
     add_rustc_flags_execroot_remap(args, Some(execroot))
 }
 
+fn rewrite_process_wrapper_execroot_substitutions(
+    args: &mut [String],
+    action_execroot: &slug_fs::paths::abs_norm_path::AbsNormPath,
+    output_base: &Path,
+) -> bool {
+    if !is_process_wrapper_invocation(args) {
+        return false;
+    }
+
+    let substitutions =
+        process_wrapper_execroot_substitution_values(action_execroot.as_path(), output_base);
+    let mut changed = false;
+    let mut idx = 0;
+    while idx < args.len() {
+        if args[idx] == "--subst" {
+            if let Some(arg) = args.get_mut(idx + 1) {
+                changed |= rewrite_process_wrapper_subst_value(arg, &substitutions);
+            }
+            idx += 2;
+            continue;
+        }
+        if let Some(subst) = args[idx].strip_prefix("--subst=") {
+            let mut rewritten = subst.to_owned();
+            if rewrite_process_wrapper_subst_value(&mut rewritten, &substitutions) {
+                args[idx] = format!("--subst={rewritten}");
+                changed = true;
+            }
+        }
+        idx += 1;
+    }
+    changed
+}
+
+struct ProcessWrapperSubstitutions {
+    pwd: String,
+    execroot: String,
+    output_base: String,
+}
+
+fn process_wrapper_execroot_substitution_values(
+    action_execroot: &Path,
+    output_base: &Path,
+) -> ProcessWrapperSubstitutions {
+    #[cfg(unix)]
+    {
+        let stable_execroot = slug_core::cells::execroot_path(output_base)
+            .unwrap_or_else(|| action_execroot.to_path_buf());
+        let action_execroot = action_execroot.to_string_lossy().into_owned();
+        ProcessWrapperSubstitutions {
+            pwd: action_execroot.clone(),
+            execroot: stable_execroot.to_string_lossy().into_owned(),
+            output_base: action_execroot,
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ProcessWrapperSubstitutions {
+            pwd: action_execroot.to_string_lossy().into_owned(),
+            execroot: action_execroot.to_string_lossy().into_owned(),
+            output_base: output_base.to_string_lossy().into_owned(),
+        }
+    }
+}
+
+fn rewrite_process_wrapper_subst_value(
+    arg: &mut String,
+    substitutions: &ProcessWrapperSubstitutions,
+) -> bool {
+    let Some((key, value)) = arg.split_once('=') else {
+        return false;
+    };
+    let Some(replacement) = (match (key, value) {
+        ("pwd", "${pwd}") => Some(substitutions.pwd.as_str()),
+        ("exec_root", "${exec_root}") => Some(substitutions.execroot.as_str()),
+        ("output_base", "${output_base}") => Some(substitutions.output_base.as_str()),
+        _ => None,
+    }) else {
+        return false;
+    };
+    *arg = format!("{key}={replacement}");
+    true
+}
+
 fn add_rustc_flags_execroot_remap(
     args: &mut Vec<String>,
     action_execroot: Option<&slug_fs::paths::abs_norm_path::AbsNormPath>,
@@ -1849,9 +1955,14 @@ fn add_rustc_flags_execroot_remap(
     let Some(execroot) = action_execroot else {
         return false;
     };
+    if args.iter().any(|arg| {
+        arg == "--remap-path-prefix=${pwd}=." || arg == "--remap-path-prefix=${exec_root}=."
+    }) {
+        return false;
+    }
     let remap = format!(
         "--remap-path-prefix={}={}",
-        execroot.as_path().to_string_lossy(),
+        rustc_execroot_remap_prefix(execroot),
         "."
     );
     if args.iter().any(|arg| arg == &remap) {
@@ -1863,6 +1974,10 @@ fn add_rustc_flags_execroot_remap(
         .unwrap_or(args.len());
     args.insert(insert_at, remap);
     true
+}
+
+fn rustc_execroot_remap_prefix(execroot: &slug_fs::paths::abs_norm_path::AbsNormPath) -> String {
+    execroot.as_path().to_string_lossy().into_owned()
 }
 
 fn should_add_rustc_paramfile_execroot_remap(args: &[String]) -> bool {
@@ -2659,6 +2774,12 @@ fn is_cargo_build_script_runner_invocation(args: &[String]) -> bool {
         && args.iter().any(|arg| arg.starts_with("--script="))
 }
 
+fn is_process_wrapper_invocation(args: &[String]) -> bool {
+    args.first()
+        .and_then(|arg| path_file_name(arg))
+        .is_some_and(|name| name == "process_wrapper" || name == "process_wrapper.exe")
+}
+
 fn is_process_wrapper_rustc_invocation(args: &[String]) -> bool {
     let Some(separator) = args.iter().position(|arg| arg == "--") else {
         return false;
@@ -2877,6 +2998,47 @@ pub async fn create_output_dirs(
     }
 
     Ok(())
+}
+
+fn sync_outputs_from_action_execroot(
+    execroot: &Path,
+    project_root: &Path,
+    request: &CommandExecutionRequest,
+    artifact_fs: &ArtifactFs,
+) -> slug_error::Result<()> {
+    for output in request.outputs() {
+        let path = output
+            .resolve(
+                artifact_fs,
+                Some(&ContentBasedPathHash::for_output_artifact()),
+            )?
+            .into_path();
+        let src = execroot.join(path.as_str());
+        if src.symlink_metadata().is_err() {
+            continue;
+        }
+        let dst = project_root.join(path.as_str());
+        if let Some(parent) = dst.parent() {
+            std::fs::create_dir_all(parent)
+                .with_buck_error_context(|| format!("creating parent for staged output {path}"))?;
+        }
+        remove_existing_path(&dst)
+            .with_buck_error_context(|| format!("removing previous output {path}"))?;
+        std::fs::rename(&src, &dst)
+            .with_buck_error_context(|| format!("moving staged output {path} into buck-out"))?;
+    }
+    Ok(())
+}
+
+fn remove_existing_path(path: &Path) -> std::io::Result<()> {
+    match path.symlink_metadata() {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+            std::fs::remove_dir_all(path)
+        }
+        Ok(_) => std::fs::remove_file(path),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 pub fn apply_local_execution_environment(
@@ -3194,24 +3356,111 @@ mod tests {
             "--remap-path-prefix=${pwd}=.".to_owned(),
         ];
 
-        assert!(add_rustc_execroot_remap(&mut args, Some(&execroot)));
-
-        let expected = format!(
-            "--remap-path-prefix={}={}",
-            execroot.as_path().to_string_lossy(),
-            "."
-        );
-        let physical = args
-            .iter()
-            .position(|arg| arg == &expected)
-            .expect("physical execroot remap");
-        let generic = args
-            .iter()
-            .position(|arg| arg == "--remap-path-prefix=${pwd}=.")
-            .expect("generic pwd remap");
         assert!(
-            physical < generic,
-            "specific physical execroot remap must run before generic pwd remap"
+            !add_rustc_execroot_remap(&mut args, Some(&execroot)),
+            "generic process_wrapper pwd remap is rewritten to a stable cwd alias"
+        );
+        assert!(!args.iter().any(|arg| arg.contains("7476792f9006565e")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_process_wrapper_execroot_substitutions_use_stable_cwd_and_output_base()
+    -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let output_base = AbsNormPathBuf::new(temp.path().to_path_buf())?;
+        let execroot = output_base
+            .as_path()
+            .join("execroot")
+            .join("7476792f9006565e");
+        std::fs::create_dir_all(&execroot)?;
+        let execroot = AbsNormPathBuf::new(execroot)?;
+        let mut args = vec![
+            "external/rules_rust/util/process_wrapper/process_wrapper".to_owned(),
+            "--subst".to_owned(),
+            "pwd=${pwd}".to_owned(),
+            "--subst".to_owned(),
+            "exec_root=${exec_root}".to_owned(),
+            "--subst".to_owned(),
+            "output_base=${output_base}".to_owned(),
+            "--".to_owned(),
+            "external/rust_linux_x86_64/bin/rustc".to_owned(),
+            "src/lib.rs".to_owned(),
+        ];
+
+        assert!(rewrite_process_wrapper_execroot_substitutions(
+            &mut args,
+            &execroot,
+            &output_base,
+        ));
+
+        #[cfg(unix)]
+        {
+            let stable_execroot = slug_core::cells::execroot_path(output_base.as_path())
+                .expect("test output base has a basename");
+            assert!(args.contains(&format!("pwd={}", execroot.as_path().to_string_lossy())));
+            assert!(args.contains(&format!("exec_root={}", stable_execroot.to_string_lossy())));
+            assert!(args.contains(&format!(
+                "output_base={}",
+                execroot.as_path().to_string_lossy()
+            )));
+        }
+        #[cfg(not(unix))]
+        {
+            assert!(args.contains(&format!("pwd={}", execroot.as_path().to_string_lossy())));
+            assert!(args.contains(&format!(
+                "exec_root={}",
+                execroot.as_path().to_string_lossy()
+            )));
+            assert!(args.contains(&format!(
+                "output_base={}",
+                output_base.as_path().to_string_lossy()
+            )));
+        }
+        assert!(!args.contains(&"pwd=${pwd}".to_owned()));
+        assert!(!args.contains(&"exec_root=${exec_root}".to_owned()));
+        assert!(!args.contains(&"output_base=${output_base}".to_owned()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_process_wrapper_execroot_substitutions_support_equals_flag() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let output_base = AbsNormPathBuf::new(temp.path().to_path_buf())?;
+        let execroot = output_base
+            .as_path()
+            .join("execroot")
+            .join("7476792f9006565e");
+        std::fs::create_dir_all(&execroot)?;
+        let execroot = AbsNormPathBuf::new(execroot)?;
+        let mut args = vec![
+            "external/rules_rust/util/process_wrapper/process_wrapper".to_owned(),
+            "--subst=exec_root=${exec_root}".to_owned(),
+            "--".to_owned(),
+            "external/rust_linux_x86_64/bin/rustc".to_owned(),
+        ];
+
+        assert!(rewrite_process_wrapper_execroot_substitutions(
+            &mut args,
+            &execroot,
+            &output_base,
+        ));
+
+        #[cfg(unix)]
+        {
+            let stable_execroot = slug_core::cells::execroot_path(output_base.as_path())
+                .expect("test output base has a basename");
+            assert_eq!(
+                args[1],
+                format!("--subst=exec_root={}", stable_execroot.to_string_lossy())
+            );
+        }
+        #[cfg(not(unix))]
+        assert_eq!(
+            args[1],
+            format!("--subst=exec_root={}", execroot.as_path().to_string_lossy())
         );
 
         Ok(())
@@ -3228,6 +3477,21 @@ mod tests {
             "--remap-path-prefix=${pwd}=.".to_owned(),
         ];
 
+        assert!(!add_rustc_flags_execroot_remap(&mut args, Some(&execroot)));
+        assert_eq!(args.len(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rustc_flags_execroot_remap_uses_action_execroot() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let execroot = temp.path().join("execroot").join("7476792f9006565e");
+        std::fs::create_dir_all(&execroot)?;
+        let execroot = AbsNormPathBuf::new(execroot)?;
+        let mut args =
+            vec!["external/rules_rs++crate+crates__anyhow-1.0.102/src/lib.rs".to_owned()];
+
         assert!(add_rustc_flags_execroot_remap(&mut args, Some(&execroot)));
 
         let expected = format!(
@@ -3235,18 +3499,7 @@ mod tests {
             execroot.as_path().to_string_lossy(),
             "."
         );
-        let physical = args
-            .iter()
-            .position(|arg| arg == &expected)
-            .expect("physical execroot remap");
-        let generic = args
-            .iter()
-            .position(|arg| arg == "--remap-path-prefix=${pwd}=.")
-            .expect("generic pwd remap");
-        assert!(
-            physical < generic,
-            "specific physical execroot remap must precede generic pwd remap in rustc paramfile"
-        );
+        assert!(args.contains(&expected));
 
         Ok(())
     }

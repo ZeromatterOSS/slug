@@ -422,37 +422,13 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
             }
         }
 
-        // Try to load and execute the extension's Starlark implementation.
-        //
-        // Failure-mode design: we still fall back to empty specs so a broken
-        // optional extension (e.g. a telemetry one) doesn't block builds
-        // that never use its repos. But silent fallback used to hide real
-        // bugs — any extension whose repos are actually referenced would
-        // later fail with `Unknown target` errors that bear no trace back
-        // to the extension. So we also print a user-visible stderr line
-        // with the extension id and underlying error; analysis errors
-        // downstream can be correlated to the extension they came from.
-        let output = match self.try_execute_starlark(ctx, aggregated, module_ctx).await {
-            Ok(output) => output,
-            Err(e) => {
-                eprintln!(
-                    "warning: module extension '{}' failed; any repo it was \
-                     supposed to generate will be stubbed out and subsequent \
-                     `Unknown target` errors will trace back here.\n  cause: {e:#}",
-                    aggregated.extension_id,
-                );
-                tracing::warn!(
-                    "Could not execute extension '{}' Starlark implementation, \
-                     falling back to empty specs: {:?}",
-                    aggregated.extension_id,
-                    e
-                );
-                ExtensionExecutionOutput {
-                    generated_repo_specs: fxhash::FxHashMap::default(),
-                    metadata: Default::default(),
-                }
-            }
-        };
+        let output = self
+            .try_execute_starlark(ctx, aggregated, module_ctx)
+            .await
+            .buck_error_context(format!(
+                "module extension '{}' failed",
+                aggregated.extension_id
+            ))?;
         let specs = output.generated_repo_specs.clone();
 
         tracing::info!(
@@ -498,7 +474,12 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                     format!("bazel-external/{}", canonical),
                 );
                 let repo_dir = project_root.join("bazel-external").join(&canonical);
-                if repo_dir.join(".slug_repo_complete").exists() {
+                let marker_layout_valid = slug_bzlmod::repo_spec_to_invocation(&canonical, spec)
+                    .map(|invocation| {
+                        slug_bzlmod::repo_layout_is_valid_for_invocation(&invocation, &repo_dir)
+                    })
+                    .unwrap_or(true);
+                if repo_dir.join(".slug_repo_complete").exists() && marker_layout_valid {
                     continue;
                 }
                 let key = slug_bzlmod::ExtensionRepoExecutionKey::new(

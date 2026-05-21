@@ -73,7 +73,7 @@ use crate::types::TagValue;
 ///
 /// This represents all the tags applied to a single extension across
 /// all modules in the dependency graph.
-#[derive(Debug, Clone, Default, Allocative)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Allocative)]
 pub struct AggregatedExtension {
     /// The extension identifier (bzl_file%name).
     pub extension_id: String,

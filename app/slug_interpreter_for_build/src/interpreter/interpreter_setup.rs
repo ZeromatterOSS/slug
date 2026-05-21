@@ -54,5 +54,10 @@ pub fn setup_interpreter_basic(
         StarlarkProfilerConfiguration::default(),
         false,
         false,
-    )
+    )?;
+    slug_bzlmod::SetBzlmodSessionData::set_bzlmod_session_data(
+        dice,
+        slug_bzlmod::BzlmodSessionData::default(),
+    )?;
+    Ok(())
 }

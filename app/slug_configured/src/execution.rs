@@ -702,7 +702,8 @@ async fn compute_execution_platforms(
 
     let cli_extras: Arc<[String]> = ctx.compute(&ExtraExecutionPlatformsKey).await?;
     let cli_extras: Vec<String> = cli_extras.iter().cloned().collect();
-    let module_registrations = slug_bzlmod::get_registered_execution_platforms();
+    let bzlmod_session_data = ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await?;
+    let module_registrations = bzlmod_session_data.registered_execution_platforms.clone();
 
     if cli_extras.is_empty() && module_registrations.is_empty() {
         return Ok(None);

@@ -21,6 +21,7 @@
 //! materialized yet, lazy materialization is triggered via `ExtensionRepoExecutionKey`.
 
 use std::fmt::Display;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -122,11 +123,6 @@ fn repo_names_summary<'a>(repo_names: impl Iterator<Item = &'a str>) -> String {
             total - names.len()
         )
     }
-}
-
-fn is_stub_marker(marker: &str) -> bool {
-    let marker = marker.trim();
-    marker == "stub" || marker.starts_with("stub:")
 }
 
 fn complete_marker(spec_hash: &str) -> String {
@@ -492,7 +488,19 @@ async fn ensure_extension_spokes_registered(
     if slug_bzlmod::extension_spokes_seeded(extension_id) {
         return;
     }
-    let Some(ext_key) = slug_bzlmod::create_extension_execution_key(extension_id) else {
+    let session_data = match ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await {
+        Ok(data) => data,
+        Err(e) => {
+            tracing::debug!(
+                "Skipping spoke seeding for '{}': bzlmod session data unavailable: {}",
+                extension_id,
+                e
+            );
+            return;
+        }
+    };
+    let Some(ext_key) = slug_bzlmod::create_extension_execution_key(&session_data, extension_id)
+    else {
         // Not a module extension — `use_repo_rule()` and similar produce a
         // single repo with no siblings, so there is nothing to seed. Mark
         // seeded so we don't retry on every cell access.
@@ -610,17 +618,17 @@ pub(crate) async fn get_file_ops_delegate(
     // partial materialization (e.g., source downloaded but BUILD.bazel not generated)
     // can leave directories without the completion marker.
     //
-    // Marker content distinguishes "complete" (real materialization) from
-    // "stub" (legacy placeholder written by older Slug builds when the
-    // extension previously failed). When we now have a valid `repo_spec_json`
-    // — typically because the lockfile pre-seed populated it — a stub from a
-    // prior failed run can be discarded and re-materialized cleanly.
+    // Marker content distinguishes complete materialization from stale or
+    // corrupted materialization. Non-complete marker content is never semantic
+    // authority; discard it and re-materialize from the current repo spec.
     let marker_path = source_path.join(".slug_repo_complete");
     let marker_contents = marker_path
         .exists()
         .then(|| std::fs::read_to_string(&marker_path).ok())
         .flatten();
-    let is_stale_stub = marker_contents.as_deref().is_some_and(is_stub_marker);
+    let is_stale_non_complete_marker = marker_contents
+        .as_deref()
+        .is_some_and(|marker| !is_complete_marker(marker));
     let is_stale_complete = !setup.repo_spec_json.is_empty()
         && !setup.spec_hash.is_empty()
         && marker_contents.as_deref().is_some_and(|s| {
@@ -642,11 +650,19 @@ pub(crate) async fn get_file_ops_delegate(
         && !source_path.join("BUILD").exists();
     let is_stale_foreign_symlink = marker_contents.as_deref().is_some_and(is_complete_marker)
         && repo_has_foreign_top_level_symlink(&source_path, &project_root_path);
-    if is_stale_stub
+    let is_stale_invalid_layout = !setup.repo_spec_json.is_empty()
+        && marker_contents.as_deref().is_some_and(is_complete_marker)
+        && repo_spec_layout_is_invalid(
+            &setup.repo_spec_json,
+            setup.canonical_name.as_ref(),
+            &source_path,
+        );
+    if is_stale_non_complete_marker
         || is_stale_complete
         || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
         || is_stale_missing_build
         || is_stale_foreign_symlink
+        || is_stale_invalid_layout
     {
         tracing::info!(
             "Extension repo '{}' has stale materialization; \
@@ -655,7 +671,7 @@ pub(crate) async fn get_file_ops_delegate(
         );
         if let Err(e) = std::fs::remove_dir_all(&source_path) {
             tracing::warn!(
-                "Failed to remove stale stub dir for '{}': {} (proceeding anyway)",
+                "Failed to remove stale extension repo dir for '{}': {} (proceeding anyway)",
                 setup.canonical_name,
                 e
             );
@@ -688,7 +704,17 @@ pub(crate) async fn get_file_ops_delegate(
                 setup.extension_id
             );
 
-            let ext_key = match slug_bzlmod::create_extension_execution_key(&setup.extension_id) {
+            let session_data = ctx
+                .compute(&slug_bzlmod::BzlmodSessionDataKey)
+                .await
+                .map_err(|e| ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!("bzlmod session data unavailable: {}", e),
+                })?;
+            let ext_key = match slug_bzlmod::create_extension_execution_key(
+                &session_data,
+                &setup.extension_id,
+            ) {
                 Some(key) => key,
                 None => {
                     // Not a module extension — likely a use_repo_rule() invocation.
@@ -905,6 +931,20 @@ fn attr_value_is_present(value: &RepoAttrValue) -> bool {
     }
 }
 
+fn repo_spec_layout_is_invalid(
+    repo_spec_json: &str,
+    canonical_name: &str,
+    source_path: &Path,
+) -> bool {
+    let Ok(repo_spec) = serde_json::from_str::<RepoSpec>(repo_spec_json) else {
+        return false;
+    };
+    let Ok(invocation) = slug_bzlmod::repo_spec_to_invocation(canonical_name, &repo_spec) else {
+        return false;
+    };
+    !slug_bzlmod::repo_layout_is_valid_for_invocation(&invocation, source_path)
+}
+
 /// Create `buck-out/v2/external_cells/extension_repo/{canonical_name}` as a symlink
 /// to `bazel-external/{canonical_name}` (the materialized repo content).
 ///
@@ -997,14 +1037,6 @@ pub(crate) async fn copy_to_destination(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn stub_marker_detection_accepts_plain_and_hashed_stubs() {
-        assert!(is_stub_marker("stub"));
-        assert!(is_stub_marker("stub:abc123\n"));
-        assert!(!is_stub_marker("complete"));
-        assert!(!is_stub_marker("notstub:abc123"));
-    }
 
     #[test]
     fn complete_marker_detection_requires_current_spec_hash_when_available() {

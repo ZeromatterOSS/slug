@@ -2641,9 +2641,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(default = NoneOr::None)] default: NoneOr<&str>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        match std::env::var(name) {
-            Ok(v) => Ok(heap.alloc(v)),
-            Err(_) => match default.into_option() {
+        match slug_build_api::interpreter::rule_defs::build_config::get_repo_env_var(name) {
+            Some(v) => Ok(heap.alloc(v)),
+            None => match default.into_option() {
                 Some(d) => Ok(heap.alloc(d)),
                 None => Ok(Value::new_none()),
             },

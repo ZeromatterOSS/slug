@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -138,6 +139,89 @@ fn module_depends_on_rules_python(parsed_modules: &[(String, ParsedModuleFile)])
         .any(|(name, _)| name == RULES_PYTHON_MODULE_NAME)
 }
 
+fn repo_mapping_snapshot_for_modules(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+) -> slug_bzlmod::RepoMappingSnapshot {
+    let mut snapshot = slug_bzlmod::RepoMappingSnapshot::new();
+    for (module_name, parsed_mod) in parsed_modules {
+        let mapping = slug_bzlmod::BzlmodRepoMapping::for_module(parsed_mod, root_module_name)
+            .entries_as_strings();
+        if module_name == root_module_name {
+            snapshot.insert(String::new(), mapping.clone());
+        }
+        snapshot.insert(module_name.clone(), mapping);
+    }
+    snapshot
+}
+
+fn repo_mapping_overrides_for_root(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+) -> slug_bzlmod::RepoMappingOverrides {
+    let mut overrides = slug_bzlmod::RepoMappingOverrides::new();
+    for (cell_name, parsed_mod) in parsed_modules {
+        let module_name = if parsed_mod.module.name.is_empty() {
+            root_module_name
+        } else {
+            &parsed_mod.module.name
+        };
+        let is_root = cell_name == root_module_name
+            || cell_name == "_main"
+            || parsed_mod.module.name == root_module_name;
+        if !is_root {
+            continue;
+        }
+
+        for usage in &parsed_mod.extension_usages {
+            if usage.repo_overrides.is_empty() {
+                continue;
+            }
+            let ext_id = slug_bzlmod::canonical_extension_id(
+                &usage.extension_bzl_file,
+                &usage.extension_name,
+                module_name,
+            );
+            let entry = overrides.entry(ext_id).or_default();
+            for (generated_name, replacement_repo) in &usage.repo_overrides {
+                entry.insert(generated_name.clone(), replacement_repo.clone());
+            }
+        }
+    }
+    overrides
+}
+
+fn add_extension_repo_mapping_rows_from_cells(
+    snapshot: &mut slug_bzlmod::RepoMappingSnapshot,
+    cells: &[slug_bzlmod::PendingRepoCell],
+    root_module_name: &str,
+    repo_mapping_overrides: &slug_bzlmod::RepoMappingOverrides,
+) {
+    let mut by_extension: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+    for cell in cells {
+        by_extension
+            .entry(cell.extension_id.clone())
+            .or_default()
+            .push((cell.internal_name.clone(), cell.canonical_name.clone()));
+    }
+
+    for (extension_id, generated_repos) in by_extension {
+        let overrides = repo_mapping_overrides.get(&extension_id);
+        if !slug_bzlmod::add_extension_generated_repo_mappings(
+            snapshot,
+            &extension_id,
+            root_module_name,
+            generated_repos,
+            overrides,
+        ) {
+            tracing::debug!(
+                "Skipping extension repo mapping rows for '{}': owner module mapping is unavailable",
+                extension_id
+            );
+        }
+    }
+}
+
 /// True iff any toolchain label already references the bundled
 /// `@local_config_python` cell (meaning the user has already wired up
 /// bundled rules_python toolchains and we should skip auto-injection).
@@ -212,6 +296,9 @@ pub struct BuckConfigBasedCells {
     /// True when MODULE.bazel is present - all cell resolution is done via bzlmod.
     /// Per-cell .buckconfig [repository_aliases] sections are ignored in this mode.
     pub is_bzlmod: bool,
+    /// Bzlmod facts from MODULE.bazel resolution that must participate in DICE
+    /// invalidation for this command.
+    pub bzlmod_session_data: slug_bzlmod::BzlmodSessionData,
 }
 
 /// Result of bzlmod dependency resolution.
@@ -228,6 +315,8 @@ struct BzlmodResolutionResult {
     /// Cell aliases to register: (alias_name, target_cell_name)
     /// These come from repo_name parameters in bazel_dep()
     aliases: Vec<(NonEmptyCellAlias, CellName)>,
+    /// DICE-injected bzlmod facts derived from this resolution.
+    session_data: slug_bzlmod::BzlmodSessionData,
 }
 
 impl BuckConfigBasedCells {
@@ -296,6 +385,7 @@ impl BuckConfigBasedCells {
         let mut bzlmod_extension_cells: Vec<(CellName, ExtensionRepoCellSetup)> = Vec::new();
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
         let mut has_module_bazel = false;
+        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::default();
 
         // ===== Bzlmod Integration =====
         // When MODULE.bazel exists, ALL cell definitions come from bzlmod resolution.
@@ -307,6 +397,7 @@ impl BuckConfigBasedCells {
                 Self::resolve_bzlmod_dependencies(project_fs, &root_config).await?
             {
                 has_module_bazel = true;
+                bzlmod_session_data = bzlmod_result.session_data;
 
                 // Root cell comes from MODULE.bazel module(name = "...")
                 let root_cell_name = CellName::unchecked_new(&bzlmod_result.root_module_name)?;
@@ -494,6 +585,7 @@ impl BuckConfigBasedCells {
                 args: processed_config_args,
             },
             is_bzlmod: has_module_bazel,
+            bzlmod_session_data,
         })
     }
 
@@ -538,6 +630,8 @@ impl BuckConfigBasedCells {
         let mut aliases = Vec::new();
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
+        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::default();
+        bzlmod_session_data.repo_env = slug_bzlmod::legacy_bzlmod_repo_env();
         let lockfile_mode = match root_config
             .get_section("bzlmod")
             .and_then(|section| section.get("lockfile_mode"))
@@ -553,6 +647,13 @@ impl BuckConfigBasedCells {
             }
             None => slug_bzlmod::LockfileMode::default(),
         };
+        // Reset temporary process-local bzlmod adapters before any dynamic
+        // extension cells are registered. Even for the same root, lockfile
+        // replay and recorded inputs may have changed since the prior command.
+        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(
+            project_root.root().to_path_buf(),
+        );
+        slug_bzlmod::reset_spoke_materialization_project_root(project_root.root().to_path_buf());
 
         // Resolve local path overrides first
         let local_modules = resolve_local_modules(&parsed.module.overrides, workspace_root)?;
@@ -857,21 +958,19 @@ impl BuckConfigBasedCells {
                 }
             }
 
-            // Populate the global module version registry
-            // so module_version() builtin returns the correct version
-            {
-                let mut version_map = std::collections::HashMap::new();
-                // Add root module
-                version_map.insert(
-                    parsed.module.name.clone(),
-                    parsed.module.version.to_string(),
-                );
-                // Add all resolved external modules
-                for (name, info) in &resolved_graph.modules {
-                    version_map.insert(name.clone(), info.version.clone());
-                }
-                slug_bzlmod::set_module_versions(version_map);
+            // Populate module version facts so module_version() builtin
+            // returns the correct version through DICE-injected command state.
+            let mut version_map = std::collections::HashMap::new();
+            // Add root module
+            version_map.insert(
+                parsed.module.name.clone(),
+                parsed.module.version.to_string(),
+            );
+            // Add all resolved external modules
+            for (name, info) in &resolved_graph.modules {
+                version_map.insert(name.clone(), info.version.clone());
             }
+            bzlmod_session_data.module_versions = version_map;
 
             // Handle repo_name aliases from transitive deps
             // Parse each resolved module's MODULE.bazel to extract repo_name aliases
@@ -957,8 +1056,19 @@ impl BuckConfigBasedCells {
         }
         let aggregated =
             slug_bzlmod::aggregate_extensions_with_root(&module_extensions, Some(root_module_name));
+        bzlmod_session_data.repo_mappings =
+            repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
+        bzlmod_session_data.repo_mapping_overrides =
+            repo_mapping_overrides_for_root(&parsed_modules, root_module_name);
         let (mut pre_computed_cells, pre_computed_aliases) =
             slug_bzlmod::pre_compute_extension_repo_cells(&parsed_modules, root_module_name)?;
+        let mut extension_mapping_cells = pre_computed_cells.clone();
+        add_extension_repo_mapping_rows_from_cells(
+            &mut bzlmod_session_data.repo_mappings,
+            &extension_mapping_cells,
+            root_module_name,
+            &bzlmod_session_data.repo_mapping_overrides,
+        );
 
         // Augment with extension-internal spokes recorded in MODULE.bazel.lock.
         // The use_repo()-driven pass above only registers repos the project
@@ -969,7 +1079,7 @@ impl BuckConfigBasedCells {
         // post-extension-eval loop) is gated on the hub's `.slug_repo_complete`
         // marker.
         if let Some(lockfile) =
-            slug_bzlmod::cached_lockfile_with_mode(project_root.root().as_path(), lockfile_mode)?
+            slug_bzlmod::read_lockfile_with_mode(project_root.root().as_path(), lockfile_mode)?
         {
             let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                 &lockfile,
@@ -977,8 +1087,18 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
+                Some(&bzlmod_session_data.repo_env),
+                Some(&bzlmod_session_data.repo_mappings),
+                Some(&bzlmod_session_data.repo_mapping_overrides),
             );
             register_lockfile_seeded_dynamic_cells(project_root, &extra);
+            extension_mapping_cells.extend(extra);
+            add_extension_repo_mapping_rows_from_cells(
+                &mut bzlmod_session_data.repo_mappings,
+                &extension_mapping_cells,
+                root_module_name,
+                &bzlmod_session_data.repo_mapping_overrides,
+            );
         }
         let hidden_lockfile_path = root_config
             .get_section("bzlmod")
@@ -986,7 +1106,7 @@ impl BuckConfigBasedCells {
             .map(|value| std::path::PathBuf::from(value.as_str()));
         if let Some(hidden_lockfile_path) = hidden_lockfile_path {
             if let Some(lockfile) =
-                slug_bzlmod::cached_lockfile_path_with_mode(&hidden_lockfile_path, lockfile_mode)?
+                slug_bzlmod::read_lockfile_path_with_mode(&hidden_lockfile_path, lockfile_mode)?
             {
                 let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                     &lockfile,
@@ -994,8 +1114,18 @@ impl BuckConfigBasedCells {
                     root_module_name,
                     &mut pre_computed_cells,
                     project_root.root().as_path(),
+                    Some(&bzlmod_session_data.repo_env),
+                    Some(&bzlmod_session_data.repo_mappings),
+                    Some(&bzlmod_session_data.repo_mapping_overrides),
                 );
                 register_lockfile_seeded_dynamic_cells(project_root, &extra);
+                extension_mapping_cells.extend(extra);
+                add_extension_repo_mapping_rows_from_cells(
+                    &mut bzlmod_session_data.repo_mappings,
+                    &extension_mapping_cells,
+                    root_module_name,
+                    &bzlmod_session_data.repo_mapping_overrides,
+                );
             }
         }
         slug_util::memory_checkpoint::checkpoint(
@@ -1007,13 +1137,13 @@ impl BuckConfigBasedCells {
             ],
         );
 
-        // Aggregate extension usages from all modules and store globally.
-        // This data is needed by DICE when extension repos are lazily executed.
-        slug_bzlmod::set_extension_aggregations(
-            aggregated,
-            root_module_name.to_owned(),
-            project_root.root().to_path_buf(),
-        );
+        // Aggregate extension usages from all modules and carry them into the
+        // DICE-injected bzlmod session state. This data is needed when
+        // extension repos are lazily executed inside DICE.
+        bzlmod_session_data.extension_aggregations = aggregated;
+        bzlmod_session_data.root_module_name = root_module_name.to_owned();
+        bzlmod_session_data.project_root = project_root.root().to_path_buf();
+        bzlmod_session_data.lockfile_mode = lockfile_mode;
 
         // Collect toolchain and execution platform registrations from all modules.
         // Priority order: root module first, then BFS order of dep graph.
@@ -1094,8 +1224,8 @@ impl BuckConfigBasedCells {
                 all_toolchains.len(),
                 all_exec_platforms.len()
             );
-            slug_bzlmod::set_registered_toolchains(all_toolchains.clone());
-            slug_bzlmod::set_registered_execution_platforms(all_exec_platforms);
+            bzlmod_session_data.registered_toolchains = all_toolchains.clone();
+            bzlmod_session_data.registered_execution_platforms = all_exec_platforms;
 
             // Ensure toolchain repos referenced in register_toolchains() exist.
             // Extract repo names from label patterns and check if the repo directories
@@ -1143,9 +1273,6 @@ impl BuckConfigBasedCells {
                 );
             }
         }
-
-        // Set project root for dynamic cell filesystem scanning
-        slug_core::cells::set_dynamic_project_root(project_root.root().to_path_buf());
 
         // Convert pre-computed cells to the format expected by
         // BzlmodResolutionResult. Bazel's identity for extension-generated
@@ -1219,6 +1346,16 @@ impl BuckConfigBasedCells {
         // second cell identity.
         let mut ext_aliases = Vec::new();
         for alias in pre_computed_aliases {
+            let target_name = resolved_graph_for_aliases
+                .as_ref()
+                .and_then(|resolved_graph| {
+                    selected_bzlmod_cell_name_for_dep(&cells, &alias.canonical_name, resolved_graph)
+                })
+                .unwrap_or(alias.canonical_name.as_str())
+                .to_owned();
+            let is_generated_override_alias = alias.declaring_module.is_none()
+                && alias.apparent_name != target_name
+                && slug_bzlmod::parse_canonical_name(&alias.apparent_name).is_some();
             if let Some(owner_module) = alias.declaring_module.as_deref().or_else(|| {
                 slug_bzlmod::parse_canonical_name(&alias.canonical_name)
                     .map(|(owner_module, _, _)| owner_module)
@@ -1226,23 +1363,31 @@ impl BuckConfigBasedCells {
                 slug_core::cells::register_scoped_bzlmod_repo_alias(
                     owner_module.to_owned(),
                     alias.apparent_name.clone(),
-                    alias.canonical_name.clone(),
+                    target_name.clone(),
+                );
+            }
+            if is_generated_override_alias {
+                slug_core::cells::register_dynamic_extension_cell_alias(
+                    alias.apparent_name.clone(),
+                    target_name.clone(),
                 );
             }
             if existing_cell_names.contains(alias.apparent_name.as_str()) {
                 tracing::debug!(
                     "Skipping global alias '{}' -> '{}': cell already exists; scoped alias remains registered",
                     alias.apparent_name,
-                    alias.canonical_name
+                    target_name
                 );
                 continue;
             }
             let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
-            let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
-            slug_core::cells::register_dynamic_extension_cell_alias(
-                apparent_name.as_str().to_owned(),
-                canonical_name.as_str().to_owned(),
-            );
+            let canonical_name = CellName::unchecked_new(&target_name)?;
+            if !is_generated_override_alias {
+                slug_core::cells::register_dynamic_extension_cell_alias(
+                    apparent_name.as_str().to_owned(),
+                    canonical_name.as_str().to_owned(),
+                );
+            }
             ext_aliases.push((apparent_name, canonical_name));
         }
 
@@ -1410,6 +1555,7 @@ impl BuckConfigBasedCells {
             cells,
             extension_cells: ext_cells,
             aliases,
+            session_data: bzlmod_session_data,
         }))
     }
 

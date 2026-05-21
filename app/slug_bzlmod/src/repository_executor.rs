@@ -58,8 +58,11 @@ pub fn execute_repository_rule(
         working_dir
     );
 
-    // Check if already materialized
-    if is_repo_complete(&working_dir) {
+    // Check if already materialized. A marker is not sufficient for repository
+    // rules whose outputs have layout invariants consumed by downstream rules.
+    if is_repo_complete(&working_dir)
+        && repo_layout_is_valid_for_invocation(invocation, &working_dir)
+    {
         record_bzlmod_event(
             BzlmodEventKind::RepoMaterializationHit,
             invocation.name.as_str(),
@@ -70,9 +73,14 @@ pub fn execute_repository_rule(
             working_dir,
         ));
     }
+    let miss_reason = if is_repo_complete(&working_dir) {
+        "marker_layout_invalid"
+    } else {
+        "marker_absent"
+    };
     record_bzlmod_event(
         BzlmodEventKind::RepoMaterializationMissReason,
-        format!("{}:marker_absent", invocation.name),
+        format!("{}:{miss_reason}", invocation.name),
     );
 
     // Clean and create working directory
@@ -112,6 +120,120 @@ pub fn execute_repository_rule(
 /// Check if a repository is already materialized.
 fn is_repo_complete(working_dir: &Path) -> bool {
     working_dir.join(".slug_repo_complete").exists()
+}
+
+pub fn repo_layout_is_valid_for_invocation(
+    invocation: &RepositoryInvocation,
+    working_dir: &Path,
+) -> bool {
+    match invocation.rule_name.as_str() {
+        "git_repository" | "new_git_repository" => working_dir.join(".git").exists(),
+        "local_repository" | "new_local_repository" => {
+            local_repository_layout_is_valid(invocation, working_dir)
+        }
+        "_llvm_subproject_repository" => llvm_subproject_layout_is_valid(invocation, working_dir),
+        _ => true,
+    }
+}
+
+fn local_repository_layout_is_valid(invocation: &RepositoryInvocation, working_dir: &Path) -> bool {
+    let Some(source_dir) = local_repository_source_path(invocation, working_dir) else {
+        return true;
+    };
+    let Ok(entries) = std::fs::read_dir(source_dir) else {
+        return false;
+    };
+
+    let mut checked_any = false;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if should_skip_local_repository_entry(name_str.as_ref()) {
+            continue;
+        }
+        checked_any = true;
+        if !working_dir.join(&name).exists() {
+            return false;
+        }
+    }
+
+    checked_any || working_dir.join("BUILD.bazel").exists() || working_dir.join("BUILD").exists()
+}
+
+fn local_repository_source_path(
+    invocation: &RepositoryInvocation,
+    working_dir: &Path,
+) -> Option<PathBuf> {
+    let path = invocation.attrs.get("path")?.as_string()?;
+    if path.is_empty() {
+        return None;
+    }
+
+    let path = Path::new(path);
+    let resolved = if path.is_relative() {
+        let project_root = working_dir.parent()?.parent()?;
+        project_root.join(path)
+    } else {
+        path.to_path_buf()
+    };
+    Some(resolved.canonicalize().unwrap_or(resolved))
+}
+
+fn should_skip_local_repository_entry(name: &str) -> bool {
+    matches!(
+        name,
+        "BUILD"
+            | "BUILD.bazel"
+            | "WORKSPACE"
+            | "WORKSPACE.bazel"
+            | "bazel-external"
+            | "bazel-out"
+            | "bazel-bin"
+            | "bazel-testlogs"
+            | "buck-out"
+            | ".slug_repo_complete"
+    )
+}
+
+fn llvm_subproject_layout_is_valid(invocation: &RepositoryInvocation, working_dir: &Path) -> bool {
+    let Some(dir) = invocation
+        .attrs
+        .get("dir")
+        .and_then(|attr| attr.as_string())
+    else {
+        return true;
+    };
+    if dir.is_empty() {
+        return true;
+    }
+    let Some(project_root) = working_dir.parent().and_then(|external| external.parent()) else {
+        return false;
+    };
+    let Some(prefix) = invocation.name.rsplit_once('+').map(|(prefix, _)| prefix) else {
+        return true;
+    };
+    let source_dir = project_root
+        .join("bazel-external")
+        .join(format!("{prefix}+llvm-raw"))
+        .join(dir);
+    let Ok(entries) = std::fs::read_dir(&source_dir) else {
+        return false;
+    };
+
+    let mut checked_any = false;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if should_skip_local_repository_entry(name_str.as_ref()) {
+            continue;
+        }
+        checked_any = true;
+        if !working_dir.join(&name).exists() {
+            return false;
+        }
+    }
+
+    checked_any && working_dir.join("BUILD.bazel").exists()
 }
 
 /// Mark a repository as complete.
@@ -1499,6 +1621,102 @@ mod tests {
 
         mark_repo_complete(&working_dir).unwrap();
         assert!(is_repo_complete(&working_dir));
+    }
+
+    #[test]
+    fn git_repository_marker_requires_git_layout() {
+        let temp = TempDir::new().unwrap();
+        let working_dir = temp.path().join("git_repo");
+        std::fs::create_dir_all(&working_dir).unwrap();
+        mark_repo_complete(&working_dir).unwrap();
+
+        let git_inv = RepositoryInvocation::new("git_repo".to_owned(), "git_repository".to_owned());
+        assert!(!repo_layout_is_valid_for_invocation(&git_inv, &working_dir));
+
+        std::fs::create_dir(working_dir.join(".git")).unwrap();
+        assert!(repo_layout_is_valid_for_invocation(&git_inv, &working_dir));
+
+        let archive_inv =
+            RepositoryInvocation::new("archive_repo".to_owned(), "http_archive".to_owned());
+        assert!(repo_layout_is_valid_for_invocation(
+            &archive_inv,
+            &working_dir
+        ));
+    }
+
+    #[test]
+    fn new_local_repository_marker_requires_source_layout() {
+        let temp = TempDir::new().unwrap();
+        let source_dir = temp.path().join("source");
+        std::fs::create_dir_all(source_dir.join("src")).unwrap();
+        std::fs::write(source_dir.join("src/lib.h"), "header").unwrap();
+        std::fs::write(source_dir.join("README.md"), "readme").unwrap();
+
+        let working_dir = temp.path().join("bazel-external/local_repo");
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(working_dir.join("BUILD.bazel"), "# generated build").unwrap();
+        mark_repo_complete(&working_dir).unwrap();
+
+        let local_inv =
+            RepositoryInvocation::new("local_repo".to_owned(), "new_local_repository".to_owned())
+                .with_attr(
+                    "path".to_owned(),
+                    crate::repository_invocations::AttrValue::String(
+                        source_dir.to_string_lossy().to_string(),
+                    ),
+                );
+
+        assert!(!repo_layout_is_valid_for_invocation(
+            &local_inv,
+            &working_dir
+        ));
+
+        std::fs::create_dir(working_dir.join("src")).unwrap();
+        std::fs::write(working_dir.join("README.md"), "readme").unwrap();
+        assert!(repo_layout_is_valid_for_invocation(
+            &local_inv,
+            &working_dir
+        ));
+    }
+
+    #[test]
+    fn llvm_subproject_marker_requires_source_layout() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let raw_dir = project_root
+            .join("bazel-external")
+            .join("llvm++llvm_source+llvm-raw")
+            .join("libcxx");
+        std::fs::create_dir_all(raw_dir.join("src")).unwrap();
+        std::fs::create_dir_all(raw_dir.join("include")).unwrap();
+
+        let working_dir = project_root
+            .join("bazel-external")
+            .join("llvm++llvm_source+libcxx");
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(working_dir.join("BUILD.bazel"), "# generated build").unwrap();
+        mark_repo_complete(&working_dir).unwrap();
+
+        let invocation = RepositoryInvocation::new(
+            "llvm++llvm_source+libcxx".to_owned(),
+            "_llvm_subproject_repository".to_owned(),
+        )
+        .with_attr(
+            "dir".to_owned(),
+            crate::repository_invocations::AttrValue::String("libcxx".to_owned()),
+        );
+
+        assert!(!repo_layout_is_valid_for_invocation(
+            &invocation,
+            &working_dir
+        ));
+
+        std::fs::create_dir(working_dir.join("src")).unwrap();
+        std::fs::create_dir(working_dir.join("include")).unwrap();
+        assert!(repo_layout_is_valid_for_invocation(
+            &invocation,
+            &working_dir
+        ));
     }
 
     #[test]

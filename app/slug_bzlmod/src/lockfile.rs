@@ -41,6 +41,7 @@
 //! }
 //! ```
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -48,6 +49,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
+use allocative::Allocative;
 use base64::Engine;
 use indexmap::IndexMap;
 use serde::Deserialize;
@@ -97,6 +99,18 @@ pub enum LockfileError {
         Run 'slug mod update' to update the lockfile."
     )]
     LockfileModeError,
+}
+
+/// Explicit capability for writing Bazel-visible lockfiles.
+///
+/// Ordinary build/query/audit paths should read lockfiles but not write them.
+/// Future `slug mod update` plumbing can use `ExplicitModUpdate`; tests use the
+/// cfg-gated helper below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LockfileWritePurpose {
+    ExplicitModUpdate,
+    #[cfg(test)]
+    Test,
 }
 
 /// The MODULE.bazel.lock file content.
@@ -182,7 +196,7 @@ pub struct LockfileExtensionGeneral {
 
     /// Recorded inputs that affect extension execution.
     /// Bazel 9.0 format - list of strings in these formats:
-    /// - `REPO_MAPPING:<module>+,<apparent_name> <canonical_name>`
+    /// - `REPO_MAPPING:<source_repo>,<apparent_name> <canonical_name>`
     /// - `FILE:@@<module>+//<path> <sha256-hex>`
     /// - `ENV:<VARIABLE_NAME>`
     #[serde(default)]
@@ -244,6 +258,25 @@ impl LockfileExtensionData {
             }
             None => false,
         }
+    }
+
+    /// Check that recorded extension inputs still match current filesystem
+    /// state. Unsupported recorded input kinds are conservative replay misses.
+    pub fn recorded_inputs_current(
+        &self,
+        workspace_root: Option<&Path>,
+        repo_env: Option<&BTreeMap<String, String>>,
+        repo_mappings: Option<&crate::RepoMappingSnapshot>,
+    ) -> Result<(), String> {
+        let Some(general) = &self.general else {
+            return Err("missing_general".to_owned());
+        };
+        validate_recorded_inputs_for_replay(
+            &general.recorded_inputs,
+            workspace_root,
+            repo_env,
+            repo_mappings,
+        )
     }
 
     /// Get the generated repo specs if valid.
@@ -315,6 +348,258 @@ fn validate_base64_sha256_lockfile_digest(
         .into());
     }
     Ok(())
+}
+
+enum RecordedInput {
+    File(PathBuf),
+    Dirents(PathBuf),
+    DirTree(PathBuf),
+    Env(String),
+    RepoMapping {
+        source_repo: String,
+        apparent: String,
+    },
+    Unsupported,
+}
+
+fn validate_recorded_inputs_for_replay(
+    recorded_inputs: &[String],
+    workspace_root: Option<&Path>,
+    repo_env: Option<&BTreeMap<String, String>>,
+    repo_mappings: Option<&crate::RepoMappingSnapshot>,
+) -> Result<(), String> {
+    for raw in recorded_inputs {
+        let (input, old_value) = parse_recorded_input_with_value(raw)
+            .ok_or_else(|| "recorded_input_malformed".to_owned())?;
+        match input {
+            RecordedInput::File(path) => {
+                let path = resolve_recorded_path(&path, workspace_root)?;
+                let Some(old_value) = old_value else {
+                    return Err("recorded_input_malformed".to_owned());
+                };
+                let current = recorded_file_marker_value(&path)
+                    .map_err(|_| "recorded_input_stat_failed".to_owned())?;
+                if current != old_value {
+                    return Err("recorded_input_changed".to_owned());
+                }
+            }
+            RecordedInput::Dirents(path) => {
+                let path = resolve_recorded_path(&path, workspace_root)?;
+                let Some(old_value) = old_value else {
+                    return Err("recorded_input_malformed".to_owned());
+                };
+                let current = recorded_dirents_marker_value(&path)
+                    .map_err(|_| "recorded_input_stat_failed".to_owned())?;
+                if current != old_value {
+                    return Err("recorded_input_changed".to_owned());
+                }
+            }
+            RecordedInput::DirTree(path) => {
+                let path = resolve_recorded_path(&path, workspace_root)?;
+                let Some(old_value) = old_value else {
+                    return Err("recorded_input_malformed".to_owned());
+                };
+                let current = recorded_dirtree_marker_value(&path)
+                    .map_err(|_| "recorded_input_stat_failed".to_owned())?;
+                if current != old_value {
+                    return Err("recorded_input_changed".to_owned());
+                }
+            }
+            RecordedInput::Env(name) => {
+                let Some(repo_env) = repo_env else {
+                    return Err("recorded_input_unsupported".to_owned());
+                };
+                let current = repo_env.get(&name).cloned();
+                if current != old_value {
+                    return Err("recorded_input_changed".to_owned());
+                }
+            }
+            RecordedInput::RepoMapping {
+                source_repo,
+                apparent,
+            } => {
+                let Some(repo_mappings) = repo_mappings else {
+                    return Err("recorded_input_unsupported".to_owned());
+                };
+                let Some(source_mapping) = repo_mappings.get(&source_repo) else {
+                    return Err("recorded_input_changed".to_owned());
+                };
+                let current = source_mapping
+                    .get(&apparent)
+                    .cloned()
+                    .or_else(|| Some(apparent.clone()));
+                if current != old_value {
+                    return Err("recorded_input_changed".to_owned());
+                }
+            }
+            RecordedInput::Unsupported => {
+                return Err("recorded_input_unsupported".to_owned());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn resolve_recorded_path(path: &Path, workspace_root: Option<&Path>) -> Result<PathBuf, String> {
+    if path.is_absolute() {
+        return Ok(path.to_path_buf());
+    }
+    let raw = path.to_string_lossy();
+    for prefix in ["@@//", "@//", "//"] {
+        if let Some(rest) = raw.strip_prefix(prefix) {
+            let Some(workspace_root) = workspace_root else {
+                return Err("recorded_input_unsupported".to_owned());
+            };
+            return Ok(workspace_root.join(rest));
+        }
+    }
+    Err("recorded_input_unsupported".to_owned())
+}
+
+fn parse_recorded_input_with_value(raw: &str) -> Option<(RecordedInput, Option<String>)> {
+    let space = raw.find(' ')?;
+    if space == 0 {
+        return None;
+    }
+    let input = unescape_recorded_input_part(&raw[..space])?;
+    let value = unescape_recorded_input_part(&raw[space + 1..]);
+    Some((parse_recorded_input(&input), value))
+}
+
+fn parse_recorded_input(input: &str) -> RecordedInput {
+    let Some((kind, payload)) = input.split_once(':') else {
+        return RecordedInput::Unsupported;
+    };
+    match kind {
+        "FILE" => RecordedInput::File(PathBuf::from(payload)),
+        "DIRENTS" => RecordedInput::Dirents(PathBuf::from(payload)),
+        "DIRTREE" => RecordedInput::DirTree(PathBuf::from(payload)),
+        "ENV" => RecordedInput::Env(payload.to_owned()),
+        "REPO_MAPPING" => {
+            if let Some((source_repo, apparent)) = payload.split_once(',') {
+                RecordedInput::RepoMapping {
+                    source_repo: source_repo.to_owned(),
+                    apparent: apparent.to_owned(),
+                }
+            } else {
+                RecordedInput::Unsupported
+            }
+        }
+        _ => RecordedInput::Unsupported,
+    }
+}
+
+fn unescape_recorded_input_part(input: &str) -> Option<String> {
+    if input == "\\0" {
+        return None;
+    }
+    let mut result = String::with_capacity(input.len());
+    let mut escaped = false;
+    for ch in input.chars() {
+        if escaped {
+            match ch {
+                'n' => result.push('\n'),
+                's' => result.push(' '),
+                other => result.push(other),
+            }
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else {
+            result.push(ch);
+        }
+    }
+    if escaped {
+        result.push('\\');
+    }
+    Some(result)
+}
+
+fn recorded_file_marker_value(path: &Path) -> std::io::Result<String> {
+    match fs::metadata(path) {
+        Ok(metadata) if metadata.is_dir() => Ok("DIR".to_owned()),
+        Ok(_) => {
+            let bytes = fs::read(path)?;
+            Ok(hex::encode(Sha256::digest(&bytes)))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("ENOENT".to_owned()),
+        Err(e) => Err(e),
+    }
+}
+
+fn recorded_dirents_marker_value(path: &Path) -> std::io::Result<String> {
+    let mut entries = sorted_directory_entry_names(path)?;
+    entries.sort();
+    Ok(bazel_fingerprint_add_strings_hex(&entries))
+}
+
+fn recorded_dirtree_marker_value(path: &Path) -> std::io::Result<String> {
+    let entries = sorted_directory_entry_names(path)?;
+    let mut subdir_digests = Vec::new();
+    let mut file_values = Vec::new();
+    for entry in &entries {
+        let entry_path = path.join(entry);
+        let metadata = fs::metadata(&entry_path)?;
+        if metadata.is_dir() {
+            subdir_digests.push(recorded_dirtree_marker_value(&entry_path)?);
+            file_values.push((2, None));
+        } else if metadata.is_file() {
+            file_values.push((0, Some(Sha256::digest(fs::read(&entry_path)?).to_vec())));
+        } else {
+            file_values.push((1, None));
+        }
+    }
+
+    let mut bytes = Vec::new();
+    bazel_fingerprint_add_strings(&entries, &mut bytes);
+    bazel_fingerprint_add_strings(&subdir_digests, &mut bytes);
+    for (file_state_type_ordinal, digest) in file_values {
+        encode_varint(file_state_type_ordinal, &mut bytes);
+        if let Some(digest) = digest {
+            bytes.extend_from_slice(&digest);
+        }
+    }
+    Ok(hex::encode(Sha256::digest(&bytes)))
+}
+
+fn sorted_directory_entry_names(path: &Path) -> std::io::Result<Vec<String>> {
+    let mut entries = fs::read_dir(path)?
+        .map(|entry| {
+            entry.and_then(|entry| {
+                entry.file_name().into_string().map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "directory entry is not valid UTF-8",
+                    )
+                })
+            })
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort();
+    Ok(entries)
+}
+
+fn bazel_fingerprint_add_strings_hex(inputs: &[String]) -> String {
+    let mut bytes = Vec::new();
+    bazel_fingerprint_add_strings(inputs, &mut bytes);
+    hex::encode(Sha256::digest(&bytes))
+}
+
+fn bazel_fingerprint_add_strings(inputs: &[String], bytes: &mut Vec<u8>) {
+    encode_varint(inputs.len() as u64, bytes);
+    for input in inputs {
+        let input = input.as_bytes();
+        encode_varint(input.len() as u64, bytes);
+        bytes.extend_from_slice(input);
+    }
+}
+
+fn encode_varint(mut value: u64, out: &mut Vec<u8>) {
+    while value >= 0x80 {
+        out.push(((value as u8) & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    out.push(value as u8);
 }
 
 /// Convert an AttrValue to a serde_json::Value for lockfile storage.
@@ -446,28 +731,7 @@ impl Lockfile {
         let content = fs::read_to_string(path)
             .map_err(|e| LockfileError::ReadError(format!("{}: {}", path.display(), e)))?;
 
-        let lockfile: Lockfile = serde_json::from_str(&content)
-            .map_err(|e| LockfileError::ParseError(format!("{}: {}", path.display(), e)))?;
-        lockfile.validate_extension_digests(path)?;
-        slug_util::memory_checkpoint::checkpoint(
-            "bzlmod_lockfile_read",
-            [
-                ("bytes", content.len()),
-                ("extensions", lockfile.module_extensions.len()),
-                ("registry_hashes", lockfile.registry_file_hashes.len()),
-            ],
-        );
-
-        // Check version compatibility
-        if lockfile.lock_file_version > LOCKFILE_VERSION {
-            return Err(LockfileError::VersionMismatch {
-                expected: LOCKFILE_VERSION,
-                found: lockfile.lock_file_version,
-            }
-            .into());
-        }
-
-        Ok(lockfile)
+        parse_lockfile_content(path, &content)
     }
 
     fn validate_extension_digests(&self, path: &Path) -> slug_error::Result<()> {
@@ -491,8 +755,21 @@ impl Lockfile {
         Ok(())
     }
 
-    /// Write the lockfile to disk.
+    /// Write the lockfile to disk for an explicit lockfile-update operation.
+    pub fn write_for_purpose(
+        &self,
+        path: &Path,
+        _purpose: LockfileWritePurpose,
+    ) -> slug_error::Result<()> {
+        self.write_impl(path)
+    }
+
+    #[cfg(test)]
     pub fn write(&self, path: &Path) -> slug_error::Result<()> {
+        self.write_for_purpose(path, LockfileWritePurpose::Test)
+    }
+
+    fn write_impl(&self, path: &Path) -> slug_error::Result<()> {
         record_bzlmod_event(
             BzlmodEventKind::LockfileWriteAttempt,
             path.display().to_string(),
@@ -562,6 +839,29 @@ impl Lockfile {
         bzl_transitive_digest: &str,
         usages_digest: &str,
     ) -> Option<fxhash::FxHashMap<String, RepoSpec>> {
+        self.get_extension_cache_for_workspace(
+            extension_id,
+            bzl_transitive_digest,
+            usages_digest,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    pub fn get_extension_cache_for_workspace(
+        &self,
+        extension_id: &str,
+        bzl_transitive_digest: &str,
+        usages_digest: &str,
+        workspace_root: Option<&Path>,
+        repo_env: Option<&BTreeMap<String, String>>,
+        repo_mappings: Option<&crate::RepoMappingSnapshot>,
+        root_module_name: Option<&str>,
+        repo_mapping_overrides: Option<&crate::RepoMappingOverrides>,
+    ) -> Option<fxhash::FxHashMap<String, RepoSpec>> {
         // Try exact match first, then normalized forms for Bazel lockfile compat.
         // Lockfiles may use any of:
         //   - slug internal:        "@<apparent>//pkg:file.bzl%name"
@@ -619,6 +919,57 @@ impl Lockfile {
             }
             return None;
         };
+
+        let canonical_extension_id = lockfile_canonical_extension_id(extension_id);
+        let augmented_repo_mappings;
+        let repo_mappings_for_validation = if let (Some(base_mappings), Some(root_module_name)) =
+            (repo_mappings, root_module_name)
+        {
+            let mut snapshot = base_mappings.clone();
+            if let Some(repo_specs) = ext_data.get_repo_specs() {
+                let owner = crate::extension_execution_dice::extract_owning_module(
+                    extension_id,
+                    root_module_name,
+                );
+                let ext_name =
+                    crate::extension_execution_dice::extract_extension_name(extension_id);
+                let generated_repos = repo_specs.keys().map(|repo_name| {
+                    (repo_name.clone(), format!("{owner}+{ext_name}+{repo_name}"))
+                });
+                let overrides = repo_mapping_overrides.and_then(|all_overrides| {
+                    all_overrides
+                        .get(extension_id)
+                        .or_else(|| all_overrides.get(selected_key))
+                        .or_else(|| all_overrides.get(&canonical_extension_id))
+                });
+                crate::repo_mapping::add_extension_generated_repo_mappings(
+                    &mut snapshot,
+                    extension_id,
+                    root_module_name,
+                    generated_repos,
+                    overrides,
+                );
+            }
+            augmented_repo_mappings = Some(snapshot);
+            augmented_repo_mappings.as_ref()
+        } else {
+            repo_mappings
+        };
+
+        if let Err(reason) =
+            ext_data.recorded_inputs_current(workspace_root, repo_env, repo_mappings_for_validation)
+        {
+            record_bzlmod_event(
+                BzlmodEventKind::ExtensionReplayMissReason,
+                format!("{extension_id}:{reason}"),
+            );
+            tracing::debug!(
+                "Extension cache miss for '{}': recorded input validation failed ({})",
+                extension_id,
+                reason
+            );
+            return None;
+        }
 
         // Convert lockfile specs back to RepoSpecs
         let repo_specs = ext_data.get_repo_specs()?;
@@ -779,6 +1130,31 @@ impl Lockfile {
     }
 }
 
+fn parse_lockfile_content(path: &Path, content: &str) -> slug_error::Result<Lockfile> {
+    let lockfile: Lockfile = serde_json::from_str(content)
+        .map_err(|e| LockfileError::ParseError(format!("{}: {}", path.display(), e)))?;
+    lockfile.validate_extension_digests(path)?;
+    slug_util::memory_checkpoint::checkpoint(
+        "bzlmod_lockfile_read",
+        [
+            ("bytes", content.len()),
+            ("extensions", lockfile.module_extensions.len()),
+            ("registry_hashes", lockfile.registry_file_hashes.len()),
+        ],
+    );
+
+    // Check version compatibility
+    if lockfile.lock_file_version > LOCKFILE_VERSION {
+        return Err(LockfileError::VersionMismatch {
+            expected: LOCKFILE_VERSION,
+            found: lockfile.lock_file_version,
+        }
+        .into());
+    }
+
+    Ok(lockfile)
+}
+
 impl Default for Lockfile {
     fn default() -> Self {
         Self::new()
@@ -808,7 +1184,7 @@ pub fn compute_sri_hash(data: &[u8]) -> String {
 }
 
 /// Lockfile mode for controlling resolution behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Allocative)]
 pub enum LockfileMode {
     /// Update lockfile if needed (default).
     #[default]
@@ -861,26 +1237,14 @@ pub fn lockfile_canonical_extension_id(internal_id: &str) -> String {
     internal_id.to_owned()
 }
 
-/// Process-wide cache of parsed `MODULE.bazel.lock` files, keyed by absolute
-/// workspace path. Both startup-time spoke seeding (in `slug_common::cells`)
-/// and per-extension cache lookup (in `extension_execution_dice`) hit the
-/// same lockfile; without this cache they each pay the parse cost (~160KB
-/// JSON for zeromatter's lockfile).
+/// Read a lockfile under explicit Bazel lockfile policy.
 ///
 /// Returns `None` if the lockfile is absent. Existing lockfiles that cannot be
 /// read or parsed are hard errors in every mode that reads lockfiles, matching
-/// Bazel 9's default lockfile behavior. The negative result is also cached so
-/// repeated misses don't re-stat the filesystem.
-static LOCKFILE_CACHE: std::sync::OnceLock<
-    std::sync::Mutex<std::collections::HashMap<PathBuf, Option<std::sync::Arc<Lockfile>>>>,
-> = std::sync::OnceLock::new();
-
-fn lockfile_cache()
--> &'static std::sync::Mutex<std::collections::HashMap<PathBuf, Option<std::sync::Arc<Lockfile>>>> {
-    LOCKFILE_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
-}
-
-fn cached_lockfile_at_path(
+/// Bazel 9's default lockfile behavior. There is deliberately no process-wide
+/// parse cache here: until Plan 61 has a real `LockfileContentKey`, the file
+/// bytes on disk remain the only read authority.
+fn read_lockfile_at_path(
     path: PathBuf,
     mode: LockfileMode,
 ) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
@@ -888,73 +1252,33 @@ fn cached_lockfile_at_path(
         return Ok(None);
     }
 
-    let key = path.clone();
-
-    if let Ok(cache) = lockfile_cache().lock() {
-        if let Some(entry) = cache.get(&key) {
-            if entry.is_some() || !path.exists() {
-                return Ok(entry.clone());
-            }
-        }
+    if !path.exists() {
+        return Ok(None);
     }
 
-    let parsed = if path.exists() {
-        match Lockfile::read(&path) {
-            Ok(l) => {
-                slug_util::memory_checkpoint::checkpoint(
-                    "bzlmod_lockfile_cache_insert",
-                    [("extensions", l.module_extensions.len())],
-                );
-                Some(std::sync::Arc::new(l))
-            }
-            Err(e) => return Err(e),
-        }
-    } else {
-        None
-    };
-
-    if let Ok(mut cache) = lockfile_cache().lock() {
-        cache.insert(key, parsed.clone());
-    }
-    Ok(parsed)
+    let parsed = std::sync::Arc::new(Lockfile::read(&path)?);
+    slug_util::memory_checkpoint::checkpoint(
+        "bzlmod_lockfile_read",
+        [("extensions", parsed.module_extensions.len())],
+    );
+    Ok(Some(parsed))
 }
 
 /// Read a lockfile path with explicit Bazel lockfile policy.
-pub fn cached_lockfile_path_with_mode(
+pub fn read_lockfile_path_with_mode(
     path: &Path,
     mode: LockfileMode,
 ) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
-    cached_lockfile_at_path(path.to_path_buf(), mode)
+    read_lockfile_at_path(path.to_path_buf(), mode)
 }
 
 /// Read `MODULE.bazel.lock` from `workspace_root` with explicit Bazel
 /// lockfile policy.
-pub fn cached_lockfile_with_mode(
+pub fn read_lockfile_with_mode(
     workspace_root: &Path,
     mode: LockfileMode,
 ) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
-    cached_lockfile_at_path(lockfile_path(workspace_root), mode)
-}
-
-/// Read `MODULE.bazel.lock` from `workspace_root`, returning a process-wide
-/// cached `Arc<Lockfile>`. `None` means the file is absent or failed to parse.
-/// New command paths should prefer `cached_lockfile_with_mode` so parse errors
-/// can propagate with Bazel-shaped lockfile policy. Use
-/// `invalidate_cached_lockfile` to drop the cached entry when the lockfile is
-/// known to have changed (e.g. after writing a new one).
-pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>> {
-    cached_lockfile_with_mode(workspace_root, LockfileMode::Update)
-        .ok()
-        .flatten()
-}
-
-/// Drop the cached `Arc<Lockfile>` for `workspace_root`. Call after writing a
-/// new lockfile so the next `cached_lockfile` call re-reads from disk.
-pub fn invalidate_cached_lockfile(workspace_root: &Path) {
-    let key = lockfile_path(workspace_root);
-    if let Ok(mut cache) = lockfile_cache().lock() {
-        cache.remove(&key);
-    }
+    read_lockfile_at_path(lockfile_path(workspace_root), mode)
 }
 
 #[cfg(test)]
@@ -1102,7 +1426,7 @@ mod tests {
         let path = dir.path().join("MODULE.bazel.lock");
         fs::write(&path, "{ this is not json }\n").unwrap();
 
-        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
+        let err = read_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
         assert!(
             format!("{err:#}").contains("Failed to parse lockfile"),
             "{err:#}"
@@ -1115,7 +1439,7 @@ mod tests {
         let path = dir.path().join("MODULE.bazel.lock");
         fs::write(&path, "{ this is not json }\n").unwrap();
 
-        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Refresh).unwrap_err();
+        let err = read_lockfile_with_mode(dir.path(), LockfileMode::Refresh).unwrap_err();
         assert!(
             format!("{err:#}").contains("Failed to parse lockfile"),
             "{err:#}"
@@ -1128,8 +1452,71 @@ mod tests {
         let path = dir.path().join("MODULE.bazel.lock");
         fs::write(&path, "{ this is not json }\n").unwrap();
 
-        let result = cached_lockfile_with_mode(dir.path(), LockfileMode::Off).unwrap();
+        let result = read_lockfile_with_mode(dir.path(), LockfileMode::Off).unwrap();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn lockfile_reader_rereads_changed_existing_file() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+
+        let mut first = Lockfile::new();
+        first.set_extension_facts(
+            "@@ext+//:ext.bzl%ext".to_owned(),
+            serde_json::json!({"version": 1}),
+        );
+        first.write(&path).unwrap();
+
+        let loaded_first = read_lockfile_with_mode(dir.path(), LockfileMode::Update)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            loaded_first.get_extension_facts("@@ext+//:ext.bzl%ext"),
+            Some(serde_json::json!({"version": 1}))
+        );
+
+        let mut second = Lockfile::new();
+        second.set_extension_facts(
+            "@@ext+//:ext.bzl%ext".to_owned(),
+            serde_json::json!({"version": 2}),
+        );
+        second.write(&path).unwrap();
+
+        let loaded_second = read_lockfile_with_mode(dir.path(), LockfileMode::Update)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            loaded_second.get_extension_facts("@@ext+//:ext.bzl%ext"),
+            Some(serde_json::json!({"version": 2}))
+        );
+    }
+
+    #[test]
+    fn lockfile_reader_reads_file_created_after_missing_lookup() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+
+        assert!(
+            read_lockfile_with_mode(dir.path(), LockfileMode::Update)
+                .unwrap()
+                .is_none()
+        );
+
+        let mut lockfile = Lockfile::new();
+        lockfile.set_extension_facts(
+            "@@ext+//:ext.bzl%ext".to_owned(),
+            serde_json::json!({"created": true}),
+        );
+        lockfile.write(&path).unwrap();
+
+        let loaded = read_lockfile_with_mode(dir.path(), LockfileMode::Update)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            loaded.get_extension_facts("@@ext+//:ext.bzl%ext"),
+            Some(serde_json::json!({"created": true}))
+        );
     }
 
     #[test]
@@ -1161,7 +1548,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
+        let err = read_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
         assert!(
             format!("{err:#}").contains("invalid bzlTransitiveDigest"),
             "{err:#}"
@@ -1198,7 +1585,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = cached_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
+        let err = read_lockfile_with_mode(dir.path(), LockfileMode::Update).unwrap_err();
         assert!(
             format!("{err:#}").contains("invalid usagesDigest"),
             "{err:#}"
@@ -1391,6 +1778,628 @@ mod tests {
             numpy_spec.repo_rule_id,
             "@@rules_python//pip:pip.bzl%pip_install"
         );
+    }
+
+    #[test]
+    fn recorded_file_input_matches_current_sha() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir.path().join("watched.txt");
+        fs::write(&watched, "first\n").unwrap();
+        let digest = hex::encode(Sha256::digest(fs::read(&watched).unwrap()));
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!("FILE:{} {digest}", watched.display()));
+
+        let cached =
+            lockfile.get_extension_cache("@@ext//ext.bzl%ext", "bzl-digest", "usages-digest");
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_file_input_changed_rejects_replay() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir.path().join("watched.txt");
+        fs::write(&watched, "first\n").unwrap();
+        let digest = hex::encode(Sha256::digest(fs::read(&watched).unwrap()));
+        fs::write(&watched, "second\n").unwrap();
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!("FILE:{} {digest}", watched.display()));
+
+        let cached =
+            lockfile.get_extension_cache("@@ext//ext.bzl%ext", "bzl-digest", "usages-digest");
+        assert!(cached.is_none());
+    }
+
+    #[test]
+    fn recorded_main_workspace_file_input_matches_current_sha() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir.path().join("watched.txt");
+        fs::write(&watched, "first\n").unwrap();
+        let digest = hex::encode(Sha256::digest(fs::read(&watched).unwrap()));
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!("FILE:@@//watched.txt {digest}"));
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            Some(dir.path()),
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_main_workspace_dirents_input_matches_current_listing() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir.path().join("watched_dir");
+        fs::create_dir(&watched).unwrap();
+        fs::write(watched.join("b.txt"), "b\n").unwrap();
+        fs::write(watched.join("a.txt"), "a\n").unwrap();
+        let digest = recorded_dirents_marker_value(&watched).unwrap();
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!("DIRENTS:@@//watched_dir {digest}"));
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            Some(dir.path()),
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_dirents_input_changed_rejects_replay() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir.path().join("watched_dir");
+        fs::create_dir(&watched).unwrap();
+        fs::write(watched.join("a.txt"), "a\n").unwrap();
+        let digest = recorded_dirents_marker_value(&watched).unwrap();
+        fs::write(watched.join("b.txt"), "b\n").unwrap();
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!("DIRENTS:{} {digest}", watched.display()));
+
+        let cached =
+            lockfile.get_extension_cache("@@ext//ext.bzl%ext", "bzl-digest", "usages-digest");
+        assert!(cached.is_none());
+    }
+
+    #[test]
+    fn recorded_main_workspace_dirtree_input_matches_current_tree() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir.path().join("watched_tree");
+        fs::create_dir(&watched).unwrap();
+        fs::write(watched.join("a.txt"), "a\n").unwrap();
+        fs::create_dir(watched.join("sub")).unwrap();
+        fs::write(watched.join("sub").join("b.txt"), "b\n").unwrap();
+        let digest = recorded_dirtree_marker_value(&watched).unwrap();
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!("DIRTREE:@@//watched_tree {digest}"));
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            Some(dir.path()),
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_dirtree_input_changed_rejects_replay() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir.path().join("watched_tree");
+        fs::create_dir(&watched).unwrap();
+        fs::write(watched.join("a.txt"), "a\n").unwrap();
+        fs::create_dir(watched.join("sub")).unwrap();
+        fs::write(watched.join("sub").join("b.txt"), "b\n").unwrap();
+        let digest = recorded_dirtree_marker_value(&watched).unwrap();
+        fs::write(watched.join("sub").join("b.txt"), "changed\n").unwrap();
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!("DIRTREE:{} {digest}", watched.display()));
+
+        let cached =
+            lockfile.get_extension_cache("@@ext//ext.bzl%ext", "bzl-digest", "usages-digest");
+        assert!(cached.is_none());
+    }
+
+    #[test]
+    fn recorded_env_input_matches_repo_env_value() {
+        let mut repo_env = BTreeMap::new();
+        repo_env.insert("PLAN61_REPO_ENV".to_owned(), "first".to_owned());
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("ENV:PLAN61_REPO_ENV first".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            None,
+            Some(&repo_env),
+            None,
+            None,
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_env_input_changed_rejects_replay() {
+        let mut repo_env = BTreeMap::new();
+        repo_env.insert("PLAN61_REPO_ENV".to_owned(), "second".to_owned());
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("ENV:PLAN61_REPO_ENV first".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            None,
+            Some(&repo_env),
+            None,
+            None,
+            None,
+        );
+        assert!(cached.is_none());
+    }
+
+    #[test]
+    fn recorded_env_input_unset_matches_absent_repo_env() {
+        let repo_env = BTreeMap::new();
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("ENV:PLAN61_REPO_ENV \\0".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            None,
+            Some(&repo_env),
+            None,
+            None,
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_repo_mapping_input_matches_current_mapping() {
+        let mut root_mapping = BTreeMap::new();
+        root_mapping.insert("dep".to_owned(), "dep_canonical".to_owned());
+        let mut repo_mappings = crate::RepoMappingSnapshot::new();
+        repo_mappings.insert(String::new(), root_mapping);
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("REPO_MAPPING:,dep dep_canonical".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            None,
+            None,
+            Some(&repo_mappings),
+            None,
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_repo_mapping_input_changed_rejects_replay() {
+        let mut root_mapping = BTreeMap::new();
+        root_mapping.insert("dep".to_owned(), "other_canonical".to_owned());
+        let mut repo_mappings = crate::RepoMappingSnapshot::new();
+        repo_mappings.insert(String::new(), root_mapping);
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("REPO_MAPPING:,dep dep_canonical".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            None,
+            None,
+            Some(&repo_mappings),
+            None,
+            None,
+        );
+        assert!(cached.is_none());
+    }
+
+    #[test]
+    fn recorded_repo_mapping_input_nonvisible_null_rejects_replay() {
+        let mut repo_mappings = crate::RepoMappingSnapshot::new();
+        repo_mappings.insert(String::new(), BTreeMap::new());
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("REPO_MAPPING:,missing \\0".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            None,
+            None,
+            Some(&repo_mappings),
+            None,
+            None,
+        );
+        assert!(cached.is_none());
+    }
+
+    #[test]
+    fn recorded_repo_mapping_input_missing_source_repo_rejects_replay() {
+        let repo_mappings = crate::RepoMappingSnapshot::new();
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("REPO_MAPPING:missing_source,dep dep".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            None,
+            None,
+            Some(&repo_mappings),
+            None,
+            None,
+        );
+        assert!(cached.is_none());
+    }
+
+    #[test]
+    fn recorded_repo_mapping_input_for_extension_repo_uses_candidate_generated_specs() {
+        let extension_id = "@owner//:ext.bzl%ext";
+        let mut repo_mappings = crate::RepoMappingSnapshot::new();
+        repo_mappings.insert("owner".to_owned(), BTreeMap::new());
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        repo_specs.insert("tool".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            extension_id.to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut(extension_id)
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("REPO_MAPPING:owner++ext+tool,repo owner++ext+repo".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            extension_id,
+            "bzl-digest",
+            "usages-digest",
+            None,
+            None,
+            Some(&repo_mappings),
+            Some("root"),
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_repo_mapping_input_for_extension_repo_applies_root_override() {
+        let extension_id = "@owner//:ext.bzl%ext";
+        let mut repo_mappings = crate::RepoMappingSnapshot::new();
+        repo_mappings.insert("owner".to_owned(), BTreeMap::new());
+        let mut overrides = crate::RepoMappingOverrides::new();
+        let mut extension_overrides = BTreeMap::new();
+        extension_overrides.insert("repo".to_owned(), "actual_dep".to_owned());
+        overrides.insert(extension_id.to_owned(), extension_overrides);
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        repo_specs.insert("tool".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            extension_id.to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut(extension_id)
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("REPO_MAPPING:owner++ext+tool,repo actual_dep".to_owned());
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            extension_id,
+            "bzl-digest",
+            "usages-digest",
+            None,
+            None,
+            Some(&repo_mappings),
+            Some("root"),
+            Some(&overrides),
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn malformed_recorded_input_rejects_replay() {
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push("FILE:/tmp/no-value".to_owned());
+
+        let cached =
+            lockfile.get_extension_cache("@@ext//ext.bzl%ext", "bzl-digest", "usages-digest");
+        assert!(cached.is_none());
     }
 
     #[test]

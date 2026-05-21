@@ -481,9 +481,9 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        match std::env::var(name) {
-            Ok(v) => Ok(heap.alloc(v)),
-            Err(_) => match default {
+        match slug_build_api::interpreter::rule_defs::build_config::get_repo_env_var(name) {
+            Some(v) => Ok(heap.alloc(v)),
+            None => match default {
                 starlark::values::none::NoneOr::Other(s) => Ok(heap.alloc(s)),
                 starlark::values::none::NoneOr::None => Ok(Value::new_none()),
             },

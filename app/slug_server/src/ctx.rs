@@ -316,6 +316,20 @@ impl<'a> ServerCommandContext<'a> {
         slug_build_api::interpreter::rule_defs::build_config::set_action_env(
             &client_context.action_env,
         );
+        slug_build_api::interpreter::rule_defs::build_config::set_repo_env(
+            &client_context.repo_env,
+            base_context
+                .project_root
+                .root()
+                .as_path()
+                .to_string_lossy()
+                .as_ref(),
+        );
+        slug_bzlmod::set_legacy_bzlmod_repo_env(
+            slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
+                .into_iter()
+                .collect(),
+        );
         slug_build_api::interpreter::rule_defs::build_config::set_copts(&client_context.copts);
         slug_build_api::interpreter::rule_defs::build_config::set_cxxopts(&client_context.cxxopts);
         slug_build_api::interpreter::rule_defs::build_config::set_conlyopts(
@@ -580,6 +594,7 @@ impl ServerCommandContext<'_> {
                     external_data: (*dice_ctx.get_injected_external_buckconfig_data().await?)
                         .clone(),
                     is_bzlmod: new_configs.is_bzlmod,
+                    bzlmod_session_data: new_configs.bzlmod_session_data,
                 })
             } else {
                 // If there is no previous command but the flag was set, then the flag is ignored,
@@ -632,9 +647,13 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
         early_timings: &mut EarlyCommandTimingBuilder,
     ) -> slug_error::Result<(DiceTransactionUpdater, UserComputationData)> {
         let existing_state = &mut ctx.existing_state().await.clone();
-        let cells_and_configs = self.cmd_ctx.load_new_configs(existing_state).await?;
+        let mut cells_and_configs = self.cmd_ctx.load_new_configs(existing_state).await?;
         let is_bzlmod = cells_and_configs.is_bzlmod;
         let cell_resolver = cells_and_configs.cell_resolver;
+        cells_and_configs.bzlmod_session_data.repo_env =
+            slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
+                .into_iter()
+                .collect();
 
         let configuror = BuildInterpreterConfiguror::new(
             self.interpreter_platform,
@@ -686,6 +705,10 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
             profiler_instrumentation_override.clone(),
             self.cmd_ctx.disable_starlark_types,
             self.cmd_ctx.unstable_typecheck,
+        )?;
+        slug_bzlmod::SetBzlmodSessionData::set_bzlmod_session_data(
+            &mut ctx,
+            cells_and_configs.bzlmod_session_data,
         )?;
         ctx.set_is_bzlmod(is_bzlmod)?;
 

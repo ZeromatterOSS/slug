@@ -118,9 +118,13 @@ use crate::fs::project::ProjectRoot;
 use crate::fs::project_rel_path::ProjectRelativePath;
 use crate::fs::project_rel_path::ProjectRelativePathBuf;
 
-/// Global storage for the root cell name, used for Bazel compatibility.
-/// Set when CellResolver is created, read by workspace_root and artifact path logic.
-static ROOT_CELL_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+/// Current root cell name for the temporary Bazel-compatible cell-name adapter.
+///
+/// This remains process state while Plan 61 migrates callers to resolver/DICE
+/// owned identity, but it must not be write-once: a long-lived process can
+/// construct a later resolver with a different root cell.
+static ROOT_CELL_NAME: std::sync::LazyLock<std::sync::RwLock<Option<String>>> =
+    std::sync::LazyLock::new(|| std::sync::RwLock::new(None));
 
 /// Global storage for non-root cell names (external repos).
 static EXTERNAL_CELL_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
@@ -162,8 +166,9 @@ static DYNAMIC_EXTENSION_CELL_SETUPS: std::sync::LazyLock<
     >,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
-/// Global project root for dynamic cell filesystem operations.
-static DYNAMIC_PROJECT_ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+/// Current project root for the temporary dynamic bzlmod cell adapter.
+static DYNAMIC_PROJECT_ROOT: std::sync::LazyLock<std::sync::RwLock<Option<std::path::PathBuf>>> =
+    std::sync::LazyLock::new(|| std::sync::RwLock::new(None));
 
 const MAX_UNKNOWN_CELL_ALIAS_SUGGESTIONS: usize = 50;
 
@@ -340,8 +345,7 @@ pub fn canonical_dynamic_extension_cell_name(name: &str) -> Option<String> {
         return Some(canonical);
     }
 
-    let bazel_ext_dir = DYNAMIC_PROJECT_ROOT
-        .get()
+    let bazel_ext_dir = dynamic_project_root()
         .map(|root| root.join("bazel-external"))
         .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
     let mut candidates = Vec::new();
@@ -406,11 +410,52 @@ pub fn get_dynamic_extension_cell_setup(
         .and_then(|m| m.get(name).cloned())
 }
 
+fn dynamic_project_root() -> Option<std::path::PathBuf> {
+    DYNAMIC_PROJECT_ROOT
+        .read()
+        .ok()
+        .and_then(|root| root.clone())
+}
+
+fn clear_dynamic_bzlmod_state_for_new_root() {
+    if let Ok(mut cells) = DYNAMIC_EXTENSION_CELLS.lock() {
+        cells.clear();
+    }
+    if let Ok(mut setups) = DYNAMIC_EXTENSION_CELL_SETUPS.lock() {
+        setups.clear();
+    }
+    if let Ok(mut aliases) = DYNAMIC_EXTENSION_CELL_ALIASES.lock() {
+        aliases.clear();
+    }
+    if let Ok(mut aliases) = SCOPED_BZLMOD_REPO_ALIASES.lock() {
+        aliases.clear();
+    }
+    if let Ok(mut cache) = BZLMOD_APPARENT_ALIAS_CACHE.lock() {
+        cache.clear();
+    }
+}
+
 /// Set the project root for dynamic cell filesystem scanning.
 pub fn set_dynamic_project_root(root: std::path::PathBuf) {
     ensure_execroot_layout(&root);
     repair_external_symlink_targets(&root);
-    let _ = DYNAMIC_PROJECT_ROOT.set(root);
+    if let Ok(mut current_root) = DYNAMIC_PROJECT_ROOT.write() {
+        if current_root.as_ref() != Some(&root) {
+            clear_dynamic_bzlmod_state_for_new_root();
+            *current_root = Some(root);
+        }
+    }
+}
+
+/// Reset the temporary dynamic bzlmod cell adapter for a fresh resolution of
+/// `root`, even when the daemon is already serving that root.
+pub fn reset_dynamic_bzlmod_state_for_project_root(root: std::path::PathBuf) {
+    ensure_execroot_layout(&root);
+    repair_external_symlink_targets(&root);
+    clear_dynamic_bzlmod_state_for_new_root();
+    if let Ok(mut current_root) = DYNAMIC_PROJECT_ROOT.write() {
+        *current_root = Some(root);
+    }
 }
 
 /// Path to the per-project execroot directory used as `cwd` for action
@@ -555,7 +600,7 @@ fn is_likely_runfiles_collision(name: &std::ffi::OsStr) -> bool {
 
 /// Get the project root (if set).
 pub fn get_dynamic_project_root() -> Option<std::path::PathBuf> {
-    DYNAMIC_PROJECT_ROOT.get().cloned()
+    dynamic_project_root()
 }
 
 /// Create an `external/<cell_name>` symlink pointing to the cell's actual directory.
@@ -870,8 +915,8 @@ fn resolve_symlink_chain(path: &std::path::Path) -> Option<std::path::PathBuf> {
 }
 
 pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
-    let project_root = match DYNAMIC_PROJECT_ROOT.get() {
-        Some(root) => root.clone(),
+    let project_root = match dynamic_project_root() {
+        Some(root) => root,
         None => return,
     };
     let external_dir = project_root.join("external");
@@ -986,7 +1031,7 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
 /// Create `external/` symlinks for all non-root cells.
 /// Called once after cell resolver is set up.
 pub fn ensure_external_symlinks_for_cells(cells: &[(impl AsRef<str>, impl AsRef<str>)]) {
-    if DYNAMIC_PROJECT_ROOT.get().is_none() {
+    if dynamic_project_root().is_none() {
         return;
     }
     for (cell_name, cell_path) in cells {
@@ -1010,7 +1055,11 @@ pub fn get_dynamic_extension_cell(name: &str) -> Option<String> {
 pub fn is_root_cell_name(cell_name: &str) -> bool {
     cell_name.is_empty()
         || cell_name == "root"
-        || ROOT_CELL_NAME.get().map_or(false, |root| root == cell_name)
+        || ROOT_CELL_NAME
+            .read()
+            .ok()
+            .and_then(|root| root.clone())
+            .is_some_and(|root| root == cell_name)
 }
 
 /// Get all non-root cell names (external repos).
@@ -1267,8 +1316,7 @@ fn resolve_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<CellNa
 }
 
 fn scan_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<String> {
-    let bazel_ext_dir = DYNAMIC_PROJECT_ROOT
-        .get()
+    let bazel_ext_dir = dynamic_project_root()
         .map(|root| root.join("bazel-external"))
         .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
     let prefix = format!("{}+", alias);
@@ -1436,9 +1484,12 @@ impl CellResolver {
         }
 
         let root_cell = root_cell.ok_or(CellError::NoRootCell)?;
-        // Store root cell name globally for Bazel compatibility checks
-        let _ = ROOT_CELL_NAME.set(root_cell.as_str().to_owned());
-        // Store non-root cell names for include path resolution
+        // Update the temporary process-level Bazel compatibility adapters.
+        // These are not final Plan 61 ownership, but they must follow the
+        // current resolver rather than the first resolver built in-process.
+        if let Ok(mut current_root_cell) = ROOT_CELL_NAME.write() {
+            *current_root_cell = Some(root_cell.as_str().to_owned());
+        }
         if let Ok(mut ext_names) = EXTERNAL_CELL_NAMES.lock() {
             ext_names.clear();
             for cell_name in cells_map.keys() {
@@ -1541,8 +1592,7 @@ impl CellResolver {
         {
             let cell_str = cell.as_str();
             let suffix = format!("+{}", cell_str);
-            let bazel_ext_dir = DYNAMIC_PROJECT_ROOT
-                .get()
+            let bazel_ext_dir = dynamic_project_root()
                 .map(|root| root.join("bazel-external"))
                 .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
             if let Ok(entries) = std::fs::read_dir(&bazel_ext_dir) {
@@ -2020,6 +2070,26 @@ mod tests {
             Some(wanted.to_owned()),
             resolve_scoped_bzlmod_repo_alias_for_current_cell("ordinary_owner", apparent)
         );
+    }
+
+    #[test]
+    fn dynamic_alias_overrides_existing_generated_extension_cell() -> slug_error::Result<()> {
+        let generated = "override_owner++ext+generated_repo";
+        let selected = "selected_repo+1.0.0";
+        register_dynamic_extension_cell(
+            generated.to_owned(),
+            format!("bazel-external/{generated}"),
+        );
+        register_dynamic_extension_cell_alias(generated.to_owned(), selected.to_owned());
+
+        let aliases = HashMap::new();
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), aliases)?;
+
+        assert_eq!(
+            CellName::testing_new(selected),
+            resolver.resolve(generated)?
+        );
+        Ok(())
     }
 
     #[test]

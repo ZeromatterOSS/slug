@@ -83,6 +83,62 @@ pub struct RepoAlias {
     pub declaring_module: Option<String>,
 }
 
+fn collect_root_extension_repo_overrides(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+) -> std::collections::HashMap<(String, String), String> {
+    let mut overrides = std::collections::HashMap::new();
+
+    for (cell_name, parsed) in parsed_modules {
+        let module_name = if parsed.module.name.is_empty() {
+            root_module_name
+        } else {
+            &parsed.module.name
+        };
+        let is_root = cell_name == root_module_name
+            || cell_name == "_main"
+            || parsed.module.name == root_module_name;
+        if !is_root {
+            continue;
+        }
+
+        for usage in &parsed.extension_usages {
+            let ext_id = crate::extensions::canonical_extension_id(
+                &usage.extension_bzl_file,
+                &usage.extension_name,
+                module_name,
+            );
+            for (repo_name, dep_name) in &usage.repo_overrides {
+                overrides.insert((ext_id.clone(), repo_name.clone()), dep_name.clone());
+            }
+        }
+    }
+
+    overrides
+}
+
+fn canonical_repo_for_extension_import_with_root_overrides(
+    usage: &ExtensionUsage,
+    owner_module: &str,
+    ext_name: &str,
+    internal_name: &str,
+    root_override: Option<&String>,
+) -> crate::repo_mapping::ExtensionImportCanonicalization {
+    if let Some(dep_repo) = root_override {
+        return crate::repo_mapping::ExtensionImportCanonicalization {
+            canonical_name: crate::repo_mapping::CanonicalRepoName::new(dep_repo.clone()),
+            is_override: true,
+        };
+    }
+
+    crate::repo_mapping::canonical_repo_for_extension_import(
+        usage,
+        owner_module,
+        ext_name,
+        internal_name,
+    )
+}
+
 /// Cell definitions to register from extension execution.
 ///
 /// Contains cells (with canonical names) and aliases (from use_repo).
@@ -148,6 +204,8 @@ pub fn pre_compute_extension_repo_cells(
     // Track which canonical names we've already registered to avoid duplicates
     // (same repo may appear in use_repo() from multiple modules).
     let mut seen_canonical: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let root_repo_overrides =
+        collect_root_extension_repo_overrides(parsed_modules, root_module_name);
 
     for (cell_name, parsed) in parsed_modules {
         // Use the module's own name from its MODULE.bazel for canonical naming.
@@ -207,14 +265,33 @@ pub fn pre_compute_extension_repo_cells(
                 extracted_owner
             };
 
+            // `override_repo(ext, generated = "actual_dep")` replaces the
+            // extension's repo named `generated` with the selected bzlmod
+            // dependency `actual_dep`. That replacement is visible from
+            // repos owned by the extension even when the root module does not
+            // also import the generated repo with `use_repo()`.
+            for (repo_name, dep_name) in &usage.repo_overrides {
+                aliases.push(RepoAlias {
+                    apparent_name: repo_name.clone(),
+                    canonical_name: dep_name.clone(),
+                    declaring_module: Some(owner_module.clone()),
+                });
+                aliases.push(RepoAlias {
+                    apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
+                    canonical_name: dep_name.clone(),
+                    declaring_module: None,
+                });
+            }
+
             for import in &usage.imports {
                 // Positional repos: use_repo(ext, "numpy", "requests")
                 for repo_name in &import.repos {
-                    let canonical = crate::repo_mapping::canonical_repo_for_extension_import(
+                    let canonical = canonical_repo_for_extension_import_with_root_overrides(
                         usage,
                         &owner_module,
                         &ext_name,
                         repo_name,
+                        root_repo_overrides.get(&(ext_id.clone(), repo_name.clone())),
                     );
                     let is_override = canonical.is_override;
                     let canonical = canonical.canonical_name.into_string();
@@ -243,11 +320,12 @@ pub fn pre_compute_extension_repo_cells(
 
                 // Keyword repos: use_repo(ext, myname = "actual_repo")
                 for (apparent_name, actual_name) in &import.repo_mapping {
-                    let canonical = crate::repo_mapping::canonical_repo_for_extension_import(
+                    let canonical = canonical_repo_for_extension_import_with_root_overrides(
                         usage,
                         &owner_module,
                         &ext_name,
                         actual_name,
+                        root_repo_overrides.get(&(ext_id.clone(), actual_name.clone())),
                     );
                     let is_override = canonical.is_override;
                     let canonical = canonical.canonical_name.into_string();
@@ -409,6 +487,9 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     root_module_name: &str,
     existing: &mut [PendingRepoCell],
     project_root: &std::path::Path,
+    repo_env: Option<&std::collections::BTreeMap<String, String>>,
+    repo_mappings: Option<&crate::RepoMappingSnapshot>,
+    repo_mapping_overrides: Option<&crate::RepoMappingOverrides>,
 ) -> Vec<PendingRepoCell> {
     let existing_by_canonical: std::collections::HashMap<String, usize> = existing
         .iter()
@@ -438,9 +519,16 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
         let bzl_transitive_digest =
             crate::compute_bzl_transitive_digest_for_project(current_ext_id, project_root);
         let usages_digest = compute_extension_input_hash(current_extension);
-        let Some(cached_specs) =
-            lockfile.get_extension_cache(current_ext_id, &bzl_transitive_digest, &usages_digest)
-        else {
+        let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
+            current_ext_id,
+            &bzl_transitive_digest,
+            &usages_digest,
+            Some(project_root),
+            repo_env,
+            repo_mappings,
+            Some(root_module_name),
+            repo_mapping_overrides,
+        ) else {
             tracing::debug!(
                 "Skipping lockfile spoke pre-seed for '{}': cached extension data is stale",
                 ext_id
@@ -1233,10 +1321,47 @@ mod tests {
                 .unwrap();
 
         assert!(cells.is_empty());
-        assert_eq!(aliases.len(), 1);
-        assert_eq!(aliases[0].apparent_name, "public");
+        assert_eq!(aliases.len(), 3);
+        assert_eq!(aliases[0].apparent_name, "generated");
         assert_eq!(aliases[0].canonical_name, "actual_dep");
-        assert_eq!(aliases[0].declaring_module.as_deref(), Some("rules_owner"));
+        assert_eq!(aliases[0].declaring_module.as_deref(), Some("rules_owner+"));
+        assert_eq!(aliases[1].apparent_name, "rules_owner++ext+generated");
+        assert_eq!(aliases[1].canonical_name, "actual_dep");
+        assert_eq!(aliases[1].declaring_module, None);
+        assert_eq!(aliases[2].apparent_name, "public");
+        assert_eq!(aliases[2].canonical_name, "actual_dep");
+        assert_eq!(aliases[2].declaring_module.as_deref(), Some("rules_owner"));
+    }
+
+    #[test]
+    fn test_root_override_repo_applies_to_owner_module_use_repo() {
+        let mut root = parsed_module("root");
+        let mut root_usage =
+            ExtensionUsage::new("@rules_owner//:extensions.bzl".to_owned(), "ext".to_owned());
+        root_usage
+            .repo_overrides
+            .push(("generated".to_owned(), "actual_dep".to_owned()));
+        root.extension_usages.push(root_usage);
+
+        let mut owner = parsed_module("rules_owner");
+        let mut owner_usage = ExtensionUsage::new("//:extensions.bzl".to_owned(), "ext".to_owned());
+        owner_usage
+            .imports
+            .push(UseRepo::new().add_repo("generated".to_owned()));
+        owner.extension_usages.push(owner_usage);
+
+        let (cells, aliases) = pre_compute_extension_repo_cells(
+            &[("root".to_owned(), root), ("rules_owner".to_owned(), owner)],
+            "root",
+        )
+        .unwrap();
+
+        assert!(cells.is_empty());
+        assert!(aliases.iter().any(|alias| {
+            alias.apparent_name == "generated"
+                && alias.canonical_name == "actual_dep"
+                && alias.declaring_module.as_deref() == Some("rules_owner")
+        }));
     }
 
     #[test]
@@ -1274,6 +1399,9 @@ mod tests {
             "_main",
             &mut existing,
             &temp,
+            None,
+            None,
+            None,
         );
 
         assert!(cells.is_empty());
@@ -1315,6 +1443,9 @@ mod tests {
             "_main",
             &mut existing,
             &temp,
+            None,
+            None,
+            None,
         );
 
         assert!(cells.is_empty());

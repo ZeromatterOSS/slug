@@ -196,6 +196,9 @@ impl<'a> ClientCommandContext<'a> {
             });
         }
 
+        let mut repo_env = config_opts.repo_env.clone();
+        repo_env.extend(self.bazel_repo_env_args());
+
         Ok(ClientContext {
             config_overrides,
             host_platform: match config_opts.host_platform_override() {
@@ -251,6 +254,7 @@ impl<'a> ClientCommandContext<'a> {
             compilation_mode: config_opts.compilation_mode.clone().unwrap_or_default(),
             define_values: config_opts.define.clone(),
             action_env: config_opts.action_env.clone(),
+            repo_env,
             copts: config_opts.copts.clone(),
             cxxopts: config_opts.cxxopts.clone(),
             conlyopts: config_opts.conlyopts.clone(),
@@ -271,6 +275,15 @@ impl<'a> ClientCommandContext<'a> {
     fn bazel_lockfile_mode_arg(&self) -> Option<String> {
         parse_lockfile_mode_args(self.argv.expanded_argv.args())
             .or_else(|| parse_lockfile_mode_args(self.argv.argv.iter().map(String::as_str)))
+    }
+
+    fn bazel_repo_env_args(&self) -> Vec<String> {
+        let values = parse_repo_env_args(self.argv.expanded_argv.args());
+        if values.is_empty() {
+            parse_repo_env_args(self.argv.argv.iter().map(String::as_str))
+        } else {
+            values
+        }
     }
 
     /// A client context for commands where CommonConfigOptions are not provided.
@@ -315,6 +328,7 @@ impl<'a> ClientCommandContext<'a> {
             compilation_mode: String::new(),
             define_values: Vec::new(),
             action_env: Vec::new(),
+            repo_env: Vec::new(),
             copts: Vec::new(),
             cxxopts: Vec::new(),
             conlyopts: Vec::new(),
@@ -357,6 +371,26 @@ fn parse_lockfile_mode_args<'a>(args: impl Iterator<Item = &'a str>) -> Option<S
         }
     }
     mode
+}
+
+fn parse_repo_env_args<'a>(args: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut args = args;
+    while let Some(arg) = args.next() {
+        if let Some(value) = arg
+            .strip_prefix("--repo_env=")
+            .or_else(|| arg.strip_prefix("--repo-env="))
+        {
+            values.push(value.to_owned());
+            continue;
+        }
+        if arg == "--repo_env" || arg == "--repo-env" {
+            if let Some(value) = args.next() {
+                values.push(value.to_owned());
+            }
+        }
+    }
+    values
 }
 
 /// Provides a common interface for buck subcommands that use event subscribers for logging.

@@ -563,8 +563,15 @@ impl MaterializerStateSqliteTable {
                 "INSERT INTO {STATE_TABLE_NAME} (path, artifact_type, digest_size, entry_hash, entry_hash_kind, file_is_executable, symlink_target, directory_size, last_access_time, parent_path) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
             )
         });
+        static DELETE_OLD_SQL: Lazy<String> = Lazy::new(|| {
+            format!("DELETE FROM {STATE_TABLE_NAME} WHERE path = ?1 OR parent_path = ?1")
+        });
         let mut conn = self.connection.lock();
         let tx = conn.transaction()?;
+        tx.execute(&DELETE_OLD_SQL, rusqlite::params![path.as_str()])
+            .with_buck_error_context(|| {
+                format!("replacing `{path}` in sqlite table {STATE_TABLE_NAME}")
+            })?;
         for entry in entries {
             tracing::trace!(sql = %*SQL, entry = ?entry, "inserting into table");
             tx.execute(
@@ -934,6 +941,67 @@ mod tests {
         assert_eq!(path, result_path);
         assert_eq!(metadata, result_metadata);
         assert_eq!(last_access_time, result_last_access_time);
+    }
+
+    #[test]
+    fn test_insert_replaces_existing_artifact_state() -> slug_error::Result<()> {
+        let digest_config = DigestConfig::testing_default();
+        let conn = Connection::open_in_memory()?;
+        let table = MaterializerStateSqliteTable::new(Arc::new(Mutex::new(conn)));
+        table.create_table()?;
+
+        let path = ProjectRelativePath::new("foo/bar")?;
+        let old_metadata = {
+            let directory = {
+                let mut builder = DirectoryBuilder::empty();
+                let digest =
+                    TrackedCasDigest::from_content(b"hello", digest_config.cas_digest_config());
+                let metadata = FileMetadata {
+                    digest,
+                    is_executable: false,
+                };
+                builder
+                    .insert(
+                        ForwardRelativePath::unchecked_new("child"),
+                        DirectoryEntry::Leaf(ActionDirectoryMember::File(metadata)),
+                    )
+                    .unwrap();
+                let interner = DashMapDirectoryInterner::new();
+                builder
+                    .fingerprint(digest_config.as_directory_serializer())
+                    .shared(&interner)
+            };
+            ArtifactMetadata(ActionDirectoryEntry::Dir(DirectoryMetadata::Full(
+                directory,
+            )))
+        };
+        let new_metadata = ArtifactMetadata(DirectoryEntry::Leaf(ActionDirectoryMember::File(
+            FileMetadata {
+                digest: TrackedFileDigest::from_content(
+                    b"replacement",
+                    digest_config.cas_digest_config(),
+                ),
+                is_executable: true,
+            },
+        )));
+        let old_time = DateTime::from_timestamp(0, 0).unwrap();
+        let new_time = DateTime::from_timestamp(1, 0).unwrap();
+
+        table.insert(path, &old_metadata, old_time)?;
+        table.insert(path, &new_metadata, new_time)?;
+
+        let mut state = table.read_materializer_state(digest_config)?;
+        assert_eq!(state.len(), 1);
+        let MaterializerStateEntry {
+            path: result_path,
+            metadata: result_metadata,
+            last_access_time: result_last_access_time,
+        } = state.pop().unwrap();
+        assert_eq!(path, result_path);
+        assert_eq!(new_metadata, result_metadata);
+        assert_eq!(new_time, result_last_access_time);
+
+        Ok(())
     }
 
     #[test]
