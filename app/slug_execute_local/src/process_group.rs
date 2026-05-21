@@ -25,7 +25,7 @@ use crate::win::process_group as imp;
 #[derive(slug_error::Error, Debug)]
 #[slug(tag = Tier0)]
 pub enum SpawnError {
-    #[error("Failed to spawn a process")]
+    #[error("Failed to spawn a process: {0}")]
     IoError(io::Error),
     #[error("Failed to create a process group")]
     GenericError(slug_error::Error),

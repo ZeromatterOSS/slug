@@ -20,6 +20,13 @@ use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use slug_artifact::artifact::source_artifact::SourceArtifact;
+use slug_core::cells::name::CellName;
+use slug_core::cells::paths::CellRelativePath;
+use slug_core::package::PackageLabel;
+use slug_core::package::package_relative_path::PackageRelativePath;
+use slug_core::package::source_path::SourcePath;
+use slug_util::arc_str::ArcS;
 use starlark::coerce::Coerce;
 use starlark::collections::SmallMap;
 use starlark::collections::StarlarkHasher;
@@ -1483,6 +1490,26 @@ mod tests {
             )
         );
     }
+
+    #[test]
+    fn source_backed_toolchain_compiler_path_tracks_feature_repo_version() {
+        Heap::temp(|heap| {
+            let args = vec![
+                heap.alloc("-resource-dir"),
+                heap.alloc(
+                    "external/llvm++http_archive+llvm-toolchain-minimal-22.1.4-linux-amd64/lib/clang/22",
+                ),
+            ];
+
+            assert_eq!(
+                source_backed_toolchain_compiler_path_from_args(&args, "clang"),
+                Some(
+                    "external/llvm++http_archive+llvm-toolchain-minimal-22.1.4-linux-amd64/bin/clang"
+                        .to_owned()
+                )
+            );
+        });
+    }
 }
 
 fn parse_cc_modern_feature_constraint<'v>(
@@ -1670,6 +1697,131 @@ fn source_backed_toolchain_executable_path(path: &str) -> Option<String> {
         return None;
     };
     Some(format!("external/{source_repo}/{rest}"))
+}
+
+fn source_backed_llvm_toolchain_repo(path: &str) -> Option<String> {
+    let external_path = path
+        .strip_prefix("bazel-external/")
+        .or_else(|| {
+            path.split_once("/bazel-external/")
+                .map(|(_, external)| external)
+        })
+        .or_else(|| path.strip_prefix("external/"))
+        .or_else(|| path.split_once("/external/").map(|(_, external)| external))?;
+    let (repo, _) = external_path.split_once('/').unwrap_or((external_path, ""));
+    if repo.starts_with("llvm++http_archive+llvm-toolchain-minimal-") {
+        Some(repo.to_owned())
+    } else if repo.starts_with("llvm+http_archive+llvm-toolchain-minimal-") {
+        Some(repo.replacen("llvm+http_archive+", "llvm++http_archive+", 1))
+    } else {
+        None
+    }
+}
+
+fn source_backed_toolchain_executable_from_files<'v>(
+    files: Value<'v>,
+    executable_name: &str,
+    heap: Heap<'v>,
+) -> starlark::Result<Option<String>> {
+    fn collect<'v>(
+        value: Value<'v>,
+        executable_name: &str,
+        heap: Heap<'v>,
+        out: &mut Vec<String>,
+    ) -> starlark::Result<()> {
+        if value.is_none() || value.unpack_str().is_some() {
+            return Ok(());
+        }
+        if let Ok(Some(path)) = value.get_attr("path", heap)
+            && let Some(path) = path.unpack_str()
+        {
+            if path.ends_with(&format!("/bin/{executable_name}"))
+                && let Some(normalized) = source_backed_toolchain_executable_path(path)
+            {
+                out.push(normalized);
+                return Ok(());
+            }
+            if let Some(repo) = source_backed_llvm_toolchain_repo(path) {
+                out.push(format!("external/{repo}/bin/{executable_name}"));
+                return Ok(());
+            }
+        }
+        if is_depset_value(value) {
+            for item in depset_to_list(value, heap)? {
+                collect(item, executable_name, heap, out)?;
+            }
+            return Ok(());
+        }
+        if let Ok(Some(directory)) = value.get_attr("directory", heap) {
+            collect(directory, executable_name, heap, out)?;
+        }
+        if let Ok(Some(files)) = value.get_attr("files", heap) {
+            collect(files, executable_name, heap, out)?;
+        }
+        if let Ok(iter) = value.iterate(heap) {
+            for item in iter {
+                collect(item, executable_name, heap, out)?;
+            }
+        }
+        Ok(())
+    }
+
+    let mut matches = Vec::new();
+    collect(files, executable_name, heap, &mut matches)?;
+    Ok(matches.into_iter().next())
+}
+
+fn source_backed_toolchain_compiler_path<'v>(
+    cc_toolchain: Value<'v>,
+    executable_name: &str,
+    heap: Heap<'v>,
+) -> starlark::Result<Option<String>> {
+    for attr_name in ["_compiler_files", "compiler_files", "all_files"] {
+        if let Ok(Some(files)) = cc_toolchain.get_attr(attr_name, heap)
+            && !files.is_none()
+            && let Some(path) =
+                source_backed_toolchain_executable_from_files(files, executable_name, heap)?
+        {
+            return Ok(Some(path));
+        }
+    }
+    Ok(None)
+}
+
+fn source_backed_toolchain_compiler_path_from_args(
+    args: &[Value<'_>],
+    executable_name: &str,
+) -> Option<String> {
+    args.iter().find_map(|arg| {
+        let value = arg.unpack_str()?;
+        let repo = source_backed_llvm_toolchain_repo(value)?;
+        Some(format!("external/{repo}/bin/{executable_name}"))
+    })
+}
+
+fn source_backed_toolchain_executable_source_artifact<'v>(
+    path: &str,
+    heap: Heap<'v>,
+) -> Option<Value<'v>> {
+    let normalized = source_backed_toolchain_executable_path(path)?;
+    let external_path = normalized.strip_prefix("external/")?;
+    let (repo, rest) = external_path.split_once('/')?;
+    let cell = CellName::unchecked_new(repo).ok()?;
+    let package = PackageLabel::new(cell, CellRelativePath::empty()).ok()?;
+    let package_path = PackageRelativePath::new(rest).ok()?;
+    let source = SourceArtifact::new(SourcePath::new(package, ArcS::from(package_path)));
+    Some(heap.alloc(StarlarkArtifact::new(source.into())))
+}
+
+fn collect_source_backed_toolchain_executable_input<'v>(
+    compiler_path: &str,
+    heap: Heap<'v>,
+    out: &mut Vec<Value<'v>>,
+) {
+    if let Some(artifact) = source_backed_toolchain_executable_source_artifact(compiler_path, heap)
+    {
+        out.push(artifact);
+    }
 }
 
 fn expand_cc_scalar_template<'v>(
@@ -2196,8 +2348,17 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         } else {
             default_compiler
         };
-        let compiler_path =
-            source_backed_toolchain_executable_path(&compiler_path).unwrap_or(compiler_path);
+        let executable_name = if is_cpp { "clang++" } else { "clang" };
+        let compiler_path = if !cc_toolchain.is_none() && !is_windows_host() {
+            source_backed_toolchain_compiler_path(cc_toolchain, executable_name, heap)?
+                .or_else(|| {
+                    source_backed_toolchain_compiler_path_from_args(&feature_args, executable_name)
+                })
+                .or_else(|| source_backed_toolchain_executable_path(&compiler_path))
+                .unwrap_or(compiler_path)
+        } else {
+            source_backed_toolchain_executable_path(&compiler_path).unwrap_or(compiler_path)
+        };
 
         // Need to call .as_output() on the output artifact to mark it as an output
         // This is required by Slug's run() to bind the artifact to an action
@@ -2586,6 +2747,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 break;
             }
         }
+        collect_source_backed_toolchain_executable_input(&compiler_path, heap, &mut compile_inputs);
         if !cc_compilation_context.is_none() {
             if let Ok(Some(headers)) = cc_compilation_context.get_attr("headers", heap) {
                 if !headers.is_none() {
@@ -5758,8 +5920,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         } else {
             default_compiler
         };
-        let compiler_path =
-            source_backed_toolchain_executable_path(&compiler_path).unwrap_or(compiler_path);
+        let executable_name = if is_cpp { "clang++" } else { "clang" };
+        let compiler_path = if !cc_toolchain.is_none() && !is_windows_host() {
+            source_backed_toolchain_compiler_path(cc_toolchain, executable_name, heap)?
+                .or_else(|| source_backed_toolchain_executable_path(&compiler_path))
+                .unwrap_or(compiler_path)
+        } else {
+            source_backed_toolchain_executable_path(&compiler_path).unwrap_or(compiler_path)
+        };
 
         // Mark output as output artifact
         let output_artifact = match output_file.get_attr("as_output", heap) {

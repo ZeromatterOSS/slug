@@ -4416,6 +4416,59 @@ Blocker reflection 2026-05-21, alias `Target.label` identity:
   loop action is a bounded-jobs SDK smoke before considering an execution
   concurrency or spawn-diagnostics code change.
 
+Blocker reflection 2026-05-21, C++ tool executable action input:
+
+- Follow-up SDK smokes with bounded concurrency reproduced the same frontier
+  in local LLVM C/C++ compilation:
+  `/tmp/slug-plan61/sdk-parity-j32-20260521-153807.log` failed after about
+  287s and `/tmp/slug-plan61/sdk-parity-j16-diag-20260521-154458.log` failed
+  after about 191s. After adding the diagnostic spawn error, Slug reported
+  `Failed to spawn a process: No such file or directory (os error 2)` for
+  `external/llvm++http_archive+llvm-toolchain-minimal-22.1.0-linux-amd64/bin/clang`.
+  The same path exists and runs from the project root, which classifies the
+  failure as a per-action execroot input/materialization problem rather than a
+  missing repository checkout or resource-only failure.
+- Bazel 9 ground truth:
+  `/tmp/slug-plan61/bazel-aquery-compiler-rt-cppcompile-20260521-*.textproto`
+  records `CppCompile` actions whose first argument is
+  `external/llvm++http_archive+llvm-toolchain-minimal-22.1.4-linux-amd64/bin/clang`
+  and whose input dep set directly contains both
+  `external/llvm++http_archive+llvm-toolchain-minimal-22.1.4-linux-amd64/bin/clang`
+  and
+  `external/llvm++http_archive+llvm-toolchain-minimal-22.1.4-linux-amd64/lib/clang/22`.
+  Therefore the Bazel-compatible shape is not to expose the whole external repo
+  in the execroot, but to declare the compiler executable/toolchain files as
+  action inputs.
+- Class boundary: this is not a bzlmod mapping bug, not a hardlink behavior,
+  and not an ELF output-root string issue. Slug's source-backed LLVM compiler
+  path was rendered as a command string, while the per-action execroot only
+  materializes declared `ctx.actions.run(inputs=...)` artifacts. A focused
+  repro also showed Slug selected stale argv[0]
+  `llvm-toolchain-minimal-22.1.0` while the same action's feature-expanded
+  resource directory and materialized repo were `llvm-toolchain-minimal-22.1.4`.
+  Bazel uses `22.1.4` consistently for both argv[0] and inputs, so the fix had
+  to align the selected compiler path with the same current source-backed repo
+  visible in the feature/toolchain files, not merely add another input.
+- Systemic fix: C++ compile action construction now derives source-backed LLVM
+  compiler executables from toolchain file depsets and, when those are not
+  enough, from feature-expanded args that identify the current LLVM toolchain
+  repo. It then declares the same `external/<repo>/bin/<tool>` path used as
+  argv[0] as a source artifact input. This follows Bazel's aquery behavior and
+  keeps undeclared sibling paths hidden.
+- Validation: `cargo build -p slug` passed after the implementation, and the
+  focused ZeroMatter target
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-llvm-tool-input-focused4 build --jobs=16 'llvm++llvm_source+compiler-rt//:builtins'`
+  now succeeds in
+  `/tmp/slug-plan61/plan61-llvm-tool-input-focused4-20260521-160728.log`.
+  After adding a focused unit assertion for feature-derived repo versions and
+  rebuilding, the same clean-target validation passed again in
+  `/tmp/slug-plan61/plan61-llvm-tool-input-focused5-20260521-161102.log`.
+- Rejected workarounds: copying `clang` into action execroots after failure,
+  symlinking the whole `external/llvm++...` repo into every action, hardcoding a
+  specific LLVM version, disabling per-action execroot isolation, or treating
+  the `buck-out`/`bazel-out` output-root exception as permission to ignore tool
+  inputs.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
