@@ -34,7 +34,6 @@ use slug_bzlmod::BzlmodEventKind;
 use slug_bzlmod::ModuleCache;
 use slug_bzlmod::ModuleSource;
 use slug_bzlmod::MvsResolver;
-use slug_bzlmod::ResolvedGraph;
 use slug_bzlmod::parse_module_bazel;
 use slug_bzlmod::record_bzlmod_event;
 use slug_bzlmod::resolve_local_modules;
@@ -2074,15 +2073,6 @@ impl BuckConfigBasedCells {
                 version_map.insert(name.clone(), info.version.clone());
             }
             bzlmod_session_data.module_versions = version_map;
-
-            // Handle repo_name aliases from transitive deps
-            // Parse each resolved module's MODULE.bazel to extract repo_name aliases
-            Self::collect_transitive_repo_aliases(
-                &resolved_graph,
-                &parsed.module.name,
-                &mut scoped_repo_aliases,
-            )
-            .await;
         }
 
         // Build parsed_modules list for extension resolution
@@ -2599,76 +2589,6 @@ impl BuckConfigBasedCells {
             eager_repo_rule_invocations,
             session_data: bzlmod_session_data,
         }))
-    }
-
-    /// Collect repo_name aliases from transitive dependencies.
-    ///
-    /// This function parses the MODULE.bazel of each resolved module to extract
-    /// bazel_dep declarations with repo_name parameters, creating global aliases
-    /// so that transitive dependencies can be accessed by their aliased names.
-    ///
-    /// Note: In Bazel, repo_name aliases are scoped to the declaring module.
-    /// This implementation creates global aliases for simplicity. A future
-    /// enhancement could implement proper scoping.
-    async fn collect_transitive_repo_aliases(
-        resolved_graph: &ResolvedGraph,
-        root_module_name: &str,
-        scoped_repo_aliases: &mut Vec<BzlmodScopedRepoAlias>,
-    ) {
-        for (module_name, module_info) in &resolved_graph.modules {
-            // Skip root module (already handled)
-            if module_name == root_module_name {
-                continue;
-            }
-
-            // Get the source path where MODULE.bazel is located
-            let source_path = match &module_info.source_path {
-                Some(path) => path.clone(),
-                None => continue,
-            };
-
-            let module_bazel_path = source_path.join("MODULE.bazel");
-            if !module_bazel_path.exists() {
-                continue;
-            }
-
-            // Parse the transitive module's MODULE.bazel
-            match parse_module_bazel(&module_bazel_path) {
-                Ok(dep_parsed) => {
-                    // Extract repo_name aliases from this module's dependencies.
-                    // Skip dev_dependency deps and deps not in the resolved graph -
-                    // they won't have a corresponding cell.
-                    for dep in &dep_parsed.module.bazel_deps {
-                        if dep.dev_dependency {
-                            continue;
-                        }
-                        if let Some(repo_name) = &dep.repo_name {
-                            if repo_name != &dep.name {
-                                // Only create alias if the target module is in the resolved graph
-                                if !resolved_graph.modules.contains_key(&dep.name) {
-                                    tracing::debug!(
-                                        "Skipping transitive repo_name alias: {} -> {} (from {}): target not in resolved graph",
-                                        repo_name,
-                                        dep.name,
-                                        module_name
-                                    );
-                                    continue;
-                                }
-                                // Bazel scopes repo_name to the declaring module.
-                                scoped_repo_aliases.push(BzlmodScopedRepoAlias {
-                                    owner_module: module_name.clone(),
-                                    apparent_name: repo_name.clone(),
-                                    target_name: dep.name.clone(),
-                                });
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::debug!("Failed to parse MODULE.bazel for {}: {}", module_name, e);
-                }
-            }
-        }
     }
 
     pub(crate) fn get_cell_aliases_from_config(

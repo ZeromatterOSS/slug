@@ -3960,7 +3960,9 @@ Implementation update 2026-05-21, transitive `repo_name` aliases are scoped:
   from parsed module files, including local-path override modules, and no
   longer registers those non-root transitive apparent names as global aliases.
   Root-module apparent names still use the legacy global alias bridge until the
-  root cell resolver is fully `RepoMappingKey`-owned.
+  root cell resolver is fully `RepoMappingKey`-owned. A follow-up cleanup
+  removed the older duplicate transitive-alias collector so parsed module files
+  have one scoped registration path.
 - Guardrail added:
   `test_transitive_repo_name_aliases_are_scoped_to_declaring_module`; it also
   asserts the root module cannot resolve the transitive-only apparent name.
