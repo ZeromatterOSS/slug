@@ -2433,6 +2433,8 @@ impl BuckConfigBasedCells {
             let is_generated_override_alias = alias.declaring_module.is_none()
                 && alias.apparent_name != target_name
                 && slug_bzlmod::parse_canonical_name(&alias.apparent_name).is_some();
+            let is_root_declared_alias =
+                alias.declaring_module.as_deref() == Some(parsed.module.name.as_str());
             if let Some(owner_module) = alias.declaring_module.as_deref().or_else(|| {
                 slug_bzlmod::parse_canonical_name(&alias.canonical_name)
                     .map(|(owner_module, _, _)| owner_module)
@@ -2449,6 +2451,9 @@ impl BuckConfigBasedCells {
                     canonical_name: target_name.clone(),
                 });
             }
+            if !is_root_declared_alias {
+                continue;
+            }
             if existing_cell_names.contains(alias.apparent_name.as_str()) {
                 tracing::debug!(
                     "Skipping global alias '{}' -> '{}': cell already exists; scoped alias remains registered",
@@ -2459,12 +2464,6 @@ impl BuckConfigBasedCells {
             }
             let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
             let canonical_name = CellName::unchecked_new(&target_name)?;
-            if !is_generated_override_alias {
-                dynamic_extension_aliases.push(BzlmodDynamicAlias {
-                    apparent_name: apparent_name.as_str().to_owned(),
-                    canonical_name: canonical_name.as_str().to_owned(),
-                });
-            }
             ext_aliases.push((apparent_name, canonical_name));
         }
 

@@ -8,7 +8,7 @@
 
 In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
 observable bzlmod replay/materialization bug shapes that blocked the current SDK
-parity loop. The current guardrail file has 41 passing tests and no xfails. The
+parity loop. The current guardrail file has 42 passing tests and no xfails. The
 broader DICE-owned bzlmod plan is not complete until the acceptance criteria
 below are satisfied or a real blocker is recorded.
 
@@ -4053,6 +4053,39 @@ Implementation update 2026-05-21, root apparent aliases do not leak to other mod
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (41 tests); and
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (41
+  tests).
+
+Implementation update 2026-05-21, root `use_repo` aliases do not leak to other modules:
+
+- Bazel ground truth: module extension imports are part of the same
+  module-scoped repository mapping as `bazel_dep` apparent names.
+  `BazelDepGraphValue.getRepositoryMapping` adds only the extension imports for
+  the requested module key. A local Bazel 9.1.0 probe saved at
+  `/tmp/slug-plan61/bazel-use-repo-root-scope-20260521.log` confirms a root
+  `use_repo(root, tool_alias = "tool_repo")` is not visible from module `a`:
+  Bazel fails `@a//:uses_tool` with
+  `No repository visible as '@tool_alias' from repository '@@a+'`.
+- Blocker reflection: after root `bazel_dep(repo_name=...)` aliases were scoped,
+  Slug still promoted all precomputed `use_repo` aliases into the root alias
+  list and dynamic extension alias table. That let labels in unrelated modules
+  resolve root-only extension imports through process-global fallback paths.
+- Systemic fix: precomputed extension aliases are always recorded in the
+  temporary scoped bzlmod alias table for their declaring module, but they are
+  added to the root resolver only when the root module declared the import.
+  Non-root `use_repo` imports no longer become root aliases, and ordinary
+  root-declared imports no longer enter the dynamic extension alias table.
+- Guardrail added:
+  `test_root_use_repo_alias_does_not_leak_to_transitive_module`, which proves
+  `//:root_uses_tool` can still resolve the root import while
+  `@a//:uses_tool` fails instead of resolving `@tool_alias`.
+- Validation passed:
+  `python3 -m py_compile tests/core/bzlmod/test_plan61_guardrails.py`;
+  `cargo fmt --check`; `cargo check -p slug_common -p slug_core`;
+  `cargo build -p slug`; `git diff --check`; focused direct pytest for the new
+  guardrail; full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (42 tests); and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (42
   tests).
 
 Exit criteria:

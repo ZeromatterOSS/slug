@@ -1968,6 +1968,66 @@ local_path_override(module_name = "b", path = "b")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_use_repo_alias_does_not_leak_to_transitive_module(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: module-scoped use_repo imports in BazelDepGraphValue."""
+    a = buck.cwd / "a"
+    tool_repo = buck.cwd / "tool_repo"
+    a.mkdir()
+    tool_repo.mkdir()
+    _write(a / "MODULE.bazel", 'module(name = "a", version = "1.0")\n')
+    _write(
+        a / "BUILD.bazel",
+        """filegroup(
+    name = "uses_tool",
+    srcs = ["@tool_alias//:tool"],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        tool_repo / "BUILD.bazel",
+        """filegroup(name = "tool", visibility = ["//visibility:public"])
+""",
+    )
+    _write(
+        buck.cwd / "root_ext.bzl",
+        """load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+
+def _impl(module_ctx):
+    local_repository(name = "tool_repo", path = "tool_repo")
+
+root_ext = module_extension(implementation = _impl)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_root_use_repo_scope")
+bazel_dep(name = "a", version = "1.0")
+local_path_override(module_name = "a", path = "a")
+root = use_extension("//:root_ext.bzl", "root_ext")
+use_repo(root, tool_alias = "tool_repo")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "root_uses_tool",
+    srcs = ["@tool_alias//:tool"],
+)
+""",
+    )
+
+    await buck.build("//:root_uses_tool")
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("@a//:uses_tool")
+
+    assert "tool_alias" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source(
     buck: Buck,
 ) -> None:
