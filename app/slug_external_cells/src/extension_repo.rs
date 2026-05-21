@@ -51,6 +51,9 @@ use slug_execute::digest_config::DigestConfig;
 use slug_execute::digest_config::HasDigestConfig;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
+static EXTENSION_REPO_MATERIALIZATION_LOCK: tokio::sync::Mutex<()> =
+    tokio::sync::Mutex::const_new(());
+
 /// Error for extension repos.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -629,6 +632,8 @@ pub(crate) async fn get_file_ops_delegate(
         setup.canonical_name.as_ref(),
     )
     .await?;
+
+    let _materialization_guard = EXTENSION_REPO_MATERIALIZATION_LOCK.lock().await;
 
     // Check if the repository is fully materialized (marked complete).
     // We check for .slug_repo_complete rather than just directory existence because

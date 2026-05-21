@@ -128,15 +128,27 @@ pub fn repo_layout_is_valid_for_invocation(
 ) -> bool {
     match invocation.rule_name.as_str() {
         "git_repository" | "new_git_repository" => working_dir.join(".git").exists(),
-        "local_repository" | "new_local_repository" => {
-            local_repository_layout_is_valid(invocation, working_dir)
-        }
+        "local_repository" => local_repository_layout_is_valid(invocation, working_dir),
+        "new_local_repository" => new_local_repository_layout_is_valid(invocation, working_dir),
         "_llvm_subproject_repository" => llvm_subproject_layout_is_valid(invocation, working_dir),
         _ => true,
     }
 }
 
 fn local_repository_layout_is_valid(invocation: &RepositoryInvocation, working_dir: &Path) -> bool {
+    let Some(source_dir) = local_repository_source_path(invocation, working_dir) else {
+        return true;
+    };
+    local_repository_root_matches_source(&source_dir, working_dir)
+}
+
+fn new_local_repository_layout_is_valid(
+    invocation: &RepositoryInvocation,
+    working_dir: &Path,
+) -> bool {
+    if !new_local_repository_build_file_is_valid(invocation, working_dir) {
+        return false;
+    }
     let Some(source_dir) = local_repository_source_path(invocation, working_dir) else {
         return true;
     };
@@ -152,12 +164,97 @@ fn local_repository_layout_is_valid(invocation: &RepositoryInvocation, working_d
             continue;
         }
         checked_any = true;
-        if !working_dir.join(&name).exists() {
+        if !local_repository_entry_matches_source(&entry.path(), &working_dir.join(&name)) {
             return false;
         }
     }
 
     checked_any || working_dir.join("BUILD.bazel").exists() || working_dir.join("BUILD").exists()
+}
+
+#[cfg(unix)]
+fn local_repository_root_matches_source(source_dir: &Path, working_dir: &Path) -> bool {
+    let Ok(metadata) = std::fs::symlink_metadata(working_dir) else {
+        return false;
+    };
+    if !metadata.file_type().is_symlink() {
+        return false;
+    }
+
+    let Ok(target) = std::fs::read_link(working_dir) else {
+        return false;
+    };
+    let actual = if target.is_absolute() {
+        target
+    } else {
+        working_dir
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(target)
+    };
+
+    let expected = source_dir
+        .canonicalize()
+        .unwrap_or_else(|_| source_dir.to_path_buf());
+    let actual = actual.canonicalize().unwrap_or(actual);
+    actual == expected
+}
+
+#[cfg(not(unix))]
+fn local_repository_root_matches_source(_source_dir: &Path, working_dir: &Path) -> bool {
+    working_dir.exists()
+}
+
+fn new_local_repository_build_file_is_valid(
+    invocation: &RepositoryInvocation,
+    working_dir: &Path,
+) -> bool {
+    let Some(expected) = invocation
+        .attrs
+        .get("build_file_content")
+        .and_then(|attr| attr.as_string())
+    else {
+        return true;
+    };
+
+    ["BUILD.bazel", "BUILD"].into_iter().any(|name| {
+        std::fs::read_to_string(working_dir.join(name))
+            .ok()
+            .is_some_and(|actual| actual == expected)
+    })
+}
+
+#[cfg(unix)]
+fn local_repository_entry_matches_source(source_entry: &Path, materialized_entry: &Path) -> bool {
+    let Ok(metadata) = std::fs::symlink_metadata(materialized_entry) else {
+        return false;
+    };
+    if !metadata.file_type().is_symlink() {
+        return false;
+    }
+
+    let Ok(target) = std::fs::read_link(materialized_entry) else {
+        return false;
+    };
+    let actual = if target.is_absolute() {
+        target
+    } else {
+        materialized_entry
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(target)
+    };
+
+    let expected = source_entry
+        .canonicalize()
+        .unwrap_or_else(|_| source_entry.to_path_buf());
+    let actual = actual.canonicalize().unwrap_or(actual);
+    actual == expected
+}
+
+#[cfg(not(unix))]
+fn local_repository_entry_matches_source(_source_entry: &Path, materialized_entry: &Path) -> bool {
+    materialized_entry.exists()
 }
 
 fn local_repository_source_path(
@@ -1671,12 +1768,91 @@ mod tests {
             &working_dir
         ));
 
-        std::fs::create_dir(working_dir.join("src")).unwrap();
-        std::fs::write(working_dir.join("README.md"), "readme").unwrap();
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(source_dir.join("src"), working_dir.join("src")).unwrap();
+            std::os::unix::fs::symlink(source_dir.join("README.md"), working_dir.join("README.md"))
+                .unwrap();
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::create_dir(working_dir.join("src")).unwrap();
+            std::fs::write(working_dir.join("README.md"), "readme").unwrap();
+        }
         assert!(repo_layout_is_valid_for_invocation(
             &local_inv,
             &working_dir
         ));
+
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(working_dir.join("README.md")).unwrap();
+            std::fs::write(working_dir.join("README.md"), "corrupt").unwrap();
+            assert!(!repo_layout_is_valid_for_invocation(
+                &local_inv,
+                &working_dir
+            ));
+        }
+    }
+
+    #[test]
+    fn local_repository_marker_requires_repo_root_link() {
+        let temp = TempDir::new().unwrap();
+        let source_dir = temp.path().join("source");
+        std::fs::create_dir_all(&source_dir).unwrap();
+        std::fs::write(
+            source_dir.join("BUILD.bazel"),
+            "filegroup(name = \"data\")\n",
+        )
+        .unwrap();
+        std::fs::write(
+            source_dir.join("MODULE.bazel"),
+            "module(name = \"source\")\n",
+        )
+        .unwrap();
+        std::fs::write(source_dir.join(".slug_repo_complete"), "complete").unwrap();
+
+        let working_dir = temp.path().join("bazel-external/local_repo");
+        std::fs::create_dir_all(working_dir.parent().unwrap()).unwrap();
+
+        let local_inv =
+            RepositoryInvocation::new("local_repo".to_owned(), "local_repository".to_owned())
+                .with_attr(
+                    "path".to_owned(),
+                    crate::repository_invocations::AttrValue::String(
+                        source_dir.to_string_lossy().to_string(),
+                    ),
+                );
+
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&source_dir, &working_dir).unwrap();
+            assert!(repo_layout_is_valid_for_invocation(
+                &local_inv,
+                &working_dir
+            ));
+
+            std::fs::remove_file(&working_dir).unwrap();
+            std::fs::create_dir(&working_dir).unwrap();
+            std::fs::write(
+                working_dir.join("BUILD.bazel"),
+                "filegroup(name = \"data\")\n",
+            )
+            .unwrap();
+            assert!(!repo_layout_is_valid_for_invocation(
+                &local_inv,
+                &working_dir
+            ));
+        }
+
+        #[cfg(not(unix))]
+        {
+            std::fs::create_dir(&working_dir).unwrap();
+            assert!(repo_layout_is_valid_for_invocation(
+                &local_inv,
+                &working_dir
+            ));
+        }
     }
 
     #[test]

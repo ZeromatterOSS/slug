@@ -48,6 +48,9 @@ use crate::dice_graph::record_bzlmod_event;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::RepositoryInvocation;
 
+static EXTENSION_REPO_MATERIALIZATION_LOCK: tokio::sync::Mutex<()> =
+    tokio::sync::Mutex::const_new(());
+
 /// Errors that can occur during repository rule execution.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -225,6 +228,12 @@ pub struct ExtensionRepoExecutionKey {
     /// Project root for repository materialization.
     /// Repositories are created under {project_root}/bazel-external/{canonical_name}/
     pub project_root: Arc<PathBuf>,
+
+    /// Lightweight pre-materialization disk state for marker/layout reuse.
+    ///
+    /// This is a transitional correctness key until repository output state is
+    /// represented as explicit DICE file deps or a manifest value.
+    pub materialized_state: Arc<str>,
 }
 
 impl std::hash::Hash for ExtensionRepoExecutionKey {
@@ -234,6 +243,7 @@ impl std::hash::Hash for ExtensionRepoExecutionKey {
         self.extension_id.hash(state);
         self.spec_hash.hash(state);
         self.project_root.hash(state);
+        self.materialized_state.hash(state);
     }
 }
 
@@ -244,6 +254,7 @@ impl PartialEq for ExtensionRepoExecutionKey {
             && self.extension_id == other.extension_id
             && self.spec_hash == other.spec_hash
             && self.project_root == other.project_root
+            && self.materialized_state == other.materialized_state
     }
 }
 
@@ -258,12 +269,19 @@ impl ExtensionRepoExecutionKey {
         project_root: PathBuf,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
+        let materialized_state = materialized_repo_state(
+            canonical_name.as_str(),
+            &repo_spec,
+            &project_root,
+            &spec_hash,
+        );
         Self {
             canonical_name: Arc::from(canonical_name.as_str()),
             extension_id: Arc::from(extension_id.as_str()),
             spec_hash: Arc::from(spec_hash.as_str()),
             repo_spec: Arc::new(repo_spec),
             project_root: Arc::new(project_root),
+            materialized_state: Arc::from(materialized_state.as_str()),
         }
     }
 
@@ -275,12 +293,19 @@ impl ExtensionRepoExecutionKey {
         project_root: Arc<PathBuf>,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
+        let materialized_state = materialized_repo_state(
+            canonical_name.as_ref(),
+            repo_spec.as_ref(),
+            project_root.as_ref(),
+            &spec_hash,
+        );
         Self {
             canonical_name,
             extension_id,
             spec_hash: Arc::from(spec_hash.as_str()),
             repo_spec,
             project_root,
+            materialized_state: Arc::from(materialized_state.as_str()),
         }
     }
 
@@ -313,6 +338,47 @@ fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
     }
 }
 
+fn materialized_repo_state(
+    canonical_name: &str,
+    repo_spec: &RepoSpec,
+    project_root: &PathBuf,
+    spec_hash: &str,
+) -> String {
+    let repo_dir = project_root.join("bazel-external").join(canonical_name);
+    let marker_path = repo_dir.join(".slug_repo_complete");
+    let marker_state = if marker_path.exists() {
+        match std::fs::read_to_string(&marker_path) {
+            Ok(marker) => {
+                let trimmed = marker.trim();
+                if complete_marker_matches(trimmed, spec_hash) {
+                    format!("marker:{trimmed}")
+                } else {
+                    format!("marker-mismatch:{trimmed}")
+                }
+            }
+            Err(e) => format!("marker-unreadable:{e}"),
+        }
+    } else {
+        "marker-absent".to_owned()
+    };
+
+    let layout_state = match repo_spec_to_invocation(canonical_name, repo_spec) {
+        Ok(invocation) => {
+            if crate::repository_executor::repo_layout_is_valid_for_invocation(
+                &invocation,
+                &repo_dir,
+            ) {
+                "layout-valid".to_owned()
+            } else {
+                "layout-invalid".to_owned()
+            }
+        }
+        Err(e) => format!("layout-unclassifiable:{e}"),
+    };
+
+    format!("{marker_state};{layout_state}")
+}
+
 #[async_trait]
 impl Key for ExtensionRepoExecutionKey {
     type Value = slug_error::Result<Arc<RepositoryRuleResult>>;
@@ -336,6 +402,8 @@ impl Key for ExtensionRepoExecutionKey {
             .project_root
             .join("bazel-external")
             .join(self.canonical_name.as_ref());
+
+        let _materialization_guard = EXTENSION_REPO_MATERIALIZATION_LOCK.lock().await;
 
         let marker_path = working_dir.join(".slug_repo_complete");
         let marker_contents = marker_path
@@ -498,7 +566,9 @@ impl Key for ExtensionRepoExecutionKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        // Don't cache errors - retry on next request
+        // Don't cache errors - retry on next request. Successful values are
+        // keyed by `materialized_state`, so marker/layout corruption creates a
+        // different key while same-transaction materialization stays deduped.
         x.is_ok()
     }
 }
@@ -865,6 +935,73 @@ mod tests {
         );
 
         assert_ne!(key1, key2);
+    }
+
+    #[test]
+    fn test_extension_repo_key_hash_includes_materialized_state() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let source_dir = project_root.join("repo_src");
+        let repo_dir = project_root
+            .join("bazel-external")
+            .join("_main+ext+local_repo");
+        std::fs::create_dir_all(&source_dir).unwrap();
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(source_dir.join("data.txt"), "fresh").unwrap();
+
+        let repo_spec = RepoSpec::new(
+            "@@bazel_tools//tools/build_defs/repo:local.bzl%new_local_repository".to_owned(),
+        )
+        .with_attr(
+            "path".to_owned(),
+            AttrValue::String(source_dir.to_string_lossy().to_string()),
+        )
+        .with_attr(
+            "build_file_content".to_owned(),
+            AttrValue::String("exports_files([\"data.txt\"])\n".to_owned()),
+        );
+        let spec_hash = repo_spec.compute_hash();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&spec_hash),
+        )
+        .unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(source_dir.join("data.txt"), repo_dir.join("data.txt")).unwrap();
+        #[cfg(not(unix))]
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+
+        let valid = ExtensionRepoExecutionKey::new(
+            "_main+ext+local_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec.clone(),
+            project_root.clone(),
+        );
+
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(repo_dir.join("data.txt")).unwrap();
+            std::fs::write(repo_dir.join("data.txt"), "corrupt").unwrap();
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::remove_file(repo_dir.join("data.txt")).unwrap();
+        }
+
+        let corrupt = ExtensionRepoExecutionKey::new(
+            "_main+ext+local_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec,
+            project_root,
+        );
+
+        assert_ne!(valid.materialized_state, corrupt.materialized_state);
+        assert_ne!(valid, corrupt);
     }
 
     // Tests for repo_spec_to_invocation

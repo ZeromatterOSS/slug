@@ -2144,6 +2144,55 @@ repo(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_materialized_repo_marker_revalidates_corrupted_local_repo_layout(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: DigestWriter, RepoRecordedInput, and RepositoryFetchFunction."""
+    canonical_repo = "+new_local_repository+corrupt_repo"
+    repo_dir = buck.cwd / "bazel-external" / canonical_repo
+    marker = repo_dir / ".slug_repo_complete"
+    repo_src = buck.cwd / "repo_src"
+
+    repo_src.mkdir()
+    _write(repo_src / "fresh.txt", "fresh output from current repo spec\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_corrupt_marker")
+
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+repo(
+    name = "corrupt_repo",
+    path = "repo_src",
+    build_file_content = \"\"\"exports_files(["fresh.txt"])
+\"\"\",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_corrupt_repo",
+    srcs = ["@corrupt_repo//:fresh.txt"],
+)
+""",
+    )
+
+    await buck.build("//:uses_corrupt_repo")
+    assert marker.exists()
+
+    materialized_file = repo_dir / "fresh.txt"
+    assert materialized_file.is_symlink()
+    materialized_file.unlink()
+    _write(materialized_file, "corrupted materialized output\n")
+
+    await buck.kill()
+    await buck.build("//:uses_corrupt_repo")
+
+    assert materialized_file.is_symlink()
+    assert materialized_file.read_text() == "fresh output from current repo spec\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_no_stub_failures_cover_missing_generated_repo_and_repo_rule_failure(
     buck: Buck,
 ) -> None:

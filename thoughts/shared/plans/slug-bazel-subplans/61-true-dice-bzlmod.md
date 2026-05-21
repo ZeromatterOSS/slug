@@ -3895,6 +3895,51 @@ Ground-truth correction 2026-05-21, `load_wasm` / `execute_wasm`:
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (37
   tests).
 
+Implementation update 2026-05-21, materialized local repository validation:
+
+- Bazel ground truth: `/var/mnt/dev/bazel/tools/build_defs/repo/local.bzl`
+  implements `local_repository` as `rctx.symlink(path, ".")`, while
+  `new_local_repository` symlinks each child and writes or links a
+  `BUILD.bazel`. `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryFetchFunction.java:717`
+  also treats a symlinked output directory as the expected
+  `local_repository` shape.
+- Blocker reflection: the first marker-layout fix incorrectly applied the
+  `new_local_repository` per-entry overlay invariant to `local_repository`.
+  That made valid lockfile replay repos look corrupt, so concurrent lazy
+  materialization could discard the symlinked repo after another caller had
+  already materialized it. The systemic fix is to validate each repository rule
+  against its Bazel-shaped output layout instead of using one generic "local
+  repo" predicate.
+- Slug now keeps separate layout validators: `local_repository` requires the
+  materialized repo root to be the Bazel-style symlink to the declared source
+  path on Unix, and `new_local_repository` requires generated BUILD content
+  plus top-level materialized entries that still point at the source entries.
+  `ExtensionRepoExecutionKey` also keys successful reuse on a lightweight
+  materialized marker/layout state, and extension-repo lazy materialization is
+  serialized at the current transition boundary to avoid stale-check/removal
+  races.
+- Guardrails added or strengthened:
+  `test_materialized_repo_marker_revalidates_corrupted_local_repo_layout` and
+  Rust unit coverage for `local_repository` root-link validation,
+  `new_local_repository` source-entry validation, and
+  `ExtensionRepoExecutionKey` materialized-state hashing.
+- This is still a transition, not a full repository-output manifest. Archive
+  and custom Starlark repository outputs still need Bazel-grounded recorded
+  input / output-state ownership before the "bare marker trust" acceptance row
+  is fully complete for every repository rule.
+- Validation passed:
+  `cargo fmt --check`; `cargo check -p slug_bzlmod -p slug_external_cells -p
+  slug_interpreter_for_build -p slug_common`; `cargo test -p slug_bzlmod
+  repository_executor -- --nocapture` (14 tests); `cargo test -p slug_bzlmod
+  repository_execution -- --nocapture` (18 tests); `cargo build -p slug`;
+  `git diff --check`; focused direct pytest for
+  `test_materialized_repo_marker_revalidates_corrupted_local_repo_layout`, the
+  two lockfile replay materialization tests that exposed the race, full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (38 tests); and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (38
+  tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
