@@ -764,9 +764,10 @@ impl MvsResolver {
                 .push((version, discovered));
         }
 
-        // Check for compatibility conflicts (same module name, different compat levels)
-        // This logs warnings but does not fail - conflicts are resolved by version
-        self.check_compatibility_conflicts(&selection_groups);
+        // Check for compatibility conflicts (same module name, different compat levels).
+        // Bazel rejects these unless a multiple_version_override explicitly allows
+        // the split.
+        Self::check_compatibility_conflicts(&self.multiple_version_overrides, &selection_groups)?;
 
         // Select maximum version per group
         let mut selected: HashMap<String, Version> = HashMap::new();
@@ -843,12 +844,14 @@ impl MvsResolver {
     }
 
     /// Check for compatibility level conflicts.
-    /// When conflicts are found, logs a warning and resolves by keeping the
-    /// highest compatibility level (newest API), rather than failing.
+    ///
+    /// Bazel rejects selected versions of the same module with different
+    /// compatibility levels unless a multiple_version_override explicitly
+    /// allows multiple selected versions.
     fn check_compatibility_conflicts(
-        &self,
+        multiple_version_overrides: &HashMap<String, MultipleVersionOverride>,
         groups: &HashMap<SelectionGroup, Vec<(Version, &DiscoveredModule)>>,
-    ) {
+    ) -> slug_error::Result<()> {
         // Group by module name to check for compat conflicts
         let mut by_name: HashMap<&str, Vec<&SelectionGroup>> = HashMap::new();
         for group in groups.keys() {
@@ -857,7 +860,7 @@ impl MvsResolver {
 
         for (name, name_groups) in by_name {
             // Skip if there's a multiple_version_override for this module
-            if self.multiple_version_overrides.contains_key(name) {
+            if multiple_version_overrides.contains_key(name) {
                 continue;
             }
 
@@ -884,21 +887,18 @@ impl MvsResolver {
                     .map(|(v, _)| v.to_string())
                     .unwrap_or_default();
 
-                // Log at debug level - this is an intentional resolution behavior.
-                // Bazel would fail here, but we resolve by selecting the highest version.
-                tracing::debug!(
-                    "Compatibility level conflict for module '{}': \
-                     version {} has compatibility_level={}, \
-                     version {} has compatibility_level={}. \
-                     Resolving by selecting the highest version.",
-                    name,
-                    v1,
-                    g1.compatibility_level,
-                    v2,
-                    g2.compatibility_level,
-                );
+                return Err(MvsResolutionError::CompatibilityConflict {
+                    name: name.to_owned(),
+                    version1: v1,
+                    compat1: g1.compatibility_level,
+                    version2: v2,
+                    compat2: g2.compatibility_level,
+                }
+                .into());
             }
         }
+
+        Ok(())
     }
 
     /// Build the final resolved graph with rewritten dependencies.
@@ -1846,6 +1846,86 @@ module(name = "local_lib", version = "2.0.0")
         assert_eq!(group1, group2);
         assert_ne!(group1, group3); // Different compat level
         assert_ne!(group1, group4); // Different name
+    }
+
+    #[test]
+    fn compatibility_conflicts_fail_without_multiple_version_override() {
+        let module_v1 = Module::new("dep".to_owned(), Version::parse("1.0.0").unwrap());
+        let module_v2 = Module::new("dep".to_owned(), Version::parse("2.0.0").unwrap());
+        let discovered_v1 = DiscoveredModule {
+            key: ModuleKey::new("dep", "1.0.0"),
+            module: module_v1,
+            compatibility_level: 1,
+            source: ModuleSource::Registry {
+                url: "https://bcr.bazel.build".to_owned(),
+            },
+        };
+        let discovered_v2 = DiscoveredModule {
+            key: ModuleKey::new("dep", "2.0.0"),
+            module: module_v2,
+            compatibility_level: 2,
+            source: ModuleSource::Registry {
+                url: "https://bcr.bazel.build".to_owned(),
+            },
+        };
+        let mut groups = HashMap::new();
+        groups.insert(
+            SelectionGroup::new("dep", 1),
+            vec![(Version::parse("1.0.0").unwrap(), &discovered_v1)],
+        );
+        groups.insert(
+            SelectionGroup::new("dep", 2),
+            vec![(Version::parse("2.0.0").unwrap(), &discovered_v2)],
+        );
+
+        let err = MvsResolver::check_compatibility_conflicts(&HashMap::new(), &groups).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("dep"));
+        assert!(message.contains("compatibility_level"));
+    }
+
+    #[test]
+    fn compatibility_conflicts_are_allowed_by_multiple_version_override() {
+        let module_v1 = Module::new("dep".to_owned(), Version::parse("1.0.0").unwrap());
+        let module_v2 = Module::new("dep".to_owned(), Version::parse("2.0.0").unwrap());
+        let discovered_v1 = DiscoveredModule {
+            key: ModuleKey::new("dep", "1.0.0"),
+            module: module_v1,
+            compatibility_level: 1,
+            source: ModuleSource::Registry {
+                url: "https://bcr.bazel.build".to_owned(),
+            },
+        };
+        let discovered_v2 = DiscoveredModule {
+            key: ModuleKey::new("dep", "2.0.0"),
+            module: module_v2,
+            compatibility_level: 2,
+            source: ModuleSource::Registry {
+                url: "https://bcr.bazel.build".to_owned(),
+            },
+        };
+        let mut groups = HashMap::new();
+        groups.insert(
+            SelectionGroup::new("dep", 1),
+            vec![(Version::parse("1.0.0").unwrap(), &discovered_v1)],
+        );
+        groups.insert(
+            SelectionGroup::new("dep", 2),
+            vec![(Version::parse("2.0.0").unwrap(), &discovered_v2)],
+        );
+        let overrides = HashMap::from([(
+            "dep".to_owned(),
+            MultipleVersionOverride {
+                module_name: "dep".to_owned(),
+                versions: vec![
+                    Version::parse("1.0.0").unwrap(),
+                    Version::parse("2.0.0").unwrap(),
+                ],
+                registry: None,
+            },
+        )]);
+
+        MvsResolver::check_compatibility_conflicts(&overrides, &groups).unwrap();
     }
 
     #[test]

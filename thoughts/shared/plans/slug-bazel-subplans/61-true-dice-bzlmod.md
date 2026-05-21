@@ -172,6 +172,23 @@ Implementation update 2026-05-19:
   rematerialized the symlinked source tree and resolved
   `llvm++llvm_source+libcxx//:src/filesystem/time_utils.h`.
 
+Implementation update 2026-05-20, module compatibility-level conflicts:
+
+- Bazel ground truth: Bazel 9 `Selection.java` rejects selected modules with
+  the same module name and different `compatibility_level` unless
+  `multiple_version_override` explicitly permits multiple selected versions.
+  Local source anchor:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Selection.java:436`.
+- Previous Slug behavior logged the conflict and selected the highest version,
+  which could mask a Bazel `VERSION_RESOLUTION_ERROR`. Slug now fails MVS
+  resolution for this class and only permits the split when a matching
+  `multiple_version_override` is present.
+- Validation:
+  `cargo test -p slug_bzlmod compatibility_conflicts -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`,
+  `cargo build -p slug`, and
+  `cargo test -p slug_bzlmod resolution -- --nocapture` all pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
