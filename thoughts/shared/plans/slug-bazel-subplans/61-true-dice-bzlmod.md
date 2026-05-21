@@ -8,7 +8,7 @@
 
 In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
 observable bzlmod replay/materialization bug shapes that blocked the current SDK
-parity loop. The current guardrail file has 25 passing tests and no xfails. The
+parity loop. The current guardrail file has 27 passing tests and no xfails. The
 broader DICE-owned bzlmod plan is not complete until the acceptance criteria
 below are satisfied or a real blocker is recorded.
 
@@ -467,8 +467,19 @@ Implementation update 2026-05-21, registry file hashes are enforced in
 - Validation:
   `cargo test -p slug_bzlmod registry_checksum -- --nocapture`,
   `cargo test -p slug_bzlmod resolution -- --nocapture`,
-  `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`, and
+  `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`,
   `git diff --check`, and `cargo build -p slug` pass.
+
+Validation checkpoint 2026-05-21, Plan 61 guardrails:
+
+- Direct Python guardrails passed:
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
+  (`27 passed`).
+- The Slug test target also passed:
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
+  (`27 passed` inside pytest; Slug reported one passing test target).
+- `slugd` was killed afterward. `/var/mnt/dev/slug/buck-out` was 3.6M after
+  the run.
 
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
