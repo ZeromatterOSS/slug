@@ -710,7 +710,10 @@ Plan 61 must add proof infrastructure before moving ownership:
 - Structured events/counters: `bzlmod_resolution_compute`, `module_file_parse`,
   `extension_eval`, `extension_replay_hit`, `extension_replay_miss_reason`,
   `repo_materialization_hit`, `repo_materialization_miss_reason`,
-  `lockfile_read`, `lockfile_write_attempt`, and `stub_fallback_attempt`.
+  `lockfile_read`, and `lockfile_write_attempt`. Historical
+  `stub_fallback_attempt` instrumentation was removed after normal stub
+  fallback paths were eliminated; guardrails now assert direct failure and no
+  generated stub repo files/markers.
 - Every parity fixture records: pinned Bazel source/doc anchor, local Bazel
   output, local Slug output, and the decision for any source/doc/policy mismatch.
 
@@ -740,7 +743,8 @@ Implementation slice 2026-05-18:
   `bzlmod_resolution_compute`, `module_file_parse`, `extension_eval`,
   `extension_replay_hit`, `extension_replay_miss_reason`,
   `repo_materialization_hit`, `repo_materialization_miss_reason`,
-  `lockfile_read`, `lockfile_write_attempt`, and `stub_fallback_attempt`.
+  `lockfile_read`, `lockfile_write_attempt`, and the now-retired historical
+  `stub_fallback_attempt`.
 - Wired those counters into current legacy locations so later phases can prove
   whether a path still depends on startup-built/global state.
 - Added explicit skipped Python guardrail tests in
@@ -771,7 +775,8 @@ Implementation slice 2026-05-18, phase 61.1/61.2 boundary:
   counter fields `bzlmod_resolution_compute`, `module_file_parse`,
   `extension_eval`, `extension_replay_hit`, `extension_replay_miss_reason`,
   `repo_materialization_hit`, `repo_materialization_miss_reason`,
-  `lockfile_read`, `lockfile_write_attempt`, and `stub_fallback_attempt`.
+  `lockfile_read`, and `lockfile_write_attempt` after the later
+  `stub_fallback_attempt` retirement.
   This is intentionally observability-only and does not change bzlmod
   resolution, replay, or materialization behavior.
 - Converted the first two skipped guardrails into focused Python daemon
@@ -3838,6 +3843,27 @@ shape:
   module/repository label-operation guardrails, and full direct
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (36 tests).
+
+Implementation update 2026-05-21, retired stale stub fallback telemetry:
+
+- The remaining `RepositoryRuleExecutionKey` direct path already fails with
+  `NoImplementation`; it no longer creates, returns, or blesses a synthetic
+  repository. Recording `stub_fallback_attempt` there was misleading because
+  no fallback happens.
+- Slug now removes the idle `StubFallbackAttempt` event kind and
+  `stub_fallback_attempt` JSON counter. The active no-stub guardrails assert
+  the behavior directly: extension/repo-rule failures leave no generated repo
+  directory, marker, `BUILD.bazel`, or `defs.bzl`.
+- Validation target for this slice is the same Plan 61 guardrail matrix plus
+  the in-process DICE counter observability test, which now enumerates only
+  active counters.
+- Validation passed: `cargo fmt --check`; `cargo test -p slug_bzlmod
+  dice_graph -- --nocapture` (7 tests); `cargo check -p slug_bzlmod -p
+  slug_interpreter_for_build -p slug_common`; `cargo build -p slug`; `git diff
+  --check`; direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python
+  -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
+  (36 tests); and `./target/debug/slug test
+  tests/core/bzlmod:test_plan61_guardrails` (36 tests).
 
 Exit criteria:
 

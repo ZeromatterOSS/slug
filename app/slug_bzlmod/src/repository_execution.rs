@@ -159,10 +159,6 @@ impl Key for RepositoryRuleExecutionKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        record_bzlmod_event(
-            BzlmodEventKind::StubFallbackAttempt,
-            format!("{}:{}", self.name, self.rule_name),
-        );
         tracing::warn!(
             "RepositoryRuleExecutionKey for '{}' cannot execute repository rule '{}' yet",
             self.name,
