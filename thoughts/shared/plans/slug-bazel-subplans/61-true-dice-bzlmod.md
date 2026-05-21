@@ -384,6 +384,24 @@ Validation checkpoint 2026-05-21:
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
   (`27 passed`).
 
+Implementation update 2026-05-21, root `MODULE.bazel` parse failures are not
+optional:
+
+- Bazel ground truth: `ModuleFileFunction` computes
+  `ModuleFileValue.KEY_FOR_ROOT_MODULE` from the root module file and wraps
+  `CompiledModuleFile.parseAndCompile` failures in persistent
+  `ModuleFileFunctionException` / `ExternalDepsException`, not in a fallback
+  that disables bzlmod. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java:170`
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java:311`.
+- Previous Slug startup cell setup warned on root `MODULE.bazel` parse failure
+  and returned `Ok(None)`, which could silently build as if bzlmod were absent.
+  Slug now propagates the parse failure with root module-file path context.
+- Validation:
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug pytest -q tests/core/bzlmod/test_module_parsing.py::test_module_bazel_syntax_error -rx --tb=short`
+  and `cargo check -p slug_common` pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module

@@ -617,14 +617,15 @@ impl BuckConfigBasedCells {
             module_bazel_path.display().to_string(),
         );
 
-        // Parse MODULE.bazel
-        let parsed = match parse_module_bazel(module_bazel_path.as_path()) {
-            Ok(p) => p,
-            Err(e) => {
-                tracing::warn!("Failed to parse MODULE.bazel: {}", e);
-                return Ok(None);
-            }
-        };
+        // Parse MODULE.bazel. Bazel treats root module-file parse/compile
+        // errors as bzlmod failures, not as a signal to disable bzlmod.
+        let parsed =
+            parse_module_bazel(module_bazel_path.as_path()).with_buck_error_context(|| {
+                format!(
+                    "Failed to parse root MODULE.bazel at {}",
+                    module_bazel_path.display()
+                )
+            })?;
 
         let mut cells = Vec::new();
         let mut aliases = Vec::new();
