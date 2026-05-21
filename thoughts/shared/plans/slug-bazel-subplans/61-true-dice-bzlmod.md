@@ -431,6 +431,21 @@ Implementation update 2026-05-21, extension replay lockfile reads route through
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k 'lockfile or replay or recorded' -rx --tb=short`
   (`17 passed, 10 deselected`) pass.
 
+SDK smoke checkpoint 2026-05-21, lockfile DICE read path:
+
+- Fresh ZeroMatter no-exec SDK smoke passed after routing extension replay
+  lockfile reads through `LockfileContentKey`:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-noexec-after-lockfile-dice-20260521-002955 build --unstable-no-execution //sdk:sdk_contents`.
+- Evidence log:
+  `/tmp/slug-plan61/plan61-noexec-after-lockfile-dice-20260521-002955.log`.
+  The run reported 6,008 local commands, `load=30.2s`, `analyze=2m25s`,
+  `execute=1m12s`, `total=3m45s`, and `BUILD SUCCEEDED`.
+- The known `rules_rust//ffi/rs:empty_allocator_libraries` wait recurred but
+  action counts moved and analysis advanced to Rust dry-run execution, so it
+  remains a non-blocking frontier pattern. `slugd` was killed afterward. The
+  generated ZeroMatter `buck-out` tree reached about 213M during the smoke and
+  was removed after the log was preserved; `execroot` was also removed.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
