@@ -1163,6 +1163,59 @@ use_repo(replay, "replayed_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_missing_lockfile_extension_executes_once_then_reuses_dice_state(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: lockfile miss executes extension and then Skyframe reuses it."""
+    _write(
+        buck.cwd / "live_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "live payload\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+live_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _live_ext_impl(module_ctx):
+    live_repo_rule(name = "live_repo")
+
+live_ext = module_extension(
+    implementation = _live_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_missing_lockfile_reuse")
+
+live = use_extension("//:live_ext.bzl", "live_ext")
+use_repo(live, "live_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_live_repo",
+    srcs = ["@live_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_live_repo")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_eval"] > before["extension_eval"]
+    assert first["extension_replay_hit"] == before["extension_replay_hit"]
+
+    await buck.build("//:uses_live_repo")
+    second = await _bzlmod_counters(buck)
+    assert second["extension_eval"] == first["extension_eval"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_file_input_edit_rejects_cache(
     buck: Buck,
 ) -> None:

@@ -226,6 +226,8 @@ pub struct BzlmodSessionData {
     pub root_module_name: String,
     pub project_root: PathBuf,
     pub hidden_lockfile_path: Option<PathBuf>,
+    pub visible_lockfile_digest: Option<String>,
+    pub hidden_lockfile_digest: Option<String>,
     pub lockfile_mode: LockfileMode,
     pub repo_env: BTreeMap<String, String>,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,

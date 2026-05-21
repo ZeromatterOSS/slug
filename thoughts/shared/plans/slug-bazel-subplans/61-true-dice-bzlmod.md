@@ -3722,6 +3722,40 @@ Validation update 2026-05-21, registry metadata/source JSON bridge inputs:
   plus `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
   (33 tests).
 
+Blocker reflection 2026-05-21, lockfile-miss extension eval did not reuse DICE:
+
+- New guardrail
+  `test_missing_lockfile_extension_executes_once_then_reuses_dice_state`
+  exposed that an extension with no usable `generatedRepoSpecs` lockfile entry
+  executed again on the second same-daemon build (`extension_eval` moved from
+  1 to 2). That violated the Plan 61 acceptance row: a lockfile miss should
+  execute once and then reuse the successful DICE value inside the daemon.
+- Root cause: `ModuleExtensionExecutionKey::compute()` read visible and hidden
+  lockfiles through `LockfileContentKey`. That key is deliberately
+  non-cacheable until filesystem-tracked lockfile reads land. The non-cacheable
+  dependency invalidated successful extension results between commands, even
+  when the visible lockfile bytes had not changed.
+- Bazel ground truth: `SingleExtensionEvalFunction` is keyed by extension
+  identity, usages, bzl transitive digest, repository environment/mappings, and
+  lockfile replay state. A lockfile miss does not make the successful extension
+  evaluation uncacheable forever; a lockfile edit changes the relevant input and
+  causes a new Skyframe value.
+- Systemic fix: startup bzlmod session data now carries the observed visible
+  and hidden lockfile digests. `ModuleExtensionExecutionKey` includes those
+  digests in hash/equality and reads lockfiles directly under that keyed
+  identity during compute, verifying the file still matches the observed digest
+  if present. This keeps same-daemon DICE reuse for lockfile misses while still
+  changing key identity when lockfiles change.
+- Validation passed:
+  `cargo fmt --check`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
+  `cargo build -p slug`, focused direct pytest for
+  `test_missing_lockfile_extension_executes_once_then_reuses_dice_state`, full
+  direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest
+  -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (34 tests),
+  and `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
+  (34 tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

@@ -1762,6 +1762,8 @@ impl BuckConfigBasedCells {
             options.allow_yanked_versions_env.as_deref(),
             &options.allow_yanked_versions_flags,
         )?;
+        let visible_lockfile_digest = visible_lockfile.and_then(|value| value.digest.clone());
+        let hidden_lockfile_digest = hidden_lockfile.and_then(|value| value.digest.clone());
         let visible_lockfile = if options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
             None
         } else if let Some(visible_lockfile) = visible_lockfile {
@@ -2236,6 +2238,8 @@ impl BuckConfigBasedCells {
         bzlmod_session_data.root_module_name = root_module_name.to_owned();
         bzlmod_session_data.project_root = project_root.root().to_path_buf();
         bzlmod_session_data.hidden_lockfile_path = hidden_lockfile_path;
+        bzlmod_session_data.visible_lockfile_digest = visible_lockfile_digest;
+        bzlmod_session_data.hidden_lockfile_digest = hidden_lockfile_digest;
         bzlmod_session_data.lockfile_mode = options.lockfile_mode;
 
         // Collect toolchain and execution platform registrations from all modules.
