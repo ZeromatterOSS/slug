@@ -282,6 +282,22 @@ Validation checkpoint 2026-05-20:
   removed afterward, `slugd` was killed, local `buck-out` was 3.6M, and
   `/var/mnt/dev/zeromatter-kuro/buck-out` was 3.3M.
 
+SDK smoke checkpoint 2026-05-20:
+
+- Fresh ZeroMatter no-exec SDK smoke passed after the registry hash and
+  override-failure checkpoints:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-noexec-after-registry-hashes-20260520 build --unstable-no-execution //sdk:sdk_contents`.
+- Evidence log:
+  `/tmp/slug-plan61/plan61-noexec-after-registry-hashes-20260520.log`.
+  The run reported 6,008 local commands, `load=39.4s`, `analyze=2m22s`,
+  `execute=1m11s`, `total=3m42s`, and `BUILD SUCCEEDED`.
+- The smoke initially revisited the known
+  `rules_rust//ffi/rs:empty_allocator_libraries` wait, but the queued action
+  count moved and the run advanced to Rust dry-run execution, so this was not a
+  blocker. `slugd` was killed afterward. The retained evidence tree
+  `/var/mnt/dev/zeromatter-kuro/buck-out/plan61-noexec-after-registry-hashes-20260520`
+  brought ZeroMatter `buck-out` to about 213M; `execroot` was 8K.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
