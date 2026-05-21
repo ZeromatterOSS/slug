@@ -3690,6 +3690,30 @@ Blocker reflection 2026-05-21, registry cache mutation under bridge hits:
   `module_file_parse` to 1712, so the warm audit is back to reusing the
   selected module graph.
 
+Validation update 2026-05-21, registry metadata/source JSON bridge inputs:
+
+- Added
+  `test_locked_registry_source_json_and_registry_metadata_are_bridge_inputs`.
+  The fixture pre-seeds cached `MODULE.bazel`, `source.json`, and top-level
+  `bazel_registry.json` entries, writes matching visible lockfile
+  `registryFileHashes`, proves a warm same-daemon `audit cell` reuses bzlmod
+  resolution, then mutates `source.json` and `bazel_registry.json` separately.
+- Systemic fix: `RegistryFileInputsKey` now validates any supported cached
+  registry file it fingerprints against the visible lockfile hash. A mismatch
+  fails with `Registry file checksum mismatch` before the bridge can reuse a
+  stale graph. This covers the files Bazel 9's `IndexRegistry` reads for
+  module files and repo specs: per-version `MODULE.bazel`, per-version
+  `source.json`, and top-level `bazel_registry.json`.
+- Validation passed:
+  `cargo fmt --check`, `git diff --check`,
+  `cargo check -p slug_common -p slug_bzlmod -p slug_server`,
+  `cargo build -p slug`, focused direct pytest for the new registry metadata
+  guardrail, and full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (33 tests),
+  plus `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
+  (33 tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

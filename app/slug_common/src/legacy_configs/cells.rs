@@ -1108,7 +1108,17 @@ impl Key for RegistryFileInputsKey {
                 Ok(content) => {
                     hasher.update(b"present");
                     hasher.update([0]);
-                    hasher.update(slug_bzlmod::lockfile::compute_sha256_hex(&content));
+                    let actual_hash = slug_bzlmod::lockfile::compute_sha256_hex(&content);
+                    if &actual_hash != expected_hash {
+                        return Err(slug_error::slug_error!(
+                            slug_error::ErrorTag::Input,
+                            "Registry file checksum mismatch for {}: expected {}, got {}",
+                            url,
+                            expected_hash,
+                            actual_hash
+                        ));
+                    }
+                    hasher.update(actual_hash);
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                     hasher.update(b"missing");
