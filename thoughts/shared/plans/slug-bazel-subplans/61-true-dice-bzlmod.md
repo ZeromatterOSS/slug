@@ -3464,6 +3464,52 @@ Implementation update 2026-05-21, root-only extension replay cache boundary:
   `bazel_dep` and extension-heavy graph shape, so this checkpoint is a
   correctness/perf step but does not yet satisfy the SDK warm-audit target.
 
+SDK smoke checkpoint 2026-05-21, after root-only extension replay cache:
+
+- ZeroMatter `audit cell` with isolation
+  `plan61-audit-cell-root-extension-cache-20260521-001` passed and wrote
+  `/tmp/slug-plan61/plan61-audit-cell-root-extension-cache-20260521-001.log`.
+  Cold timing was `elapsed=0:22.73 maxrss_kb=80448`. A same-daemon warm rerun
+  wrote `/tmp/slug-plan61/plan61-audit-cell-root-extension-cache-20260521-001-warm.out`
+  / `.err` and took `elapsed=0:13.80 maxrss_kb=80328`.
+- `audit bzlmod-counters` after the warm run reported
+  `bzlmod_resolution_compute=4`, `module_file_parse=1712`,
+  `extension_eval=0`, `extension_replay_hit=0`,
+  `extension_replay_miss_reason=39`, and `lockfile_read=3`. This confirms the
+  root-only replay checkpoint did not move the ZeroMatter frontier: the
+  remaining startup cost is transitive legacy module graph parsing/resolution
+  plus stale/missing extension replay entries, not root-only lockfile replay.
+
+Implementation update 2026-05-21, extension `.bzl` digest is DICE key identity:
+
+- Blocker reflection: widening the higher-level bzlmod resolution bridge while
+  `ModuleExtensionExecutionKey` computed the `.bzl` transitive digest inside
+  `compute()` would be unsound. A DICE hit could reuse an old extension result
+  without rerunning Bazel's replay invalidation check. Bazel's
+  `SingleExtensionEvalFunction` keys replay by the runnable extension's
+  transitive `.bzl` digest, so Slug's key identity must carry that digest even
+  while the digest implementation remains the current project-local literal
+  load approximation.
+- `ModuleExtensionExecutionKey` now stores `bzl_transitive_digest` and includes
+  it in display, equality, hashing, and `Dupe`. Constructors with a project
+  root compute `compute_bzl_transitive_digest_for_project()` before key
+  construction; minimal/non-project constructors keep the existing extension-id
+  digest fallback. `compute()` now consumes the keyed digest instead of
+  recomputing it.
+- Validation passed:
+  `cargo fmt --check`, `git diff --check`,
+  `cargo test -p slug_bzlmod module_extension_key -- --nocapture`,
+  `cargo test -p slug_bzlmod test_project_bzl_digest_is_in_hash_and_eq -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
+  `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (30 tests).
+- Remaining Plan 61 work: the higher-level resolution bridge still cannot cache
+  ZeroMatter's transitive graph because parsed transitive modules, archive/git
+  override source manifests, registry module/source metadata, and eval factors
+  are still hidden inside legacy resolution rather than first-class DICE key
+  inputs.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

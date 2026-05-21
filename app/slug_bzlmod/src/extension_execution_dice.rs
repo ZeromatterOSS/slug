@@ -273,7 +273,12 @@ impl ModuleExtensionResult {
 /// `project_root` is included because it identifies the workspace whose lockfile,
 /// local `.bzl` loads, and generated repo namespace are being evaluated.
 #[derive(Clone, Debug, Display, Allocative)]
-#[display("ModuleExtensionKey({}, {})", extension_id, input_hash)]
+#[display(
+    "ModuleExtensionKey({}, {}, {})",
+    extension_id,
+    input_hash,
+    bzl_transitive_digest
+)]
 pub struct ModuleExtensionExecutionKey {
     /// Extension identifier: "@@module//path:file.bzl%extension_name"
     pub extension_id: Arc<str>,
@@ -281,6 +286,14 @@ pub struct ModuleExtensionExecutionKey {
     /// Hash of input tags for cache invalidation.
     /// This hash covers all tags from all modules that use this extension.
     pub input_hash: Arc<str>,
+
+    /// Digest of the extension implementation's loaded `.bzl` graph.
+    ///
+    /// Bazel's `SingleExtensionEvalFunction` keys extension replay by the
+    /// runnable extension's transitive `.bzl` digest. Slug's current digest is
+    /// still an approximation for project-local literal loads, but it must be
+    /// part of the key identity so a DICE hit cannot skip replay invalidation.
+    pub bzl_transitive_digest: Arc<str>,
 
     /// Aggregated extension data from all modules.
     /// Contains all the tags needed to build module_ctx.
@@ -322,6 +335,7 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
         // Hash the identifying fields; input_hash represents the aggregated data
         self.extension_id.hash(state);
         self.input_hash.hash(state);
+        self.bzl_transitive_digest.hash(state);
         self.root_module_name.hash(state);
         self.project_root.hash(state);
         self.hidden_lockfile_path.hash(state);
@@ -337,6 +351,7 @@ impl PartialEq for ModuleExtensionExecutionKey {
         // Compare by identifying fields; input_hash represents the aggregated data
         self.extension_id == other.extension_id
             && self.input_hash == other.input_hash
+            && self.bzl_transitive_digest == other.bzl_transitive_digest
             && self.root_module_name == other.root_module_name
             && self.project_root == other.project_root
             && self.hidden_lockfile_path == other.hidden_lockfile_path
@@ -355,6 +370,7 @@ impl Dupe for ModuleExtensionExecutionKey {
         Self {
             extension_id: self.extension_id.dupe(),
             input_hash: self.input_hash.dupe(),
+            bzl_transitive_digest: self.bzl_transitive_digest.dupe(),
             aggregated: self.aggregated.dupe(),
             root_module_name: self.root_module_name.dupe(),
             project_root: self.project_root.clone(),
@@ -372,9 +388,12 @@ impl ModuleExtensionExecutionKey {
     pub fn new(aggregated: AggregatedExtension, root_module_name: String) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
+        let bzl_transitive_digest =
+            Arc::from(compute_bzl_transitive_digest(&extension_id).as_str());
         Self {
             extension_id,
             input_hash,
+            bzl_transitive_digest,
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: None,
@@ -399,9 +418,14 @@ impl ModuleExtensionExecutionKey {
     ) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
+        let bzl_transitive_digest = Arc::from(
+            compute_bzl_transitive_digest_for_project(&extension_id, project_root.as_path())
+                .as_str(),
+        );
         Self {
             extension_id,
             input_hash,
+            bzl_transitive_digest,
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: Some(Arc::new(project_root)),
@@ -420,9 +444,12 @@ impl ModuleExtensionExecutionKey {
         aggregated: Arc<AggregatedExtension>,
         root_module_name: Arc<str>,
     ) -> Self {
+        let bzl_transitive_digest =
+            Arc::from(compute_bzl_transitive_digest(&extension_id).as_str());
         Self {
             extension_id,
             input_hash,
+            bzl_transitive_digest,
             aggregated,
             root_module_name,
             project_root: None,
@@ -447,9 +474,14 @@ impl ModuleExtensionExecutionKey {
         repo_mappings: Arc<RepoMappingSnapshot>,
         repo_mapping_overrides: Arc<RepoMappingOverrides>,
     ) -> Self {
+        let bzl_transitive_digest = Arc::from(
+            compute_bzl_transitive_digest_for_project(&extension_id, project_root.as_ref())
+                .as_str(),
+        );
         Self {
             extension_id,
             input_hash,
+            bzl_transitive_digest,
             aggregated,
             root_module_name,
             project_root: Some(project_root),
@@ -464,9 +496,11 @@ impl ModuleExtensionExecutionKey {
     /// Create a minimal key (for testing or when aggregated data is not available).
     /// This is primarily for backward compatibility with tests.
     pub fn new_minimal(extension_id: String, input_hash: String) -> Self {
+        let bzl_transitive_digest = compute_bzl_transitive_digest(&extension_id);
         Self {
             extension_id: Arc::from(extension_id.as_str()),
             input_hash: Arc::from(input_hash.as_str()),
+            bzl_transitive_digest: Arc::from(bzl_transitive_digest.as_str()),
             aggregated: Arc::new(AggregatedExtension::default()),
             root_module_name: Arc::from("_main"),
             project_root: None,
@@ -562,16 +596,9 @@ impl Key for ModuleExtensionExecutionKey {
             self.input_hash
         );
 
-        // Compute digests for lockfile cache validation. For workspace-local
-        // extensions, include the extension .bzl file and literal transitive
-        // load() dependencies so edits reject stale replay.
-        let bzl_transitive_digest = self
-            .project_root
-            .as_deref()
-            .map(|project_root| {
-                compute_bzl_transitive_digest_for_project(&self.extension_id, project_root)
-            })
-            .unwrap_or_else(|| compute_bzl_transitive_digest(&self.extension_id));
+        // The `.bzl` transitive digest is part of key identity. Do not compute
+        // it here, or a DICE hit could skip Bazel's replay invalidation check.
+        let bzl_transitive_digest = self.bzl_transitive_digest.to_string();
         let usages_digest = self.input_hash.to_string();
         let mut prior_facts = empty_facts();
         let mut workspace_lockfile_facts = empty_facts();
@@ -1284,7 +1311,7 @@ mod tests {
         );
 
         let display = format!("{}", key);
-        assert_eq!(display, "ModuleExtensionKey(@@m//e.bzl%x, hash123)");
+        assert!(display.starts_with("ModuleExtensionKey(@@m//e.bzl%x, hash123, "));
     }
 
     #[test]
@@ -1536,6 +1563,59 @@ mod tests {
             crate::RepoMappingOverrides::new(),
         );
 
+        assert_ne!(key1, key2);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+        key1.hash(&mut hasher1);
+        key2.hash(&mut hasher2);
+        assert_ne!(hasher1.finish(), hasher2.finish());
+    }
+
+    #[test]
+    fn test_project_bzl_digest_is_in_hash_and_eq() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        use crate::extensions::AggregatedExtension;
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("ext.bzl"),
+            "def _impl(ctx):\n    pass\n",
+        )
+        .unwrap();
+        let aggregated1 = AggregatedExtension::new("@@mod//:ext.bzl", "ext");
+        let key1 = ModuleExtensionExecutionKey::new_with_lockfile(
+            aggregated1,
+            "_main".to_owned(),
+            temp_dir.path().to_path_buf(),
+            None,
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
+        );
+
+        std::fs::write(
+            temp_dir.path().join("ext.bzl"),
+            "def _impl(ctx):\n    fail('changed')\n",
+        )
+        .unwrap();
+        let aggregated2 = AggregatedExtension::new("@@mod//:ext.bzl", "ext");
+        let key2 = ModuleExtensionExecutionKey::new_with_lockfile(
+            aggregated2,
+            "_main".to_owned(),
+            temp_dir.path().to_path_buf(),
+            None,
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
+        );
+
+        assert_ne!(key1.bzl_transitive_digest, key2.bzl_transitive_digest);
         assert_ne!(key1, key2);
 
         let mut hasher1 = DefaultHasher::new();
