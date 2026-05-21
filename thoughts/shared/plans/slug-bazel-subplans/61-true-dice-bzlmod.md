@@ -227,6 +227,33 @@ resolution failures:
 - Validation: `cargo check -p slug_common -p slug_bzlmod` and
   `cargo fmt --check` pass.
 
+Implementation update 2026-05-20, registry file hash propagation:
+
+- Bazel ground truth: `ModuleFileValue` carries hashes for registry files used
+  to obtain module files, `ModuleFileFunction` collects those registry download
+  events, `RepoSpecFunction` returns additional hashes for repo-spec/source
+  files, and `BazelModuleResolutionFunction` merges them into the resolution
+  value. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileValue.java:42`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java:203`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RepoSpecFunction.java:59`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java:113`.
+- Slug registry fetch APIs now have hash-returning variants for
+  `MODULE.bazel` and `source.json` registry files. `ResolvedGraph` carries the
+  collected URL-to-SRI-SHA256 map, and the legacy bzlmod session bridge carries
+  those hashes forward while final `ModuleSourceKey` / `BzlmodResolutionKey`
+  ownership is still pending.
+- This does not write `MODULE.bazel.lock` on ordinary build/query paths. It
+  makes the Bazel-shaped input facts observable at the current transition
+  boundary so the future lockfile/update path can consume them without
+  recomputing from side effects.
+- Validation:
+  `cargo test -p slug_bzlmod registry -- --nocapture`,
+  `cargo test -p slug_bzlmod resolution -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`, and
+  `cargo build -p slug` all pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module

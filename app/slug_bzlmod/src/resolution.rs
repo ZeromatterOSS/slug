@@ -22,6 +22,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use fxhash::FxHashMap;
+use indexmap::IndexMap;
 use serde::Deserialize;
 use serde::Serialize;
 use slug_error::BuckErrorContext;
@@ -259,6 +260,12 @@ pub struct ResolvedGraph {
     pub modules: FxHashMap<String, ResolvedModuleInfo>,
     /// Resolution order (topological).
     pub resolution_order: Vec<String>,
+
+    /// Registry file hashes collected during module file and source metadata
+    /// resolution. Keys are registry file URLs, values are SRI SHA-256 hashes
+    /// of the exact file bytes.
+    #[serde(default)]
+    pub registry_file_hashes: IndexMap<String, String>,
 }
 
 /// Information about a resolved module in the final graph.
@@ -296,6 +303,8 @@ pub struct MvsResolver {
     single_version_overrides: HashMap<String, SingleVersionOverride>,
     /// Multiple version overrides.
     multiple_version_overrides: HashMap<String, MultipleVersionOverride>,
+    /// Registry file inputs observed during resolution.
+    registry_file_hashes: IndexMap<String, String>,
 }
 
 impl MvsResolver {
@@ -312,6 +321,7 @@ impl MvsResolver {
             overridden_modules: HashMap::new(),
             single_version_overrides: HashMap::new(),
             multiple_version_overrides: HashMap::new(),
+            registry_file_hashes: IndexMap::new(),
         })
     }
 
@@ -328,6 +338,7 @@ impl MvsResolver {
             overridden_modules: HashMap::new(),
             single_version_overrides: HashMap::new(),
             multiple_version_overrides: HashMap::new(),
+            registry_file_hashes: IndexMap::new(),
         })
     }
 
@@ -513,7 +524,7 @@ impl MvsResolver {
 
     /// Fetch a module from registry and create DiscoveredModule.
     async fn fetch_and_discover_module(
-        &self,
+        &mut self,
         dep: &BazelDep,
     ) -> slug_error::Result<DiscoveredModule> {
         let version_str = dep.version.as_str();
@@ -521,25 +532,30 @@ impl MvsResolver {
         tracing::debug!("Fetching {}@{} from registry", dep.name, version_str);
 
         // Fetch MODULE.bazel content
-        let module_bazel_content = self
+        let module_bazel_file = self
             .registry_client
-            .fetch_module_bazel(&dep.name, version_str)
+            .fetch_module_bazel_file(&dep.name, version_str)
             .await
             .map_err(|e| MvsResolutionError::DependencyResolutionFailed {
                 name: dep.name.clone(),
                 version: version_str.to_string(),
                 reason: format!("Failed to fetch MODULE.bazel: {}", e),
             })?;
+        self.registry_file_hashes.insert(
+            module_bazel_file.url.clone(),
+            module_bazel_file.hash.clone(),
+        );
 
         // Parse MODULE.bazel
         let filename = format!("{}@{}/MODULE.bazel", dep.name, version_str);
-        let parsed = parse_module_bazel_content(&module_bazel_content, &filename).map_err(|e| {
-            MvsResolutionError::DependencyResolutionFailed {
-                name: dep.name.clone(),
-                version: version_str.to_string(),
-                reason: format!("Failed to parse MODULE.bazel: {}", e),
-            }
-        })?;
+        let parsed =
+            parse_module_bazel_content(&module_bazel_file.content, &filename).map_err(|e| {
+                MvsResolutionError::DependencyResolutionFailed {
+                    name: dep.name.clone(),
+                    version: version_str.to_string(),
+                    reason: format!("Failed to parse MODULE.bazel: {}", e),
+                }
+            })?;
 
         Ok(DiscoveredModule {
             key: ModuleKey::from_dep(dep),
@@ -962,6 +978,7 @@ impl MvsResolver {
                 .collect(),
             modules,
             resolution_order,
+            registry_file_hashes: self.registry_file_hashes.clone(),
         })
     }
 
@@ -1027,24 +1044,32 @@ impl MvsResolver {
                 ModuleSource::Registry { url: _ } => {
                     // Fetch from registry
                     let result = async {
-                        let source_info = self
+                        let source_info_file = self
                             .registry_client
-                            .fetch_source_info(name, &info.version)
+                            .fetch_source_info_file(name, &info.version)
                             .await?;
 
-                        self.source_fetcher
+                        let source_path = self
+                            .source_fetcher
                             .fetch_source(
                                 self.registry_client.base_url(),
                                 name,
                                 &info.version,
-                                &source_info,
+                                &source_info_file.source_info,
                             )
-                            .await
+                            .await?;
+
+                        Ok::<_, slug_error::Error>((source_path, source_info_file.file))
                     }
                     .await;
 
                     match result {
-                        Ok(path) => Some(path),
+                        Ok((path, registry_file)) => {
+                            graph
+                                .registry_file_hashes
+                                .insert(registry_file.url, registry_file.hash);
+                            Some(path)
+                        }
                         Err(e) => {
                             tracing::warn!(
                                 "Failed to fetch source for {}@{}: {}",

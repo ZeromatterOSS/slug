@@ -35,6 +35,7 @@ use slug_http::HttpClientBuilder;
 use slug_http::to_bytes;
 
 use crate::cache::ModuleCache;
+use crate::lockfile::compute_sri_hash;
 use crate::version::Version;
 
 pub type RegistryFileMap = indexmap::IndexMap<String, String>;
@@ -145,6 +146,36 @@ pub struct SourceInfo {
     pub shallow_since: Option<String>,
 }
 
+/// Content fetched from a registry plus the lockfile-style hash of the exact
+/// registry file bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RegistryFileContent {
+    /// Registry URL used as the lockfile key.
+    pub url: String,
+
+    /// UTF-8 file content.
+    pub content: String,
+
+    /// SRI SHA-256 hash of `content`.
+    pub hash: String,
+}
+
+impl RegistryFileContent {
+    fn new(url: String, content: String) -> Self {
+        let hash = compute_sri_hash(content.as_bytes());
+        Self { url, content, hash }
+    }
+}
+
+/// Parsed registry source metadata plus the source.json file identity.
+#[derive(Debug, Clone, Allocative)]
+pub struct RegistrySourceInfo {
+    pub file: RegistryFileContent,
+
+    #[allocative(skip)]
+    pub source_info: SourceInfo,
+}
+
 impl SourceInfo {
     /// Get all URLs for downloading the source archive.
     pub fn get_urls(&self) -> Vec<String> {
@@ -237,19 +268,29 @@ impl RegistryClient {
         name: &str,
         version: &str,
     ) -> slug_error::Result<String> {
+        Ok(self.fetch_module_bazel_file(name, version).await?.content)
+    }
+
+    /// Fetch MODULE.bazel content and registry file identity for a specific version.
+    pub async fn fetch_module_bazel_file(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> slug_error::Result<RegistryFileContent> {
+        let url = format!(
+            "{}/modules/{}/{}/MODULE.bazel",
+            self.base_url, name, version
+        );
+
         // Check cache first
         if let Some(cached) = self
             .cache
             .read_module_bazel(&self.base_url, name, version)?
         {
             tracing::debug!("Using cached MODULE.bazel for {}@{}", name, version);
-            return Ok(cached);
+            return Ok(RegistryFileContent::new(url, cached));
         }
 
-        let url = format!(
-            "{}/modules/{}/{}/MODULE.bazel",
-            self.base_url, name, version
-        );
         tracing::debug!("Fetching MODULE.bazel from {}", url);
 
         let response = self
@@ -269,7 +310,7 @@ impl RegistryClient {
         self.cache
             .write_module_bazel(&self.base_url, name, version, &content)?;
 
-        Ok(content)
+        Ok(RegistryFileContent::new(url, content))
     }
 
     /// Fetch source.json for a specific version.
@@ -278,15 +319,31 @@ impl RegistryClient {
         name: &str,
         version: &str,
     ) -> slug_error::Result<SourceInfo> {
+        Ok(self
+            .fetch_source_info_file(name, version)
+            .await?
+            .source_info)
+    }
+
+    /// Fetch source.json and registry file identity for a specific version.
+    pub async fn fetch_source_info_file(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> slug_error::Result<RegistrySourceInfo> {
+        let url = format!("{}/modules/{}/{}/source.json", self.base_url, name, version);
+
         // Check cache first
         if let Some(cached) = self.cache.read_source_json(&self.base_url, name, version)? {
             tracing::debug!("Using cached source.json for {}@{}", name, version);
             let source_info: SourceInfo =
                 serde_json::from_str(&cached).buck_error_context("Failed to parse source.json")?;
-            return Ok(source_info);
+            return Ok(RegistrySourceInfo {
+                file: RegistryFileContent::new(url, cached),
+                source_info,
+            });
         }
 
-        let url = format!("{}/modules/{}/{}/source.json", self.base_url, name, version);
         tracing::debug!("Fetching source.json from {}", url);
 
         let response = self
@@ -312,7 +369,10 @@ impl RegistryClient {
         self.cache
             .write_source_json(&self.base_url, name, version, &content)?;
 
-        Ok(source_info)
+        Ok(RegistrySourceInfo {
+            file: RegistryFileContent::new(url, content),
+            source_info,
+        })
     }
 
     /// Check if a module version exists in the registry.
@@ -488,5 +548,44 @@ mod tests {
         let metadata: ModuleMetadata = serde_json::from_str(json).unwrap();
         assert_eq!(metadata.versions.len(), 3);
         assert!(metadata.yanked_versions.contains_key("0.0.1"));
+    }
+
+    #[test]
+    fn registry_file_content_reports_registry_hash() {
+        let content = "module(name = \"rules_cc\", version = \"0.0.9\")\n";
+        let file = RegistryFileContent::new(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            content.to_owned(),
+        );
+
+        assert_eq!(file.content, content);
+        assert_eq!(
+            file.url,
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"
+        );
+        assert_eq!(file.hash, compute_sri_hash(content.as_bytes()));
+    }
+
+    #[test]
+    fn registry_source_info_carries_source_json_file_identity() {
+        let content = r#"{"url":"https://example.com/rules_cc.tar.gz"}"#;
+        let source_info: SourceInfo = serde_json::from_str(content).unwrap();
+        let source = RegistrySourceInfo {
+            file: RegistryFileContent::new(
+                "https://bcr.bazel.build/modules/rules_cc/0.0.9/source.json".to_owned(),
+                content.to_owned(),
+            ),
+            source_info,
+        };
+
+        assert_eq!(
+            source.file.url,
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/source.json"
+        );
+        assert_eq!(source.file.hash, compute_sri_hash(content.as_bytes()));
+        assert_eq!(
+            source.source_info.url.as_deref(),
+            Some("https://example.com/rules_cc.tar.gz")
+        );
     }
 }

@@ -728,6 +728,7 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
+            bzlmod_session_data.registry_file_hashes = resolved_graph.registry_file_hashes.clone();
 
             // Build a set of local override names to skip
             let local_override_names: std::collections::HashSet<_> = parsed
