@@ -590,7 +590,6 @@ impl PartialEq for LegacyBzlmodResolutionDiceKey {
             && self.root_module_file.path == other.root_module_file.path
             && self.root_module_file.input_digest == other.root_module_file.input_digest
             && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
-            && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
             && self.local_override_inputs.digest == other.local_override_inputs.digest
             && self.registry_file_inputs.digest == other.registry_file_inputs.digest
             && self.extension_replay_summary_digest == other.extension_replay_summary_digest
@@ -607,7 +606,6 @@ impl std::hash::Hash for LegacyBzlmodResolutionDiceKey {
         self.root_module_file.path.hash(state);
         self.root_module_file.input_digest.hash(state);
         hash_lockfile_content_identity(&self.visible_lockfile, state);
-        hash_lockfile_content_identity(&self.hidden_lockfile, state);
         self.local_override_inputs.digest.hash(state);
         self.registry_file_inputs.digest.hash(state);
         self.extension_replay_summary_digest.hash(state);
@@ -1053,6 +1051,10 @@ impl Key for LocalOverrideModuleInputsKey {
 }
 
 fn cached_registry_file_path(cache: &ModuleCache, url: &str) -> Option<PathBuf> {
+    if let Some(registry_url) = url.strip_suffix("/bazel_registry.json") {
+        return Some(cache.registry_dir(registry_url).join("bazel_registry.json"));
+    }
+
     let (registry_url, module_path) = url.split_once("/modules/")?;
     let mut parts = module_path.split('/');
     let name = parts.next()?;

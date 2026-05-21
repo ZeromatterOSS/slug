@@ -381,8 +381,10 @@ async def test_warm_noop_locked_registry_dep_reuses_bzlmod_resolution(
         / module_name
         / module_version
     )
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
     source_dir = module_cache / "source"
     source_dir.mkdir(parents=True)
+    _write(registry_cache / "bazel_registry.json", "{}\n")
     _write(
         module_cache / "MODULE.bazel",
         f'module(name = "{module_name}", version = "{module_version}")\n',
@@ -404,12 +406,14 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     source_url = (
         f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
     )
+    registry_url = "https://bcr.bazel.build/bazel_registry.json"
     _write(
         buck.cwd / "MODULE.bazel.lock",
         json.dumps(
             {
                 "lockFileVersion": 26,
                 "registryFileHashes": {
+                    registry_url: _sha256(registry_cache / "bazel_registry.json"),
                     module_url: _sha256(module_cache / "MODULE.bazel"),
                     source_url: _sha256(module_cache / "source.json"),
                 },

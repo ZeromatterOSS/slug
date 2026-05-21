@@ -3644,20 +3644,51 @@ Blocker reflection 2026-05-21, registry cache mutation under bridge hits:
 - Rejected shortcuts: disabling all locked-registry graph reuse, trusting only
   the visible lockfile digest, or accepting stale cached registry file content
   because the prior bridge value was warm.
+- Follow-up blocker/regression: the first implementation treated every
+  non-`MODULE.bazel`/`source.json` lockfile registry hash as unsupported and
+  therefore disabled locked-registry bridge reuse for ZeroMatter. Its real
+  Bazel-generated lockfile has one top-level
+  `https://bcr.bazel.build/bazel_registry.json` entry. Bazel ground truth:
+  `IndexRegistry.getModuleFile()` reads per-version `MODULE.bazel`, while
+  `IndexRegistry.getRepoSpec()` reads per-version `source.json` and top-level
+  `bazel_registry.json` for repo spec fields such as mirrors/local paths
+  (Bazel source:
+  `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java`,
+  lines 166-172 and 237-287 in the Bazel 9-era source tree). The systemic fix
+  is to model `bazel_registry.json` as a supported registry-file key input
+  rather than globally disabling caching.
 - Slug now computes a non-cacheable registry-file input summary for visible
-  lockfile `MODULE.bazel` and `source.json` registry hash entries, using the
-  same `ModuleCache` layout the resolver reads. Registry graph bridge reuse is
-  enabled only when selected registry/remote deps have visible lockfile hashes
-  and those lockfile entries map to supported cached registry files. Mutating a
-  cached registry `MODULE.bazel` file changes the bridge key, forces resolution
-  to rerun, and surfaces the existing checksum-mismatch error.
+  lockfile `MODULE.bazel`, `source.json`, and top-level `bazel_registry.json`
+  registry hash entries, using the same `ModuleCache` registry layout the
+  resolver reads. Registry graph bridge reuse is enabled only when selected
+  registry/remote deps have visible lockfile hashes and those lockfile entries
+  map to supported cached registry files. Mutating a cached registry
+  `MODULE.bazel` file changes the bridge key, forces resolution to rerun, and
+  surfaces the existing checksum-mismatch error.
+- The same focused guardrail also exposed hidden-lockfile churn in the
+  transitional bridge: the daemon's Slug-only hidden lockfile can be created or
+  refreshed between commands, but Bazel has no second lockfile input for module
+  resolution. Cacheable bridge identity now excludes the hidden lockfile's raw
+  digest. Hidden lockfile extension entries still make the bridge non-cacheable,
+  and the root-extension replay path is still keyed by the explicit extension
+  replay summary digest.
 - Validation passed:
   `cargo fmt --check`, `git diff --check`,
   `cargo check -p slug_common -p slug_bzlmod -p slug_server`,
   `cargo build -p slug`, focused direct pytest for
   `test_warm_noop_locked_registry_dep_reuses_bzlmod_resolution`, and full
   direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest
-  -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (32 tests).
+  -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (32 tests),
+  plus `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
+  (32 tests).
+- ZeroMatter validation after the systemic fix:
+  `slug --isolation-dir plan61-audit-cell-registry-inputs-20260521-002 audit
+  cell` cold `elapsed=0:20.74 maxrss_kb=79656`; warm
+  `elapsed=0:10.85 maxrss_kb=79604`; final counters
+  `bzlmod_resolution_compute=2`, `module_file_parse=857`,
+  `lockfile_read=2`. The prior regressed path had doubled
+  `module_file_parse` to 1712, so the warm audit is back to reusing the
+  selected module graph.
 
 Exit criteria:
 
