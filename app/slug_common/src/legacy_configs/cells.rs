@@ -716,17 +716,18 @@ impl BuckConfigBasedCells {
             resolved_graph_for_aliases = Some(resolved_graph.clone());
 
             // Fetch sources for all resolved modules (downloads and extracts).
-            // Keep as a warning: partial fetch failures (e.g. one registry URL
-            // down) shouldn't block the whole build — cells for modules whose
-            // sources did fetch remain usable, and unresolved cells will surface
-            // a concrete "path does not exist" error at cell-access time.
-            if let Err(e) = resolver.fetch_sources(&mut resolved_graph).await {
-                tracing::warn!(
-                    "Failed to fetch some module sources for root module '{}': {}",
-                    parsed.module.name,
-                    e
-                );
-            }
+            // Bazel computes repo specs for every selected registry module during
+            // module resolution; registry/source access errors are direct
+            // resolution failures, not warnings followed by a broken cell graph.
+            resolver
+                .fetch_sources(&mut resolved_graph)
+                .await
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to fetch selected module sources for root module '{}'",
+                        parsed.module.name
+                    )
+                })?;
 
             // Build a set of local override names to skip
             let local_override_names: std::collections::HashSet<_> = parsed

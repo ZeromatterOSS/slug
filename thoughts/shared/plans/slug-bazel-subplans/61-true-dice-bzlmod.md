@@ -208,6 +208,25 @@ source of compatibility-level facts in Bazel 9:
   `cargo test -p slug_bzlmod resolution -- --nocapture`, and
   `cargo fmt --check` all pass.
 
+Implementation update 2026-05-20, selected registry source failures are direct
+resolution failures:
+
+- Bazel ground truth: Bazel 9 computes `RepoSpecValue` for every selected
+  registry module during `BazelModuleResolutionFunction`; `RepoSpecFunction`
+  throws when it cannot fetch source/registry repo-spec data. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java:113`
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RepoSpecFunction.java:59`.
+- Previous Slug behavior warned on `fetch_sources()` failure and continued to
+  register a partially broken cell graph with empty source paths. That can mask
+  a Bazel resolution failure until a later, less-informative cell/file access.
+- Slug legacy bzlmod setup now propagates selected module source fetch failures
+  with root-module context. This is still a transition toward
+  `ModuleSourceKey` / `RepoSpecFunction`-shaped DICE ownership, but it removes
+  the masking behavior at the current legacy boundary.
+- Validation: `cargo check -p slug_common -p slug_bzlmod` and
+  `cargo fmt --check` pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
