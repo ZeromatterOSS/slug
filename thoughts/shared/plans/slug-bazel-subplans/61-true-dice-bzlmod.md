@@ -3324,6 +3324,43 @@ Implementation update 2026-05-21, root MODULE parsing DICE bridge:
   shortcuts: making the current direct-read key cacheable, ignoring includes in
   equality, or treating the broad smoke wait as a completed validation.
 
+Implementation update 2026-05-21, visible lockfile read through DICE:
+
+- Bazel ground truth: the visible workspace lockfile is a graph input to bzlmod
+  resolution via `BazelLockFileValue.KEY` / `BazelLockFileFunction`, and
+  malformed visible lockfiles are hard failures in modes that read lockfiles.
+  This is distinct from the hidden output-base lockfile, which Bazel treats as
+  fail-open. Local anchors: `BazelLockFileValue.java` and
+  `BazelLockFileFunction.java`; hidden-lockfile behavior remains covered by the
+  existing Plan 61 hidden-lockfile tests.
+- Slug's server config-loading path now computes
+  `LockfileContentKey { kind: Workspace, path: MODULE.bazel.lock }` when the
+  root module exists and `--lockfile_mode` is not `off`, then passes the
+  resulting `LockfileContentValue` into the legacy bzlmod cell bridge. The
+  bridge still has a direct `read_lockfile_with_mode` fallback for
+  non-DICE/bootstrap callers, but ordinary server commands no longer perform
+  the visible workspace lockfile read inside `cells.rs`.
+- Guardrail added:
+  `test_visible_lockfile_edit_is_observed_in_same_daemon`, which runs
+  `audit cell --lockfile_mode=error`, edits a previously valid visible
+  `MODULE.bazel.lock` to malformed JSON, and verifies the same daemon rejects
+  the next audit. Focused validation passed:
+  `cargo test -p slug_bzlmod
+  dice_graph::tests::lockfile_content_key_is_non_cacheable_until_file_deps_are_tracked
+  -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
+  `cargo fmt --check`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -k 'visible_lockfile or
+  lockfile_mode_off' -rx --tb=short`. Checkpoint validation also passed
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (28 tests) and
+  `cargo build -p slug`.
+- Rejected shortcuts: making `LockfileContentKey` cacheable before tracked
+  filesystem inputs exist, sharing hidden-lockfile fail-open semantics with the
+  visible lockfile, or reading the visible lockfile in the server path and again
+  in the legacy bridge.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

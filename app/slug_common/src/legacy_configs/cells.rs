@@ -354,7 +354,7 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs), None)
+        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs), None, None)
             .await
             .buck_error_context("Parsing cells")
     }
@@ -364,10 +364,26 @@ impl BuckConfigBasedCells {
         config_args: &[slug_cli_proto::ConfigOverride],
         root_module_file: Arc<slug_bzlmod::RootModuleFileValue>,
     ) -> slug_error::Result<Self> {
+        Self::parse_with_config_args_and_bzlmod_inputs(
+            project_fs,
+            config_args,
+            root_module_file,
+            None,
+        )
+        .await
+    }
+
+    pub async fn parse_with_config_args_and_bzlmod_inputs(
+        project_fs: &ProjectRoot,
+        config_args: &[slug_cli_proto::ConfigOverride],
+        root_module_file: Arc<slug_bzlmod::RootModuleFileValue>,
+        visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
+    ) -> slug_error::Result<Self> {
         Self::parse_with_file_ops_and_options_inner(
             config_args,
             Some(project_fs),
             Some(root_module_file),
+            visible_lockfile,
         )
         .await
         .buck_error_context("Parsing cells")
@@ -377,7 +393,7 @@ impl BuckConfigBasedCells {
     pub async fn testing_parse(
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, None, None)
+        Self::parse_with_file_ops_and_options_inner(config_args, None, None, None)
             .await
             .buck_error_context("Parsing cells")
     }
@@ -386,6 +402,7 @@ impl BuckConfigBasedCells {
         config_args: &[slug_cli_proto::ConfigOverride],
         project_fs: Option<&ProjectRoot>,
         root_module_file: Option<Arc<slug_bzlmod::RootModuleFileValue>>,
+        visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
         let processed_config_args = resolve_config_args(config_args).await?;
@@ -412,6 +429,7 @@ impl BuckConfigBasedCells {
                 project_fs,
                 &root_config,
                 root_module_file.as_deref(),
+                visible_lockfile.as_deref(),
             )
             .await?
             {
@@ -622,6 +640,7 @@ impl BuckConfigBasedCells {
         project_root: &ProjectRoot,
         root_config: &LegacyBuckConfig,
         root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
+        visible_lockfile: Option<&slug_bzlmod::LockfileContentValue>,
     ) -> slug_error::Result<Option<BzlmodResolutionResult>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
@@ -668,21 +687,7 @@ impl BuckConfigBasedCells {
         let mut resolved_graph_for_aliases = None;
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::default();
         bzlmod_session_data.repo_env = slug_bzlmod::legacy_bzlmod_repo_env();
-        let lockfile_mode = match root_config
-            .get_section("bzlmod")
-            .and_then(|section| section.get("lockfile_mode"))
-        {
-            Some(value) => {
-                slug_bzlmod::LockfileMode::from_str(value.as_str()).ok_or_else(|| {
-                    slug_error::slug_error!(
-                        slug_error::ErrorTag::Input,
-                        "Invalid --lockfile_mode value `{}` for bzlmod",
-                        value.as_str()
-                    )
-                })?
-            }
-            None => slug_bzlmod::LockfileMode::default(),
-        };
+        let lockfile_mode = Self::bzlmod_lockfile_mode_from_config(root_config)?;
         let bzlmod_section = root_config.get_section("bzlmod");
         let allow_yanked_versions_env = bzlmod_section
             .and_then(|section| section.get("allow_yanked_versions_env"))
@@ -695,8 +700,13 @@ impl BuckConfigBasedCells {
             allow_yanked_versions_env.as_deref(),
             &allow_yanked_versions_flags,
         )?;
-        let visible_lockfile =
-            slug_bzlmod::read_lockfile_with_mode(project_root.root().as_path(), lockfile_mode)?;
+        let visible_lockfile = if lockfile_mode == slug_bzlmod::LockfileMode::Off {
+            None
+        } else if let Some(visible_lockfile) = visible_lockfile {
+            visible_lockfile.lockfile.clone()
+        } else {
+            slug_bzlmod::read_lockfile_with_mode(project_root.root().as_path(), lockfile_mode)?
+        };
         // Reset temporary process-local bzlmod adapters before any dynamic
         // extension cells are registered. Even for the same root, lockfile
         // replay and recorded inputs may have changed since the prior command.
@@ -1733,6 +1743,31 @@ impl BuckConfigBasedCells {
             }
         }
         Ok(aliases.into_iter())
+    }
+
+    pub fn bzlmod_lockfile_mode_from_config_args(
+        config_args: &[slug_cli_proto::ConfigOverride],
+    ) -> slug_error::Result<slug_bzlmod::LockfileMode> {
+        let root_config = LegacyBuckConfig::from_overrides_only(config_args)?;
+        Self::bzlmod_lockfile_mode_from_config(&root_config)
+    }
+
+    fn bzlmod_lockfile_mode_from_config(
+        root_config: &LegacyBuckConfig,
+    ) -> slug_error::Result<slug_bzlmod::LockfileMode> {
+        match root_config
+            .get_section("bzlmod")
+            .and_then(|section| section.get("lockfile_mode"))
+        {
+            Some(value) => slug_bzlmod::LockfileMode::from_str(value.as_str()).ok_or_else(|| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "Invalid --lockfile_mode value `{}` for bzlmod",
+                    value.as_str()
+                )
+            }),
+            None => Ok(slug_bzlmod::LockfileMode::default()),
+        }
     }
 
     pub(crate) async fn parse_single_cell_with_dice(

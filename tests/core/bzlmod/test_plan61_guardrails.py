@@ -598,6 +598,21 @@ async def test_lockfile_mode_error_rejects_invalid_visible_lockfile(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_visible_lockfile_edit_is_observed_in_same_daemon(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelLockFileValue.KEY is a graph input to resolution."""
+    lockfile = buck.cwd / "MODULE.bazel.lock"
+    _write_minimal_lockfile(lockfile)
+
+    await buck.audit("cell", "--lockfile_mode=error")
+
+    _write(lockfile, "{ this is not json }\n")
+    with pytest.raises(BuckException):
+        await buck.audit("cell", "--lockfile_mode=error")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_mode_error_rejects_changed_extension_facts(
     buck: Buck,
 ) -> None:

@@ -569,11 +569,34 @@ impl ServerCommandContext<'_> {
             .compute(&slug_bzlmod::RootModuleFileKey { workspace_id })
             .await?
             .buck_error_context("Computing root MODULE.bazel through DICE")?;
+        let visible_lockfile_mode =
+            BuckConfigBasedCells::bzlmod_lockfile_mode_from_config_args(&config_overrides)?;
+        let visible_lockfile = if root_module_file.parsed.is_some()
+            && visible_lockfile_mode != slug_bzlmod::LockfileMode::Off
+        {
+            let workspace_id = slug_bzlmod::WorkspaceId::new(
+                project_root_path.clone(),
+                project_root_path.join("buck-out/v2"),
+            );
+            Some(
+                dice_ctx
+                    .compute(&slug_bzlmod::LockfileContentKey {
+                        workspace_id,
+                        kind: slug_bzlmod::LockfileContentKind::Workspace,
+                        path: Arc::new(slug_bzlmod::lockfile_path(&project_root_path)),
+                    })
+                    .await?
+                    .buck_error_context("Computing visible MODULE.bazel.lock through DICE")?,
+            )
+        } else {
+            None
+        };
 
-        let new_configs = BuckConfigBasedCells::parse_with_config_args_and_root_module(
+        let new_configs = BuckConfigBasedCells::parse_with_config_args_and_bzlmod_inputs(
             &self.base_context.project_root,
             &config_overrides,
             root_module_file,
+            visible_lockfile,
         )
         .await?;
 
