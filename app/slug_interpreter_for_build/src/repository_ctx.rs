@@ -754,16 +754,27 @@ fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> P
 /// returning a path. Slug resolves Labels syntactically, so callers that then
 /// execute or read the path must trigger the same lazy materialization here.
 pub(crate) fn ensure_label_path_materialized(path: &Path) {
-    let Some(canonical) = canonical_name_from_bazel_external_path(path) else {
-        return;
-    };
-    if let Err(e) = slug_bzlmod::materialize_spoke_sync(&canonical) {
+    if let Err(e) = try_ensure_label_path_materialized(path) {
         tracing::warn!(
-            "Lazy materialization of extension repo '{}' failed (continuing with path): {}",
-            canonical,
+            "Lazy materialization of extension repo for '{}' failed (continuing with path): {}",
+            path.display(),
             e
         );
     }
+}
+
+pub(crate) fn try_ensure_label_path_materialized(path: &Path) -> starlark::Result<bool> {
+    let Some(canonical) = canonical_name_from_bazel_external_path(path) else {
+        return Ok(false);
+    };
+    slug_bzlmod::materialize_spoke_sync(&canonical).map_err(|e| {
+        starlark::Error::from(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "Failed to materialize extension repo '{}': {}",
+            canonical,
+            e
+        ))
+    })
 }
 
 pub(crate) fn apply_unified_patch(
@@ -2564,22 +2575,30 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Watch a path for changes.
-    /// Currently a no-op stub - Slug doesn't support watch yet.
     fn watch<'v>(
         this: &RepositoryContext,
-        #[starlark(require = pos)] _path: Value<'v>,
+        #[starlark(require = pos)] path: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Watch is a no-op for now
+        let resolved = repository_ctx_resolve_watch_path(this, path)?;
+        let _ = try_ensure_label_path_materialized(&resolved)?;
         Ok(Value::new_none())
     }
 
     /// Watch a directory tree for changes.
-    /// Currently a no-op stub - Slug doesn't support watch yet.
     fn watch_tree<'v>(
         this: &RepositoryContext,
-        #[starlark(require = pos)] _path: Value<'v>,
+        #[starlark(require = pos)] path: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // watch_tree is a no-op for now
+        let resolved = repository_ctx_resolve_watch_path(this, path)?;
+        let _ = try_ensure_label_path_materialized(&resolved)?;
+        if !resolved.is_dir() {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "can't call watch_tree() on non-directory {}",
+                resolved.display()
+            )
+            .into());
+        }
         Ok(Value::new_none())
     }
 
@@ -2676,6 +2695,33 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         tracing::info!("Repository progress: {}", status);
         Ok(Value::new_none())
     }
+}
+
+fn repository_ctx_resolve_watch_path(
+    this: &RepositoryContext,
+    path: Value,
+) -> starlark::Result<PathBuf> {
+    if let Some(s) = path.unpack_str() {
+        if is_bazel_label_string(s) {
+            return Ok(resolve_label_to_filesystem_path(s, &this.workspace_root));
+        }
+        return Ok(this.resolve_path(s));
+    }
+    if let Some(repo_path) = path.downcast_ref::<RepositoryPath>() {
+        return Ok(repo_path.absolute_path());
+    }
+    if path.get_type() == "Label" {
+        return Ok(resolve_label_to_filesystem_path(
+            &format!("{}", path),
+            &this.workspace_root,
+        ));
+    }
+    Err(slug_error::slug_error!(
+        slug_error::ErrorTag::Input,
+        "repository_ctx.watch() requires a string, Label, or path object, got {}",
+        path.get_type()
+    )
+    .into())
 }
 
 #[starlark_value(type = "repository_ctx")]

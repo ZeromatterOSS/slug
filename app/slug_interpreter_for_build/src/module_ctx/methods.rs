@@ -35,6 +35,7 @@ use crate::repository_ctx::ensure_label_path_materialized;
 use crate::repository_ctx::extract_archive;
 use crate::repository_ctx::get_urls_from_value;
 use crate::repository_ctx::resolve_label_to_path;
+use crate::repository_ctx::try_ensure_label_path_materialized;
 
 /// Module context methods for Bazel module extensions.
 /// I/O operations (download, execute, file) are fully implemented.
@@ -885,7 +886,7 @@ fn resolve_module_ctx_input_path(
                 workspace_root.join(legacy_path)
             }
         };
-        ensure_label_path_materialized(&resolved);
+        let _ = try_ensure_label_path_materialized(&resolved)?;
         return Ok(resolved);
     }
 

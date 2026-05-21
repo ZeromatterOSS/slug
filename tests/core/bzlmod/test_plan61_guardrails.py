@@ -1283,6 +1283,64 @@ use_repo(label_ops, "label_ops_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_watch_tree_label_fails_directly_for_non_directory(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkBaseExternalContext.watchTree and getPathFromLabel."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+watch_ext+watch_repo"
+    _write(buck.cwd / "watched.txt", "not a directory\n")
+    _write(
+        buck.cwd / "watch_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.watch_tree(Label("//:watched.txt"))
+    repository_ctx.file("data.txt", "watch payload\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+watch_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _watch_ext_impl(module_ctx):
+    watch_repo_rule(name = "watch_repo")
+
+watch_ext = module_extension(
+    implementation = _watch_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_watch")
+
+watch = use_extension("//:watch_ext.bzl", "watch_ext")
+use_repo(watch, "watch_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_watch_repo",
+    srcs = ["@watch_repo//:data"],
+)
+""",
+    )
+
+    failure_stderr: str | None = None
+    try:
+        await buck.build("//:uses_watch_repo")
+    except BuckException as e:
+        failure_stderr = e.stderr
+
+    if failure_stderr is None:
+        pytest.fail("repository_ctx.watch_tree(Label(file)) unexpectedly succeeded")
+
+    assert "watch_tree" in failure_stderr
+    assert "non-directory" in failure_stderr
+    assert not (repo_dir / ".slug_repo_complete").exists()
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_file_input_edit_rejects_cache(
     buck: Buck,
 ) -> None:

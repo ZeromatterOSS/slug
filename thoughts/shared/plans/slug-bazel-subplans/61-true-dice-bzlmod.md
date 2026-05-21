@@ -3801,6 +3801,44 @@ Implementation update 2026-05-21, `module_ctx` label-taking operations:
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (35 tests).
 
+Implementation update 2026-05-21, `repository_ctx.watch_tree(Label)` failure
+shape:
+
+- Bazel ground truth: `StarlarkBaseExternalContext.getPathFromLabel()` drives
+  non-main repository materialization for labels before returning a path, and
+  `StarlarkRepositoryContext.watchTree()` rejects non-directory paths after
+  resolving the label. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java:2308`
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContext.java:566`.
+- Blocker reflection: `repository_ctx.watch()` and `watch_tree()` were still
+  no-op stubs. That could let repository rules succeed and write completion
+  markers even when Bazel would reject an invalid watched label/path during
+  repository fetch. The owning Slug subsystem is
+  `app/slug_interpreter_for_build/src/repository_ctx.rs`, and the broader class
+  is all repository rules that rely on watched label/path inputs for marker
+  invalidation. Rejected symptom fixes: leaving no-op watch methods because the
+  current SDK does not visibly depend on them, or converting this to a
+  generated-repo-specific check outside repository-context path resolution.
+- Slug now resolves string/path/Label inputs for `repository_ctx.watch()` and
+  `repository_ctx.watch_tree()`, runs the fallible extension-repo
+  materialization boundary for resolved labels, and rejects
+  `watch_tree(Label(file))` with a direct non-directory error instead of
+  silently continuing.
+- Guardrail added:
+  `test_repository_ctx_watch_tree_label_fails_directly_for_non_directory`.
+  The old implementation would have ignored the invalid watch tree and
+  materialized a generated repo; the new behavior fails at the repository rule
+  boundary and leaves no `.slug_repo_complete` marker.
+- Validation passed:
+  `python3 -m py_compile tests/core/bzlmod/test_plan61_guardrails.py`,
+  `cargo fmt --check`,
+  `cargo check -p slug_interpreter_for_build -p slug_bzlmod -p slug_common`,
+  `cargo build -p slug`, `git diff --check`, focused direct pytest for the
+  module/repository label-operation guardrails, and full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (36 tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
