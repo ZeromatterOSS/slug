@@ -4358,6 +4358,15 @@ Implementation update 2026-05-21, rules_rust bootstrap transition parity:
   `process_wrapper` to
   `rules_rs++toolchains+default_rust_toolchains//:linux_x86_64_1_95_0_rust_toolchain_bootstrap`,
   matching the Bazel cquery.
+- Warm reuse guardrail rechecked after the transition fix: isolation
+  `plan61-audit-cell-post-transition-20260521-151301` passed `audit cell`
+  cold in `elapsed=0:10.52 maxrss_kb=85480`, then the same-daemon warm rerun
+  passed in `elapsed=0:05.13 maxrss_kb=85792`
+  (`/tmp/slug-plan61/plan61-audit-cell-post-transition-20260521-151301.log`
+  and `/tmp/slug-plan61/plan61-audit-cell-post-transition-20260521-151301-warm.out`).
+  The warm result remains under the 10s Plan 61 budget. The daemon was stopped
+  afterward, and the ZeroMatter repro checkout was left at about `3.6M`
+  `buck-out` and `8.0K` `execroot`.
 
 Exit criteria:
 
