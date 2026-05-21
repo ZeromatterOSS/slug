@@ -321,21 +321,27 @@ impl ExtensionRepoExecutionKey {
     }
 }
 
-fn complete_marker(spec_hash: &str) -> String {
-    if spec_hash.is_empty() {
+fn complete_marker(spec_hash: &str, output_digest: &str) -> String {
+    if spec_hash.is_empty() && output_digest.is_empty() {
         "complete".to_owned()
-    } else {
+    } else if output_digest.is_empty() {
         format!("complete:{spec_hash}")
+    } else if spec_hash.is_empty() {
+        format!("complete:output:{output_digest}")
+    } else {
+        format!("complete:{spec_hash}:output:{output_digest}")
     }
 }
 
-fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
+fn complete_marker_matches(marker: &str, spec_hash: &str, output_digest: Option<&str>) -> bool {
     let marker = marker.trim();
-    if spec_hash.is_empty() {
-        marker == "complete" || marker.starts_with("complete:")
-    } else {
-        marker == complete_marker(spec_hash)
+    let Some(output_digest) = output_digest else {
+        return false;
+    };
+    if marker == complete_marker(spec_hash, output_digest) {
+        return true;
     }
+    spec_hash.is_empty() && marker == "complete"
 }
 
 fn materialized_repo_state(
@@ -350,7 +356,9 @@ fn materialized_repo_state(
         match std::fs::read_to_string(&marker_path) {
             Ok(marker) => {
                 let trimmed = marker.trim();
-                if complete_marker_matches(trimmed, spec_hash) {
+                let output_digest =
+                    crate::repository_executor::repository_output_digest(&repo_dir).ok();
+                if complete_marker_matches(trimmed, spec_hash, output_digest.as_deref()) {
                     format!("marker:{trimmed}")
                 } else {
                     format!("marker-mismatch:{trimmed}")
@@ -410,9 +418,11 @@ impl Key for ExtensionRepoExecutionKey {
             .exists()
             .then(|| std::fs::read_to_string(&marker_path).ok())
             .flatten();
-        let marker_matches = marker_contents
-            .as_deref()
-            .is_some_and(|marker| complete_marker_matches(marker, &self.spec_hash));
+        let marker_matches = marker_contents.as_deref().is_some_and(|marker| {
+            let output_digest =
+                crate::repository_executor::repository_output_digest(&working_dir).ok();
+            complete_marker_matches(marker, &self.spec_hash, output_digest.as_deref())
+        });
         let layout_valid = crate::repository_executor::repo_layout_is_valid_for_invocation(
             &invocation,
             &working_dir,
@@ -508,9 +518,13 @@ impl Key for ExtensionRepoExecutionKey {
                                         format!("workspace(name = \"{}\")\n", self.canonical_name),
                                     );
                                 }
+                                let output_digest =
+                                    crate::repository_executor::repository_output_digest(
+                                        &working_dir,
+                                    )?;
                                 let _ = std::fs::write(
                                     working_dir.join(".slug_repo_complete"),
-                                    complete_marker(&self.spec_hash),
+                                    complete_marker(&self.spec_hash, &output_digest),
                                 );
                                 return Ok(Arc::new(RepositoryRuleResult::success(
                                     self.canonical_name.to_string(),
@@ -537,10 +551,12 @@ impl Key for ExtensionRepoExecutionKey {
         // This handles http_archive, git_repository, local_repository, etc.
         let result =
             crate::repository_executor::execute_repository_rule(&invocation, &self.project_root)?;
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&result.repo_path)?;
 
         std::fs::write(
             result.repo_path.join(".slug_repo_complete"),
-            complete_marker(&self.spec_hash),
+            complete_marker(&self.spec_hash, &output_digest),
         )
         .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
             reason: format!(
@@ -886,8 +902,29 @@ mod tests {
 
     #[test]
     fn test_extension_repo_complete_marker_includes_spec_hash() {
-        assert_eq!(complete_marker(""), "complete");
-        assert_eq!(complete_marker("sha256-abc123"), "complete:sha256-abc123");
+        assert_eq!(complete_marker("", ""), "complete");
+        assert_eq!(
+            complete_marker("sha256-abc123", ""),
+            "complete:sha256-abc123"
+        );
+        assert_eq!(
+            complete_marker("", "sha256-out"),
+            "complete:output:sha256-out"
+        );
+        assert_eq!(
+            complete_marker("sha256-abc123", "sha256-out"),
+            "complete:sha256-abc123:output:sha256-out"
+        );
+        assert!(complete_marker_matches(
+            "complete:sha256-abc123:output:sha256-out",
+            "sha256-abc123",
+            Some("sha256-out")
+        ));
+        assert!(!complete_marker_matches(
+            "complete:sha256-abc123",
+            "sha256-abc123",
+            Some("sha256-out")
+        ));
     }
 
     #[test]
@@ -962,11 +999,6 @@ mod tests {
         );
         let spec_hash = repo_spec.compute_hash();
         std::fs::write(
-            repo_dir.join(".slug_repo_complete"),
-            complete_marker(&spec_hash),
-        )
-        .unwrap();
-        std::fs::write(
             repo_dir.join("BUILD.bazel"),
             "exports_files([\"data.txt\"])\n",
         )
@@ -975,6 +1007,12 @@ mod tests {
         std::os::unix::fs::symlink(source_dir.join("data.txt"), repo_dir.join("data.txt")).unwrap();
         #[cfg(not(unix))]
         std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+        let digest = crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&spec_hash, &digest),
+        )
+        .unwrap();
 
         let valid = ExtensionRepoExecutionKey::new(
             "_main+ext+local_repo".to_owned(),
@@ -995,6 +1033,56 @@ mod tests {
 
         let corrupt = ExtensionRepoExecutionKey::new(
             "_main+ext+local_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec,
+            project_root,
+        );
+
+        assert_ne!(valid.materialized_state, corrupt.materialized_state);
+        assert_ne!(valid, corrupt);
+    }
+
+    #[test]
+    fn test_archive_repo_key_hash_includes_materialized_output_state() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let repo_dir = project_root
+            .join("bazel-external")
+            .join("_main+ext+archive_repo");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.invalid/archive.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let spec_hash = repo_spec.compute_hash();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+        let digest = crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&spec_hash, &digest),
+        )
+        .unwrap();
+
+        let valid = ExtensionRepoExecutionKey::new(
+            "_main+ext+archive_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec.clone(),
+            project_root.clone(),
+        );
+
+        std::fs::write(repo_dir.join("data.txt"), "corrupt").unwrap();
+
+        let corrupt = ExtensionRepoExecutionKey::new(
+            "_main+ext+archive_repo".to_owned(),
             "@@m//e.bzl%ext".to_owned(),
             repo_spec,
             project_root,

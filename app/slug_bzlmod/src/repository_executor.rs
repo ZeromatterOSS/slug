@@ -24,10 +24,12 @@
 
 use std::io::Cursor;
 use std::io::ErrorKind;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use base64::Engine;
 use flate2::read::GzDecoder;
 use sha2::Digest;
 use sha2::Sha256;
@@ -119,7 +121,21 @@ pub fn execute_repository_rule(
 
 /// Check if a repository is already materialized.
 fn is_repo_complete(working_dir: &Path) -> bool {
-    working_dir.join(".slug_repo_complete").exists()
+    let marker_path = working_dir.join(".slug_repo_complete");
+    if !marker_path.exists() {
+        return false;
+    }
+    let Ok(marker) = std::fs::read_to_string(marker_path) else {
+        return false;
+    };
+    let marker = marker.trim();
+    if marker == "complete" {
+        return true;
+    }
+    let Some((_, expected_output_state)) = marker.split_once(":output:") else {
+        return true;
+    };
+    repository_output_digest(working_dir).is_ok_and(|digest| digest == expected_output_state)
 }
 
 pub fn repo_layout_is_valid_for_invocation(
@@ -335,12 +351,105 @@ fn llvm_subproject_layout_is_valid(invocation: &RepositoryInvocation, working_di
 
 /// Mark a repository as complete.
 fn mark_repo_complete(working_dir: &Path) -> slug_error::Result<()> {
-    std::fs::write(working_dir.join(".slug_repo_complete"), "complete").map_err(|e| {
-        RepositoryExecutionError::WorkingDirFailed {
-            reason: format!("Failed to write completion marker: {}", e),
-        }
+    let output_digest = repository_output_digest(working_dir)?;
+    std::fs::write(
+        working_dir.join(".slug_repo_complete"),
+        format!("complete:output:{output_digest}"),
+    )
+    .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
+        reason: format!("Failed to write completion marker: {}", e),
     })?;
     Ok(())
+}
+
+pub fn repository_output_digest(working_dir: &Path) -> slug_error::Result<String> {
+    let mut hasher = Sha256::new();
+    hash_repository_entry(working_dir, Path::new(""), &mut hasher)?;
+    let hash = hasher.finalize();
+    Ok(format!(
+        "sha256-{}",
+        base64::engine::general_purpose::STANDARD.encode(hash)
+    ))
+}
+
+fn hash_repository_entry(
+    path: &Path,
+    relative: &Path,
+    hasher: &mut Sha256,
+) -> slug_error::Result<()> {
+    let metadata =
+        std::fs::symlink_metadata(path).map_err(|e| RepositoryExecutionError::ExecutionFailed {
+            name: "repository_output_digest".to_owned(),
+            reason: format!("Failed to stat '{}': {}", path.display(), e),
+        })?;
+    hash_path_bytes(relative, hasher);
+    if metadata.file_type().is_symlink() {
+        hasher.update(b"L");
+        let target =
+            std::fs::read_link(path).map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                name: "repository_output_digest".to_owned(),
+                reason: format!("Failed to read symlink '{}': {}", path.display(), e),
+            })?;
+        hash_path_bytes(&target, hasher);
+        return Ok(());
+    }
+    if metadata.is_dir() {
+        hasher.update(b"D");
+        let mut entries = std::fs::read_dir(path)
+            .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                name: "repository_output_digest".to_owned(),
+                reason: format!("Failed to read directory '{}': {}", path.display(), e),
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                name: "repository_output_digest".to_owned(),
+                reason: format!("Failed to read directory entry '{}': {}", path.display(), e),
+            })?;
+        entries.retain(|entry| entry.file_name() != ".slug_repo_complete");
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            hash_repository_entry(&entry.path(), &relative.join(entry.file_name()), hasher)?;
+        }
+        return Ok(());
+    }
+    if metadata.is_file() {
+        hasher.update(b"F");
+        hasher.update(metadata.len().to_le_bytes());
+        let mut file =
+            std::fs::File::open(path).map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                name: "repository_output_digest".to_owned(),
+                reason: format!("Failed to open file '{}': {}", path.display(), e),
+            })?;
+        let mut buf = [0; 8192];
+        loop {
+            let n = file
+                .read(&mut buf)
+                .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                    name: "repository_output_digest".to_owned(),
+                    reason: format!("Failed to read file '{}': {}", path.display(), e),
+                })?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+        }
+        return Ok(());
+    }
+    hasher.update(b"S");
+    Ok(())
+}
+
+fn hash_path_bytes(path: &Path, hasher: &mut Sha256) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        hasher.update(path.as_os_str().as_bytes());
+    }
+    #[cfg(not(unix))]
+    {
+        hasher.update(path.to_string_lossy().as_bytes());
+    }
+    hasher.update([0]);
 }
 
 /// Prepare the working directory.
@@ -1718,6 +1827,35 @@ mod tests {
 
         mark_repo_complete(&working_dir).unwrap();
         assert!(is_repo_complete(&working_dir));
+    }
+
+    #[test]
+    fn repo_complete_marker_tracks_output_digest() {
+        let temp = TempDir::new().unwrap();
+        let working_dir = temp.path().join("test_repo");
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(working_dir.join("data.txt"), "fresh").unwrap();
+
+        mark_repo_complete(&working_dir).unwrap();
+        assert!(is_repo_complete(&working_dir));
+
+        std::fs::write(working_dir.join("data.txt"), "corrupt").unwrap();
+        assert!(!is_repo_complete(&working_dir));
+    }
+
+    #[test]
+    fn repository_output_digest_ignores_completion_marker() {
+        let temp = TempDir::new().unwrap();
+        let working_dir = temp.path().join("test_repo");
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(working_dir.join("data.txt"), "fresh").unwrap();
+
+        let digest = repository_output_digest(&working_dir).unwrap();
+        std::fs::write(working_dir.join(".slug_repo_complete"), "complete:legacy").unwrap();
+        assert_eq!(repository_output_digest(&working_dir).unwrap(), digest);
+
+        std::fs::write(working_dir.join("data.txt"), "changed").unwrap();
+        assert_ne!(repository_output_digest(&working_dir).unwrap(), digest);
     }
 
     #[test]

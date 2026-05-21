@@ -4156,6 +4156,45 @@ Implementation update 2026-05-21, generated repo mappings and Bazel 9 load canon
   `lockfile_read=2`. This confirms the generated-repo mapping fix did not
   regress the validated warm same-daemon reuse boundary.
 
+Implementation update 2026-05-21, repository output-state markers:
+
+- Bazel ground truth: repository success values do not compare fetched repo
+  contents directly; `RepositoryDirectoryValue` is a `NotComparableSkyValue`
+  because the marker/dirtying machinery owns repository freshness
+  (`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/repository/RepositoryDirectoryValue.java:34`).
+  `RepoRecordedInput` records repository fetch inputs and stores them in marker
+  files (`RepoRecordedInput.java:60`, `RepoRecordedInput.java:71`).
+  `RepositoryFetchFunction` first checks that the marker file still describes
+  current repository state, clears it before refetching inconsistent repos, and
+  writes the new marker after successful fetch
+  (`RepositoryFetchFunction.java:252`, `RepositoryFetchFunction.java:302`,
+  `RepositoryFetchFunction.java:310`). This confirms that bare marker presence
+  is not a Bazel-compatible freshness predicate.
+- Blocker reflection: the previous git/local layout checks closed two concrete
+  stale-marker failures, but archive-like and custom Starlark repository rules
+  could still reuse a corrupted output tree if `.slug_repo_complete` remained
+  present and the repo spec had not changed. That is the same materialization
+  integrity class, not an `http_archive`-specific or SDK-specific target bug.
+  Symptom-only fixes rejected: special-casing archive rule names, requiring only
+  `BUILD.bazel` existence, or deleting the observed repo directories manually.
+- Transitional systemic fix: Slug now writes completion markers with an
+  output-state digest for native, extension, Starlark, and lazy-spoke repo
+  materialization (`complete:output:<digest>` or
+  `complete:<spec-digest>:output:<digest>`). The digest recursively covers the
+  materialized repository tree while excluding `.slug_repo_complete`, so a
+  content mutation, deleted file, corrupted file, stale symlink target, or mode
+  change makes the marker mismatch and forces rematerialization. This is a
+  transitional Slug manifest standing in for Bazel-shaped `RepoRecordedInput`
+  coverage until Plan 61 finishes typed DICE ownership.
+- Focused validation passed:
+  `cargo test -p slug_bzlmod repository_executor -- --nocapture` (16 tests),
+  `cargo test -p slug_bzlmod repository_execution -- --nocapture` (19 tests),
+  `cargo test -p slug_bzlmod spoke_materialization -- --nocapture` (5 tests),
+  and `cargo check -p slug_bzlmod`.
+- Process note: attempted subagent dispatch for this slice failed with
+  `agent thread limit reached`, so the work continued locally per the parity
+  loop prompt's single-agent fallback.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

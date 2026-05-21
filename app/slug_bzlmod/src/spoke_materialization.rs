@@ -3,9 +3,8 @@
  *
  * This source code is dual-licensed under either the MIT license found in the
  * LICENSE-MIT file in the root directory of this source tree or the Apache
- * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
- * of this source tree. You may select, at your option, one of the
- * above-listed licenses.
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory.
+ * You may select, at your option, one of the above-listed licenses.
  */
 
 //! Plan 36: Lazy materialization of extension spoke repos triggered from
@@ -202,10 +201,12 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> slug_error::Result<bool> 
         .join(canonical_name);
     let marker = repo_dir.join(".slug_repo_complete");
     if marker.exists() {
-        let expected = complete_marker(&registration.repo_spec.compute_hash());
+        let spec_hash = registration.repo_spec.compute_hash();
+        let output_digest = crate::repository_executor::repository_output_digest(&repo_dir).ok();
         let marker_matches = std::fs::read_to_string(&marker).ok().is_some_and(|s| {
             let marker = s.trim();
-            marker == "complete" || marker == expected
+            marker == complete_marker(&spec_hash, output_digest.as_deref())
+                || spec_hash.is_empty() && marker == "complete"
         });
         if marker_matches {
             return Ok(true);
@@ -254,11 +255,12 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> slug_error::Result<bool> 
     })
 }
 
-fn complete_marker(spec_hash: &str) -> String {
-    if spec_hash.is_empty() {
-        "complete".to_owned()
-    } else {
-        format!("complete:{spec_hash}")
+fn complete_marker(spec_hash: &str, output_digest: Option<&str>) -> String {
+    match (spec_hash.is_empty(), output_digest) {
+        (true, None) => "complete".to_owned(),
+        (true, Some(output_digest)) => format!("complete:output:{output_digest}"),
+        (false, Some(output_digest)) => format!("complete:{spec_hash}:output:{output_digest}"),
+        (false, None) => format!("complete:{spec_hash}"),
     }
 }
 
@@ -267,6 +269,41 @@ mod tests {
     use super::*;
 
     static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn complete_marker_includes_output_digest_when_available() {
+        assert_eq!(complete_marker("", None), "complete");
+        assert_eq!(
+            complete_marker("", Some("sha256-out")),
+            "complete:output:sha256-out"
+        );
+        assert_eq!(
+            complete_marker("sha256-spec", Some("sha256-out")),
+            "complete:sha256-spec:output:sha256-out"
+        );
+        assert_eq!(complete_marker("sha256-spec", None), "complete:sha256-spec");
+    }
+
+    #[test]
+    fn spoke_marker_changes_when_output_changes() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let repo_dir = temp.path().join("bazel-external/repo");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+        let digest = crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        let marker = complete_marker("sha256-spec", Some(&digest));
+
+        std::fs::write(repo_dir.join(".slug_repo_complete"), &marker).unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "corrupt").unwrap();
+        let changed_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+
+        assert_ne!(digest, changed_digest);
+        assert_ne!(
+            marker,
+            complete_marker("sha256-spec", Some(&changed_digest))
+        );
+    }
 
     #[test]
     fn lookup_returns_none_for_unknown() {
