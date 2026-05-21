@@ -446,6 +446,30 @@ SDK smoke checkpoint 2026-05-21, lockfile DICE read path:
   generated ZeroMatter `buck-out` tree reached about 213M during the smoke and
   was removed after the log was preserved; `execroot` was also removed.
 
+Implementation update 2026-05-21, registry file hashes are enforced in
+`--lockfile_mode=error`:
+
+- Bazel ground truth: HTTP/HTTPS registries use
+  `KnownFileHashesMode.ENFORCE` under `--lockfile_mode=error`; file registries
+  ignore known hashes. Local anchor:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactoryImpl.java:59`.
+- Bazel ground truth: when a registry file has no known checksum under
+  `--lockfile_mode=error`, Bazel throws a missing-checksum error before
+  downloading mutable registry content. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java:169`
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java:203`.
+- Slug now applies that policy to registry `MODULE.bazel` and `source.json`
+  fetches during transitional MVS/source resolution. Error mode requires a
+  known visible-lockfile hash for HTTP(S) registry files before fetch, file
+  registries are exempt, and any known hash mismatch fails instead of recording
+  a new hash opportunistically.
+- Validation:
+  `cargo test -p slug_bzlmod registry_checksum -- --nocapture`,
+  `cargo test -p slug_bzlmod resolution -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`, and
+  `git diff --check`, and `cargo build -p slug` pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module

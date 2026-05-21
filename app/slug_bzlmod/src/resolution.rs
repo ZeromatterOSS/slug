@@ -127,6 +127,19 @@ pub enum MvsResolutionError {
         version: String,
         reason: String,
     },
+
+    #[error(
+        "Missing checksum for registry file {url} not permitted with --lockfile_mode=error. \
+        Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+    )]
+    MissingRegistryChecksum { url: String },
+
+    #[error("Registry file checksum mismatch for {url}: expected {expected}, got {actual}")]
+    RegistryChecksumMismatch {
+        url: String,
+        expected: String,
+        actual: String,
+    },
 }
 
 // ============================================================================
@@ -664,8 +677,12 @@ impl MvsResolver {
         dep: &BazelDep,
     ) -> slug_error::Result<DiscoveredModule> {
         let version_str = dep.version.as_str();
+        let key = ModuleKey::from_dep(dep);
+        let module_bazel_url = self.module_bazel_url(&key);
 
         tracing::debug!("Fetching {}@{} from registry", dep.name, version_str);
+
+        self.validate_registry_file_hash(&module_bazel_url, None)?;
 
         // Fetch MODULE.bazel content
         let module_bazel_file = self
@@ -677,6 +694,7 @@ impl MvsResolver {
                 version: version_str.to_string(),
                 reason: format!("Failed to fetch MODULE.bazel: {}", e),
             })?;
+        self.validate_registry_file_hash(&module_bazel_file.url, Some(&module_bazel_file.hash))?;
         self.registry_file_hashes.insert(
             module_bazel_file.url.clone(),
             module_bazel_file.hash.clone(),
@@ -694,7 +712,7 @@ impl MvsResolver {
             })?;
 
         Ok(DiscoveredModule {
-            key: ModuleKey::from_dep(dep),
+            key,
             compatibility_level: parsed.module.compatibility_level,
             module: parsed.module,
             source: ModuleSource::Registry {
@@ -1188,6 +1206,29 @@ impl MvsResolver {
         )
     }
 
+    fn module_bazel_url(&self, key: &ModuleKey) -> String {
+        format!(
+            "{}/modules/{}/{}/MODULE.bazel",
+            self.registry_client.base_url(),
+            key.name,
+            key.version
+        )
+    }
+
+    fn validate_registry_file_hash(
+        &self,
+        url: &str,
+        actual_hash: Option<&str>,
+    ) -> slug_error::Result<()> {
+        validate_registry_file_hash_facts(
+            self.lockfile_mode,
+            self.registry_client.base_url(),
+            &self.known_registry_file_hashes,
+            url,
+            actual_hash,
+        )
+    }
+
     /// Run the full MVS resolution algorithm.
     ///
     /// # Algorithm
@@ -1251,10 +1292,18 @@ impl MvsResolver {
                 ModuleSource::Registry { url: _ } => {
                     // Fetch from registry
                     let result = async {
+                        let key = ModuleKey::new(name.as_str(), info.version.as_str());
+                        let source_json_url = self.source_json_url(&key);
+                        self.validate_registry_file_hash(&source_json_url, None)?;
+
                         let source_info_file = self
                             .registry_client
                             .fetch_source_info_file(name, &info.version)
                             .await?;
+                        self.validate_registry_file_hash(
+                            &source_info_file.file.url,
+                            Some(&source_info_file.file.hash),
+                        )?;
 
                         let source_path = self
                             .source_fetcher
@@ -1351,6 +1400,40 @@ fn yanked_reason_from_lockfile_facts(
     }
 
     YankedVersionStatus::Unknown
+}
+
+fn validate_registry_file_hash_facts(
+    lockfile_mode: LockfileMode,
+    registry_base_url: &str,
+    known_registry_file_hashes: &IndexMap<String, String>,
+    url: &str,
+    actual_hash: Option<&str>,
+) -> slug_error::Result<()> {
+    if registry_base_url.starts_with("file:") {
+        return Ok(());
+    }
+
+    let expected_hash = known_registry_file_hashes.get(url);
+
+    if lockfile_mode == LockfileMode::Error && expected_hash.is_none() {
+        return Err(MvsResolutionError::MissingRegistryChecksum {
+            url: url.to_owned(),
+        }
+        .into());
+    }
+
+    if let (Some(expected), Some(actual)) = (expected_hash, actual_hash) {
+        if expected != actual {
+            return Err(MvsResolutionError::RegistryChecksumMismatch {
+                url: url.to_owned(),
+                expected: expected.clone(),
+                actual: actual.to_owned(),
+            }
+            .into());
+        }
+    }
+
+    Ok(())
 }
 
 // ============================================================================
@@ -2149,6 +2232,69 @@ module(name = "local_lib", version = "2.0.0")
             ),
             YankedVersionStatus::Unknown
         );
+    }
+
+    #[test]
+    fn registry_checksum_error_mode_requires_known_http_hash() {
+        let url = "https://bcr.bazel.build/modules/alpha/1.0.0/MODULE.bazel";
+        let err = validate_registry_file_hash_facts(
+            LockfileMode::Error,
+            "https://bcr.bazel.build",
+            &IndexMap::new(),
+            url,
+            None,
+        )
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("Missing checksum for registry file"));
+        assert!(message.contains("--lockfile_mode=error"));
+        assert!(message.contains("bazel mod deps --lockfile_mode=update"));
+    }
+
+    #[test]
+    fn registry_checksum_error_mode_ignores_file_registry_missing_hash() {
+        validate_registry_file_hash_facts(
+            LockfileMode::Error,
+            "file:///tmp/registry",
+            &IndexMap::new(),
+            "file:///tmp/registry/modules/alpha/1.0.0/MODULE.bazel",
+            None,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn registry_checksum_update_mode_allows_missing_hash() {
+        validate_registry_file_hash_facts(
+            LockfileMode::Update,
+            "https://bcr.bazel.build",
+            &IndexMap::new(),
+            "https://bcr.bazel.build/modules/alpha/1.0.0/source.json",
+            None,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn registry_checksum_known_hash_mismatch_fails() {
+        let url = "https://bcr.bazel.build/modules/alpha/1.0.0/source.json";
+        let mut known_hashes = IndexMap::new();
+        known_hashes.insert(url.to_owned(), "sha256-expected".to_owned());
+
+        let err = validate_registry_file_hash_facts(
+            LockfileMode::Update,
+            "https://bcr.bazel.build",
+            &known_hashes,
+            url,
+            Some("sha256-actual"),
+        )
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("checksum mismatch"));
+        assert!(message.contains("sha256-expected"));
+        assert!(message.contains("sha256-actual"));
     }
 
     #[test]
