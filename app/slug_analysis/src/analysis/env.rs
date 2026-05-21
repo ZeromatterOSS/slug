@@ -48,7 +48,6 @@ use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_t
 use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_external_runner_test_info_for_bazel_test;
 use slug_build_api::interpreter::rule_defs::provider::builtin::template_placeholder_info::FrozenTemplatePlaceholderInfo;
 use slug_build_api::interpreter::rule_defs::provider::builtin::validation_info::FrozenValidationInfo;
-use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValueRef;
 use slug_build_api::interpreter::rule_defs::provider::collection::ProviderCollection;
@@ -99,7 +98,6 @@ use starlark::environment::Module;
 use starlark::eval::CallStackCheckpoint;
 use starlark::eval::Evaluator;
 use starlark::values::FrozenValue;
-use starlark::values::FrozenValueTyped;
 use starlark::values::Heap;
 use starlark::values::Value;
 use starlark::values::ValueTyped;
@@ -120,6 +118,7 @@ use crate::analysis::native_rule_analysis::set_deferred_toolchains;
 use crate::analysis::plugins::plugins_to_starlark_value;
 use crate::attrs::resolve::ctx::AnalysisQueryResult;
 use crate::attrs::resolve::ctx::AttrResolutionContext;
+use crate::attrs::resolve::ctx::ResolvedDep;
 use crate::attrs::resolve::node_to_attrs_struct::node_to_attrs_struct;
 
 static ANALYSIS_ENV_VERBOSE_CHECKPOINT_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -344,7 +343,7 @@ enum AnalysisError {
 // that are NOT tied to that module. Must claim ownership of them via `add_reference` before returning them.
 pub struct RuleAnalysisAttrResolutionContext<'v> {
     pub module: &'v Module,
-    pub dep_analysis_results: HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>,
+    pub dep_analysis_results: HashMap<ConfiguredTargetLabel, DepAnalysisValue>,
     pub query_results: HashMap<String, Arc<AnalysisQueryResult>>,
     pub execution_platform_resolution: ExecutionPlatformResolution,
 }
@@ -357,7 +356,7 @@ impl<'v> AttrResolutionContext<'v> for &'_ RuleAnalysisAttrResolutionContext<'v>
     fn get_dep(
         &mut self,
         target: &ConfiguredProvidersLabel,
-    ) -> slug_error::Result<FrozenValueTyped<'v, FrozenProviderCollection>> {
+    ) -> slug_error::Result<ResolvedDep<'v>> {
         get_dep(&self.dep_analysis_results, target, self.module)
     }
 
@@ -382,28 +381,33 @@ impl<'v> AttrResolutionContext<'v> for &'_ RuleAnalysisAttrResolutionContext<'v>
 }
 
 pub fn get_dep<'v>(
-    dep_analysis_results: &HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>,
+    dep_analysis_results: &HashMap<ConfiguredTargetLabel, DepAnalysisValue>,
     target: &ConfiguredProvidersLabel,
     module: &'v Module,
-) -> slug_error::Result<FrozenValueTyped<'v, FrozenProviderCollection>> {
+) -> slug_error::Result<ResolvedDep<'v>> {
     match dep_analysis_results.get(target.target()) {
         None => Err(AnalysisError::MissingDep(target.dupe()).into()),
         Some(x) => {
-            let x = x.lookup_inner(target)?;
+            let providers = x.providers.lookup_inner(target)?;
+            let label = x.effective_label(target);
             // IMPORTANT: Anything given back to the user must be kept alive
-            Ok(x.add_heap_ref(module.frozen_heap()))
+            Ok(ResolvedDep {
+                label,
+                providers: providers.add_heap_ref(module.frozen_heap()),
+            })
         }
     }
 }
 
 pub fn resolve_unkeyed_placeholder<'v>(
-    dep_analysis_results: &HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>,
+    dep_analysis_results: &HashMap<ConfiguredTargetLabel, DepAnalysisValue>,
     name: &str,
     module: &'v Module,
 ) -> Option<FrozenCommandLineArg> {
     // TODO(cjhopman): Make it an error if two deps provide a value for the placeholder.
     for providers in dep_analysis_results.values() {
         if let Some(placeholder_info) = providers
+            .providers
             .provider_collection()
             .builtin_provider::<FrozenTemplatePlaceholderInfo>()
         {
@@ -411,7 +415,7 @@ pub fn resolve_unkeyed_placeholder<'v>(
                 // IMPORTANT: Anything given back to the user must be kept alive
                 module
                     .frozen_heap()
-                    .add_reference(providers.value().owner());
+                    .add_reference(providers.providers.value().owner());
                 return Some(*value);
             }
         }
@@ -432,6 +436,23 @@ pub fn resolve_query(
                 module.frozen_heap().add_reference(y.value().owner());
             }
             Ok(x.dupe())
+        }
+    }
+}
+
+#[derive(Clone, allocative::Allocative)]
+pub struct DepAnalysisValue {
+    providers: FrozenProviderCollectionValue,
+    effective_label: Option<ConfiguredProvidersLabel>,
+}
+
+impl DepAnalysisValue {
+    fn effective_label(&self, requested: &ConfiguredProvidersLabel) -> ConfiguredProvidersLabel {
+        match &self.effective_label {
+            Some(label) => {
+                ConfiguredProvidersLabel::new(label.target().dupe(), requested.name().dupe())
+            }
+            None => requested.dupe(),
         }
     }
 }
@@ -995,11 +1016,22 @@ pub(crate) async fn run_analysis<'a>(
 
 pub fn get_deps_from_analysis_results(
     results: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
-) -> slug_error::Result<HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>> {
+) -> slug_error::Result<HashMap<ConfiguredTargetLabel, DepAnalysisValue>> {
     results
         .into_iter()
-        .map(|(label, result)| Ok((label.dupe(), result.providers()?.to_owned())))
-        .collect::<slug_error::Result<HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>>>()
+        .map(|(label, result)| {
+            Ok((
+                label.dupe(),
+                DepAnalysisValue {
+                    providers: result.providers()?.to_owned(),
+                    effective_label: result
+                        .owner_target_label()
+                        .filter(|owner| *owner != label)
+                        .map(|owner| ConfiguredProvidersLabel::default_for(owner.dupe())),
+                },
+            ))
+        })
+        .collect::<slug_error::Result<HashMap<ConfiguredTargetLabel, DepAnalysisValue>>>()
 }
 
 // ============================================================================
@@ -3440,9 +3472,17 @@ async fn run_analysis_with_env_underlying(
                     use slug_build_api::interpreter::rule_defs::provider::collection::merge_provider_collections;
                     for (dep_label, aspect_providers) in &analysis_env.aspect_results {
                         if let Some(base_providers) = dep_analysis_results.get(dep_label) {
-                            let merged =
-                                merge_provider_collections(base_providers, aspect_providers);
-                            dep_analysis_results.insert(dep_label.dupe(), merged);
+                            let merged = merge_provider_collections(
+                                &base_providers.providers,
+                                aspect_providers,
+                            );
+                            dep_analysis_results.insert(
+                                dep_label.dupe(),
+                                DepAnalysisValue {
+                                    providers: merged,
+                                    effective_label: base_providers.effective_label.clone(),
+                                },
+                            );
                         }
                     }
                 }

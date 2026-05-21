@@ -29,6 +29,7 @@ use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_core::deferred::key::DeferredHolderKey;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::fs::buck_out_path::BuckOutPathKind;
+use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_error::BuckErrorContext;
 use slug_error::internal_error;
 use slug_execute::execute::request::OutputType;
@@ -834,6 +835,13 @@ impl RecordedAnalysisValues {
                 analysis_storage.owner(),
                 value,
             ))
+        }
+    }
+
+    pub fn owner_target_label(&self) -> Option<&ConfiguredTargetLabel> {
+        match &self.self_key {
+            DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(label)) => Some(label),
+            _ => None,
         }
     }
 

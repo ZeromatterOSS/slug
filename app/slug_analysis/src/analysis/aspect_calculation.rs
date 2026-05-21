@@ -631,14 +631,17 @@ async fn execute_aspect(
                 fn get_dep(
                     &mut self,
                     target: &slug_core::provider::label::ConfiguredProvidersLabel,
-                ) -> slug_error::Result<starlark::values::FrozenValueTyped<'v, slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection>> {
+                ) -> slug_error::Result<crate::attrs::resolve::ctx::ResolvedDep<'v>> {
                     // Look up the dep's providers from our collected map
                     // Shadow graph: if dep has aspect result, return aspect providers
                     // Otherwise, return target's regular providers
                     match self.dep_analysis_results.get(target.target()) {
                         Some(providers) => {
                             let providers_ref = providers.lookup_inner(target)?;
-                            Ok(providers_ref.add_heap_ref(self.module.frozen_heap()))
+                            Ok(crate::attrs::resolve::ctx::ResolvedDep {
+                                label: target.dupe(),
+                                providers: providers_ref.add_heap_ref(self.module.frozen_heap()),
+                            })
                         }
                         None => Err(slug_error::slug_error!(
                             slug_error::ErrorTag::Tier0,

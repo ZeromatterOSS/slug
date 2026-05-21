@@ -4368,6 +4368,54 @@ Implementation update 2026-05-21, rules_rust bootstrap transition parity:
   afterward, and the ZeroMatter repro checkout was left at about `3.6M`
   `buck-out` and `8.0K` `execroot`.
 
+Blocker reflection 2026-05-21, alias `Target.label` identity:
+
+- Fresh full SDK smoke after the transition fix failed during analysis in
+  rules_rust with `fail: macos_sdkroot must provide exactly one file`:
+  `/tmp/slug-plan61/sdk-parity-post-transition-20260521-151409.log`. The
+  failing code compares a configured attr target's `.label` to
+  `Label("//rust/private:empty_macos_sdkroot")`, then only inspects
+  `DefaultInfo.files` when that label comparison is false.
+- Bazel 9 ground truth: with the same Linux GNU host platform, Bazel cquery of
+  `deps(@@rules_rs++crate+crates//:rust_decimal-1.40.0, 3)` includes the
+  selected `alias rule @rules_rust//rust/private:default_macos_sdkroot` and
+  its actual `filegroup rule @rules_rust//rust/private:empty_macos_sdkroot`
+  without failing. This establishes that Bazel's configured attr target label
+  is comparable to the unconfigured `Label()` value after alias resolution; an
+  alias to an empty filegroup must be transparent even when no output artifact
+  owner exists to infer from.
+- Class boundary: this was not a macOS SDK special case and not a
+  `rules_rust`-only workaround. Slug was using `DefaultInfo` output owners to
+  guess alias-effective target labels and exposed `Target.label` as a
+  configured providers label, so empty-output aliases and Starlark `Label()`
+  equality diverged from Bazel.
+- Systemic fix: attr resolution now carries each analyzed dependency's
+  effective owner label from the analysis result into the `Dependency` object
+  instead of deriving it from outputs. `Target.label` and source-file
+  `Target.label` now expose a Bazel-compatible unconfigured `Label` value for
+  Starlark, while Rust-side `Dependency::label()` keeps the configured
+  providers label for provider lookup, hashing, and subtargets.
+- Rejected workarounds: special-casing
+  `rules_rust//rust/private:default_macos_sdkroot`, treating empty filegroups
+  as a successful SDK root, broadening all label equality by string repr, or
+  resurrecting output-owner heuristics for aliases.
+- Validation passed:
+  `cargo fmt`, `cargo build -p slug`, and focused ZeroMatter repro
+  `/tmp/slug-plan61/plan61-rust-decimal-label-identity-20260521-152941.log`
+  for `slug --isolation-dir plan61-rust-decimal-label-identity build
+  --unstable-no-execution
+  'rules_rs++crate+crates//:rust_decimal-1.40.0'`, which now reports
+  `BUILD SUCCEEDED`.
+- Broad SDK frontier advanced past analysis to local C compilation:
+  `/tmp/slug-plan61/sdk-parity-label-identity-20260521-153026.log` failed
+  after 211s while compiling LLVM compiler-rt because multiple actions could
+  not spawn `external/llvm++http_archive+llvm-toolchain-minimal-22.1.0-linux-amd64/bin/clang`.
+  The clang path exists and runs manually; the smoke peaked at about
+  `10256372 KiB` RSS with a large local action fanout. This is recorded as the
+  next execution-resource frontier, not as a bzlmod analysis failure. The next
+  loop action is a bounded-jobs SDK smoke before considering an execution
+  concurrency or spawn-diagnostics code change.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

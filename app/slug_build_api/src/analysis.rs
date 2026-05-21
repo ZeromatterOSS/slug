@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_core::provider::label::ConfiguredProvidersLabel;
+use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_interpreter::starlark_profiler::data::StarlarkProfileDataAndStats;
 
 use crate::analysis::registry::RecordedAnalysisValueCounts;
@@ -71,6 +72,10 @@ impl AnalysisResult {
 
     pub fn providers(&self) -> slug_error::Result<FrozenProviderCollectionValueRef<'_>> {
         self.analysis_values.provider_collection()
+    }
+
+    pub fn owner_target_label(&self) -> Option<&ConfiguredTargetLabel> {
+        self.analysis_values.owner_target_label()
     }
 
     pub fn promise_artifact_map(&self) -> &Arc<HashMap<PromiseArtifactId, Artifact>> {

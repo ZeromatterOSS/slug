@@ -56,7 +56,7 @@ pub(crate) trait SourceAttrTypeExt {
         ctx: &mut dyn AttrResolutionContext<'v>,
         label: &ConfiguredProvidersLabel,
     ) -> slug_error::Result<Vec<Value<'v>>> {
-        let dep = ctx.get_dep(label)?;
+        let dep = ctx.get_dep(label)?.providers;
         let default_outputs = dep.default_info()?.default_outputs_raw();
         let res = ListRef::from_frozen_value(default_outputs)
             .unwrap()

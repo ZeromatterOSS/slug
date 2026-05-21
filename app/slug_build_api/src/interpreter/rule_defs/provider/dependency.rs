@@ -47,6 +47,7 @@ use starlark::values::structs::AllocStruct;
 use starlark_map::StarlarkHasher;
 
 use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfo;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
@@ -143,36 +144,6 @@ impl<'v> Dependency<'v> {
         provider_collection: FrozenValueTyped<'v, FrozenProviderCollection>,
         execution_platform: Option<&ExecutionPlatformResolution>,
     ) -> Self {
-        // Bazel compatibility: for alias (Forward) targets, use the actual target's
-        // label instead of the alias label. In Bazel, alias targets are transparent
-        // in label_keyed_string_dict — Target.label returns the actual target.
-        // Detect by checking if DefaultInfo outputs have a different owner.
-        let label = {
-            let mut effective = label.clone();
-            if let Ok(di) = provider_collection.default_info() {
-                let raw = di.default_outputs_raw();
-                if let Some(list) = starlark::values::list::ListRef::from_frozen_value(raw) {
-                    if let Some(first) = list.content().first() {
-                        // Try to get the artifact's owner label
-                        use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike;
-                        if let Some(artifact) = first
-                            .to_value()
-                            .downcast_ref::<crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact>()
-                        {
-                            if let Some(slug_core::deferred::base_deferred_key::BaseDeferredKey::TargetLabel(owner_label)) = artifact.artifact().owner() {
-                                if owner_label != label.target() {
-                                    effective = ConfiguredProvidersLabel::new(
-                                        owner_label.clone(),
-                                        label.name().clone(),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            effective
-        };
         let execution_platform: ValueOfUnchecked<NoneOr<StarlarkExecutionPlatformResolution>> =
             match execution_platform {
                 Some(e) => ValueOfUnchecked::new(
@@ -315,7 +286,7 @@ enum ProviderIndexError {
 fn source_file_target_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn label<'v>(this: &SourceFileTarget, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(this.label.dupe())))
+        Ok(heap.alloc(bazel_label_from_configured(&this.label)))
     }
 
     #[starlark(attribute)]
@@ -373,10 +344,8 @@ fn source_file_target_methods(builder: &mut MethodsBuilder) {
 fn dependency_methods(builder: &mut MethodsBuilder) {
     /// The label of this dependency.
     #[starlark(attribute)]
-    fn label<'v>(
-        this: &Dependency<'v>,
-    ) -> starlark::Result<ValueOfUnchecked<'v, StarlarkConfiguredProvidersLabel>> {
-        Ok(this.label)
+    fn label<'v>(this: &Dependency<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(bazel_label_from_configured(this.label().inner())))
     }
 
     /// Returns a list of all providers available from this dependency.
@@ -526,6 +495,10 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
             ("runfiles_manifest", Value::new_none()),
         ])))
     }
+}
+
+fn bazel_label_from_configured(label: &ConfiguredProvidersLabel) -> BazelLabel {
+    BazelLabel::parse(&label.target().unconfigured().to_string())
 }
 
 #[starlark_module]

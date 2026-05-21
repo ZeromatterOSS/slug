@@ -33,6 +33,25 @@ pub struct AnalysisQueryResult {
     pub result: Vec<(ConfiguredTargetLabel, FrozenProviderCollectionValue)>,
 }
 
+pub struct ResolvedDep<'v> {
+    pub label: ConfiguredProvidersLabel,
+    pub providers: FrozenValueTyped<'v, FrozenProviderCollection>,
+}
+
+impl AsRef<FrozenProviderCollection> for ResolvedDep<'_> {
+    fn as_ref(&self) -> &FrozenProviderCollection {
+        self.providers.as_ref()
+    }
+}
+
+impl std::ops::Deref for ResolvedDep<'_> {
+    type Target = FrozenProviderCollection;
+
+    fn deref(&self) -> &Self::Target {
+        self.providers.as_ref()
+    }
+}
+
 /// The context for attribute resolution. Provides access to the providers from
 /// dependents.
 pub trait AttrResolutionContext<'v> {
@@ -44,10 +63,8 @@ pub trait AttrResolutionContext<'v> {
 
     /// Get the `ProviderCollection` for this label. This is converted to a `Dependency`
     /// by the `resolve()` method in `attrs::label`
-    fn get_dep(
-        &mut self,
-        target: &ConfiguredProvidersLabel,
-    ) -> slug_error::Result<FrozenValueTyped<'v, FrozenProviderCollection>>;
+    fn get_dep(&mut self, target: &ConfiguredProvidersLabel)
+    -> slug_error::Result<ResolvedDep<'v>>;
 
     fn resolve_unkeyed_placeholder(
         &mut self,

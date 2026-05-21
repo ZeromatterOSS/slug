@@ -103,8 +103,8 @@ impl DepAttrTypeExt for DepAttrType {
         required_providers: &ProviderIdSet,
         is_exec_dep: bool,
     ) -> slug_error::Result<Value<'v>> {
-        let provider_collection = ctx.get_dep(target)?;
-        Self::check_providers(required_providers, provider_collection.as_ref(), target)?;
+        let dep = ctx.get_dep(target)?;
+        Self::check_providers(required_providers, dep.providers.as_ref(), target)?;
         let execution_platform_resolution = if is_exec_dep {
             Some(ctx.execution_platform_resolution())
         } else {
@@ -113,8 +113,8 @@ impl DepAttrTypeExt for DepAttrType {
 
         Ok(Self::alloc_dependency(
             ctx.starlark_module(),
-            target,
-            provider_collection,
+            &dep.label,
+            dep.providers,
             execution_platform_resolution,
         ))
     }

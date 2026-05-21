@@ -16,29 +16,27 @@ use allocative::Allocative;
 use futures::FutureExt;
 use slug_analysis::analysis::calculation::get_dep_analysis;
 use slug_analysis::analysis::calculation::resolve_queries;
+use slug_analysis::analysis::env::DepAnalysisValue;
 use slug_analysis::analysis::env::get_dep;
 use slug_analysis::analysis::env::get_deps_from_analysis_results;
 use slug_analysis::analysis::env::resolve_query;
 use slug_analysis::analysis::env::resolve_unkeyed_placeholder;
 use slug_analysis::attrs::resolve::ctx::AnalysisQueryResult;
 use slug_analysis::attrs::resolve::ctx::AttrResolutionContext;
+use slug_analysis::attrs::resolve::ctx::ResolvedDep;
 use slug_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
-use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
-use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_node::nodes::configured::ConfiguredTargetNode;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
-use starlark::values::FrozenValueTyped;
 
 use crate::bxl::starlark_defs::context::BxlContext;
 
 #[derive(Allocative)]
 pub(crate) struct LazyAttrResolutionCache {
-    pub(super) dep_analysis_results:
-        Option<HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>>,
+    pub(super) dep_analysis_results: Option<HashMap<ConfiguredTargetLabel, DepAnalysisValue>>,
     pub(super) query_results: Option<HashMap<String, Arc<AnalysisQueryResult>>>,
 }
 
@@ -68,7 +66,7 @@ impl LazyAttrResolutionCache {
         ctx: &'v BxlContext<'v>,
         configured_node: &'v ConfiguredTargetNode,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> slug_error::Result<&HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>> {
+    ) -> slug_error::Result<&HashMap<ConfiguredTargetLabel, DepAnalysisValue>> {
         get_or_try_init(&mut self.dep_analysis_results, || {
             get_deps_from_analysis_results(ctx.via_dice(eval, |ctx| {
                 ctx.via(|dice_ctx| {
@@ -102,7 +100,7 @@ impl<'v, 'a, 'e, 'c> AttrResolutionContext<'v> for LazyAttrResolutionContext<'v,
     fn get_dep(
         &mut self,
         target: &ConfiguredProvidersLabel,
-    ) -> slug_error::Result<FrozenValueTyped<'v, FrozenProviderCollection>> {
+    ) -> slug_error::Result<ResolvedDep<'v>> {
         let module = self.eval.module();
         match self
             .cache
