@@ -16,6 +16,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use sha2::Digest;
+use sha2::Sha256;
 use slug_error::BuckErrorContext;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
@@ -32,6 +34,20 @@ use crate::globals::new_module_file_context;
 use crate::globals::register_module_file_globals;
 use crate::types::Module as BzlModule;
 use crate::types::ParsedModuleFile;
+
+/// A MODULE.bazel evaluation input and the exact bytes Slug parsed from it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleFileInputDigest {
+    pub path: PathBuf,
+    pub digest: String,
+}
+
+/// Parsed MODULE.bazel data plus every filesystem input consumed by include().
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedModuleFileWithInputs {
+    pub parsed: ParsedModuleFile,
+    pub inputs: Vec<ModuleFileInputDigest>,
+}
 
 /// Errors that can occur during MODULE.bazel parsing.
 #[derive(Debug, slug_error::Error)]
@@ -190,7 +206,23 @@ fn parsed_module_file_from_context(
 pub fn parse_module_bazel(path: &Path) -> slug_error::Result<ParsedModuleFile> {
     let content = std::fs::read_to_string(path)
         .buck_error_context(format!("Failed to read MODULE.bazel at {:?}", path))?;
+    Ok(
+        parse_module_bazel_content_from_path(path, &content, sha256_hex(content.as_bytes()))?
+            .parsed,
+    )
+}
+
+pub fn parse_module_bazel_content_from_path(
+    path: &Path,
+    content: &str,
+    digest: String,
+) -> slug_error::Result<ParsedModuleFileWithInputs> {
     let context = new_module_file_context();
+    let mut inputs = Vec::new();
+    inputs.push(ModuleFileInputDigest {
+        path: path.to_path_buf(),
+        digest,
+    });
 
     let filename = path
         .file_name()
@@ -204,9 +236,13 @@ pub fn parse_module_bazel(path: &Path) -> slug_error::Result<ParsedModuleFile> {
         filename,
         &context,
         &mut include_stack,
+        &mut inputs,
     )?;
 
-    parsed_module_file_from_context(&context)
+    Ok(ParsedModuleFileWithInputs {
+        parsed: parsed_module_file_from_context(&context)?,
+        inputs,
+    })
 }
 
 fn eval_module_bazel_file_with_includes(
@@ -215,6 +251,7 @@ fn eval_module_bazel_file_with_includes(
     filename: &str,
     context: &std::cell::RefCell<ModuleFileContext>,
     include_stack: &mut Vec<PathBuf>,
+    inputs: &mut Vec<ModuleFileInputDigest>,
 ) -> slug_error::Result<()> {
     let include_start = context.borrow().include_labels.len();
     eval_module_bazel_content_into_context(content, filename, context)?;
@@ -234,11 +271,20 @@ fn eval_module_bazel_file_with_includes(
             );
         }
         include_stack.push(canonical);
-        let include_content =
-            std::fs::read_to_string(&include_path).buck_error_context(format!(
-                "Failed to read included MODULE.bazel segment at {:?}",
-                include_path
-            ))?;
+        let include_bytes = std::fs::read(&include_path).buck_error_context(format!(
+            "Failed to read included MODULE.bazel segment at {:?}",
+            include_path
+        ))?;
+        let include_content = String::from_utf8(include_bytes).map_err(|e| {
+            ModuleParseError::ReadError(format!(
+                "included MODULE.bazel segment at {:?} is not UTF-8: {}",
+                include_path, e
+            ))
+        })?;
+        inputs.push(ModuleFileInputDigest {
+            path: include_path.clone(),
+            digest: sha256_hex(include_content.as_bytes()),
+        });
         eval_module_bazel_file_with_includes(
             module_root,
             &include_content,
@@ -248,6 +294,7 @@ fn eval_module_bazel_file_with_includes(
                 .unwrap_or("MODULE.bazel"),
             context,
             include_stack,
+            inputs,
         )?;
         include_stack.pop();
     }
@@ -279,6 +326,12 @@ fn include_label_to_path(module_root: &Path, label: &str) -> slug_error::Result<
         .into());
     }
     Ok(module_root.join(package).join(name))
+}
+
+fn sha256_hex(content: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content);
+    hex::encode(hasher.finalize())
 }
 
 #[cfg(test)]

@@ -3278,6 +3278,52 @@ Implementation slice 2026-05-20, stable Rust remap substitutions:
   info, mapping every Slug config hash to a hand-written `k8-fastbuild` value,
   or adding Rust-only remap flags that leave `env!("OUT_DIR")` wrong.
 
+Implementation update 2026-05-21, root MODULE parsing DICE bridge:
+
+- Bazel ground truth: `ModuleFileValue` is the Skyframe value for a parsed
+  module file and `ModuleFileFunction` reads/expands module-file inputs before
+  `BazelModuleResolutionFunction` consumes the root `ModuleFileValue`. Local
+  anchors used for this slice:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileValue.java:33`,
+  `:68`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java:163`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java:99`.
+- Slug now computes the root `MODULE.bazel` parse through
+  `RootModuleFileKey` during server config loading and passes that parsed value
+  into the legacy cell bridge. Direct filesystem parsing remains only for
+  bootstrap/completion paths without a DICE transaction. This is deliberately a
+  transitional bridge: MVS, local override module files, and the bzlmod cell
+  graph are still computed inside legacy `cells.rs`.
+- Validation before the first broad smoke:
+  `cargo test -p slug_bzlmod root_module_file -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
+  `cargo fmt --check`, `git diff --check`, `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` all passed.
+- Fresh ZeroMatter no-exec smoke
+  `/tmp/slug-plan61/plan61-noexec-after-root-module-dice-20260521-011500.log`
+  was stopped after about two hours with CPU still active and no client log
+  progress beyond the already-known
+  `rules_rust//ffi/rs:empty_allocator_libraries` analysis wait. The event log
+  was not preserved before cleanup; preserved evidence is the text log copied
+  to
+  `/tmp/slug-plan61/plan61-noexec-after-root-module-dice-20260521-011500.hung.log`.
+  Generated ZeroMatter output for that isolation was cleaned immediately
+  afterward, reducing `/var/mnt/dev/zeromatter-kuro/buck-out` back to about
+  3.3M and removing `execroot`.
+- Blocker reflection: this is not evidence of a DICE dependency cycle; the
+  root key does not request any other DICE keys. The systemic issue found in
+  the slice was that the bridge was only root-digest based and reread the root
+  module during parsing, while Bazel's `ModuleFileValue` dependency shape covers
+  the actual module-file inputs. Slug now parses the root module from the bytes
+  already read by `RootModuleFileKey` and computes the equality token over the
+  root file plus every included `.MODULE.bazel` segment consumed by
+  `include()`. The key remains non-cacheable (`validity=false`) until the root
+  and include reads are backed by tracked DICE filesystem inputs. Rejected
+  shortcuts: making the current direct-read key cacheable, ignoring includes in
+  equality, or treating the broad smoke wait as a completed validation.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

@@ -33,7 +33,8 @@ use sha2::Sha256;
 use crate::lockfile::Lockfile;
 use crate::lockfile::compute_file_hash;
 use crate::lockfile::compute_sha256_hex;
-use crate::parser::parse_module_bazel;
+use crate::parser::ModuleFileInputDigest;
+use crate::parser::parse_module_bazel_content_from_path;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
 use crate::types::ParsedModuleFile;
@@ -110,7 +111,8 @@ pub struct RootModuleFileKey {
 #[derive(Clone, Debug, Allocative)]
 pub struct RootModuleFileValue {
     pub path: Arc<PathBuf>,
-    pub digest: Option<String>,
+    pub input_digest: Option<String>,
+    pub input_count: usize,
     pub parsed: Option<ParsedModuleFile>,
 }
 
@@ -131,25 +133,38 @@ impl Key for RootModuleFileKey {
         if !path.exists() {
             return Ok(Arc::new(RootModuleFileValue {
                 path,
-                digest: None,
+                input_digest: None,
+                input_count: 0,
                 parsed: None,
             }));
         }
 
         let content = std::fs::read(path.as_ref())?;
         let digest = compute_sha256_hex(&content);
-        let parsed = parse_module_bazel(path.as_ref())?;
+        let content = String::from_utf8(content).map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to read MODULE.bazel at {:?}: {}",
+                path,
+                e
+            )
+        })?;
+        let parsed_with_inputs =
+            parse_module_bazel_content_from_path(path.as_ref(), &content, digest)?;
+        let input_digest = module_file_inputs_digest(&parsed_with_inputs.inputs);
+        let input_count = parsed_with_inputs.inputs.len();
 
         Ok(Arc::new(RootModuleFileValue {
             path,
-            digest: Some(digest),
-            parsed: Some(parsed),
+            input_digest: Some(input_digest),
+            input_count,
+            parsed: Some(parsed_with_inputs.parsed),
         }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         match (x, y) {
-            (Ok(x), Ok(y)) => x.path == y.path && x.digest == y.digest,
+            (Ok(x), Ok(y)) => x.path == y.path && x.input_digest == y.input_digest,
             _ => false,
         }
     }
@@ -157,6 +172,17 @@ impl Key for RootModuleFileKey {
     fn validity(_x: &Self::Value) -> bool {
         false
     }
+}
+
+fn module_file_inputs_digest(inputs: &[ModuleFileInputDigest]) -> String {
+    let mut hasher = Sha256::new();
+    for input in inputs {
+        hasher.update(input.path.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(input.digest.as_bytes());
+        hasher.update([0]);
+    }
+    hex::encode(hasher.finalize())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -624,7 +650,8 @@ mod tests {
     fn root_module_file_key_is_non_cacheable_until_file_deps_are_tracked() {
         let value = Ok(Arc::new(RootModuleFileValue {
             path: Arc::new(PathBuf::from("/tmp/MODULE.bazel")),
-            digest: None,
+            input_digest: None,
+            input_count: 0,
             parsed: None,
         }));
 
@@ -636,12 +663,47 @@ mod tests {
         let path = Arc::new(PathBuf::from("/tmp/MODULE.bazel"));
         let first = Ok(Arc::new(RootModuleFileValue {
             path: path.clone(),
-            digest: Some("first".to_owned()),
+            input_digest: Some("first".to_owned()),
+            input_count: 1,
             parsed: None,
         }));
         let second = Ok(Arc::new(RootModuleFileValue {
             path,
-            digest: Some("second".to_owned()),
+            input_digest: Some("second".to_owned()),
+            input_count: 1,
+            parsed: None,
+        }));
+
+        assert!(!<RootModuleFileKey as Key>::equality(&first, &second));
+    }
+
+    #[test]
+    fn root_module_file_value_equality_tracks_include_digest() {
+        let path = Arc::new(PathBuf::from("/tmp/MODULE.bazel"));
+        let root_only = module_file_inputs_digest(&[ModuleFileInputDigest {
+            path: path.as_ref().clone(),
+            digest: "root".to_owned(),
+        }]);
+        let with_include = module_file_inputs_digest(&[
+            ModuleFileInputDigest {
+                path: path.as_ref().clone(),
+                digest: "root".to_owned(),
+            },
+            ModuleFileInputDigest {
+                path: PathBuf::from("/tmp/deps.MODULE.bazel"),
+                digest: "include".to_owned(),
+            },
+        ]);
+        let first = Ok(Arc::new(RootModuleFileValue {
+            path: path.clone(),
+            input_digest: Some(root_only),
+            input_count: 1,
+            parsed: None,
+        }));
+        let second = Ok(Arc::new(RootModuleFileValue {
+            path,
+            input_digest: Some(with_include),
+            input_count: 2,
             parsed: None,
         }));
 
