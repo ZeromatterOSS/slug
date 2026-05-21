@@ -8,7 +8,7 @@
 
 In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
 observable bzlmod replay/materialization bug shapes that blocked the current SDK
-parity loop. The current guardrail file has 27 passing tests and no xfails. The
+parity loop. The current guardrail file has 31 passing tests and no xfails. The
 broader DICE-owned bzlmod plan is not complete until the acceptance criteria
 below are satisfied or a real blocker is recorded.
 
@@ -3551,12 +3551,71 @@ Implementation update 2026-05-21, transitive legacy graph bridge cache:
   Bazel-grounded on-disk graph cache keyed by lockfile/root/policy/source
   manifests, rather than adding more process-local shortcuts.
 
+Ground-truth correction 2026-05-21, cold graph disk-cache boundary:
+
+- Subagent dispatch was attempted for the next implementation-slice
+  classification, but the runtime reported the agent thread limit was reached.
+  Local classification and implementation continued per the loop-manager
+  prompt.
+- Bazel ground truth: `BazelModuleResolutionFunction` and
+  `BazelDepGraphFunction` produce Skyframe values for module resolution and the
+  derived dep graph, while `BazelLockFileFunction` reads durable lockfile
+  content. The durable bzlmod state Bazel exposes here is
+  `MODULE.bazel.lock` (registry hashes, selected yanked versions, extension
+  generated repo specs, facts), not a serialized legacy cell graph. Local
+  anchors: `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java`,
+  `BazelDepGraphFunction.java`, `BazelModuleResolutionValue.java`,
+  `BazelDepGraphValue.java`, and `BazelLockFileFunction.java`.
+- Decision: do not add a Slug-private on-disk cache for
+  `BzlmodResolutionResult` as a Plan 61 fix. That result contains Slug cell
+  graph/runtime adapter state, would require a new DTO/schema/invalidation
+  layer, and would persist state beyond Bazel's lockfile/Skyframe split. Treat
+  same-daemon DICE reuse as the current validated boundary and continue moving
+  root/transitive module files, module sources, extension replay inputs, repo
+  mappings, and materialization manifests into typed DICE values. A separate
+  on-disk graph cache can be proposed only as an explicitly Slug-private
+  performance feature or as part of a separately Bazel-grounded persistent
+  Skyframe/cache design.
+
+Implementation update 2026-05-21, local override graph bridge cache:
+
+- Bazel ground truth: local override module files are module-file inputs to
+  bzlmod resolution through the same `ModuleFileFunction` /
+  `BazelModuleResolutionFunction` boundary as registry modules. A local
+  override's own nested local overrides are also module-file inputs, while git
+  overrides, extension usages, and repo-rule invocations introduce additional
+  mutable/evaluation inputs that are not yet fully DICE-owned.
+- Slug's transitional bridge key now fingerprints recursive local override
+  `MODULE.bazel` inputs, including included `*.MODULE.bazel` segments consumed
+  by `include()`, before considering a legacy bzlmod graph cacheable. Local
+  override graphs are cacheable only when the recursive override inputs contain
+  no git overrides, extension usages, or repo-rule invocations. Root
+  `bazel_dep`s that are satisfied by local overrides no longer force a visible
+  registry lockfile digest; registry/remote deps and local modules with their
+  own `bazel_dep`s still require the visible lockfile digest before bridge
+  caching.
+- Guardrail added:
+  `test_warm_noop_local_override_audit_cell_reuses_bzlmod_resolution`, which
+  proves an unchanged local-override graph reuses the bzlmod resolution on the
+  second same-daemon `audit cell` while the existing local override edit
+  guardrail continues to prove edits invalidate the graph.
+- Validation passed:
+  `cargo fmt --check`, `git diff --check`,
+  `cargo check -p slug_common -p slug_bzlmod -p slug_server`,
+  `cargo test -p slug_bzlmod root_module_file -- --nocapture`,
+  `cargo build -p slug`, focused direct pytest for the new guardrail, and full
+  direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest
+  -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (31 tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
-- Real-world smokes stay usable throughout the migration; cold read-only audit
-  startup for zeromatter must stay below 10s, and any regression is a Plan 61
-  performance failure rather than a smoke to wait out.
+- Real-world smokes stay usable throughout the migration. Same-daemon warm
+  read-only audit for zeromatter must stay below 10s after a validated reuse
+  checkpoint. Cold fresh-daemon audit remains a tracked performance gap, but it
+  must be addressed by typed DICE ownership of bzlmod inputs/values or a
+  separately Bazel-grounded persistent Skyframe/cache design, not by a
+  Slug-only serialized legacy cell graph.
 
 ## Acceptance Criteria
 

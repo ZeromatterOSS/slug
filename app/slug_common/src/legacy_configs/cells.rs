@@ -10,6 +10,8 @@
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::collections::VecDeque;
 use std::hash::Hash;
 use std::path::Path;
 use std::path::PathBuf;
@@ -665,15 +667,36 @@ fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey
     if !parsed.repo_rule_invocations.is_empty() {
         return false;
     }
-    if parsed.module.overrides.iter().any(|override_| {
-        matches!(
-            override_,
-            slug_bzlmod::types::Override::LocalPath(_) | slug_bzlmod::types::Override::Git(_)
-        )
-    }) {
+    if parsed
+        .module
+        .overrides
+        .iter()
+        .any(|override_| matches!(override_, slug_bzlmod::types::Override::Git(_)))
+    {
         return false;
     }
-    if !parsed.module.bazel_deps.is_empty()
+    if key.local_override_inputs.has_git_overrides
+        || key.local_override_inputs.has_extension_usages
+        || key.local_override_inputs.has_repo_rule_invocations
+    {
+        return false;
+    }
+
+    let local_override_names = parsed
+        .module
+        .overrides
+        .iter()
+        .filter_map(|override_| match override_ {
+            slug_bzlmod::types::Override::LocalPath(local) => Some(local.module_name.as_str()),
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+    let has_registry_or_remote_dep = parsed
+        .module
+        .bazel_deps
+        .iter()
+        .any(|dep| !local_override_names.contains(dep.name.as_str()));
+    if (has_registry_or_remote_dep || key.local_override_inputs.has_bazel_deps)
         && key
             .visible_lockfile
             .as_ref()
@@ -839,6 +862,10 @@ struct LocalOverrideModuleInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct LocalOverrideModuleInputsValue {
     digest: String,
+    has_bazel_deps: bool,
+    has_extension_usages: bool,
+    has_repo_rule_invocations: bool,
+    has_git_overrides: bool,
 }
 
 fn local_overrides_from_root_module(
@@ -863,6 +890,118 @@ fn local_overrides_from_root_module(
         .unwrap_or_default()
 }
 
+fn local_override_module_inputs_digest(
+    project_root: &Path,
+    overrides: &[(String, String)],
+) -> slug_error::Result<LocalOverrideModuleInputsValue> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"local-override-module-inputs-v2");
+    hasher.update([0]);
+    let mut queue = VecDeque::new();
+    for (module_name, path) in overrides {
+        queue.push_back((
+            module_name.clone(),
+            project_root.to_path_buf(),
+            path.clone(),
+        ));
+    }
+
+    let mut visited_module_dirs = HashSet::new();
+    let mut has_bazel_deps = false;
+    let mut has_extension_usages = false;
+    let mut has_repo_rule_invocations = false;
+    let mut has_git_overrides = false;
+
+    while let Some((module_name, base, path)) = queue.pop_front() {
+        let module_dir = base.join(&path);
+        let normalized_module_dir = module_dir
+            .canonicalize()
+            .unwrap_or_else(|_| module_dir.clone());
+        hasher.update(module_name.as_bytes());
+        hasher.update([0]);
+        hasher.update(base.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(path.as_bytes());
+        hasher.update([0]);
+        hasher.update(normalized_module_dir.to_string_lossy().as_bytes());
+        hasher.update([0]);
+
+        if !visited_module_dirs.insert(normalized_module_dir.clone()) {
+            hasher.update(b"already-seen");
+            hasher.update([0]);
+            continue;
+        }
+
+        let module_bazel_path = normalized_module_dir.join("MODULE.bazel");
+        match std::fs::read(&module_bazel_path) {
+            Ok(content) => {
+                hasher.update(b"present");
+                hasher.update([0]);
+                let content_digest = slug_bzlmod::lockfile::compute_sha256_hex(&content);
+                let content = String::from_utf8(content).map_err(|e| {
+                    slug_error::slug_error!(
+                        slug_error::ErrorTag::Input,
+                        "Failed to read MODULE.bazel for local override '{}' at {:?}: {}",
+                        module_name,
+                        module_bazel_path,
+                        e
+                    )
+                })?;
+                let parsed_with_inputs = slug_bzlmod::parser::parse_module_bazel_content_from_path(
+                    &module_bazel_path,
+                    &content,
+                    content_digest,
+                )
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to parse MODULE.bazel for local override '{}' at {:?}",
+                        module_name, module_bazel_path
+                    )
+                })?;
+                for input in &parsed_with_inputs.inputs {
+                    hasher.update(input.path.to_string_lossy().as_bytes());
+                    hasher.update([0]);
+                    hasher.update(input.digest.as_bytes());
+                    hasher.update([0]);
+                }
+
+                let parsed = parsed_with_inputs.parsed;
+                has_bazel_deps |= !parsed.module.bazel_deps.is_empty();
+                has_extension_usages |= !parsed.extension_usages.is_empty();
+                has_repo_rule_invocations |= !parsed.repo_rule_invocations.is_empty();
+                has_git_overrides |= parsed
+                    .module
+                    .overrides
+                    .iter()
+                    .any(|override_| matches!(override_, slug_bzlmod::types::Override::Git(_)));
+
+                for override_ in &parsed.module.overrides {
+                    if let slug_bzlmod::types::Override::LocalPath(local) = override_ {
+                        queue.push_back((
+                            local.module_name.clone(),
+                            normalized_module_dir.clone(),
+                            local.path.clone(),
+                        ));
+                    }
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                hasher.update(b"missing");
+                hasher.update([0]);
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+
+    Ok(LocalOverrideModuleInputsValue {
+        digest: hex::encode(hasher.finalize()),
+        has_bazel_deps,
+        has_extension_usages,
+        has_repo_rule_invocations,
+        has_git_overrides,
+    })
+}
+
 #[async_trait]
 impl Key for LocalOverrideModuleInputsKey {
     type Value = slug_error::Result<Arc<LocalOverrideModuleInputsValue>>;
@@ -872,31 +1011,11 @@ impl Key for LocalOverrideModuleInputsKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let mut hasher = Sha256::new();
-        for (module_name, path) in &self.overrides {
-            let module_path = AsRef::<Path>::as_ref(&self.project_root)
-                .join(path)
-                .join("MODULE.bazel");
-            hasher.update(module_name.as_bytes());
-            hasher.update([0]);
-            hasher.update(path.as_bytes());
-            hasher.update([0]);
-            match std::fs::read(&module_path) {
-                Ok(content) => {
-                    hasher.update(b"present");
-                    hasher.update([0]);
-                    hasher.update(Sha256::digest(&content));
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    hasher.update(b"missing");
-                }
-                Err(e) => return Err(e.into()),
-            }
-            hasher.update([0]);
-        }
-        Ok(Arc::new(LocalOverrideModuleInputsValue {
-            digest: hex::encode(hasher.finalize()),
-        }))
+        local_override_module_inputs_digest(
+            AsRef::<Path>::as_ref(&self.project_root),
+            &self.overrides,
+        )
+        .map(Arc::new)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

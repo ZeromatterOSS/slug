@@ -334,6 +334,36 @@ async def test_warm_noop_audit_cell_reuses_bzlmod_resolution(buck: Buck) -> None
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_warm_noop_local_override_audit_cell_reuses_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: local override MODULE files are ModuleFileFunction inputs."""
+    local_lib = buck.cwd / "libs/local_lib"
+    local_lib.mkdir(parents=True, exist_ok=True)
+    _write(local_lib / "MODULE.bazel", 'module(name = "local_lib", version = "1.0")\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_local_override_warm")
+
+bazel_dep(name = "local_lib")
+local_path_override(
+    module_name = "local_lib",
+    path = "libs/local_lib",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert "local_lib" in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, second = await _audit_cells_and_counters(buck)
+    assert "local_lib" in output
+    assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_warm_noop_extension_replay_audit_cell_reuses_bzlmod_resolution(
     buck: Buck,
 ) -> None:
