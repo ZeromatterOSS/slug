@@ -23,7 +23,10 @@
 //! 1. Repository rule invocations are recorded during MODULE.bazel/extension parsing
 //! 2. When a repository is needed, `RepositoryRuleExecutionKey::compute()` is called
 //! 3. The computation creates a working directory, invokes the rule implementation,
-//!    and registers the result with the materializer
+//!    and registers the result with the materializer.
+//!
+//! Until this key is fully wired to the native/Starlark repository executor, it
+//! must fail directly rather than returning a placeholder successful repository.
 //!
 //! ## Pattern Reference
 //!
@@ -156,30 +159,16 @@ impl Key for RepositoryRuleExecutionKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        // For now, create a stub result that indicates the repository was "executed"
-        // The actual implementation will be filled in during Phase 5d-3 (Blocking I/O Integration)
-        //
-        // The full implementation will:
-        // 1. Get the project root from DICE context
-        // 2. Create/clean the working directory
-        // 3. Load the repository rule's .bzl file
-        // 4. Create a RepositoryContext with the working directory
-        // 5. Execute the implementation function
-        // 6. Register the result with the materializer
-
-        tracing::info!(
-            "Executing repository rule '{}' for repository '{}'",
-            self.rule_name,
-            self.name
+        record_bzlmod_event(
+            BzlmodEventKind::StubFallbackAttempt,
+            format!("{}:{}", self.name, self.rule_name),
         );
-
-        // Stub: Just create the path that would be used
-        let repo_path = PathBuf::from("bazel-external").join(self.name.as_ref());
-
-        Ok(Arc::new(RepositoryRuleResult::success(
-            self.name.to_string(),
-            repo_path,
-        )))
+        tracing::warn!(
+            "RepositoryRuleExecutionKey for '{}' cannot execute repository rule '{}' yet",
+            self.name,
+            self.rule_name
+        );
+        Err(repository_rule_execution_key_unimplemented_error(&self.name, &self.rule_name).into())
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -192,6 +181,21 @@ impl Key for RepositoryRuleExecutionKey {
     fn validity(x: &Self::Value) -> bool {
         // Don't cache errors - retry on next request
         x.is_ok()
+    }
+}
+
+/// Explain why direct `RepositoryRuleExecutionKey` computation is disabled.
+pub fn repository_rule_execution_key_unimplemented_error(
+    repository_name: &str,
+    rule_name: &str,
+) -> RepositoryExecutionError {
+    tracing::debug!(
+        "RepositoryRuleExecutionKey for '{}' has no direct executor for rule '{}'",
+        repository_name,
+        rule_name
+    );
+    RepositoryExecutionError::NoImplementation {
+        name: rule_name.to_owned(),
     }
 }
 
@@ -675,6 +679,13 @@ mod tests {
         assert_eq!(key.name.as_ref(), "test_repo");
         assert_eq!(key.rule_name.as_ref(), "http_archive");
         assert!(key.attrs_hash.starts_with("sha256-"));
+    }
+
+    #[test]
+    fn direct_repository_rule_execution_key_fails_instead_of_stubbing() {
+        let err = repository_rule_execution_key_unimplemented_error("test_repo", "http_archive");
+        assert!(err.to_string().contains("has no implementation"));
+        assert!(err.to_string().contains("http_archive"));
     }
 
     #[test]

@@ -279,6 +279,7 @@ pub enum BzlmodEventKind {
     RepoMaterializationMissReason,
     LockfileRead,
     LockfileWriteAttempt,
+    StubFallbackAttempt,
 }
 
 impl BzlmodEventKind {
@@ -293,6 +294,7 @@ impl BzlmodEventKind {
             Self::RepoMaterializationMissReason => "repo_materialization_miss_reason",
             Self::LockfileRead => "lockfile_read",
             Self::LockfileWriteAttempt => "lockfile_write_attempt",
+            Self::StubFallbackAttempt => "stub_fallback_attempt",
         }
     }
 }
@@ -308,6 +310,7 @@ pub struct BzlmodEventCounters {
     pub repo_materialization_miss_reason: u64,
     pub lockfile_read: u64,
     pub lockfile_write_attempt: u64,
+    pub stub_fallback_attempt: u64,
 }
 
 static BZLMOD_RESOLUTION_COMPUTE: AtomicU64 = AtomicU64::new(0);
@@ -319,6 +322,7 @@ static REPO_MATERIALIZATION_HIT: AtomicU64 = AtomicU64::new(0);
 static REPO_MATERIALIZATION_MISS_REASON: AtomicU64 = AtomicU64::new(0);
 static LOCKFILE_READ: AtomicU64 = AtomicU64::new(0);
 static LOCKFILE_WRITE_ATTEMPT: AtomicU64 = AtomicU64::new(0);
+static STUB_FALLBACK_ATTEMPT: AtomicU64 = AtomicU64::new(0);
 
 fn counter(kind: BzlmodEventKind) -> &'static AtomicU64 {
     match kind {
@@ -331,6 +335,7 @@ fn counter(kind: BzlmodEventKind) -> &'static AtomicU64 {
         BzlmodEventKind::RepoMaterializationMissReason => &REPO_MATERIALIZATION_MISS_REASON,
         BzlmodEventKind::LockfileRead => &LOCKFILE_READ,
         BzlmodEventKind::LockfileWriteAttempt => &LOCKFILE_WRITE_ATTEMPT,
+        BzlmodEventKind::StubFallbackAttempt => &STUB_FALLBACK_ATTEMPT,
     }
 }
 
@@ -357,6 +362,7 @@ pub fn bzlmod_event_counters() -> BzlmodEventCounters {
         repo_materialization_miss_reason: REPO_MATERIALIZATION_MISS_REASON.load(Ordering::Relaxed),
         lockfile_read: LOCKFILE_READ.load(Ordering::Relaxed),
         lockfile_write_attempt: LOCKFILE_WRITE_ATTEMPT.load(Ordering::Relaxed),
+        stub_fallback_attempt: STUB_FALLBACK_ATTEMPT.load(Ordering::Relaxed),
     }
 }
 
@@ -441,6 +447,11 @@ mod tests {
                 BzlmodEventKind::LockfileWriteAttempt,
                 |c: &BzlmodEventCounters| c.lockfile_write_attempt,
                 "lockfile_write_attempt",
+            ),
+            (
+                BzlmodEventKind::StubFallbackAttempt,
+                |c: &BzlmodEventCounters| c.stub_fallback_attempt,
+                "stub_fallback_attempt",
             ),
         ];
 

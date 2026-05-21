@@ -349,6 +349,34 @@ SDK smoke checkpoint 2026-05-21:
   `buck-out` tree reached about 213M during the smoke and was removed after the
   log was preserved; `execroot` was also removed.
 
+Implementation update 2026-05-21, latent repository-rule DICE stubs fail
+directly:
+
+- Bazel ground truth: `RepositoryFetchFunction` returns
+  `RepositoryDirectoryValue.Success` only after an existing marker is validated,
+  an override is set up, or the repository rule fetch has completed and its
+  marker was written; missing/hidden repositories produce
+  `RepositoryDirectoryValue.Failure`, and fetch/materialization failures
+  propagate as `RepositoryFunctionException`. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryFetchFunction.java:147`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryFetchFunction.java:251`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryFetchFunction.java:300`.
+- Previous Slug `RepositoryRuleExecutionKey::compute()` still returned a
+  placeholder successful `bazel-external/<name>` result if that DICE key was
+  requested directly. The current common path uses the native repository
+  executor and extension repo execution key, but the latent key still violated
+  Plan 61's no-stub invariant.
+- Slug now records `stub_fallback_attempt` and fails the direct key with
+  `NoImplementation` instead of synthesizing a successful repository. The
+  Plan 61 event enum/counter snapshot now includes the required
+  `stub_fallback_attempt` counter so future audits can observe any remaining
+  fallback attempts.
+- Validation:
+  `cargo test -p slug_bzlmod repository_execution -- --nocapture` and
+  `cargo test -p slug_bzlmod dice_graph::tests::all_plan61_event_counters_are_observable_in_process -- --nocapture`
+  pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
