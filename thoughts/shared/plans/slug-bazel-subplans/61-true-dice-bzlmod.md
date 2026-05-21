@@ -3422,6 +3422,48 @@ Implementation update 2026-05-21, transitional DICE bzlmod resolution bridge:
   extension-bearing legacy graph and miss the <10s cold-audit performance
   target.
 
+Implementation update 2026-05-21, root-only extension replay cache boundary:
+
+- Bazel ground truth: `SingleExtensionEvalFunction` accepts lockfile extension
+  replay only after comparing the runnable extension `.bzl` transitive digest,
+  extension usages digest, and `RepoRecordedInput` values; `BazelDepGraphFunction`
+  supplies the extension usage table, repo mappings, and root `override_repo`
+  rows consumed by that validation. Local anchors used for this slice:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java`,
+  `RegularRunnableExtension.java`, `BazelDepGraphFunction.java`, and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/repository/RepoRecordedInput.java`.
+- Slug now computes a conservative `root_extension_replay_summary_digest` for
+  root-module-only extension replay workspaces before enabling the persisted
+  resolution bridge cache. The summary covers the effective repo env, root
+  repo-mapping override rows, each used extension id, Slug's current
+  project-local `.bzl` transitive digest approximation, extension usages
+  digest, selected visible/hidden lockfile replay source, and replayed repo
+  spec hashes. It is computed by calling the same lockfile replay validation
+  path used for extension pre-seeding, so stale recorded file/dir/tree/env/repo
+  mapping inputs disable the bridge cache rather than reusing stale runtime
+  state.
+- Cacheability is still intentionally narrow. Extension replay caching is
+  enabled only when the root MODULE has no `bazel_dep`, no overrides, no
+  `use_repo_rule()` invocations, and every root extension usage has a valid
+  visible or hidden lockfile replay entry. Dependency graphs, local overrides,
+  fresh extension eval, and repo-rule invocations continue down the uncached
+  legacy path until their transitive module, eval-factor, and repo-rule inputs
+  become first-class DICE keys.
+- Guardrail added:
+  `test_warm_noop_extension_replay_audit_cell_reuses_bzlmod_resolution`, which
+  warms a valid root-only extension replay lockfile and proves the second
+  same-daemon `audit cell` does not increment `bzlmod_resolution_compute`.
+  Full validation passed `cargo fmt --check`, `git diff --check`,
+  `cargo check -p slug_common -p slug_server`, `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (30 tests).
+- Remaining Plan 61 work: lift this from root-only replay to full bzlmod
+  graphs by DICE-owning parsed transitive modules/local overrides, real
+  Starlark load graphs for extension `.bzl` files, eval factors, repo-rule
+  invocation identities, and typed recorded-input values. ZeroMatter still has
+  `bazel_dep` and extension-heavy graph shape, so this checkpoint is a
+  correctness/perf step but does not yet satisfy the SDK warm-audit target.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

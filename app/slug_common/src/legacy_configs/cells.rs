@@ -576,6 +576,7 @@ struct LegacyBzlmodResolutionDiceKey {
     visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
+    extension_replay_summary_digest: Option<Arc<str>>,
 }
 
 impl PartialEq for LegacyBzlmodResolutionDiceKey {
@@ -588,6 +589,7 @@ impl PartialEq for LegacyBzlmodResolutionDiceKey {
             && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
             && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
             && self.local_override_inputs.digest == other.local_override_inputs.digest
+            && self.extension_replay_summary_digest == other.extension_replay_summary_digest
     }
 }
 
@@ -603,6 +605,7 @@ impl std::hash::Hash for LegacyBzlmodResolutionDiceKey {
         hash_lockfile_content_identity(&self.visible_lockfile, state);
         hash_lockfile_content_identity(&self.hidden_lockfile, state);
         self.local_override_inputs.digest.hash(state);
+        self.extension_replay_summary_digest.hash(state);
     }
 }
 
@@ -661,10 +664,12 @@ fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey
     };
     if !parsed.module.bazel_deps.is_empty()
         || !parsed.module.overrides.is_empty()
-        || !parsed.extension_usages.is_empty()
         || !parsed.repo_rule_invocations.is_empty()
     {
         return false;
+    }
+    if !parsed.extension_usages.is_empty() {
+        return key.extension_replay_summary_digest.is_some();
     }
     let lockfile_has_extension_entries = |lockfile: &slug_bzlmod::Lockfile| {
         !lockfile.module_extensions.is_empty() || !lockfile.facts.is_empty()
@@ -686,6 +691,118 @@ fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey
         return false;
     }
     true
+}
+
+fn root_extension_replay_summary_digest(
+    parsed: &ParsedModuleFile,
+    project_root: &Path,
+    visible_lockfile: Option<&slug_bzlmod::Lockfile>,
+    hidden_lockfile: Option<&slug_bzlmod::Lockfile>,
+) -> Option<String> {
+    if parsed.extension_usages.is_empty()
+        || !parsed.module.bazel_deps.is_empty()
+        || !parsed.module.overrides.is_empty()
+        || !parsed.repo_rule_invocations.is_empty()
+    {
+        return None;
+    }
+
+    let root_module_name = if parsed.module.name.is_empty() {
+        "_main"
+    } else {
+        &parsed.module.name
+    };
+    let parsed_modules = vec![(root_module_name.to_owned(), parsed.clone())];
+    let mut module_extensions = HashMap::new();
+    module_extensions.insert(root_module_name.to_owned(), parsed.extension_usages.clone());
+    let aggregated =
+        slug_bzlmod::aggregate_extensions_with_root(&module_extensions, Some(root_module_name));
+    if aggregated.is_empty() {
+        return None;
+    }
+
+    let repo_env = slug_bzlmod::legacy_bzlmod_repo_env();
+    let repo_mappings = repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
+    let repo_mapping_overrides = repo_mapping_overrides_for_root(&parsed_modules, root_module_name);
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"root-extension-replay-summary-v1");
+    hasher.update([0]);
+    for (name, value) in &repo_env {
+        hasher.update(name.as_bytes());
+        hasher.update([0]);
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+    for (extension_id, overrides) in &repo_mapping_overrides {
+        hasher.update(extension_id.as_bytes());
+        hasher.update([0]);
+        for (generated_name, target_name) in overrides {
+            hasher.update(generated_name.as_bytes());
+            hasher.update([0]);
+            hasher.update(target_name.as_bytes());
+            hasher.update([0]);
+        }
+    }
+
+    let mut extension_ids = aggregated.keys().cloned().collect::<Vec<_>>();
+    extension_ids.sort();
+    for extension_id in extension_ids {
+        let extension = aggregated.get(&extension_id)?;
+        let bzl_transitive_digest =
+            slug_bzlmod::compute_bzl_transitive_digest_for_project(&extension_id, project_root);
+        let usages_digest = slug_bzlmod::compute_extension_input_hash(extension);
+        let visible_specs = visible_lockfile.and_then(|lockfile| {
+            lockfile.get_extension_cache_for_workspace(
+                &extension_id,
+                &bzl_transitive_digest,
+                &usages_digest,
+                Some(project_root),
+                Some(&repo_env),
+                Some(&repo_mappings),
+                Some(root_module_name),
+                Some(&repo_mapping_overrides),
+            )
+        });
+        let (source, cached_specs) = if let Some(cached_specs) = visible_specs {
+            ("visible", cached_specs)
+        } else if let Some(cached_specs) = hidden_lockfile.and_then(|lockfile| {
+            lockfile.get_extension_cache_for_workspace(
+                &extension_id,
+                &bzl_transitive_digest,
+                &usages_digest,
+                Some(project_root),
+                Some(&repo_env),
+                Some(&repo_mappings),
+                Some(root_module_name),
+                Some(&repo_mapping_overrides),
+            )
+        }) {
+            ("hidden", cached_specs)
+        } else {
+            return None;
+        };
+
+        hasher.update(extension_id.as_bytes());
+        hasher.update([0]);
+        hasher.update(bzl_transitive_digest.as_bytes());
+        hasher.update([0]);
+        hasher.update(usages_digest.as_bytes());
+        hasher.update([0]);
+        hasher.update(source.as_bytes());
+        hasher.update([0]);
+        let mut repo_names = cached_specs.keys().cloned().collect::<Vec<_>>();
+        repo_names.sort();
+        for repo_name in repo_names {
+            let spec = cached_specs.get(&repo_name)?;
+            hasher.update(repo_name.as_bytes());
+            hasher.update([0]);
+            hasher.update(spec.compute_hash().as_bytes());
+            hasher.update([0]);
+        }
+    }
+
+    Some(hex::encode(hasher.finalize()))
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -1001,6 +1118,18 @@ impl BuckConfigBasedCells {
         } else {
             None
         };
+        let extension_replay_summary_digest = root_module_file.parsed.as_ref().and_then(|parsed| {
+            root_extension_replay_summary_digest(
+                parsed,
+                project_fs.root().as_path(),
+                visible_lockfile
+                    .as_ref()
+                    .and_then(|value| value.lockfile.as_deref()),
+                hidden_lockfile
+                    .as_ref()
+                    .and_then(|value| value.lockfile.as_deref()),
+            )
+        });
         let key = LegacyBzlmodResolutionDiceKey {
             project_root,
             resolution_key,
@@ -1009,6 +1138,7 @@ impl BuckConfigBasedCells {
             visible_lockfile,
             hidden_lockfile,
             local_override_inputs,
+            extension_replay_summary_digest: extension_replay_summary_digest.map(Arc::from),
         };
         Ok(key)
     }

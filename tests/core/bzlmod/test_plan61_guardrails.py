@@ -334,6 +334,53 @@ async def test_warm_noop_audit_cell_reuses_bzlmod_resolution(buck: Buck) -> None
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_warm_noop_extension_replay_audit_cell_reuses_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: valid extension replay is a Skyframe cut-off input."""
+    module_name = "plan61_replay_warm"
+    extension_id = f"@{module_name}//:replay_ext.bzl%replay_ext"
+    repo_path = buck.cwd / "replayed_repo"
+    repo_path.mkdir()
+    _write(repo_path / "MODULE.bazel", 'module(name = "replayed_repo")\n')
+    _write(repo_path / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "replay_ext.bzl",
+        """def _impl(module_ctx):
+    fail("extension should replay from lockfile")
+
+replay_ext = module_extension(
+    implementation = _impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=module_name,
+        project_root=buck.cwd,
+        repo_path=repo_path,
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+
+    output, second = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_module_bazel_edit_invalidates_bzlmod_graph(buck: Buck) -> None:
     """Bazel anchors: ModuleFileFunction.java and BazelModuleResolutionFunction.java."""
     before = await _bzlmod_counters(buck)
