@@ -52,6 +52,9 @@ use crate::BzlmodSessionData;
 use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::LockfileContentKey;
+use crate::dice_graph::LockfileContentKind;
+use crate::dice_graph::WorkspaceId;
 use crate::dice_graph::record_bzlmod_event;
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
@@ -489,6 +492,15 @@ impl ModuleExtensionExecutionKey {
     pub fn project_root(&self) -> Option<&PathBuf> {
         self.project_root.as_ref().map(|p| p.as_ref())
     }
+
+    fn workspace_id_for_lockfile(&self) -> Option<WorkspaceId> {
+        self.project_root.as_ref().map(|project_root| {
+            WorkspaceId::new(
+                project_root.as_ref().clone(),
+                project_root.join("buck-out/v2"),
+            )
+        })
+    }
 }
 
 fn empty_facts() -> serde_json::Value {
@@ -497,6 +509,22 @@ fn empty_facts() -> serde_json::Value {
 
 fn facts_for_message(facts: &serde_json::Value) -> String {
     serde_json::to_string(facts).unwrap_or_else(|_| facts.to_string())
+}
+
+async fn compute_lockfile_content(
+    ctx: &mut DiceComputations<'_>,
+    key: &LockfileContentKey,
+    label: &str,
+) -> slug_error::Result<Arc<crate::dice_graph::LockfileContentValue>> {
+    match ctx.compute(key).await {
+        Ok(result) => result,
+        Err(e) => Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "DICE compute failed for {label} '{}': {}",
+            key.path.display(),
+            e
+        )),
+    }
 }
 
 fn validate_error_mode_facts(
@@ -549,13 +577,21 @@ impl Key for ModuleExtensionExecutionKey {
         let mut workspace_lockfile_facts = empty_facts();
         let mut workspace_lockfile_facts_present = false;
 
-        // 1. Read lockfile facts if project_root is set. This is a read-only
-        //    operation; normal extension replay must not mutate the visible
-        //    lockfile.
-        if let Some(project_root) = &self.project_root {
-            if let Some(lockfile) =
-                crate::lockfile::read_lockfile_with_mode(project_root, self.lockfile_mode)?
-            {
+        // 1. Read lockfile facts through the Plan 61 lockfile content key if
+        //    project_root is set. This is read-only; normal extension replay
+        //    must not mutate the visible lockfile.
+        if self.lockfile_mode != LockfileMode::Off
+            && let (Some(project_root), Some(workspace_id)) =
+                (&self.project_root, self.workspace_id_for_lockfile())
+        {
+            let lockfile_key = LockfileContentKey {
+                workspace_id,
+                kind: LockfileContentKind::Workspace,
+                path: Arc::new(crate::lockfile::lockfile_path(project_root)),
+            };
+            let lockfile_content =
+                compute_lockfile_content(ctx, &lockfile_key, "workspace lockfile").await?;
+            if let Some(lockfile) = lockfile_content.lockfile.as_ref() {
                 if let Some(facts) = lockfile.get_extension_facts(&self.extension_id) {
                     prior_facts = facts.clone();
                     workspace_lockfile_facts = facts;
@@ -606,46 +642,50 @@ impl Key for ModuleExtensionExecutionKey {
             }
         }
         if self.lockfile_mode != LockfileMode::Off
-            && let Some(hidden_lockfile_path) = &self.hidden_lockfile_path
+            && let (Some(hidden_lockfile_path), Some(workspace_id)) =
+                (&self.hidden_lockfile_path, self.workspace_id_for_lockfile())
         {
-            match crate::lockfile::read_hidden_lockfile_path(hidden_lockfile_path) {
-                Ok(Some(lockfile)) => {
-                    if !workspace_lockfile_facts_present {
-                        prior_facts = lockfile
-                            .get_extension_facts(&self.extension_id)
-                            .unwrap_or_else(empty_facts);
-                    }
-                    if let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
-                        &self.extension_id,
-                        &bzl_transitive_digest,
-                        &usages_digest,
-                        self.project_root.as_deref().map(|p| p.as_path()),
-                        Some(self.repo_env.as_ref()),
-                        Some(self.repo_mappings.as_ref()),
-                        Some(self.root_module_name()),
-                        Some(self.repo_mapping_overrides.as_ref()),
-                    ) {
-                        tracing::info!(
-                            "Extension '{}' hidden lockfile cache HIT: using {} cached repo specs",
-                            self.extension_id,
-                            cached_specs.len()
-                        );
-
-                        let result = ModuleExtensionResult::new_with_metadata(
-                            self.extension_id.clone(),
-                            self.input_hash.to_string(),
-                            cached_specs,
-                            &self.root_module_name,
-                            ModuleExtensionMetadata {
-                                facts: prior_facts.clone(),
-                            },
-                        );
-
-                        return Ok(Arc::new(result));
-                    }
+            let hidden_lockfile_key = LockfileContentKey {
+                workspace_id,
+                kind: LockfileContentKind::Hidden,
+                path: hidden_lockfile_path.clone(),
+            };
+            let lockfile_content =
+                compute_lockfile_content(ctx, &hidden_lockfile_key, "hidden lockfile").await?;
+            if let Some(lockfile) = lockfile_content.lockfile.as_ref() {
+                if !workspace_lockfile_facts_present {
+                    prior_facts = lockfile
+                        .get_extension_facts(&self.extension_id)
+                        .unwrap_or_else(empty_facts);
                 }
-                Ok(None) => {}
-                Err(e) => return Err(e),
+                if let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
+                    &self.extension_id,
+                    &bzl_transitive_digest,
+                    &usages_digest,
+                    self.project_root.as_deref().map(|p| p.as_path()),
+                    Some(self.repo_env.as_ref()),
+                    Some(self.repo_mappings.as_ref()),
+                    Some(self.root_module_name()),
+                    Some(self.repo_mapping_overrides.as_ref()),
+                ) {
+                    tracing::info!(
+                        "Extension '{}' hidden lockfile cache HIT: using {} cached repo specs",
+                        self.extension_id,
+                        cached_specs.len()
+                    );
+
+                    let result = ModuleExtensionResult::new_with_metadata(
+                        self.extension_id.clone(),
+                        self.input_hash.to_string(),
+                        cached_specs,
+                        &self.root_module_name,
+                        ModuleExtensionMetadata {
+                            facts: prior_facts.clone(),
+                        },
+                    );
+
+                    return Ok(Arc::new(result));
+                }
             }
         }
 

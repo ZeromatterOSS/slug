@@ -402,6 +402,35 @@ optional:
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug pytest -q tests/core/bzlmod/test_module_parsing.py::test_module_bazel_syntax_error -rx --tb=short`
   and `cargo check -p slug_common` pass.
 
+Implementation update 2026-05-21, extension replay lockfile reads route through
+`LockfileContentKey`:
+
+- Bazel ground truth: lockfile-backed extension replay is a Skyframe input to
+  `SingleExtensionEvalFunction`; Bazel reads workspace and hidden lockfiles,
+  compares recorded bzl/usages/recorded-input facts, and in error mode rejects
+  changes rather than silently updating. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:147`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:315`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java:71`.
+- Slug now computes workspace and hidden extension replay lockfile reads
+  through the Plan 61 `LockfileContentKey` instead of calling
+  `read_lockfile_with_mode` / `read_hidden_lockfile_path` directly inside
+  `ModuleExtensionExecutionKey::compute()`. Hidden lockfile read/parse failures
+  still fail open, while visible lockfile parse failures remain hard errors.
+- Guardrail: `LockfileContentKey` is intentionally non-cacheable until its file
+  reads are backed by tracked DICE filesystem inputs. This avoids introducing a
+  stale lockfile cache while still moving the consumer onto a DICE-owned read
+  boundary.
+- Validation:
+  `cargo test -p slug_bzlmod dice_graph::tests::lockfile_content_key_is_non_cacheable_until_file_deps_are_tracked -- --nocapture`,
+  `cargo test -p slug_bzlmod extension_execution_dice -- --nocapture`,
+  `cargo test -p slug_bzlmod lockfile -- --nocapture`, and
+  `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`,
+  `cargo fmt --check`, `git diff --check`, `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k 'lockfile or replay or recorded' -rx --tb=short`
+  (`17 passed, 10 deselected`) pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module

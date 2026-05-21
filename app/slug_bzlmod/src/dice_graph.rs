@@ -22,9 +22,16 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
+use async_trait::async_trait;
+use derive_more::Display;
+use dice::CancellationContext;
+use dice::DiceComputations;
+use dice::Key;
 use sha2::Digest;
 use sha2::Sha256;
 
+use crate::lockfile::Lockfile;
+use crate::lockfile::compute_file_hash;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
 
@@ -116,11 +123,84 @@ pub enum LockfileContentKind {
     Hidden,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("LockfileContentKey({:?}, {})", kind, path.display())]
 pub struct LockfileContentKey {
     pub workspace_id: WorkspaceId,
     pub kind: LockfileContentKind,
     pub path: Arc<PathBuf>,
+}
+
+/// DICE-owned lockfile read result.
+///
+/// This key is deliberately non-cacheable until Slug wires lockfile reads
+/// through filesystem-tracked DICE inputs. That keeps command behavior from
+/// reusing stale lockfile bytes while moving consumers away from ad hoc direct
+/// reads inside higher-level bzlmod keys.
+#[derive(Clone, Debug, Allocative)]
+pub struct LockfileContentValue {
+    pub path: Arc<PathBuf>,
+    pub digest: Option<String>,
+    #[allocative(skip)]
+    pub lockfile: Option<Arc<Lockfile>>,
+}
+
+#[async_trait]
+impl Key for LockfileContentKey {
+    type Value = slug_error::Result<Arc<LockfileContentValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let path = self.path.clone();
+        if !path.exists() {
+            return Ok(Arc::new(LockfileContentValue {
+                path,
+                digest: None,
+                lockfile: None,
+            }));
+        }
+
+        let read_result = Lockfile::read(&path).and_then(|lockfile| {
+            let digest = compute_file_hash(&path)?;
+            Ok((lockfile, digest))
+        });
+
+        match read_result {
+            Ok((lockfile, digest)) => Ok(Arc::new(LockfileContentValue {
+                path,
+                digest: Some(digest),
+                lockfile: Some(Arc::new(lockfile)),
+            })),
+            Err(e) if self.kind == LockfileContentKind::Hidden => {
+                tracing::warn!(
+                    "Ignoring unreadable hidden lockfile '{}': {}",
+                    path.display(),
+                    e
+                );
+                Ok(Arc::new(LockfileContentValue {
+                    path,
+                    digest: None,
+                    lockfile: None,
+                }))
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.digest == y.digest && x.path == y.path,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // Recompute every request until this key depends on tracked file inputs.
+        false
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -462,5 +542,16 @@ mod tests {
             let after = read_counter(&bzlmod_event_counters());
             assert!(after >= before + 1, "{name}: before={before} after={after}");
         }
+    }
+
+    #[test]
+    fn lockfile_content_key_is_non_cacheable_until_file_deps_are_tracked() {
+        let value = Ok(Arc::new(LockfileContentValue {
+            path: Arc::new(PathBuf::from("/tmp/MODULE.bazel.lock")),
+            digest: None,
+            lockfile: None,
+        }));
+
+        assert!(!<LockfileContentKey as Key>::validity(&value));
     }
 }

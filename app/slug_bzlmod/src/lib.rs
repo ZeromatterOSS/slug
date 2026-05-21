@@ -75,6 +75,7 @@ pub use dice_graph::InnateExtensionKey;
 pub use dice_graph::LocalOverrideSourceKey;
 pub use dice_graph::LockfileContentKey;
 pub use dice_graph::LockfileContentKind;
+pub use dice_graph::LockfileContentValue;
 pub use dice_graph::LockfileExtensionEntryKey;
 pub use dice_graph::ModuleExtensionAggregationKey;
 pub use dice_graph::ModuleExtensionExecutionIdentity;
