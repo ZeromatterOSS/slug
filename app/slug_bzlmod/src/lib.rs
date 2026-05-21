@@ -220,6 +220,7 @@ pub struct BzlmodSessionData {
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
     pub root_module_name: String,
     pub project_root: PathBuf,
+    pub hidden_lockfile_path: Option<PathBuf>,
     pub lockfile_mode: LockfileMode,
     pub repo_env: BTreeMap<String, String>,
     pub repo_mappings: RepoMappingSnapshot,

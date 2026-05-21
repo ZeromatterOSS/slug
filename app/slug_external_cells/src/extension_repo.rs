@@ -484,19 +484,23 @@ async fn ensure_extension_spokes_registered(
     ctx: &mut DiceComputations<'_>,
     extension_id: &str,
     project_root_path: &std::path::Path,
-) {
+    requesting_canonical_name: &str,
+) -> slug_error::Result<()> {
     if slug_bzlmod::extension_spokes_seeded(extension_id) {
-        return;
+        return Ok(());
     }
     let session_data = match ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await {
         Ok(data) => data,
         Err(e) => {
-            tracing::debug!(
-                "Skipping spoke seeding for '{}': bzlmod session data unavailable: {}",
-                extension_id,
-                e
-            );
-            return;
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: requesting_canonical_name.to_owned(),
+                reason: format!(
+                    "bzlmod session data unavailable while registering extension spokes for '{}': {}",
+                    extension_id,
+                    diagnostic_summary(&e)
+                ),
+            }
+            .into());
         }
     };
     let Some(ext_key) = slug_bzlmod::create_extension_execution_key(&session_data, extension_id)
@@ -505,26 +509,32 @@ async fn ensure_extension_spokes_registered(
         // single repo with no siblings, so there is nothing to seed. Mark
         // seeded so we don't retry on every cell access.
         slug_bzlmod::mark_extension_spokes_seeded(extension_id);
-        return;
+        return Ok(());
     };
 
     let ext_result = match ctx.compute(&ext_key).await {
         Ok(Ok(r)) => r,
         Ok(Err(e)) => {
-            tracing::debug!(
-                "Skipping spoke seeding for '{}': extension eval failed: {}",
-                extension_id,
-                e
-            );
-            return;
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: requesting_canonical_name.to_owned(),
+                reason: format!(
+                    "Extension '{}' execution failed while registering spokes: {}",
+                    extension_id,
+                    diagnostic_summary(&e)
+                ),
+            }
+            .into());
         }
         Err(e) => {
-            tracing::debug!(
-                "Skipping spoke seeding for '{}': DICE error: {}",
-                extension_id,
-                e
-            );
-            return;
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: requesting_canonical_name.to_owned(),
+                reason: format!(
+                    "Extension '{}' DICE error while registering spokes: {}",
+                    extension_id,
+                    diagnostic_summary(&e)
+                ),
+            }
+            .into());
         }
     };
 
@@ -575,6 +585,7 @@ async fn ensure_extension_spokes_registered(
     }
 
     slug_bzlmod::mark_extension_spokes_seeded(extension_id);
+    Ok(())
 }
 
 /// Get the file ops delegate for an extension-generated repository cell.
@@ -611,7 +622,13 @@ pub(crate) async fn get_file_ops_delegate(
     // it. Necessary on warm builds where `.slug_repo_complete` markers would
     // otherwise skip the materialization block below, leaving spoke lookups
     // unresolvable.
-    ensure_extension_spokes_registered(ctx, &setup.extension_id, &project_root_path).await;
+    ensure_extension_spokes_registered(
+        ctx,
+        &setup.extension_id,
+        &project_root_path,
+        setup.canonical_name.as_ref(),
+    )
+    .await?;
 
     // Check if the repository is fully materialized (marked complete).
     // We check for .slug_repo_complete rather than just directory existence because

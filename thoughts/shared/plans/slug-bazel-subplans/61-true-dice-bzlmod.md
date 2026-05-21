@@ -2281,6 +2281,38 @@ Implementation slice 2026-05-19, Bazel-shaped extension lockfile digests:
   -p slug_bzlmod extension_execution_dice -- --nocapture` (21 passed), `cargo
   check -p slug_bzlmod -p slug_interpreter_for_build -p slug_external_cells`,
   and `cargo build -p slug`.
+- Implementation slice 2026-05-20, lockfile ERROR-mode facts validation:
+  Bazel ground truth is `SingleExtensionEvalFunction`: it reads visible
+  workspace and hidden lockfiles when lockfile mode is not `OFF`, passes visible
+  facts to extension execution when present and otherwise falls back to hidden
+  facts, deliberately excludes facts from normal replay invalidation, and in
+  `LockfileMode.ERROR` compares newly returned facts only against visible
+  workspace lockfile facts before reporting the lockfile as outdated. Slug now
+  carries the configured hidden lockfile path through `BzlmodSessionData` into
+  `ModuleExtensionExecutionKey`, uses hidden facts/cache only as fallback input,
+  validates returned `module_ctx.extension_metadata(facts = ...)` against the
+  visible lockfile in ERROR mode, and emits the Bazel-shaped
+  `bazel mod deps --lockfile_mode=update` remediation. While validating this,
+  a systemic failure path was fixed: extension execution errors discovered
+  during extension-spoke registration are now propagated instead of logged and
+  ignored, so eager repository materialization side effects cannot mask a
+  failed extension evaluation. This remains read-only: ordinary Slug builds do
+  not write returned facts to `MODULE.bazel.lock`, and hidden-lockfile parse
+  policy still needs a separate Bazel-grounded pass if it becomes observable.
+  Validation passed: `python3 -m py_compile
+  tests/core/bzlmod/test_plan61_guardrails.py`, `cargo fmt --check`, `cargo
+  test -p slug_bzlmod error_mode_facts -- --nocapture` (3 passed), `cargo test
+  -p slug_bzlmod extension_execution_dice -- --nocapture` (24 passed), `cargo
+  check -p slug_bzlmod -p slug_common -p slug_external_cells -p
+  slug_interpreter_for_build`, `cargo check -p slug_external_cells -p
+  slug_bzlmod`, `cargo build -p slug`, focused direct pytest
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k
+  'changed_extension_facts' --tb=short` (1 passed), full direct pytest
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py --tb=short` (26
+  passed), and `./target/debug/slug test
+  tests/core/bzlmod:test_plan61_guardrails` (26 passed inside pytest). The
+  Slug daemon was killed afterward; `/var/mnt/dev/slug/buck-out` was about
+  3.5M and ZeroMatter `buck-out` remained about 3.3M.
 - Historical note, superseded on 2026-05-20: real-world SDK output parity was
   still pending until the zeromatter checkout had a Bazel-valid lockfile again.
   Later validation restored the lockfile, reran Bazel and Slug on

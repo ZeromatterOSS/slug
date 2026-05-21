@@ -106,6 +106,7 @@ pub fn create_extension_execution_key(
         aggregated.clone(),
         data.root_module_name.clone(),
         data.project_root.clone(),
+        data.hidden_lockfile_path.clone(),
         data.lockfile_mode,
         data.repo_env.clone(),
         data.repo_mappings.clone(),
@@ -137,6 +138,12 @@ pub enum ModuleExtensionError {
 
     #[error("Failed to load extension .bzl file: {path}")]
     BzlLoadFailed { path: String },
+
+    #[error(
+        "MODULE.bazel.lock is no longer up-to-date because {reason}. \
+        Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+    )]
+    OutdatedLockfile { reason: String },
 }
 
 /// Result of module extension evaluation.
@@ -285,6 +292,12 @@ pub struct ModuleExtensionExecutionKey {
     /// surface, not a Slug-private extension cache.
     pub project_root: Option<Arc<PathBuf>>,
 
+    /// Hidden lockfile path used as a fallback for replay data and prior facts.
+    ///
+    /// Bazel reads the workspace lockfile first, then the hidden lockfile.
+    /// In ERROR mode, facts are still validated only against workspace facts.
+    pub hidden_lockfile_path: Option<Arc<PathBuf>>,
+
     /// Lockfile policy for extension replay reads.
     ///
     /// This is part of the key identity because Bazel lockfile mode changes
@@ -308,6 +321,7 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
         self.input_hash.hash(state);
         self.root_module_name.hash(state);
         self.project_root.hash(state);
+        self.hidden_lockfile_path.hash(state);
         self.lockfile_mode.hash(state);
         self.repo_env.hash(state);
         self.repo_mappings.hash(state);
@@ -322,6 +336,7 @@ impl PartialEq for ModuleExtensionExecutionKey {
             && self.input_hash == other.input_hash
             && self.root_module_name == other.root_module_name
             && self.project_root == other.project_root
+            && self.hidden_lockfile_path == other.hidden_lockfile_path
             && self.lockfile_mode == other.lockfile_mode
             && self.repo_env == other.repo_env
             && self.repo_mappings == other.repo_mappings
@@ -340,6 +355,7 @@ impl Dupe for ModuleExtensionExecutionKey {
             aggregated: self.aggregated.dupe(),
             root_module_name: self.root_module_name.dupe(),
             project_root: self.project_root.clone(),
+            hidden_lockfile_path: self.hidden_lockfile_path.clone(),
             lockfile_mode: self.lockfile_mode,
             repo_env: self.repo_env.clone(),
             repo_mappings: self.repo_mappings.clone(),
@@ -359,6 +375,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: None,
+            hidden_lockfile_path: None,
             lockfile_mode: LockfileMode::Update,
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
@@ -371,6 +388,7 @@ impl ModuleExtensionExecutionKey {
         aggregated: AggregatedExtension,
         root_module_name: String,
         project_root: PathBuf,
+        hidden_lockfile_path: Option<PathBuf>,
         lockfile_mode: LockfileMode,
         repo_env: BTreeMap<String, String>,
         repo_mappings: RepoMappingSnapshot,
@@ -384,6 +402,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: Some(Arc::new(project_root)),
+            hidden_lockfile_path: hidden_lockfile_path.map(Arc::new),
             lockfile_mode,
             repo_env: Arc::new(repo_env),
             repo_mappings: Arc::new(repo_mappings),
@@ -404,6 +423,7 @@ impl ModuleExtensionExecutionKey {
             aggregated,
             root_module_name,
             project_root: None,
+            hidden_lockfile_path: None,
             lockfile_mode: LockfileMode::Update,
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
@@ -418,6 +438,7 @@ impl ModuleExtensionExecutionKey {
         aggregated: Arc<AggregatedExtension>,
         root_module_name: Arc<str>,
         project_root: Arc<PathBuf>,
+        hidden_lockfile_path: Option<Arc<PathBuf>>,
         lockfile_mode: LockfileMode,
         repo_env: Arc<BTreeMap<String, String>>,
         repo_mappings: Arc<RepoMappingSnapshot>,
@@ -429,6 +450,7 @@ impl ModuleExtensionExecutionKey {
             aggregated,
             root_module_name,
             project_root: Some(project_root),
+            hidden_lockfile_path,
             lockfile_mode,
             repo_env,
             repo_mappings,
@@ -445,6 +467,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(AggregatedExtension::default()),
             root_module_name: Arc::from("_main"),
             project_root: None,
+            hidden_lockfile_path: None,
             lockfile_mode: LockfileMode::Update,
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
@@ -466,6 +489,34 @@ impl ModuleExtensionExecutionKey {
     pub fn project_root(&self) -> Option<&PathBuf> {
         self.project_root.as_ref().map(|p| p.as_ref())
     }
+}
+
+fn empty_facts() -> serde_json::Value {
+    serde_json::Value::Object(serde_json::Map::new())
+}
+
+fn facts_for_message(facts: &serde_json::Value) -> String {
+    serde_json::to_string(facts).unwrap_or_else(|_| facts.to_string())
+}
+
+fn validate_error_mode_facts(
+    extension_id: &str,
+    lockfile_mode: LockfileMode,
+    new_facts: &serde_json::Value,
+    workspace_lockfile_facts: &serde_json::Value,
+) -> Result<(), ModuleExtensionError> {
+    if lockfile_mode == LockfileMode::Error && new_facts != workspace_lockfile_facts {
+        return Err(ModuleExtensionError::OutdatedLockfile {
+            reason: format!(
+                "the extension '{}' has changed its facts: {} != {}",
+                extension_id,
+                facts_for_message(new_facts),
+                facts_for_message(workspace_lockfile_facts),
+            ),
+        });
+    }
+
+    Ok(())
 }
 
 #[async_trait]
@@ -494,7 +545,9 @@ impl Key for ModuleExtensionExecutionKey {
             })
             .unwrap_or_else(|| compute_bzl_transitive_digest(&self.extension_id));
         let usages_digest = self.input_hash.to_string();
-        let mut prior_facts = serde_json::Value::Object(serde_json::Map::new());
+        let mut prior_facts = empty_facts();
+        let mut workspace_lockfile_facts = empty_facts();
+        let mut workspace_lockfile_facts_present = false;
 
         // 1. Read lockfile facts if project_root is set. This is a read-only
         //    operation; normal extension replay must not mutate the visible
@@ -503,9 +556,11 @@ impl Key for ModuleExtensionExecutionKey {
             if let Some(lockfile) =
                 crate::lockfile::read_lockfile_with_mode(project_root, self.lockfile_mode)?
             {
-                prior_facts = lockfile
-                    .get_extension_facts(&self.extension_id)
-                    .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
+                if let Some(facts) = lockfile.get_extension_facts(&self.extension_id) {
+                    prior_facts = facts.clone();
+                    workspace_lockfile_facts = facts;
+                    workspace_lockfile_facts_present = true;
+                }
                 if let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
                     &self.extension_id,
                     &bzl_transitive_digest,
@@ -548,6 +603,58 @@ impl Key for ModuleExtensionExecutionKey {
                     BzlmodEventKind::ExtensionReplayMissReason,
                     format!("{}:lockfile_absent_or_unreadable", self.extension_id),
                 );
+            }
+        }
+        if self.lockfile_mode != LockfileMode::Off
+            && let Some(hidden_lockfile_path) = &self.hidden_lockfile_path
+        {
+            match crate::lockfile::read_lockfile_path_with_mode(
+                hidden_lockfile_path,
+                LockfileMode::Update,
+            ) {
+                Ok(Some(lockfile)) => {
+                    if !workspace_lockfile_facts_present {
+                        prior_facts = lockfile
+                            .get_extension_facts(&self.extension_id)
+                            .unwrap_or_else(empty_facts);
+                    }
+                    if let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
+                        &self.extension_id,
+                        &bzl_transitive_digest,
+                        &usages_digest,
+                        self.project_root.as_deref().map(|p| p.as_path()),
+                        Some(self.repo_env.as_ref()),
+                        Some(self.repo_mappings.as_ref()),
+                        Some(self.root_module_name()),
+                        Some(self.repo_mapping_overrides.as_ref()),
+                    ) {
+                        tracing::info!(
+                            "Extension '{}' hidden lockfile cache HIT: using {} cached repo specs",
+                            self.extension_id,
+                            cached_specs.len()
+                        );
+
+                        let result = ModuleExtensionResult::new_with_metadata(
+                            self.extension_id.clone(),
+                            self.input_hash.to_string(),
+                            cached_specs,
+                            &self.root_module_name,
+                            ModuleExtensionMetadata {
+                                facts: prior_facts.clone(),
+                            },
+                        );
+
+                        return Ok(Arc::new(result));
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        "Ignoring unreadable hidden lockfile '{}': {}",
+                        hidden_lockfile_path.display(),
+                        e
+                    );
+                }
             }
         }
 
@@ -610,6 +717,12 @@ impl Key for ModuleExtensionExecutionKey {
 
         // Check for execution errors
         let output = execution_result?;
+        validate_error_mode_facts(
+            &self.extension_id,
+            self.lockfile_mode,
+            &output.metadata.facts,
+            &workspace_lockfile_facts,
+        )?;
 
         // 7. Build result with canonical names
         let result = ModuleExtensionResult::new_with_metadata(
@@ -1240,6 +1353,48 @@ mod tests {
     }
 
     #[test]
+    fn test_error_mode_facts_accepts_matching_workspace_facts() {
+        validate_error_mode_facts(
+            "@@mod+//:ext.bzl%ext",
+            LockfileMode::Error,
+            &serde_json::json!({"resource": {"checksum": "abc"}}),
+            &serde_json::json!({"resource": {"checksum": "abc"}}),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_error_mode_facts_rejects_changed_workspace_facts() {
+        let err = validate_error_mode_facts(
+            "@@mod+//:ext.bzl%ext",
+            LockfileMode::Error,
+            &serde_json::json!({"resource": {"checksum": "new"}}),
+            &serde_json::json!({"resource": {"checksum": "old"}}),
+        )
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("MODULE.bazel.lock is no longer up-to-date"));
+        assert!(message.contains("the extension '@@mod+//:ext.bzl%ext' has changed its facts"));
+        assert!(message.contains(r#""checksum":"new""#));
+        assert!(message.contains(r#""checksum":"old""#));
+        assert!(message.contains("bazel mod deps --lockfile_mode=update"));
+    }
+
+    #[test]
+    fn test_error_mode_facts_rejects_new_facts_when_workspace_facts_absent() {
+        let err = validate_error_mode_facts(
+            "@@mod+//:ext.bzl%ext",
+            LockfileMode::Error,
+            &serde_json::json!({"resource": "new"}),
+            &empty_facts(),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains(r#"{"resource":"new"} != {}"#));
+    }
+
+    #[test]
     fn test_repo_names_iterator() {
         let mut specs = FxHashMap::default();
         specs.insert("a".to_owned(), RepoSpec::new("rule".to_owned()));
@@ -1306,6 +1461,7 @@ mod tests {
             aggregated,
             "_main".to_owned(),
             PathBuf::from("/tmp/project"),
+            None,
             LockfileMode::Update,
             BTreeMap::new(),
             crate::RepoMappingSnapshot::new(),
@@ -1332,6 +1488,7 @@ mod tests {
             aggregated1,
             "_main".to_owned(),
             PathBuf::from("/project1"),
+            None,
             LockfileMode::Update,
             BTreeMap::new(),
             crate::RepoMappingSnapshot::new(),
@@ -1341,6 +1498,7 @@ mod tests {
             aggregated2,
             "_main".to_owned(),
             PathBuf::from("/project2"),
+            None,
             LockfileMode::Update,
             BTreeMap::new(),
             crate::RepoMappingSnapshot::new(),
@@ -1372,6 +1530,7 @@ mod tests {
             aggregated,
             root_module_name,
             project_root,
+            None,
             LockfileMode::Update,
             Arc::new(BTreeMap::new()),
             Arc::new(crate::RepoMappingSnapshot::new()),
@@ -1397,6 +1556,7 @@ mod tests {
             aggregated1,
             "_main".to_owned(),
             PathBuf::from("/project"),
+            None,
             LockfileMode::Update,
             BTreeMap::new(),
             crate::RepoMappingSnapshot::new(),
@@ -1406,6 +1566,7 @@ mod tests {
             aggregated2,
             "_main".to_owned(),
             PathBuf::from("/project"),
+            None,
             LockfileMode::Off,
             BTreeMap::new(),
             crate::RepoMappingSnapshot::new(),

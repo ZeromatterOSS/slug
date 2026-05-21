@@ -266,6 +266,7 @@ def _write_replay_lockfile(
     repo_path: Path,
     recorded_inputs: list[str] | None = None,
     repo_paths: dict[str, Path] | None = None,
+    facts: dict[str, object] | None = None,
 ) -> None:
     generated_repo_specs = {
         repo_name: {
@@ -302,7 +303,11 @@ def _write_replay_lockfile(
                         },
                     },
                 },
-                "facts": {},
+                "facts": (
+                    {extension_id: facts}
+                    if facts is not None
+                    else {}
+                ),
             },
             indent=2,
             sort_keys=True,
@@ -571,6 +576,90 @@ async def test_lockfile_mode_error_rejects_invalid_visible_lockfile(
 
     with pytest.raises(BuckException):
         await buck.audit("cell", "--lockfile_mode=error")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_lockfile_mode_error_rejects_changed_extension_facts(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction ERROR-mode facts validation."""
+    extension_id = "@@plan61_facts_error+//:facts_ext.bzl%facts_ext"
+    lockfile = buck.cwd / "MODULE.bazel.lock"
+    _write(
+        buck.cwd / "facts_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "facts repo payload\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+facts_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _facts_ext_impl(module_ctx):
+    facts_repo_rule(name = "facts_repo")
+    return module_ctx.extension_metadata(
+        facts = {"resource": {"checksum": "new"}},
+    )
+
+facts_ext = module_extension(
+    implementation = _facts_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_facts_error")
+
+facts = use_extension("//:facts_ext.bzl", "facts_ext")
+use_repo(facts, "facts_repo")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_facts_repo",
+    srcs = ["@facts_repo//:data"],
+)
+""",
+    )
+    _write(
+        lockfile,
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {},
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {
+                    extension_id: {"resource": {"checksum": "old"}},
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+    before_sha = _sha256(lockfile)
+    before = await _bzlmod_counters(buck, "--lockfile_mode=error")
+
+    failure_stderr: str | None = None
+    try:
+        await buck.build("//:uses_facts_repo", "--lockfile_mode=error")
+    except BuckException as e:
+        failure_stderr = e.stderr
+    after = await _bzlmod_counters(buck, "--lockfile_mode=error")
+
+    if failure_stderr is None:
+        pytest.fail("facts mismatch build unexpectedly succeeded")
+
+    assert "MODULE.bazel.lock is no longer up-to-date" in failure_stderr
+    assert "has changed its facts" in failure_stderr
+    assert '"checksum":"new"' in failure_stderr
+    assert '"checksum":"old"' in failure_stderr
+    assert "bazel mod deps --lockfile_mode=update" in failure_stderr
+    assert after["extension_eval"] > before["extension_eval"]
+    assert after["lockfile_write_attempt"] == before["lockfile_write_attempt"]
+    assert _sha256(lockfile) == before_sha
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

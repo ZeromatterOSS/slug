@@ -1104,9 +1104,9 @@ impl BuckConfigBasedCells {
             .get_section("bzlmod")
             .and_then(|section| section.get("hidden_lockfile_path"))
             .map(|value| std::path::PathBuf::from(value.as_str()));
-        if let Some(hidden_lockfile_path) = hidden_lockfile_path {
+        if let Some(hidden_lockfile_path) = hidden_lockfile_path.as_ref() {
             if let Some(lockfile) =
-                slug_bzlmod::read_lockfile_path_with_mode(&hidden_lockfile_path, lockfile_mode)?
+                slug_bzlmod::read_lockfile_path_with_mode(hidden_lockfile_path, lockfile_mode)?
             {
                 let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                     &lockfile,
@@ -1143,6 +1143,7 @@ impl BuckConfigBasedCells {
         bzlmod_session_data.extension_aggregations = aggregated;
         bzlmod_session_data.root_module_name = root_module_name.to_owned();
         bzlmod_session_data.project_root = project_root.root().to_path_buf();
+        bzlmod_session_data.hidden_lockfile_path = hidden_lockfile_path;
         bzlmod_session_data.lockfile_mode = lockfile_mode;
 
         // Collect toolchain and execution platform registrations from all modules.
