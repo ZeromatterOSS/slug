@@ -2080,7 +2080,6 @@ impl BuckConfigBasedCells {
             Self::collect_transitive_repo_aliases(
                 &resolved_graph,
                 &parsed.module.name,
-                &mut aliases,
                 &mut scoped_repo_aliases,
             )
             .await;
@@ -2134,6 +2133,7 @@ impl BuckConfigBasedCells {
                             apparent_name: apparent_name.to_owned(),
                             target_name: target_name.to_owned(),
                         });
+                        continue;
                     }
                     if aliases
                         .iter()
@@ -2613,7 +2613,6 @@ impl BuckConfigBasedCells {
     async fn collect_transitive_repo_aliases(
         resolved_graph: &ResolvedGraph,
         root_module_name: &str,
-        aliases: &mut Vec<(NonEmptyCellAlias, CellName)>,
         scoped_repo_aliases: &mut Vec<BzlmodScopedRepoAlias>,
     ) {
         for (module_name, module_info) in &resolved_graph.modules {
@@ -2656,45 +2655,11 @@ impl BuckConfigBasedCells {
                                     continue;
                                 }
                                 // Bazel scopes repo_name to the declaring module.
-                                // Keep the legacy global alias below as a
-                                // fallback for older Slug paths, but register
-                                // the scoped mapping first so label resolution
-                                // from this module does not collide with another
-                                // module's same apparent name.
                                 scoped_repo_aliases.push(BzlmodScopedRepoAlias {
                                     owner_module: module_name.clone(),
                                     apparent_name: repo_name.clone(),
                                     target_name: dep.name.clone(),
                                 });
-
-                                // Create legacy global alias: repo_name -> dep.name.
-                                match (
-                                    NonEmptyCellAlias::new(repo_name.clone()),
-                                    CellName::unchecked_new(&dep.name),
-                                ) {
-                                    (Ok(alias_name), Ok(cell_name)) => {
-                                        // Check if this alias already exists
-                                        let already_exists =
-                                            aliases.iter().any(|(a, _)| a == &alias_name);
-                                        if !already_exists {
-                                            tracing::info!(
-                                                "Creating transitive repo_name alias: {} -> {} (from {})",
-                                                repo_name,
-                                                dep.name,
-                                                module_name
-                                            );
-                                            aliases.push((alias_name, cell_name));
-                                        }
-                                    }
-                                    _ => {
-                                        tracing::debug!(
-                                            "Failed to create alias {} -> {} from {}",
-                                            repo_name,
-                                            dep.name,
-                                            module_name
-                                        );
-                                    }
-                                }
                             }
                         }
                     }

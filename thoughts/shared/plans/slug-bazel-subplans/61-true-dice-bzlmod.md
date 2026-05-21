@@ -3957,17 +3957,20 @@ Implementation update 2026-05-21, transitive `repo_name` aliases are scoped:
   parse local-path override modules into the same parsed-module list used for
   repo mappings and extension aggregation.
 - Slug now registers scoped repo aliases for transitive `repo_name` entries
-  from parsed module files, including local-path override modules. The legacy
-  global alias remains as a temporary fallback for older lookup paths, but
-  normal cell resolution checks the owner-scoped mapping first.
+  from parsed module files, including local-path override modules, and no
+  longer registers those non-root transitive apparent names as global aliases.
+  Root-module apparent names still use the legacy global alias bridge until the
+  root cell resolver is fully `RepoMappingKey`-owned.
 - Guardrail added:
-  `test_transitive_repo_name_aliases_are_scoped_to_declaring_module`.
+  `test_transitive_repo_name_aliases_are_scoped_to_declaring_module`; it also
+  asserts the root module cannot resolve the transitive-only apparent name.
 - Validation passed:
   Bazel 9.1.0 local probe
   `/tmp/slug-plan61-scoped-repo-names.eJM5D6`; `python3 -m py_compile
   tests/core/bzlmod/test_plan61_guardrails.py`; `cargo fmt --check`; `cargo
   check -p slug_common -p slug_bzlmod`; `cargo build -p slug`; `git diff
-  --check`; focused direct pytest for the new guardrail; full direct
+  --check`; focused direct pytest for the new guardrail after removing the
+  transitive global alias fallback; full direct
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (39 tests); and
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (39

@@ -1827,6 +1827,18 @@ local_path_override(module_name = "d", path = "d")
 
     await buck.build("//:uses_transitive_scoped_aliases")
 
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "root_cannot_see_transitive_alias",
+    srcs = ["@shared//:c_only"],
+)
+""",
+    )
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:root_cannot_see_transitive_alias")
+    assert "unknown cell name: `shared`" in str(exc.value)
+
 
 @buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source(
