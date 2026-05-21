@@ -1661,10 +1661,26 @@ impl CellResolver {
         // Use the root cell's path to determine the project root directory.
         {
             let cell_str = cell.as_str();
-            let suffix = format!("+{}", cell_str);
             let bazel_ext_dir = dynamic_project_root()
                 .map(|root| root.join("bazel-external"))
                 .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
+            let exact_path = bazel_ext_dir.join(cell_str);
+            if exact_path.is_dir() {
+                let path = format!("bazel-external/{cell_str}");
+                if let Ok(rel_path) = ProjectRelativePath::new(&path) {
+                    let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+                    let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+                    if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                        register_dynamic_extension_cell(cell_str.to_owned(), path);
+                        if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
+                            dynamic.insert(cell, Box::leak(Box::new(instance)));
+                        }
+                        return self.get_or_create_dynamic_cell(cell);
+                    }
+                }
+            }
+
+            let suffix = format!("+{}", cell_str);
             if let Ok(entries) = std::fs::read_dir(&bazel_ext_dir) {
                 for entry in entries.flatten() {
                     let dir_name = entry.file_name();
@@ -1745,6 +1761,25 @@ impl CellResolver {
 
     pub fn get_cell_path<P: AsRef<ProjectRelativePath> + ?Sized>(&self, path: &P) -> CellPath {
         let path = path.as_ref();
+        if let Ok(dynamic_cells) = self.0.dynamic_cells.read() {
+            let mut best_dynamic: Option<(usize, CellPath)> = None;
+            for (cell, instance) in dynamic_cells.iter() {
+                let cell_root = instance.path().as_project_relative_path();
+                let Some(relative) = path.strip_prefix_opt(cell_root) else {
+                    continue;
+                };
+                let depth = cell_root.iter().count();
+                if best_dynamic
+                    .as_ref()
+                    .is_none_or(|(best_depth, _)| depth > *best_depth)
+                {
+                    best_dynamic = Some((depth, CellPath::new(*cell, relative.to_owned().into())));
+                }
+            }
+            if let Some((_, cell_path)) = best_dynamic {
+                return cell_path;
+            }
+        }
         let cell = self.find(path);
         // Both of these unwraps are ok by construction of the `CellResolver`
         let instance = self.get(cell).unwrap();
@@ -1982,6 +2017,49 @@ mod tests {
                 ForwardRelativePathBuf::unchecked_new("fake/cell3".to_owned()).into()
             )
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_cell_path_prefers_dynamic_extension_cell_over_root() -> slug_error::Result<()> {
+        let canonical = "dynamic_owner++ext+generated_repo";
+        let dynamic_path = format!("bazel-external/{canonical}");
+        register_dynamic_extension_cell(canonical.to_owned(), dynamic_path.clone());
+
+        let cells = CellResolver::testing_with_names_and_paths(&[(
+            CellName::testing_new("root"),
+            CellRootPathBuf::testing_new(""),
+        )]);
+        let dynamic_cell = CellName::testing_new(canonical);
+        cells.get(dynamic_cell)?;
+
+        assert_eq!(
+            cells.get_cell_path(ProjectRelativePath::new(&format!(
+                "{dynamic_path}/defs.bzl"
+            ))?),
+            CellPath::new(
+                dynamic_cell,
+                ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
+            )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn cell_resolver_discovers_exact_dynamic_extension_repo_dir() -> slug_error::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        std::fs::create_dir_all(tmp.path().join("bazel-external/exact_owner++ext+generated"))?;
+        set_dynamic_project_root(tmp.path().to_path_buf());
+
+        let cells = CellResolver::testing_with_names_and_paths(&[(
+            CellName::testing_new("root"),
+            CellRootPathBuf::testing_new(""),
+        )]);
+        let dynamic_cell = CellName::testing_new("exact_owner++ext+generated");
+
+        assert_eq!(cells.get(dynamic_cell)?.name(), dynamic_cell);
 
         Ok(())
     }

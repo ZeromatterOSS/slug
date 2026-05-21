@@ -563,6 +563,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
                 self.name.clone()
             };
             let mut spec = RepoSpec::new(repo_rule_id);
+            spec.local = self.local;
 
             // Convert all kwargs (except 'name') to attributes
             for (key, value) in kwargs.iter() {

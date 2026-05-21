@@ -38,6 +38,8 @@ use slug_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineAr
 use slug_build_api::interpreter::rule_defs::context::AnalysisContext;
 use slug_build_api::interpreter::rule_defs::context::ResolvedToolchains;
 use slug_build_api::interpreter::rule_defs::context::cc_toolchain_native_shim_provider_collection;
+use slug_build_api::interpreter::rule_defs::context::normalize_toolchain_type_label;
+use slug_build_api::interpreter::rule_defs::context::rust_allocator_bootstrap_toolchain_provider_collection;
 use slug_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use slug_build_api::interpreter::rule_defs::provider::ValueAsProviderLike;
 use slug_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
@@ -469,6 +471,10 @@ pub trait RuleSpec: Sync {
     fn exec_group_defs(&self) -> Vec<(String, slug_node::rule::ExecGroupDef)> {
         Vec::new()
     }
+
+    fn rule_name(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// Container for the environment that analysis implementation functions should run in
@@ -844,6 +850,18 @@ fn is_cpp_toolchain_type_label(label: &str) -> bool {
                         .next()
                         .is_some_and(|version| version.contains('.'))
                 }))
+}
+
+fn is_rust_toolchain_type_label(label: &str) -> bool {
+    normalize_toolchain_type_label(label) == "rules_rust//rust:toolchain_type"
+}
+
+fn is_rust_allocator_libraries_bootstrap_rule(
+    rule_spec: &dyn RuleSpec,
+    label: &ConfiguredTargetLabel,
+) -> bool {
+    rule_spec.rule_name() == Some("rust_allocator_libraries")
+        && label.unconfigured().name().as_str() == "empty_allocator_libraries"
 }
 
 pub(crate) async fn run_analysis<'a>(
@@ -3537,6 +3555,11 @@ async fn run_analysis_with_env_underlying(
                                     );
                                     let use_cpp_native_shim =
                                         is_cpp_toolchain_type_label(type_label);
+                                    let use_rust_allocator_bootstrap_shim =
+                                        is_rust_allocator_libraries_bootstrap_rule(
+                                            analysis_env.rule_spec,
+                                            &analysis_env.label,
+                                        ) && is_rust_toolchain_type_label(type_label);
                                     if use_cpp_native_shim {
                                         let toolchain_config_info = None;
                                         let toolchain_metadata_label = tc
@@ -3622,6 +3645,21 @@ async fn run_analysis_with_env_underlying(
 	                                            static_runtime_data,
 	                                            dynamic_runtime_data,
                                         ))
+                                    } else if use_rust_allocator_bootstrap_shim {
+                                        analysis_ctx_toolchain_provider_checkpoint(
+                                            &analysis_env.label,
+                                            type_label,
+                                            &tc.toolchain_impl,
+                                            Some(&configured),
+                                            toolchain_index,
+                                            toolchain_count,
+                                            is_mandatory,
+                                            is_self_dependency,
+                                            9,
+                                            "rust_allocator_bootstrap_shim",
+                                            evaluate_rule_started,
+                                        );
+                                        Some(rust_allocator_bootstrap_toolchain_provider_collection())
                                     } else {
                                         let analysis_result =
                                             dice.get_analysis_result(&configured).await;
@@ -4692,6 +4730,10 @@ pub fn get_user_defined_rule_spec(
 
         fn exec_group_defs(&self) -> Vec<(String, slug_node::rule::ExecGroupDef)> {
             self.exec_group_defs.clone()
+        }
+
+        fn rule_name(&self) -> Option<&str> {
+            Some(&self.name)
         }
     }
 

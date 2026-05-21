@@ -48,9 +48,6 @@ use crate::dice_graph::record_bzlmod_event;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::RepositoryInvocation;
 
-static EXTENSION_REPO_MATERIALIZATION_LOCK: tokio::sync::Mutex<()> =
-    tokio::sync::Mutex::const_new(());
-
 /// Errors that can occur during repository rule execution.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -231,8 +228,9 @@ pub struct ExtensionRepoExecutionKey {
 
     /// Lightweight pre-materialization disk state for marker/layout reuse.
     ///
-    /// This is a transitional correctness key until repository output state is
-    /// represented as explicit DICE file deps or a manifest value.
+    /// This mirrors Bazel's repository marker-file pruning model: key the
+    /// fetch on marker contents and cheap layout checks, not a full tree walk
+    /// of every external repo on access.
     pub materialized_state: Arc<str>,
 }
 
@@ -333,15 +331,14 @@ fn complete_marker(spec_hash: &str, output_digest: &str) -> String {
     }
 }
 
-fn complete_marker_matches(marker: &str, spec_hash: &str, output_digest: Option<&str>) -> bool {
+fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
     let marker = marker.trim();
-    let Some(output_digest) = output_digest else {
-        return false;
-    };
-    if marker == complete_marker(spec_hash, output_digest) {
-        return true;
+    if spec_hash.is_empty() {
+        return marker == "complete" || marker.starts_with("complete:output:");
     }
-    spec_hash.is_empty() && marker == "complete"
+    marker
+        .strip_prefix(&format!("complete:{spec_hash}:output:"))
+        .is_some_and(|output_digest| !output_digest.is_empty())
 }
 
 fn materialized_repo_state(
@@ -352,13 +349,13 @@ fn materialized_repo_state(
 ) -> String {
     let repo_dir = project_root.join("bazel-external").join(canonical_name);
     let marker_path = repo_dir.join(".slug_repo_complete");
-    let marker_state = if marker_path.exists() {
+    let marker_state = if repo_spec.local {
+        "local-rule".to_owned()
+    } else if marker_path.exists() {
         match std::fs::read_to_string(&marker_path) {
             Ok(marker) => {
                 let trimmed = marker.trim();
-                let output_digest =
-                    crate::repository_executor::repository_output_digest(&repo_dir).ok();
-                if complete_marker_matches(trimmed, spec_hash, output_digest.as_deref()) {
+                if complete_marker_matches(trimmed, spec_hash) {
                     format!("marker:{trimmed}")
                 } else {
                     format!("marker-mismatch:{trimmed}")
@@ -411,18 +408,15 @@ impl Key for ExtensionRepoExecutionKey {
             .join("bazel-external")
             .join(self.canonical_name.as_ref());
 
-        let _materialization_guard = EXTENSION_REPO_MATERIALIZATION_LOCK.lock().await;
-
         let marker_path = working_dir.join(".slug_repo_complete");
         let marker_contents = marker_path
             .exists()
             .then(|| std::fs::read_to_string(&marker_path).ok())
             .flatten();
-        let marker_matches = marker_contents.as_deref().is_some_and(|marker| {
-            let output_digest =
-                crate::repository_executor::repository_output_digest(&working_dir).ok();
-            complete_marker_matches(marker, &self.spec_hash, output_digest.as_deref())
-        });
+        let marker_matches = !self.repo_spec.local
+            && marker_contents
+                .as_deref()
+                .is_some_and(|marker| complete_marker_matches(marker, &self.spec_hash));
         let layout_valid = crate::repository_executor::repo_layout_is_valid_for_invocation(
             &invocation,
             &working_dir,
@@ -438,7 +432,9 @@ impl Key for ExtensionRepoExecutionKey {
             )));
         }
 
-        let miss_reason = if marker_matches && !layout_valid {
+        let miss_reason = if self.repo_spec.local {
+            "local_rule"
+        } else if marker_matches && !layout_valid {
             "marker_layout_invalid"
         } else if marker_contents.is_some() {
             "marker_digest_mismatch"
@@ -917,13 +913,11 @@ mod tests {
         );
         assert!(complete_marker_matches(
             "complete:sha256-abc123:output:sha256-out",
-            "sha256-abc123",
-            Some("sha256-out")
+            "sha256-abc123"
         ));
         assert!(!complete_marker_matches(
             "complete:sha256-abc123",
-            "sha256-abc123",
-            Some("sha256-out")
+            "sha256-abc123"
         ));
     }
 
@@ -1043,7 +1037,7 @@ mod tests {
     }
 
     #[test]
-    fn test_archive_repo_key_hash_includes_materialized_output_state() {
+    fn test_archive_repo_key_hash_includes_marker_state() {
         let temp = tempfile::TempDir::new().unwrap();
         let project_root = temp.path().to_path_buf();
         let repo_dir = project_root
@@ -1088,8 +1082,8 @@ mod tests {
             project_root,
         );
 
-        assert_ne!(valid.materialized_state, corrupt.materialized_state);
-        assert_ne!(valid, corrupt);
+        assert_eq!(valid.materialized_state, corrupt.materialized_state);
+        assert_eq!(valid, corrupt);
     }
 
     // Tests for repo_spec_to_invocation

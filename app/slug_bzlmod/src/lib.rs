@@ -158,6 +158,7 @@ pub use repository_execution::RepositoryRuleResult;
 pub use repository_execution::repo_spec_to_invocation;
 pub use repository_executor::execute_repository_rule;
 pub use repository_executor::repo_layout_is_valid_for_invocation;
+pub use repository_executor::repository_output_digest;
 pub use repository_invocations::AttrValue as RepoAttrValue;
 pub use repository_invocations::RegistryGuard;
 pub use repository_invocations::RepositoryInvocation;

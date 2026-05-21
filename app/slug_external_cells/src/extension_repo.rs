@@ -51,9 +51,6 @@ use slug_execute::digest_config::DigestConfig;
 use slug_execute::digest_config::HasDigestConfig;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
-static EXTENSION_REPO_MATERIALIZATION_LOCK: tokio::sync::Mutex<()> =
-    tokio::sync::Mutex::const_new(());
-
 /// Error for extension repos.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -128,11 +125,12 @@ fn repo_names_summary<'a>(repo_names: impl Iterator<Item = &'a str>) -> String {
     }
 }
 
-fn complete_marker(spec_hash: &str) -> String {
-    if spec_hash.is_empty() {
-        "complete".to_owned()
-    } else {
-        format!("complete:{spec_hash}")
+fn complete_marker(spec_hash: &str, output_digest: Option<&str>) -> String {
+    match (spec_hash.is_empty(), output_digest) {
+        (true, None) => "complete".to_owned(),
+        (true, Some(output_digest)) => format!("complete:output:{output_digest}"),
+        (false, Some(output_digest)) => format!("complete:{spec_hash}:output:{output_digest}"),
+        (false, None) => format!("complete:{spec_hash}"),
     }
 }
 
@@ -141,13 +139,18 @@ fn is_complete_marker(marker: &str) -> bool {
     marker == "complete" || marker.starts_with("complete:")
 }
 
+fn is_output_state_marker(marker: &str) -> bool {
+    marker.trim().contains(":output:")
+}
+
 fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
     let marker = marker.trim();
     if spec_hash.is_empty() {
-        is_complete_marker(marker)
-    } else {
-        marker == complete_marker(spec_hash)
+        return marker == "complete" || marker.starts_with("complete:output:");
     }
+    marker
+        .strip_prefix(&format!("complete:{spec_hash}:output:"))
+        .is_some_and(|output_digest| !output_digest.is_empty())
 }
 
 fn build_file_has_invalid_empty_target_label(repo_path: &std::path::Path) -> bool {
@@ -238,10 +241,12 @@ fn repair_invalid_empty_target_labels_from_repo_spec(
     }
 
     if repaired_any {
-        let _ = std::fs::write(
-            repo_path.join(".slug_repo_complete"),
-            complete_marker(spec_hash),
-        );
+        if let Ok(output_digest) = slug_bzlmod::repository_output_digest(repo_path) {
+            let _ = std::fs::write(
+                repo_path.join(".slug_repo_complete"),
+                complete_marker(spec_hash, Some(&output_digest)),
+            );
+        }
     }
     repaired_any
 }
@@ -633,8 +638,6 @@ pub(crate) async fn get_file_ops_delegate(
     )
     .await?;
 
-    let _materialization_guard = EXTENSION_REPO_MATERIALIZATION_LOCK.lock().await;
-
     // Check if the repository is fully materialized (marked complete).
     // We check for .slug_repo_complete rather than just directory existence because
     // partial materialization (e.g., source downloaded but BUILD.bazel not generated)
@@ -656,6 +659,10 @@ pub(crate) async fn get_file_ops_delegate(
         && marker_contents.as_deref().is_some_and(|s| {
             is_complete_marker(s) && !complete_marker_matches(s, &setup.spec_hash)
         });
+    let is_stale_spec_unknown_complete = setup.repo_spec_json.is_empty()
+        && marker_contents
+            .as_deref()
+            .is_some_and(|s| is_complete_marker(s) && !is_output_state_marker(s));
     let is_stale_invalid_empty_target_label = !setup.repo_spec_json.is_empty()
         && marker_contents.as_deref().is_some_and(is_complete_marker)
         && build_file_has_invalid_empty_target_label(&source_path);
@@ -681,6 +688,7 @@ pub(crate) async fn get_file_ops_delegate(
         );
     if is_stale_non_complete_marker
         || is_stale_complete
+        || is_stale_spec_unknown_complete
         || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
         || is_stale_missing_build
         || is_stale_foreign_symlink
@@ -870,13 +878,26 @@ pub(crate) async fn get_file_ops_delegate(
         match ctx.compute(&key).await {
             Ok(Ok(repo_result)) => {
                 if !setup.spec_hash.is_empty() {
-                    if let Err(e) = std::fs::write(&marker_path, complete_marker(&setup.spec_hash))
-                    {
-                        tracing::warn!(
-                            "Failed to write spec-hashed completion marker for '{}': {}",
-                            setup.canonical_name,
-                            e
-                        );
+                    match slug_bzlmod::repository_output_digest(&repo_result.repo_path) {
+                        Ok(output_digest) => {
+                            if let Err(e) = std::fs::write(
+                                repo_result.repo_path.join(".slug_repo_complete"),
+                                complete_marker(&setup.spec_hash, Some(&output_digest)),
+                            ) {
+                                tracing::warn!(
+                                    "Failed to write spec-hashed completion marker for '{}': {}",
+                                    setup.canonical_name,
+                                    e
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to compute output-state marker for '{}': {}",
+                                setup.canonical_name,
+                                e
+                            );
+                        }
                     }
                 }
                 tracing::info!(
@@ -1062,9 +1083,15 @@ mod tests {
 
     #[test]
     fn complete_marker_detection_requires_current_spec_hash_when_available() {
+        let base =
+            std::env::temp_dir().join(format!("slug-complete-marker-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let repo = base.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::write(repo.join("data.txt"), "fresh").unwrap();
         assert!(complete_marker_matches("complete", ""));
         assert!(complete_marker_matches(
-            "complete:sha256-new\n",
+            "complete:sha256-new:output:sha256-out\n",
             "sha256-new"
         ));
         assert!(!complete_marker_matches("complete", "sha256-new"));
@@ -1072,9 +1099,20 @@ mod tests {
             "complete:sha256-old",
             "sha256-new"
         ));
+        assert!(!complete_marker_matches(
+            "complete:sha256-old:output:sha256-out",
+            "sha256-new"
+        ));
         assert!(is_complete_marker("complete"));
         assert!(is_complete_marker("complete:sha256-old"));
+        assert!(is_complete_marker("complete:sha256-old:output:sha256-out"));
+        assert!(!is_output_state_marker("complete"));
+        assert!(!is_output_state_marker("complete:sha256-old"));
+        assert!(is_output_state_marker(
+            "complete:sha256-old:output:sha256-out"
+        ));
         assert!(!is_complete_marker("stub:sha256-old"));
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

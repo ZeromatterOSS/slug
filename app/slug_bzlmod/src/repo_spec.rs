@@ -39,6 +39,10 @@ use sha2::Sha256;
 
 use crate::repository_invocations::AttrValue;
 
+pub(crate) fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// A captured repository specification from extension execution.
 ///
 /// This represents the intent to create a repository WITHOUT executing
@@ -59,6 +63,14 @@ pub struct RepoSpec {
     /// the Starlark call site. This matches Bazel's lockfile behaviour and
     /// gives stable JSON across invocations without sorting.
     pub attributes: IndexMap<String, AttrValue>,
+
+    /// Whether the repository rule was declared `local = True`.
+    ///
+    /// Bazel does not reuse cached repository contents for local repository
+    /// rules across server instances; this bit lets Slug make the same
+    /// materialization decision when executing extension-generated repos.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub local: bool,
 }
 
 impl RepoSpec {
@@ -67,6 +79,7 @@ impl RepoSpec {
         Self {
             repo_rule_id,
             attributes: IndexMap::new(),
+            local: false,
         }
     }
 
@@ -80,6 +93,7 @@ impl RepoSpec {
     pub fn compute_hash(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(self.repo_rule_id.as_bytes());
+        hasher.update([self.local as u8]);
 
         let mut keys: Vec<_> = self.attributes.keys().collect();
         keys.sort();
@@ -105,7 +119,7 @@ impl RepoSpec {
 #[derive(Debug, Default)]
 pub struct RepoSpecRegistry {
     /// Collected specs: internal_name -> RepoSpec
-    specs: RefCell<fxhash::FxHashMap<String, RepoSpec>>,
+    specs: RefCell<FxHashMap<String, RepoSpec>>,
 }
 
 impl RepoSpecRegistry {
@@ -119,7 +133,7 @@ impl RepoSpecRegistry {
     }
 
     /// Take all collected specs.
-    pub fn take(&self) -> fxhash::FxHashMap<String, RepoSpec> {
+    pub fn take(&self) -> FxHashMap<String, RepoSpec> {
         std::mem::take(&mut *self.specs.borrow_mut())
     }
 }
@@ -137,9 +151,7 @@ thread_local! {
 /// being recorded as RepositoryInvocations.
 ///
 /// Returns a tuple of (result, captured_specs).
-pub fn with_repo_spec_registry<R>(
-    f: impl FnOnce() -> R,
-) -> (R, fxhash::FxHashMap<String, RepoSpec>) {
+pub fn with_repo_spec_registry<R>(f: impl FnOnce() -> R) -> (R, FxHashMap<String, RepoSpec>) {
     REPO_SPEC_REGISTRY.with(|cell| {
         *cell.borrow_mut() = Some(RepoSpecRegistry::new());
     });

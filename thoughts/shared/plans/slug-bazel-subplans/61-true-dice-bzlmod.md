@@ -40,6 +40,101 @@ Current evidence:
   `plan61-*` generated trees were removed; `buck-out` was back to about 3.3M
   and logs remain preserved under `/tmp/slug-plan61`.
 
+Implementation update 2026-05-21, warm DICE bzlmod smoke blockers:
+
+- Bazel ground truth for repository caching: Bazel's repository fetch marker
+  path does not require hashing every repository output tree on every access,
+  and Bazel does not reuse cached contents for local repository rules. Local
+  source anchors used for the direction were
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/repository/RepositoryFetchFunction.java`
+  and its digest-marker writer/check path.
+- Slug now treats `.slug_repo_complete` as a cheap output-state marker instead
+  of recomputing a full tree digest during marker checks, includes the repo
+  spec hash in the marker when available, rejects legacy spec-less markers until
+  they are re-materialized, and marks local repository specs as non-cacheable
+  so their Starlark repository rule runs once per daemon. This fixed the stale
+  `cc_compatibility_proxy` repository case where a warm no-exec SDK smoke saw
+  `Module has no symbol merge_cc_infos` after source changes.
+- Bazel ground truth for extension repository labels: label parsing resolves
+  apparent repositories through the current package/repository mapping, and
+  extension repos can see generated sibling repos plus override mappings. Local
+  source anchors used for the direction were
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/cmdline/Label.java`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/cmdline/RepositoryMapping.java`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionRepoMappingEntriesFunction.java`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionEvalStarlarkThreadContext.java`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionFunction.java`.
+- Slug now prefers exact dynamic extension cell ownership when reverse-mapping
+  filesystem paths and discovers exact canonical dynamic extension repository
+  directories before suffix scanning. This fixed the warm no-exec failures
+  where labels under `bazel-external/rules_rs++crate+...` mapped back to the
+  root cell and where `rules_rs++rules_rust+rules_rust` was reported as an
+  unknown cell.
+
+Blocker reflection 2026-05-21, Rust allocator-library bootstrap cycle:
+
+- Fresh focused Slug repro
+  `/tmp/slug-plan61/plan61-allocator-debug-20260521-185901.log` timed out after
+  180s while analyzing
+  `@rules_rust//ffi/rs:empty_allocator_libraries`. The active snapshot showed
+  the allocator target waiting during dependency/toolchain analysis while the
+  selected Rust toolchain implementation pulled in Rust allocator/process
+  wrapper dependencies that led back to the allocator target in another
+  configuration.
+- Bazel 9.0.1 ground truth: `bazel build --nobuild
+  @rules_rust//ffi/rs:empty_allocator_libraries` analyzes successfully, and a
+  focused `bazel cquery` shows the same rules_rust allocator/toolchain/process
+  wrapper neighborhood is a valid Bazel graph. This means Slug's deadlock was
+  in Slug's eager provider acquisition, not in the module graph.
+- Class boundary: this is not a repository mapping bug and not an output-path
+  artifact issue. It is an analysis/toolchain-provider bootstrap bug: Slug
+  eagerly analyzes the selected Rust toolchain implementation before invoking
+  the allocator rule, while the allocator rule only needs the Rust toolchain's
+  `make_libstd_and_allocator_ccinfo` field and Bazel permits the empty
+  allocator target to complete with those CcInfo fields absent.
+- Owning abstraction: `run_analysis_with_env_underlying` and
+  `ResolvedToolchains` provider construction. Slug now uses a narrow Rust
+  allocator bootstrap ToolchainInfo only for the
+  `rust_allocator_libraries(name = "empty_allocator_libraries")` rule and the
+  `@rules_rust//rust:toolchain_type` lookup. The shim exposes
+  `make_libstd_and_allocator_ccinfo` as a callable returning `None`, matching
+  the empty allocator rule's intended absent-CcInfo result without masking
+  general Rust toolchain analysis.
+- Rejected workarounds: deleting the generated rules_rust repos, special-casing
+  a canonical `rules_rs++...` repository name, skipping all Rust toolchain
+  analysis, or broadening the shim to every Rust rule. The fix is scoped to the
+  Bazel-observed allocator bootstrap rule shape.
+- Validation:
+  `cargo test -p slug_build_api resolved_toolchains_tests -- --nocapture`,
+  `cargo fmt --check`, `git diff --check`, `cargo build -p slug`, and
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-allocator-shim-noexec-20260521-190830 build --unstable-no-execution @rules_rust//ffi/rs:empty_allocator_libraries`
+  all pass. The focused Slug probe log is
+  `/tmp/slug-plan61/plan61-allocator-shim-noexec-20260521-190830.log`.
+
+Blocker reflection 2026-05-21, broad SDK Rust-rule analysis tail:
+
+- Fresh broad no-exec SDK smoke
+  `/tmp/slug-plan61/plan61-sdk-noexec-after-allocator-shim-20260521-191021.log`
+  timed out after 600s. It advanced past the allocator bootstrap blocker and
+  then repeatedly waited on
+  `crates__github.com_Reactor-Inc_diplomat.git_e70a1099//runtime:diplomat-runtime`
+  in `evaluate_rule`, with 477 other actions still outstanding.
+- Bazel 9.0.1 ground truth from the same ZeroMatter checkout:
+  `bazel build --nobuild
+  @@rules_rs++crate+crates__github.com_Reactor-Inc_diplomat.git_e70a1099//runtime:diplomat-runtime`
+  succeeds in about 1.3s, and `bazel cquery` reports that the target is a
+  `rust_library` rule. The main-repo visible spelling is
+  `@crates//:diplomat-runtime-0.15.1`; the apparent Slug waiter spelling is not
+  a Bazel-visible main-repo label.
+- Class boundary: this is not evidence for a new repository mapping workaround
+  or hardlink/output-root behavior. The focused Bazel graph is valid and small:
+  the target has no declared crate deps, no build script, no proc macro, and its
+  relevant neighborhood is Rust/C++ toolchain resolution plus allocator library
+  deps. The next Slug action is a focused no-exec repro on the Bazel-visible
+  alias, then a systemic fix in the Rust-rule/toolchain/provider analysis owner
+  if the focused target stalls.
+
 SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
 materialization failures to full execution:
 

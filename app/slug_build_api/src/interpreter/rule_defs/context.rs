@@ -3032,6 +3032,44 @@ pub fn cc_toolchain_native_shim_provider_collection(
     })
 }
 
+#[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative)]
+#[display("<rust allocator bootstrap make_libstd_and_allocator_ccinfo>")]
+struct RustAllocatorMakeLibstdAndAllocatorCcinfoShim;
+
+starlark::starlark_simple_value!(RustAllocatorMakeLibstdAndAllocatorCcinfoShim);
+
+#[starlark_value(type = "function")]
+impl<'v> StarlarkValue<'v> for RustAllocatorMakeLibstdAndAllocatorCcinfoShim {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(Value::new_none())
+    }
+}
+
+pub fn rust_allocator_bootstrap_toolchain_provider_collection() -> FrozenProviderCollectionValue {
+    let heap = FrozenHeap::new();
+    let make_ccinfo = heap.alloc(RustAllocatorMakeLibstdAndAllocatorCcinfoShim);
+    let fields = heap.alloc(AllocDict([(
+        "make_libstd_and_allocator_ccinfo",
+        make_ccinfo,
+    )]));
+    let toolchain_info = heap.alloc(ToolchainInfoInstanceGen::new(fields));
+    let providers = FrozenProviderCollection::new(SmallMap::from_iter([(
+        ToolchainInfoProvider::provider_id().dupe(),
+        toolchain_info,
+    )]));
+    let provider_collection =
+        starlark::values::FrozenValueTyped::new_err(heap.alloc(providers)).unwrap();
+    let heap_ref = heap.into_ref();
+    FrozenProviderCollectionValue::from_value(unsafe {
+        OwnedFrozenValueTyped::new(heap_ref, provider_collection)
+    })
+}
+
 /// Real resolved toolchains from the toolchain resolution algorithm.
 ///
 /// Real resolved toolchains from the toolchain resolution algorithm.
@@ -3165,7 +3203,7 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
 /// Strips `@` / `@@` prefixes and treats Bzlmod module-version canonical
 /// repo names as equivalent to their apparent module name. Extension repos
 /// such as `rules_rust+rust+rust_linux_x86_64` keep their full name.
-fn normalize_toolchain_type_label(label: &str) -> String {
+pub fn normalize_toolchain_type_label(label: &str) -> String {
     let label = label.trim_start_matches('@');
     let Some((repo, rest)) = label.split_once("//") else {
         return label.to_owned();
@@ -3261,6 +3299,7 @@ mod resolved_toolchains_tests {
     use super::cc_toolchain_runtime_solib_path;
     use super::normalize_toolchain_type_label;
     use super::relative_symlink_target;
+    use super::rust_allocator_bootstrap_toolchain_provider_collection;
 
     fn leaked_toolchain_input_target(label: &str) -> &'static ConfiguredTargetLabel {
         let cfg = ConfigurationData::testing_new();
@@ -3395,6 +3434,36 @@ mod resolved_toolchains_tests {
             .at(key.to_value(), heap)
             .expect("C++ toolchain lookup should not raise for optional miss");
         assert!(value.is_none());
+    }
+
+    #[test]
+    fn rust_allocator_bootstrap_toolchain_returns_none_ccinfo_builder() {
+        let mut toolchains = std::collections::HashMap::new();
+        toolchains.insert(
+            "@rules_rust//rust:toolchain_type".to_owned(),
+            Some(rust_allocator_bootstrap_toolchain_provider_collection()),
+        );
+        let resolved = ResolvedToolchains {
+            toolchains,
+            exec_platform: "//bazel/platforms:linux-gnu-host".to_owned(),
+            target_platform: "//bazel/platforms:linux-musl".to_owned(),
+        };
+
+        let env = Module::new();
+        let mut eval = Evaluator::new(&env);
+        let heap = eval.heap();
+        let key = heap.alloc_str("@@rules_rust+0.70.0//rust:toolchain_type");
+        let toolchain = resolved
+            .at(key.to_value(), heap)
+            .expect("Rust toolchain lookup should return bootstrap ToolchainInfo");
+        let make_ccinfo = toolchain
+            .get_attr("make_libstd_and_allocator_ccinfo", heap)
+            .expect("bootstrap ToolchainInfo attr lookup should not fail")
+            .expect("bootstrap ToolchainInfo should expose allocator ccinfo builder");
+        let result = eval
+            .eval_function(make_ccinfo, &[], &[])
+            .expect("bootstrap allocator ccinfo builder should be callable");
+        assert!(result.is_none());
     }
 
     #[test]

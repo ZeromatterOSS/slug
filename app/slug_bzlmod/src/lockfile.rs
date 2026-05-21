@@ -227,6 +227,10 @@ pub struct LockfileRepoSpec {
     /// All attributes (serialized as JSON values).
     #[serde(default)]
     pub attributes: IndexMap<String, serde_json::Value>,
+
+    /// Whether the repository rule was declared `local = True`.
+    #[serde(default, skip_serializing_if = "crate::repo_spec::is_false")]
+    pub local: bool,
 }
 
 impl LockfileExtensionData {
@@ -291,6 +295,7 @@ impl LockfileRepoSpec {
         Self {
             repo_rule_id,
             attributes: IndexMap::new(),
+            local: false,
         }
     }
 
@@ -304,6 +309,7 @@ impl LockfileRepoSpec {
     pub fn from_repo_spec(spec: &RepoSpec) -> Self {
         Self {
             repo_rule_id: spec.repo_rule_id.clone(),
+            local: spec.local,
             attributes: spec
                 .attributes
                 .iter()
@@ -316,6 +322,7 @@ impl LockfileRepoSpec {
     pub fn to_repo_spec(&self) -> RepoSpec {
         RepoSpec {
             repo_rule_id: self.repo_rule_id.clone(),
+            local: self.local,
             attributes: self
                 .attributes
                 .iter()
