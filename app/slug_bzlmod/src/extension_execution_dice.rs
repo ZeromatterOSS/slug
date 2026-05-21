@@ -57,6 +57,7 @@ use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
 use crate::lockfile::LockfileMode;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
+use crate::module_extension_executor::ModuleExtensionMetadata;
 
 const MAX_EXTENSION_IDS_IN_WARNING: usize = 25;
 
@@ -159,6 +160,13 @@ pub struct ModuleExtensionResult {
     /// Canonical name mapping.
     /// Maps internal_name -> canonical_name (e.g., "numpy" -> "_main+pip+numpy")
     pub canonical_names: FxHashMap<String, String>,
+
+    /// Metadata returned by module_ctx.extension_metadata(...).
+    ///
+    /// Bazel stores facts as part of `SingleExtensionValue` and deliberately
+    /// excludes them from normal replay invalidation.
+    #[allocative(skip)]
+    pub metadata: ModuleExtensionMetadata,
 }
 
 impl ModuleExtensionResult {
@@ -175,6 +183,22 @@ impl ModuleExtensionResult {
         generated_repo_specs: FxHashMap<String, RepoSpec>,
         root_module_name: &str,
     ) -> Self {
+        Self::new_with_metadata(
+            extension_id,
+            input_hash,
+            generated_repo_specs,
+            root_module_name,
+            ModuleExtensionMetadata::default(),
+        )
+    }
+
+    pub fn new_with_metadata(
+        extension_id: Arc<str>,
+        input_hash: String,
+        generated_repo_specs: FxHashMap<String, RepoSpec>,
+        root_module_name: &str,
+        metadata: ModuleExtensionMetadata,
+    ) -> Self {
         let canonical_names =
             build_canonical_names(&extension_id, &generated_repo_specs, root_module_name);
         Self {
@@ -182,6 +206,7 @@ impl ModuleExtensionResult {
             input_hash,
             generated_repo_specs,
             canonical_names,
+            metadata,
         }
     }
 
@@ -497,11 +522,14 @@ impl Key for ModuleExtensionExecutionKey {
                         cached_specs.len()
                     );
 
-                    let result = ModuleExtensionResult::new(
+                    let result = ModuleExtensionResult::new_with_metadata(
                         self.extension_id.clone(),
                         self.input_hash.to_string(),
                         cached_specs,
                         &self.root_module_name,
+                        ModuleExtensionMetadata {
+                            facts: prior_facts.clone(),
+                        },
                     );
 
                     return Ok(Arc::new(result));
@@ -584,11 +612,12 @@ impl Key for ModuleExtensionExecutionKey {
         let output = execution_result?;
 
         // 7. Build result with canonical names
-        let result = ModuleExtensionResult::new(
+        let result = ModuleExtensionResult::new_with_metadata(
             self.extension_id.clone(),
             self.input_hash.to_string(),
             output.generated_repo_specs.clone(),
             &self.root_module_name,
+            output.metadata.clone(),
         );
 
         tracing::info!(
@@ -1187,6 +1216,27 @@ mod tests {
             "@@bazel_tools//repo:http.bzl%http_archive"
         );
         assert!(result.get_repo_spec("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_module_extension_result_carries_facts_metadata() {
+        let mut specs = FxHashMap::default();
+        specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+
+        let result = ModuleExtensionResult::new_with_metadata(
+            Arc::from("@@//ext.bzl%test"),
+            "hash".to_owned(),
+            specs,
+            "",
+            ModuleExtensionMetadata {
+                facts: serde_json::json!({"resource": {"checksum": "abc"}}),
+            },
+        );
+
+        assert_eq!(
+            result.metadata.facts,
+            serde_json::json!({"resource": {"checksum": "abc"}})
+        );
     }
 
     #[test]

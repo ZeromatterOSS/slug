@@ -2262,6 +2262,25 @@ Implementation slice 2026-05-19, Bazel-shaped extension lockfile digests:
   tests/core/bzlmod:test_plan61_guardrails` (25 passed inside pytest). Daemons
   were cleaned afterward; `/var/mnt/dev/slug/buck-out` was about 3.5M and
   ZeroMatter `buck-out` remained about 3.3M.
+- Implementation slice 2026-05-20, module extension facts carried in DICE
+  results: Bazel ground truth is `SingleExtensionValue` carrying `Facts`,
+  `SingleExtensionEvalFunction` loading facts from the workspace and hidden
+  lockfiles before extension execution, and Bazel's intentional replay behavior
+  that facts are not part of the normal replay diff check. `Facts` are also
+  excluded from `LockfileModuleExtensionMetadata` because Bazel stores them in
+  the top-level lockfile field. Slug already exposed `module_ctx.facts` and
+  accepted `module_ctx.extension_metadata(facts = ...)`; this slice preserves
+  returned facts in `ModuleExtensionResult` and populates replay-hit DICE
+  results from prior lockfile facts instead of dropping metadata at the DICE
+  boundary. This is still partial Plan 61 work: ordinary Slug builds still do
+  not persist returned facts to `MODULE.bazel.lock`, and Bazel's
+  `--lockfile_mode=error` facts validation against the visible workspace
+  lockfile remains the next owner-level behavior to implement.
+  Validation passed: `cargo fmt --check`, `cargo test -p slug_bzlmod
+  module_extension_result_carries_facts_metadata -- --nocapture`, `cargo test
+  -p slug_bzlmod extension_execution_dice -- --nocapture` (21 passed), `cargo
+  check -p slug_bzlmod -p slug_interpreter_for_build -p slug_external_cells`,
+  and `cargo build -p slug`.
 - Historical note, superseded on 2026-05-20: real-world SDK output parity was
   still pending until the zeromatter checkout had a Bazel-valid lockfile again.
   Later validation restored the lockfile, reran Bazel and Slug on
