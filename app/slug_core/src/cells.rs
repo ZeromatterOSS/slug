@@ -283,7 +283,45 @@ pub fn resolve_scoped_bzlmod_repo_alias_for_current_cell(
         return None;
     }
 
+    let canonical_current_cell =
+        canonical_dynamic_extension_cell_name(current_cell).filter(|cell| cell != current_cell);
     let aliases = SCOPED_BZLMOD_REPO_ALIASES.lock().ok()?;
+
+    lookup_scoped_bzlmod_repo_alias_for_cell(&aliases, current_cell, apparent_name)
+        .or_else(|| {
+            canonical_current_cell
+                .as_deref()
+                .and_then(|canonical_cell| {
+                    lookup_scoped_bzlmod_repo_alias_for_cell(
+                        &aliases,
+                        canonical_cell,
+                        apparent_name,
+                    )
+                })
+        })
+        .or_else(|| {
+            canonical_current_cell
+                .as_deref()
+                .or(Some(current_cell))
+                .and_then(|cell| {
+                    let prefix = bzlmod_extension_repo_prefix(cell)?;
+                    resolve_dynamic_extension_cell_alias(apparent_name)
+                        .filter(|canonical| canonical.starts_with(&prefix))
+                })
+        })
+}
+
+fn bzlmod_extension_repo_prefix(cell: &str) -> Option<String> {
+    let (owner, rest) = cell.split_once("++")?;
+    let (extension_name, _) = rest.split_once('+')?;
+    Some(format!("{owner}++{extension_name}+"))
+}
+
+fn lookup_scoped_bzlmod_repo_alias_for_cell(
+    aliases: &HashMap<(String, String), String>,
+    current_cell: &str,
+    apparent_name: &str,
+) -> Option<String> {
     let lookup = |owner_module: &str| {
         aliases
             .get(&(owner_module.to_owned(), apparent_name.to_owned()))
@@ -292,6 +330,19 @@ pub fn resolve_scoped_bzlmod_repo_alias_for_current_cell(
 
     if let Some(canonical) = lookup(current_cell).or_else(|| lookup(&format!("{current_cell}+"))) {
         return Some(canonical);
+    }
+
+    if let Some(module_name) = current_cell.strip_suffix("+override") {
+        if let Some(canonical) = lookup(&format!("{module_name}+")).or_else(|| lookup(module_name))
+        {
+            return Some(canonical);
+        }
+    }
+
+    if let Some(module_name) = current_cell.strip_suffix('+') {
+        if let Some(canonical) = lookup(module_name) {
+            return Some(canonical);
+        }
     }
 
     if let Some((owner, _rest)) = current_cell.split_once("++") {
@@ -2071,6 +2122,85 @@ mod tests {
             resolve_scoped_bzlmod_repo_alias_for_current_cell(
                 "double_owner_no_separator++source+generated",
                 apparent
+            )
+        );
+    }
+
+    #[test]
+    fn scoped_bzlmod_repo_alias_resolves_apparent_generated_repo_cell() {
+        let apparent = "crates";
+        let wanted = "rules_rs++crate+crates";
+        register_scoped_bzlmod_repo_alias(
+            "rules_rs+".to_owned(),
+            apparent.to_owned(),
+            wanted.to_owned(),
+        );
+
+        assert_eq!(
+            Some(wanted.to_owned()),
+            resolve_scoped_bzlmod_repo_alias_for_current_cell("crates__clap-4.5.60", apparent)
+        );
+    }
+
+    #[test]
+    fn scoped_bzlmod_repo_alias_resolves_archive_override_module_cell() {
+        let apparent = "rules_rust";
+        let wanted = "rules_rust+";
+        register_scoped_bzlmod_repo_alias(
+            "rules_rs".to_owned(),
+            apparent.to_owned(),
+            wanted.to_owned(),
+        );
+
+        assert_eq!(
+            Some(wanted.to_owned()),
+            resolve_scoped_bzlmod_repo_alias_for_current_cell("rules_rs+override", apparent)
+        );
+    }
+
+    #[test]
+    fn scoped_bzlmod_repo_alias_last_registration_wins() {
+        let apparent = "rules_rust";
+        register_scoped_bzlmod_repo_alias(
+            "rules_rs".to_owned(),
+            apparent.to_owned(),
+            "rules_rs++rules_rust+rules_rust".to_owned(),
+        );
+        register_scoped_bzlmod_repo_alias(
+            "rules_rs".to_owned(),
+            apparent.to_owned(),
+            "rules_rust+".to_owned(),
+        );
+
+        assert_eq!(
+            Some("rules_rust+".to_owned()),
+            resolve_scoped_bzlmod_repo_alias_for_current_cell("rules_rs", apparent)
+        );
+    }
+
+    #[test]
+    fn scoped_bzlmod_repo_alias_resolves_same_extension_dynamic_alias() {
+        register_dynamic_extension_cell_alias(
+            "crates".to_owned(),
+            "rules_rs++crate+crates".to_owned(),
+        );
+        register_dynamic_extension_cell_alias(
+            "other".to_owned(),
+            "rules_rs++other_ext+other".to_owned(),
+        );
+
+        assert_eq!(
+            Some("rules_rs++crate+crates".to_owned()),
+            resolve_scoped_bzlmod_repo_alias_for_current_cell(
+                "rules_rs++crate+crates__clap-4.5.60",
+                "crates",
+            )
+        );
+        assert_eq!(
+            None,
+            resolve_scoped_bzlmod_repo_alias_for_current_cell(
+                "rules_rs++crate+crates__clap-4.5.60",
+                "other",
             )
         );
     }

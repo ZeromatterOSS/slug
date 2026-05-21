@@ -36,7 +36,9 @@ Current evidence:
   `/tmp/slug-plan61/slug-sdk-contents-sha-after-cc-all-files.txt`.
 - `/var/mnt/dev/zeromatter-kuro/execroot` was removed after validation;
   `/var/mnt/dev/zeromatter-kuro/buck-out` was retained as the current evidence
-  tree and was about 21G at the last check.
+  tree. After later Plan 61 cleanup and the 2026-05-21 no-exec smoke, stale
+  `plan61-*` generated trees were removed; `buck-out` was back to about 3.3M
+  and logs remain preserved under `/tmp/slug-plan61`.
 
 SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
 materialization failures to full execution:
@@ -4087,6 +4089,63 @@ Implementation update 2026-05-21, root `use_repo` aliases do not leak to other m
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (42 tests); and
   `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (42
   tests).
+
+Implementation update 2026-05-21, generated repo mappings and Bazel 9 load canonicalization:
+
+- Bazel ground truth: `bazel 9.0.1 mod dump_repo_mapping rules_rs+` in the
+  ZeroMatter workspace reports `rules_rust -> rules_rust+` from the
+  `rules_rs+` module repository, not Slug's stale extension-repo fallback
+  `rules_rs++rules_rust+rules_rust`. The same dump shows extension-generated
+  repositories share the owning module's mapping plus same-extension generated
+  repo rows. Evidence is saved at
+  `/tmp/slug-plan61/bazel-rules-rs-override-canonical-mapping-20260521.ndjson`
+  and
+  `/tmp/slug-plan61/bazel-dump-repo-mapping-rules-rs-20260521.ndjson`.
+- Blocker reflection: after root aliases stopped leaking globally, the SDK
+  no-exec smoke exposed three related transitional adapter gaps rather than
+  three SDK-specific repo names. First, extension-generated repository mapping
+  rows in `RepoMappingSnapshot` were not all registered into Slug's scoped
+  alias adapter. Second, root `override_repo()` replacement rows had to win
+  for the owner module spelling Bazel uses while Slug may execute from a
+  physical `+override` archive cell or stripped module cell. Third, the
+  Starlark load canonicalization equivalence helper still parsed extension
+  repo internal names with single-plus-era splitting, so
+  `rules_rs++crate+crates` looked like internal repo `crate+crates` instead of
+  `crates`. Symptom-only fixes rejected: hardcoding `rules_rs`, `rules_rust`,
+  `crates`, or the `clap` generated repo outside the repo-mapping/load
+  canonicalization abstractions.
+- Systemic fix: legacy cell setup now bridges the session
+  `RepoMappingSnapshot` into `SCOPED_BZLMOD_REPO_ALIASES`; root override rows
+  are registered after precomputed aliases so they win, and are registered for
+  both owner spellings when the owner module has Bazel's trailing `+`.
+  `CellAliasResolver` now normalizes dynamic generated repo current cells,
+  physical `+override` cells, and same-extension dynamic aliases through the
+  scoped adapter without reopening root alias leakage. Starlark load
+  equivalence now uses `slug_bzlmod::parse_canonical_name()` so Bazel 9
+  double-plus canonical names compare by their true internal repo name.
+- Diagnostic fix: extension/repo materialization summaries now render
+  `{error:#}` so nested Starlark load causes survive the materialization
+  boundary. This exposed the real `@rules_rust` mapping mismatch in
+  `/tmp/slug-plan61/plan61-spoke-cause-noexec-20260521-160700.log` instead of
+  only reporting failed spoke registration.
+- Smoke progression evidence:
+  `/tmp/slug-plan61/plan61-post-genrepo-scope2-noexec-20260521-160232.log`
+  removed the initial generated-repo mapping failure,
+  `/tmp/slug-plan61/plan61-post-owner-override-row-noexec-20260521-162038.log`
+  moved past the stale `@rules_rust` canonical target, and
+  `/tmp/slug-plan61/plan61-post-load-equiv-noexec-20260521-172358.log`
+  passed `slug --isolation-dir plan61-post-load-equiv-noexec-20260521-172358
+  build --unstable-no-execution //sdk:sdk_contents` in 2m32s.
+- Validation passed:
+  `cargo test -p slug_core scoped_bzlmod_repo_alias -- --nocapture` (8 tests);
+  `cargo test -p slug_interpreter_for_build load_cell_equivalence --
+  --nocapture` (3 tests); `cargo check -p slug_common -p slug_core`;
+  `cargo check -p slug_external_cells -p slug_interpreter_for_build`;
+  `cargo build -p slug`; direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (42 tests); and
+  `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails` (42
+  tests); and the ZeroMatter SDK no-exec smoke above.
 
 Exit criteria:
 

@@ -234,6 +234,54 @@ fn add_extension_repo_mapping_rows_from_cells(
     }
 }
 
+fn add_scoped_repo_aliases_from_mapping_snapshot(
+    aliases: &mut Vec<BzlmodScopedRepoAlias>,
+    snapshot: &slug_bzlmod::RepoMappingSnapshot,
+) {
+    for (source_repo, mappings) in snapshot {
+        if source_repo.is_empty() {
+            continue;
+        }
+        for (apparent_name, target_name) in mappings {
+            aliases.push(BzlmodScopedRepoAlias {
+                owner_module: source_repo.clone(),
+                apparent_name: apparent_name.clone(),
+                target_name: target_name.clone(),
+            });
+        }
+    }
+}
+
+fn add_scoped_repo_aliases_from_root_overrides(
+    aliases: &mut Vec<BzlmodScopedRepoAlias>,
+    repo_mapping_overrides: &slug_bzlmod::RepoMappingOverrides,
+    root_module_name: &str,
+    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
+) {
+    for (extension_id, overrides) in repo_mapping_overrides {
+        let owner_module = slug_bzlmod::extract_owning_module(extension_id, root_module_name);
+        for (generated_name, replacement_repo) in overrides {
+            let target_name = resolved_graph
+                .and_then(|graph| selected_bzlmod_cell_name_for_dep(cells, replacement_repo, graph))
+                .unwrap_or(replacement_repo.as_str())
+                .to_owned();
+            aliases.push(BzlmodScopedRepoAlias {
+                owner_module: owner_module.clone(),
+                apparent_name: generated_name.clone(),
+                target_name: target_name.clone(),
+            });
+            if let Some(owner_without_separator) = owner_module.strip_suffix('+') {
+                aliases.push(BzlmodScopedRepoAlias {
+                    owner_module: owner_without_separator.to_owned(),
+                    apparent_name: generated_name.clone(),
+                    target_name,
+                });
+            }
+        }
+    }
+}
+
 /// True iff any toolchain label already references the bundled
 /// `@local_config_python` cell (meaning the user has already wired up
 /// bundled rules_python toolchains and we should skip auto-injection).
@@ -2244,6 +2292,10 @@ impl BuckConfigBasedCells {
                 &bzlmod_session_data.repo_mapping_overrides,
             );
         }
+        add_scoped_repo_aliases_from_mapping_snapshot(
+            &mut scoped_repo_aliases,
+            &bzlmod_session_data.repo_mappings,
+        );
         slug_util::memory_checkpoint::checkpoint(
             "legacy_cells_bzlmod_precomputed_repos",
             [
@@ -2466,6 +2518,13 @@ impl BuckConfigBasedCells {
             let canonical_name = CellName::unchecked_new(&target_name)?;
             ext_aliases.push((apparent_name, canonical_name));
         }
+        add_scoped_repo_aliases_from_root_overrides(
+            &mut scoped_repo_aliases,
+            &bzlmod_session_data.repo_mapping_overrides,
+            root_module_name,
+            &cells,
+            resolved_graph_for_aliases.as_ref(),
+        );
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);

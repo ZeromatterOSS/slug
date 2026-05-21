@@ -284,11 +284,9 @@ fn are_bzlmod_alias_equivalent(apparent: &str, canonical: &str) -> bool {
 }
 
 fn extension_repo_internal_name(canonical: &str) -> Option<&str> {
-    let mut parts = canonical.splitn(3, '+');
-    parts.next()?;
-    parts.next()?;
-    let internal_name = parts.next()?;
-    (!internal_name.is_empty()).then_some(internal_name)
+    slug_bzlmod::parse_canonical_name(canonical)
+        .map(|(_, _, internal_name)| internal_name)
+        .filter(|internal_name| !internal_name.is_empty())
 }
 
 #[cfg(test)]
@@ -317,6 +315,18 @@ mod tests {
         assert!(are_bzlmod_alias_equivalent(
             "crates__ts-rs-12.0.1",
             "rules_rs+crate+crates__ts-rs-12.0.1"
+        ));
+    }
+
+    #[test]
+    fn load_cell_equivalence_accepts_bazel9_double_plus_internal_repo_name() {
+        assert!(are_bzlmod_alias_equivalent(
+            "rules_rs++crate+crates",
+            "crates"
+        ));
+        assert!(are_bzlmod_alias_equivalent(
+            "crates",
+            "rules_rs++crate+crates"
         ));
     }
 

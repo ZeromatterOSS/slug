@@ -270,7 +270,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
 
 fn diagnostic_summary(error: impl std::fmt::Display) -> String {
     const MAX_CHARS: usize = 2000;
-    let rendered = error.to_string();
+    let rendered = format!("{error:#}");
     let mut iter = rendered.char_indices();
     let Some((idx, _)) = iter.nth(MAX_CHARS) else {
         return rendered;
