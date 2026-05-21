@@ -12,6 +12,9 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::LazyLock;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use derive_more::Display;
@@ -98,7 +101,7 @@ pub(crate) struct Transition<'v> {
 #[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative)]
 #[display("transition")]
 pub(crate) struct FrozenTransition {
-    id: Arc<TransitionId>,
+    pub(crate) id: Arc<TransitionId>,
     pub(crate) implementation: FrozenValue,
     pub(crate) refs: SmallMap<FrozenStringValue, ProvidersLabel>,
     pub(crate) attrs_names: Option<Vec<FrozenStringValue>>,
@@ -154,32 +157,14 @@ impl Freeze for Transition<'_> {
             None if !self.inputs.is_empty() || !self.outputs.is_empty() => {
                 Arc::new(TransitionId::AnonymousBazel {
                     path: self.path.clone(),
-                    name: "_anonymous_bazel_transition".to_owned(),
+                    name: next_anonymous_transition_name(&self.path, "bazel"),
                     outputs: Arc::from(self.outputs.clone().into_boxed_slice()),
                 })
             }
-            None => {
-                use std::collections::HashMap;
-                use std::sync::Mutex;
-                use std::sync::atomic::AtomicU64;
-                use std::sync::atomic::Ordering;
-                // Use per-path counters so that the same module always produces
-                // the same IDs regardless of cross-module evaluation order.
-                static PER_PATH_COUNTERS: std::sync::LazyLock<
-                    Mutex<HashMap<ImportPath, AtomicU64>>,
-                > = std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
-                let n = {
-                    let mut counters = PER_PATH_COUNTERS.lock().unwrap();
-                    let counter = counters
-                        .entry(self.path.clone())
-                        .or_insert_with(|| AtomicU64::new(0));
-                    counter.fetch_add(1, Ordering::Relaxed)
-                };
-                Arc::new(TransitionId::MagicObject {
-                    path: self.path.clone(),
-                    name: format!("_anonymous_{}", n),
-                })
-            }
+            None => Arc::new(TransitionId::MagicObject {
+                path: self.path.clone(),
+                name: next_anonymous_transition_name(&self.path, "legacy"),
+            }),
         };
         let refs = self
             .refs
@@ -218,13 +203,13 @@ impl TransitionValue for Transition<'_> {
             *id = Some(if !self.inputs.is_empty() || !self.outputs.is_empty() {
                 Arc::new(TransitionId::AnonymousBazel {
                     path: self.path.clone(),
-                    name: "_anonymous_bazel_transition".to_owned(),
+                    name: next_anonymous_transition_name(&self.path, "bazel"),
                     outputs: Arc::from(self.outputs.clone().into_boxed_slice()),
                 })
             } else {
                 Arc::new(TransitionId::MagicObject {
                     path: self.path.clone(),
-                    name: "_anonymous_transition".to_owned(),
+                    name: next_anonymous_transition_name(&self.path, "legacy"),
                 })
             });
         }
@@ -236,6 +221,22 @@ impl TransitionValue for FrozenTransition {
     fn transition_id(&self) -> slug_error::Result<Arc<TransitionId>> {
         Ok(self.id.dupe())
     }
+}
+
+fn next_anonymous_transition_name(path: &ImportPath, kind: &str) -> String {
+    use std::collections::HashMap;
+    // Use per-path counters so that the same module always produces the same
+    // IDs regardless of cross-module evaluation order.
+    static PER_PATH_COUNTERS: LazyLock<Mutex<HashMap<ImportPath, AtomicU64>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+    let n = {
+        let mut counters = PER_PATH_COUNTERS.lock().unwrap();
+        let counter = counters
+            .entry(path.clone())
+            .or_insert_with(|| AtomicU64::new(0));
+        counter.fetch_add(1, Ordering::Relaxed)
+    };
+    format!("_anonymous_{kind}_{n}")
 }
 
 pub(crate) struct ParamNameAndType {

@@ -299,10 +299,17 @@ fn build_setting_label_from_transition_label(
     }
 
     if raw.starts_with("//") {
-        if let TransitionId::MagicObject { path, .. } | TransitionId::AnonymousBazel { path, .. } =
-            transition_id
-        {
-            return BuildSettingLabel::from_bazel_label(&format!("@{}{}", path.cell(), raw));
+        match transition_id {
+            TransitionId::MagicObject { path, .. } | TransitionId::AnonymousBazel { path, .. } => {
+                return BuildSettingLabel::from_bazel_label(&format!("@{}{}", path.cell(), raw));
+            }
+            TransitionId::Target(label) => {
+                return BuildSettingLabel::from_bazel_label(&format!(
+                    "@{}{}",
+                    label.target().pkg().cell_name(),
+                    raw
+                ));
+            }
         }
     }
 
@@ -632,17 +639,6 @@ async fn do_apply_transition(
         return Ok(TransitionApplied::Single(conf.dupe()));
     }
 
-    if let TransitionId::AnonymousBazel { outputs, .. } = transition_id {
-        let output_defaults = transition_output_defaults(ctx, transition_id, outputs).await?;
-        return apply_anonymous_bazel_transition(
-            conf,
-            transition_id,
-            &output_defaults,
-            outputs,
-            bazel_all_attrs,
-        );
-    }
-
     // Legacy anonymous transitions are not bound to module-level globals and
     // do not carry declared Bazel outputs. Keep the old no-op behavior for
     // that unsupported shape.
@@ -652,7 +648,24 @@ async fn do_apply_transition(
         }
     }
 
-    let transition = ctx.fetch_transition(transition_id).await?;
+    let transition = match ctx.fetch_transition(transition_id).await {
+        Ok(transition) => transition,
+        Err(e) if matches!(transition_id, TransitionId::AnonymousBazel { .. }) => {
+            if let TransitionId::AnonymousBazel { outputs, .. } = transition_id {
+                let output_defaults =
+                    transition_output_defaults(ctx, transition_id, outputs).await?;
+                return apply_anonymous_bazel_transition(
+                    conf,
+                    transition_id,
+                    &output_defaults,
+                    outputs,
+                    bazel_all_attrs,
+                );
+            }
+            return Err(e);
+        }
+        Err(e) => return Err(e),
+    };
     let output_defaults = if transition.is_bazel_style() {
         transition_output_defaults(ctx, transition_id, transition.outputs()).await?
     } else {
@@ -948,6 +961,8 @@ mod tests {
     use slug_core::configuration::data::ConfigurationData;
     use slug_core::configuration::data::ConfigurationDataData;
     use slug_core::configuration::transition::id::TransitionId;
+    use slug_core::provider::label::ProvidersLabel;
+    use slug_core::target::label::label::TargetLabel;
     use slug_node::attrs::configured_attr::ConfiguredAttr;
 
     fn llvm_transition_id() -> TransitionId {
@@ -1074,6 +1089,21 @@ mod tests {
         let label =
             super::build_setting_label_from_transition_label("//config:ubsan", &transition_id)?;
         let expected = BuildSettingLabel::from_bazel_label("@llvm//config:ubsan")?;
+        assert_eq!(label, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn target_relative_build_setting_labels_use_defining_cell() -> slug_error::Result<()> {
+        let transition_id = TransitionId::Target(ProvidersLabel::default_for(
+            TargetLabel::testing_parse("rules_rust//rust/private:defs.bzl"),
+        ));
+        let label = super::build_setting_label_from_transition_label(
+            "//rust/private:bootstrap_setting",
+            &transition_id,
+        )?;
+        let expected =
+            BuildSettingLabel::from_bazel_label("@rules_rust//rust/private:bootstrap_setting")?;
         assert_eq!(label, expected);
         Ok(())
     }

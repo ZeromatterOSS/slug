@@ -1132,6 +1132,13 @@ fn verify_transitioned_attrs(
     node: &ConfiguredTargetNode,
 ) -> slug_error::Result<()> {
     for (attr, attr_value) in pre_transition_attrs {
+        // Bazel evaluates compatibility under the post-incoming-transition
+        // configuration; rules_rust's process_wrapper relies on this.
+        if *attr == TARGET_COMPATIBLE_WITH_ATTRIBUTE.name
+            || *attr == LEGACY_TARGET_COMPATIBLE_WITH_ATTRIBUTE.name
+        {
+            continue;
+        }
         let transition_configured_attr = node
             .get(attr, AttrInspectOptions::All)
             .with_internal_error(|| {
@@ -1480,7 +1487,6 @@ async fn compute_configured_target_node(
                 _ => unreachable!("Verified by attr coercer"),
             }),
     };
-
     if let Some(transition_id) = transition_id {
         compute_configured_forward_target_node(key, &target_node, &transition_id, ctx).await
     } else {

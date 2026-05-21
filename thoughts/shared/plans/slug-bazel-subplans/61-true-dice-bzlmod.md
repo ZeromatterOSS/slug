@@ -4290,6 +4290,75 @@ Implementation update 2026-05-21, repository output-state markers:
   `agent thread limit reached`, so the work continued locally per the parity
   loop prompt's single-agent fallback.
 
+Implementation update 2026-05-21, rules_rust bootstrap transition parity:
+
+- Bazel ground truth: Bazel 9 analyzes the generated rust toolchain target
+  successfully with the Linux GNU host platform:
+  `bazel --output_user_root=/var/mnt/dev/.bazel-cache/output-user-root build
+  --nobuild --platforms='//bazel/platforms:linux-gnu-host'
+  '@@rules_rs++toolchains+default_rust_toolchains//:linux_x86_64_1_95_0_rust_toolchain'`.
+  A focused Bazel cquery of
+  `deps(@rules_rust//util/process_wrapper:process_wrapper, 1)` shows
+  `rust_binary_without_process_wrapper rule
+  @rules_rust//util/process_wrapper:process_wrapper` and
+  `rust_toolchain rule
+  @default_rust_toolchains//:linux_x86_64_1_95_0_rust_toolchain_bootstrap`.
+  This establishes that the process wrapper must resolve the bootstrap rust
+  toolchain, not the normal rust toolchain.
+- Source anchor: generated `rules_rust` defines
+  `_bootstrap_process_wrapper_transition` in
+  `/var/mnt/dev/.bazel-cache/output-user-root/c8eb594982e41e16cf66122e20b2bc26/external/rules_rs++rules_rust+rules_rust/rust/private/rust.bzl:1438-1468`,
+  where the transition writes
+  `Label("//rust/private:bootstrap_setting") = True`, and attaches it as
+  `cfg` on `rust_binary_without_process_wrapper`.
+  `rust/private/BUILD.bazel:84-101` defines `bootstrap_setting` plus
+  target-setting `config_setting`s for `bootstrapping` and `bootstrapped`.
+- Failure diagnosis: Slug initially selected
+  `rules_rs++toolchains+default_rust_toolchains//:linux_x86_64_1_95_0_rust_toolchain`
+  for
+  `rules_rs++rules_rust+rules_rust//util/process_wrapper:process_wrapper`
+  (`/tmp/slug-plan61/plan61-bootstrap-selection-fixed-20260521-143857.log`).
+  Target-setting debug showed the configured node had no bootstrap build
+  setting (`/tmp/slug-plan61/plan61-configsetting-debug-20260521-144206.log`),
+  and configured-node debug showed
+  `rust_binary_without_process_wrapper incoming_transition=None`
+  (`/tmp/slug-plan61/plan61-process-wrapper-ruletype-20260521-145945.log`).
+  Rule-freeze debug then isolated the systemic bzlmod issue: apparent
+  `rules_rust//rust/private/rust.bzl` retained the fixed cfg, while the
+  generated `rules_rs++rules_rust+rules_rust` module lost it
+  (`/tmp/slug-plan61/plan61-freeze-rule-cfg-20260521-150053.log`).
+- Fix: preserve Bazel-style transition identity for this generated-repo path by
+  bridging `rust_binary_without_process_wrapper` back to the rules_rust
+  `_bootstrap_process_wrapper_transition`, and make transition lookup resilient
+  to bzlmod apparent/canonical divergence by retrying magic-object transition
+  lookup in the apparent repo cell derived from a generated repo cell. Relative
+  build-setting outputs from target-based transitions now qualify `//...`
+  labels against the defining target's cell, so
+  `//rust/private:bootstrap_setting` resolves to
+  `@rules_rust//rust/private:bootstrap_setting` when the transition is defined
+  by `@rules_rust`.
+- Clean validation passed:
+  `cargo test -p slug_transition
+  target_relative_build_setting_labels_use_defining_cell`,
+  `cargo test -p slug_analysis
+  config_setting_flag_values_accept_bazel_bool_spellings`,
+  `cargo test -p slug_analysis
+  build_setting_lookup_normalizes_bzlmod_repo_spellings`,
+  `cargo test -p slug_core
+  build_setting_labels_resolve_dynamic_extension_aliases`, and
+  `cargo build -p slug`.
+- Real-world smoke passed after removing temporary diagnostics:
+  `/tmp/slug-plan61/plan61-clean-smoke-20260521-151014.log` records
+  `BUILD SUCCEEDED` for
+  `slug --isolation-dir plan61-clean-smoke build --unstable-no-execution
+  --target-platforms='//bazel/platforms:linux-gnu-host'
+  'rules_rs++toolchains+default_rust_toolchains//:linux_x86_64_1_95_0_rust_toolchain'`.
+  The same log confirms Slug now resolves
+  `@@rules_rs++rules_rust+rules_rust//rust:toolchain_type` for
+  `process_wrapper` to
+  `rules_rs++toolchains+default_rust_toolchains//:linux_x86_64_1_95_0_rust_toolchain_bootstrap`,
+  matching the Bazel cquery.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

@@ -214,6 +214,12 @@ impl FrozenModule {
         self.module.names()
     }
 
+    /// Iterate through all the names defined in this module, including private symbols.
+    #[doc(hidden)]
+    pub fn names_any_visibility(&self) -> impl Iterator<Item = FrozenStringValue> + '_ {
+        self.module.all_items().map(|(name, _value)| name)
+    }
+
     /// Obtain the [`FrozenHeapRef`] which owns the storage of all values defined in this module.
     pub fn frozen_heap(&self) -> &FrozenHeapRef {
         &self.heap

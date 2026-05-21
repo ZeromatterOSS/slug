@@ -21,6 +21,7 @@ use dupe::Dupe;
 use pagable::Pagable;
 use strong_hash::StrongHash;
 
+use crate::cells;
 use crate::target::label::label::TargetLabel;
 
 /// Label that identifies a build-setting target.
@@ -67,7 +68,7 @@ impl BuildSettingLabel {
     pub fn from_bazel_label(raw: &str) -> slug_error::Result<Self> {
         const SYNTHETIC_CELL: &str = "@slug_settings";
 
-        let canon = if raw.starts_with('@') {
+        let mut canon = if raw.starts_with('@') {
             raw.to_owned()
         } else if let Some(rest) = raw.strip_prefix("//") {
             format!("{SYNTHETIC_CELL}//{rest}")
@@ -79,8 +80,39 @@ impl BuildSettingLabel {
             ));
         };
 
+        if let Some((prefix, rest)) = canon
+            .strip_prefix("@@")
+            .map(|rest| ("@@", rest))
+            .or_else(|| canon.strip_prefix('@').map(|rest| ("@", rest)))
+            && let Some((repo, package_and_target)) = rest.split_once("//")
+            && let Some(canonical) = cells::resolve_dynamic_extension_cell_alias(repo)
+        {
+            canon = format!("{prefix}{canonical}//{package_and_target}");
+        }
+
         let target = TargetLabel::testing_parse(&canon);
         Ok(BuildSettingLabel(target))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BuildSettingLabel;
+
+    #[test]
+    fn build_setting_labels_resolve_dynamic_extension_aliases() {
+        crate::cells::register_dynamic_extension_cell_alias(
+            "rules_rs++rules_rust+rules_rust".to_owned(),
+            "rules_rust+".to_owned(),
+        );
+
+        let label = BuildSettingLabel::from_bazel_label(
+            "@@rules_rs++rules_rust+rules_rust//rust/private:bootstrap_setting",
+        )
+        .unwrap();
+
+        assert_eq!(label.target().pkg().cell_name().as_str(), "rules_rust+");
+        assert_eq!(label.target().name().as_str(), "bootstrap_setting");
     }
 }
 

@@ -340,6 +340,11 @@ pub fn resolve_toolchains(
                     continue;
                 }
 
+                // Check Bazel `toolchain(target_settings = ...)` filters.
+                if !target_platform.satisfies(&tc_info.target_settings) {
+                    continue;
+                }
+
                 // First match wins
                 found = Some(ResolvedToolchain {
                     toolchain_target: tc_label.clone(),
@@ -411,8 +416,8 @@ pub fn resolve_toolchains(
         ));
         for (lbl, info) in registrations.iter().take(3) {
             diag.push_str(&format!(
-                "      - {}: exec_compat={:?}, target_compat={:?}\n",
-                lbl, info.exec_compatible_with, info.target_compatible_with
+                "      - {}: exec_compat={:?}, target_compat={:?}, target_settings={:?}\n",
+                lbl, info.exec_compatible_with, info.target_compatible_with, info.target_settings
             ));
         }
     }

@@ -18,6 +18,7 @@ use derive_more::Display;
 use dupe::Dupe;
 use either::Either;
 use itertools::Itertools;
+use slug_core::configuration::transition::id::TransitionId;
 use slug_core::plugins::PluginKind;
 use slug_core::plugins::PluginKindSet;
 use slug_error::BuckErrorContext;
@@ -373,7 +374,6 @@ impl<'v> StarlarkRuleCallable<'v> {
             (None, Some(true)) => RuleIncomingTransition::FromAttribute,
             (None, Some(false) | None) => RuleIncomingTransition::None,
         };
-
         let rule_kind = match (is_configuration_rule, is_toolchain_rule) {
             (false, false) => RuleKind::Normal,
             (true, false) => RuleKind::Configuration,
@@ -594,6 +594,31 @@ impl<'v> Freeze for RuleImpl<'v> {
     }
 }
 
+fn rules_rust_bootstrap_process_wrapper_cfg(
+    rule_type: &StarlarkRuleType,
+    rule_name: &str,
+    cfg: RuleIncomingTransition,
+) -> RuleIncomingTransition {
+    if cfg != RuleIncomingTransition::None || rule_name != "rust_binary_without_process_wrapper" {
+        return cfg;
+    }
+    let BzlOrBxlPath::Bzl(path) = &rule_type.path else {
+        return cfg;
+    };
+    if path.path().path().as_str() != "rust/private/rust.bzl" {
+        return cfg;
+    }
+    let cell = path.cell();
+    let cell_name = cell.as_str();
+    if cell_name != "rules_rust" && !cell_name.contains("rules_rust") {
+        return cfg;
+    }
+    RuleIncomingTransition::Fixed(Arc::new(TransitionId::MagicObject {
+        path: path.clone(),
+        name: "_bootstrap_process_wrapper_transition".to_owned(),
+    }))
+}
+
 impl<'v> Freeze for StarlarkRuleCallable<'v> {
     type Frozen = FrozenStarlarkRuleCallable;
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
@@ -609,6 +634,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
         };
         let rule_type = Arc::new(id);
         let rule_name = rule_type.name.to_owned();
+        let cfg = rules_rust_bootstrap_process_wrapper_cfg(&rule_type, &rule_name, self.cfg);
 
         // For StarlarkRuleCallable, it doesn't rely on `signature` to get the default value, instead we get the default value from `Rule.attributes`,
         // so use `signature(rule_name)` method here.
@@ -630,7 +656,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             rule: Arc::new(Rule {
                 attributes: self.attributes,
                 rule_type: RuleType::Starlark(rule_type.dupe()),
-                cfg: self.cfg,
+                cfg,
                 rule_kind: self.rule_kind,
                 uses_plugins: self.uses_plugins,
                 is_test: self.is_test,
@@ -1339,10 +1365,12 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             }
         };
 
+        let cfg_value = cfg.map(|v| v.get());
+
         Ok(StarlarkRuleCallable::new(
             RuleImpl::BuildRule(StarlarkCallable::unchecked_new(impl_fn.0)),
             attrs,
-            cfg.map(|v| v.get()),
+            cfg_value,
             supports_incoming_transition,
             doc,
             is_configuration_rule,

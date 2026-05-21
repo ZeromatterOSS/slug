@@ -318,7 +318,7 @@ fn active_analysis_key_count() -> usize {
         .len()
 }
 
-fn set_active_analysis_phase(
+pub(crate) fn set_active_analysis_phase(
     target: &ConfiguredTargetLabel,
     phase: &'static str,
     current_dep: Option<&ConfiguredTargetLabel>,
@@ -635,10 +635,19 @@ pub async fn get_dep_analysis<'v>(
     ctx: &mut DiceComputations<'_>,
 ) -> slug_error::Result<Vec<(&'v ConfiguredTargetLabel, AnalysisResult)>> {
     let started = Instant::now();
-    let labels = configured_node
+    let mut labels = configured_node
         .deps()
         .map(|dep| dep.label())
         .collect::<Vec<_>>();
+
+    // Bazel 9 can analyze rules_rust's empty allocator bootstrap target even
+    // though the selected Rust toolchain neighborhood leads back through
+    // allocator libraries. Let exactly that bootstrap rule run its implementation
+    // with the narrow ctx.toolchains shim instead of requiring all deps first.
+    if is_empty_rust_allocator_libraries_bootstrap_node(configured_node) {
+        labels.clear();
+    }
+
     let total_deps = labels.len();
     let mut results = Vec::with_capacity(labels.len());
     analysis_dep_checkpoint(
@@ -709,6 +718,22 @@ pub async fn get_dep_analysis<'v>(
         }
     }
     Ok(results)
+}
+
+fn is_empty_rust_allocator_libraries_bootstrap_node(
+    configured_node: ConfiguredTargetNodeRef<'_>,
+) -> bool {
+    if configured_node.rule_type().name() != "rust_allocator_libraries" {
+        return false;
+    }
+    let label = configured_node.label().unconfigured();
+    if label.name().as_str() != "empty_allocator_libraries" {
+        return false;
+    }
+    let pkg = label.pkg();
+    let cell = pkg.cell_name().as_str();
+    let package = pkg.cell_relative_path().as_str();
+    package == "ffi/rs" && (cell == "rules_rust" || cell == "rules_rs++rules_rust+rules_rust")
 }
 
 /// Check whether all `flag_values` entries in a `config_setting` target match their
@@ -813,29 +838,12 @@ async fn check_config_setting_flag_values(
         //     default is the full tool name list. Every
         //     `driver-tools-include-<tool>` config_setting should match
         //     against the default because each tool is in the list.
-        let cfg_value: Option<BuildSettingValue> = {
-            let canonical_label = BuildSettingLabel::new(flag_target_label.dupe());
-            configured_node
-                .label()
-                .cfg()
-                .get_build_setting(&canonical_label)
-                .ok()
-                .flatten()
-                .cloned()
-                .or_else(|| {
-                    BuildSettingLabel::from_bazel_label(&flag_label_str)
-                        .ok()
-                        .and_then(|l| {
-                            configured_node
-                                .label()
-                                .cfg()
-                                .get_build_setting(&l)
-                                .ok()
-                                .flatten()
-                                .cloned()
-                        })
-                })
-        };
+        let cfg_value = get_configured_build_setting_value(
+            configured_node,
+            &flag_target_label,
+            &flag_label_str,
+        )
+        .await?;
 
         let (scalar_actual, list_actual): (Option<String>, Option<Vec<String>>) =
             if let Some(value) = &cfg_value {
@@ -894,7 +902,7 @@ async fn check_config_setting_flag_values(
             };
 
         let matched = match (&scalar_actual, &list_actual) {
-            (Some(actual), _) => actual == &expected_str,
+            (Some(actual), _) => config_setting_flag_value_matches(actual, &expected_str),
             (_, Some(list)) => list.iter().any(|v| v == &expected_str),
             _ => false,
         };
@@ -904,6 +912,82 @@ async fn check_config_setting_flag_values(
     }
 
     Ok(true) // All flag_values match their build_setting_defaults
+}
+
+fn config_setting_flag_value_matches(actual: &str, expected: &str) -> bool {
+    if actual == expected {
+        return true;
+    }
+
+    match normalize_bazel_bool_flag_value(actual) {
+        Some(actual) => normalize_bazel_bool_flag_value(expected) == Some(actual),
+        None => false,
+    }
+}
+
+async fn get_configured_build_setting_value(
+    configured_node: ConfiguredTargetNodeRef<'_>,
+    flag_target_label: &TargetLabel,
+    flag_label_str: &str,
+) -> slug_error::Result<Option<BuildSettingValue>> {
+    let cfg = configured_node.label().cfg();
+    let canonical_label = BuildSettingLabel::new(flag_target_label.dupe());
+    if let Some(value) = cfg.get_build_setting(&canonical_label)? {
+        return Ok(Some(value.clone()));
+    }
+
+    if let Some(value) = BuildSettingLabel::from_bazel_label(flag_label_str)
+        .ok()
+        .and_then(|label| cfg.get_build_setting(&label).ok().flatten().cloned())
+    {
+        return Ok(Some(value));
+    }
+
+    // Bazel's bzlmod labels for the same repository can appear under an
+    // apparent repo, selected canonical repo, or generated extension repo
+    // spelling. `rules_rust` transitions return `str(Label(...))`, while
+    // sibling `config_setting(flag_values=...)` keys are parsed in the package
+    // repo. Match the build-setting key by target identity after normalizing
+    // those repo spellings so target_settings filters observe the transition.
+    let wanted_pkg = flag_target_label.pkg().cell_relative_path().as_str();
+    let wanted_name = flag_target_label.name().as_str();
+    let wanted_cell = normalized_bzlmod_repo_name(flag_target_label.pkg().cell_name().as_str());
+    for (label, value) in &cfg.data()?.build_settings {
+        let target = label.target();
+        if target.name().as_str() != wanted_name {
+            continue;
+        }
+        let pkg = target.pkg();
+        if pkg.cell_relative_path().as_str() != wanted_pkg {
+            continue;
+        }
+        if normalized_bzlmod_repo_name(pkg.cell_name().as_str()) == wanted_cell {
+            return Ok(Some(value.clone()));
+        }
+    }
+
+    Ok(None)
+}
+
+fn normalize_bazel_bool_flag_value(value: &str) -> Option<bool> {
+    match value {
+        "1" | "true" | "True" => Some(true),
+        "0" | "false" | "False" => Some(false),
+        _ => None,
+    }
+}
+
+fn normalized_bzlmod_repo_name(repo: &str) -> String {
+    let repo = slug_core::cells::resolve_dynamic_extension_cell_alias(repo)
+        .unwrap_or_else(|| repo.to_owned());
+    let repo = if let Some((_, rest)) = repo.split_once("++") {
+        rest.rsplit_once('+')
+            .map(|(_, internal_repo)| internal_repo.to_owned())
+            .unwrap_or(repo)
+    } else {
+        repo
+    };
+    repo.strip_suffix('+').unwrap_or(&repo).to_owned()
 }
 
 /// Check whether all `values` entries in a `config_setting` target match the current config.
@@ -1299,6 +1383,13 @@ async fn get_analysis_result_inner(
 
     let ((res, now), spans): ((slug_error::Result<_>, _), _) = match configured_node.rule_type() {
         RuleType::Starlark(func) => {
+            let rule_spec = get_rule_spec(ctx, func).await?;
+            let toolchain_dep_analysis = crate::analysis::env::get_resolved_toolchain_dep_analysis(
+                ctx,
+                configured_node,
+                &rule_spec,
+            )
+            .await?;
             let dep_analysis = get_dep_analysis(configured_node, ctx).await?;
             let query_results = resolve_queries(ctx, configured_node).await?;
             dep_analysis_checkpoint(
@@ -1325,7 +1416,6 @@ async fn get_analysis_result_inner(
 
             let now = TimeSpan::start_now();
             let (res, spans) = async_record_root_spans(async {
-                let rule_spec = get_rule_spec(ctx, func).await?;
                 let start_event = slug_data::AnalysisStart {
                     target: Some(target.as_proto().into()),
                     rule: func.to_string(),
@@ -1347,6 +1437,7 @@ async fn get_analysis_result_inner(
                                 ctx,
                                 target,
                                 dep_analysis,
+                                toolchain_dep_analysis,
                                 query_results,
                                 configured_node.execution_platform_resolution(),
                                 &rule_spec,
@@ -1549,4 +1640,35 @@ pub struct AnalysisKeyActivationData {
 #[derive(Clone)]
 pub struct AnalysisWithExtraData {
     pub target_rule_type_name: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::config_setting_flag_value_matches;
+    use super::normalized_bzlmod_repo_name;
+
+    #[test]
+    fn config_setting_flag_values_accept_bazel_bool_spellings() {
+        assert!(config_setting_flag_value_matches("True", "1"));
+        assert!(config_setting_flag_value_matches("False", "0"));
+        assert!(config_setting_flag_value_matches("true", "True"));
+        assert!(config_setting_flag_value_matches("false", "False"));
+        assert!(!config_setting_flag_value_matches("True", "0"));
+        assert!(!config_setting_flag_value_matches("opt", "1"));
+    }
+
+    #[test]
+    fn build_setting_lookup_normalizes_bzlmod_repo_spellings() {
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            "rules_rs++rules_rust+rules_rust".to_owned(),
+            "rules_rust+".to_owned(),
+        );
+
+        assert_eq!(
+            normalized_bzlmod_repo_name("rules_rs++rules_rust+rules_rust"),
+            "rules_rust"
+        );
+        assert_eq!(normalized_bzlmod_repo_name("rules_rust+"), "rules_rust");
+        assert_eq!(normalized_bzlmod_repo_name("rules_rust"), "rules_rust");
+    }
 }

@@ -832,6 +832,13 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
         }
     }
 
+    pub fn toolchain_types(self) -> &'a [(String, bool)] {
+        match &self.0.get().target_node {
+            TargetNodeOrForward::TargetNode(target_node) => target_node.toolchain_types(),
+            TargetNodeOrForward::Forward(_, _) => &[],
+        }
+    }
+
     pub fn exec_group_defs(self) -> &'a [(String, crate::rule::ExecGroupDef)] {
         match &self.0.get().target_node {
             TargetNodeOrForward::TargetNode(target_node) => target_node.exec_group_defs(),

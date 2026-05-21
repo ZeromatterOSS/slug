@@ -370,13 +370,21 @@ pub(crate) mod rule_defs {
         let toolchain_impl_attr = Attribute::new(
             None, // required
             "The toolchain implementation target",
-            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+            AttrType::label(),
+        );
+        let target_settings_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            "Config settings that must match for this toolchain to be selected",
+            AttrType::list(AttrType::configuration_dep(
+                slug_node::attrs::attr_type::configuration_dep::ConfigurationDepKind::CompatibilityAttribute,
+            )),
         );
 
         AttributeSpec::from(
             vec![
                 ("toolchain_type".to_owned(), toolchain_type_attr),
                 ("toolchain".to_owned(), toolchain_impl_attr),
+                ("target_settings".to_owned(), target_settings_attr),
             ],
             false,
             &RuleIncomingTransition::None,
@@ -1954,14 +1962,16 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = (tags, testonly, deprecation, target_settings);
+        let _ = (tags, testonly, deprecation);
         let internals = ModuleInternals::from_context(eval, "toolchain")?;
         let coercion_ctx = internals.attr_coercion_context();
 
         let dep_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let label_type = AttrType::label();
         let coerced_toolchain_type =
             dep_type.coerce(AttrIsConfigurable::No, coercion_ctx, toolchain_type)?;
-        let coerced_toolchain = dep_type.coerce(AttrIsConfigurable::No, coercion_ctx, toolchain)?;
+        let coerced_toolchain =
+            label_type.coerce(AttrIsConfigurable::No, coercion_ctx, toolchain)?;
 
         // Coerce exec_compatible_with / target_compatible_with (lists of
         // constraint_value labels) so toolchain resolution can compare an
@@ -1985,6 +1995,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             };
         let coerced_exec_compat = coerce_constraint_list(exec_compatible_with)?;
         let coerced_target_compat = coerce_constraint_list(target_compatible_with)?;
+        let coerced_target_settings = coerce_constraint_list(target_settings)?;
 
         let target_node = create_native_target_node(
             rule_defs::TOOLCHAIN_RULE.clone(),
@@ -1995,6 +2006,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("toolchain".to_owned(), coerced_toolchain),
                 ("exec_compatible_with".to_owned(), coerced_exec_compat),
                 ("target_compatible_with".to_owned(), coerced_target_compat),
+                ("target_settings".to_owned(), coerced_target_settings),
             ],
             &extract_visibility_strings(visibility),
             internals.attr_coercion_context(),

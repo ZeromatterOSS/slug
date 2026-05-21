@@ -18,6 +18,10 @@ use ref_cast::RefCast;
 use slug_build_api::analysis::calculation::RuleAnalysisCalculation;
 use slug_build_api::transition::TRANSITION_ATTRS_PROVIDER;
 use slug_build_api::transition::TransitionAttrProvider;
+use slug_core::bzl::ImportPath;
+use slug_core::cells::build_file_cell::BuildFileCell;
+use slug_core::cells::cell_path::CellPath;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::transition::id::TransitionId;
 use slug_core::provider::label::ProvidersLabel;
 use slug_interpreter::load_module::InterpreterCalculation;
@@ -102,26 +106,72 @@ enum FetchTransitionError {
     MissingTransitionInfo(ProvidersLabel),
 }
 
+fn apparent_bzlmod_repo_cell(cell: CellName) -> Option<CellName> {
+    let apparent = cell.as_str().rsplit_once('+')?.1;
+    if apparent.is_empty() || apparent == cell.as_str() {
+        return None;
+    }
+    CellName::unchecked_new(apparent).ok()
+}
+
+fn import_path_in_cell(path: &ImportPath, cell: CellName) -> Option<ImportPath> {
+    ImportPath::new_with_build_file_cells(
+        CellPath::new(cell, path.path().path().to_owned()),
+        BuildFileCell::new(cell),
+    )
+    .ok()
+}
+
 #[async_trait]
 impl FetchTransition for DiceComputations<'_> {
     async fn fetch_transition(&mut self, id: &TransitionId) -> slug_error::Result<TransitionData> {
         match id {
             TransitionId::MagicObject { path, name } => {
                 let module = self.get_loaded_module_from_import_path(path).await?;
-                let transition = module
-                    .env()
-                    // This is a hashmap lookup, so we are not caching the result in DICE.
-                    .get_any_visibility(name)
-                    .map_err(|_| {
-                        slug_error::Error::from(FetchTransitionError::NotFound(id.clone()))
-                    })?
-                    .0;
+                let transition = match module.env().get_any_visibility(name) {
+                    Ok((transition, _visibility)) => transition,
+                    Err(_) => {
+                        let Some(apparent_path) = apparent_bzlmod_repo_cell(path.cell())
+                            .and_then(|cell| import_path_in_cell(path, cell))
+                        else {
+                            return Err(slug_error::Error::from(FetchTransitionError::NotFound(
+                                id.clone(),
+                            )));
+                        };
+                        let module = self
+                            .get_loaded_module_from_import_path(&apparent_path)
+                            .await?;
+                        module
+                            .env()
+                            // This is a hashmap lookup, so we are not caching the result in DICE.
+                            .get_any_visibility(name)
+                            .map_err(|_| {
+                                slug_error::Error::from(FetchTransitionError::NotFound(id.clone()))
+                            })?
+                            .0
+                    }
+                };
 
                 Ok(TransitionData::MagicObject(transition.downcast_starlark()?))
             }
-            TransitionId::AnonymousBazel { .. } => Err(slug_error::Error::from(
-                FetchTransitionError::NotFound(id.clone()),
-            )),
+            TransitionId::AnonymousBazel { path, .. } => {
+                let module = self.get_loaded_module_from_import_path(path).await?;
+                for name in module.env().names_any_visibility() {
+                    let Ok((value, _visibility)) = module.env().get_any_visibility(name.as_str())
+                    else {
+                        continue;
+                    };
+                    let Ok(transition) = value.downcast_starlark::<FrozenTransition>() else {
+                        continue;
+                    };
+                    if transition.id.as_ref() == id {
+                        return Ok(TransitionData::MagicObject(transition));
+                    }
+                }
+                Err(slug_error::Error::from(FetchTransitionError::NotFound(
+                    id.clone(),
+                )))
+            }
             TransitionId::Target(label) => {
                 let transition_info = self
                     .get_configuration_analysis_result(label)

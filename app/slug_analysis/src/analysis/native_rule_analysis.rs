@@ -97,6 +97,8 @@ pub struct DeclaredToolchainInfo {
     pub exec_compatible_with: Vec<String>,
     /// Constraint values the target platform must satisfy
     pub target_compatible_with: Vec<String>,
+    /// Config settings that must match the target configuration
+    pub target_settings: Vec<String>,
 }
 
 /// Global registry of declared toolchains, populated during analysis of `toolchain()` targets.
@@ -1225,13 +1227,13 @@ fn make_native_analysis_result(
 fn analyze_toolchain(
     target: &ConfiguredTargetLabel,
     configured_node: ConfiguredTargetNodeRef,
-    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    _dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> slug_error::Result<AnalysisResult> {
     let label_str = target.unconfigured().to_string();
 
-    // Extract toolchain_type and toolchain impl labels from deps.
-    // The toolchain() rule has exactly two user attrs: "toolchain_type" and "toolchain".
-    // These are deps, so their labels appear in dep_analysis.
+    // Bazel's native toolchain rule keeps `toolchain` as a NODEP_LABEL:
+    // declarations should not analyze implementation targets until toolchain
+    // resolution selects them.
     let mut toolchain_type_label = String::new();
     let mut toolchain_impl_label = String::new();
 
@@ -1242,8 +1244,14 @@ fn analyze_toolchain(
                 toolchain_type_label = dep.label.target().unconfigured().to_string();
             }
         } else if attr_full.name == "toolchain" {
-            if let ConfiguredAttr::Dep(dep) = &attr_full.value {
-                toolchain_impl_label = dep.label.target().unconfigured().to_string();
+            match &attr_full.value {
+                ConfiguredAttr::Dep(dep) => {
+                    toolchain_impl_label = dep.label.target().unconfigured().to_string();
+                }
+                ConfiguredAttr::Label(label) => {
+                    toolchain_impl_label = label.target().unconfigured().to_string();
+                }
+                _ => {}
             }
         }
     }
@@ -1252,14 +1260,20 @@ fn analyze_toolchain(
     // These are list-of-label attrs. We extract the label strings.
     let mut exec_compat = Vec::new();
     let mut target_compat = Vec::new();
+    let mut target_settings = Vec::new();
 
     for attr_full in configured_node.attrs(AttrInspectOptions::All) {
-        if attr_full.name == "exec_compatible_with" || attr_full.name == "target_compatible_with" {
+        if attr_full.name == "exec_compatible_with"
+            || attr_full.name == "target_compatible_with"
+            || attr_full.name == "target_settings"
+        {
             let labels = extract_label_strings_from_attr(&attr_full.value);
             if attr_full.name == "exec_compatible_with" {
                 exec_compat = labels;
-            } else {
+            } else if attr_full.name == "target_compatible_with" {
                 target_compat = labels;
+            } else {
+                target_settings = labels;
             }
         }
     }
@@ -1273,6 +1287,7 @@ fn analyze_toolchain(
             cc_toolchain_module_map: None,
             exec_compatible_with: exec_compat,
             target_compatible_with: target_compat,
+            target_settings,
         };
         tracing::debug!(
             "Registered toolchain '{}': type='{}', impl='{}'",

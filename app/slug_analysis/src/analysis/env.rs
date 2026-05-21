@@ -42,6 +42,7 @@ use slug_build_api::interpreter::rule_defs::context::normalize_toolchain_type_la
 use slug_build_api::interpreter::rule_defs::context::rust_allocator_bootstrap_toolchain_provider_collection;
 use slug_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use slug_build_api::interpreter::rule_defs::provider::ValueAsProviderLike;
+use slug_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
 use slug_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::FrozenExternalRunnerTestInfo;
 use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_external_runner_test_info_for_bazel_test;
@@ -110,6 +111,7 @@ use crate::analysis::native_rule_analysis::DeclaredToolchainInfo;
 use crate::analysis::native_rule_analysis::DeferredToolchain;
 use crate::analysis::native_rule_analysis::deferred_all_loaded;
 use crate::analysis::native_rule_analysis::deferred_key_already_loaded;
+use crate::analysis::native_rule_analysis::get_declared_toolchains;
 use crate::analysis::native_rule_analysis::get_deferred_toolchains;
 use crate::analysis::native_rule_analysis::mark_deferred_all_loaded;
 use crate::analysis::native_rule_analysis::mark_deferred_key_loaded;
@@ -481,6 +483,7 @@ pub trait RuleSpec: Sync {
 struct AnalysisEnv<'a> {
     rule_spec: &'a dyn RuleSpec,
     deps: Vec<(&'a ConfiguredTargetLabel, AnalysisResult)>,
+    toolchain_deps: Vec<(ConfiguredTargetLabel, AnalysisResult)>,
     query_results: HashMap<String, Arc<AnalysisQueryResult>>,
     execution_platform: &'a ExecutionPlatformResolution,
     label: ConfiguredTargetLabel,
@@ -702,10 +705,11 @@ fn analysis_eval_phase_checkpoint(
     if !slug_util::memory_checkpoint::enabled() {
         return;
     }
-    if !should_emit_analysis_env_verbose_checkpoint(checkpoint) {
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    crate::analysis::calculation::set_active_analysis_phase(label, phase, None);
+    if elapsed_ms < 1_000 && !should_emit_analysis_env_verbose_checkpoint(checkpoint) {
         return;
     }
-    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
     slug_util::memory_checkpoint::checkpoint(
         checkpoint,
         [
@@ -864,10 +868,111 @@ fn is_rust_allocator_libraries_bootstrap_rule(
         && label.unconfigured().name().as_str() == "empty_allocator_libraries"
 }
 
+fn precomputed_toolchain_provider_collection(
+    deps: &[(&ConfiguredTargetLabel, AnalysisResult)],
+    toolchain_deps: &[(ConfiguredTargetLabel, AnalysisResult)],
+    target_label: &TargetLabel,
+) -> slug_error::Result<Option<FrozenProviderCollectionValue>> {
+    for (dep_label, analysis_result) in deps {
+        if dep_label.unconfigured() == target_label {
+            return Ok(Some(analysis_result.providers()?.to_owned()));
+        }
+    }
+    for (dep_label, analysis_result) in toolchain_deps {
+        if dep_label.unconfigured() == target_label {
+            return Ok(Some(analysis_result.providers()?.to_owned()));
+        }
+    }
+    Ok(None)
+}
+
+async fn configured_toolchain_impl_post_transition(
+    dice: &mut DiceComputations<'_>,
+    target_label: &TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+) -> slug_error::Result<ConfiguredTargetLabel> {
+    let configured = target_label.configure(target_cfg.dupe());
+    let node = dice
+        .get_internal_configured_target_node(&configured)
+        .await?
+        .require_compatible()?;
+    Ok(node.unwrap_forward().label().dupe())
+}
+
+pub(crate) async fn get_resolved_toolchain_dep_analysis(
+    dice: &mut DiceComputations<'_>,
+    node: ConfiguredTargetNodeRef<'_>,
+    rule_spec: &dyn RuleSpec,
+) -> slug_error::Result<Vec<(ConfiguredTargetLabel, AnalysisResult)>> {
+    let toolchain_types = rule_spec.toolchain_types();
+    let exec_group_defs = rule_spec.exec_group_defs();
+    if toolchain_types.is_empty() && exec_group_defs.is_empty() {
+        return Ok(Vec::new());
+    }
+    if is_rust_allocator_libraries_bootstrap_rule(rule_spec, node.label()) {
+        return Ok(Vec::new());
+    }
+
+    let registered_exec_platforms = dice.get_execution_platforms().await?;
+    let candidate_constraints: Vec<crate::analysis::toolchain_resolution::PlatformConstraints> =
+        match registered_exec_platforms.as_ref() {
+            Some(eps) => eps
+                .candidates()
+                .map(crate::analysis::toolchain_resolution::PlatformConstraints::from_execution_platform)
+                .collect(),
+            None => vec![
+                crate::analysis::toolchain_resolution::PlatformConstraints::host_platform(),
+            ],
+        };
+
+    let (default_result, exec_group_results) = resolve_toolchain_types(
+        dice,
+        toolchain_types,
+        exec_group_defs,
+        node,
+        &candidate_constraints,
+    )
+    .await?;
+
+    let target_cfg = node.label().cfg().dupe();
+    let mut configured_toolchains = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let groups = default_result
+        .into_iter()
+        .chain(exec_group_results.into_values());
+    for result in groups {
+        for (type_label, resolved) in &result.resolved_toolchains {
+            if is_cpp_toolchain_type_label(type_label) {
+                continue;
+            }
+            let Some(resolved) = resolved else {
+                continue;
+            };
+            let Some(target_label) = parse_impl_label_to_target_label(&resolved.toolchain_impl)
+            else {
+                continue;
+            };
+            let configured =
+                configured_toolchain_impl_post_transition(dice, &target_label, &target_cfg).await?;
+            if !seen.insert(configured.dupe()) {
+                continue;
+            }
+            let analysis = dice
+                .get_analysis_result(&configured)
+                .await?
+                .require_compatible()?;
+            configured_toolchains.push((configured, analysis));
+        }
+    }
+
+    Ok(configured_toolchains)
+}
+
 pub(crate) async fn run_analysis<'a>(
     dice: &'a mut DiceComputations<'_>,
     label: &ConfiguredTargetLabel,
     results: Vec<(&'a ConfiguredTargetLabel, AnalysisResult)>,
+    toolchain_results: Vec<(ConfiguredTargetLabel, AnalysisResult)>,
     query_results: HashMap<String, Arc<AnalysisQueryResult>>,
     execution_platform: &'a ExecutionPlatformResolution,
     rule_spec: &'a dyn RuleSpec,
@@ -878,6 +983,7 @@ pub(crate) async fn run_analysis<'a>(
     let analysis_env = AnalysisEnv {
         rule_spec,
         deps: results,
+        toolchain_deps: toolchain_results,
         query_results,
         execution_platform,
         label: label.dupe(),
@@ -1438,6 +1544,8 @@ fn parse_registered_toolchain_label(label: &str) -> Option<(String, String)> {
     if repo_name.is_empty() {
         return None;
     }
+    let repo_name = slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name)
+        .unwrap_or_else(|| repo_name.to_owned());
     let after_slashes = &stripped[slash_pos + 2..];
     // Extract package path (before the colon, if any)
     let pkg_path = if let Some(colon_pos) = after_slashes.find(':') {
@@ -1482,6 +1590,7 @@ fn extract_toolchain_info_from_node(
     let mut toolchain_impl = String::new();
     let mut exec_compat = Vec::new();
     let mut target_compat = Vec::new();
+    let mut target_settings = Vec::new();
 
     // Read all attributes (including internal ones for constraint lists)
     for attr in target_node.attrs(AttrInspectOptions::All) {
@@ -1498,6 +1607,9 @@ fn extract_toolchain_info_from_node(
             "target_compatible_with" => {
                 target_compat = extract_label_list_from_coerced_attr(&attr.value);
             }
+            "target_settings" => {
+                target_settings = extract_label_list_from_coerced_attr(&attr.value);
+            }
             _ => {}
         }
     }
@@ -1513,6 +1625,7 @@ fn extract_toolchain_info_from_node(
         cc_toolchain_module_map: None,
         exec_compatible_with: exec_compat,
         target_compatible_with: target_compat,
+        target_settings,
     })
 }
 
@@ -1570,6 +1683,8 @@ fn parse_impl_label_to_target_label(label: &str) -> Option<TargetLabel> {
     if repo_name.is_empty() {
         return None;
     }
+    let repo_name = slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name)
+        .unwrap_or_else(|| repo_name.to_owned());
     let after_slashes = &stripped[slash_pos + 2..];
 
     // Split into package path and target name
@@ -1585,7 +1700,7 @@ fn parse_impl_label_to_target_label(label: &str) -> Option<TargetLabel> {
         return None;
     }
 
-    let cell_name = CellName::unchecked_new(repo_name).ok()?;
+    let cell_name = CellName::unchecked_new(&repo_name).ok()?;
     let cell_rel_path = CellRelativePath::unchecked_new(pkg_path);
     let package_label =
         PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)).ok()?;
@@ -3315,7 +3430,8 @@ async fn run_analysis_with_env_underlying(
                 stage: Some(slug_data::analysis_stage_start::Stage::AttrEval(())),
             },
             || {
-                let mut dep_analysis_results = get_deps_from_analysis_results(analysis_env.deps)?;
+                let mut dep_analysis_results =
+                    get_deps_from_analysis_results(analysis_env.deps.clone())?;
 
                 // Phase 8h: Merge aspect providers into dependency provider collections.
                 // When a rule's attribute has aspects (e.g., deps with aspects=[cc_proto_aspect]),
@@ -3538,7 +3654,13 @@ async fn run_analysis_with_env_underlying(
                         let provider_value: Option<FrozenProviderCollectionValue> =
                             match parse_impl_label_to_target_label(&tc.toolchain_impl) {
 	                                Some(target_label) => {
-	                                    let configured = target_label.configure(target_cfg.dupe());
+	                                    let configured =
+	                                        configured_toolchain_impl_post_transition(
+	                                            dice,
+	                                            &target_label,
+	                                            &target_cfg,
+	                                        )
+	                                        .await?;
                                     let is_self_dependency = configured.eq(node.label());
                                     analysis_ctx_toolchain_provider_checkpoint(
                                         &analysis_env.label,
@@ -3660,121 +3782,49 @@ async fn run_analysis_with_env_underlying(
                                             evaluate_rule_started,
                                         );
                                         Some(rust_allocator_bootstrap_toolchain_provider_collection())
+                                    } else if let Some(precomputed) =
+                                        precomputed_toolchain_provider_collection(
+                                            &analysis_env.deps,
+                                            &analysis_env.toolchain_deps,
+                                            &target_label,
+                                        )?
+                                    {
+                                        analysis_ctx_toolchain_provider_checkpoint(
+                                            &analysis_env.label,
+                                            type_label,
+                                            &tc.toolchain_impl,
+                                            Some(&configured),
+                                            toolchain_index,
+                                            toolchain_count,
+                                            is_mandatory,
+                                            is_self_dependency,
+                                            10,
+                                            "precomputed_dep",
+                                            evaluate_rule_started,
+                                        );
+                                        Some(precomputed)
                                     } else {
-                                        let analysis_result =
-                                            dice.get_analysis_result(&configured).await;
-                                        match analysis_result {
-                                            Ok(slug_core::configuration::compatibility::MaybeCompatible::Compatible(analysis)) => {
-                                                analysis_ctx_toolchain_provider_checkpoint(
-                                                    &analysis_env.label,
-                                                    type_label,
-                                                    &tc.toolchain_impl,
-                                                    Some(&configured),
-                                                    toolchain_index,
-                                                    toolchain_count,
-                                                    is_mandatory,
-                                                    is_self_dependency,
-                                                    2,
-                                                    "analysis_compatible",
-                                                    evaluate_rule_started,
-                                                );
-                                                match analysis.providers() {
-                                                    Ok(providers) => Some(providers.to_owned()),
-                                                    Err(e) => {
-                                                        analysis_ctx_toolchain_provider_checkpoint(
-                                                            &analysis_env.label,
-                                                            type_label,
-                                                            &tc.toolchain_impl,
-                                                            Some(&configured),
-                                                            toolchain_index,
-                                                            toolchain_count,
-                                                            is_mandatory,
-                                                            is_self_dependency,
-                                                            4,
-                                                            "provider_extract_error",
-                                                            evaluate_rule_started,
-                                                        );
-                                                        if is_mandatory {
-                                                            return Err(e).with_buck_error_context(|| {
-                                                                format!(
-                                                                    "Failed to extract providers from \
-                                                                     mandatory toolchain impl '{}' for \
-                                                                     toolchain type '{}'",
-                                                                    tc.toolchain_impl, type_label
-                                                                )
-                                                            });
-                                                        }
-                                                        tracing::debug!(
-                                                            "  {} → providers extraction failed (optional): {}",
-                                                            type_label,
-                                                            e
-                                                        );
-                                                        None
-                                                    }
-                                                }
-                                            }
-                                            Ok(_) => {
-                                                analysis_ctx_toolchain_provider_checkpoint(
-                                                    &analysis_env.label,
-                                                    type_label,
-                                                    &tc.toolchain_impl,
-                                                    Some(&configured),
-                                                    toolchain_index,
-                                                    toolchain_count,
-                                                    is_mandatory,
-                                                    is_self_dependency,
-                                                    3,
-                                                    "analysis_incompatible",
-                                                    evaluate_rule_started,
-                                                );
-                                                if is_mandatory {
-                                                    return Err(slug_error::slug_error!(
-                                                        slug_error::ErrorTag::Input,
-                                                        "Mandatory toolchain impl '{}' for type '{}' \
-                                                         is incompatible with target configuration",
-                                                        tc.toolchain_impl,
-                                                        type_label
-                                                    ));
-                                                }
-                                                tracing::debug!(
-                                                    "  {} → impl '{}' incompatible (optional)",
-                                                    type_label,
-                                                    tc.toolchain_impl
-                                                );
-                                                None
-                                            }
-                                            Err(e) => {
-                                                analysis_ctx_toolchain_provider_checkpoint(
-                                                    &analysis_env.label,
-                                                    type_label,
-                                                    &tc.toolchain_impl,
-                                                    Some(&configured),
-                                                    toolchain_index,
-                                                    toolchain_count,
-                                                    is_mandatory,
-                                                    is_self_dependency,
-                                                    5,
-                                                    "analysis_error",
-                                                    evaluate_rule_started,
-                                                );
-                                                if is_mandatory {
-                                                    return Err(e).with_buck_error_context(|| {
-                                                        format!(
-                                                            "Failed to analyze mandatory toolchain \
-                                                             impl '{}' for toolchain type '{}'",
-                                                            tc.toolchain_impl, type_label
-                                                        )
-                                                    });
-                                                }
-                                                tracing::debug!(
-                                                    "  {} → analysis of impl '{}' failed (optional): {:#}",
-                                                    type_label,
-                                                    tc.toolchain_impl,
-                                                    e
-                                                );
-                                                None
-                                            }
-                                        }
+                                        analysis_ctx_toolchain_provider_checkpoint(
+                                            &analysis_env.label,
+                                            type_label,
+                                            &tc.toolchain_impl,
+                                            Some(&configured),
+                                            toolchain_index,
+                                            toolchain_count,
+                                            is_mandatory,
+                                            is_self_dependency,
+                                            11,
+                                            "missing_precomputed_dep",
+                                            evaluate_rule_started,
+                                        );
+                                        return Err(slug_error::slug_error!(
+                                            slug_error::ErrorTag::Tier0,
+                                            "Resolved toolchain impl '{}' for type '{}' was not \
+                                             analyzed as a pre-rule dependency of '{}'",
+                                            tc.toolchain_impl,
+                                            type_label,
+                                            analysis_env.label
+                                        ));
                                     }
                                 }
                                 None => {
@@ -4312,7 +4362,8 @@ async fn resolve_toolchain_types(
     // sees the same list as default-group resolution does. Check
     // `target_compatible_with` against the configured target platform, whose
     // constraints may include user/toolchain constraints beyond OS and CPU.
-    let target = PlatformConstraints::from_configuration_data(node.label().cfg());
+    let mut target = PlatformConstraints::from_configuration_data(node.label().cfg());
+    add_matching_toolchain_target_settings(dice, node, &mut target).await?;
     let candidates: Vec<PlatformConstraints> = if candidate_platforms.is_empty() {
         vec![target.clone()]
     } else {
@@ -4506,6 +4557,50 @@ fn needs_deferred_toolchain_retry(
                     .unwrap_or(true)
         })
     })
+}
+
+async fn add_matching_toolchain_target_settings(
+    dice: &mut DiceComputations<'_>,
+    node: ConfiguredTargetNodeRef<'_>,
+    target: &mut crate::analysis::toolchain_resolution::PlatformConstraints,
+) -> slug_error::Result<()> {
+    let settings: HashSet<String> = get_declared_toolchains()
+        .into_iter()
+        .flat_map(|(_, info)| info.target_settings)
+        .collect();
+    if settings.is_empty() {
+        return Ok(());
+    }
+
+    let target_cfg = node.label().cfg().dupe();
+    for setting in settings {
+        let Some(setting_target) = parse_impl_label_to_target_label(&setting) else {
+            continue;
+        };
+        let configured = setting_target.configure(target_cfg.dupe());
+        let providers = match dice.get_analysis_result(&configured).await? {
+            slug_core::configuration::compatibility::MaybeCompatible::Compatible(result) => result,
+            slug_core::configuration::compatibility::MaybeCompatible::Incompatible(_) => continue,
+        };
+        let Ok(providers) = providers.providers() else {
+            continue;
+        };
+        let provider_value = providers.value();
+        let Some(config_info) = provider_value.builtin_provider::<FrozenConfigurationInfo>() else {
+            continue;
+        };
+        let config_data = config_info.to_config_setting_data();
+        let required: Vec<String> = config_data
+            .constraints
+            .values()
+            .map(|value| value.0.target().to_string())
+            .collect();
+        if target.satisfies(&required) {
+            target.constraint_values.insert(setting);
+        }
+    }
+
+    Ok(())
 }
 
 fn summarize_toolchain_resolution_result(
@@ -5196,6 +5291,19 @@ mod tests {
         assert!(label.is_some());
         let label = label.unwrap();
         assert_eq!(label.name().as_str(), "cc-compiler-k8");
+
+        // override_repo() replacement labels keep Bazel's generated canonical
+        // name but use the selected repo's cell content.
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            "rules_rs++rules_rust+rules_rust".to_owned(),
+            "rules_rust+".to_owned(),
+        );
+        let label = parse_impl_label_to_target_label(
+            "rules_rs++rules_rust+rules_rust//rust/private:bootstrapping",
+        )
+        .unwrap();
+        assert_eq!(label.pkg().cell_name().as_str(), "rules_rust+");
+        assert_eq!(label.name().as_str(), "bootstrapping");
 
         // Relative label (no repo) - should fail
         assert!(parse_impl_label_to_target_label("//foo:bar").is_none());
