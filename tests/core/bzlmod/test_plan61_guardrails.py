@@ -1216,6 +1216,73 @@ use_repo(live, "live_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_label_taking_operations_materialize_or_fail_directly(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkBaseExternalContext and StarlarkRepositoryContext."""
+    _write(buck.cwd / "tool.txt", "tool payload\n")
+    _write(buck.cwd / "template.txt", "before\n")
+    _write(
+        buck.cwd / "change.patch",
+        """--- generated.txt
++++ generated.txt
+@@ -1 +1 @@
+-before
++after
+""",
+    )
+    _write(
+        buck.cwd / "label_ops_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "label ops payload\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+label_ops_repo = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _label_ops_ext_impl(module_ctx):
+    module_ctx.watch(Label("//:template.txt"))
+    module_ctx.template("generated.txt", Label("//:template.txt"), substitutions = {})
+    module_ctx.patch(Label("//:change.patch"), strip = 0)
+    if module_ctx.read("generated.txt") != "after\\n":
+        fail("PLAN61_MODULE_CTX_PATCH_LABEL_NOT_APPLIED")
+    module_ctx.symlink(Label("//:tool.txt"), "linked.txt")
+    if module_ctx.read("linked.txt") != "tool payload\\n":
+        fail("PLAN61_MODULE_CTX_SYMLINK_LABEL_NOT_MATERIALIZED")
+    label_ops_repo(name = "label_ops_repo")
+
+label_ops_ext = module_extension(
+    implementation = _label_ops_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_label_ops")
+
+label_ops = use_extension("//:label_ops_ext.bzl", "label_ops_ext")
+use_repo(label_ops, "label_ops_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_label_ops_repo",
+    srcs = ["@label_ops_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_label_ops_repo")
+    after = await _bzlmod_counters(buck)
+
+    assert after["extension_eval"] > before["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_file_input_edit_rejects_cache(
     buck: Buck,
 ) -> None:

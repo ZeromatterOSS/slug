@@ -766,7 +766,11 @@ pub(crate) fn ensure_label_path_materialized(path: &Path) {
     }
 }
 
-fn apply_unified_patch(patch_path: &Path, strip: i32, working_dir: &Path) -> Result<(), String> {
+pub(crate) fn apply_unified_patch(
+    patch_path: &Path,
+    strip: i32,
+    working_dir: &Path,
+) -> Result<(), String> {
     let patch_error = match Command::new("patch")
         .args(["-p", &strip.to_string(), "-i"])
         .arg(patch_path)

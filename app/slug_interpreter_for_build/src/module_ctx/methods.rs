@@ -9,8 +9,8 @@
  */
 
 //! Starlark methods available on `module_ctx`. I/O operations (download,
-//! execute, file) are fully implemented. Watch/template/patch methods remain
-//! as no-ops (acceptable for most extensions).
+//! execute, file) are implemented directly; label-taking path operations share
+//! the same materialization boundary as `repository_ctx`.
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -30,6 +30,7 @@ use crate::repository_ctx::DownloadInfo;
 use crate::repository_ctx::DownloadToken;
 use crate::repository_ctx::ExecutionResult;
 use crate::repository_ctx::RepositoryPath;
+use crate::repository_ctx::apply_unified_patch;
 use crate::repository_ctx::ensure_label_path_materialized;
 use crate::repository_ctx::extract_archive;
 use crate::repository_ctx::get_urls_from_value;
@@ -37,7 +38,7 @@ use crate::repository_ctx::resolve_label_to_path;
 
 /// Module context methods for Bazel module extensions.
 /// I/O operations (download, execute, file) are fully implemented.
-/// Watch/template/patch methods remain as no-ops (acceptable for most extensions).
+/// Label-taking path operations trigger lazy materialization before use.
 #[starlark_module]
 pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
     /// Report progress to the user.
@@ -606,11 +607,11 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Watch a file or directory for changes.
-    /// STUB: Returns None.
     fn watch<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] _path: Value<'v>,
+        #[starlark(require = pos)] path: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
+        let _ = resolve_module_ctx_input_path(this, path, "module_ctx.watch()")?;
         Ok(Value::new_none())
     }
 
@@ -681,7 +682,9 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] target: Value<'v>,
         #[starlark(require = pos)] link: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let target_str = target.unpack_str().unwrap_or("");
+        let target_str = resolve_module_ctx_input_path(this, target, "module_ctx.symlink()")?
+            .to_string_lossy()
+            .to_string();
         let link_str = link.unpack_str().unwrap_or("");
 
         let resolved_link = if Path::new(link_str).is_absolute() {
@@ -700,7 +703,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         // On Windows, copy instead of symlink (symlinks require privileges)
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(target_str, &resolved_link).map_err(|e| {
+            std::os::unix::fs::symlink(&target_str, &resolved_link).map_err(|e| {
                 starlark::Error::from(slug_error::slug_error!(
                     slug_error::ErrorTag::Input,
                     "Failed to create symlink {} -> {}: {}",
@@ -764,16 +767,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] executable: bool,
     ) -> starlark::Result<Value<'v>> {
         let path_str = path.unpack_str().unwrap_or("");
-        let template_str = template.unpack_str().unwrap_or("");
-
-        // Read the template file
-        let template_path = if Path::new(template_str).is_absolute() {
-            PathBuf::from(template_str)
-        } else if let Some(ref wd) = this.working_dir {
-            wd.join(template_str)
-        } else {
-            PathBuf::from(template_str)
-        };
+        let template_path = resolve_module_ctx_input_path(this, template, "module_ctx.template()")?;
 
         let mut content = std::fs::read_to_string(&template_path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
@@ -830,12 +824,76 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Apply patches.
-    /// STUB: Returns None.
     fn patch<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] _patch_file: Value<'v>,
-        #[starlark(require = named, default = 0)] _strip: i32,
+        #[starlark(require = pos)] patch_file: Value<'v>,
+        #[starlark(require = named, default = 0)] strip: i32,
     ) -> starlark::Result<Value<'v>> {
+        let patch_path = resolve_module_ctx_input_path(this, patch_file, "module_ctx.patch()")?;
+        let Some(ref working_dir) = this.working_dir else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "module_ctx.patch() requires a working directory"
+            )
+            .into());
+        };
+        apply_unified_patch(&patch_path, strip, working_dir.as_ref()).map_err(|e| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "{}",
+                e
+            ))
+        })?;
         Ok(Value::new_none())
     }
+}
+
+fn resolve_module_ctx_input_path(
+    this: &ModuleContext,
+    value: Value,
+    method: &str,
+) -> starlark::Result<PathBuf> {
+    if let Some(s) = value.unpack_str() {
+        if Path::new(s).is_absolute() {
+            return Ok(PathBuf::from(s));
+        }
+        if let Some(ref wd) = this.working_dir {
+            return Ok(wd.join(s));
+        }
+        return Ok(PathBuf::from(s));
+    }
+
+    if let Some(repo_path) = value.downcast_ref::<RepositoryPath>() {
+        return Ok(repo_path.absolute_path());
+    }
+
+    if value.get_type() == "Label" {
+        let label_str = format!("{}", value);
+        let resolved = if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
+            resolved
+        } else {
+            let workspace_root = this
+                .working_dir
+                .as_ref()
+                .map(|wd| wd.as_ref().as_path())
+                .unwrap_or_else(|| Path::new("."));
+            let legacy = resolve_label_to_path(&label_str, workspace_root);
+            let legacy_path = PathBuf::from(legacy);
+            if legacy_path.is_absolute() {
+                legacy_path
+            } else {
+                workspace_root.join(legacy_path)
+            }
+        };
+        ensure_label_path_materialized(&resolved);
+        return Ok(resolved);
+    }
+
+    Err(slug_error::slug_error!(
+        slug_error::ErrorTag::Input,
+        "{} requires a string, Label, or path object, got {}",
+        method,
+        value.get_type()
+    )
+    .into())
 }

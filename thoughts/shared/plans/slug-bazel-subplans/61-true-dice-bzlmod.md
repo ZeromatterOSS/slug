@@ -3756,6 +3756,51 @@ Blocker reflection 2026-05-21, lockfile-miss extension eval did not reuse DICE:
   and `./target/debug/slug test tests/core/bzlmod:test_plan61_guardrails`
   (34 tests).
 
+Implementation update 2026-05-21, `module_ctx` label-taking operations:
+
+- Bazel ground truth: module-extension contexts inherit the shared
+  `StarlarkBaseExternalContext` `path`, `read`, `watch`, `load_wasm`, and
+  `execute_wasm` label/path boundary, and repository contexts implement the
+  same label materialization shape for `symlink`, `template`, and `patch`.
+  Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java:1524`,
+  `:1562`, `:1706`, `:2088`, `:2193`, and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContext.java:218`,
+  `:520`.
+- Blocker reflection: Plan 61's label-taking operation row was not fully
+  covered for `module_ctx`. `module_ctx.template(Label(...))` treated the
+  label as an empty/plain string path, `module_ctx.patch(Label(...))` was a
+  no-op, and `module_ctx.symlink(Label(...))` did not resolve and materialize
+  the label target. The owning Slug subsystem is
+  `app/slug_interpreter_for_build/src/module_ctx/methods.rs`, using the same
+  lazy materialization boundary as `repository_ctx`. Broader affected cases are
+  module extensions that patch, template, watch, or symlink files from visible
+  module/generated repositories. Rejected symptom fixes: changing one
+  extension fixture to use strings, pre-copying the template/patch file into
+  the temporary extension working directory, or masking failures by leaving
+  no-op methods in place.
+- Slug now resolves string/path/Label inputs for `module_ctx.watch`,
+  `module_ctx.template`, `module_ctx.symlink`, and `module_ctx.patch`, triggers
+  lazy extension-repo materialization for labels before filesystem access, and
+  reuses the existing repository-context unified-patch implementation for
+  `module_ctx.patch`.
+- Guardrail added:
+  `test_module_ctx_label_taking_operations_materialize_or_fail_directly`.
+  It runs a live extension that calls `module_ctx.watch(Label(...))`,
+  `module_ctx.template(..., Label(...))`, `module_ctx.patch(Label(...))`, and
+  `module_ctx.symlink(Label(...))`, verifies the patched/template/symlink
+  contents inside the extension, then materializes a generated repo. The old
+  implementation failed before repo creation or left the patch/symlink effects
+  absent.
+- Validation passed:
+  `python3 -m py_compile tests/core/bzlmod/test_plan61_guardrails.py`,
+  `cargo fmt --check`,
+  `cargo check -p slug_interpreter_for_build -p slug_bzlmod -p slug_common`,
+  `cargo build -p slug`, `git diff --check`, focused direct pytest for the new
+  guardrail, and full direct
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (35 tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
