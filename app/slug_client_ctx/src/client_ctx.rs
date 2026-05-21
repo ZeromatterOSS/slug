@@ -195,6 +195,13 @@ impl<'a> ClientCommandContext<'a> {
                 config_type: ConfigType::Value as i32,
             });
         }
+        if let Ok(allowed) = std::env::var("BZLMOD_ALLOW_YANKED_VERSIONS") {
+            config_overrides.push(ConfigOverride {
+                cell: None,
+                config_override: format!("bzlmod.allow_yanked_versions_env={allowed}"),
+                config_type: ConfigType::Value as i32,
+            });
+        }
 
         let mut repo_env = config_opts.repo_env.clone();
         repo_env.extend(self.bazel_repo_env_args());

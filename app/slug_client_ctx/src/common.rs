@@ -916,7 +916,7 @@ pub struct CommonBuildConfigurationOptions {
     #[clap(long = "enable-bzlmod", alias = "enable_bzlmod", hide = true)]
     pub enable_bzlmod: bool,
 
-    /// Allow yanked versions (Bazel compatibility, accepted but ignored).
+    /// Allow yanked versions.
     #[clap(
         long = "allow-yanked-versions",
         alias = "allow_yanked_versions",
@@ -1301,6 +1301,17 @@ impl CommonBuildConfigurationOptions {
                     config_type: ConfigType::Value as i32,
                 });
             }
+        }
+
+        if !self.allow_yanked_versions.is_empty() {
+            result.push(ConfigOverride {
+                cell: None,
+                config_override: format!(
+                    "bzlmod.allow_yanked_versions={}",
+                    self.allow_yanked_versions.join(",")
+                ),
+                config_type: ConfigType::Value as i32,
+            });
         }
 
         // `--remote_header=KEY=VALUE` (and the cache/exec-specific

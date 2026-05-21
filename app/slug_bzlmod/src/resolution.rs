@@ -29,6 +29,7 @@ use slug_error::BuckErrorContext;
 
 use crate::cache::ModuleCache;
 use crate::fetch::SourceFetcher;
+use crate::lockfile::LockfileMode;
 use crate::parser::parse_module_bazel;
 use crate::parser::parse_module_bazel_content;
 use crate::registry::RegistryClient;
@@ -97,8 +98,12 @@ pub enum MvsResolutionError {
     },
 
     #[error(
-        "Yanked version selected: {name}@{version}. Reason: {reason}. \
-        Use --allow_yanked_versions={name}@{version} to override."
+        "Yanked version detected in your resolved dependency graph: {name}@{version}, \
+        for the reason: {reason}.\n\
+        Yanked versions may contain serious vulnerabilities and should not be used. \
+        To fix this, use a bazel_dep on a newer version of this module. To continue \
+        using this version, allow it using the --allow_yanked_versions flag or the \
+        BZLMOD_ALLOW_YANKED_VERSIONS env variable."
     )]
     YankedVersionSelected {
         name: String,
@@ -159,6 +164,103 @@ impl std::fmt::Display for ModuleKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}@{}", self.name, self.version)
     }
+}
+
+/// Bazel-shaped allow-list for yanked module versions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AllowedYankedVersions {
+    /// Any selected yanked version is allowed.
+    All,
+    /// Only the listed module keys are allowed.
+    Some(HashSet<ModuleKey>),
+}
+
+impl Default for AllowedYankedVersions {
+    fn default() -> Self {
+        Self::Some(HashSet::new())
+    }
+}
+
+impl AllowedYankedVersions {
+    fn allows(&self, key: &ModuleKey) -> bool {
+        match self {
+            Self::All => true,
+            Self::Some(allowed) => allowed.contains(key),
+        }
+    }
+}
+
+/// Parse Bazel's `BZLMOD_ALLOW_YANKED_VERSIONS` env var plus every
+/// `--allow_yanked_versions` occurrence.
+pub fn parse_allowed_yanked_versions(
+    from_env: Option<&str>,
+    from_flags: &[String],
+) -> slug_error::Result<AllowedYankedVersions> {
+    let mut allowed = HashSet::new();
+
+    if let Some(value) = from_env {
+        if parse_allowed_yanked_versions_entry(value, &mut allowed, "environment variable")? {
+            return Ok(AllowedYankedVersions::All);
+        }
+    }
+
+    for value in from_flags {
+        if parse_allowed_yanked_versions_entry(value, &mut allowed, "command line flag")? {
+            return Ok(AllowedYankedVersions::All);
+        }
+    }
+
+    Ok(AllowedYankedVersions::Some(allowed))
+}
+
+fn parse_allowed_yanked_versions_entry(
+    value: &str,
+    allowed: &mut HashSet<ModuleKey>,
+    context: &str,
+) -> slug_error::Result<bool> {
+    for module in value.split(',') {
+        if module == "all" {
+            return Ok(true);
+        }
+        if module.is_empty() {
+            continue;
+        }
+
+        let Some((name, version)) = module.split_once('@') else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Parsing {context} failed, module versions must be of the form '<module name>@<version>'"
+            ));
+        };
+        if !is_valid_bazel_module_name(name) {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Parsing {context} failed, invalid module name '{name}': valid names must 1) only contain lowercase letters (a-z), digits (0-9), dots (.), hyphens (-), and underscores (_); 2) begin with a lowercase letter; 3) end with a lowercase letter or digit."
+            ));
+        }
+        Version::parse(version).with_buck_error_context(|| {
+            format!("Parsing {context} failed, invalid version specified for module: {version}")
+        })?;
+        allowed.insert(ModuleKey::new(name, version));
+    }
+
+    Ok(false)
+}
+
+fn is_valid_bazel_module_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_lowercase() {
+        return false;
+    }
+    let last = name.chars().last().unwrap();
+    if !(last.is_ascii_lowercase() || last.is_ascii_digit()) {
+        return false;
+    }
+    name.chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '-' | '_'))
 }
 
 /// Selection group key for MVS algorithm.
@@ -266,6 +368,11 @@ pub struct ResolvedGraph {
     /// of the exact file bytes.
     #[serde(default)]
     pub registry_file_hashes: IndexMap<String, String>,
+
+    /// Yanked selected module versions that were explicitly allowed for this
+    /// resolution. Keys are `module@version`, values are registry reasons.
+    #[serde(default)]
+    pub selected_yanked_versions: IndexMap<String, String>,
 }
 
 /// Information about a resolved module in the final graph.
@@ -305,6 +412,21 @@ pub struct MvsResolver {
     multiple_version_overrides: HashMap<String, MultipleVersionOverride>,
     /// Registry file inputs observed during resolution.
     registry_file_hashes: IndexMap<String, String>,
+    /// Bazel command/env yanked-version allow-list.
+    allowed_yanked_versions: AllowedYankedVersions,
+    /// Lockfile mode controls whether mutable yanked metadata is refreshed.
+    lockfile_mode: LockfileMode,
+    /// Registry file hashes read from the current visible lockfile.
+    known_registry_file_hashes: IndexMap<String, String>,
+    /// Selected yanked versions read from the current visible lockfile.
+    previously_selected_yanked_versions: IndexMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum YankedVersionStatus {
+    KnownNotYanked,
+    KnownYanked(String),
+    Unknown,
 }
 
 impl MvsResolver {
@@ -322,6 +444,10 @@ impl MvsResolver {
             single_version_overrides: HashMap::new(),
             multiple_version_overrides: HashMap::new(),
             registry_file_hashes: IndexMap::new(),
+            allowed_yanked_versions: AllowedYankedVersions::default(),
+            lockfile_mode: LockfileMode::default(),
+            known_registry_file_hashes: IndexMap::new(),
+            previously_selected_yanked_versions: IndexMap::new(),
         })
     }
 
@@ -339,7 +465,25 @@ impl MvsResolver {
             single_version_overrides: HashMap::new(),
             multiple_version_overrides: HashMap::new(),
             registry_file_hashes: IndexMap::new(),
+            allowed_yanked_versions: AllowedYankedVersions::default(),
+            lockfile_mode: LockfileMode::default(),
+            known_registry_file_hashes: IndexMap::new(),
+            previously_selected_yanked_versions: IndexMap::new(),
         })
+    }
+
+    /// Configure Bazel yanked-version policy for this command.
+    pub fn set_yanked_version_policy(
+        &mut self,
+        allowed_yanked_versions: AllowedYankedVersions,
+        lockfile_mode: LockfileMode,
+        known_registry_file_hashes: IndexMap<String, String>,
+        previously_selected_yanked_versions: IndexMap<String, String>,
+    ) {
+        self.allowed_yanked_versions = allowed_yanked_versions;
+        self.lockfile_mode = lockfile_mode;
+        self.known_registry_file_hashes = known_registry_file_hashes;
+        self.previously_selected_yanked_versions = previously_selected_yanked_versions;
     }
 
     /// Process overrides from the root module.
@@ -971,7 +1115,77 @@ impl MvsResolver {
             modules,
             resolution_order,
             registry_file_hashes: self.registry_file_hashes.clone(),
+            selected_yanked_versions: IndexMap::new(),
         })
+    }
+
+    async fn check_yanked_versions(
+        &self,
+        graph: &ResolvedGraph,
+    ) -> slug_error::Result<IndexMap<String, String>> {
+        let mut selected_yanked_versions = IndexMap::new();
+
+        for info in graph.modules.values() {
+            if !matches!(info.source, ModuleSource::Registry { .. }) {
+                continue;
+            }
+
+            let key = ModuleKey::new(&info.name, &info.version);
+            let reason = match self.yanked_reason_from_lockfile(&key) {
+                YankedVersionStatus::KnownNotYanked => None,
+                YankedVersionStatus::KnownYanked(reason) => Some(reason),
+                YankedVersionStatus::Unknown => {
+                    match self.registry_client.fetch_metadata(&info.name).await {
+                        Ok(metadata) => metadata.yanked_versions.get(&info.version).cloned(),
+                        Err(e) => {
+                            tracing::warn!(
+                                "Could not read metadata file for module {} from registry {}: {}",
+                                info.name,
+                                self.registry_client.base_url(),
+                                e
+                            );
+                            None
+                        }
+                    }
+                }
+            };
+
+            let Some(reason) = reason else {
+                continue;
+            };
+            if self.allowed_yanked_versions.allows(&key) {
+                selected_yanked_versions.insert(key.to_string(), reason);
+                continue;
+            }
+
+            return Err(MvsResolutionError::YankedVersionSelected {
+                name: key.name,
+                version: key.version,
+                reason,
+            }
+            .into());
+        }
+
+        Ok(selected_yanked_versions)
+    }
+
+    fn yanked_reason_from_lockfile(&self, key: &ModuleKey) -> YankedVersionStatus {
+        yanked_reason_from_lockfile_facts(
+            self.lockfile_mode,
+            &self.known_registry_file_hashes,
+            &self.previously_selected_yanked_versions,
+            &self.source_json_url(key),
+            key,
+        )
+    }
+
+    fn source_json_url(&self, key: &ModuleKey) -> String {
+        format!(
+            "{}/modules/{}/{}/source.json",
+            self.registry_client.base_url(),
+            key.name,
+            key.version
+        )
     }
 
     /// Run the full MVS resolution algorithm.
@@ -1015,7 +1229,8 @@ impl MvsResolver {
         tracing::debug!("Selected {} unique module versions", selected.len());
 
         // Phase 5: Build resolved graph
-        let graph = self.build_resolved_graph(&selected).await?;
+        let mut graph = self.build_resolved_graph(&selected).await?;
+        graph.selected_yanked_versions = self.check_yanked_versions(&graph).await?;
 
         tracing::info!(
             "MVS resolution complete: {} modules in final graph",
@@ -1116,11 +1331,31 @@ impl MvsResolver {
     }
 }
 
+fn yanked_reason_from_lockfile_facts(
+    lockfile_mode: LockfileMode,
+    known_registry_file_hashes: &IndexMap<String, String>,
+    previously_selected_yanked_versions: &IndexMap<String, String>,
+    source_json_url: &str,
+    key: &ModuleKey,
+) -> YankedVersionStatus {
+    if lockfile_mode == LockfileMode::Refresh {
+        return YankedVersionStatus::Unknown;
+    }
+
+    if let Some(reason) = previously_selected_yanked_versions.get(&key.to_string()) {
+        return YankedVersionStatus::KnownYanked(reason.clone());
+    }
+
+    if known_registry_file_hashes.contains_key(source_json_url) {
+        return YankedVersionStatus::KnownNotYanked;
+    }
+
+    YankedVersionStatus::Unknown
+}
+
 // ============================================================================
 // Lockfile-Integrated Resolution
 // ============================================================================
-
-use crate::lockfile::LockfileMode;
 
 /// Resolve dependencies with lockfile support.
 ///
@@ -1834,6 +2069,86 @@ module(name = "local_lib", version = "2.0.0")
         let key = ModuleKey::from_dep(&dep);
         assert_eq!(key.name, "rules_rust");
         assert_eq!(key.version, "0.40.0");
+    }
+
+    #[test]
+    fn allowed_yanked_versions_parse_unions_env_and_flags() {
+        let flags = vec![
+            "beta@2.0.0,,gamma@3.0.0".to_owned(),
+            "delta@4.0.0".to_owned(),
+        ];
+        let parsed = parse_allowed_yanked_versions(Some("alpha@1.0.0"), &flags).unwrap();
+        let AllowedYankedVersions::Some(allowed) = parsed else {
+            panic!("expected an explicit allow-list");
+        };
+        assert!(allowed.contains(&ModuleKey::new("alpha", "1.0.0")));
+        assert!(allowed.contains(&ModuleKey::new("beta", "2.0.0")));
+        assert!(allowed.contains(&ModuleKey::new("gamma", "3.0.0")));
+        assert!(allowed.contains(&ModuleKey::new("delta", "4.0.0")));
+    }
+
+    #[test]
+    fn allowed_yanked_versions_all_disables_checking() {
+        let parsed =
+            parse_allowed_yanked_versions(Some("alpha@1.0.0"), &["beta@2.0.0,all".to_owned()])
+                .unwrap();
+        assert_eq!(parsed, AllowedYankedVersions::All);
+    }
+
+    #[test]
+    fn allowed_yanked_versions_rejects_bad_format_and_module_name() {
+        let bad_format =
+            parse_allowed_yanked_versions(None, &["alpha+1.0.0".to_owned()]).unwrap_err();
+        assert!(
+            bad_format
+                .to_string()
+                .contains("module versions must be of the form")
+        );
+
+        let bad_name =
+            parse_allowed_yanked_versions(None, &["Alpha@1.0.0".to_owned()]).unwrap_err();
+        assert!(bad_name.to_string().contains("invalid module name"));
+    }
+
+    #[test]
+    fn lockfile_yanked_facts_follow_bazel_refresh_and_source_hash_rules() {
+        let key = ModuleKey::new("alpha", "1.0.0");
+        let source_json = "https://bcr.bazel.build/modules/alpha/1.0.0/source.json";
+        let mut known_hashes = IndexMap::new();
+        known_hashes.insert(source_json.to_owned(), "sha256-deadbeef".to_owned());
+        let mut selected_yanked = IndexMap::new();
+        selected_yanked.insert(key.to_string(), "security issue".to_owned());
+
+        assert_eq!(
+            yanked_reason_from_lockfile_facts(
+                LockfileMode::Update,
+                &known_hashes,
+                &selected_yanked,
+                source_json,
+                &key,
+            ),
+            YankedVersionStatus::KnownYanked("security issue".to_owned())
+        );
+        assert_eq!(
+            yanked_reason_from_lockfile_facts(
+                LockfileMode::Update,
+                &known_hashes,
+                &IndexMap::new(),
+                source_json,
+                &key,
+            ),
+            YankedVersionStatus::KnownNotYanked
+        );
+        assert_eq!(
+            yanked_reason_from_lockfile_facts(
+                LockfileMode::Refresh,
+                &known_hashes,
+                &selected_yanked,
+                source_json,
+                &key,
+            ),
+            YankedVersionStatus::Unknown
+        );
     }
 
     #[test]

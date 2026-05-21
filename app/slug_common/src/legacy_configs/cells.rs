@@ -647,6 +647,20 @@ impl BuckConfigBasedCells {
             }
             None => slug_bzlmod::LockfileMode::default(),
         };
+        let bzlmod_section = root_config.get_section("bzlmod");
+        let allow_yanked_versions_env = bzlmod_section
+            .and_then(|section| section.get("allow_yanked_versions_env"))
+            .map(|value| value.as_str().to_owned());
+        let allow_yanked_versions_flags = bzlmod_section
+            .and_then(|section| section.get("allow_yanked_versions"))
+            .map(|value| vec![value.as_str().to_owned()])
+            .unwrap_or_default();
+        let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
+            allow_yanked_versions_env.as_deref(),
+            &allow_yanked_versions_flags,
+        )?;
+        let visible_lockfile =
+            slug_bzlmod::read_lockfile_with_mode(project_root.root().as_path(), lockfile_mode)?;
         // Reset temporary process-local bzlmod adapters before any dynamic
         // extension cells are registered. Even for the same root, lockfile
         // replay and recorded inputs may have changed since the prior command.
@@ -698,6 +712,21 @@ impl BuckConfigBasedCells {
                     parsed.module.name
                 )
             })?;
+            if let Some(lockfile) = visible_lockfile.as_ref() {
+                resolver.set_yanked_version_policy(
+                    allowed_yanked_versions.clone(),
+                    lockfile_mode,
+                    lockfile.registry_file_hashes.clone(),
+                    lockfile.selected_yanked_versions.clone(),
+                );
+            } else {
+                resolver.set_yanked_version_policy(
+                    allowed_yanked_versions.clone(),
+                    lockfile_mode,
+                    Default::default(),
+                    Default::default(),
+                );
+            }
             let mut resolved_graph = resolver
                 .resolve(&parsed.module, workspace_root)
                 .await
@@ -729,6 +758,8 @@ impl BuckConfigBasedCells {
                     )
                 })?;
             bzlmod_session_data.registry_file_hashes = resolved_graph.registry_file_hashes.clone();
+            bzlmod_session_data.selected_yanked_versions =
+                resolved_graph.selected_yanked_versions.clone();
 
             // Build a set of local override names to skip
             let local_override_names: std::collections::HashSet<_> = parsed
@@ -1080,11 +1111,9 @@ impl BuckConfigBasedCells {
         // because the only path that registers spokes (`get_file_ops_delegate`'s
         // post-extension-eval loop) is gated on the hub's `.slug_repo_complete`
         // marker.
-        if let Some(lockfile) =
-            slug_bzlmod::read_lockfile_with_mode(project_root.root().as_path(), lockfile_mode)?
-        {
+        if let Some(lockfile) = visible_lockfile.as_ref() {
             let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
-                &lockfile,
+                lockfile,
                 &aggregated,
                 root_module_name,
                 &mut pre_computed_cells,

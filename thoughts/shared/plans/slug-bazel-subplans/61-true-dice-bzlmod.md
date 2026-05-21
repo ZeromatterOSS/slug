@@ -298,6 +298,41 @@ SDK smoke checkpoint 2026-05-20:
   `/var/mnt/dev/zeromatter-kuro/buck-out/plan61-noexec-after-registry-hashes-20260520`
   brought ZeroMatter `buck-out` to about 213M; `execroot` was 8K.
 
+Implementation update 2026-05-20, yanked-version command policy:
+
+- Bazel ground truth: Bazel parses `BZLMOD_ALLOW_YANKED_VERSIONS` and all
+  `--allow_yanked_versions` occurrences as comma-separated
+  `<module name>@<version>` entries; any exact `all` entry disables
+  yanked-version rejection. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/YankedVersionsUtil.java:37`
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryOptions.java:134`.
+- Bazel ground truth: selected registry modules are checked after discovery and
+  selection; non-registry overrides are never yanked; if selected yanked
+  metadata is unavailable because `metadata.json` cannot be read, Bazel warns
+  and fails open. Local anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java:176`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java:340`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/YankedVersionsFunction.java:52`.
+- Bazel ground truth: mutable yanked metadata is not always refreshed. Outside
+  refresh mode, Bazel reuses visible lockfile `selectedYankedVersions`; if the
+  selected module's `source.json` hash is already recorded and the module is
+  not in `selectedYankedVersions`, Bazel treats it as not yanked without
+  fetching `metadata.json`. Local anchor:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java:613`.
+- Slug now threads `--allow_yanked_versions` and the client
+  `BZLMOD_ALLOW_YANKED_VERSIONS` environment into the bzlmod command policy,
+  parses them with Bazel-shaped syntax, checks selected registry modules after
+  MVS, fails on unallowed yanked selections, records allowed selected yanked
+  versions in the transitional session data, and honors visible lockfile
+  yanked/source-hash facts to avoid over-fetching mutable metadata.
+- Validation:
+  `cargo test -p slug_bzlmod yanked -- --nocapture`,
+  `cargo test -p slug_bzlmod resolution -- --nocapture`, and
+  `cargo check -p slug_client_ctx -p slug_common`, `cargo fmt --check`,
+  `git diff --check`, and `cargo build -p slug` pass.
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module

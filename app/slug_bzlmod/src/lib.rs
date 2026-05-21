@@ -161,6 +161,7 @@ pub use repository_invocations::RegistryGuard;
 pub use repository_invocations::RepositoryInvocation;
 pub use repository_invocations::RepositoryInvocationRegistry;
 pub use repository_invocations::record_invocation;
+pub use resolution::AllowedYankedVersions;
 pub use resolution::ModuleKey;
 pub use resolution::ModuleSource;
 pub use resolution::MvsResolver;
@@ -171,6 +172,7 @@ pub use resolution::ResolvedLocalModules;
 pub use resolution::ResolvedModuleInfo;
 pub use resolution::ResolvedRemoteModule;
 pub use resolution::ResolvedRemoteModules;
+pub use resolution::parse_allowed_yanked_versions;
 pub use resolution::resolve_all_dependencies;
 pub use resolution::resolve_local_modules;
 pub use resolution::resolve_local_override;
@@ -225,6 +227,7 @@ pub struct BzlmodSessionData {
     pub lockfile_mode: LockfileMode,
     pub repo_env: BTreeMap<String, String>,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
+    pub selected_yanked_versions: indexmap::IndexMap<String, String>,
     pub repo_mappings: RepoMappingSnapshot,
     pub repo_mapping_overrides: RepoMappingOverrides,
 }
