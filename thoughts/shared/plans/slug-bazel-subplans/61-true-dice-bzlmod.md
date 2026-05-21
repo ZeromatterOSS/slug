@@ -3689,6 +3689,14 @@ Blocker reflection 2026-05-21, registry cache mutation under bridge hits:
   `lockfile_read=2`. The prior regressed path had doubled
   `module_file_parse` to 1712, so the warm audit is back to reusing the
   selected module graph.
+- Follow-up ZeroMatter timing against the `<10s` warm-audit exit criterion:
+  `plan61-audit-cell-registry-inputs-20260521-003` cold
+  `elapsed=0:19.43 maxrss_kb=78216`, warm1
+  `elapsed=0:09.53 maxrss_kb=78532`, warm2
+  `elapsed=0:09.74 maxrss_kb=78644`; counters after the sequence were
+  `bzlmod_resolution_compute=2`, `module_file_parse=858`,
+  `lockfile_read=3`. This satisfies the warm same-daemon audit budget while
+  preserving the registry-file checksum guardrail.
 
 Validation update 2026-05-21, registry metadata/source JSON bridge inputs:
 
