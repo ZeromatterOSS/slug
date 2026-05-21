@@ -3510,6 +3510,47 @@ Implementation update 2026-05-21, extension `.bzl` digest is DICE key identity:
   are still hidden inside legacy resolution rather than first-class DICE key
   inputs.
 
+Implementation update 2026-05-21, transitive legacy graph bridge cache:
+
+- Bazel ground truth: `BazelModuleResolutionValue` / `BazelDepGraphValue` are
+  Skyframe cut-off values for the selected module graph and derived repo
+  mapping/extension tables. Slug still computes that graph in legacy
+  `cells.rs`, but the result can be reused when the unresolved inputs are
+  pinned by the root MODULE digest, visible lockfile digest, command policy,
+  and replay-safe runtime state.
+- The bridge cache predicate was widened from root-only graphs to locked
+  transitive graphs with no `local_path_override()`, no `git_override()`, and
+  no root `use_repo_rule()` invocations. Local/git overrides remain uncached
+  because their source trees/refs are mutable inputs not yet owned by DICE.
+  Registry/archive graphs require a visible lockfile content digest before
+  caching.
+- Cache storage is now also gated by the computed result. A candidate graph is
+  stored only if it has no lockfile-seeded extension spokes and no eager
+  repo-rule materialization side effects; otherwise the command uses the fresh
+  result without seeding DICE or the process cache. Runtime state replay remains
+  mandatory for every cache hit.
+- Validation passed `cargo fmt --check`, `git diff --check`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
+  `cargo build -p slug`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (30 tests).
+- ZeroMatter smoke with isolation
+  `plan61-audit-cell-transitive-cache-20260521-001` passed. Cold
+  `audit cell` wrote
+  `/tmp/slug-plan61/plan61-audit-cell-transitive-cache-20260521-001.log` and
+  took `elapsed=0:20.65 maxrss_kb=79168`. Same-daemon warm rerun wrote
+  `/tmp/slug-plan61/plan61-audit-cell-transitive-cache-20260521-001-warm.out`
+  / `.err` and took `elapsed=0:09.84 maxrss_kb=78556`. Counters after the warm
+  run were `bzlmod_resolution_compute=2`, `module_file_parse=857`,
+  `extension_eval=0`, `extension_replay_hit=0`,
+  `extension_replay_miss_reason=13`, and `lockfile_read=2`. This clears the
+  warm reuse symptom but not the cold <10s Plan 61 target.
+- Remaining Plan 61 work: cold first-run graph construction still reparses
+  hundreds of transitive MODULE files. The next systemic boundary is to move
+  selected module graph construction into DICE-owned module keys or persist a
+  Bazel-grounded on-disk graph cache keyed by lockfile/root/policy/source
+  manifests, rather than adding more process-local shortcuts.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

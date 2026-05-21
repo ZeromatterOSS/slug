@@ -662,14 +662,30 @@ fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey
     let Some(parsed) = key.root_module_file.parsed.as_ref() else {
         return true;
     };
+    if !parsed.repo_rule_invocations.is_empty() {
+        return false;
+    }
+    if parsed.module.overrides.iter().any(|override_| {
+        matches!(
+            override_,
+            slug_bzlmod::types::Override::LocalPath(_) | slug_bzlmod::types::Override::Git(_)
+        )
+    }) {
+        return false;
+    }
     if !parsed.module.bazel_deps.is_empty()
-        || !parsed.module.overrides.is_empty()
-        || !parsed.repo_rule_invocations.is_empty()
+        && key
+            .visible_lockfile
+            .as_ref()
+            .and_then(|value| value.digest.as_ref())
+            .is_none()
     {
         return false;
     }
     if !parsed.extension_usages.is_empty() {
-        return key.extension_replay_summary_digest.is_some();
+        return key.extension_replay_summary_digest.is_some()
+            || !parsed.module.bazel_deps.is_empty()
+            || !parsed.module.overrides.is_empty();
     }
     let lockfile_has_extension_entries = |lockfile: &slug_bzlmod::Lockfile| {
         !lockfile.module_extensions.is_empty() || !lockfile.facts.is_empty()
@@ -691,6 +707,14 @@ fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey
         return false;
     }
     true
+}
+
+fn legacy_bzlmod_resolution_result_bridge_cacheable(
+    value: &Arc<Option<BzlmodResolutionResult>>,
+) -> bool {
+    value.as_ref().as_ref().is_none_or(|result| {
+        result.lockfile_seeded_cells.is_empty() && result.eager_repo_rule_invocations.is_empty()
+    })
 }
 
 fn root_extension_replay_summary_digest(
@@ -1008,21 +1032,26 @@ impl BuckConfigBasedCells {
         let mut dice_ctx = updater.existing_state().await;
         let key =
             Self::build_dice_bzlmod_resolution_key(project_fs, config_args, &mut dice_ctx).await?;
-        let can_use_bridge_cache = legacy_bzlmod_resolution_bridge_cacheable(&key);
-        let bzlmod_resolution = if can_use_bridge_cache {
+        let bridge_cache_candidate = legacy_bzlmod_resolution_bridge_cacheable(&key);
+        let mut should_seed_bridge_cache = false;
+        let bzlmod_resolution = if bridge_cache_candidate {
             let cached_resolution = LEGACY_BZLMOD_RESOLUTION_CACHE
                 .lock()
                 .ok()
                 .and_then(|cache| cache.get(&key).cloned());
             if let Some(bzlmod_resolution) = cached_resolution {
+                should_seed_bridge_cache = true;
                 bzlmod_resolution
             } else {
                 let bzlmod_resolution = dice_ctx
                     .compute(&key)
                     .await?
                     .buck_error_context("Computing bzlmod resolution through DICE")?;
-                if let Ok(mut cache) = LEGACY_BZLMOD_RESOLUTION_CACHE.lock() {
-                    cache.insert(key.clone(), bzlmod_resolution.clone());
+                if legacy_bzlmod_resolution_result_bridge_cacheable(&bzlmod_resolution) {
+                    if let Ok(mut cache) = LEGACY_BZLMOD_RESOLUTION_CACHE.lock() {
+                        cache.insert(key.clone(), bzlmod_resolution.clone());
+                    }
+                    should_seed_bridge_cache = true;
                 }
                 bzlmod_resolution
             }
@@ -1031,7 +1060,7 @@ impl BuckConfigBasedCells {
                 .await
                 .buck_error_context("Computing uncached bzlmod resolution")?
         };
-        if can_use_bridge_cache {
+        if should_seed_bridge_cache {
             updater.changed_to([(key, Ok(bzlmod_resolution.clone()))])?;
         }
 
