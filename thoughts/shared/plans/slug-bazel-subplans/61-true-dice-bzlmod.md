@@ -377,6 +377,13 @@ directly:
   `cargo test -p slug_bzlmod dice_graph::tests::all_plan61_event_counters_are_observable_in_process -- --nocapture`
   pass.
 
+Validation checkpoint 2026-05-21:
+
+- After the yanked-version policy and latent repository-rule stub checkpoints,
+  direct Plan 61 guardrails passed with
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
+  (`27 passed`).
+
 This plan supersedes the completion claims in Plans 02, 09, and 10 when
 "DICE bzlmod" means replay-correct graph-owned semantics. The current bzlmod
 implementation is useful scaffolding. It is not yet the authority for module
