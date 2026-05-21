@@ -3360,6 +3360,22 @@ Implementation update 2026-05-21, visible lockfile read through DICE:
   filesystem inputs exist, sharing hidden-lockfile fail-open semantics with the
   visible lockfile, or reading the visible lockfile in the server path and again
   in the legacy bridge.
+- ZeroMatter startup smoke after this checkpoint:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir
+  plan61-audit-cell-dice-lockfile-20260521-030500 audit cell` passed and wrote
+  `/tmp/slug-plan61/plan61-audit-cell-dice-lockfile-20260521-030500.log`.
+  Cold elapsed time was 20.83s, and a warm same-daemon rerun redirected to
+  `/tmp/slug-plan61/plan61-audit-cell-dice-lockfile-warm-20260521-030500.out`
+  / `.err` still took 14.80s. `audit bzlmod-counters` after those commands
+  reported `bzlmod_resolution_compute=4`, `module_file_parse=1712`, and
+  `lockfile_read=3`. This crosses the plan's <10s cold audit target and shows
+  the remaining systemic issue: the root and visible lockfile inputs now enter
+  DICE, but MVS, extension repo projection, and cell graph construction still
+  execute in legacy `cells.rs` on every command. The next performance/parity
+  slice must move the bzlmod resolution/cell graph result behind a cacheable
+  DICE-owned value rather than adding more direct-read input bridges. The smoke
+  isolation tree was cleaned after preserving logs; ZeroMatter `buck-out` was
+  back to about 3.3M and `execroot` removed.
 
 Exit criteria:
 
