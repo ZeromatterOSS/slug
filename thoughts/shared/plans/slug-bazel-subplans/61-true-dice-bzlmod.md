@@ -3626,6 +3626,39 @@ Validation update 2026-05-21, locked registry graph reuse guardrail:
   direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest
   -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (32 tests).
 
+Blocker reflection 2026-05-21, registry cache mutation under bridge hits:
+
+- The locked-registry guardrail exposed a cache-safety class before it reached
+  ZeroMatter scale: once the legacy graph bridge reused a selected registry
+  graph, an edited cached registry `MODULE.bazel` file could be hidden by the
+  bridge hit even though Bazel would validate the file against the visible
+  lockfile hash and fail with a registry checksum mismatch.
+- Missing Bazel semantic: registry file bytes/hashes are Skyframe inputs to
+  bzlmod module resolution (`IndexRegistry` / `BazelModuleResolutionFunction`),
+  not just facts in `MODULE.bazel.lock`.
+- Owning Slug subsystem: the transitional `LegacyBzlmodResolutionDiceKey` in
+  `slug_common::legacy_configs::cells`. Until `ModuleSourceKey` /
+  `ModuleFileKey` own registry files directly, the bridge key must include the
+  cached registry files named by visible lockfile `registryFileHashes` before
+  it can safely reuse locked registry graphs.
+- Rejected shortcuts: disabling all locked-registry graph reuse, trusting only
+  the visible lockfile digest, or accepting stale cached registry file content
+  because the prior bridge value was warm.
+- Slug now computes a non-cacheable registry-file input summary for visible
+  lockfile `MODULE.bazel` and `source.json` registry hash entries, using the
+  same `ModuleCache` layout the resolver reads. Registry graph bridge reuse is
+  enabled only when selected registry/remote deps have visible lockfile hashes
+  and those lockfile entries map to supported cached registry files. Mutating a
+  cached registry `MODULE.bazel` file changes the bridge key, forces resolution
+  to rerun, and surfaces the existing checksum-mismatch error.
+- Validation passed:
+  `cargo fmt --check`, `git diff --check`,
+  `cargo check -p slug_common -p slug_bzlmod -p slug_server`,
+  `cargo build -p slug`, focused direct pytest for
+  `test_warm_noop_locked_registry_dep_reuses_bzlmod_resolution`, and full
+  direct `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest
+  -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (32 tests).
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

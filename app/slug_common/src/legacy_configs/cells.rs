@@ -578,6 +578,7 @@ struct LegacyBzlmodResolutionDiceKey {
     visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
+    registry_file_inputs: Arc<RegistryFileInputsValue>,
     extension_replay_summary_digest: Option<Arc<str>>,
 }
 
@@ -591,6 +592,7 @@ impl PartialEq for LegacyBzlmodResolutionDiceKey {
             && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
             && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
             && self.local_override_inputs.digest == other.local_override_inputs.digest
+            && self.registry_file_inputs.digest == other.registry_file_inputs.digest
             && self.extension_replay_summary_digest == other.extension_replay_summary_digest
     }
 }
@@ -607,6 +609,7 @@ impl std::hash::Hash for LegacyBzlmodResolutionDiceKey {
         hash_lockfile_content_identity(&self.visible_lockfile, state);
         hash_lockfile_content_identity(&self.hidden_lockfile, state);
         self.local_override_inputs.digest.hash(state);
+        self.registry_file_inputs.digest.hash(state);
         self.extension_replay_summary_digest.hash(state);
     }
 }
@@ -696,14 +699,20 @@ fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey
         .bazel_deps
         .iter()
         .any(|dep| !local_override_names.contains(dep.name.as_str()));
-    if (has_registry_or_remote_dep || key.local_override_inputs.has_bazel_deps)
-        && key
+    let needs_registry_file_inputs =
+        has_registry_or_remote_dep || key.local_override_inputs.has_bazel_deps;
+    if needs_registry_file_inputs {
+        if key
             .visible_lockfile
             .as_ref()
             .and_then(|value| value.digest.as_ref())
             .is_none()
-    {
-        return false;
+        {
+            return false;
+        }
+        if !key.registry_file_inputs.cache_safe || !key.registry_file_inputs.has_inputs {
+            return false;
+        }
     }
     if !parsed.extension_usages.is_empty() {
         return key.extension_replay_summary_digest.is_some()
@@ -868,6 +877,19 @@ struct LocalOverrideModuleInputsValue {
     has_git_overrides: bool,
 }
 
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("RegistryFileInputsKey")]
+struct RegistryFileInputsKey {
+    registry_file_hashes: Vec<(String, String)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct RegistryFileInputsValue {
+    digest: String,
+    has_inputs: bool,
+    cache_safe: bool,
+}
+
 fn local_overrides_from_root_module(
     root_module_file: &slug_bzlmod::RootModuleFileValue,
 ) -> Vec<(String, String)> {
@@ -1016,6 +1038,89 @@ impl Key for LocalOverrideModuleInputsKey {
             &self.overrides,
         )
         .map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        false
+    }
+}
+
+fn cached_registry_file_path(cache: &ModuleCache, url: &str) -> Option<PathBuf> {
+    let (registry_url, module_path) = url.split_once("/modules/")?;
+    let mut parts = module_path.split('/');
+    let name = parts.next()?;
+    let version = parts.next()?;
+    let file_name = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    match file_name {
+        "MODULE.bazel" => Some(cache.module_bazel_path(registry_url, name, version)),
+        "source.json" => Some(cache.source_json_path(registry_url, name, version)),
+        _ => None,
+    }
+}
+
+#[async_trait]
+impl Key for RegistryFileInputsKey {
+    type Value = slug_error::Result<Arc<RegistryFileInputsValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let mut hasher = Sha256::new();
+        hasher.update(b"registry-file-inputs-v1");
+        hasher.update([0]);
+        if self.registry_file_hashes.is_empty() {
+            return Ok(Arc::new(RegistryFileInputsValue {
+                digest: hex::encode(hasher.finalize()),
+                has_inputs: false,
+                cache_safe: true,
+            }));
+        }
+        let cache = ModuleCache::new()?;
+        let mut cache_safe = true;
+        for (url, expected_hash) in &self.registry_file_hashes {
+            hasher.update(url.as_bytes());
+            hasher.update([0]);
+            hasher.update(expected_hash.as_bytes());
+            hasher.update([0]);
+            let Some(path) = cached_registry_file_path(&cache, url) else {
+                cache_safe = false;
+                hasher.update(b"unsupported");
+                hasher.update([0]);
+                continue;
+            };
+            hasher.update(path.to_string_lossy().as_bytes());
+            hasher.update([0]);
+            match std::fs::read(&path) {
+                Ok(content) => {
+                    hasher.update(b"present");
+                    hasher.update([0]);
+                    hasher.update(slug_bzlmod::lockfile::compute_sha256_hex(&content));
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    hasher.update(b"missing");
+                }
+                Err(e) => return Err(e.into()),
+            }
+            hasher.update([0]);
+        }
+
+        Ok(Arc::new(RegistryFileInputsValue {
+            digest: hex::encode(hasher.finalize()),
+            has_inputs: !self.registry_file_hashes.is_empty(),
+            cache_safe,
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1266,6 +1371,22 @@ impl BuckConfigBasedCells {
         } else {
             None
         };
+        let registry_file_inputs = dice_ctx
+            .compute(&RegistryFileInputsKey {
+                registry_file_hashes: visible_lockfile
+                    .as_ref()
+                    .and_then(|value| value.lockfile.as_deref())
+                    .map(|lockfile| {
+                        lockfile
+                            .registry_file_hashes
+                            .iter()
+                            .map(|(url, hash)| (url.clone(), hash.clone()))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default(),
+            })
+            .await?
+            .buck_error_context("Computing registry file inputs for bzlmod resolution bridge")?;
         let extension_replay_summary_digest = root_module_file.parsed.as_ref().and_then(|parsed| {
             root_extension_replay_summary_digest(
                 parsed,
@@ -1286,6 +1407,7 @@ impl BuckConfigBasedCells {
             visible_lockfile,
             hidden_lockfile,
             local_override_inputs,
+            registry_file_inputs,
             extension_replay_summary_digest: extension_replay_summary_digest.map(Arc::from),
         };
         Ok(key)

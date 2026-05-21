@@ -433,6 +433,14 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     assert module_name in output
     assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
+    _write(
+        module_cache / "MODULE.bazel",
+        f'module(name = "{module_name}", version = "2.0.0")\n',
+    )
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    assert "Registry file checksum mismatch" in str(exc.value)
+
 
 @buck_test(data_dir="test_plan61_guardrails_data")
 async def test_warm_noop_extension_replay_audit_cell_reuses_bzlmod_resolution(
