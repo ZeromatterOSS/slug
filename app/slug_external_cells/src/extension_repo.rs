@@ -483,7 +483,7 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
 async fn ensure_extension_spokes_registered(
     ctx: &mut DiceComputations<'_>,
     extension_id: &str,
-    project_root_path: &std::path::Path,
+    _project_root_path: &std::path::Path,
     requesting_canonical_name: &str,
 ) -> slug_error::Result<()> {
     let session_data = match ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await {
@@ -567,15 +567,6 @@ async fn ensure_extension_spokes_registered(
                 format!("bazel-external/{}", canonical),
                 cell_setup,
             );
-        }
-        let registration = slug_bzlmod::SpokeRegistration {
-            extension_id: std::sync::Arc::from(extension_id),
-            repo_spec: std::sync::Arc::new(spec.clone()),
-            project_root: std::sync::Arc::new(project_root_path.to_path_buf()),
-        };
-        slug_bzlmod::register_spoke(canonical.clone(), registration.clone());
-        if internal_name != &canonical {
-            slug_bzlmod::register_spoke(internal_name.clone(), registration);
         }
     }
 

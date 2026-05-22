@@ -139,6 +139,12 @@ Observed SDK result at the checkpoint:
   sibling repos, instead of a cross-command seeded marker. Focused
   `slug_bzlmod` spoke-materialization tests and the full 50-test Plan 61
   guardrail target passed after the change.
+- The extension spoke process-global registry was removed. Synchronous
+  `module_ctx.path(Label(...))` spoke materialization now uses the active
+  extension DICE context to find the owning extension result and then computes
+  the repository execution key directly. Focused spoke-materialization tests,
+  affected-crate checks, `cargo build -p slug`, and the full 50-test Plan 61
+  guardrail target passed after the change.
 
 ## Consolidated Learnings
 
@@ -184,9 +190,10 @@ What did not work or remains risky:
   literal loads and existing external files under `bazel-external/<repo>` are
   hashed, but repo mappings at load sites, load failures, deleted files, and
   the full interpreter load graph are not replay-complete.
-- Extension spoke registration still uses process-global state. The command
-  repo-env and seeded-extension globals have been removed, but the remaining
-  spoke registry does not provide a replay-pure dependency model.
+- Extension spoke materialization no longer uses a bzlmod process-global
+  registry, but generated repo cells and dynamic alias registration still flow
+  through transitional runtime cell-registration plumbing rather than a final
+  DICE-owned cell graph.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
   remaining command policy around non-root dev dependencies.
@@ -312,9 +319,9 @@ using Rust DICE keys and values:
 5. Move extension spoke and generated repo registration out of process globals.
    - Represent generated repo specs, sibling spokes, seeded cells, and
      materialization state as DICE values.
-   - `SEEDED_EXTENSIONS` is removed. Remove `SPOKE_REGISTRY` as semantic state.
-     Temporary instrumentation may remain only if guardrails prove it cannot
-     affect correctness.
+   - `SEEDED_EXTENSIONS` and `SPOKE_REGISTRY` are removed as bzlmod semantic
+     state. Continue moving generated repo cell registration and materialized
+     output state into DICE-owned values.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 

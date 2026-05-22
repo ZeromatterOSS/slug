@@ -21,14 +21,12 @@
 //!
 //! This module provides:
 //!
-//! 1. A temporary root-scoped `SPOKE_REGISTRY` populated when extensions
-//!    register their captured `RepoSpec`s. Maps
-//!    `canonical_name -> (extension_id, RepoSpec, project_root)`.
-//! 2. A thread-local DICE pointer scoped to the duration of an extension's
+//! 1. A thread-local DICE pointer scoped to the duration of an extension's
 //!    Starlark eval (`with_extension_dice`).
-//! 3. `materialize_spoke_sync()` — synchronous bridge that takes a
-//!    canonical name, looks up the spec, and drives DICE materialization
-//!    via `tokio::task::block_in_place + Handle::block_on`.
+//! 2. `materialize_spoke_sync()` — synchronous bridge that takes a
+//!    canonical name, finds the owning extension result through DICE, and
+//!    drives DICE materialization via
+//!    `tokio::task::block_in_place + Handle::block_on`.
 //!
 //! The synchronous bridge is the only place we use `unsafe`. It's safe
 //! because the pointer's lifetime is strictly bounded by the
@@ -36,75 +34,11 @@
 //! only thing running on this thread during that scope.
 
 use std::cell::Cell;
-use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use dice::DiceComputations;
-use fxhash::FxHashMap;
 
 use crate::ExtensionRepoExecutionKey;
-use crate::RepoSpec;
-
-/// Information needed to materialize a single spoke repo on demand.
-#[derive(Clone)]
-pub struct SpokeRegistration {
-    pub extension_id: Arc<str>,
-    pub repo_spec: Arc<RepoSpec>,
-    pub project_root: Arc<PathBuf>,
-}
-
-/// Global registry of spoke repos that may need lazy materialization.
-///
-/// Populated by `slug_external_cells::extension_repo` after each
-/// extension's spec capture loop. Read by `materialize_spoke_sync` when
-/// a sibling extension dereferences a spoke via `mctx.path(Label)`.
-static SPOKE_REGISTRY: RwLock<Option<FxHashMap<String, SpokeRegistration>>> = RwLock::new(None);
-static SPOKE_PROJECT_ROOT: RwLock<Option<PathBuf>> = RwLock::new(None);
-
-/// Register a spoke for potential lazy materialization.
-///
-/// Idempotent: repeated registration of the same canonical_name overwrites
-/// the previous entry (the latest spec wins, which matches DICE's
-/// last-write-wins semantics for the underlying RepoSpec).
-pub fn register_spoke(canonical_name: String, registration: SpokeRegistration) {
-    let mut guard = SPOKE_REGISTRY.write().unwrap();
-    let map = guard.get_or_insert_with(FxHashMap::default);
-    map.insert(canonical_name, registration);
-}
-
-/// Look up a spoke's materialization spec by canonical name.
-pub fn lookup_spoke(canonical_name: &str) -> Option<SpokeRegistration> {
-    SPOKE_REGISTRY
-        .read()
-        .unwrap()
-        .as_ref()
-        .and_then(|m| m.get(canonical_name).cloned())
-}
-
-fn clear_spoke_state_for_new_root() {
-    *SPOKE_REGISTRY.write().unwrap() = None;
-}
-
-/// Set the workspace root for the temporary spoke-materialization adapter.
-///
-/// Plan 61's final owner is a DICE value, not process state. Until that
-/// migration is complete, root transitions must discard spoke registrations
-/// from the previous workspace.
-pub fn set_spoke_materialization_project_root(root: PathBuf) {
-    let mut current_root = SPOKE_PROJECT_ROOT.write().unwrap();
-    if current_root.as_ref() != Some(&root) {
-        clear_spoke_state_for_new_root();
-        *current_root = Some(root);
-    }
-}
-
-/// Reset spoke registrations for a fresh bzlmod resolution of `root`, even
-/// when the daemon is already serving that root.
-pub fn reset_spoke_materialization_project_root(root: PathBuf) {
-    clear_spoke_state_for_new_root();
-    *SPOKE_PROJECT_ROOT.write().unwrap() = Some(root);
-}
 
 // ============================================================================
 // Thread-local DICE pointer for sync->async bridging during extension eval
@@ -156,35 +90,6 @@ pub fn with_extension_dice<R>(ctx: &mut DiceComputations<'_>, f: impl FnOnce() -
 /// Must be called from inside a `with_extension_dice` scope on a tokio
 /// runtime worker thread.
 pub fn materialize_spoke_sync(canonical_name: &str) -> slug_error::Result<bool> {
-    // Check disk first — common case where sibling already triggered
-    // materialization, or eager path materialized at registration time.
-    let registration = match lookup_spoke(canonical_name) {
-        Some(r) => r,
-        None => {
-            // Not a known extension spoke. Caller will fall back to its
-            // existing Label resolution.
-            return Ok(false);
-        }
-    };
-    let repo_dir = registration
-        .project_root
-        .join("bazel-external")
-        .join(canonical_name);
-    let marker = repo_dir.join(".slug_repo_complete");
-    if marker.exists() {
-        let spec_hash = registration.repo_spec.compute_hash();
-        let output_digest = crate::repository_executor::repository_output_digest(&repo_dir).ok();
-        let marker_matches = std::fs::read_to_string(&marker).ok().is_some_and(|s| {
-            let marker = s.trim();
-            marker == complete_marker(&spec_hash, output_digest.as_deref())
-                || spec_hash.is_empty() && marker == "complete"
-        });
-        if marker_matches {
-            return Ok(true);
-        }
-        let _ = std::fs::remove_dir_all(&repo_dir);
-    }
-
     let raw = match EXTENSION_DICE_PTR.with(|c| c.get()) {
         Some(p) => p,
         None => {
@@ -196,13 +101,6 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> slug_error::Result<bool> 
         }
     };
 
-    let key = ExtensionRepoExecutionKey::from_arcs(
-        Arc::from(canonical_name),
-        registration.extension_id.clone(),
-        registration.repo_spec.clone(),
-        registration.project_root.clone(),
-    );
-
     // Bridge sync -> async. block_in_place releases the current tokio
     // worker so other tasks can make progress while we wait. The nested
     // block_on then drives the DICE compute on this thread.
@@ -212,6 +110,9 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> slug_error::Result<bool> 
             // the pointer is valid for the duration of `f` (the eval
             // closure) which encloses this call.
             let ctx: &mut DiceComputations<'_> = unsafe { &mut *raw };
+            let Some(key) = spoke_execution_key(ctx, canonical_name).await? else {
+                return Ok(false);
+            };
             match ctx.compute(&key).await {
                 Ok(Ok(_)) => Ok(true),
                 Ok(Err(e)) => Err(e),
@@ -226,20 +127,83 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> slug_error::Result<bool> 
     })
 }
 
-fn complete_marker(spec_hash: &str, output_digest: Option<&str>) -> String {
-    match (spec_hash.is_empty(), output_digest) {
-        (true, None) => "complete".to_owned(),
-        (true, Some(output_digest)) => format!("complete:output:{output_digest}"),
-        (false, Some(output_digest)) => format!("complete:{spec_hash}:output:{output_digest}"),
-        (false, None) => format!("complete:{spec_hash}"),
+async fn spoke_execution_key(
+    ctx: &mut DiceComputations<'_>,
+    canonical_name: &str,
+) -> slug_error::Result<Option<ExtensionRepoExecutionKey>> {
+    let Some((_, extension_name, _)) = crate::parse_canonical_name(canonical_name) else {
+        return Ok(None);
+    };
+    let session_data = ctx
+        .compute(&crate::BzlmodSessionDataKey)
+        .await
+        .map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "DICE compute failed while looking up spoke '{}': {}",
+                canonical_name,
+                e
+            )
+        })?;
+    let mut extension_ids = session_data
+        .extension_aggregations
+        .iter()
+        .filter_map(|(extension_id, aggregation)| {
+            (aggregation.extension_name == extension_name).then_some(extension_id.as_str())
+        })
+        .collect::<Vec<_>>();
+    extension_ids.sort_unstable();
+
+    for extension_id in extension_ids {
+        let Some(extension_key) =
+            crate::create_extension_execution_key(&session_data, extension_id)
+        else {
+            continue;
+        };
+        let result = match ctx.compute(&extension_key).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(e)) => return Err(e),
+            Err(e) => {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "DICE compute failed for extension '{}' while looking up spoke '{}': {}",
+                    extension_id,
+                    canonical_name,
+                    e
+                ));
+            }
+        };
+        for (internal_name, repo_spec) in result.generated_repo_specs.iter() {
+            let Some(canonical) = result.canonical_name(internal_name) else {
+                continue;
+            };
+            if canonical != canonical_name && internal_name != canonical_name {
+                continue;
+            }
+            return Ok(Some(ExtensionRepoExecutionKey::from_arcs(
+                Arc::from(canonical),
+                result.extension_id.clone(),
+                Arc::new(repo_spec.clone()),
+                Arc::new(session_data.project_root.clone()),
+            )));
+        }
     }
+
+    Ok(None)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    fn complete_marker(spec_hash: &str, output_digest: Option<&str>) -> String {
+        match (spec_hash.is_empty(), output_digest) {
+            (true, None) => "complete".to_owned(),
+            (true, Some(output_digest)) => format!("complete:output:{output_digest}"),
+            (false, Some(output_digest)) => {
+                format!("complete:{spec_hash}:output:{output_digest}")
+            }
+            (false, None) => format!("complete:{spec_hash}"),
+        }
+    }
 
     #[test]
     fn complete_marker_includes_output_digest_when_available() {
@@ -274,51 +238,5 @@ mod tests {
             marker,
             complete_marker("sha256-spec", Some(&changed_digest))
         );
-    }
-
-    #[test]
-    fn lookup_returns_none_for_unknown() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        assert!(lookup_spoke("definitely_not_registered_xyz_123").is_none());
-    }
-
-    #[test]
-    fn register_and_lookup_roundtrip() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-roundtrip"));
-        let canonical = "test+ext+roundtrip_spoke".to_owned();
-        let spec = RepoSpec::new("@@ext//pkg:file.bzl%test_rule".to_owned());
-        register_spoke(
-            canonical.clone(),
-            SpokeRegistration {
-                extension_id: Arc::from("@@ext//pkg:file.bzl%test"),
-                repo_spec: Arc::new(spec),
-                project_root: Arc::new(PathBuf::from("/tmp")),
-            },
-        );
-        let found = lookup_spoke(&canonical).expect("spoke registered");
-        assert_eq!(&*found.extension_id, "@@ext//pkg:file.bzl%test");
-    }
-
-    #[test]
-    fn root_transition_clears_spoke_registrations() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-a"));
-        let canonical = "test+ext+root_transition_spoke".to_owned();
-        let extension_id: Arc<str> = Arc::from("@@ext//pkg:file.bzl%test");
-        register_spoke(
-            canonical.clone(),
-            SpokeRegistration {
-                extension_id: extension_id.clone(),
-                repo_spec: Arc::new(RepoSpec::new("@@ext//pkg:file.bzl%test_rule".to_owned())),
-                project_root: Arc::new(PathBuf::from("/tmp")),
-            },
-        );
-
-        assert!(lookup_spoke(&canonical).is_some());
-
-        set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-b"));
-
-        assert!(lookup_spoke(&canonical).is_none());
     }
 }

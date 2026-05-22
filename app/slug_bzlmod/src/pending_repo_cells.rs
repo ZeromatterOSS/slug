@@ -594,13 +594,6 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
                     cell.spec_hash = spec_hash.clone();
                     cell.repo_spec_json = repo_spec_json.clone();
                 }
-                register_lockfile_seeded_spoke(
-                    ext_id,
-                    &repo_name,
-                    &canonical,
-                    repo_spec,
-                    project_root,
-                );
                 continue;
             }
 
@@ -612,8 +605,6 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
                 repo_spec_json,
                 path: format!("bazel-external/{}", canonical),
             });
-
-            register_lockfile_seeded_spoke(ext_id, &repo_name, &canonical, repo_spec, project_root);
 
             // Caller (slug_common::cells) is expected to also register
             // these in the dynamic-extension-cell map so
@@ -745,29 +736,6 @@ fn extension_package(ext_id: &str) -> String {
     };
     let package = after_repo.split(':').next().unwrap_or_default();
     package.to_owned()
-}
-
-fn register_lockfile_seeded_spoke(
-    ext_id: &str,
-    repo_name: &str,
-    canonical: &str,
-    repo_spec: RepoSpec,
-    project_root: &std::path::Path,
-) {
-    // Also register in the spoke-materialization registry so
-    // `rctx.path(@<repo_name>)` can drive lazy materialization via
-    // `materialize_spoke_sync`. The registry is keyed by both canonical name
-    // and the bare repo name so callers that pass a pre-canonicalization
-    // apparent name still resolve.
-    let registration = crate::spoke_materialization::SpokeRegistration {
-        extension_id: std::sync::Arc::from(ext_id),
-        repo_spec: std::sync::Arc::new(repo_spec),
-        project_root: std::sync::Arc::new(project_root.to_path_buf()),
-    };
-    crate::spoke_materialization::register_spoke(canonical.to_owned(), registration.clone());
-    if repo_name != canonical {
-        crate::spoke_materialization::register_spoke(repo_name.to_owned(), registration);
-    }
 }
 
 /// Convert a MODULE.bazel `TagValue` (parser representation) to an `AttrValue`

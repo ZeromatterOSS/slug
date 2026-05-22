@@ -81,10 +81,7 @@ const BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS: &[&str] = &[
     "@local_config_python//:host_launcher_maker_toolchain",
 ];
 
-fn register_lockfile_seeded_dynamic_cells(
-    project_root: &ProjectRoot,
-    cells: &[BzlmodPendingRepoCell],
-) {
+fn register_lockfile_seeded_dynamic_cells(cells: &[BzlmodPendingRepoCell]) {
     for cell in cells {
         let setup = ExtensionRepoCellSetup {
             canonical_name: Arc::from(cell.canonical_name.as_str()),
@@ -110,17 +107,7 @@ fn register_lockfile_seeded_dynamic_cells(
             continue;
         }
         match serde_json::from_str::<slug_bzlmod::RepoSpec>(&cell.repo_spec_json) {
-            Ok(repo_spec) => {
-                let registration = slug_bzlmod::SpokeRegistration {
-                    extension_id: Arc::from(cell.extension_id.as_str()),
-                    repo_spec: Arc::new(repo_spec),
-                    project_root: Arc::new(project_root.root().to_path_buf()),
-                };
-                slug_bzlmod::register_spoke(cell.canonical_name.clone(), registration.clone());
-                if cell.internal_name != cell.canonical_name {
-                    slug_bzlmod::register_spoke(cell.internal_name.clone(), registration);
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 tracing::warn!(
                     "Failed to parse lockfile-seeded RepoSpec for '{}': {}",
@@ -486,7 +473,6 @@ impl BzlmodResolutionResult {
         slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(
             project_root.root().to_path_buf(),
         );
-        slug_bzlmod::reset_spoke_materialization_project_root(project_root.root().to_path_buf());
 
         let external_base_dir = project_root.root().as_path().join("bazel-external");
         let buck_out_external_cells_dir = project_root
@@ -516,9 +502,9 @@ impl BzlmodResolutionResult {
         cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
         cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
 
-        register_lockfile_seeded_dynamic_cells(project_root, &self.lockfile_seeded_cells);
+        register_lockfile_seeded_dynamic_cells(&self.lockfile_seeded_cells);
 
-        for (name, path, setup) in &self.extension_cells {
+        for (_name, path, setup) in &self.extension_cells {
             slug_core::cells::register_dynamic_extension_cell_with_setup(
                 setup.canonical_name.to_string(),
                 path.as_str().to_owned(),
@@ -535,21 +521,7 @@ impl BzlmodResolutionResult {
                 continue;
             }
             match serde_json::from_str::<slug_bzlmod::RepoSpec>(&setup.repo_spec_json) {
-                Ok(repo_spec) => {
-                    let registration = slug_bzlmod::SpokeRegistration {
-                        extension_id: setup.extension_id.dupe(),
-                        repo_spec: Arc::new(repo_spec),
-                        project_root: Arc::new(project_root.root().to_path_buf()),
-                    };
-                    slug_bzlmod::register_spoke(name.as_str().to_owned(), registration.clone());
-                    slug_bzlmod::register_spoke(
-                        setup.canonical_name.to_string(),
-                        registration.clone(),
-                    );
-                    if setup.internal_name != setup.canonical_name {
-                        slug_bzlmod::register_spoke(setup.internal_name.to_string(), registration);
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => {
                     tracing::warn!(
                         "Failed to parse precomputed RepoSpec for '{}': {}",
