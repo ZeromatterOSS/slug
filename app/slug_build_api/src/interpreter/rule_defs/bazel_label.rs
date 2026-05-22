@@ -36,9 +36,7 @@ pub(crate) fn bazel_label_from_configured(label: &ConfiguredProvidersLabel) -> B
     let workspace_name = if slug_core::cells::is_root_cell_name(cell) {
         String::new()
     } else {
-        slug_core::cells::canonical_dynamic_extension_cell_name(cell)
-            .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell))
-            .unwrap_or_else(|| cell.to_owned())
+        slug_core::cells::canonical_bazel_repo_name_for_cell(cell)
     };
     BazelLabel::new(
         workspace_name,

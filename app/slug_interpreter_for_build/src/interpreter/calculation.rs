@@ -31,6 +31,8 @@ use slug_common::package_listing::dice::DicePackageListingResolver;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::bzl::ImportPath;
 use slug_core::cells::build_file_cell::BuildFileCell;
+use slug_core::cells::cell_path::CellPath;
+use slug_core::cells::name::CellName;
 use slug_core::package::PackageLabel;
 use slug_events::dispatch::async_record_root_spans;
 use slug_events::span::SpanId;
@@ -81,9 +83,10 @@ fn canonicalize_bzlmod_module_path(
     path: StarlarkModulePath<'_>,
 ) -> slug_error::Result<OwnedStarlarkModulePath> {
     fn import_path(path: &ImportPath) -> slug_error::Result<ImportPath> {
+        let cell_path = canonicalize_bzlmod_cell_path(path.path().clone())?;
         ImportPath::new_with_build_file_cells(
-            path.path().clone(),
-            BuildFileCell::new(path.path().cell()),
+            cell_path.clone(),
+            BuildFileCell::new(cell_path.cell()),
         )
     }
 
@@ -93,6 +96,22 @@ fn canonicalize_bzlmod_module_path(
         StarlarkModulePath::TomlFile(path) => OwnedStarlarkModulePath::TomlFile(import_path(path)?),
         StarlarkModulePath::BxlFile(path) => OwnedStarlarkModulePath::BxlFile(path.clone()),
     })
+}
+
+fn canonicalize_bzlmod_cell_path(path: CellPath) -> slug_error::Result<CellPath> {
+    if slug_core::cells::is_root_cell_name(path.cell().as_str()) {
+        return Ok(path);
+    }
+
+    let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(path.cell().as_str());
+    if canonical == path.cell().as_str() {
+        Ok(path)
+    } else {
+        Ok(CellPath::new(
+            CellName::unchecked_new(&canonical)?,
+            path.path().to_buf(),
+        ))
+    }
 }
 
 fn package_evaluation_concurrency_limit() -> usize {

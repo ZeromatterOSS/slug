@@ -194,7 +194,7 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
                     this,
                     output,
                     target_file,
-                    CopyMode::Symlink,
+                    CopyMode::SymlinkToArtifactPath,
                     OutputType::FileOrDirectory,
                     None,
                 )?;

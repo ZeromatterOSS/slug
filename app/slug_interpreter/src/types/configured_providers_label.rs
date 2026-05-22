@@ -168,8 +168,7 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         if slug_core::cells::is_root_cell_name(cell) {
             Ok(heap.alloc_str_intern(""))
         } else {
-            let canonical = slug_core::cells::canonical_dynamic_extension_cell_name(cell)
-                .unwrap_or_else(|| cell.to_owned());
+            let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(cell);
             Ok(heap.alloc_str_intern(&canonical))
         }
     }
@@ -187,8 +186,7 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         if slug_core::cells::is_root_cell_name(cell) {
             Ok(heap.alloc_str_intern(""))
         } else {
-            let canonical = slug_core::cells::canonical_dynamic_extension_cell_name(cell)
-                .unwrap_or_else(|| cell.to_owned());
+            let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(cell);
             Ok(heap.alloc_str_intern(&canonical))
         }
     }
@@ -205,7 +203,8 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         if slug_core::cells::is_root_cell_name(cell) {
             Ok(heap.alloc_str_intern(""))
         } else {
-            Ok(heap.alloc_str_intern(&format!("external/{}", cell)))
+            let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(cell);
+            Ok(heap.alloc_str_intern(&format!("external/{}", canonical)))
         }
     }
 
@@ -463,6 +462,18 @@ mod tests {
             })
         }
 
+        fn bzlmod_module_label() -> starlark::Result<StarlarkConfiguredProvidersLabel> {
+            Ok(StarlarkConfiguredProvidersLabel {
+                label: ConfiguredProvidersLabel::new(
+                    ConfiguredTargetLabel::testing_parse(
+                        "llvm//runtimes/libunwind:unwind",
+                        ConfigurationData::testing_new(),
+                    ),
+                    ProvidersName::Default,
+                ),
+            })
+        }
+
         fn providers_label() -> starlark::Result<StarlarkProvidersLabel> {
             Ok(StarlarkProvidersLabel {
                 label: ProvidersLabel::new(
@@ -497,5 +508,18 @@ mod tests {
             "'\"foo//bar:baz[qux][quux]\"'",
             "json.encode(providers_label())",
         );
+    }
+
+    #[test]
+    fn configured_label_uses_canonical_bzlmod_module_workspace() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("bazel-external/llvm+")).unwrap();
+        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let mut a = Assert::new();
+        a.globals_add(register_test_providers_label);
+        a.eq("\"llvm+\"", "bzlmod_module_label().workspace_name");
+        a.eq("\"llvm+\"", "bzlmod_module_label().repo_name");
+        a.eq("\"external/llvm+\"", "bzlmod_module_label().workspace_root");
     }
 }

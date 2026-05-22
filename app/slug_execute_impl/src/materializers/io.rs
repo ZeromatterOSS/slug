@@ -101,15 +101,15 @@ where
     )
 }
 
-/// Materializes the files of an the entry rooted at `dest`.
-///
-/// Files are copied from `src`. In other words, if a file would be
-/// materialized at `dest/p`, then it's copied from `src/p`.
-pub(crate) fn materialize_files<P, D>(
+/// Materializes a locally-copied artifact, including files, directories, and
+/// symlinks. Files are copied from `src`; symlinks are recreated from the
+/// artifact metadata at `dest`.
+pub(crate) fn materialize_local_copy<P, D>(
     entry: DirectoryEntry<&D, &ActionDirectoryMember>,
     src: P,
     dest: P,
     executable_bit_override: Option<bool>,
+    project_fs: &ProjectRoot,
 ) -> slug_error::Result<()>
 where
     P: AsRef<AbsNormPath>,
@@ -128,7 +128,14 @@ where
             Some(src.join(subpath))
         }
     };
-    materialize(entry, dest, false, file_src, executable_bit_override, None)
+    materialize(
+        entry,
+        dest,
+        true,
+        file_src,
+        executable_bit_override,
+        Some(project_fs),
+    )
 }
 
 /// Materializes the files of an entry rooted at `dest`.
@@ -190,24 +197,41 @@ where
             Ok(())
         }
         DirectoryEntry::Leaf(ActionDirectoryMember::Symlink(s)) => {
-            if materialize_dirs_and_syms && fs_util::symlink_metadata(&dest).is_err() {
+            if materialize_dirs_and_syms {
                 let target = materializer_symlink_target(
                     project_fs,
                     Path::new(s.target().as_str()),
                     dest.as_ref(),
                 );
-                fs_util::symlink(target, dest)?;
+                materialize_symlink(target, dest.as_ref())?;
             }
             Ok(())
         }
         DirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(s)) => {
-            if materialize_dirs_and_syms && fs_util::symlink_metadata(&dest).is_err() {
+            if materialize_dirs_and_syms {
                 let target = materializer_symlink_target(project_fs, s.target(), dest.as_ref());
-                fs_util::symlink(target, dest)?;
+                materialize_symlink(target, dest.as_ref())?;
             }
             Ok(())
         }
     }
+}
+
+fn materialize_symlink(target: PathBuf, dest: &AbsNormPath) -> slug_error::Result<()> {
+    match fs_util::symlink_metadata_if_exists(dest)? {
+        Some(metadata) if metadata.file_type().is_symlink() => {
+            if fs_util::read_link(dest)? == target {
+                return Ok(());
+            }
+            fs_util::remove_all(dest)?;
+        }
+        Some(_) => {
+            fs_util::remove_all(dest)?;
+        }
+        None => {}
+    }
+    fs_util::symlink(target, dest)?;
+    Ok(())
 }
 
 fn materializer_symlink_target(
@@ -273,16 +297,42 @@ fn external_alias_target(external_dir: &Path, alias: &Path, rest: &Path) -> Opti
     } else {
         external_dir.join(target)
     };
-    Some(target.join(rest))
+    Some(normalize_path_lexically(target.join(rest)))
+}
+
+fn normalize_path_lexically(path: PathBuf) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                normalized.push(component.as_os_str());
+            }
+        }
+    }
+    normalized
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    use std::sync::Arc;
 
+    use slug_common::file_ops::metadata::Symlink;
     use slug_core::fs::project::ProjectRootTemp;
+    use slug_directory::directory::entry::DirectoryEntry;
+    use slug_execute::directory::ActionDirectoryEntry;
+    use slug_execute::directory::ActionDirectoryMember;
+    use slug_execute::directory::ActionSharedDirectory;
     use slug_fs::fs_util;
 
+    use super::materialize_dirs_and_syms;
+    use super::materialize_local_copy;
     use super::project_external_target;
 
     #[test]
@@ -318,6 +368,165 @@ mod tests {
             project_external_target(project.path(), target).as_deref(),
             Some(rustc.as_path())
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn materialize_external_rustc_symlink_points_to_source_repo() -> slug_error::Result<()> {
+        let project = ProjectRootTemp::new()?;
+        let source = project
+            .path()
+            .root()
+            .as_path()
+            .join("bazel-external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc");
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            source.parent().unwrap(),
+        )?)?;
+        fs_util::write(slug_fs::paths::abs_path::AbsPath::new(&source)?, b"rustc")?;
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            &project.path().root().as_path().join("external"),
+        )?)?;
+        fs_util::symlink(
+            Path::new("../bazel-external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0"),
+            slug_fs::paths::abs_path::AbsPath::new(
+                &project
+                    .path()
+                    .root()
+                    .as_path()
+                    .join("external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0"),
+            )?,
+        )?;
+
+        let dest = project.path().root().as_path().join(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+        let entry: ActionDirectoryEntry<ActionSharedDirectory> = DirectoryEntry::Leaf(ActionDirectoryMember::Symlink(Arc::new(Symlink::new(
+            "../../../../../../../../../external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc".into(),
+        ))));
+
+        materialize_dirs_and_syms(
+            entry.as_ref(),
+            slug_fs::paths::abs_norm_path::AbsNormPath::new(&dest)?,
+            project.path(),
+        )?;
+
+        assert_eq!(std::fs::read_link(&dest)?, source);
+
+        Ok(())
+    }
+
+    #[test]
+    fn materialize_symlink_replaces_stale_target() -> slug_error::Result<()> {
+        let project = ProjectRootTemp::new()?;
+        let source = project
+            .path()
+            .root()
+            .as_path()
+            .join("bazel-external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc");
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            source.parent().unwrap(),
+        )?)?;
+        fs_util::write(slug_fs::paths::abs_path::AbsPath::new(&source)?, b"rustc")?;
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            &project.path().root().as_path().join("external"),
+        )?)?;
+        fs_util::symlink(
+            Path::new("../bazel-external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0"),
+            slug_fs::paths::abs_path::AbsPath::new(
+                &project
+                    .path()
+                    .root()
+                    .as_path()
+                    .join("external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0"),
+            )?,
+        )?;
+
+        let dest = project.path().root().as_path().join(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            dest.parent().unwrap(),
+        )?)?;
+        fs_util::symlink(
+            slug_fs::paths::abs_path::AbsPath::new(&dest)?,
+            slug_fs::paths::abs_path::AbsPath::new(&dest)?,
+        )?;
+
+        let entry: ActionDirectoryEntry<ActionSharedDirectory> = DirectoryEntry::Leaf(
+            ActionDirectoryMember::Symlink(Arc::new(Symlink::new(
+                "../../../../../../../../../external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc".into(),
+            ))),
+        );
+
+        materialize_dirs_and_syms(
+            entry.as_ref(),
+            slug_fs::paths::abs_norm_path::AbsNormPath::new(&dest)?,
+            project.path(),
+        )?;
+
+        assert_eq!(std::fs::read_link(&dest)?, source);
+
+        Ok(())
+    }
+
+    #[test]
+    fn materialize_local_copy_writes_symlink_artifacts() -> slug_error::Result<()> {
+        let project = ProjectRootTemp::new()?;
+        let source = project
+            .path()
+            .root()
+            .as_path()
+            .join("bazel-external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc");
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            source.parent().unwrap(),
+        )?)?;
+        fs_util::write(slug_fs::paths::abs_path::AbsPath::new(&source)?, b"rustc")?;
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            &project.path().root().as_path().join("external"),
+        )?)?;
+        fs_util::symlink(
+            Path::new("../bazel-external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0"),
+            slug_fs::paths::abs_path::AbsPath::new(
+                &project
+                    .path()
+                    .root()
+                    .as_path()
+                    .join("external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0"),
+            )?,
+        )?;
+
+        let dest = project.path().root().as_path().join(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+        fs_util::create_dir_all(slug_fs::paths::abs_path::AbsPath::new(
+            dest.parent().unwrap(),
+        )?)?;
+        fs_util::symlink(
+            slug_fs::paths::abs_path::AbsPath::new(&dest)?,
+            slug_fs::paths::abs_path::AbsPath::new(&dest)?,
+        )?;
+        let entry: ActionDirectoryEntry<ActionSharedDirectory> = DirectoryEntry::Leaf(
+            ActionDirectoryMember::Symlink(Arc::new(Symlink::new(
+                "../../../../../../../../../external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc".into(),
+            ))),
+        );
+
+        materialize_local_copy(
+            entry.as_ref(),
+            slug_fs::paths::abs_norm_path::AbsNormPath::new(
+                &project
+                    .path()
+                    .root()
+                    .as_path()
+                    .join("external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc"),
+            )?,
+            slug_fs::paths::abs_norm_path::AbsNormPath::new(&dest)?,
+            None,
+            project.path(),
+        )?;
+
+        assert_eq!(std::fs::read_link(&dest)?, source);
 
         Ok(())
     }

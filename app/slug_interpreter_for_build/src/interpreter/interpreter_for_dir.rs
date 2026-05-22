@@ -27,6 +27,7 @@ use slug_core::bzl::ImportPath;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
+use slug_core::cells::name::CellName;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_event_observer::humanized::HumanizedBytes;
@@ -259,6 +260,10 @@ impl LoadResolver for InterpreterLoadResolver {
             }
         }
 
+        if self.config.bzlmod_mode {
+            path = canonicalize_bzlmod_load_path(path)?;
+        }
+
         let build_file_cell = if self.config.bzlmod_mode {
             BuildFileCell::new(path.cell())
         } else {
@@ -270,6 +275,22 @@ impl LoadResolver for InterpreterLoadResolver {
             Some("toml") => OwnedStarlarkModulePath::TomlFile(import_path),
             _ => OwnedStarlarkModulePath::LoadFile(import_path),
         })
+    }
+}
+
+fn canonicalize_bzlmod_load_path(path: CellPath) -> slug_error::Result<CellPath> {
+    if slug_core::cells::is_root_cell_name(path.cell().as_str()) {
+        return Ok(path);
+    }
+
+    let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(path.cell().as_str());
+    if canonical == path.cell().as_str() {
+        Ok(path)
+    } else {
+        Ok(CellPath::new(
+            CellName::unchecked_new(&canonical)?,
+            path.path().to_buf(),
+        ))
     }
 }
 
@@ -312,6 +333,25 @@ mod tests {
     fn load_cell_equivalence_accepts_empty_version_module_suffix() {
         assert!(are_bzlmod_alias_equivalent("rules_rust", "rules_rust+"));
         assert!(are_bzlmod_alias_equivalent("rules_rust+", "rules_rust"));
+    }
+
+    #[test]
+    fn bzlmod_load_path_uses_empty_version_module_suffix() -> slug_error::Result<()> {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("bazel-external/rules_rust+"))?;
+        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let path = canonicalize_bzlmod_load_path(CellPath::new(
+            CellName::testing_new("rules_rust"),
+            slug_core::cells::paths::CellRelativePathBuf::unchecked_new(
+                "rust/settings/settings.bzl".into(),
+            ),
+        ))?;
+
+        assert_eq!("rules_rust+", path.cell().as_str());
+        assert_eq!("rust/settings/settings.bzl", path.path().as_str());
+
+        Ok(())
     }
 
     #[test]

@@ -82,6 +82,49 @@ impl<'a> ArtifactValueBuilder<'a> {
         Ok(())
     }
 
+    /// Like `add_symlinked`, but the symlink target is absolute. Use this when
+    /// the resulting artifact may be declared at a different path than `dest`.
+    pub fn add_external_symlinked(
+        &mut self,
+        src_value: &ArtifactValue,
+        src: ProjectRelativePathBuf,
+        dest: &ProjectRelativePath,
+    ) -> slug_error::Result<()> {
+        let target = match src_value.entry() {
+            DirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(s)) => s.to_path_buf(),
+            DirectoryEntry::Leaf(ActionDirectoryMember::Symlink(s)) => {
+                let parent = src
+                    .parent()
+                    .buck_error_context("Symlink has no dir parent")?;
+                self.project_fs
+                    .resolve(parent)
+                    .as_path()
+                    .join(s.target().as_str())
+            }
+            _ => self.project_fs.resolve(&src).as_path().to_path_buf(),
+        };
+        let symlink = new_symlink(target)?;
+        insert_artifact(&mut self.builder, src, src_value)?;
+        let entry = DirectoryEntry::Leaf(symlink);
+        self.builder.insert(dest, entry)?;
+        Ok(())
+    }
+
+    /// Like `add_symlinked`, but the symlink target is the source artifact
+    /// path itself. This matches Bazel `ctx.actions.symlink(target_file = ...)`.
+    pub fn add_artifact_path_symlinked(
+        &mut self,
+        src_value: &ArtifactValue,
+        src: ProjectRelativePathBuf,
+        dest: &ProjectRelativePath,
+    ) -> slug_error::Result<()> {
+        let symlink = new_symlink(self.project_fs.resolve(&src).as_path())?;
+        insert_artifact(&mut self.builder, src, src_value)?;
+        let entry = DirectoryEntry::Leaf(symlink);
+        self.builder.insert(dest, entry)?;
+        Ok(())
+    }
+
     /// Takes an input `src_value`, adds it to the builder at `src`. Then
     /// creates a copy of `src_value`'s entry relativized as if it had been
     /// copied from `src` to `dest`, adds it to the builder at `dest` and
@@ -157,10 +200,13 @@ impl<'a> ArtifactValueBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
+    use slug_common::external_symlink::ExternalSymlink;
+    use slug_common::file_ops::metadata::FileMetadata;
     use slug_common::file_ops::metadata::Symlink;
     use slug_core::fs::project::ProjectRootTemp;
 
     use super::*;
+    use crate::directory::insert_file;
 
     fn path(s: &str) -> &ProjectRelativePath {
         ProjectRelativePath::new(s).unwrap()
@@ -173,6 +219,146 @@ mod tests {
     fn get_symlink_artifact_value(s: &str) -> ArtifactValue {
         let symlink = DirectoryEntry::Leaf(ActionDirectoryMember::Symlink(get_symlink(s)));
         ArtifactValue::new(symlink, None)
+    }
+
+    #[test]
+    fn symlinked_external_artifact_points_to_source_repo() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new().unwrap();
+        let digest_config = DigestConfig::testing_default();
+        let src =
+            path("external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc").to_buf();
+        let dest = path(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+
+        let src_value = {
+            let mut builder = ActionDirectoryBuilder::empty();
+            insert_file(
+                &mut builder,
+                src.clone(),
+                FileMetadata::empty(digest_config.cas_digest_config()),
+            )?;
+            extract_artifact_value(&builder, src.as_ref(), digest_config)?
+                .buck_error_context("missing source value")?
+        };
+
+        let mut builder = ArtifactValueBuilder::new(fs.path(), digest_config);
+        builder.add_symlinked(&src_value, src, dest)?;
+        let value = builder.build(dest)?;
+
+        let symlink = match value.entry() {
+            DirectoryEntry::Leaf(ActionDirectoryMember::Symlink(symlink)) => symlink,
+            entry => panic!("expected symlink entry, got {entry:?}"),
+        };
+
+        assert_eq!(
+            symlink.target().as_str(),
+            "../../../../../../../../../external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn external_symlinked_artifact_is_destination_independent() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new().unwrap();
+        let digest_config = DigestConfig::testing_default();
+        let src =
+            path("external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc").to_buf();
+        let tmp_dest = path(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/__content_based_path__/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+        let final_dest = path(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+
+        let src_value = {
+            let mut builder = ActionDirectoryBuilder::empty();
+            insert_file(
+                &mut builder,
+                src.clone(),
+                FileMetadata::empty(digest_config.cas_digest_config()),
+            )?;
+            extract_artifact_value(&builder, src.as_ref(), digest_config)?
+                .buck_error_context("missing source value")?
+        };
+
+        let mut builder = ArtifactValueBuilder::new(fs.path(), digest_config);
+        builder.add_external_symlinked(&src_value, src.clone(), tmp_dest)?;
+        let value = builder.build(tmp_dest)?;
+
+        let symlink = match value.entry() {
+            DirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(symlink)) => symlink,
+            entry => panic!("expected external symlink entry, got {entry:?}"),
+        };
+
+        assert_eq!(symlink.target(), fs.path().resolve(src).as_path(),);
+        assert_ne!(symlink.target(), fs.path().resolve(final_dest).as_path());
+
+        Ok(())
+    }
+
+    #[test]
+    fn external_symlinked_artifact_preserves_source_symlink_target() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new().unwrap();
+        let digest_config = DigestConfig::testing_default();
+        let source_path = path(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        )
+        .to_buf();
+        let actual_rustc = fs
+            .path()
+            .root()
+            .as_path()
+            .join("bazel-external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc");
+        let src_value = ArtifactValue::external_symlink(Arc::new(ExternalSymlink::new(
+            actual_rustc.clone(),
+            Default::default(),
+        )?));
+        let dest = path(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/__content_based_path__/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+
+        let mut builder = ArtifactValueBuilder::new(fs.path(), digest_config);
+        builder.add_external_symlinked(&src_value, source_path.clone(), dest)?;
+        let value = builder.build(dest)?;
+
+        let symlink = match value.entry() {
+            DirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(symlink)) => symlink,
+            entry => panic!("expected external symlink entry, got {entry:?}"),
+        };
+
+        assert_eq!(symlink.target(), actual_rustc.as_path());
+        assert_ne!(symlink.target(), fs.path().resolve(source_path).as_path());
+
+        Ok(())
+    }
+
+    #[test]
+    fn artifact_path_symlinked_ignores_source_symlink_target() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new().unwrap();
+        let digest_config = DigestConfig::testing_default();
+        let src =
+            path("external/rules_rs++toolchains+rustc_linux_x86_64_1_95_0/bin/rustc").to_buf();
+        let dest = path(
+            "buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+        let src_value = get_symlink_artifact_value(
+            "/var/mnt/dev/zeromatter-kuro/buck-out/plan61/gen/rules_rs++toolchains+default_rust_toolchains/ef6520194e777f31/external/rules_rs++toolchains+default_rust_toolchains/linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc",
+        );
+
+        let mut builder = ArtifactValueBuilder::new(fs.path(), digest_config);
+        builder.add_artifact_path_symlinked(&src_value, src.clone(), dest)?;
+        let value = builder.build(dest)?;
+
+        let symlink = match value.entry() {
+            DirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(symlink)) => symlink,
+            entry => panic!("expected external symlink entry, got {entry:?}"),
+        };
+
+        assert_eq!(symlink.target(), fs.path().resolve(&src).as_path());
+
+        Ok(())
     }
 
     #[test]

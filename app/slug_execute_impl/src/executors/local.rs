@@ -45,6 +45,7 @@ use slug_common::local_resource_state::LocalResourceHolder;
 use slug_core::content_hash::ContentBasedPathHash;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
 use slug_core::fs::buck_out_path::BuildArtifactPath;
+use slug_core::fs::project::ProjectRoot;
 use slug_core::fs::project_rel_path::ProjectRelativePath;
 use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_core::soft_error;
@@ -1258,16 +1259,18 @@ impl LocalExecutor {
                                 .as_ref()
                                 .resolve_configuration_hash_path(&self.artifact_fs)?
                                 .into_path();
-                            let mut builder =
-                                ArtifactValueBuilder::new(self.artifact_fs.fs(), digest_config);
-                            builder.add_symlinked(
-                                &value,
-                                hashed_path.clone(),
-                                &configuration_hash_path,
-                            )?;
-                            let symlink_value = builder.build(&configuration_hash_path)?;
-                            configuration_path_to_content_based_path_symlinks
-                                .push((configuration_hash_path, symlink_value));
+                            if let Some((configuration_hash_path, symlink_value)) =
+                                content_based_configuration_symlink(
+                                    self.artifact_fs.fs(),
+                                    digest_config,
+                                    &value,
+                                    &configuration_hash_path,
+                                    hashed_path.clone(),
+                                )?
+                            {
+                                configuration_path_to_content_based_path_symlinks
+                                    .push((configuration_hash_path, symlink_value));
+                            }
 
                             to_declare.push(DeclareArtifactPayload {
                                 path: output_path.clone(),
@@ -1733,17 +1736,19 @@ pub async fn materialize_inputs(
                             // TODO(ianc) We want to also create symlinks here for projected artifacts.
                             if artifact.is_projected() {
                                 paths.push(content_based_path);
-                            } else {
-                                let mut builder =
-                                    ArtifactValueBuilder::new(artifact_fs.fs(), digest_config);
-                                builder.add_symlinked(
+                            } else if let Some((configuration_hash_path, symlink_value)) =
+                                content_based_configuration_symlink(
+                                    artifact_fs.fs(),
+                                    digest_config,
                                     artifact_value,
-                                    content_based_path,
                                     &configuration_hash_path,
-                                )?;
-                                let symlink_value = builder.build(&configuration_hash_path)?;
+                                    content_based_path,
+                                )?
+                            {
                                 configuration_path_to_content_based_path_symlinks
                                     .push((configuration_hash_path.clone(), symlink_value));
+                                paths.push(configuration_hash_path);
+                            } else {
                                 paths.push(configuration_hash_path);
                             }
                         } else {
@@ -2949,6 +2954,27 @@ async fn materialize_build_outputs(
     Ok(paths)
 }
 
+fn content_based_configuration_symlink(
+    project_fs: &ProjectRoot,
+    digest_config: DigestConfig,
+    artifact_value: &ArtifactValue,
+    configuration_hash_path: &ProjectRelativePathBuf,
+    content_based_path: ProjectRelativePathBuf,
+) -> slug_error::Result<Option<(ProjectRelativePathBuf, ArtifactValue)>> {
+    if content_based_path == *configuration_hash_path {
+        return Ok(None);
+    }
+
+    let mut builder = ArtifactValueBuilder::new(project_fs, digest_config);
+    builder.add_symlinked(
+        artifact_value,
+        content_based_path,
+        configuration_hash_path.as_ref(),
+    )?;
+    let symlink_value = builder.build(configuration_hash_path.as_ref())?;
+    Ok(Some((configuration_hash_path.clone(), symlink_value)))
+}
+
 /// Create any output dirs requested by the command. Note that this makes no effort to delete
 /// the output paths first. Eventually it should, but right now this happens earlier. This
 /// would be a separate refactor.
@@ -3013,21 +3039,51 @@ fn sync_outputs_from_action_execroot(
                 Some(&ContentBasedPathHash::for_output_artifact()),
             )?
             .into_path();
-        let src = execroot.join(path.as_str());
-        if src.symlink_metadata().is_err() {
-            continue;
-        }
-        let dst = project_root.join(path.as_str());
-        if let Some(parent) = dst.parent() {
-            std::fs::create_dir_all(parent)
-                .with_buck_error_context(|| format!("creating parent for staged output {path}"))?;
-        }
-        remove_existing_path(&dst)
-            .with_buck_error_context(|| format!("removing previous output {path}"))?;
-        std::fs::rename(&src, &dst)
-            .with_buck_error_context(|| format!("moving staged output {path} into buck-out"))?;
+        sync_output_from_action_execroot_path(execroot, project_root, &path)?;
     }
     Ok(())
+}
+
+fn sync_output_from_action_execroot_path(
+    execroot: &Path,
+    project_root: &Path,
+    path: &ProjectRelativePath,
+) -> slug_error::Result<()> {
+    let src = execroot.join(path.as_str());
+    if src.symlink_metadata().is_err() {
+        return Ok(());
+    }
+    let dst = project_root.join(path.as_str());
+    if symlink_points_to_path(&src, &dst)? {
+        return Ok(());
+    }
+    if let Some(parent) = dst.parent() {
+        std::fs::create_dir_all(parent)
+            .with_buck_error_context(|| format!("creating parent for staged output {path}"))?;
+    }
+    remove_existing_path(&dst)
+        .with_buck_error_context(|| format!("removing previous output {path}"))?;
+    std::fs::rename(&src, &dst)
+        .with_buck_error_context(|| format!("moving staged output {path} into buck-out"))?;
+    Ok(())
+}
+
+fn symlink_points_to_path(link: &Path, path: &Path) -> slug_error::Result<bool> {
+    let metadata = link.symlink_metadata();
+    let Ok(metadata) = metadata else {
+        return Ok(false);
+    };
+    if !metadata.file_type().is_symlink() {
+        return Ok(false);
+    }
+    let target = std::fs::read_link(link)
+        .with_buck_error_context(|| format!("reading symlink {}", link.display()))?;
+    let target = if target.is_absolute() {
+        target
+    } else {
+        link.parent().unwrap_or_else(|| Path::new("")).join(target)
+    };
+    Ok(target == path)
 }
 
 fn remove_existing_path(path: &Path) -> std::io::Result<()> {
@@ -3198,6 +3254,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use host_sharing::HostSharingStrategy;
+    use slug_common::file_ops::metadata::FileMetadata;
     use slug_common::liveliness_observer::NoopLivelinessObserver;
     use slug_core::cells::CellResolver;
     use slug_core::cells::cell_root_path::CellRootPathBuf;
@@ -3246,6 +3303,56 @@ mod tests {
         );
 
         Ok((executor, temp.path().root().to_buf(), temp))
+    }
+
+    #[test]
+    fn content_based_configuration_symlink_skips_identity_alias() -> slug_error::Result<()> {
+        let temp = ProjectRootTemp::new().unwrap();
+        let digest_config = DigestConfig::testing_default();
+        let path = ProjectRelativePathBuf::unchecked_new(
+            "buck-out/plan61/gen/repo/hash/external/repo/bin/rustc".to_owned(),
+        );
+        let value = ArtifactValue::file(FileMetadata::empty(digest_config.cas_digest_config()));
+
+        assert!(
+            content_based_configuration_symlink(
+                temp.path(),
+                digest_config,
+                &value,
+                &path,
+                path.clone(),
+            )?
+            .is_none()
+        );
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sync_outputs_skips_execroot_alias_to_project_output() -> slug_error::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let project_root = temp.path().join("project");
+        let execroot = temp.path().join("execroot");
+        let output = ProjectRelativePathBuf::unchecked_new(
+            "buck-out/plan61/gen/repo/hash/external/repo/bin/rustc".to_owned(),
+        );
+        let dst = project_root.join(output.as_str());
+        let src = execroot.join(output.as_str());
+        let real_rustc = project_root.join("external/repo/bin/rustc");
+        std::fs::create_dir_all(real_rustc.parent().unwrap())?;
+        std::fs::write(&real_rustc, b"rustc")?;
+        std::fs::create_dir_all(dst.parent().unwrap())?;
+        std::os::unix::fs::symlink(&real_rustc, &dst)?;
+        std::fs::create_dir_all(src.parent().unwrap())?;
+        std::os::unix::fs::symlink(&dst, &src)?;
+
+        sync_output_from_action_execroot_path(&execroot, &project_root, &output)?;
+
+        assert_eq!(std::fs::read_link(&dst)?, real_rustc);
+        assert_eq!(std::fs::read_link(&src)?, dst);
+
+        Ok(())
     }
 
     #[cfg(unix)]

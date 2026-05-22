@@ -69,9 +69,7 @@ fn bazel_output_cell_name(cell_name: &str) -> String {
     if crate::cells::is_root_cell_name(cell_name) {
         cell_name.to_owned()
     } else {
-        crate::cells::canonical_dynamic_extension_cell_name(cell_name)
-            .or_else(|| crate::cells::canonical_bzlmod_module_cell_name(cell_name))
-            .unwrap_or_else(|| cell_name.to_owned())
+        crate::cells::canonical_bazel_repo_name_for_cell(cell_name)
     }
 }
 

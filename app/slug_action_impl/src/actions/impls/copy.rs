@@ -57,6 +57,7 @@ pub(crate) enum CopyMode {
         executable_bit_override: Option<bool>,
     },
     Symlink,
+    SymlinkToArtifactPath,
 }
 
 #[derive(Allocative)]
@@ -170,9 +171,10 @@ impl Action for CopyAction {
             .buck_error_context("Input did not dereference to exactly one artifact")?;
 
         let artifact_fs = ctx.fs();
+        let use_content_based_src = !matches!(self.copy, CopyMode::SymlinkToArtifactPath);
         let src = input.resolve_path(
             artifact_fs,
-            if input.has_content_based_path() {
+            if use_content_based_src && input.has_content_based_path() {
                 Some(src_value.content_based_path_hash())
             } else {
                 None
@@ -199,7 +201,22 @@ impl Action for CopyAction {
                     )?;
                 }
                 CopyMode::Symlink => {
-                    builder.add_symlinked(src_value, src.clone(), tmp_dest.as_ref())?;
+                    if self.output().get_path().is_content_based_path() {
+                        builder.add_external_symlinked(
+                            src_value,
+                            src.clone(),
+                            tmp_dest.as_ref(),
+                        )?;
+                    } else {
+                        builder.add_symlinked(src_value, src.clone(), tmp_dest.as_ref())?;
+                    }
+                }
+                CopyMode::SymlinkToArtifactPath => {
+                    builder.add_artifact_path_symlinked(
+                        src_value,
+                        src.clone(),
+                        tmp_dest.as_ref(),
+                    )?;
                 }
             }
 
@@ -230,7 +247,7 @@ impl Action for CopyAction {
                         CopyMode::Copy {
                             executable_bit_override,
                         } => executable_bit_override,
-                        CopyMode::Symlink => None,
+                        CopyMode::Symlink | CopyMode::SymlinkToArtifactPath => None,
                     },
                 )],
             )

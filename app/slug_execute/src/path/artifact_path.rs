@@ -61,12 +61,7 @@ pub fn get_artifact_path_buck_out_root() -> ProjectRelativePathBuf {
 }
 
 fn canonical_external_cell_name(cell_name: &str) -> String {
-    if cell_name.starts_with("crates__") {
-        return format!("rules_rs++crate+{cell_name}");
-    }
-    slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
-        .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
-        .unwrap_or_else(|| cell_name.to_owned())
+    slug_core::cells::canonical_bazel_repo_name_for_cell(cell_name)
 }
 
 fn has_bazel_external_prefix(path: &ForwardRelativePath, cell_name: &str) -> bool {

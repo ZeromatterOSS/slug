@@ -447,12 +447,24 @@ pub fn canonical_bzlmod_module_cell_name(name: &str) -> Option<String> {
     Some(canonical_name)
 }
 
+/// Canonical Bazel repository name for a Slug cell name.
+///
+/// This keeps all Starlark-visible label fields and action/output paths aligned
+/// on Bazel's canonical bzlmod repository identity. Callers that need the main
+/// repository's empty Bazel repo name should handle the root cell before calling.
+pub fn canonical_bazel_repo_name_for_cell(cell_name: &str) -> String {
+    canonical_dynamic_extension_cell_name(cell_name)
+        .or_else(|| canonical_bzlmod_module_cell_name(cell_name))
+        .unwrap_or_else(|| cell_name.to_owned())
+}
+
 pub fn action_external_cell_name(
     project_root: &std::path::Path,
     cell_name: &str,
     cell_path: &str,
 ) -> String {
-    canonical_dynamic_extension_cell_name(cell_name)
+    canonical_external_name_from_symlink(project_root, cell_name)
+        .or_else(|| canonical_dynamic_extension_cell_name(cell_name))
         .or_else(|| canonical_bzlmod_module_cell_name(cell_name))
         .or_else(|| {
             cell_path
@@ -479,6 +491,19 @@ pub fn action_external_cell_name(
             candidates.into_iter().next()
         })
         .unwrap_or_else(|| cell_name.to_owned())
+}
+
+fn canonical_external_name_from_symlink(
+    project_root: &std::path::Path,
+    cell_name: &str,
+) -> Option<String> {
+    if cell_name.contains('+') {
+        return None;
+    }
+    let external = project_root.join("external").join(cell_name);
+    let target = std::fs::read_link(external).ok()?;
+    let name = target.file_name()?.to_str()?;
+    name.contains('+').then(|| name.to_owned())
 }
 
 /// Plan 36: register a dynamic extension spoke cell with its
@@ -2214,6 +2239,48 @@ mod tests {
         *EXTERNAL_CELL_NAMES.lock().unwrap() = original;
 
         assert_eq!(None, resolved);
+    }
+
+    #[test]
+    fn canonical_bazel_repo_name_uses_empty_version_module_suffix() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("bazel-external/llvm+")).unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        assert_eq!("llvm+", canonical_bazel_repo_name_for_cell("llvm"));
+    }
+
+    #[test]
+    fn action_external_cell_name_uses_canonical_generated_repo_suffix() {
+        let tmp = tempfile::tempdir().unwrap();
+        let apparent = "rustc_linux_x86_64_1_95_0";
+        let canonical = "rules_rs++toolchains+rustc_linux_x86_64_1_95_0";
+        std::fs::create_dir_all(tmp.path().join("bazel-external").join(canonical)).unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        assert_eq!(
+            canonical,
+            action_external_cell_name(tmp.path(), apparent, &format!("bazel-external/{apparent}"))
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn action_external_cell_name_uses_external_symlink_target() {
+        let tmp = tempfile::tempdir().unwrap();
+        let apparent = "rustc_linux_x86_64_1_95_0";
+        let canonical = "rules_rs++toolchains+rustc_linux_x86_64_1_95_0";
+        let canonical_path = tmp.path().join("bazel-external").join(canonical);
+        std::fs::create_dir_all(&canonical_path).unwrap();
+        std::fs::create_dir(tmp.path().join("external")).unwrap();
+        std::os::unix::fs::symlink(&canonical_path, tmp.path().join("external").join(apparent))
+            .unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        assert_eq!(
+            canonical,
+            action_external_cell_name(tmp.path(), apparent, &format!("bazel-external/{apparent}"))
+        );
     }
 
     #[test]

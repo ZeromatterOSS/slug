@@ -569,8 +569,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             if slug_core::cells::is_root_cell_name(cell) {
                 Ok(heap.alloc_str("").to_value())
             } else {
-                let canonical = slug_core::cells::canonical_dynamic_extension_cell_name(cell)
-                    .unwrap_or_else(|| cell.to_owned());
+                let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(cell);
                 Ok(heap.alloc_str(&canonical).to_value())
             }
         } else {
@@ -870,8 +869,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             if slug_core::cells::is_root_cell_name(cell_name) {
                 Ok(heap.alloc_str("_main").to_value())
             } else {
-                let canonical = slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
-                    .unwrap_or_else(|| cell_name.to_owned());
+                let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(cell_name);
                 Ok(heap.alloc_str(&canonical).to_value())
             }
         } else {
@@ -1557,8 +1555,7 @@ pub fn bin_dir_path_from_label(
         let output_cell_name = if slug_core::cells::is_root_cell_name(cell_name) {
             cell_name.to_owned()
         } else {
-            slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
-                .unwrap_or_else(|| cell_name.to_owned())
+            slug_core::cells::canonical_bazel_repo_name_for_cell(cell_name)
         };
         let cfg_hash = label.label().cfg().output_hash().as_str();
         format!("{}/gen/{}/{}", buck_out_root, output_cell_name, cfg_hash)
@@ -1596,8 +1593,7 @@ pub fn workspace_root_from_label(
     if slug_core::cells::is_root_cell_name(cell_name) {
         String::new()
     } else {
-        let output_cell_name = slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
-            .unwrap_or_else(|| cell_name.to_owned());
+        let output_cell_name = slug_core::cells::canonical_bazel_repo_name_for_cell(cell_name);
         format!("external/{}", output_cell_name)
     }
 }

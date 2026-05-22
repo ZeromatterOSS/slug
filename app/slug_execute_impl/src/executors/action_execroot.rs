@@ -40,6 +40,7 @@ pub(crate) struct ActionExecrootPlan {
     external_repos: BTreeSet<String>,
     buck_out_inputs: BTreeSet<String>,
     buck_out_writable_dirs: BTreeSet<String>,
+    buck_out_declared_outputs: BTreeSet<String>,
 }
 
 /// Compute the sorted set of top-level workspace path components
@@ -57,6 +58,7 @@ pub(crate) fn collect_execroot_plan(
         top_level_prefixes: BTreeSet::new(),
         buck_out_inputs: BTreeSet::new(),
         buck_out_writable_dirs: BTreeSet::new(),
+        buck_out_declared_outputs: BTreeSet::new(),
         external_repos: BTreeSet::new(),
     };
 
@@ -96,18 +98,75 @@ pub(crate) fn collect_execroot_plan(
         }
     }
 
+    for arg in request.exe().iter().chain(request.args()) {
+        add_execroot_paths_from_command_arg(&mut plan, arg);
+    }
+
+    for (_key, value) in request.env() {
+        add_execroot_path_from_arg_segment(&mut plan, value);
+    }
+
     for output in request.outputs() {
         if let Ok(resolved) = output.resolve(
             artifact_fs,
             Some(&ContentBasedPathHash::for_output_artifact()),
         ) {
+            if let Some(buck_out_rel) = strip_buck_out_prefix(resolved.path().as_str()) {
+                plan.buck_out_declared_outputs
+                    .insert(buck_out_rel.to_owned());
+            }
             if let Some(path) = resolved.path_to_create() {
                 add_execroot_path(&mut plan, path.as_str(), true);
             }
         }
     }
 
+    remove_buck_out_inputs_overlapping_writable_outputs(&mut plan);
+
     plan
+}
+
+fn add_execroot_paths_from_command_arg(plan: &mut ActionExecrootPlan, arg: &str) {
+    let arg = trim_shell_quotes(arg);
+    if let Some(value) = arg.strip_prefix('@') {
+        add_execroot_path_from_arg_segment(plan, value);
+        return;
+    }
+
+    if let Some((flag, value)) = arg.split_once('=') {
+        if flag.starts_with("--") {
+            add_execroot_path_from_arg_segment(plan, value);
+        } else {
+            add_execroot_path_from_arg_segment(plan, flag);
+            add_execroot_path_from_arg_segment(plan, value);
+        }
+        return;
+    }
+
+    add_execroot_path_from_arg_segment(plan, arg);
+}
+
+fn add_execroot_path_from_arg_segment(plan: &mut ActionExecrootPlan, segment: &str) {
+    let segment = trim_shell_quotes(segment);
+    let segment = segment.strip_prefix('@').unwrap_or(segment);
+    if is_known_execroot_relative_path(segment) {
+        add_execroot_path(plan, segment, false);
+    }
+}
+
+fn trim_shell_quotes(value: &str) -> &str {
+    value
+        .strip_prefix('\'')
+        .and_then(|s| s.strip_suffix('\''))
+        .or_else(|| value.strip_prefix('"').and_then(|s| s.strip_suffix('"')))
+        .unwrap_or(value)
+}
+
+fn is_known_execroot_relative_path(path: &str) -> bool {
+    matches!(path, "external" | "buck-out" | "bazel-out")
+        || path.starts_with("external/")
+        || path.starts_with("buck-out/")
+        || path.starts_with("bazel-out/")
 }
 
 fn add_execroot_path(plan: &mut ActionExecrootPlan, path: &str, writable_dir: bool) {
@@ -126,6 +185,31 @@ fn add_execroot_path(plan: &mut ActionExecrootPlan, path: &str, writable_dir: bo
     } else if let Some(prefix) = top_level_component(path) {
         plan.top_level_prefixes.insert(prefix.to_owned());
     }
+}
+
+fn remove_buck_out_inputs_overlapping_writable_outputs(plan: &mut ActionExecrootPlan) {
+    if plan.buck_out_inputs.is_empty() || plan.buck_out_declared_outputs.is_empty() {
+        return;
+    }
+
+    let output_paths = plan.buck_out_declared_outputs.clone();
+    plan.buck_out_inputs.retain(|input| {
+        !output_paths
+            .iter()
+            .any(|output| paths_overlap(input, output))
+    });
+}
+
+fn paths_overlap(a: &str, b: &str) -> bool {
+    a == b || path_is_prefix(a, b) || path_is_prefix(b, a)
+}
+
+fn path_is_prefix(prefix: &str, path: &str) -> bool {
+    if prefix.is_empty() {
+        return true;
+    }
+    path.strip_prefix(prefix)
+        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 fn strip_buck_out_prefix(path: &str) -> Option<&str> {
@@ -330,12 +414,12 @@ pub(crate) fn ensure_execroot(
             }
         }
 
-        for rel in &plan.buck_out_inputs {
-            let target = project_root.as_path().join("buck-out").join(rel);
+        for rel in buck_out_inputs_to_link(project_root.as_path(), &plan.buck_out_inputs) {
+            let target = project_root.as_path().join("buck-out").join(&rel);
             if !target.exists() {
                 continue;
             }
-            if !link_buck_out_path(&buck_out_root, rel, &target, false) {
+            if !link_buck_out_path(&buck_out_root, &rel, &target, target.is_dir()) {
                 return None;
             }
         }
@@ -343,6 +427,23 @@ pub(crate) fn ensure_execroot(
 
     entry.digests.insert(digest);
     AbsNormPathBuf::new(execroot_abs).ok()
+}
+
+fn buck_out_inputs_to_link(project_root: &Path, inputs: &BTreeSet<String>) -> Vec<String> {
+    let mut linked = Vec::new();
+    for input in inputs {
+        if !input.is_empty()
+            && linked.iter().any(|ancestor: &String| {
+                !ancestor.is_empty()
+                    && path_is_prefix(ancestor, input)
+                    && project_root.join("buck-out").join(ancestor).is_dir()
+            })
+        {
+            continue;
+        }
+        linked.push(input.clone());
+    }
+    linked
 }
 
 fn link_buck_out_path(buck_out_root: &Path, rel: &str, target: &Path, target_is_dir: bool) -> bool {
@@ -812,6 +913,74 @@ mod tests {
     }
 
     #[test]
+    fn command_args_contribute_execroot_relative_paths() {
+        let mut plan = ActionExecrootPlan::default();
+
+        add_execroot_paths_from_command_arg(
+            &mut plan,
+            "--input_dep_env_path=external/rules_rs++crate+crates__serde_core-1.0.228/cargo_toml_env_vars.env",
+        );
+        add_execroot_paths_from_command_arg(&mut plan, "buck-out/plan61/gen/repo/out=m/out");
+        add_execroot_paths_from_command_arg(&mut plan, "'@buck-out/plan61/tmp/params'");
+
+        assert!(
+            plan.external_repos
+                .contains("rules_rs++crate+crates__serde_core-1.0.228")
+        );
+        assert!(plan.buck_out_inputs.contains("plan61/gen/repo/out"));
+        assert!(plan.buck_out_inputs.contains("plan61/tmp/params"));
+        assert!(!plan.top_level_prefixes.contains("m"));
+    }
+
+    #[test]
+    fn output_tree_args_do_not_prelink_declared_outputs() {
+        let mut plan = ActionExecrootPlan::default();
+
+        add_execroot_paths_from_command_arg(
+            &mut plan,
+            "--sysroot=buck-out/plan61/gen/rust_toolchain/linux_x86_64_bootstrap",
+        );
+        add_execroot_path(
+            &mut plan,
+            "buck-out/plan61/gen/rust_toolchain/linux_x86_64_bootstrap/bin/rustc",
+            true,
+        );
+        plan.buck_out_declared_outputs
+            .insert("plan61/gen/rust_toolchain/linux_x86_64_bootstrap/bin/rustc".to_owned());
+        remove_buck_out_inputs_overlapping_writable_outputs(&mut plan);
+
+        assert!(
+            !plan
+                .buck_out_inputs
+                .contains("plan61/gen/rust_toolchain/linux_x86_64_bootstrap")
+        );
+        assert!(
+            plan.buck_out_writable_dirs
+                .contains("plan61/gen/rust_toolchain/linux_x86_64_bootstrap/bin/rustc")
+        );
+    }
+
+    #[test]
+    fn output_tree_args_keep_non_overlapping_inputs() {
+        let mut plan = ActionExecrootPlan::default();
+
+        add_execroot_paths_from_command_arg(
+            &mut plan,
+            "buck-out/plan61/gen/pkg/output_config.json",
+        );
+        add_execroot_path(&mut plan, "buck-out/plan61/gen/pkg", true);
+        plan.buck_out_declared_outputs
+            .insert("plan61/gen/pkg/output".to_owned());
+        remove_buck_out_inputs_overlapping_writable_outputs(&mut plan);
+
+        assert!(
+            plan.buck_out_inputs
+                .contains("plan61/gen/pkg/output_config.json")
+        );
+        assert!(plan.buck_out_writable_dirs.contains("plan61/gen/pkg"));
+    }
+
+    #[test]
     fn ensure_execroot_materializes_sparse_external_repos() {
         reset_cache_for_test();
         let tmp = tempfile::tempdir().unwrap();
@@ -925,6 +1094,40 @@ mod tests {
                 .unwrap()
                 .file_type()
                 .is_symlink()
+        );
+    }
+
+    #[test]
+    fn ensure_execroot_does_not_link_nested_buck_out_inputs_through_directory_alias() {
+        reset_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path();
+        let sysroot = project.join("buck-out/root/gen/toolchain/sysroot");
+        std::fs::create_dir_all(sysroot.join("bin")).unwrap();
+        std::fs::write(sysroot.join("bin/rustc"), b"rustc").unwrap();
+        let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
+
+        let mut plan = ActionExecrootPlan::default();
+        plan.buck_out_inputs
+            .insert("root/gen/toolchain/sysroot".to_owned());
+        plan.buck_out_inputs
+            .insert("root/gen/toolchain/sysroot/bin/rustc".to_owned());
+
+        let exec = ensure_execroot(&project_norm, &plan).unwrap();
+
+        let exec_sysroot = exec.as_path().join("buck-out/root/gen/toolchain/sysroot");
+        assert!(
+            exec_sysroot
+                .symlink_metadata()
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(std::fs::read_link(&exec_sysroot).unwrap(), sysroot);
+        assert!(
+            !std::fs::read_link(sysroot.join("bin/rustc"))
+                .map(|target| target == sysroot.join("bin/rustc"))
+                .unwrap_or(false)
         );
     }
 

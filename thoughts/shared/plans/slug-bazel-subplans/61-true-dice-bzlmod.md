@@ -4864,6 +4864,185 @@ identity:
   This is a new action-output/materialization frontier; analyze it separately
   against Bazel's action behavior before changing Slug.
 
+Blocker reflection, `copy_to_directory` generated-file owner workspace:
+
+- Ground-truth behavior:
+  Bazel cquery for `@@llvm+//runtimes/libunwind:libunwind_library_search_directory`
+  reports workspace `llvm+`, package `runtimes/libunwind`, and canonical label
+  `@@llvm+//runtimes/libunwind:libunwind_library_search_directory`. Bazel aquery
+  writes the config under
+  `bazel-out/k8-fastbuild/bin/external/llvm+/runtimes/libunwind/...`, runs
+  `external/bazel_lib++toolchains+copy_to_directory_linux_amd64/copy_to_directory`,
+  and passes the target workspace argument `llvm+`.
+- Slug failure:
+  `/tmp/slug-plan61/plan61-serde-core-lexical-label-v4-20260522-061907.log`
+  reached the same action but produced config file entries with
+  `"workspace": "llvm"` while the command argument was `llvm+`. The upstream
+  `copy_to_directory` tool filters files whose owner workspace differs from the
+  target workspace unless `include_external_repositories` includes them, so the
+  tool exited successfully with no copied output.
+- Missing semantic:
+  generated `File.owner.workspace_name` must use the same Bazel canonical bzlmod
+  repo identity as `ctx.label.workspace_name`. For ordinary bzlmod module repos
+  with an empty version, Slug must expose `llvm+` rather than the apparent
+  `llvm` when Starlark reads configured-label owner fields.
+- Systemic direction:
+  unify configured-label workspace/repo/root accessors with the same canonical
+  dynamic-extension plus bzlmod-module helper used by Bazel-compatible
+  `Label` conversion and output-path generation.
+- Rejected workarounds:
+  passing apparent `llvm` to `copy_to_directory`, adding
+  `include_external_repositories`, creating the missing output directory after
+  the action, special-casing LLVM/libunwind/copy_to_directory, or modifying the
+  third-party Bazel library/tool.
+
+Implementation update:
+
+- Slug now exposes a shared `canonical_bazel_repo_name_for_cell` helper and uses
+  it for Bazel-compatible `Label` conversion, configured-label
+  `workspace_name` / `repo_name` / `workspace_root`, `ctx.workspace_name`,
+  bin/workspace-root helper paths, and output-path canonicalization. Focused
+  unit tests cover both crate extension repos and ordinary empty-version bzlmod
+  module repos such as `llvm+`.
+- Validation:
+  `cargo fmt --check`, `git diff --check`,
+  `cargo test -p slug_core canonical_bazel_repo_name_uses_empty_version_module_suffix -- --nocapture`,
+  `cargo test -p slug_interpreter configured_label_uses_canonical_bzlmod_module_workspace -- --nocapture`,
+  and `cargo build -p slug` pass. Focused Slug repro
+  `/tmp/slug-plan61/plan61-serde-core-copydir-owner-20260522-063308.log`
+  advanced past `copy_to_directory`, completed 2556 local commands, and reached
+  the `serde_core` build-script runner.
+
+Blocker reflection, cargo build-script dep-env file under per-action execroot:
+
+- Ground-truth behavior:
+  Bazel `cargo_build_script.bzl` adds `ctx.files.build_script_env_files` to the
+  action inputs and passes each file path as
+  `--input_dep_env_path=%s`; the upstream runner reads those paths relative to
+  the action execroot. For `serde_core`, Bazel and Slug both use
+  `--input_dep_env_path=external/rules_rs++crate+crates__serde_core-1.0.228/cargo_toml_env_vars.env`.
+- Slug failure:
+  the file exists in the project-level `external/` symlink forest, and Slug's
+  cargo manifest mappings now correctly use `=m/...`, but local actions run in
+  a narrowed per-action execroot. That execroot did not include
+  `external/rules_rs++crate+crates__serde_core-1.0.228`, so the runner failed
+  with `error: Dependency environment file unreadable`.
+- Missing semantic:
+  any action argument or environment value that names an execroot-relative
+  `external/...` or output-tree path required by the tool must be reflected in
+  the per-action execroot layout. Resolved artifact inputs are the preferred
+  source of truth, but Slug's current action API can still leave path-bearing
+  command args as the only visible evidence for rules_rust helpers.
+- Systemic direction:
+  extend per-action execroot planning to include path-bearing command args/env
+  with known execroot prefixes (`external/`, `buck-out/`, and future
+  `bazel-out/`) so local execution cwd matches Bazel's execroot expectations
+  without exposing the whole project tree.
+- Rejected workarounds:
+  disabling per-action execroots for cargo build scripts, changing
+  `RULES_RUST_SYMLINK_EXEC_ROOT`, copying the dep-env file into the manifest
+  root by hand, changing rules_rust, or special-casing `serde_core`.
+
+Implementation update:
+
+- Slug's per-action execroot planner now scans action argv/env for
+  execroot-relative `external/`, `buck-out/`, and future `bazel-out/` paths and
+  materializes the referenced sparse prefixes. Focused unit coverage verifies
+  that a rules_rust-style `--input_dep_env_path=external/...` argument pulls the
+  corresponding canonical generated repo into the narrowed execroot.
+- Validation:
+  `cargo fmt --check`, `git diff --check`,
+  `cargo test -p slug_execute_impl command_args_contribute_execroot_relative_paths -- --nocapture`,
+  and `cargo build -p slug` pass. Focused Slug repro
+  `/tmp/slug-plan61/plan61-serde-core-execroot-args-20260522-064840.log`
+  advanced past the `serde_core` dependency environment file failure, completed
+  2549 local commands, and reached a new `rules_rust_tinyjson` Rust toolchain
+  execution failure.
+
+Blocker reflection, output-tree argv paths overlapping action outputs:
+
+- Ground-truth behavior:
+  rules_rust's sysroot generator in
+  `bazel-external/rules_rust+/rust/toolchain.bzl` creates the bootstrap Rust
+  toolchain files with `ctx.actions.symlink(output = ..., target_file = ...)`;
+  for `rustc`, `_symlink_sysroot_bin` declares
+  `<toolchain>/bin/<target.basename>` and Bazel treats that declared path as the
+  action-owned output, not as a pre-existing input symlink back to the output
+  tree.
+- Slug failure:
+  `/tmp/slug-plan61/plan61-serde-core-execroot-args-20260522-064840.log`
+  failed in `rules_rs++http_archive+rules_rust_tinyjson//:tinyjson` with
+  `bootstrap_process_wrapper: execvp: Too many levels of symbolic links`.
+  Inspecting the generated tree showed
+  `buck-out/.../linux_x86_64_1_95_0_rust_toolchain_bootstrap/bin/rustc` had
+  become a self-referential symlink. The immediate cause was the new argv/env
+  path scanner treating an output-tree sysroot path as an input for the same
+  action that owns files under that sysroot, then syncing that staged symlink
+  back into the project output tree.
+- Missing semantic:
+  path-bearing argv/env discovery is only a supplement for inputs that are not
+  otherwise visible through Slug's action API. It must never pre-materialize a
+  `buck-out` path that overlaps a declared writable output path for the same
+  action, because Bazel lets the producer action create that output path inside
+  the execroot.
+- Systemic direction:
+  keep argv/env discovery for `external/` dep-env files and non-overlapping
+  output-tree inputs, but after declared outputs are known, drop any discovered
+  `buck-out` input whose path overlaps a declared output path. The pruning must
+  use declared output paths, not merely output parent directories, because Bazel
+  actions can legitimately pass sibling generated config files such as
+  `*_config.json` as inputs while producing a same-prefix directory output. This
+  fixes the action-execroot planner rather than the Rust toolchain or one
+  symlink file.
+- Rejected workarounds:
+  replacing the self-link by hand, disabling per-action execroots, disabling
+  argv/env path discovery, skipping `buck-out` argument handling globally,
+  special-casing `rustc`, `tinyjson`, or rules_rust toolchain labels, or
+  changing third-party rules_rust.
+
+Implementation update:
+
+- Grounding:
+  Bazel's `ExecutableSymlink` action for the rules_rust bootstrap `rustc`
+  declares the external downloaded `rustc` binary as the input and the
+  output-tree `..._rust_toolchain_bootstrap/bin/rustc` path as the output. The
+  checked Bazel aquery log is
+  `/tmp/slug-plan61/bazel-aquery-rust-toolchain-bootstrap-direct-20260522-003615.txt`.
+  Slug may differ in the output-tree prefix spelling (`buck-out` today,
+  optional `bazel-out` later), but it must preserve the input/output ownership
+  relationship.
+- Diagnostics:
+  temporary instrumentation showed `materialize_local_copy` wrote the intended
+  external symlink and the materializer sqlite state still recorded that
+  external target after failure. The project output was later overwritten as a
+  self-link. The systemic cause was the per-action execroot planner linking both
+  a broad generated sysroot directory and a nested generated file path below
+  that directory. After the directory link existed, creating the nested link
+  followed the parent symlink and wrote through to the project output tree.
+- Fix:
+  `materialize_local_copy` now preserves symlink entries instead of collapsing
+  them through `fs::copy`, local output sync refuses to move an execroot symlink
+  that points back to the project output destination, and action execroot
+  planning prunes nested `buck-out` inputs already covered by a generated
+  directory input. The execroot pruning is the owning fix for the fresh
+  `rustc` self-link failure; the output-sync guard remains as a defense against
+  another alias-back path.
+- Validation:
+  `cargo test -p slug_execute_impl materialize_local_copy_writes_symlink_artifacts -- --nocapture`,
+  `cargo test -p slug_execute artifact_path_symlinked_ignores_source_symlink_target -- --nocapture`,
+  `cargo test -p slug_execute_impl materialize_symlink -- --nocapture`,
+  `cargo test -p slug_execute_impl sync_outputs_skips_execroot_alias_to_project_output -- --nocapture`,
+  `cargo test -p slug_execute_impl ensure_execroot_does_not_link_nested_buck_out_inputs_through_directory_alias -- --nocapture`,
+  `cargo fmt`, and `cargo build -p slug` pass. Fresh Slug smoke
+  `/tmp/slug-plan61/plan61-serde-core-pruned-buckout-20260522-050458.log`
+  passed `@@rules_rs++crate+crates__serde_core-1.0.228//:_bs` with 2556 local
+  commands after reaching the rules_rust toolchain bootstrap frontier.
+- Cleanup note:
+  after the focused smoke, `/var/mnt/dev/zeromatter-kuro/buck-out` was 265M and
+  `/var/mnt/dev/zeromatter-kuro/execroot` was 334M. Continue deleting stale
+  `plan61-*` isolation dirs and old execroot entries between smokes so generated
+  output does not grow unbounded.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

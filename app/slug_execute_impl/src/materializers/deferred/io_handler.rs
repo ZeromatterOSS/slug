@@ -78,7 +78,7 @@ use crate::materializers::deferred::artifact_tree::MaterializationMethodToProto;
 use crate::materializers::deferred::clean_stale::CleanInvalidatedPathRequest;
 use crate::materializers::immediate;
 use crate::materializers::io::MaterializeTreeStructure;
-use crate::materializers::io::materialize_files;
+use crate::materializers::io::materialize_local_copy;
 
 #[derive(Allocative)]
 pub struct DefaultIoHandler {
@@ -292,11 +292,12 @@ impl DefaultIoHandler {
                             stat.file_count += count_and_bytes.count;
                             stat.total_bytes += count_and_bytes.bytes;
 
-                            materialize_files(
+                            materialize_local_copy(
                                 a.dest_entry.as_ref(),
                                 &self.fs.root().join(&a.src),
                                 &self.fs.root().join(&a.dest),
                                 a.executable_bit_override,
+                                &self.fs,
                             )?;
                         }
                         Ok(())
