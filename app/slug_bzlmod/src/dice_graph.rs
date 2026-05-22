@@ -61,6 +61,10 @@ impl WorkspaceId {
     pub fn stable_hash(&self) -> &str {
         &self.stable_hash
     }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::new(project_root.clone(), project_root.join("buck-out/v2"))
+    }
 }
 
 fn workspace_hash(canonical_project_root: &Path, output_base: &Path) -> String {
@@ -436,7 +440,7 @@ pub struct RegisteredToolchainsKey {
 impl RegisteredToolchainsKey {
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self {
-            workspace_id: WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2")),
+            workspace_id: WorkspaceId::for_project_root(project_root),
             resolution_digest: Arc::from("injected-bzlmod-session"),
         }
     }
@@ -495,7 +499,7 @@ pub struct RegisteredExecutionPlatformsKey {
 impl RegisteredExecutionPlatformsKey {
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self {
-            workspace_id: WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2")),
+            workspace_id: WorkspaceId::for_project_root(project_root),
             resolution_digest: Arc::from("injected-bzlmod-session"),
         }
     }
@@ -602,6 +606,59 @@ pub struct InnateExtensionKey {
 pub struct ExtensionSpokesKey {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
+}
+
+impl ExtensionSpokesKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
+        Self {
+            workspace_id,
+            extension_id: Arc::from(extension_id),
+        }
+    }
+
+    pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root), extension_id)
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "ExtensionSpokesByExtensionIdKey({}, {})",
+    workspace_id.stable_hash(),
+    extension_id
+)]
+pub struct ExtensionSpokesByExtensionIdKey {
+    pub workspace_id: WorkspaceId,
+    pub extension_id: Arc<str>,
+}
+
+impl ExtensionSpokesByExtensionIdKey {
+    pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
+        Self {
+            workspace_id: WorkspaceId::for_project_root(project_root),
+            extension_id: Arc::from(extension_id),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "ExtensionSpokesByCanonicalRepoKey({}, {})",
+    workspace_id.stable_hash(),
+    canonical_name
+)]
+pub struct ExtensionSpokesByCanonicalRepoKey {
+    pub workspace_id: WorkspaceId,
+    pub canonical_name: Arc<str>,
+}
+
+impl ExtensionSpokesByCanonicalRepoKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId, canonical_name: &str) -> Self {
+        Self {
+            workspace_id,
+            canonical_name: Arc::from(canonical_name),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]

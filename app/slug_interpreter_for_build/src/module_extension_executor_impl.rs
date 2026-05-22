@@ -206,6 +206,7 @@ impl ConcreteModuleExtensionExecutor {
         &self,
         ctx: &mut DiceComputations<'_>,
         aggregated: &AggregatedExtension,
+        project_root: PathBuf,
         mut module_ctx: crate::module_ctx::ModuleContext,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
         // 1. Get the cell resolver to parse the bzl path
@@ -293,7 +294,7 @@ impl ConcreteModuleExtensionExecutor {
         // `mctx.path(Label)` / `mctx.read(Label)` calls inside the eval
         // can drive lazy materialization of sibling-extension spoke
         // repos via `slug_bzlmod::materialize_spoke_sync`.
-        let (result, specs) = slug_bzlmod::with_extension_dice(ctx, || {
+        let (result, specs) = slug_bzlmod::with_extension_dice(ctx, project_root, || {
             with_repo_spec_registry(|| {
                 // Create a Starlark module for evaluation
                 let starlark_module = Module::new();
@@ -423,7 +424,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         }
 
         let output = self
-            .try_execute_starlark(ctx, aggregated, module_ctx)
+            .try_execute_starlark(ctx, aggregated, project_root.clone(), module_ctx)
             .await
             .buck_error_context(format!(
                 "module extension '{}' failed",

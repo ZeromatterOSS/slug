@@ -53,6 +53,8 @@ use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::ExtensionSpoke;
+use crate::dice_graph::ExtensionSpokesByCanonicalRepoKey;
+use crate::dice_graph::ExtensionSpokesByExtensionIdKey;
 use crate::dice_graph::ExtensionSpokesKey;
 use crate::dice_graph::ExtensionSpokesValue;
 use crate::dice_graph::record_bzlmod_event;
@@ -130,9 +132,8 @@ pub fn extension_spokes_key_for_extension_id(
 ) -> Option<ExtensionSpokesKey> {
     data.extension_aggregations
         .contains_key(extension_id)
-        .then(|| ExtensionSpokesKey {
-            workspace_id: workspace_id_for_session_data(data),
-            extension_id: Arc::from(extension_id),
+        .then(|| {
+            ExtensionSpokesKey::for_workspace_id(workspace_id_for_session_data(data), extension_id)
         })
 }
 
@@ -178,6 +179,98 @@ fn owning_module_matches(canonical_owner: &str, extension_owner: &str) -> bool {
         || (!canonical_owner.ends_with('+') && extension_owner == format!("{canonical_owner}+"))
         || (canonical_owner.ends_with('+')
             && extension_owner.strip_suffix('+') == Some(canonical_owner.trim_end_matches('+')))
+}
+
+#[async_trait]
+impl Key for ExtensionSpokesByExtensionIdKey {
+    type Value = slug_error::Result<Option<Arc<ExtensionSpokesValue>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        if session_data.project_root != *self.workspace_id.canonical_project_root {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "ExtensionSpokesByExtensionIdKey for '{}' was computed with project root '{}', \
+                 but current bzlmod session root is '{}'",
+                self.extension_id,
+                self.workspace_id.canonical_project_root.display(),
+                session_data.project_root.display()
+            ));
+        }
+        let Some(spokes_key) =
+            extension_spokes_key_for_extension_id(&session_data, &self.extension_id)
+        else {
+            return Ok(None);
+        };
+
+        match ctx.compute(&spokes_key).await {
+            Ok(Ok(spokes)) => Ok(Some(spokes)),
+            Ok(Err(e)) => Err(e),
+            Err(e) => Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "DICE compute failed for extension '{}' spokes: {}",
+                self.extension_id,
+                e
+            )),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for ExtensionSpokesByCanonicalRepoKey {
+    type Value = slug_error::Result<Option<Arc<ExtensionSpokesValue>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        if session_data.project_root != *self.workspace_id.canonical_project_root {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "ExtensionSpokesByCanonicalRepoKey for '{}' was computed with project root '{}', \
+                 but current bzlmod session root is '{}'",
+                self.canonical_name,
+                self.workspace_id.canonical_project_root.display(),
+                session_data.project_root.display()
+            ));
+        }
+        let Some(spokes_key) =
+            extension_spokes_key_for_canonical_repo(&session_data, &self.canonical_name)
+        else {
+            return Ok(None);
+        };
+
+        match ctx.compute(&spokes_key).await {
+            Ok(Ok(spokes)) => Ok(Some(spokes)),
+            Ok(Err(e)) => Err(e),
+            Err(e) => Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "DICE compute failed for canonical repo '{}' spokes: {}",
+                self.canonical_name,
+                e
+            )),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
 }
 
 #[async_trait]

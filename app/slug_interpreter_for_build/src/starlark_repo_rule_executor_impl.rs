@@ -250,7 +250,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             let starlark_module = Module::new();
             let ctx_value = starlark_module.heap().alloc(repo_ctx.clone());
             let mut eval = Evaluator::new(&starlark_module);
-            slug_bzlmod::with_extension_dice(ctx, || {
+            slug_bzlmod::with_extension_dice(ctx, workspace_root.root().to_path_buf(), || {
                 eval.eval_function(impl_fn.to_value(), &[ctx_value], &[])
             })
             .map(|_| ())

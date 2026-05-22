@@ -68,6 +68,8 @@ pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionRepoExecutionIdentity;
 pub use dice_graph::ExtensionSpoke;
+pub use dice_graph::ExtensionSpokesByCanonicalRepoKey;
+pub use dice_graph::ExtensionSpokesByExtensionIdKey;
 pub use dice_graph::ExtensionSpokesKey;
 pub use dice_graph::ExtensionSpokesValue;
 pub use dice_graph::ExtensionUniqueName;

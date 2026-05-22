@@ -34,6 +34,8 @@
 //! only thing running on this thread during that scope.
 
 use std::cell::Cell;
+use std::cell::RefCell;
+use std::path::PathBuf;
 
 use dice::DiceComputations;
 
@@ -52,6 +54,11 @@ thread_local! {
     /// scope. Readers must only deref while a `with_extension_dice`
     /// activation is on the call stack of the same thread.
     static EXTENSION_DICE_PTR: Cell<Option<*mut DiceComputations<'static>>> = const { Cell::new(None) };
+
+    /// Workspace identity paired with `EXTENSION_DICE_PTR`. Synchronous
+    /// spoke materialization uses it to construct DICE keys without reading
+    /// injected bzlmod session data in the materialization bridge itself.
+    static EXTENSION_WORKSPACE_ID: RefCell<Option<crate::WorkspaceId>> = RefCell::new(None);
 }
 
 /// Run `f` with a thread-local pointer to the given DICE computations
@@ -60,21 +67,37 @@ thread_local! {
 /// `materialize_spoke_sync`.
 ///
 /// Nesting: the previous pointer (if any) is restored on exit.
-pub fn with_extension_dice<R>(ctx: &mut DiceComputations<'_>, f: impl FnOnce() -> R) -> R {
+pub fn with_extension_dice<R>(
+    ctx: &mut DiceComputations<'_>,
+    project_root: PathBuf,
+    f: impl FnOnce() -> R,
+) -> R {
     // Cast away the lifetime. SAFETY: `f` runs synchronously to completion
     // before this function returns; `ctx`'s borrow is live the entire time.
     // We restore the previous pointer on exit so nested scopes work.
     let raw = ctx as *mut DiceComputations<'_> as *mut DiceComputations<'static>;
     let prev = EXTENSION_DICE_PTR.with(|c| c.replace(Some(raw)));
+    let workspace_id = crate::WorkspaceId::for_project_root(project_root);
+    let prev_workspace = EXTENSION_WORKSPACE_ID.with(|c| c.replace(Some(workspace_id)));
     // Use a guard so we restore on panic too.
-    struct Guard(Option<*mut DiceComputations<'static>>);
+    struct Guard {
+        prev: Option<*mut DiceComputations<'static>>,
+        prev_workspace: Option<crate::WorkspaceId>,
+    }
     impl Drop for Guard {
         fn drop(&mut self) {
-            let prev = self.0.take();
+            let prev = self.prev.take();
             EXTENSION_DICE_PTR.with(|c| c.set(prev));
+            let prev_workspace = self.prev_workspace.take();
+            EXTENSION_WORKSPACE_ID.with(|c| {
+                c.replace(prev_workspace);
+            });
         }
     }
-    let _guard = Guard(prev);
+    let _guard = Guard {
+        prev,
+        prev_workspace,
+    };
     f()
 }
 
@@ -133,24 +156,20 @@ async fn spoke_execution_key(
     let Some(_) = crate::parse_canonical_name(canonical_name) else {
         return Ok(None);
     };
-    let session_data = ctx
-        .compute(&crate::BzlmodSessionDataKey)
-        .await
-        .map_err(|e| {
+    let workspace_id = EXTENSION_WORKSPACE_ID
+        .with(|c| c.borrow().clone())
+        .ok_or_else(|| {
             slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
-                "DICE compute failed while looking up spoke '{}': {}",
-                canonical_name,
-                e
+                "materialize_spoke_sync called for '{}' without workspace identity",
+                canonical_name
             )
         })?;
-    let Some(spokes_key) =
-        crate::extension_spokes_key_for_canonical_repo(&session_data, canonical_name)
-    else {
-        return Ok(None);
-    };
-    let spokes = match ctx.compute(&spokes_key).await {
-        Ok(Ok(spokes)) => spokes,
+    let lookup_key =
+        crate::ExtensionSpokesByCanonicalRepoKey::for_workspace_id(workspace_id, canonical_name);
+    let spokes = match ctx.compute(&lookup_key).await {
+        Ok(Ok(Some(spokes))) => spokes,
+        Ok(Ok(None)) => return Ok(None),
         Ok(Err(e)) => return Err(e),
         Err(e) => {
             return Err(slug_error::slug_error!(

@@ -483,38 +483,20 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
 async fn ensure_extension_spokes_registered(
     ctx: &mut DiceComputations<'_>,
     extension_id: &str,
-    _project_root_path: &std::path::Path,
+    project_root_path: &std::path::Path,
     requesting_canonical_name: &str,
 ) -> slug_error::Result<()> {
-    let session_data = match ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await {
-        Ok(data) => data,
-        Err(e) => {
-            return Err(ExtensionRepoError::MaterializationFailed {
-                canonical_name: requesting_canonical_name.to_owned(),
-                reason: format!(
-                    "bzlmod session data unavailable while registering extension spokes for '{}': {}",
-                    extension_id,
-                    diagnostic_summary(&e)
-                ),
-            }
-            .into());
-        }
-    };
-    let Some(spokes_key) =
-        slug_bzlmod::extension_spokes_key_for_extension_id(&session_data, extension_id)
-    else {
-        // Not a module extension — `use_repo_rule()` and similar produce a
-        // single repo with no siblings, so there is nothing to seed.
-        return Ok(());
-    };
-
-    let spokes = match ctx.compute(&spokes_key).await {
-        Ok(Ok(r)) => r,
+    let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_project_root(
+        project_root_path.to_path_buf(),
+        extension_id,
+    );
+    let Some(spokes) = (match ctx.compute(&lookup_key).await {
+        Ok(Ok(spokes)) => spokes,
         Ok(Err(e)) => {
             return Err(ExtensionRepoError::MaterializationFailed {
                 canonical_name: requesting_canonical_name.to_owned(),
                 reason: format!(
-                    "Extension '{}' spoke computation failed while registering spokes: {}",
+                    "Extension '{}' spoke lookup failed while registering spokes: {}",
                     extension_id,
                     diagnostic_summary(&e)
                 ),
@@ -525,13 +507,17 @@ async fn ensure_extension_spokes_registered(
             return Err(ExtensionRepoError::MaterializationFailed {
                 canonical_name: requesting_canonical_name.to_owned(),
                 reason: format!(
-                    "Extension '{}' DICE error while computing spokes: {}",
+                    "Extension '{}' DICE error while looking up spokes: {}",
                     extension_id,
                     diagnostic_summary(&e)
                 ),
             }
             .into());
         }
+    }) else {
+        // Not a module extension — `use_repo_rule()` and similar produce a
+        // single repo with no siblings, so there is nothing to seed.
+        return Ok(());
     };
 
     for spoke in spokes.iter() {
@@ -708,19 +694,13 @@ pub(crate) async fn get_file_ops_delegate(
                 setup.extension_id
             );
 
-            let session_data = ctx
-                .compute(&slug_bzlmod::BzlmodSessionDataKey)
-                .await
-                .map_err(|e| ExtensionRepoError::MaterializationFailed {
-                    canonical_name: setup.canonical_name.to_string(),
-                    reason: format!("bzlmod session data unavailable: {}", e),
-                })?;
-            let spokes_key = match slug_bzlmod::extension_spokes_key_for_extension_id(
-                &session_data,
+            let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_project_root(
+                project_root_path.clone(),
                 &setup.extension_id,
-            ) {
-                Some(key) => key,
-                None => {
+            );
+            let spokes = match ctx.compute(&lookup_key).await {
+                Ok(Ok(Some(result))) => result,
+                Ok(Ok(None)) => {
                     // Not a module extension — likely a use_repo_rule() invocation.
                     // Execute directly as a Starlark repository rule via DICE.
                     tracing::info!(
@@ -790,15 +770,11 @@ pub(crate) async fn get_file_ops_delegate(
                         digest_config,
                     )));
                 }
-            };
-
-            let spokes = match ctx.compute(&spokes_key).await {
-                Ok(Ok(result)) => result,
                 Ok(Err(e)) => {
                     return Err(ExtensionRepoError::MaterializationFailed {
                         canonical_name: setup.canonical_name.to_string(),
                         reason: format!(
-                            "Extension '{}' spoke computation failed: {}",
+                            "Extension '{}' spoke lookup failed: {}",
                             setup.extension_id,
                             diagnostic_summary(&e)
                         ),
@@ -809,7 +785,7 @@ pub(crate) async fn get_file_ops_delegate(
                     return Err(ExtensionRepoError::MaterializationFailed {
                         canonical_name: setup.canonical_name.to_string(),
                         reason: format!(
-                            "Extension '{}' DICE error while computing spokes: {}",
+                            "Extension '{}' DICE error while looking up spokes: {}",
                             setup.extension_id,
                             diagnostic_summary(&e)
                         ),

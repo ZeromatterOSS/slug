@@ -150,6 +150,12 @@ Observed SDK result at the checkpoint:
   hashes, and serialized repo specs. Runtime materialization still registers
   temporary dynamic cells as transitional output plumbing, but sibling lookup
   no longer scans extension aggregations by extension name alone.
+- Runtime extension-repo materialization and synchronous
+  `module_ctx.path(Label(...))` spoke materialization now use
+  `ExtensionSpokesByExtensionIdKey` and `ExtensionSpokesByCanonicalRepoKey`
+  lookup keys. The sync bridge carries the active workspace identity, so
+  materialization plumbing no longer reads injected `BzlmodSessionData`
+  directly to find sibling spokes.
 - Registered toolchain and execution platform consumers now read
   `RegisteredToolchainsKey` and `RegisteredExecutionPlatformsKey` instead of
   directly reading those fields from injected `BzlmodSessionData`. The keys are
@@ -228,8 +234,10 @@ What did not work or remains risky:
   the full interpreter load graph are not replay-complete.
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
-  cells and dynamic alias registration still flow through transitional runtime
-  cell-registration plumbing rather than a final DICE-owned cell graph.
+  materialization now goes through DICE lookup keys with workspace identity, but
+  generated repo cells and dynamic alias registration still flow through
+  transitional runtime cell-registration plumbing rather than a final
+  DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.
