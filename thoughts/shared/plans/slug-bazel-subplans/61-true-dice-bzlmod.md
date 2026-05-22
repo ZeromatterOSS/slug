@@ -5159,6 +5159,39 @@ Implementation slice 2026-05-22, nested external action inputs:
   owner is action execution/materialization scheduling or overly expensive
   per-action input setup for large C compile sets, not missing musl headers.
 
+Implementation slice 2026-05-22, external alias scan cache:
+
+- Ground truth:
+  Bazel 9.0.1 builds the same focused target,
+  `@@llvm++llvm_source+compiler-rt//:builtins` on
+  `//bazel/platforms:linux-musl`, successfully in about `2.094s` elapsed with
+  183 total actions and 15 concurrent sandboxed compile actions. The checked
+  log is
+  `/tmp/slug-plan61/bazel-build-compiler-rt-builtins-20260522-135300.log`.
+- Reflection:
+  the post-correctness Slug timeout was not a new header-declaration bug. Slug
+  `aquery` expanded the target quickly into many independent `c_compile`
+  actions with unique object outputs, while the timed-out build kept the daemon
+  CPU-active and slowly drained compile actions before child compiler work was
+  visible. The systemic hotspot was in per-action execroot materialization:
+  every nested external path called alias linking, and alias linking reread and
+  canonicalized the full project `external/` directory for each path.
+- Fix:
+  `materialize_external_prefix` now caches apparent-alias discovery per
+  canonical external repo target during one execroot materialization pass.
+  Whole-repo links and nested path links reuse that alias list instead of
+  rescanning `external/` for each declared file.
+- Validation:
+  `cargo test -p slug_execute_impl action_execroot -- --nocapture`, `cargo
+  build -p slug`, and `git diff --check` passed. A fresh focused Slug build
+  `/tmp/slug-plan61/plan61-builtins-alias-cache-20260522-135450.log` succeeded:
+  177 local commands, total `1m06s`, execute `54.5s`, and `c_compile=8.2s/171`.
+  This is still slower than Bazel's 2.1s baseline, but it removes the hard
+  timeout and confirms the previous missing-header frontier is fixed.
+- Cleanup:
+  after validation, remove the `plan61-builtins-alias-cache-*` generated
+  `buck-out` and staged `execroot` trees before the next broad SDK smoke.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

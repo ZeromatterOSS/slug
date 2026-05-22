@@ -20,6 +20,7 @@
 //! Replaces the global allowlist-filtered execroot from Phase 2.5
 //! (`slug_core::cells::ensure_execroot_layout`).
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -542,6 +543,8 @@ fn materialize_external_prefix(
     repos: &BTreeSet<String>,
     paths: &BTreeSet<String>,
 ) -> bool {
+    let mut alias_cache: BTreeMap<std::path::PathBuf, Vec<String>> = BTreeMap::new();
+
     match execroot_external.symlink_metadata() {
         Ok(meta) if meta.file_type().is_symlink() => {
             if !remove_symlink_path(execroot_external) {
@@ -572,8 +575,15 @@ fn materialize_external_prefix(
         if !link_external_entry(execroot_external, repo.into(), &target) {
             return false;
         }
-        if !link_external_aliases_for_target(project_external, execroot_external, &target) {
+        let Some(aliases) =
+            external_alias_names_for_target(project_external, &target, &mut alias_cache)
+        else {
             return false;
+        };
+        for alias in aliases {
+            if !link_external_entry(execroot_external, alias.into(), &target) {
+                return false;
+            }
         }
     }
 
@@ -587,9 +597,15 @@ fn materialize_external_prefix(
         if !link_external_path(execroot_external, repo, rel, &target) {
             return false;
         }
-        if !link_external_alias_paths_for_target(project_external, execroot_external, &target, rel)
-        {
+        let Some(aliases) =
+            external_alias_names_for_target(project_external, &target, &mut alias_cache)
+        else {
             return false;
+        };
+        for alias in aliases {
+            if !link_external_path(execroot_external, &alias, rel, &target) {
+                return false;
+            }
         }
     }
 
@@ -616,43 +632,15 @@ fn external_repo_target(
     None
 }
 
-fn link_external_aliases_for_target(
+fn external_alias_names_for_target(
     project_external: &std::path::Path,
-    execroot_external: &std::path::Path,
     selected_target: &std::path::Path,
-) -> bool {
-    let entries = match std::fs::read_dir(project_external) {
-        Ok(entries) => entries,
-        Err(e) => {
-            tracing::debug!(
-                ?e,
-                path = %project_external.display(),
-                "failed to read project external aliases"
-            );
-            return false;
-        }
-    };
-
-    for entry in entries.flatten() {
-        let target = canonical_external_entry_target(project_external, &entry.path())
-            .unwrap_or_else(|| entry.path());
-        if target != selected_target {
-            continue;
-        }
-        if !link_external_entry(execroot_external, entry.file_name(), selected_target) {
-            return false;
-        }
+    alias_cache: &mut BTreeMap<std::path::PathBuf, Vec<String>>,
+) -> Option<Vec<String>> {
+    if let Some(aliases) = alias_cache.get(selected_target) {
+        return Some(aliases.clone());
     }
 
-    true
-}
-
-fn link_external_alias_paths_for_target(
-    project_external: &std::path::Path,
-    execroot_external: &std::path::Path,
-    selected_target: &std::path::Path,
-    rel: &str,
-) -> bool {
     let entries = match std::fs::read_dir(project_external) {
         Ok(entries) => entries,
         Err(e) => {
@@ -661,10 +649,11 @@ fn link_external_alias_paths_for_target(
                 path = %project_external.display(),
                 "failed to read project external aliases"
             );
-            return false;
+            return None;
         }
     };
 
+    let mut aliases = Vec::new();
     for entry in entries.flatten() {
         let target = canonical_external_entry_target(project_external, &entry.path())
             .unwrap_or_else(|| entry.path());
@@ -674,12 +663,11 @@ fn link_external_alias_paths_for_target(
         let Some(name) = entry.file_name().to_str().map(ToOwned::to_owned) else {
             continue;
         };
-        if !link_external_path(execroot_external, &name, rel, selected_target) {
-            return false;
-        }
+        aliases.push(name);
     }
 
-    true
+    alias_cache.insert(selected_target.to_path_buf(), aliases.clone());
+    Some(aliases)
 }
 
 fn link_external_path(
