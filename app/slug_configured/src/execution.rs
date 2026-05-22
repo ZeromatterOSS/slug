@@ -22,6 +22,7 @@ use itertools::Itertools;
 use slug_build_api::actions::execute::dice_data::HasFallbackExecutorConfig;
 use slug_build_api::analysis::calculation::RuleAnalysisCalculation;
 use slug_common::dice::cells::HasCellResolver;
+use slug_common::dice::data::HasIoProvider;
 use slug_core::configuration::compatibility::MaybeCompatible;
 use slug_core::configuration::data::ConfigurationData;
 use slug_core::configuration::pair::ConfigurationNoExec;
@@ -702,8 +703,17 @@ async fn compute_execution_platforms(
 
     let cli_extras: Arc<[String]> = ctx.compute(&ExtraExecutionPlatformsKey).await?;
     let cli_extras: Vec<String> = cli_extras.iter().cloned().collect();
-    let bzlmod_session_data = ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await?;
-    let module_registrations = bzlmod_session_data.registered_execution_platforms.clone();
+    let project_root = ctx
+        .global_data()
+        .get_io_provider()
+        .project_root()
+        .root()
+        .to_path_buf();
+    let module_registrations = ctx
+        .compute(&slug_bzlmod::RegisteredExecutionPlatformsKey::for_project_root(project_root))
+        .await??
+        .registered_execution_platforms
+        .clone();
 
     if cli_extras.is_empty() && module_registrations.is_empty() {
         return Ok(None);

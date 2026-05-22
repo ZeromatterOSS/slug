@@ -422,16 +422,122 @@ pub struct RepoMappingKey {
     pub scope: RepoMappingScope,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "RegisteredToolchainsKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
 pub struct RegisteredToolchainsKey {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+impl RegisteredToolchainsKey {
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self {
+            workspace_id: WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2")),
+            resolution_digest: Arc::from("injected-bzlmod-session"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct RegisteredToolchainsValue {
+    pub workspace_id: WorkspaceId,
+    pub registered_toolchains: Vec<crate::RegisteredToolchain>,
+}
+
+#[async_trait]
+impl Key for RegisteredToolchainsKey {
+    type Value = slug_error::Result<Arc<RegisteredToolchainsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        if session_data.project_root != *self.workspace_id.canonical_project_root {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "RegisteredToolchainsKey was computed with project root '{}', \
+                 but current bzlmod session root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                session_data.project_root.display()
+            ));
+        }
+        Ok(Arc::new(RegisteredToolchainsValue {
+            workspace_id: self.workspace_id.clone(),
+            registered_toolchains: session_data.registered_toolchains.clone(),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "RegisteredExecutionPlatformsKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
 pub struct RegisteredExecutionPlatformsKey {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
+}
+
+impl RegisteredExecutionPlatformsKey {
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self {
+            workspace_id: WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2")),
+            resolution_digest: Arc::from("injected-bzlmod-session"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct RegisteredExecutionPlatformsValue {
+    pub workspace_id: WorkspaceId,
+    pub registered_execution_platforms: Vec<String>,
+}
+
+#[async_trait]
+impl Key for RegisteredExecutionPlatformsKey {
+    type Value = slug_error::Result<Arc<RegisteredExecutionPlatformsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        if session_data.project_root != *self.workspace_id.canonical_project_root {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "RegisteredExecutionPlatformsKey was computed with project root '{}', \
+                 but current bzlmod session root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                session_data.project_root.display()
+            ));
+        }
+        Ok(Arc::new(RegisteredExecutionPlatformsValue {
+            workspace_id: self.workspace_id.clone(),
+            registered_execution_platforms: session_data.registered_execution_platforms.clone(),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]

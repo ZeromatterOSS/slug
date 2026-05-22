@@ -150,6 +150,11 @@ Observed SDK result at the checkpoint:
   hashes, and serialized repo specs. Runtime materialization still registers
   temporary dynamic cells as transitional output plumbing, but sibling lookup
   no longer scans extension aggregations by extension name alone.
+- Registered toolchain and execution platform consumers now read
+  `RegisteredToolchainsKey` and `RegisteredExecutionPlatformsKey` instead of
+  directly reading those fields from injected `BzlmodSessionData`. The keys are
+  still transitional producers over the injected session graph, but analysis
+  and execution-platform selection now depend on named DICE values.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -210,7 +215,9 @@ What did not work or remains risky:
   wrapped resolver is still not a Skyframe-shaped module graph.
 - The resolved graph, repo mappings, cell graph, and registered toolchain and
   execution platform facts are still assembled during legacy cell setup, then
-  injected as `BzlmodSessionData`.
+  injected as `BzlmodSessionData`. Toolchain/platform consumers now go through
+  DICE keys, but those keys still source their values from the injected
+  transitional session.
 - Hidden lockfile identity is included in the transitional bridge key equality
   and hashing path, and hidden replay has same-daemon edit coverage. Broader
   hidden lockfile replay/fail-open behavior now has stronger guardrails, but

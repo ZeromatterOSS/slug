@@ -54,6 +54,7 @@ use slug_build_api::interpreter::rule_defs::provider::collection::ProviderCollec
 use slug_build_api::validation::transitive_validations::TransitiveValidations;
 use slug_build_api::validation::transitive_validations::TransitiveValidationsData;
 use slug_common::dice::cells::HasCellResolver;
+use slug_common::dice::data::HasIoProvider;
 use slug_core::cells::cell_path::CellPathRef;
 use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePath;
@@ -1106,11 +1107,25 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         return;
     }
 
-    let registered = match dice.compute(&slug_bzlmod::BzlmodSessionDataKey).await {
-        Ok(data) => data.registered_toolchains.clone(),
+    let project_root = dice
+        .global_data()
+        .get_io_provider()
+        .project_root()
+        .root()
+        .to_path_buf();
+    let registered_key = slug_bzlmod::RegisteredToolchainsKey::for_project_root(project_root);
+    let registered = match dice.compute(&registered_key).await {
+        Ok(Ok(data)) => data.registered_toolchains.clone(),
+        Ok(Err(e)) => {
+            tracing::warn!(
+                "Bzlmod registered toolchains unavailable while loading toolchains: {}",
+                e
+            );
+            Vec::new()
+        }
         Err(e) => {
             tracing::warn!(
-                "Bzlmod session data unavailable while loading registered toolchains: {}",
+                "DICE error while loading registered bzlmod toolchains: {}",
                 e
             );
             Vec::new()
