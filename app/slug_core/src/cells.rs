@@ -148,6 +148,10 @@ static BZLMOD_APPARENT_ALIAS_CACHE: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<String, Option<String>>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
+#[cfg(test)]
+static BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
+
 /// Plan 36: dynamic-cell sibling registry that carries the
 /// `ExtensionRepoCellSetup` alongside the path, so that
 /// `get_or_create_dynamic_cell` can wire `ExternalCellOrigin::ExtensionRepo`
@@ -414,6 +418,25 @@ pub fn canonical_dynamic_extension_cell_name(name: &str) -> Option<String> {
     candidates.into_iter().next()
 }
 
+pub fn canonical_bzlmod_module_cell_name(name: &str) -> Option<String> {
+    if name.contains('+') {
+        return None;
+    }
+
+    let canonical_name = {
+        let mut cache = BZLMOD_APPARENT_ALIAS_CACHE.lock().ok()?;
+        if let Some(cached) = cache.get(name) {
+            cached.clone()
+        } else {
+            let discovered = scan_bzlmod_apparent_alias_from_external_dir(name);
+            cache.insert(name.to_owned(), discovered.clone());
+            discovered
+        }
+    }?;
+
+    Some(canonical_name)
+}
+
 /// Plan 36: register a dynamic extension spoke cell with its
 /// `ExtensionRepoCellSetup` so that `get_or_create_dynamic_cell`
 /// wires `ExternalCellOrigin::ExtensionRepo` onto the synthesized
@@ -667,13 +690,13 @@ pub fn get_dynamic_project_root() -> Option<std::path::PathBuf> {
 /// precedence. Higher = more preferred.
 ///
 /// When multiple cells share the same apparent name (e.g. `rules_python`
-/// is both the bzlmod module `rules_python+1.9.0` AND an extension spoke
+/// is both the bzlmod module `rules_python+` AND an extension spoke
 /// `rules_foreign_cc+ext+rules_python`), the symlink should point at the
 /// bzlmod module form because that's where bazel_dep'd consumers expect
 /// templates and other source files to live. Extension spokes get their
 /// own symlinks under their canonical names elsewhere.
 ///
-///   `rules_python+1.9.0`               → 2 (module form, name+version)
+///   `rules_python+` / `rules_python+1.9.0` → 3 (module form)
 ///   `rules_foreign_cc+ext+rules_python` → 1 (extension spoke, 3 segments)
 ///   `rules_python`                     → 0 (no version, ambiguous)
 fn module_form_priority(cell_path: &str) -> u8 {
@@ -1385,7 +1408,7 @@ fn scan_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<String> {
             continue;
         }
         let suffix = &dir_name[prefix.len()..];
-        if suffix.is_empty() || suffix.contains('+') {
+        if suffix.contains('+') {
             continue;
         }
         match &best {
@@ -1400,7 +1423,7 @@ fn cache_bzlmod_apparent_alias_for_canonical_name(canonical_name: &str) {
     let Some((alias, suffix)) = canonical_name.split_once('+') else {
         return;
     };
-    if alias.is_empty() || suffix.is_empty() || suffix.contains('+') {
+    if alias.is_empty() || suffix.contains('+') {
         return;
     }
     if let Ok(mut cache) = BZLMOD_APPARENT_ALIAS_CACHE.lock() {
@@ -1440,22 +1463,25 @@ mod bzlmod_apparent_alias_cache_tests {
 
     #[test]
     fn cache_tracks_lexicographically_first_module_form_alias() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         clear_bzlmod_apparent_alias_cache_for_tests();
 
         cache_bzlmod_apparent_alias_for_canonical_name("rules_python+1.9.0");
+        cache_bzlmod_apparent_alias_for_canonical_name("rules_python+");
         cache_bzlmod_apparent_alias_for_canonical_name("rules_python+1.8.0");
         cache_bzlmod_apparent_alias_for_canonical_name("rules_python+ext+spoke");
         cache_bzlmod_apparent_alias_for_canonical_name("plain_repo");
 
         assert_eq!(
             cached_bzlmod_apparent_alias_for_tests("rules_python"),
-            Some(Some("rules_python+1.8.0".to_owned()))
+            Some(Some("rules_python+".to_owned()))
         );
         assert_eq!(cached_bzlmod_apparent_alias_for_tests("plain_repo"), None);
     }
 
     #[test]
     fn cache_updates_negative_lookup_when_module_form_registers_later() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         clear_bzlmod_apparent_alias_cache_for_tests();
 
         BZLMOD_APPARENT_ALIAS_CACHE

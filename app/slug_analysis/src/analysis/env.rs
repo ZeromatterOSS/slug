@@ -2309,8 +2309,7 @@ fn metadata_path_for_label(
 ) -> String {
     let buck_out_root = slug_execute::path::artifact_path::get_artifact_path_buck_out_root();
     let cell_name = label.pkg().cell_name().as_str();
-    let external_cell_name = slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
-        .unwrap_or_else(|| cell_name.to_owned());
+    let external_cell_name = metadata_external_cell_name(cell_name);
     let cfg_hash = target_cfg.output_hash().as_str();
     let cell_relative_path = label.pkg().cell_relative_path().as_str();
     let target_name = label.name().as_str();
@@ -2344,10 +2343,15 @@ fn metadata_path_for_label(
     }
 }
 
+fn metadata_external_cell_name(cell_name: &str) -> String {
+    slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+        .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
+        .unwrap_or_else(|| cell_name.to_owned())
+}
+
 fn metadata_source_path_for_label(label: &TargetLabel) -> String {
     let cell_name = label.pkg().cell_name().as_str();
-    let external_cell_name = slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
-        .unwrap_or_else(|| cell_name.to_owned());
+    let external_cell_name = metadata_external_cell_name(cell_name);
     let cell_relative_path = label.pkg().cell_relative_path().as_str();
     let target_name = label.name().as_str();
     if slug_core::cells::is_root_cell_name(cell_name) {

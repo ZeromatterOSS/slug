@@ -98,6 +98,7 @@ impl ArtifactFs {
             // (matching `ArtifactPath::with_path`).
             let external_cell_name =
                 crate::cells::canonical_dynamic_extension_cell_name(cell_name.as_str())
+                    .or_else(|| crate::cells::canonical_bzlmod_module_cell_name(cell_name.as_str()))
                     .or_else(|| {
                         cell.path()
                             .as_project_relative_path()

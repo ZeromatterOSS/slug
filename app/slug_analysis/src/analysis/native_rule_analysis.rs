@@ -33,8 +33,13 @@ use slug_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use slug_build_api::interpreter::rule_defs::cc_common::CcInfoInstanceStub;
 use slug_build_api::interpreter::rule_defs::cc_common::CcInfoProvider;
+use slug_build_api::interpreter::rule_defs::cc_common::OutputGroupInfoInstanceGen;
+use slug_build_api::interpreter::rule_defs::cc_common::OutputGroupInfoProvider;
+use slug_build_api::interpreter::rule_defs::depset::depset_to_list_without_heap;
+use slug_build_api::interpreter::rule_defs::depset::is_depset_value;
 use slug_build_api::interpreter::rule_defs::platform_common::ConstraintSettingInfoProvider;
 use slug_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
+use slug_build_api::interpreter::rule_defs::provider::ProviderLike;
 use slug_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
 use slug_build_api::interpreter::rule_defs::provider::builtin::constraint_setting_info::FrozenConstraintSettingInfo;
 use slug_build_api::interpreter::rule_defs::provider::builtin::constraint_value_info::FrozenConstraintValueInfo;
@@ -71,7 +76,10 @@ use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::FrozenValueTyped;
 use starlark::values::OwnedFrozenValue;
+use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::any_complex::StarlarkAnyComplex;
+use starlark::values::list::FrozenListRef;
 use starlark_map::small_map::SmallMap;
 
 use crate::analysis::genrule_action::GenruleAction;
@@ -903,6 +911,65 @@ fn collect_source_files_from_configured_attr(
     }
 }
 
+fn configured_attr_string(attr: &ConfiguredAttr) -> Option<&str> {
+    match attr {
+        ConfiguredAttr::String(s) => Some(s.as_str()),
+        ConfiguredAttr::OneOf(inner, _) => configured_attr_string(inner),
+        _ => None,
+    }
+}
+
+fn frozen_values_from_output_group(value: Value<'static>) -> slug_error::Result<Vec<FrozenValue>> {
+    let values = if is_depset_value(value) {
+        depset_to_list_without_heap(value).map_err(slug_error::Error::from)?
+    } else if let Some(list) = FrozenListRef::from_value(value) {
+        return Ok(list.iter().copied().collect());
+    } else {
+        return Err(internal_error!(
+            "filegroup output_group expected a depset or list, got `{}`",
+            value.get_type()
+        ));
+    };
+
+    values
+        .into_iter()
+        .map(|value| {
+            value.unpack_frozen().ok_or_else(|| {
+                internal_error!(
+                    "filegroup output_group element was not frozen: `{}`",
+                    value.get_type()
+                )
+            })
+        })
+        .collect()
+}
+
+fn output_group_outputs(
+    providers: &FrozenProviderCollection,
+    output_group: &str,
+) -> slug_error::Result<Vec<FrozenValue>> {
+    let Some(provider_value) = providers.get_provider_raw(OutputGroupInfoProvider::provider_id())
+    else {
+        return Ok(Vec::new());
+    };
+    let Some(output_group_info) = provider_value
+        .to_value()
+        .downcast_ref::<OutputGroupInfoInstanceGen<FrozenValue>>()
+    else {
+        return Err(internal_error!(
+            "OutputGroupInfo provider had unexpected value type `{}`",
+            provider_value.to_value().get_type()
+        ));
+    };
+
+    for (name, value) in output_group_info.items() {
+        if name == output_group {
+            return frozen_values_from_output_group(value);
+        }
+    }
+    Ok(Vec::new())
+}
+
 /// Analyze a filegroup target.
 /// Filegroups collect files from their srcs and data deps.
 /// For filegroups with source files in srcs, returns DefaultInfo with those source artifacts.
@@ -917,6 +984,16 @@ fn analyze_filegroup(
     // Source files are not deps, so they don't appear in dep_analysis.
     let heap = FrozenHeap::new();
     let mut source_outputs: Vec<FrozenValue> = Vec::new();
+    let output_group = configured_node
+        .get("output_group", AttrInspectOptions::All)
+        .and_then(|attr| configured_attr_string(&attr.value).map(str::to_owned))
+        .unwrap_or_default();
+    if output_group.ends_with("_INTERNAL_") {
+        return Err(internal_error!(
+            "Output group {} is not permitted for reference in filegroups.",
+            output_group
+        ));
+    }
 
     let pkg = target.pkg();
 
@@ -944,20 +1021,28 @@ fn analyze_filegroup(
         return make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0));
     }
 
-    // Fast path: single dep with no source files, just forward its result directly
-    if dep_analysis.len() == 1 && source_outputs.is_empty() {
+    // Fast path: single dep with no source files, just forward its result directly.
+    // Bazel's filegroup(output_group = ...) forwards only the named OutputGroupInfo
+    // group, so it must not use this DefaultInfo shortcut.
+    if output_group.is_empty() && dep_analysis.len() == 1 && source_outputs.is_empty() {
         let (_label, result) = dep_analysis.into_iter().next().unwrap();
         return Ok(result);
     }
 
-    // Collect default_outputs from all deps into a single merged list, plus source_outputs.
+    // Collect selected outputs from all deps into a single merged list, plus source_outputs.
     // Use the heap already created above.
     let mut all_outputs: Vec<FrozenValue> = source_outputs;
     for (_dep_label, dep_result) in &dep_analysis {
         if let Ok(providers_ref) = dep_result.providers() {
             let collection: &FrozenProviderCollection = providers_ref.value().as_ref();
-            if let Some(default_info) = collection.builtin_provider::<FrozenDefaultInfo>() {
-                for artifact in default_info.default_outputs() {
+            if output_group.is_empty() {
+                if let Some(default_info) = collection.builtin_provider::<FrozenDefaultInfo>() {
+                    for artifact in default_info.default_outputs() {
+                        all_outputs.push(heap.alloc(artifact));
+                    }
+                }
+            } else {
+                for artifact in output_group_outputs(collection, &output_group)? {
                     all_outputs.push(heap.alloc(artifact));
                 }
             }

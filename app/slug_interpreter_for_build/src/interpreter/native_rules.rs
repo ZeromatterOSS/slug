@@ -217,11 +217,19 @@ pub(crate) mod rule_defs {
                 AttrType::source(true),
             ])),
         );
+        let output_group_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                "",
+            ))))),
+            "The output group from srcs targets to expose",
+            AttrType::string(),
+        );
 
         AttributeSpec::from(
             vec![
                 ("srcs".to_owned(), srcs_attr),
                 ("data".to_owned(), data_attr),
+                ("output_group".to_owned(), output_group_attr),
             ],
             false,
             &RuleIncomingTransition::None,
@@ -1107,6 +1115,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] data: Value<'v>,
+        #[starlark(require = named, default = "")] output_group: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
@@ -1150,6 +1159,12 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         };
         let coerced_data =
             data_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, data_value)?;
+        let output_group_attr_type = AttrType::string();
+        let coerced_output_group = output_group_attr_type.coerce(
+            AttrIsConfigurable::Yes,
+            coercion_ctx,
+            eval.heap().alloc(output_group),
+        )?;
 
         let target_node = create_native_target_node(
             rule_defs::FILEGROUP_RULE.clone(),
@@ -1158,6 +1173,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             vec![
                 ("srcs".to_owned(), coerced_srcs),
                 ("data".to_owned(), coerced_data),
+                ("output_group".to_owned(), coerced_output_group),
             ],
             &extract_visibility_strings(visibility),
             internals.attr_coercion_context(),

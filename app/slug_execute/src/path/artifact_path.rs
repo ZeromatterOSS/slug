@@ -65,6 +65,7 @@ fn canonical_external_cell_name(cell_name: &str) -> String {
         return format!("rules_rs++crate+{cell_name}");
     }
     slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+        .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
         .unwrap_or_else(|| cell_name.to_owned())
 }
 

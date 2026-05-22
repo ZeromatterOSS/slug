@@ -4469,6 +4469,176 @@ Blocker reflection 2026-05-21, C++ tool executable action input:
   the `buck-out`/`bazel-out` output-root exception as permission to ignore tool
   inputs.
 
+Blocker reflection 2026-05-21, C++ linkopts location expansion:
+
+- Broad SDK execution smoke
+  `/tmp/slug-plan61/sdk-parity-after-cc-tool-input-20260521-161231.log`
+  advanced past Rust analysis, C++ compiler spawn, and thousands of LLVM runtime
+  compile actions before failing after 12m42s while linking
+  `llvm//runtimes/glibc:libutil_shared_library_/libutil_shared_library`.
+  The command passed literal
+  `-Wl,--version-script=$(location :all.map)` to lld, even though
+  `all.map` had been materialized as an action input.
+- Bazel 9 ground truth:
+  `/tmp/slug-plan61/bazel-aquery-glibc-libutil-link-20260521-162544.textproto`
+  records the matching `CppLink` action with the flag expanded to
+  `-Wl,--version-script=bazel-out/.../external/llvm+/runtimes/glibc/build/all.map`
+  and with `all.map` present in the input dep set. Therefore the missing
+  semantic is not file materialization and not a linker-script special case; it
+  is Bazel-compatible `$(location ...)` expansion for C++ link user flags against
+  `additional_linker_inputs`.
+- Class boundary: this affects any C++ linking path where Starlark rules pass
+  linkopts/user link flags containing `$(location)`, `$(execpath)`, `$(rootpath)`,
+  or rlocation variants and the referenced file is supplied through
+  `additional_linker_inputs` or a linker input's additional inputs. It is not
+  specific to glibc, `all.map`, or `--version-script`.
+- Systemic fix in progress: C++ link flag location expansion should derive
+  paths from the full `StarlarkArtifactLike` abstraction used by action inputs,
+  not only two concrete artifact wrapper types. That keeps the expansion tied
+  to the same declared inputs that the link action materializes.
+- Rejected workarounds: replacing the literal string only for `all.map`, adding
+  a `--version-script`-specific fallback, copying linker scripts into the
+  working directory, or allowing lld to see broad generated directories outside
+  declared action inputs.
+
+Blocker reflection 2026-05-21, external C++ source artifact exec paths:
+
+- Broad SDK execution smoke
+  `/tmp/slug-plan61/sdk-parity-after-linkopts-location-20260521-163228.log`
+  advanced past the linkopts-location implementation and then failed compiling
+  `@rules_rust//util/process_wrapper/private:bootstrap_process_wrapper`.
+  The command passed `-c
+  external/rules_rust/util/process_wrapper/private/bootstrap_process_wrapper.cc`,
+  and clang reported that path missing.
+- Bazel 9 ground truth:
+  `/tmp/slug-plan61/bazel-aquery-rules-rust-process-wrapper-20260521-164525.textproto`
+  records the matching `CppCompile` action under canonical
+  `@@rules_rust+//...` with source argv
+  `external/rules_rust+/util/process_wrapper/private/bootstrap_process_wrapper.cc`.
+  A focused Bazel cquery also resolves the apparent main-repo spelling
+  `@rules_rust//...` to canonical `@@rules_rust+//...`.
+- Class boundary: this affects any C++ compile path where rules_cc feature
+  expansion reads `File.path` from an external bzlmod source artifact. The
+  source argv path and declared input materialization path must come from the
+  same artifact execution-path policy; creating a hidden input from the already
+  rendered string would only hide mismatched repository identity.
+- Systemic fix in progress: external source artifact `with_full_path` rendering
+  now uses the same bzlmod module canonical-directory discovery used by source
+  materialization, so C++ `%{source_file}` expansion, normal artifact argv
+  lowering, and action execroot input planning agree on the external repo
+  directory. This is grounded in Bazel's `external/<canonical_repo>/...` aquery
+  behavior, not in a hardlink or output-root assumption.
+- Rejected workarounds: copying
+  `bootstrap_process_wrapper.cc`, adding a rules_rust-only symlink, making the
+  action run from a broad workspace root, or adding an apparent-repo hidden
+  input from the already-expanded argv string.
+
+Blocker reflection 2026-05-21, non-registry override canonical repo versions:
+
+- Focused Slug validation
+  `/tmp/slug-plan61/plan61-process-wrapper-source-path-20260521-165519.log`
+  did not reproduce the previous missing
+  `external/rules_rust/.../bootstrap_process_wrapper.cc` source error, but it
+  moved to LLVM runtime packaging:
+  `copy_to_directory` tried to read
+  `buck-out/.../gen/llvm+0.7.7/.../libc++.a` while the producing action emitted
+  the archive under `buck-out/.../gen/llvm/.../libc++.a`.
+- Bazel 9 ground truth:
+  `/tmp/slug-plan61/bazel-aquery-libcxx-copydir-20260521-165658.textproto`
+  records the matching target as canonical `@@llvm+//...`; its
+  `CopyToDirectory` argv uses
+  `bazel-out/.../external/llvm+/runtimes/libcxx/libcxx_library_search_directory_config.json`
+  and workspace argument `llvm+`. Non-registry overrides use an empty canonical
+  version segment (`name+`), not the declared module version (`name+0.7.7`).
+- Class boundary: this affects archive/git override modules broadly, including
+  `@llvm`, `@rules_rust`, and any Starlark code that embeds
+  `File.path`/`root.path`/`short_path` for build outputs or source files from
+  those repos. It is not a hardlink requirement; the hardlink field appears in
+  the copy tool config, but the failure is that Slug minted the wrong canonical
+  repo directory for an override.
+- Systemic fix in progress: bzlmod resolution now records git/archive override
+  modules with `Version::empty()` for selection/canonical repo identity, and
+  external source path canonicalization accepts the empty-version `name+`
+  directory. This aligns Slug with Bazel's canonical `@@repo+` path behavior
+  instead of generating `@@repo+<declared_version>` for non-registry overrides.
+- Rejected workarounds: copying the missing `libc++.a`, rewriting only
+  `copy_to_directory` config JSON, disabling hardlink mode, or special-casing
+  LLVM/rules_rust repo names.
+
+Blocker reflection 2026-05-21, native filegroup output groups and frozen run
+inputs:
+
+- Focused Slug validation
+  `/tmp/slug-plan61/plan61-process-wrapper-filegroup-output-group-20260521-172139.log`
+  advanced past source-path and override canonicalization, then failed while
+  archiving LLVM glibc stub libraries. The `CppArchive` actions were passing all
+  generated glibc objects to each single-object archive target, and some archive
+  actions raced before the object producer had materialized the selected object.
+- Bazel 9 ground truth:
+  `/tmp/slug-plan61/bazel-aquery-glibc-libm-archive-20260521-171254.textproto`
+  records `@@llvm+//runtimes/glibc:libm` archiving only
+  `.../_objs/libm/m.pic.o`. Bazel source
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/filegroup/Filegroup.java`
+  shows native `filegroup(output_group = "...")` forwards the named
+  `OutputGroupInfo` group from `srcs` and rejects names ending
+  `_INTERNAL_`.
+- Class boundary: this affects any native `filegroup` used as an output-group
+  selector, not only LLVM glibc, and any `ctx.actions.run(inputs = ...)` path
+  that freezes direct `File` inputs rather than command-line-like carriers.
+  Treating the missing object as a compiler scheduling issue would hide the
+  provider-forwarding bug.
+- Systemic fix implemented: native `filegroup` now declares and analyzes
+  `output_group`, forwards the selected `OutputGroupInfo` files, rejects
+  internal output groups, and disables the previous direct-dep forwarding fast
+  path when output-group selection is active. Frozen `RunAction` inputs now
+  visit direct `File` values as action inputs, and the Rust-side C++ helpers now
+  propagate compile action registration errors and declare argv artifacts as
+  link inputs.
+- Rejected workarounds: adding glibc-specific archive inputs, serializing the
+  glibc compile/archive actions, expanding every `filegroup` to all default
+  outputs, or materializing broad generated directories for archive actions.
+
+Blocker reflection 2026-05-21, C++ toolchain metadata bzlmod path
+canonicalization:
+
+- Focused Slug validation
+  `/tmp/slug-plan61/plan61-process-wrapper-filegroup-inputs-20260521-172711.log`
+  and the fresh rerun
+  `/tmp/slug-plan61/plan61-process-wrapper-fresh-canonical-20260521-173211.log`
+  passed the glibc archive phase but failed linking
+  `@rules_rust//util/process_wrapper/private:bootstrap_process_wrapper`.
+  The link command used runtime flags rooted at
+  `buck-out/.../gen/llvm/.../external/llvm/...` while the producing actions had
+  materialized those tree artifacts under
+  `buck-out/.../gen/llvm+/.../external/llvm+/...`.
+- Bazel 9 ground truth:
+  `/tmp/slug-plan61/bazel-aquery-process-wrapper-link-*.textproto` records the
+  matching `CppLink` action with runtime directory arguments under
+  `bazel-out/.../external/llvm+`. The relevant arguments come from LLVM
+  `cc_args(format = {"resource_dir": "//runtimes:resource_directory", ...})`,
+  not from ELF hardlink behavior or a linker-specific path rewrite.
+- Class boundary: this affects all C++ toolchain metadata-derived placeholders
+  for ordinary bzlmod module repos (`@llvm`, `@rules_rust`, etc.), including
+  library search directories, resource dirs, CRT object dirs, module maps, and
+  source-directory backed tree artifacts. Artifact output materialization was
+  already canonical; the split was in metadata path rendering.
+- Systemic fix implemented: toolchain metadata path helpers now canonicalize
+  both dynamic extension repos and ordinary bzlmod module repos using the shared
+  module alias cache, so placeholder expansion, hidden toolchain inputs, and
+  artifact materialization agree on `external/<canonical_repo>/...`.
+- Validation:
+  `cargo fmt --check`,
+  `cargo check -p slug_analysis`,
+  `cargo check -p slug_execute -p slug_build_api -p slug_action_impl -p slug_interpreter_for_build -p slug_analysis`,
+  `cargo test -p slug_core bzlmod_apparent_alias_cache_tests -- --nocapture`,
+  `cargo build -p slug`, and
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-process-wrapper-metadata-canonical build --jobs=16 @rules_rust//util/process_wrapper/private:bootstrap_process_wrapper`
+  all pass. The successful focused smoke log is
+  `/tmp/slug-plan61/plan61-process-wrapper-metadata-canonical-20260521-173501.log`.
+- Rejected workarounds: creating a secondary `llvm` generated output tree,
+  symlinking `buck-out/.../gen/llvm` to `llvm+`, disabling hardlink/copydir
+  semantics, or rewriting only `-resource-dir` at link time.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

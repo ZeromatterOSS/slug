@@ -805,7 +805,7 @@ impl MvsResolver {
                     module
                 };
 
-                let version = parsed_module.version.clone();
+                let version = Version::empty();
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&g.module_name, version.as_str()),
                     compatibility_level: parsed_module.compatibility_level,
@@ -884,7 +884,7 @@ impl MvsResolver {
                     module
                 };
 
-                let version = parsed_module.version.clone();
+                let version = Version::empty();
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&a.module_name, version.as_str()),
                     compatibility_level: parsed_module.compatibility_level,

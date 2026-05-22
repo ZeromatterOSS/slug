@@ -58,6 +58,7 @@ use starlark::values::starlark_value;
 use starlark::values::tuple::TupleRef;
 
 use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike;
 use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatArtifactStub;
@@ -936,6 +937,12 @@ fn cc_freeze_user_link_flags<'v>(
 fn cc_value_path<'v>(value: Value<'v>, heap: Heap<'v>) -> Option<String> {
     if let Some(path) = value.unpack_str() {
         return Some(path.to_owned());
+    }
+    if let Ok(Some(artifact)) = <&dyn StarlarkArtifactLike<'v>>::unpack_value(value) {
+        return artifact
+            .with_full_path(&|p| heap.alloc_str(p.as_str()))
+            .ok()
+            .map(|path| path.as_str().to_owned());
     }
     if let Some(artifact) = value.downcast_ref::<StarlarkArtifact>()
         && let Ok(bound) = artifact.get_bound_starlark_artifact()
@@ -4515,7 +4522,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             if !compile_inputs_value.is_none() {
                                 run_kwargs.push(("inputs", compile_inputs_value));
                             }
-                            let run_result = eval.eval_function(run, &[args], &run_kwargs);
+                            eval.eval_function(run, &[args], &run_kwargs)?;
                             // Register PIC compile action with unique identifier
                             let mut pic_args_vec: Vec<Value<'v>> = Vec::new();
                             pic_args_vec.push(heap.alloc_str(&host_compiler).to_value());
@@ -4571,7 +4578,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             if !compile_inputs_value.is_none() {
                                 pic_run_kwargs.push(("inputs", compile_inputs_value));
                             }
-                            let _ = eval.eval_function(run, &[pic_args], &pic_run_kwargs);
+                            eval.eval_function(run, &[pic_args], &pic_run_kwargs)?;
 
                             object_files.push(out);
                             pic_object_files.push(pic_out);
@@ -4889,6 +4896,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
             args.extend(feature_args);
             let mut run_inputs = direct_additional_inputs.clone();
+            let push_arg_input = |args: &mut Vec<Value<'v>>,
+                                  run_inputs: &mut Vec<Value<'v>>,
+                                  artifact: Value<'v>| {
+                args.push(artifact);
+                run_inputs.push(artifact);
+            };
 
             // Collect object files from compilation_outputs
             if !compilation_outputs.is_none() {
@@ -4897,7 +4910,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     if !objects.is_none() {
                         if let Ok(iter) = objects.iterate(heap) {
                             for obj in iter {
-                                args.push(obj);
+                                push_arg_input(&mut args, &mut run_inputs, obj);
                             }
                         }
                     }
@@ -4907,7 +4920,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     if !pic_objects.is_none() {
                         if let Ok(iter) = pic_objects.iterate(heap) {
                             for obj in iter {
-                                args.push(obj);
+                                push_arg_input(&mut args, &mut run_inputs, obj);
                             }
                         }
                     }
@@ -4936,7 +4949,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                                         lib.get_attr("static_library", heap)
                                                     {
                                                         if !static_lib.is_none() {
-                                                            args.push(static_lib);
+                                                            push_arg_input(
+                                                                &mut args,
+                                                                &mut run_inputs,
+                                                                static_lib,
+                                                            );
                                                             linked = true;
                                                         }
                                                     }
@@ -4946,7 +4963,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                                             lib.get_attr("pic_static_library", heap)
                                                         {
                                                             if !pic_static_lib.is_none() {
-                                                                args.push(pic_static_lib);
+                                                                push_arg_input(
+                                                                    &mut args,
+                                                                    &mut run_inputs,
+                                                                    pic_static_lib,
+                                                                );
                                                                 linked = true;
                                                             }
                                                         }
@@ -4957,7 +4978,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                                         lib.get_attr("dynamic_library", heap)
                                                     {
                                                         if !dynamic_lib.is_none() {
-                                                            args.push(dynamic_lib);
+                                                            push_arg_input(
+                                                                &mut args,
+                                                                &mut run_inputs,
+                                                                dynamic_lib,
+                                                            );
                                                             linked = true;
                                                         }
                                                     }
@@ -4967,7 +4992,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                                             lib.get_attr("interface_library", heap)
                                                         {
                                                             if !iface_lib.is_none() {
-                                                                args.push(iface_lib);
+                                                                push_arg_input(
+                                                                    &mut args,
+                                                                    &mut run_inputs,
+                                                                    iface_lib,
+                                                                );
                                                                 linked = true;
                                                             }
                                                         }
@@ -4978,7 +5007,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                                             lib.get_attr("static_library", heap)
                                                         {
                                                             if !static_lib.is_none() {
-                                                                args.push(static_lib);
+                                                                push_arg_input(
+                                                                    &mut args,
+                                                                    &mut run_inputs,
+                                                                    static_lib,
+                                                                );
                                                                 linked = true;
                                                             }
                                                         }
@@ -4994,8 +5027,36 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                                             if let Ok(obj_iter) =
                                                                 objects.iterate(heap)
                                                             {
+                                                                let mut added_object = false;
                                                                 for obj in obj_iter {
-                                                                    args.push(obj);
+                                                                    push_arg_input(
+                                                                        &mut args,
+                                                                        &mut run_inputs,
+                                                                        obj,
+                                                                    );
+                                                                    added_object = true;
+                                                                }
+                                                                if added_object {
+                                                                    linked = true;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if !linked {
+                                                    if let Ok(Some(pic_objects)) =
+                                                        lib.get_attr("pic_objects", heap)
+                                                    {
+                                                        if !pic_objects.is_none() {
+                                                            if let Ok(pic_obj_iter) =
+                                                                pic_objects.iterate(heap)
+                                                            {
+                                                                for obj in pic_obj_iter {
+                                                                    push_arg_input(
+                                                                        &mut args,
+                                                                        &mut run_inputs,
+                                                                        obj,
+                                                                    );
                                                                 }
                                                             }
                                                         }

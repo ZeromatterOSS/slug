@@ -70,6 +70,7 @@ fn bazel_output_cell_name(cell_name: &str) -> String {
         cell_name.to_owned()
     } else {
         crate::cells::canonical_dynamic_extension_cell_name(cell_name)
+            .or_else(|| crate::cells::canonical_bzlmod_module_cell_name(cell_name))
             .unwrap_or_else(|| cell_name.to_owned())
     }
 }

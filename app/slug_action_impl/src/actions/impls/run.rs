@@ -121,6 +121,7 @@ use starlark::values::StringValue;
 use starlark::values::Trace;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::ValueOf;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
@@ -455,6 +456,22 @@ impl CommandLineArtifactVisitor<'_> for SkipHiddenCommandLineArtifactVisitor {
 }
 
 impl RunAction {
+    fn visit_bazel_input<'a>(
+        bazel_input: FrozenValue,
+        artifact_visitor: &mut dyn CommandLineArtifactVisitor<'a>,
+    ) -> slug_error::Result<()> {
+        let val = bazel_input.to_value();
+        if let Some(cmd_arg) = ValueAsCommandLineLike::unpack_value_opt(val) {
+            cmd_arg.0.visit_artifacts(artifact_visitor)?;
+        } else if let Some(artifact) = val.downcast_ref::<StarlarkArtifact>() {
+            artifact_visitor.visit_input(
+                ArtifactGroup::Artifact(artifact.artifact().dupe()),
+                Vec::new(),
+            );
+        }
+        Ok(())
+    }
+
     fn visit_artifacts<'a>(
         &'a self,
         artifact_visitor: &mut dyn CommandLineArtifactVisitor<'a>,
@@ -477,10 +494,7 @@ impl RunAction {
         // Bazel compatibility: visit extra input artifacts from the `inputs` parameter.
         // These artifacts are tracked as dependencies but don't appear on the command line.
         for bazel_input in &self.starlark_values.bazel_inputs {
-            let val = bazel_input.to_value();
-            if let Some(cmd_arg) = ValueAsCommandLineLike::unpack_value_opt(val) {
-                cmd_arg.0.visit_artifacts(artifact_visitor)?;
-            }
+            Self::visit_bazel_input(*bazel_input, artifact_visitor)?;
         }
         Ok(())
     }
@@ -810,10 +824,7 @@ impl RunAction {
         // scheduling (`Action::inputs()`), but `expand_command_line_and_worker` is a
         // separate pass that feeds `CommandExecutionRequest`, so we repeat it here.
         for bazel_input in &self.starlark_values.bazel_inputs {
-            let val = bazel_input.to_value();
-            if let Some(cmd_arg) = ValueAsCommandLineLike::unpack_value_opt(val) {
-                cmd_arg.0.visit_artifacts(artifact_visitor)?;
-            }
+            Self::visit_bazel_input(*bazel_input, artifact_visitor)?;
         }
 
         let env_len = values.env.len();

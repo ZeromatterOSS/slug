@@ -391,6 +391,19 @@ struct BzlmodExternalModuleSymlink {
     source_path: PathBuf,
 }
 
+fn bazel_canonical_module_repo_name(module_name: &str, version: &str) -> String {
+    if module_name.contains('+') {
+        module_name.to_owned()
+    } else if version.is_empty() {
+        format!("{module_name}+")
+    } else {
+        // Bazel 9 canonical module repository names keep an empty version
+        // segment for the selected module repo (`@@llvm+//...`), even when the
+        // selected version is recorded separately in the lockfile.
+        format!("{module_name}+")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodPendingRepoCell {
     canonical_name: String,
@@ -1964,7 +1977,8 @@ impl BuckConfigBasedCells {
 
                 // Only create symlinks for modules with cached source paths
                 if let Some(source_path) = &module_info.source_path {
-                    let entry_name = format!("{}+{}", module_name, module_info.version);
+                    let entry_name =
+                        bazel_canonical_module_repo_name(module_name, &module_info.version);
                     module_symlinks.push(BzlmodExternalModuleSymlink {
                         entry_name,
                         source_path: source_path.clone(),
@@ -1999,8 +2013,9 @@ impl BuckConfigBasedCells {
                             .unwrap_or_default();
 
                         // Create a project-relative path for this external module
-                        let external_path =
-                            format!("bazel-external/{}+{}", module_name, module_info.version);
+                        let canonical_repo =
+                            bazel_canonical_module_repo_name(module_name, &module_info.version);
+                        let external_path = format!("bazel-external/{canonical_repo}");
                         let cell_path = CellRootPathBuf::new(
                             ProjectRelativePath::new(&external_path)?.to_owned(),
                         );
@@ -2036,8 +2051,9 @@ impl BuckConfigBasedCells {
                             .map(|p| p.to_string_lossy().to_string())
                             .unwrap_or_default();
 
-                        let external_path =
-                            format!("bazel-external/{}+{}", module_name, module_info.version);
+                        let canonical_repo =
+                            bazel_canonical_module_repo_name(module_name, &module_info.version);
+                        let external_path = format!("bazel-external/{canonical_repo}");
                         let cell_path = CellRootPathBuf::new(
                             ProjectRelativePath::new(&external_path)?.to_owned(),
                         );
@@ -2066,8 +2082,9 @@ impl BuckConfigBasedCells {
                             .map(|p| p.to_string_lossy().to_string())
                             .unwrap_or_default();
 
-                        let external_path =
-                            format!("bazel-external/{}+{}", module_name, module_info.version);
+                        let canonical_repo =
+                            bazel_canonical_module_repo_name(module_name, &module_info.version);
+                        let external_path = format!("bazel-external/{canonical_repo}");
                         let cell_path = CellRootPathBuf::new(
                             ProjectRelativePath::new(&external_path)?.to_owned(),
                         );
