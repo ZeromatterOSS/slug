@@ -89,6 +89,10 @@ Observed SDK result at the checkpoint:
   equality and hashing, matching the existing visible-lockfile bridge identity.
   A focused Rust regression test covers this key property, and the hidden
   lockfile Python guardrail subset plus the full Plan 61 guardrail file pass.
+- Hidden-lockfile replay now has a same-daemon edit guardrail: a generated repo
+  first replays from the daemon hidden lockfile, then editing that hidden
+  lockfile removes the cached extension entry and forces the extension to run
+  and fail instead of reusing stale replay state.
 
 ## Consolidated Learnings
 
@@ -126,9 +130,9 @@ What did not work or remains risky:
   execution platform facts are still assembled during legacy cell setup, then
   injected as `BzlmodSessionData`.
 - Hidden lockfile identity is included in the transitional bridge key equality
-  and hashing path. Hidden-lockfile-backed replay or seeded-cell behavior still
-  needs stronger same-daemon consumer invalidation guardrails before it can be
-  treated as complete.
+  and hashing path, and hidden replay has same-daemon edit coverage. Broader
+  create/delete/facts-mode coverage is still needed before lockfile replay can
+  be treated as complete.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads are hashed; external and full interpreter load graphs are not
   replay-complete.
@@ -242,8 +246,8 @@ using Rust DICE keys and values:
      consume their contents.
    - Preserve Bazel's hidden-lockfile fail-open behavior without hiding
      invalidation.
-   - Add same-daemon hidden-lockfile replay-consumer coverage, not just read
-     observability and fail-open coverage.
+   - Broaden same-daemon hidden-lockfile coverage beyond replay edits to
+     create/delete/facts-mode transitions.
    - Model facts, selected yanked versions, registry file hashes, recorded
      inputs, and lockfile mode as explicit dependencies.
    - Keep ordinary build/query paths read-only; count write attempts as test

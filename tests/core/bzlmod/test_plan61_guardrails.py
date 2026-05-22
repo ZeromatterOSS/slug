@@ -826,6 +826,85 @@ async def test_malformed_hidden_lockfile_is_ignored(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_hidden_lockfile_edit_invalidates_replay_in_same_daemon(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: HIDDEN_KEY is an input to SingleExtensionEvalValue."""
+    module_name = "plan61_hidden_replay_materialization"
+    extension_id = f"@{module_name}//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    replayed_repo.mkdir()
+    _write(replayed_repo / "data.txt", "hidden replay payload\n")
+    _write(
+        replayed_repo / "BUILD.bazel",
+        """exports_files(["data.txt"])
+filegroup(name = "data", srcs = ["data.txt"])
+""",
+    )
+    _write(
+        buck.cwd / "replay_ext.bzl",
+        """def _replay_ext_impl(module_ctx):
+    fail("hidden lockfile replay should have been used")
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_hidden_replay",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    daemon_dir = Path((await buck.debug("daemon-dir")).stdout.strip())
+    hidden_lockfile = daemon_dir / "MODULE.bazel.lock"
+    # `debug daemon-dir` starts the daemon before the hidden lockfile exists.
+    # Switch modes so the replay command must reload default-mode bzlmod state.
+    await _bzlmod_counters(buck, "--lockfile_mode=off")
+    hidden_lockfile.parent.mkdir(parents=True, exist_ok=True)
+    _write_replay_lockfile(
+        hidden_lockfile,
+        extension_id=extension_id,
+        module_name=module_name,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_hidden_replay")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    _write_minimal_lockfile(hidden_lockfile)
+
+    failure_stderr: str | None = None
+    try:
+        await buck.build("//:uses_hidden_replay")
+    except BuckException as e:
+        failure_stderr = e.stderr
+    after = await _bzlmod_counters(buck)
+
+    if failure_stderr is None:
+        pytest.fail("hidden lockfile replay stayed cached after hidden lockfile edit")
+
+    assert "hidden lockfile replay should have been used" in failure_stderr
+    assert after["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_mode_off_does_not_read_lockfiles(buck: Buck) -> None:
     """Bazel anchor: SingleExtensionEvalFunction skips lockfiles in OFF mode."""
     _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
