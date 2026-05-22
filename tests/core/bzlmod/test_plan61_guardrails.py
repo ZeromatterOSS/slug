@@ -817,6 +817,130 @@ async def test_two_workspaces_do_not_share_bzlmod_state(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_bazel_dep_dev_dependency_is_available_by_default(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: --ignore_dev_dependency defaults false for root MODULE.bazel."""
+    dev_lib = buck.cwd / "libs/root_dev_dep_lib"
+    dev_lib.mkdir(parents=True)
+    _write(
+        dev_lib / "MODULE.bazel",
+        """module(name = "root_dev_dep_lib", version = "1.0")
+""",
+    )
+    _write(
+        dev_lib / "BUILD.bazel",
+        """filegroup(
+    name = "lib",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_guardrails")
+bazel_dep(name = "root_dev_dep_lib", version = "1.0", dev_dependency = True)
+local_path_override(
+    module_name = "root_dev_dep_lib",
+    path = "libs/root_dev_dep_lib",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_root_dev_dep",
+    srcs = ["@root_dev_dep_lib//:lib"],
+)
+""",
+    )
+
+    await buck.build("//:uses_root_dev_dep")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_registry_bazel_dep_dev_dependency_is_resolved_by_default(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root bazel_dep(dev_dependency=True) participates by default."""
+    module_name = "root_registry_dev_dep_lib"
+    module_version = "1.0.0"
+    cache_home = buck.cwd / "cache_home"
+    module_cache = (
+        cache_home
+        / "slug"
+        / "registry"
+        / "bcr.bazel.build"
+        / "modules"
+        / module_name
+        / module_version
+    )
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    source_dir = module_cache / "source"
+    source_dir.mkdir(parents=True)
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+    _write(
+        module_cache / "MODULE.bazel",
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    _write(module_cache / "source.json", "{}\n")
+    _write(source_dir / ".complete", "")
+    _write(
+        source_dir / "BUILD.bazel",
+        """filegroup(
+    name = "lib",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_guardrails")
+bazel_dep(name = "{module_name}", version = "{module_version}", dev_dependency = True)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        f"""filegroup(
+    name = "uses_root_registry_dev_dep",
+    srcs = ["@{module_name}//:lib"],
+)
+""",
+    )
+
+    module_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel"
+    )
+    source_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
+    )
+    registry_url = "https://bcr.bazel.build/bazel_registry.json"
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    registry_url: _sha256(registry_cache / "bazel_registry.json"),
+                    module_url: _sha256(module_cache / "MODULE.bazel"),
+                    source_url: _sha256(module_cache / "source.json"),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    await buck.build("//:uses_root_registry_dev_dep", env={"XDG_CACHE_HOME": str(cache_home)})
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only(
     buck: Buck,
 ) -> None:

@@ -558,7 +558,6 @@ impl MvsResolver {
         let override_modules: Vec<_> = root
             .bazel_deps
             .iter()
-            .filter(|dep| !dep.dev_dependency)
             .filter_map(|dep| {
                 self.has_non_registry_override(&dep.name, &root.overrides)
                     .cloned()
@@ -606,10 +605,6 @@ impl MvsResolver {
 
         // Add root's direct dependencies to queue
         for dep in &root.bazel_deps {
-            if dep.dev_dependency {
-                continue; // Skip dev dependencies for now
-            }
-
             // Skip if we already resolved an override for this module
             if self.overridden_modules.contains_key(&dep.name) {
                 continue;
