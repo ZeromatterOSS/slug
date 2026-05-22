@@ -990,6 +990,63 @@ repo(name = "repo_rule_dev_repo", path = "repo_rule_dev_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_non_root_use_repo_rule_dev_dependency_is_always_ignored(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: non-root use_repo_rule(dev_dependency=True) is ignored."""
+    dep = buck.cwd / "libs/dep_with_dev_repo_rule"
+    dev_repo = buck.cwd / "repo_rule_non_root_dev_repo"
+    dep.mkdir(parents=True)
+    dev_repo.mkdir()
+    _write(dev_repo / ".buckroot", "")
+    _write(
+        dev_repo / "BUILD.bazel",
+        """filegroup(
+    name = "lib",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        dep / "MODULE.bazel",
+        """module(name = "dep_with_dev_repo_rule", version = "1.0")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", dev_dependency = True)
+repo(name = "repo_rule_non_root_dev_repo", path = "../../repo_rule_non_root_dev_repo")
+""",
+    )
+    _write(dep / "BUILD.bazel", 'filegroup(name = "dep", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_guardrails")
+bazel_dep(name = "dep_with_dev_repo_rule", version = "1.0")
+local_path_override(
+    module_name = "dep_with_dev_repo_rule",
+    path = "libs/dep_with_dev_repo_rule",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_non_root_repo_rule_dev_dep",
+    srcs = ["@repo_rule_non_root_dev_repo//:lib"],
+)
+""",
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_non_root_repo_rule_dev_dep")
+    assert "repo_rule_non_root_dev_repo" in str(exc.value)
+    with pytest.raises(BuckException) as exc:
+        await buck.build(
+            "//:uses_non_root_repo_rule_dev_dep",
+            "--ignore_dev_dependency",
+        )
+    assert "repo_rule_non_root_dev_repo" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_use_extension_dev_dependency_follows_ignore_policy(
     buck: Buck,
 ) -> None:
@@ -1044,6 +1101,70 @@ use_repo(dev, "dev_extension_repo")
     with pytest.raises(BuckException) as exc:
         await buck.build("//:uses_dev_extension_repo", "--ignore_dev_dependency")
     assert "dev_extension_repo" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_non_root_use_extension_dev_dependency_is_always_ignored(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: non-root use_extension(dev_dependency=True) is ignored."""
+    dep = buck.cwd / "libs/dep_with_dev_extension"
+    dep.mkdir(parents=True)
+    dev_repo = buck.cwd / "non_root_dev_extension_repo"
+    dev_repo.mkdir()
+    _write(dev_repo / "data.txt", "non-root dev extension payload\n")
+    _write(
+        dev_repo / "BUILD.bazel",
+        """exports_files(["data.txt"])
+filegroup(name = "data", srcs = ["data.txt"], visibility = ["//visibility:public"])
+""",
+    )
+    _write(
+        dep / "dev_ext.bzl",
+        """def _dev_ext_impl(module_ctx):
+    fail("non-root dev extension should be ignored")
+
+dev_ext = module_extension(
+    implementation = _dev_ext_impl,
+)
+""",
+    )
+    _write(
+        dep / "MODULE.bazel",
+        """module(name = "dep_with_dev_extension", version = "1.0")
+dev = use_extension("//:dev_ext.bzl", "dev_ext", dev_dependency = True)
+use_repo(dev, "non_root_dev_extension_repo")
+""",
+    )
+    _write(dep / "BUILD.bazel", 'filegroup(name = "dep", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_guardrails")
+bazel_dep(name = "dep_with_dev_extension", version = "1.0")
+local_path_override(
+    module_name = "dep_with_dev_extension",
+    path = "libs/dep_with_dev_extension",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_non_root_dev_extension_repo",
+    srcs = ["@non_root_dev_extension_repo//:data"],
+)
+""",
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_non_root_dev_extension_repo")
+    assert "non_root_dev_extension_repo" in str(exc.value)
+    with pytest.raises(BuckException) as exc:
+        await buck.build(
+            "//:uses_non_root_dev_extension_repo",
+            "--ignore_dev_dependency",
+        )
+    assert "non_root_dev_extension_repo" in str(exc.value)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

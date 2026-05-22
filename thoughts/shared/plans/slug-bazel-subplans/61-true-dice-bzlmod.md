@@ -118,6 +118,11 @@ Observed SDK result at the checkpoint:
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
   skipped. Focused `slug_common` unit coverage verifies the collection policy.
+- Non-root `use_repo_rule(..., dev_dependency = True)` and
+  `use_extension(..., dev_dependency = True)` now have explicit negative
+  guardrails proving the generated repos stay unavailable both by default and
+  under `--ignore_dev_dependency`. The full Plan 61 guardrail file passed with
+  50 tests after adding this coverage.
 
 ## Consolidated Learnings
 
