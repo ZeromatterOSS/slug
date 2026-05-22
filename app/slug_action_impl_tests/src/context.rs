@@ -103,7 +103,6 @@ fn ctx_instantiates() -> slug_error::Result<()> {
          def test(ctx):
              assert_eq("foo/bar", ctx.label.package)
              assert_eq("some_name", ctx.label.name)
-             assert_eq(None, ctx.label.sub_target)
              return ctx.attrs.name
          "#
     );

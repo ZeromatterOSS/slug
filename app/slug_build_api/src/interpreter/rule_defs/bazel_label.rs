@@ -17,6 +17,7 @@
 use std::fmt;
 
 use allocative::Allocative;
+use slug_core::provider::label::ConfiguredProvidersLabel;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
@@ -28,6 +29,10 @@ use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::starlark_value;
+
+pub(crate) fn bazel_label_from_configured(label: &ConfiguredProvidersLabel) -> BazelLabel {
+    BazelLabel::parse(&label.target().unconfigured().to_string())
+}
 
 /// A Bazel-compatible Label value returned by `Label()` and `ctx.package_relative_label()`.
 ///

@@ -76,6 +76,7 @@ use crate::artifact_groups::InputSymlink;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
+use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured;
 use crate::interpreter::rule_defs::cc_common::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::cc_common::CcToolchainVariablesGen;
@@ -219,7 +220,9 @@ pub struct AnalysisContext<'v> {
     attrs: Option<ValueOfUnchecked<'v, StructRef<'static>>>,
     pub actions: ValueTyped<'v, AnalysisActions<'v>>,
     /// Only `None` when running a `dynamic_output` action from Bxl.
-    label: Option<ValueTyped<'v, StarlarkConfiguredProvidersLabel>>,
+    configured_label: Option<ValueTyped<'v, StarlarkConfiguredProvidersLabel>>,
+    /// Bazel-compatible, unconfigured Starlark-visible target label.
+    label: Option<ValueTyped<'v, BazelLabel>>,
     plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
     /// Cached outputs for Bazel-compatible ctx.outputs access.
     /// This is computed lazily on first access and cached thereafter.
@@ -253,7 +256,8 @@ impl<'v> AnalysisContext<'v> {
     fn new(
         heap: Heap<'v>,
         attrs: Option<ValueOfUnchecked<'v, StructRef<'static>>>,
-        label: Option<ValueTyped<'v, StarlarkConfiguredProvidersLabel>>,
+        configured_label: Option<ValueTyped<'v, StarlarkConfiguredProvidersLabel>>,
+        label: Option<ValueTyped<'v, BazelLabel>>,
         plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
@@ -267,6 +271,7 @@ impl<'v> AnalysisContext<'v> {
                 plugins,
                 digest_config,
             }),
+            configured_label,
             label,
             plugins,
             outputs: RefCell::new(None),
@@ -283,7 +288,7 @@ impl<'v> AnalysisContext<'v> {
     /// `DefaultInfo(executable=..., default_runfiles=...)` to key the runfiles
     /// symlink tree under `<exe>.runfiles/<workspace_name>/...`.
     pub fn workspace_name_str(&self) -> &str {
-        match self.label {
+        match self.configured_label {
             Some(label) => {
                 let cell = label.label().target().pkg().cell_name().as_str();
                 if slug_core::cells::is_root_cell_name(cell) {
@@ -312,16 +317,19 @@ impl<'v> AnalysisContext<'v> {
         digest_config: DigestConfig,
         rule_outputs: Vec<(String, String)>,
     ) -> ValueTyped<'v, AnalysisContext<'v>> {
-        let label = label.map(|label| {
+        let configured_label = label.map(|label| {
             heap.alloc_typed(StarlarkConfiguredProvidersLabel::new(
                 ConfiguredProvidersLabel::new(label, ProvidersName::Default),
             ))
         });
+        let bazel_label = configured_label
+            .map(|label| heap.alloc_typed(bazel_label_from_configured(label.inner())));
 
-        let mut analysis_context = Self::new(
+        let analysis_context = Self::new(
             heap,
             attrs,
-            label,
+            configured_label,
+            bazel_label,
             plugins,
             registry,
             digest_config,
@@ -385,7 +393,7 @@ impl<'v> AnalysisContext<'v> {
                     drop(borrow);
                     let attrs_val = self.attrs.map(|v| v.get()).unwrap_or_else(Value::new_none);
                     let target_name = self
-                        .label
+                        .configured_label
                         .as_ref()
                         .map(|l| l.label().target().name().as_str().to_owned())
                         .unwrap_or_else(|| "output".to_owned());
@@ -421,7 +429,7 @@ impl<'v> AnalysisContext<'v> {
     /// Returns true if this target is being built in exec (tool) configuration.
     /// In Bazel, this means the target is a build tool that runs on the host machine.
     fn is_tool_configuration(&self) -> bool {
-        self.label
+        self.configured_label
             .as_ref()
             .map(|l| l.inner().target().exec_cfg().is_some())
             .unwrap_or(false)
@@ -500,7 +508,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn label<'v>(
         this: RefAnalysisContext<'v>,
-    ) -> starlark::Result<NoneOr<ValueTyped<'v, StarlarkConfiguredProvidersLabel>>> {
+    ) -> starlark::Result<NoneOr<ValueTyped<'v, BazelLabel>>> {
         Ok(NoneOr::from_option(this.0.label))
     }
 
@@ -555,7 +563,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        if let Some(label) = this.0.label {
+        if let Some(label) = this.0.configured_label {
             let cell = label.label().target().pkg().cell_name().as_str();
             // In Bazel, the main repo returns "" or the module name
             if slug_core::cells::is_root_cell_name(cell) {
@@ -579,7 +587,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        if let Some(label) = this.0.label {
+        if let Some(label) = this.0.configured_label {
             let pkg = label.label().target().pkg();
             let pkg_path = pkg.cell_relative_path().as_str();
             let path = if pkg_path.is_empty() {
@@ -602,7 +610,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // compilation_mode comes from the target's configuration so that a
         // transitioned dep (exec cfg, user cfg) sees its own mode rather than
         // leaking the top-level target's.
-        let mode = compilation_mode_from_cfg(cfg_from_label(this.0.label));
+        let mode = compilation_mode_from_cfg(cfg_from_label(this.0.configured_label));
         let force_pic = crate::interpreter::rule_defs::build_config::get_force_pic();
         let coverage = crate::interpreter::rule_defs::build_config::get_collect_code_coverage();
         let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
@@ -621,7 +629,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let mode = compilation_mode_from_cfg(cfg_from_label(this.0.label));
+        let mode = compilation_mode_from_cfg(cfg_from_label(this.0.configured_label));
         let force_pic = crate::interpreter::rule_defs::build_config::get_force_pic();
         let coverage = crate::interpreter::rule_defs::build_config::get_collect_code_coverage();
         let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
@@ -672,7 +680,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 
         let target_name = this
             .0
-            .label
+            .configured_label
             .as_ref()
             .map(|l| l.label().target().name().as_str().to_owned())
             .unwrap_or_else(|| "output".to_string());
@@ -757,7 +765,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let is_tool = this.0.is_tool_configuration();
-        let (config_hash, config_label) = match &this.0.label {
+        let (config_hash, config_label) = match &this.0.configured_label {
             Some(label) => {
                 let cfg = label.inner().target().cfg();
                 (
@@ -827,7 +835,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        if let Some(label) = this.0.label {
+        if let Some(label) = this.0.configured_label {
             let pkg = label.label().target().pkg();
             let pkg_path = pkg.cell_relative_path().as_str();
             let path = if pkg_path.is_empty() {
@@ -855,7 +863,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        if let Some(label) = this.0.label {
+        if let Some(label) = this.0.configured_label {
             let cell_name = label.label().target().pkg().cell_name().as_str();
             // In Bazel with bzlmod, the root module is known as "_main".
             // Extension repos use their canonical repo name.
@@ -881,7 +889,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// `<buck-out>/gen/<cell>/<cfg_hash>`
     #[starlark(attribute)]
     fn bin_dir<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let path = bin_dir_path_from_label(this.0.label);
+        let path = bin_dir_path_from_label(this.0.configured_label);
         Ok(heap.alloc(CtxDirRoot { path }))
     }
 
@@ -898,7 +906,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         // In Slug, genfiles and bin share the same output root
-        let path = bin_dir_path_from_label(this.0.label);
+        let path = bin_dir_path_from_label(this.0.configured_label);
         Ok(heap.alloc(CtxDirRoot { path }))
     }
 
@@ -986,7 +994,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 
         // Resolve from the target's own ConfigurationData (where CLI
         // overrides and transition-produced overrides land).
-        if let Some(label) = this.0.label {
+        if let Some(label) = this.0.configured_label {
             let target = label.label().target();
             let cfg = label.label().cfg();
             let cell = target.pkg().cell_name().as_str();
@@ -1474,7 +1482,7 @@ pub fn lookup_output_path_for_ctx<'v>(
             None => {
                 let attrs_for_outputs = ctx.attrs.map(|v| v.get()).unwrap_or_else(Value::new_none);
                 let target_name = ctx
-                    .label
+                    .configured_label
                     .as_ref()
                     .map(|l| l.label().target().name().as_str().to_owned())
                     .unwrap_or_else(|| "output".to_string());
@@ -2629,12 +2637,10 @@ impl CcToolchainInfoNativeShim {
     }
 
     fn all_toolchain_files(&self) -> Option<Arc<[ToolchainInputFile]>> {
-        let groups = [
-            &self.compiler_files,
-            &self.linker_files,
-            &self.static_runtime_files,
-            &self.dynamic_runtime_files,
-        ];
+        // Bazel keeps C++ runtime archives behind link-semantics calls such as
+        // `static_runtime_lib()`. Including them in `all_files` makes plain
+        // `cc_library` analysis depend on the runtime cone.
+        let groups = [&self.compiler_files, &self.linker_files];
         let total = groups
             .iter()
             .filter_map(|files| files.as_ref())
@@ -3374,7 +3380,7 @@ mod resolved_toolchains_tests {
     }
 
     #[test]
-    fn native_cc_toolchain_all_files_includes_linker_and_runtime_inputs() {
+    fn native_cc_toolchain_all_files_excludes_runtime_inputs() {
         let compiler = ToolchainInputFile {
             path: "buck-out/gen/toolchain/clang",
             symlink_target: None,
@@ -3411,7 +3417,6 @@ mod resolved_toolchains_tests {
             vec![
                 "buck-out/gen/toolchain/clang",
                 "buck-out/gen/llvm/runtimes/resource_directory",
-                "buck-out/gen/llvm/runtimes/libcxx/libc++.a",
             ]
         );
     }

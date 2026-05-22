@@ -244,6 +244,63 @@ SDK checkpoint 2026-05-21, broad target after edge-kind/canonical symlink fix:
   were removed. Evidence logs remain under `/tmp/slug-plan61`; generated output
   sizes after cleanup were about `buck-out=3.3M` and `execroot=256K`.
 
+Blocker reflection 2026-05-21, rules_rust C++ runtime and direct-dep alias
+frontier:
+
+- Broad Slug SDK execution after the edge-kind/canonical-symlink checkpoint
+  reached
+  `rules_rs++rules_rust+rules_rust//util/process_wrapper/private:bootstrap_process_wrapper`
+  and failed at link time with C++/unwind undefined symbols. Bazel 9 ground
+  truth from
+  `/tmp/slug-plan61/bazel-aquery-bootstrap-process-wrapper-20260522.txt`
+  showed the matching `CppLink` action passes
+  `liblibcxx.static.a`, `liblibcxxabi.static.a`, and
+  `liblibunwind.static.a` explicitly. Slug now populates the native C++
+  toolchain shim's `static_runtime_lib()` data from the selected toolchain's
+  `static_runtime_lib` attr, while keeping dynamic runtime data lazy until a
+  dynamic-link aquery proves the required inputs.
+- The next broad SDK execution advanced to
+  `crates__spin-0.10.0//:spin` and failed with
+  `cannot find module or crate lock_api_crate`; Slug emitted
+  `--extern=lock_api=...` while Bazel emitted
+  `--extern=lock_api_crate=...`. Bazel ground truth from
+  `/tmp/slug-plan61/bazel-aquery-spin-0.10.0-linux-musl-20260522.txt`
+  showed rules_rust applies `ctx.attr.aliases` to direct crate extern names.
+  The systemic cause was Slug exposing `ctx.label` as a configured providers
+  label while dependency `.label` returned a Bazel `Label`; rules_rust stores
+  `CrateInfo.owner = ctx.label`, then looks it up in a dict keyed by
+  dependency labels. Slug now exposes Starlark `ctx.label` as an unconfigured
+  Bazel-compatible `Label` and keeps the configured providers label private on
+  `AnalysisContext` for configuration/output-root internals.
+- The first focused `spin` validation then exposed another C++ toolchain
+  boundary bug: the target timed out with progress while draining runtime
+  actions, and a warmed rerun parked in analysis at
+  `rules_rust//ffi/cc/allocator_library:cc_allocator_library` with
+  `bazel_tools//tools/cpp:malloc`, `rules_cc//:empty_lib`, glibc, and musl
+  open in `log what-up`. Bazel 9 ground truth
+  (`bazel build --nobuild
+  @@rules_rs++rules_rust+rules_rust//ffi/cc/allocator_library:cc_allocator_library
+  --platforms=//bazel/platforms:linux-musl`) analyzed in about 0.5s with zero
+  actions. The systemic fix is to keep C++ runtime archives behind
+  link-semantics methods such as `static_runtime_lib()` and exclude them from
+  `cc_toolchain.all_files`; plain `cc_library` analysis must not depend on the
+  runtime cone.
+- Validation:
+  `cargo fmt --check`, `cargo check -p slug_build_api`,
+  `cargo test -p slug_action_impl_tests ctx_instantiates -- --nocapture`,
+  `cargo test -p slug_build_api native_cc_toolchain_all_files_excludes_runtime_inputs -- --nocapture`,
+  and `cargo build -p slug` pass. Focused Slug validation also passes:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-spin-alias-label-parity
+  build --jobs=16
+  '@@rules_rs++crate+crates__spin-0.10.0//:spin'
+  --platforms=//bazel/platforms:linux-musl`, log
+  `/tmp/slug-plan61/plan61-spin-alias-label-parity-after-all-files-runtime-fix-20260521-220742.log`.
+  The final `what-ran` command line for `spin` contains
+  `--extern=lock_api_crate=...`, matching Bazel's alias behavior. Subagent
+  dispatch was attempted for the `ctx.label` slice but the runtime reported the
+  agent thread limit was reached; the slice continued in single-agent manager
+  mode per the loop-manager prompt.
+
 SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
 materialization failures to full execution:
 

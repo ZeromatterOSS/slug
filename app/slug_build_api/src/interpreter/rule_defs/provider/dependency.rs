@@ -47,7 +47,7 @@ use starlark::values::structs::AllocStruct;
 use starlark_map::StarlarkHasher;
 
 use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
-use crate::interpreter::rule_defs::bazel_label::BazelLabel;
+use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfo;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
@@ -495,10 +495,6 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
             ("runfiles_manifest", Value::new_none()),
         ])))
     }
-}
-
-fn bazel_label_from_configured(label: &ConfiguredProvidersLabel) -> BazelLabel {
-    BazelLabel::parse(&label.target().unconfigured().to_string())
 }
 
 #[starlark_module]

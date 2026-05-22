@@ -2848,6 +2848,31 @@ async fn metadata_toolchain_action_data(
     data
 }
 
+async fn metadata_toolchain_runtime_data(
+    ctx: &mut DiceComputations<'_>,
+    toolchain_label: &TargetLabel,
+    target_cfg: &slug_core::configuration::data::ConfigurationData,
+    attr_name: &str,
+) -> Vec<(ConfiguredTargetLabel, Arc<str>)> {
+    let Some(toolchain_node) = target_node_for_metadata(ctx, toolchain_label).await else {
+        return Vec::new();
+    };
+    let Some(runtime_attr) = toolchain_node.attr_or_none(attr_name, AttrInspectOptions::All) else {
+        return Vec::new();
+    };
+
+    let mut data = Vec::new();
+    for runtime_label in labels_from_coerced_attr(&runtime_attr.value, target_cfg) {
+        let runtime_label = metadata_canonicalize_label_for_owner(toolchain_label, runtime_label);
+        for (output_label, output_path) in
+            metadata_default_output_data_for_label_configured(ctx, runtime_label, target_cfg).await
+        {
+            data.push((output_label, output_path.into()));
+        }
+    }
+    data
+}
+
 fn metadata_variable_name_for_label(label: &TargetLabel) -> String {
     label.name().as_str().to_owned()
 }
@@ -3738,17 +3763,23 @@ async fn run_analysis_with_env_underlying(
                                         } else {
                                             Vec::new()
                                         };
-	                                        let module_map_path = tc
-	                                            .cc_toolchain_module_map
-	                                            .as_deref()
-	                                            .and_then(parse_impl_label_to_target_label)
-	                                            .map(|label| metadata_path_for_label(&label, &target_cfg));
+                                        let module_map_path = tc
+                                            .cc_toolchain_module_map
+                                            .as_deref()
+                                            .and_then(parse_impl_label_to_target_label)
+                                            .map(|label| metadata_path_for_label(&label, &target_cfg));
                                         // Bazel's rules_cc asks for C++ runtime libraries from
-                                        // rule semantics at the link point. Plain cc_library
-                                        // analysis, including @rules_cc//:empty_lib, does not
-                                        // force the runtime graph while constructing
-                                        // ctx.toolchains.
-                                        let static_runtime_data = Vec::new();
+                                        // rule semantics at the link point. The executable link
+                                        // frontier proven by Bazel aquery needs the selected
+                                        // static runtime outputs; keep dynamic runtime data lazy
+                                        // until a dynamic-link aquery proves the matching inputs.
+                                        let static_runtime_data = metadata_toolchain_runtime_data(
+                                            dice,
+                                            &target_label,
+                                            &target_cfg,
+                                            "static_runtime_lib",
+                                        )
+                                        .await;
                                         let dynamic_runtime_data = Vec::new();
                                         analysis_ctx_toolchain_provider_checkpoint(
                                             &analysis_env.label,
