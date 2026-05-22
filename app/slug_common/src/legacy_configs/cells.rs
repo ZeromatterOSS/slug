@@ -661,6 +661,7 @@ impl PartialEq for LegacyBzlmodResolutionDiceKey {
             && self.root_module_file.path == other.root_module_file.path
             && self.root_module_file.input_digest == other.root_module_file.input_digest
             && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
+            && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
             && self.local_override_inputs.digest == other.local_override_inputs.digest
             && self.registry_file_inputs.digest == other.registry_file_inputs.digest
             && self.extension_replay_summary_digest == other.extension_replay_summary_digest
@@ -677,6 +678,7 @@ impl std::hash::Hash for LegacyBzlmodResolutionDiceKey {
         self.root_module_file.path.hash(state);
         self.root_module_file.input_digest.hash(state);
         hash_lockfile_content_identity(&self.visible_lockfile, state);
+        hash_lockfile_content_identity(&self.hidden_lockfile, state);
         self.local_override_inputs.digest.hash(state);
         self.registry_file_inputs.digest.hash(state);
         self.extension_replay_summary_digest.hash(state);
@@ -2850,5 +2852,90 @@ fn tag_value_to_repo_attr(tv: &TagValue) -> slug_bzlmod::RepoAttrValue {
                 .collect();
             slug_bzlmod::RepoAttrValue::Dict(map)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash as _;
+    use std::hash::Hasher as _;
+
+    use super::*;
+
+    fn lockfile_value(path: &str, digest: &str) -> Arc<slug_bzlmod::LockfileContentValue> {
+        Arc::new(slug_bzlmod::LockfileContentValue {
+            path: Arc::new(PathBuf::from(path)),
+            digest: Some(digest.to_owned()),
+            lockfile: None,
+        })
+    }
+
+    fn legacy_bzlmod_resolution_key(
+        hidden_lockfile: Arc<slug_bzlmod::LockfileContentValue>,
+    ) -> LegacyBzlmodResolutionDiceKey {
+        let project_root = PathBuf::from("/tmp/slug-plan61-hidden-lockfile-key-test");
+        let workspace_id =
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), PathBuf::from("/tmp/output-base"));
+
+        LegacyBzlmodResolutionDiceKey {
+            project_root: AbsNormPathBuf::try_from(project_root.clone()).unwrap(),
+            resolution_key: slug_bzlmod::BzlmodResolutionKey {
+                workspace_id,
+                command_policy_digest: Arc::from("command-policy"),
+            },
+            options: BzlmodResolutionOptions {
+                lockfile_mode: slug_bzlmod::LockfileMode::Update,
+                allow_yanked_versions_env: None,
+                allow_yanked_versions_flags: Vec::new(),
+                hidden_lockfile_path: Some(PathBuf::from("/tmp/hidden/MODULE.bazel.lock")),
+                repo_env_digest: "repo-env".to_owned(),
+            },
+            root_module_file: Arc::new(slug_bzlmod::RootModuleFileValue {
+                path: Arc::new(project_root.join("MODULE.bazel")),
+                input_digest: Some("root-module".to_owned()),
+                input_count: 1,
+                parsed: None,
+            }),
+            visible_lockfile: Some(lockfile_value(
+                "/tmp/workspace/MODULE.bazel.lock",
+                "visible-lockfile",
+            )),
+            hidden_lockfile: Some(hidden_lockfile),
+            local_override_inputs: Arc::new(LocalOverrideModuleInputsValue {
+                digest: "local-overrides".to_owned(),
+                has_bazel_deps: false,
+                has_extension_usages: false,
+                has_repo_rule_invocations: false,
+                has_git_overrides: false,
+            }),
+            registry_file_inputs: Arc::new(RegistryFileInputsValue {
+                digest: "registry-files".to_owned(),
+                has_inputs: false,
+                cache_safe: true,
+            }),
+            extension_replay_summary_digest: Some(Arc::from("extension-replay")),
+        }
+    }
+
+    #[test]
+    fn legacy_bzlmod_resolution_key_includes_hidden_lockfile_identity() {
+        let first = legacy_bzlmod_resolution_key(lockfile_value(
+            "/tmp/hidden/MODULE.bazel.lock",
+            "hidden-lockfile-first",
+        ));
+        let second = legacy_bzlmod_resolution_key(lockfile_value(
+            "/tmp/hidden/MODULE.bazel.lock",
+            "hidden-lockfile-second",
+        ));
+
+        assert_ne!(first, second);
+
+        let mut first_hasher = DefaultHasher::new();
+        first.hash(&mut first_hasher);
+        let mut second_hasher = DefaultHasher::new();
+        second.hash(&mut second_hasher);
+
+        assert_ne!(first_hasher.finish(), second_hasher.finish());
     }
 }

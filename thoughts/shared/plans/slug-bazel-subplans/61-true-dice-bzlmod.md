@@ -85,6 +85,10 @@ Observed SDK result at the checkpoint:
   manifests against the existing Bazel 9.0.1 post-lease manifests showed exact
   mode parity, matching non-ELF hashes, and the same four accepted ELF hash
   differences listed above.
+- `LegacyBzlmodResolutionDiceKey` now includes hidden lockfile identity in
+  equality and hashing, matching the existing visible-lockfile bridge identity.
+  A focused Rust regression test covers this key property, and the hidden
+  lockfile Python guardrail subset plus the full Plan 61 guardrail file pass.
 
 ## Consolidated Learnings
 
@@ -121,10 +125,10 @@ What did not work or remains risky:
 - The resolved graph, repo mappings, cell graph, and registered toolchain and
   execution platform facts are still assembled during legacy cell setup, then
   injected as `BzlmodSessionData`.
-- Hidden lockfile identity is not first-class in all bridge key equality and
-  hashing paths. Any hidden-lockfile-backed replay or seeded-cell behavior must
-  be treated as suspect until guardrails prove same-daemon edits invalidate or
-  fail correctly.
+- Hidden lockfile identity is included in the transitional bridge key equality
+  and hashing path. Hidden-lockfile-backed replay or seeded-cell behavior still
+  needs stronger same-daemon consumer invalidation guardrails before it can be
+  treated as complete.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads are hashed; external and full interpreter load graphs are not
   replay-complete.
@@ -234,10 +238,12 @@ using Rust DICE keys and values:
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
-   - Include visible and hidden lockfile identity in every key that can consume
-     their contents.
+   - Maintain visible and hidden lockfile identity in every key that can
+     consume their contents.
    - Preserve Bazel's hidden-lockfile fail-open behavior without hiding
      invalidation.
+   - Add same-daemon hidden-lockfile replay-consumer coverage, not just read
+     observability and fail-open coverage.
    - Model facts, selected yanked versions, registry file hashes, recorded
      inputs, and lockfile mode as explicit dependencies.
    - Keep ordinary build/query paths read-only; count write attempts as test
