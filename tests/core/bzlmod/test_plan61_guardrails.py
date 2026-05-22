@@ -2770,6 +2770,80 @@ use_repo(root, tool_alias = "tool_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_inject_repo_keyword_alias_maps_generated_repo_and_replays(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: inject_repo() adds root-visible repos to generated repo mappings."""
+    helper_a = buck.cwd / "helper_a"
+    helper_b = buck.cwd / "helper_b"
+    helper_a.mkdir()
+    helper_b.mkdir()
+    _write(helper_a / "MODULE.bazel", 'module(name = "helper_a", version = "1.0")\n')
+    _write(
+        helper_a / "BUILD.bazel",
+        """exports_files(["payload.txt"])
+""",
+    )
+    _write(helper_a / "payload.txt", "payload from helper_a\n")
+    _write(helper_b / "MODULE.bazel", 'module(name = "helper_b", version = "1.0")\n')
+    _write(helper_b / "BUILD.bazel", "# helper_b intentionally has no payload.txt\n")
+    _write(
+        buck.cwd / "ext.bzl",
+        """def _made_impl(ctx):
+    ctx.file(
+        "BUILD.bazel",
+        "filegroup(name = \\"from_injected\\", srcs = [\\"@injected_helper//:payload.txt\\"])\\n",
+    )
+
+made = repository_rule(implementation = _made_impl)
+
+def _ext_impl(module_ctx):
+    made(name = "generated")
+
+ext = module_extension(implementation = _ext_impl)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_inject_repo")
+bazel_dep(name = "helper_a", version = "1.0")
+bazel_dep(name = "helper_b", version = "1.0")
+local_path_override(module_name = "helper_a", path = "helper_a")
+local_path_override(module_name = "helper_b", path = "helper_b")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, injected_helper = "helper_a")
+use_repo(ext, "generated")
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "root")\n')
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("@generated//:from_injected")
+    after_first = await _bzlmod_counters(buck)
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_inject_repo")
+bazel_dep(name = "helper_a", version = "1.0")
+bazel_dep(name = "helper_b", version = "1.0")
+local_path_override(module_name = "helper_a", path = "helper_a")
+local_path_override(module_name = "helper_b", path = "helper_b")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, injected_helper = "helper_b")
+use_repo(ext, "generated")
+""",
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("@generated//:from_injected")
+    after_second = await _bzlmod_counters(buck)
+
+    assert "payload.txt" in str(exc.value)
+    assert after_first["extension_eval"] > before["extension_eval"]
+    assert after_second["extension_eval"] > after_first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source(
     buck: Buck,
 ) -> None:

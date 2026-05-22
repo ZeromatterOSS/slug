@@ -364,8 +364,8 @@ pub struct ExtensionUsage {
     pub repo_overrides: Vec<(String, String)>,
 
     /// Injected repos from `inject_repo()`.
-    /// Names of bazel_dep repos to make visible to this extension.
-    pub injected_repos: Vec<String>,
+    /// Each entry is (repo_name_in_extension, dep_name_visible_to_root).
+    pub injected_repos: Vec<(String, String)>,
 }
 
 impl ExtensionUsage {

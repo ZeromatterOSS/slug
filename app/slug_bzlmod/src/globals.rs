@@ -984,6 +984,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     fn inject_repo<'v>(
         #[starlark(require = pos)] extension_proxy: Value<'v>,
         #[starlark(args)] repos: UnpackTuple<&str>,
+        #[starlark(kwargs)] kwargs: starlark::collections::SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let proxy = extension_proxy
@@ -1000,7 +1001,13 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         // Record the injected repos on the extension
         if let Some(ext) = ctx.extensions.get_mut(proxy.index()) {
             for repo in repos.items {
-                ext.injected_repos.push(repo.to_owned());
+                ext.injected_repos.push((repo.to_owned(), repo.to_owned()));
+            }
+            for (injected_name, source_value) in kwargs.iter() {
+                if let Some(source_name) = source_value.unpack_str() {
+                    ext.injected_repos
+                        .push((injected_name.clone(), source_name.to_owned()));
+                }
             }
         }
 

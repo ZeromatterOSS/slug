@@ -170,7 +170,7 @@ fn repo_mapping_overrides_for_root(
         }
 
         for usage in &parsed_mod.extension_usages {
-            if usage.repo_overrides.is_empty() {
+            if usage.repo_overrides.is_empty() && usage.injected_repos.is_empty() {
                 continue;
             }
             let ext_id = slug_bzlmod::canonical_extension_id(
@@ -181,6 +181,9 @@ fn repo_mapping_overrides_for_root(
             let entry = overrides.entry(ext_id).or_default();
             for (generated_name, replacement_repo) in &usage.repo_overrides {
                 entry.insert(generated_name.clone(), replacement_repo.clone());
+            }
+            for (injected_name, source_repo) in &usage.injected_repos {
+                entry.insert(injected_name.clone(), source_repo.clone());
             }
         }
     }

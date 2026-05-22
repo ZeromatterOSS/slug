@@ -114,6 +114,17 @@ Observed SDK result at the checkpoint:
 - Root `use_extension(..., dev_dependency = True)` now participates by default
   and is excluded from extension aggregation, precomputed repo cells, and
   lockfile replay under `--ignore_dev_dependency`.
+- Root `inject_repo()` now accepts Bazel's keyword alias form and feeds the
+  injected apparent-to-root repo mapping into extension generated-repo mappings
+  and the transitional DICE session replay key. Bazel source anchor:
+  `ModuleFileGlobals.injectRepo` records `mustExist = false`, and
+  `ModuleThreadContext.buildUsage` validates the root-visible repo before
+  storing the override. Local Bazel 9.1.0 repros showed
+  `inject_repo(ext, injected_helper = "helper")` makes
+  `@injected_helper` visible from the generated repo, while omitting the
+  directive fails with "No repository visible as '@injected_helper' from
+  repository '@@+ext+generated'"; Slug now has a same-daemon guardrail for the
+  keyword alias and repo-mapping replay transition.
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain

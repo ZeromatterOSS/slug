@@ -111,6 +111,9 @@ fn collect_root_extension_repo_overrides(
             for (repo_name, dep_name) in &usage.repo_overrides {
                 overrides.insert((ext_id.clone(), repo_name.clone()), dep_name.clone());
             }
+            for (repo_name, dep_name) in &usage.injected_repos {
+                overrides.insert((ext_id.clone(), repo_name.clone()), dep_name.clone());
+            }
         }
     }
 
@@ -272,6 +275,18 @@ pub fn pre_compute_extension_repo_cells(
             // repos owned by the extension even when the root module does not
             // also import the generated repo with `use_repo()`.
             for (repo_name, dep_name) in &usage.repo_overrides {
+                aliases.push(RepoAlias {
+                    apparent_name: repo_name.clone(),
+                    canonical_name: dep_name.clone(),
+                    declaring_module: Some(owner_module.clone()),
+                });
+                aliases.push(RepoAlias {
+                    apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
+                    canonical_name: dep_name.clone(),
+                    declaring_module: None,
+                });
+            }
+            for (repo_name, dep_name) in &usage.injected_repos {
                 aliases.push(RepoAlias {
                     apparent_name: repo_name.clone(),
                     canonical_name: dep_name.clone(),
