@@ -1765,17 +1765,21 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // `@repo` shorthand for `@repo//:repo`.
             if is_bazel_label_string(s) {
                 trigger_materialization(s);
-                resolve_label_to_path(s, &this.working_dir)
+                resolve_label_to_filesystem_path(s, &this.workspace_root)
+                    .to_string_lossy()
+                    .to_string()
             } else {
                 s.to_owned()
             }
         } else if let Some(repo_path) = path_arg.downcast_ref::<RepositoryPath>() {
             repo_path.path_str().to_owned()
         } else if path_arg.get_type() == "Label" {
-            // Handle Label objects: resolve to workspace-relative path.
+            // Handle Label objects: resolve to the project-root filesystem path.
             let label_str = format!("{}", path_arg);
             trigger_materialization(&label_str);
-            resolve_label_to_path(&label_str, &this.working_dir)
+            resolve_label_to_filesystem_path(&label_str, &this.workspace_root)
+                .to_string_lossy()
+                .to_string()
         } else {
             path_arg.to_repr()
         };
@@ -2984,6 +2988,21 @@ mod tests {
         assert_eq!(
             resolve_label_to_filesystem_path("//pkg:file.patch", workspace_root),
             workspace_root.join("pkg/file.patch")
+        );
+    }
+
+    #[test]
+    fn test_resolve_external_label_to_filesystem_path_scans_project_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let raw_repo = workspace_root
+            .join("bazel-external")
+            .join("llvm++llvm_source+llvm-raw");
+        std::fs::create_dir_all(&raw_repo).unwrap();
+
+        assert_eq!(
+            resolve_label_to_filesystem_path("@llvm-raw//:WORKSPACE", workspace_root),
+            raw_repo.join("WORKSPACE")
         );
     }
 

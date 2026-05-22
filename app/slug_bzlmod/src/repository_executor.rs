@@ -341,7 +341,7 @@ fn llvm_subproject_layout_is_valid(invocation: &RepositoryInvocation, working_di
             continue;
         }
         checked_any = true;
-        if !working_dir.join(&name).exists() {
+        if !local_repository_entry_matches_source(&entry.path(), &working_dir.join(&name)) {
             return false;
         }
     }
@@ -2025,8 +2025,25 @@ mod tests {
             &working_dir
         ));
 
-        std::fs::create_dir(working_dir.join("src")).unwrap();
-        std::fs::create_dir(working_dir.join("include")).unwrap();
+        #[cfg(unix)]
+        {
+            std::fs::create_dir(working_dir.join("src")).unwrap();
+            std::fs::create_dir(working_dir.join("include")).unwrap();
+            assert!(!repo_layout_is_valid_for_invocation(
+                &invocation,
+                &working_dir
+            ));
+            std::fs::remove_dir(working_dir.join("src")).unwrap();
+            std::fs::remove_dir(working_dir.join("include")).unwrap();
+            std::os::unix::fs::symlink(raw_dir.join("src"), working_dir.join("src")).unwrap();
+            std::os::unix::fs::symlink(raw_dir.join("include"), working_dir.join("include"))
+                .unwrap();
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::create_dir(working_dir.join("src")).unwrap();
+            std::fs::create_dir(working_dir.join("include")).unwrap();
+        }
         assert!(repo_layout_is_valid_for_invocation(
             &invocation,
             &working_dir

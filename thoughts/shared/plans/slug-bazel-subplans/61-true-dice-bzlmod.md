@@ -5192,6 +5192,74 @@ Implementation slice 2026-05-22, external alias scan cache:
   after validation, remove the `plan61-builtins-alias-cache-*` generated
   `buck-out` and staged `execroot` trees before the next broad SDK smoke.
 
+Implementation slice 2026-05-22, generated LLVM subproject symlink layout:
+
+- Failure:
+  the next broad Slug SDK smoke
+  `/tmp/slug-plan61/plan61-sdk-alias-cache-20260522-135714.log` failed while
+  compiling libcxx because
+  `external/llvm++llvm_source+libcxx/src/charconv.cpp` did not exist. Bazel
+  aquery confirms that path is a declared input for the same libcxx action:
+  `/tmp/slug-plan61/bazel-aquery-libcxx-charconv-inputs-20260522-135831.txt`.
+- Ground truth:
+  ZeroMatter's `_llvm_subproject_repository_impl` computes
+  `llvm_root = rctx.path(Label("@llvm-raw//:WORKSPACE")).dirname` and then
+  symlinks each top-level entry from the raw LLVM subdirectory into the
+  generated subproject repository. A focused Bazel 9.1.0 repro under
+  `/tmp/slug-bazel-symlink-repro` showed that
+  `repository_ctx.symlink(src_dir, "dir")` preserves a symlink on disk even
+  when `src_dir` is a directory, while `glob(["dir/**"])` still follows that
+  directory symlink for package expansion.
+- Reflection:
+  the bug class was not hardlink behavior. Slug resolved
+  `repository_ctx.path(Label(...))` relative to the generated repository's
+  working directory, collapsed symlink-to-directory metadata into a real
+  directory, accepted real directories as a valid generated LLVM subproject
+  layout, and could corrupt an action execroot when both `external` and nested
+  `external/<repo>/...` inputs appeared in one plan.
+- Fix:
+  label-valued `repository_ctx.path` now resolves from the workspace root so
+  labels like `@llvm-raw//:WORKSPACE` find the sibling raw repository. External
+  file-operation delegates preserve symlink metadata even when the target is a
+  directory, while directory reads still follow directory symlinks so Bazel-like
+  glob expansion works. The LLVM subproject repository-layout fast path now
+  requires top-level entries to match the raw source symlink layout instead of
+  accepting self-referential real directories. Action execroot materialization
+  replaces an existing `external/<repo>` symlink with a real directory before
+  adding nested external paths.
+- Validation:
+  `cargo fmt`, `cargo test -p slug_execute_impl
+  ensure_execroot_materializes_external_file_paths_with_real_directories --
+  --nocapture`, `cargo test -p slug_bzlmod
+  llvm_subproject_marker_requires_source_layout -- --nocapture`,
+  `cargo test -p slug_interpreter_for_build
+  test_resolve_external_label_to_filesystem_path_scans_project_root --
+  --nocapture`, `cargo build -p slug`, and `git diff --check` passed. A fresh
+  no-exec Slug build of
+  `@@llvm++llvm_source+libcxx//:libcxx` left
+  `bazel-external/llvm++llvm_source+libcxx/src` and `include` as symlinks to
+  `llvm-raw/libcxx`, log
+  `/tmp/slug-plan61/plan61-libcxx-noexec-20260522-141459.log`. A real Slug
+  focused build
+  `/tmp/slug-plan61/plan61-libcxx-execroot-nested-20260522-141901.log` then
+  advanced to libcxx compile diagnostics while preserving the corrected layout.
+- Boundary:
+  direct Bazel sandboxed execution of the same libcxx target failed while
+  copying symlinked inputs into the sandbox
+  (`/tmp/slug-plan61/bazel-build-libcxx-20260522-141952.log`), so it was not a
+  clean compile oracle. Re-running Bazel with local spawn/C++ strategies in
+  `/tmp/slug-plan61/bazel-build-libcxx-local-20260522-142156.log` reached the
+  same libcxx compile class (`std::memcpy` unresolved through
+  `using_if_exists`). Therefore the libcxx compile failure is not a Slug
+  blocker; the Slug parity fix in this slice is the repository and execroot
+  symlink materialization behavior that Bazel requires for the declared input
+  graph.
+- Cleanup:
+  after validation, stale `plan61-*` generated Slug trees were removed from
+  `/var/mnt/dev/zeromatter-kuro/buck-out` and staged execroot directories were
+  removed from `/var/mnt/dev/zeromatter-kuro/execroot`; sizes returned to about
+  `buck-out=3.3M` and `execroot=480K`.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

@@ -681,7 +681,22 @@ fn link_external_path(
         return true;
     }
 
-    let link = execroot_external.join(repo).join(rel);
+    let repo_root = execroot_external.join(repo);
+    match repo_root.symlink_metadata() {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            if !remove_symlink_path(&repo_root) {
+                tracing::debug!(
+                    link = %repo_root.display(),
+                    "failed to replace execroot external repo symlink for nested path"
+                );
+                return false;
+            }
+        }
+        Ok(meta) if !meta.is_dir() => return true,
+        Ok(_) | Err(_) => {}
+    }
+
+    let link = repo_root.join(rel);
     let Some(parent) = link.parent() else {
         return false;
     };
@@ -1215,6 +1230,7 @@ mod tests {
 
         let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
         let mut plan = ActionExecrootPlan::default();
+        plan.top_level_prefixes.insert("external".to_owned());
         plan.external_paths
             .insert("rules_rs++crate+crates__diplomat.git/tool/src/js/gen.rs".to_owned());
         plan.external_paths.insert(
