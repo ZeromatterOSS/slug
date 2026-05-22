@@ -28,6 +28,64 @@ Cite Bazel source of truth for parity decisions:
 - Bazel 9 MODULE.bazel builds → slug builds, same result.
 - Bazel 9 fails → slug fails. Workarounds masking a Bazel 9 failure = bugs.
 
+## Repo workflow for agents
+
+Start from the live checkout, not from memory.
+
+- Read this file, then the relevant roadmap entry in
+  `thoughts/shared/plans/2026-01-21-slug-bazel-compatible-build-tool.md`.
+- If the user names a prompt or plan, read that prompt/plan before editing.
+  Prompts live in `thoughts/shared/prompts/`; subplans live in
+  `thoughts/shared/plans/slug-bazel-subplans/`.
+- Check `git status --short` and inspect dirty diffs before making changes.
+  Treat dirty files as active user/agent state unless the user says otherwise.
+- Prefer focused owning-abstraction tests before broad SDK or repo-wide smokes.
+  Use broad smokes only after the local bug class is understood.
+- Do not run multiple `cargo build` or `cargo test` commands in parallel when
+  they share the same target directory; Cargo lock contention obscures signal.
+- If a Rust change affects the `slug` binary path used by Python/e2e tests,
+  rebuild it with `cargo build -p slug` before invoking `target/debug/slug`.
+- Clean stale `slugd` processes before and after Slug smokes or focused
+  daemon-sensitive tests.
+
+## DICE and incremental state
+
+DICE is Slug's incremental computation graph. Use it for semantic build state
+that must be cached, invalidated, replayed, or shared across requests.
+
+- Represent semantic inputs as DICE keys or tracked DICE dependencies. Do not
+  make a value "DICE-owned" by computing it outside DICE and injecting it after
+  startup.
+- Key equality and hashing must include every input that can change the result:
+  command policy, environment policy, file identity/digest, repo mapping,
+  toolchain/platform policy, lockfile policy, and any relevant mode flags.
+- Prefer explicit invalidation edges over process-global mutable state,
+  singleton caches, marker-file trust, or best-effort digests.
+- A warm cache hit is correct only when the key or tracked dependency graph
+  explains why every Bazel-relevant input is unchanged.
+- Use process globals only for non-semantic instrumentation or short-lived
+  plumbing, and document why they cannot affect correctness.
+- When modeling Bazel Skyframe behavior, mirror the ownership boundary:
+  parse inputs, resolution outputs, repo mappings, repository specs,
+  materialization state, and lockfile policy should each have auditable
+  producers and dependencies rather than being bundled into an opaque session
+  object.
+
+## Validation expectations
+
+- Every parity fix needs either observed Bazel 9.0.1 behavior or a local Bazel
+  source citation from `/var/mnt/dev/bazel`.
+- Add or strengthen the narrow regression first, then implement the fix.
+- Same-daemon behavior matters: create/edit/delete transitions, lockfile
+  changes, environment changes, repository mapping changes, and materialized
+  output changes should invalidate or replay for a clear reason.
+- Repository materialization tests should compare against the helper or manifest
+  format that writes the marker/output state; avoid hard-coding stale marker
+  formats in new tests.
+- Update the owning plan with compact evidence when a result changes the
+  project state. Do not use a passing real-world target as proof that structural
+  acceptance criteria are complete unless the plan says so.
+
 ## NOT in scope
 
 - Bazel 8.x compat. `.bazelversion=8.x` → upgrade it.
