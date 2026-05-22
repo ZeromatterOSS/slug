@@ -98,6 +98,10 @@ Observed SDK result at the checkpoint:
   when the hidden facts are created with the expected value, fails after an
   edit to stale facts, succeeds after restoration, and fails again after the
   hidden lockfile is deleted.
+- Best-effort extension `.bzl` digests now include existing external
+  repository load files materialized under `bazel-external/<repo>` in addition
+  to project-local literal loads. Focused Rust coverage and the Plan 61 Python
+  replay guardrails pass for this transitional digest behavior.
 
 ## Consolidated Learnings
 
@@ -139,8 +143,9 @@ What did not work or remains risky:
   hidden lockfile replay/fail-open behavior now has stronger guardrails, but
   lockfile replay still depends on the transitional graph and is not complete.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
-  literal loads are hashed; external and full interpreter load graphs are not
-  replay-complete.
+  literal loads and existing external files under `bazel-external/<repo>` are
+  hashed, but repo mappings at load sites, load failures, deleted files, and
+  the full interpreter load graph are not replay-complete.
 - Extension spoke registration and seeded-extension tracking still use
   process-global state. Reset hooks reduce the risk but do not provide a
   replay-pure dependency model.
@@ -261,10 +266,11 @@ using Rust DICE keys and values:
 4. Replace best-effort extension `.bzl` digesting with the actual loaded module
    graph.
    - Reuse the Starlark loader or expose its load graph to bzlmod keys.
-   - Include external repository loads, repo mappings at load sites, file
-     digest changes, load failures, and deleted files.
+   - Keep the current external `bazel-external/<repo>` digest coverage while
+     adding repo mappings at load sites, file digest changes from the actual
+     loader graph, load failures, and deleted files.
    - Reject replay when any loaded implementation file changes, not only
-     project-local literal loads.
+     literal loads that the transitional scanner can find.
 
 5. Move extension spoke and generated repo registration out of process globals.
    - Represent generated repo specs, sibling spokes, seeded cells, and

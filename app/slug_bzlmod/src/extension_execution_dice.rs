@@ -1078,15 +1078,27 @@ fn label_bzl_path_under_project(
     current_dir: Option<&Path>,
 ) -> Option<PathBuf> {
     let without_repo = if let Some(rest) = label.strip_prefix("@@") {
-        rest.split_once("//").map(|(_, target)| target)?
+        let (repo, target) = rest.split_once("//")?;
+        if let Some(path) = external_bzl_path_under_project(repo, target, project_root) {
+            return Some(path);
+        }
+        target
     } else if let Some(rest) = label.strip_prefix('@') {
-        rest.split_once("//").map(|(_, target)| target)?
+        let (repo, target) = rest.split_once("//")?;
+        if let Some(path) = external_bzl_path_under_project(repo, target, project_root) {
+            return Some(path);
+        }
+        target
     } else if let Some(rest) = label.strip_prefix("//") {
         rest
     } else if let Some(name) = label.strip_prefix(':') {
         return current_dir.map(|dir| dir.join(name));
     } else if label.contains("//") {
-        label.split_once("//").map(|(_, target)| target)?
+        let (repo, target) = label.split_once("//")?;
+        if let Some(path) = external_bzl_path_under_project(repo, target, project_root) {
+            return Some(path);
+        }
+        target
     } else {
         return current_dir.map(|dir| dir.join(label));
     };
@@ -1098,6 +1110,25 @@ fn label_bzl_path_under_project(
     }
     path.push(name);
     Some(path)
+}
+
+fn external_bzl_path_under_project(
+    repo: &str,
+    target: &str,
+    project_root: &Path,
+) -> Option<PathBuf> {
+    let (pkg, name) = target.split_once(':')?;
+    let repo = repo.trim_end_matches('+');
+    if repo.is_empty() || repo == "_main" {
+        return None;
+    }
+
+    let mut path = project_root.join("bazel-external").join(repo);
+    if !pkg.is_empty() {
+        path.push(pkg);
+    }
+    path.push(name);
+    path.is_file().then_some(path)
 }
 
 fn collect_bzl_transitive_files(
@@ -1655,6 +1686,29 @@ mod tests {
         key1.hash(&mut hasher1);
         key2.hash(&mut hasher2);
         assert_ne!(hasher1.finish(), hasher2.finish());
+    }
+
+    #[test]
+    fn test_project_bzl_digest_includes_existing_external_loads() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("ext.bzl"),
+            "load(\"@helper_repo//tools:helper.bzl\", \"HELPER\")\n",
+        )
+        .unwrap();
+        let helper_dir = temp_dir.path().join("bazel-external/helper_repo/tools");
+        std::fs::create_dir_all(&helper_dir).unwrap();
+        let helper_path = helper_dir.join("helper.bzl");
+        std::fs::write(&helper_path, "HELPER = \"first\"\n").unwrap();
+
+        let first =
+            compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
+
+        std::fs::write(&helper_path, "HELPER = \"second\"\n").unwrap();
+        let second =
+            compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
+
+        assert_ne!(first, second);
     }
 
     #[test]

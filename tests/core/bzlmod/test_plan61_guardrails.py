@@ -195,17 +195,26 @@ def _label_bzl_path(
     if label.startswith("@@"):
         if "//" not in label:
             return None
-        target = label.split("//", 1)[1]
+        repo, target = label[2:].split("//", 1)
+        external = _external_bzl_path(repo, target, project_root)
+        if external is not None:
+            return external
     elif label.startswith("@"):
         if "//" not in label:
             return None
-        target = label.split("//", 1)[1]
+        repo, target = label[1:].split("//", 1)
+        external = _external_bzl_path(repo, target, project_root)
+        if external is not None:
+            return external
     elif label.startswith("//"):
         target = label[2:]
     elif label.startswith(":"):
         return current_dir / label[1:] if current_dir is not None else None
     elif "//" in label:
-        target = label.split("//", 1)[1]
+        repo, target = label.split("//", 1)
+        external = _external_bzl_path(repo, target, project_root)
+        if external is not None:
+            return external
     else:
         return current_dir / label if current_dir is not None else None
 
@@ -213,6 +222,20 @@ def _label_bzl_path(
         return None
     package, name = target.split(":", 1)
     return project_root / package / name if package else project_root / name
+
+
+def _external_bzl_path(repo: str, target: str, project_root: Path) -> Path | None:
+    if ":" not in target:
+        return None
+    repo = repo.removesuffix("+")
+    if not repo or repo == "_main":
+        return None
+    package, name = target.split(":", 1)
+    path = project_root / "bazel-external" / repo
+    if package:
+        path = path / package
+    path = path / name
+    return path if path.is_file() else None
 
 
 def _slug_usages_digest_without_tags(extension_id: str, module_name: str) -> str:
