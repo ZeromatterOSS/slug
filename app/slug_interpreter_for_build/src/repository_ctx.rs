@@ -46,6 +46,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use allocative::Allocative;
 use base64::Engine;
@@ -618,9 +619,22 @@ pub struct RepositoryContext {
     /// generated repository directory.
     #[allocative(skip)]
     workspace_root: Arc<PathBuf>,
+    /// Recorded inputs collected by repository_ctx.watch/watch_tree.
+    #[allocative(skip)]
+    recorded_inputs: Arc<Mutex<Vec<String>>>,
+    /// Structured watch inputs used by the repo-rule executor to add DICE
+    /// filesystem dependencies for same-daemon invalidation.
+    #[allocative(skip)]
+    watch_inputs: Arc<Mutex<Vec<RepositoryWatchInput>>>,
 }
 
 starlark_simple_value!(RepositoryContext);
+
+#[derive(Debug, Clone)]
+pub enum RepositoryWatchInput {
+    File(PathBuf),
+    DirTree(PathBuf),
+}
 
 impl RepositoryContext {
     /// Create a new repository context.
@@ -644,6 +658,8 @@ impl RepositoryContext {
             attr,
             working_dir: Arc::new(working_dir),
             workspace_root: Arc::new(workspace_root),
+            recorded_inputs: Arc::new(Mutex::new(Vec::new())),
+            watch_inputs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -662,6 +678,8 @@ impl RepositoryContext {
             attr,
             working_dir: Arc::new(working_dir),
             workspace_root: Arc::new(workspace_root),
+            recorded_inputs: Arc::new(Mutex::new(Vec::new())),
+            watch_inputs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -678,6 +696,8 @@ impl RepositoryContext {
             workspace_root: Arc::new(
                 std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             ),
+            recorded_inputs: Arc::new(Mutex::new(Vec::new())),
+            watch_inputs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -693,6 +713,80 @@ impl RepositoryContext {
         } else {
             self.working_dir.join(path)
         }
+    }
+
+    /// Return recorded inputs collected during repository rule execution.
+    pub fn recorded_inputs(&self) -> slug_error::Result<Vec<String>> {
+        self.recorded_inputs
+            .lock()
+            .map(|inputs| inputs.clone())
+            .map_err(|_| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "repository_ctx recorded input lock poisoned"
+                )
+            })
+    }
+
+    /// Return structured watch inputs collected during repository rule execution.
+    pub fn watch_inputs(&self) -> slug_error::Result<Vec<RepositoryWatchInput>> {
+        self.watch_inputs
+            .lock()
+            .map(|inputs| inputs.clone())
+            .map_err(|_| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "repository_ctx watch input lock poisoned"
+                )
+            })
+    }
+
+    fn record_file_input(&self, path: &Path) -> starlark::Result<()> {
+        let recorded = slug_bzlmod::lockfile::recorded_file_input(path).map_err(|e| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to record repository_ctx.watch input '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
+        self.record_input(recorded)?;
+        self.record_watch_input(RepositoryWatchInput::File(path.to_path_buf()))
+    }
+
+    fn record_dirtree_input(&self, path: &Path) -> starlark::Result<()> {
+        let recorded = slug_bzlmod::lockfile::recorded_dirtree_input(path).map_err(|e| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to record repository_ctx.watch_tree input '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
+        self.record_input(recorded)?;
+        self.record_watch_input(RepositoryWatchInput::DirTree(path.to_path_buf()))
+    }
+
+    fn record_input(&self, recorded: String) -> starlark::Result<()> {
+        let mut inputs = self.recorded_inputs.lock().map_err(|_| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "repository_ctx recorded input lock poisoned"
+            ))
+        })?;
+        inputs.push(recorded);
+        Ok(())
+    }
+
+    fn record_watch_input(&self, input: RepositoryWatchInput) -> starlark::Result<()> {
+        let mut inputs = self.watch_inputs.lock().map_err(|_| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "repository_ctx watch input lock poisoned"
+            ))
+        })?;
+        inputs.push(input);
+        Ok(())
     }
 }
 
@@ -2585,6 +2679,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let resolved = repository_ctx_resolve_watch_path(this, path)?;
         let _ = try_ensure_label_path_materialized(&resolved)?;
+        this.record_file_input(&resolved)?;
         Ok(Value::new_none())
     }
 
@@ -2603,6 +2698,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             )
             .into());
         }
+        this.record_dirtree_input(&resolved)?;
         Ok(Value::new_none())
     }
 

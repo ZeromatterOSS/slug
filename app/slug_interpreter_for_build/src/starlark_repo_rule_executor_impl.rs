@@ -35,12 +35,18 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
+use slug_bzlmod::StarlarkRepoRuleExecution;
 use slug_bzlmod::StarlarkRepoRuleExecutorImpl;
 use slug_bzlmod::repository_invocations::RepositoryInvocation;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
+use slug_common::file_ops::dice::DiceFileComputations;
+use slug_common::file_ops::metadata::RawPathMetadata;
+use slug_core::cells::CellResolver;
+use slug_core::fs::project::ProjectRoot;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
+use slug_fs::paths::abs_path::AbsPath;
 use slug_interpreter::load_module::InterpreterCalculation;
 use slug_interpreter::paths::module::StarlarkModulePath;
 use starlark::environment::Module;
@@ -51,6 +57,7 @@ use crate::module_extension_executor_impl::parse_bzlmod_bzl_path;
 use crate::repository_ctx::AttrValue as CtxAttrValue;
 use crate::repository_ctx::RepositoryAttr;
 use crate::repository_ctx::RepositoryContext;
+use crate::repository_ctx::RepositoryWatchInput;
 use crate::repository_rule::FrozenStarlarkRepositoryRule;
 
 /// Errors during Starlark repository rule execution.
@@ -150,7 +157,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         rule_bzl_path: &str,
         rule_name: &str,
         working_dir: &Path,
-    ) -> slug_error::Result<()> {
+    ) -> slug_error::Result<StarlarkRepoRuleExecution> {
         tracing::debug!(
             "Executing Starlark repository rule '{}' from '{}' for repo '{}'",
             rule_name,
@@ -225,12 +232,6 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             workspace_root.root().to_path_buf(),
         );
 
-        // 8. Execute the implementation function in Starlark
-        let starlark_module = Module::new();
-        let ctx_value = starlark_module.heap().alloc(repo_ctx);
-        let mut eval = Evaluator::new(&starlark_module);
-        let impl_fn = frozen_rule.implementation();
-
         tracing::debug!(
             "Invoking repository rule implementation for '{}'",
             invocation.name
@@ -242,9 +243,17 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         // worktree-fans-out from). `with_extension_dice` was originally
         // introduced for module-extension Starlark eval (Plan 36); the same
         // sync->async bridge applies here.
-        let invoke_result = slug_bzlmod::with_extension_dice(ctx, || {
-            eval.eval_function(impl_fn.to_value(), &[ctx_value], &[])
-        });
+        let invoke_result: Result<(), String> = {
+            let impl_fn = frozen_rule.implementation();
+            let starlark_module = Module::new();
+            let ctx_value = starlark_module.heap().alloc(repo_ctx.clone());
+            let mut eval = Evaluator::new(&starlark_module);
+            slug_bzlmod::with_extension_dice(ctx, || {
+                eval.eval_function(impl_fn.to_value(), &[ctx_value], &[])
+            })
+            .map(|_| ())
+            .map_err(|e| diagnostic_summary(&e))
+        };
 
         match invoke_result {
             Ok(_) => {
@@ -253,10 +262,13 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
                     invocation.name,
                     rule_name
                 );
-                Ok(())
+                let watch_inputs = repo_ctx.watch_inputs()?;
+                let recorded_inputs = repo_ctx.recorded_inputs()?;
+                track_repository_watch_inputs(ctx, &cell_resolver, workspace_root, &watch_inputs)
+                    .await?;
+                Ok(StarlarkRepoRuleExecution::new(recorded_inputs))
             }
-            Err(e) => {
-                let summary = diagnostic_summary(&e);
+            Err(summary) => {
                 tracing::debug!(
                     "Repository rule '{}' implementation failed: {}",
                     rule_name,
@@ -266,6 +278,55 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             }
         }
     }
+}
+
+async fn track_repository_watch_inputs(
+    ctx: &mut DiceComputations<'_>,
+    cell_resolver: &CellResolver,
+    project_root: &ProjectRoot,
+    inputs: &[RepositoryWatchInput],
+) -> slug_error::Result<()> {
+    for input in inputs {
+        match input {
+            RepositoryWatchInput::File(path) => {
+                let Some(cell_path) = cell_path_for_watch_input(cell_resolver, project_root, path)
+                else {
+                    continue;
+                };
+                let metadata =
+                    DiceFileComputations::read_path_metadata_if_exists(ctx, cell_path.as_ref())
+                        .await?;
+                if matches!(metadata, Some(RawPathMetadata::File(_))) {
+                    let _ =
+                        DiceFileComputations::read_file_if_exists(ctx, cell_path.as_ref()).await?;
+                }
+            }
+            RepositoryWatchInput::DirTree(path) => {
+                let Some(cell_path) = cell_path_for_watch_input(cell_resolver, project_root, path)
+                else {
+                    continue;
+                };
+                let metadata =
+                    DiceFileComputations::read_path_metadata_if_exists(ctx, cell_path.as_ref())
+                        .await?;
+                if matches!(metadata, Some(RawPathMetadata::Directory)) {
+                    let _ = DiceFileComputations::read_dir(ctx, cell_path.as_ref()).await?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn cell_path_for_watch_input(
+    cell_resolver: &CellResolver,
+    project_root: &ProjectRoot,
+    path: &Path,
+) -> Option<slug_core::cells::cell_path::CellPath> {
+    let abs = AbsPath::new(path).ok()?;
+    cell_resolver
+        .get_cell_path_from_abs_path(abs, project_root)
+        .ok()
 }
 
 fn diagnostic_summary(error: impl std::fmt::Display) -> String {

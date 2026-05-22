@@ -36,6 +36,19 @@ use slug_util::late_binding::LateBinding;
 
 use crate::repository_invocations::RepositoryInvocation;
 
+/// Result returned by a Starlark repository rule execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StarlarkRepoRuleExecution {
+    /// Bazel-style recorded inputs collected from repository_ctx.watch APIs.
+    pub recorded_inputs: Vec<String>,
+}
+
+impl StarlarkRepoRuleExecution {
+    pub fn new(recorded_inputs: Vec<String>) -> Self {
+        Self { recorded_inputs }
+    }
+}
+
 /// Names of built-in repository rules implemented natively (not via Starlark execution).
 ///
 /// These rules are handled by `execute_repository_rule()` in `repository_executor.rs`
@@ -85,7 +98,7 @@ pub trait StarlarkRepoRuleExecutorImpl: Send + Sync + 'static {
         rule_bzl_path: &str,
         rule_name: &str,
         working_dir: &Path,
-    ) -> slug_error::Result<()>;
+    ) -> slug_error::Result<StarlarkRepoRuleExecution>;
 }
 
 /// Late binding for the Starlark repository rule executor.

@@ -479,7 +479,10 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                         slug_bzlmod::repo_layout_is_valid_for_invocation(&invocation, &repo_dir)
                     })
                     .unwrap_or(true);
-                if repo_dir.join(".slug_repo_complete").exists() && marker_layout_valid {
+                if repo_dir.join(".slug_repo_complete").exists()
+                    && marker_layout_valid
+                    && slug_bzlmod::repository_recorded_inputs_current(&repo_dir)
+                {
                     continue;
                 }
                 let key = slug_bzlmod::ExtensionRepoExecutionKey::new(

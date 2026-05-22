@@ -162,6 +162,12 @@ Observed SDK result at the checkpoint:
   bzlmod-root reset path that clears dynamic cells, setups, apparent aliases,
   and scoped aliases, preventing stale suffix lookups from surviving a fresh
   root reset.
+- Starlark repository rules now record `repository_ctx.watch()` and
+  `repository_ctx.watch_tree()` inputs into a materialization sidecar, validate
+  that sidecar before reusing extension repo completion markers, and add DICE
+  filesystem reads for watched root files during repository execution. A new
+  same-daemon guardrail edits a watched root file and proves the generated
+  repository is re-executed rather than serving the stale materialization.
 
 ## Consolidated Learnings
 
@@ -218,6 +224,12 @@ What did not work or remains risky:
   environment through the interpreter build-config adapter. The bzlmod session
   data rewrite is gone, but the runtime environment surface is not yet a
   DICE-owned command value end to end.
+- Repository-rule watched inputs are now captured in a sidecar and root-file
+  watches participate in same-daemon DICE invalidation, but this is still
+  marker/layout plumbing rather than a final DICE-owned repository
+  materialization manifest. Recursive `watch_tree()` state is conservatively
+  validated on marker access and still needs a first-class recursive DICE input
+  value for replay completeness.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

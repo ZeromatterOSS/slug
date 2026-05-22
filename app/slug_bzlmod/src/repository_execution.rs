@@ -32,6 +32,7 @@
 //!
 //! This follows the `GitFileOpsDelegateKey` pattern from `slug_external_cells/src/git.rs`.
 
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -45,8 +46,12 @@ use dupe::Dupe;
 
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::record_bzlmod_event;
+use crate::lockfile::compute_sha256_hex;
+use crate::lockfile::validate_recorded_inputs_current;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::RepositoryInvocation;
+
+pub(crate) const REPO_RECORDED_INPUTS_FILE: &str = ".slug_repo_recorded_inputs";
 
 /// Errors that can occur during repository rule execution.
 #[derive(Debug, slug_error::Error)]
@@ -341,6 +346,69 @@ fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
         .is_some_and(|output_digest| !output_digest.is_empty())
 }
 
+pub fn repository_recorded_inputs_current(repo_dir: &Path) -> bool {
+    repository_recorded_inputs_digest(repo_dir).is_ok()
+}
+
+fn repository_recorded_inputs_state(repo_dir: &Path) -> String {
+    match repository_recorded_inputs_digest(repo_dir) {
+        Ok(None) => "inputs:none".to_owned(),
+        Ok(Some(digest)) => format!("inputs:{digest}:valid"),
+        Err(reason) => format!("inputs-invalid:{reason}"),
+    }
+}
+
+fn repository_recorded_inputs_digest(repo_dir: &Path) -> Result<Option<String>, String> {
+    let manifest_path = repo_dir.join(REPO_RECORDED_INPUTS_FILE);
+    if !manifest_path.exists() {
+        return Ok(None);
+    }
+    let content =
+        std::fs::read_to_string(&manifest_path).map_err(|_| "recorded_inputs_unreadable")?;
+    let recorded_inputs: Vec<String> = content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(ToOwned::to_owned)
+        .collect();
+    validate_recorded_inputs_current(&recorded_inputs, None, None, None)?;
+    Ok(Some(compute_sha256_hex(content.as_bytes())))
+}
+
+fn write_repository_recorded_inputs(repo_dir: &Path, inputs: &[String]) -> slug_error::Result<()> {
+    let manifest_path = repo_dir.join(REPO_RECORDED_INPUTS_FILE);
+    if inputs.is_empty() {
+        if let Err(e) = std::fs::remove_file(&manifest_path)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(RepositoryExecutionError::WorkingDirFailed {
+                reason: format!(
+                    "Failed to remove recorded input manifest '{}': {}",
+                    manifest_path.display(),
+                    e
+                ),
+            }
+            .into());
+        }
+        return Ok(());
+    }
+
+    let mut stable_inputs = inputs.to_vec();
+    stable_inputs.sort();
+    stable_inputs.dedup();
+    let mut content = stable_inputs.join("\n");
+    content.push('\n');
+    std::fs::write(&manifest_path, content).map_err(|e| {
+        RepositoryExecutionError::WorkingDirFailed {
+            reason: format!(
+                "Failed to write recorded input manifest '{}': {}",
+                manifest_path.display(),
+                e
+            ),
+        }
+    })?;
+    Ok(())
+}
+
 fn materialized_repo_state(
     canonical_name: &str,
     repo_spec: &RepoSpec,
@@ -380,8 +448,9 @@ fn materialized_repo_state(
         }
         Err(e) => format!("layout-unclassifiable:{e}"),
     };
+    let recorded_inputs_state = repository_recorded_inputs_state(&repo_dir);
 
-    format!("{marker_state};{layout_state}")
+    format!("{marker_state};{layout_state};{recorded_inputs_state}")
 }
 
 #[async_trait]
@@ -421,7 +490,8 @@ impl Key for ExtensionRepoExecutionKey {
             &invocation,
             &working_dir,
         );
-        if marker_matches && layout_valid {
+        let recorded_inputs_current = repository_recorded_inputs_current(&working_dir);
+        if marker_matches && layout_valid && recorded_inputs_current {
             record_bzlmod_event(
                 BzlmodEventKind::RepoMaterializationHit,
                 self.canonical_name.as_ref(),
@@ -434,6 +504,8 @@ impl Key for ExtensionRepoExecutionKey {
 
         let miss_reason = if self.repo_spec.local {
             "local_rule"
+        } else if marker_matches && layout_valid && !recorded_inputs_current {
+            "recorded_inputs_changed"
         } else if marker_matches && !layout_valid {
             "marker_layout_invalid"
         } else if marker_contents.is_some() {
@@ -504,7 +576,7 @@ impl Key for ExtensionRepoExecutionKey {
                             )
                             .await
                         {
-                            Ok(()) => {
+                            Ok(execution) => {
                                 // Mark as complete and write WORKSPACE if missing
                                 if !working_dir.join("WORKSPACE").exists()
                                     && !working_dir.join("WORKSPACE.bazel").exists()
@@ -514,6 +586,10 @@ impl Key for ExtensionRepoExecutionKey {
                                         format!("workspace(name = \"{}\")\n", self.canonical_name),
                                     );
                                 }
+                                write_repository_recorded_inputs(
+                                    &working_dir,
+                                    &execution.recorded_inputs,
+                                )?;
                                 let output_digest =
                                     crate::repository_executor::repository_output_digest(
                                         &working_dir,
@@ -1084,6 +1160,70 @@ mod tests {
 
         assert_eq!(valid.materialized_state, corrupt.materialized_state);
         assert_eq!(valid, corrupt);
+    }
+
+    #[test]
+    fn test_recorded_input_manifest_changes_materialized_state() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let watched = project_root.join("watched.txt");
+        let repo_dir = project_root
+            .join("bazel-external")
+            .join("_main+ext+watched_repo");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(&watched, "first").unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "stable").unwrap();
+
+        let repo_spec = RepoSpec::new("@@//:watched_repo.bzl%watched_repository".to_owned())
+            .with_attr(
+                "name".to_owned(),
+                AttrValue::String("watched_repo".to_owned()),
+            );
+        let spec_hash = repo_spec.compute_hash();
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&spec_hash, &output_digest),
+        )
+        .unwrap();
+        std::fs::write(
+            repo_dir.join(REPO_RECORDED_INPUTS_FILE),
+            format!(
+                "{}\n",
+                crate::lockfile::recorded_file_input(&watched).unwrap()
+            ),
+        )
+        .unwrap();
+
+        let valid = ExtensionRepoExecutionKey::new(
+            "_main+ext+watched_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec.clone(),
+            project_root.clone(),
+        );
+
+        std::fs::write(&watched, "second").unwrap();
+
+        let stale = ExtensionRepoExecutionKey::new(
+            "_main+ext+watched_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec,
+            project_root,
+        );
+
+        assert_ne!(valid.materialized_state, stale.materialized_state);
+        assert_ne!(valid, stale);
+        assert!(
+            stale
+                .materialized_state
+                .contains("inputs-invalid:recorded_input_changed")
+        );
     }
 
     // Tests for repo_spec_to_invocation

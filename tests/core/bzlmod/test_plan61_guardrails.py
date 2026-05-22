@@ -1909,6 +1909,68 @@ use_repo(watch, "watch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_watch_label_edit_reexecutes_materialized_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepoRecordedInput.File and RepositoryFetchFunction."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+watch_ext+watch_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    _write(buck.cwd / "watched.txt", "first\n")
+    _write(
+        buck.cwd / "watch_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.watch(Label("//:watched.txt"))
+    repository_ctx.file("data.txt", repository_ctx.read(Label("//:watched.txt")))
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+watch_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _watch_ext_impl(module_ctx):
+    watch_repo_rule(name = "watch_repo")
+
+watch_ext = module_extension(
+    implementation = _watch_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_watch_input")
+
+watch = use_extension("//:watch_ext.bzl", "watch_ext")
+use_repo(watch, "watch_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_watch_repo",
+    srcs = ["@watch_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_watch_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write(buck.cwd / "watched.txt", "second\n")
+
+    await buck.build("//:uses_watch_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_wasm_methods_are_disabled_by_default(
     buck: Buck,
 ) -> None:

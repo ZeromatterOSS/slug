@@ -663,6 +663,8 @@ pub(crate) async fn get_file_ops_delegate(
             setup.canonical_name.as_ref(),
             &source_path,
         );
+    let is_stale_recorded_inputs = marker_contents.as_deref().is_some_and(is_complete_marker)
+        && !slug_bzlmod::repository_recorded_inputs_current(&source_path);
     if is_stale_non_complete_marker
         || is_stale_complete
         || is_stale_spec_unknown_complete
@@ -670,6 +672,7 @@ pub(crate) async fn get_file_ops_delegate(
         || is_stale_missing_build
         || is_stale_foreign_symlink
         || is_stale_invalid_layout
+        || is_stale_recorded_inputs
     {
         tracing::info!(
             "Extension repo '{}' has stale materialization; \

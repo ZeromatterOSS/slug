@@ -39,6 +39,7 @@ use zip::ZipArchive;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::record_bzlmod_event;
 use crate::repository_execution::InvocationAttrs;
+use crate::repository_execution::REPO_RECORDED_INPUTS_FILE;
 use crate::repository_execution::RepositoryExecutionError;
 use crate::repository_execution::RepositoryRuleResult;
 use crate::repository_invocations::RepositoryInvocation;
@@ -405,7 +406,10 @@ fn hash_repository_entry(
                 name: "repository_output_digest".to_owned(),
                 reason: format!("Failed to read directory entry '{}': {}", path.display(), e),
             })?;
-        entries.retain(|entry| entry.file_name() != ".slug_repo_complete");
+        entries.retain(|entry| {
+            let file_name = entry.file_name();
+            file_name != ".slug_repo_complete" && file_name != REPO_RECORDED_INPUTS_FILE
+        });
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             hash_repository_entry(&entry.path(), &relative.join(entry.file_name()), hasher)?;
@@ -1852,6 +1856,11 @@ mod tests {
 
         let digest = repository_output_digest(&working_dir).unwrap();
         std::fs::write(working_dir.join(".slug_repo_complete"), "complete:legacy").unwrap();
+        std::fs::write(
+            working_dir.join(REPO_RECORDED_INPUTS_FILE),
+            "FILE:/tmp/does-not-exist ENOENT\n",
+        )
+        .unwrap();
         assert_eq!(repository_output_digest(&working_dir).unwrap(), digest);
 
         std::fs::write(working_dir.join("data.txt"), "changed").unwrap();

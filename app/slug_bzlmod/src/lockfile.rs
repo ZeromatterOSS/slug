@@ -289,6 +289,43 @@ impl LockfileExtensionData {
     }
 }
 
+/// Build a Bazel-style recorded FILE input marker for current filesystem state.
+pub fn recorded_file_input(path: &Path) -> std::io::Result<String> {
+    Ok(format_recorded_input(
+        "FILE",
+        path,
+        &recorded_file_marker_value(path)?,
+    ))
+}
+
+/// Build a Bazel-style recorded DIRENTS input marker for current filesystem state.
+pub fn recorded_dirents_input(path: &Path) -> std::io::Result<String> {
+    Ok(format_recorded_input(
+        "DIRENTS",
+        path,
+        &recorded_dirents_marker_value(path)?,
+    ))
+}
+
+/// Build a Bazel-style recorded DIRTREE input marker for current filesystem state.
+pub fn recorded_dirtree_input(path: &Path) -> std::io::Result<String> {
+    Ok(format_recorded_input(
+        "DIRTREE",
+        path,
+        &recorded_dirtree_marker_value(path)?,
+    ))
+}
+
+/// Validate recorded inputs against current filesystem/env/repo-mapping state.
+pub fn validate_recorded_inputs_current(
+    recorded_inputs: &[String],
+    workspace_root: Option<&Path>,
+    repo_env: Option<&BTreeMap<String, String>>,
+    repo_mappings: Option<&crate::RepoMappingSnapshot>,
+) -> Result<(), String> {
+    validate_recorded_inputs_for_replay(recorded_inputs, workspace_root, repo_env, repo_mappings)
+}
+
 impl LockfileRepoSpec {
     /// Create a new lockfile repo spec.
     pub fn new(repo_rule_id: String) -> Self {
@@ -520,6 +557,28 @@ fn unescape_recorded_input_part(input: &str) -> Option<String> {
         result.push('\\');
     }
     Some(result)
+}
+
+fn format_recorded_input(kind: &str, path: &Path, value: &str) -> String {
+    let input = format!("{kind}:{}", path.to_string_lossy());
+    format!(
+        "{} {}",
+        escape_recorded_input_part(&input),
+        escape_recorded_input_part(value)
+    )
+}
+
+fn escape_recorded_input_part(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    for ch in input.chars() {
+        match ch {
+            '\\' => result.push_str("\\\\"),
+            '\n' => result.push_str("\\n"),
+            ' ' => result.push_str("\\s"),
+            other => result.push(other),
+        }
+    }
+    result
 }
 
 fn recorded_file_marker_value(path: &Path) -> std::io::Result<String> {
