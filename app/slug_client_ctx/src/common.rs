@@ -1033,6 +1033,14 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub lockfile_mode: Option<String>,
 
+    /// Ignore root module dev dependencies (Bazel compatibility).
+    #[clap(
+        long = "ignore-dev-dependency",
+        alias = "ignore_dev_dependency",
+        hide = true
+    )]
+    pub ignore_dev_dependency: bool,
+
     /// Module mirrors for BCR (Bazel compatibility, accepted but ignored).
     #[clap(
         long = "module-mirrors",
@@ -1302,6 +1310,13 @@ impl CommonBuildConfigurationOptions {
                 });
             }
         }
+        if self.ignore_dev_dependency {
+            result.push(ConfigOverride {
+                cell: None,
+                config_override: "bzlmod.ignore_dev_dependency=true".to_owned(),
+                config_type: ConfigType::Value as i32,
+            });
+        }
 
         if !self.allow_yanked_versions.is_empty() {
             result.push(ConfigOverride {
@@ -1525,6 +1540,7 @@ impl CommonBuildConfigurationOptions {
             flaky_test_attempts: None,
             grpc_keepalive_time: None,
             lockfile_mode: None,
+            ignore_dev_dependency: false,
             module_mirrors: None,
             remote_download_outputs: None,
             remote_local_fallback: false,
@@ -1645,6 +1661,7 @@ impl CommonBuildConfigurationOptions {
             flaky_test_attempts: None,
             grpc_keepalive_time: None,
             lockfile_mode: None,
+            ignore_dev_dependency: false,
             module_mirrors: None,
             remote_download_outputs: None,
             remote_local_fallback: false,

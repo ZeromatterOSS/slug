@@ -195,6 +195,13 @@ impl<'a> ClientCommandContext<'a> {
                 config_type: ConfigType::Value as i32,
             });
         }
+        if self.bazel_ignore_dev_dependency_arg() {
+            config_overrides.push(ConfigOverride {
+                cell: None,
+                config_override: "bzlmod.ignore_dev_dependency=true".to_owned(),
+                config_type: ConfigType::Value as i32,
+            });
+        }
         if let Ok(allowed) = std::env::var("BZLMOD_ALLOW_YANKED_VERSIONS") {
             config_overrides.push(ConfigOverride {
                 cell: None,
@@ -282,6 +289,11 @@ impl<'a> ClientCommandContext<'a> {
     fn bazel_lockfile_mode_arg(&self) -> Option<String> {
         parse_lockfile_mode_args(self.argv.expanded_argv.args())
             .or_else(|| parse_lockfile_mode_args(self.argv.argv.iter().map(String::as_str)))
+    }
+
+    fn bazel_ignore_dev_dependency_arg(&self) -> bool {
+        contains_ignore_dev_dependency_arg(self.argv.expanded_argv.args())
+            || contains_ignore_dev_dependency_arg(self.argv.argv.iter().map(String::as_str))
     }
 
     fn bazel_repo_env_args(&self) -> Vec<String> {
@@ -378,6 +390,11 @@ fn parse_lockfile_mode_args<'a>(args: impl Iterator<Item = &'a str>) -> Option<S
         }
     }
     mode
+}
+
+fn contains_ignore_dev_dependency_arg<'a>(args: impl Iterator<Item = &'a str>) -> bool {
+    args.into_iter()
+        .any(|arg| arg == "--ignore_dev_dependency" || arg == "--ignore-dev-dependency")
 }
 
 fn parse_repo_env_args<'a>(args: impl Iterator<Item = &'a str>) -> Vec<String> {

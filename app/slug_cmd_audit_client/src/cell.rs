@@ -65,6 +65,8 @@ impl AuditCellCommand {
                 if self.common_opts.config_opts.lockfile_mode.is_none() {
                     self.common_opts.config_opts.lockfile_mode = Some(mode.to_owned());
                 }
+            } else if arg == "--ignore_dev_dependency" || arg == "--ignore-dev-dependency" {
+                self.common_opts.config_opts.ignore_dev_dependency = true;
             } else if let Some(value) = arg
                 .strip_prefix("--repo_env=")
                 .or_else(|| arg.strip_prefix("--repo-env="))

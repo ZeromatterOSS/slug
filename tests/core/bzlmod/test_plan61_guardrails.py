@@ -857,6 +857,9 @@ local_path_override(
     )
 
     await buck.build("//:uses_root_dev_dep")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_root_dev_dep", "--ignore_dev_dependency")
+    assert "root_dev_dep_lib" in str(exc.value)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -938,6 +941,13 @@ bazel_dep(name = "{module_name}", version = "{module_version}", dev_dependency =
     )
 
     await buck.build("//:uses_root_registry_dev_dep", env={"XDG_CACHE_HOME": str(cache_home)})
+    with pytest.raises(BuckException) as exc:
+        await buck.build(
+            "//:uses_root_registry_dev_dep",
+            "--ignore_dev_dependency",
+            env={"XDG_CACHE_HOME": str(cache_home)},
+        )
+    assert module_name in str(exc.value)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

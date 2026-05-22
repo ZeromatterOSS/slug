@@ -579,6 +579,7 @@ impl BzlmodResolutionResult {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 struct BzlmodResolutionOptions {
     lockfile_mode: slug_bzlmod::LockfileMode,
+    ignore_dev_dependency: bool,
     allow_yanked_versions_env: Option<String>,
     allow_yanked_versions_flags: Vec<String>,
     hidden_lockfile_path: Option<PathBuf>,
@@ -590,6 +591,11 @@ impl BzlmodResolutionOptions {
         let bzlmod_section = root_config.get_section("bzlmod");
         Ok(Self {
             lockfile_mode: BuckConfigBasedCells::bzlmod_lockfile_mode_from_config(root_config)?,
+            ignore_dev_dependency: bzlmod_section
+                .and_then(|section| section.get("ignore_dev_dependency"))
+                .map(|value| parse_bzlmod_bool("ignore_dev_dependency", value.as_str()))
+                .transpose()?
+                .unwrap_or(false),
             allow_yanked_versions_env: bzlmod_section
                 .and_then(|section| section.get("allow_yanked_versions_env"))
                 .map(|value| value.as_str().to_owned()),
@@ -608,6 +614,8 @@ impl BzlmodResolutionOptions {
         let mut hasher = Sha256::new();
         hasher.update(format!("{:?}", self.lockfile_mode).as_bytes());
         hasher.update([0]);
+        hasher.update([u8::from(self.ignore_dev_dependency)]);
+        hasher.update([0]);
         if let Some(value) = &self.allow_yanked_versions_env {
             hasher.update(value.as_bytes());
         }
@@ -619,6 +627,17 @@ impl BzlmodResolutionOptions {
         hasher.update(self.repo_env_digest.as_bytes());
         hasher.update([0]);
         hex::encode(hasher.finalize())
+    }
+}
+
+fn parse_bzlmod_bool(key: &str, value: &str) -> slug_error::Result<bool> {
+    match value {
+        "1" | "true" | "True" | "yes" => Ok(true),
+        "0" | "false" | "False" | "no" | "" => Ok(false),
+        _ => Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "Invalid bzlmod.{key} value `{value}`; expected true or false"
+        )),
     }
 }
 
@@ -721,6 +740,7 @@ fn bzlmod_resolution_options_policy_eq(
     right: &BzlmodResolutionOptions,
 ) -> bool {
     left.lockfile_mode == right.lockfile_mode
+        && left.ignore_dev_dependency == right.ignore_dev_dependency
         && left.allow_yanked_versions_env == right.allow_yanked_versions_env
         && left.allow_yanked_versions_flags == right.allow_yanked_versions_flags
         && left.repo_env_digest == right.repo_env_digest
@@ -731,6 +751,7 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
     state: &mut H,
 ) {
     value.lockfile_mode.hash(state);
+    value.ignore_dev_dependency.hash(state);
     value.allow_yanked_versions_env.hash(state);
     value.allow_yanked_versions_flags.hash(state);
     value.repo_env_digest.hash(state);
@@ -879,14 +900,13 @@ struct RegistryFileInputsValue {
 
 fn local_overrides_from_root_module(
     root_module_file: &slug_bzlmod::RootModuleFileValue,
+    ignore_dev_dependency: bool,
 ) -> Vec<(String, String)> {
     root_module_file
         .parsed
         .as_ref()
         .map(|parsed| {
-            parsed
-                .module
-                .overrides
+            active_root_overrides(&parsed.module, ignore_dev_dependency)
                 .iter()
                 .filter_map(|override_| match override_ {
                     slug_bzlmod::types::Override::LocalPath(local) => {
@@ -897,6 +917,39 @@ fn local_overrides_from_root_module(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default()
+}
+
+fn active_root_overrides(
+    module: &slug_bzlmod::types::Module,
+    ignore_dev_dependency: bool,
+) -> Vec<slug_bzlmod::types::Override> {
+    if !ignore_dev_dependency {
+        return module.overrides.clone();
+    }
+
+    let ignored_root_dev_deps: HashSet<_> = module
+        .bazel_deps
+        .iter()
+        .filter(|dep| dep.dev_dependency)
+        .map(|dep| dep.name.clone())
+        .collect();
+    module
+        .overrides
+        .iter()
+        .filter(|override_| match override_ {
+            slug_bzlmod::types::Override::LocalPath(local) => {
+                !ignored_root_dev_deps.contains(&local.module_name)
+            }
+            slug_bzlmod::types::Override::Git(git) => {
+                !ignored_root_dev_deps.contains(&git.module_name)
+            }
+            slug_bzlmod::types::Override::Archive(archive) => {
+                !ignored_root_dev_deps.contains(&archive.module_name)
+            }
+            _ => true,
+        })
+        .cloned()
+        .collect()
 }
 
 fn local_override_module_inputs_digest(
@@ -1299,7 +1352,10 @@ impl BuckConfigBasedCells {
         let local_override_inputs = dice_ctx
             .compute(&LocalOverrideModuleInputsKey {
                 project_root: project_root.clone(),
-                overrides: local_overrides_from_root_module(root_module_file.as_ref()),
+                overrides: local_overrides_from_root_module(
+                    root_module_file.as_ref(),
+                    options.ignore_dev_dependency,
+                ),
             })
             .await?
             .buck_error_context(
@@ -1746,8 +1802,9 @@ impl BuckConfigBasedCells {
             None
         };
 
-        // Resolve local path overrides first
-        let local_modules = resolve_local_modules(&parsed.module.overrides, workspace_root)?;
+        // Resolve active local path overrides first.
+        let active_overrides = active_root_overrides(&parsed.module, options.ignore_dev_dependency);
+        let local_modules = resolve_local_modules(&active_overrides, workspace_root)?;
         for (name, resolved) in local_modules.iter() {
             let cell_name = CellName::unchecked_new(name)?;
             let cell_path =
@@ -1804,6 +1861,7 @@ impl BuckConfigBasedCells {
                     Default::default(),
                 );
             }
+            resolver.set_ignore_dev_dependency(options.ignore_dev_dependency);
             let mut resolved_graph = resolver
                 .resolve(&parsed.module, workspace_root)
                 .await
@@ -1839,9 +1897,7 @@ impl BuckConfigBasedCells {
                 resolved_graph.selected_yanked_versions.clone();
 
             // Build a set of local override names to skip
-            let local_override_names: std::collections::HashSet<_> = parsed
-                .module
-                .overrides
+            let local_override_names: std::collections::HashSet<_> = active_overrides
                 .iter()
                 .filter_map(|o| match o {
                     slug_bzlmod::types::Override::LocalPath(local) => {
@@ -2886,6 +2942,7 @@ mod tests {
             },
             options: BzlmodResolutionOptions {
                 lockfile_mode: slug_bzlmod::LockfileMode::Update,
+                ignore_dev_dependency: false,
                 allow_yanked_versions_env: None,
                 allow_yanked_versions_flags: Vec::new(),
                 hidden_lockfile_path: Some(PathBuf::from("/tmp/hidden/MODULE.bazel.lock")),

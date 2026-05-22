@@ -104,10 +104,9 @@ Observed SDK result at the checkpoint:
   replay guardrails pass for this transitional digest behavior.
 - Root `bazel_dep(..., dev_dependency = True)` now participates in normal
   resolution by default for both local overrides and registry-backed modules,
-  matching Bazel's default `--ignore_dev_dependency=false` behavior. Local
-  Bazel 9.1.0 evidence showed the same root dev dependency builds by default
-  and disappears with `--ignore_dev_dependency`; Slug still needs explicit
-  support for that flag.
+  and `--ignore_dev_dependency` removes those root dev dependencies from the
+  command's bzlmod graph. Local Bazel 9.1.0 evidence showed the same root dev
+  dependency builds by default and disappears with `--ignore_dev_dependency`.
 
 ## Consolidated Learnings
 
@@ -157,8 +156,8 @@ What did not work or remains risky:
   replay-pure dependency model.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, `use_repo_rule(dev_dependency)`,
-  `--ignore_dev_dependency`, registry selection on overrides, and command
-  policy around non-root dev dependencies.
+  registry selection on overrides, and remaining command policy around non-root
+  dev dependencies.
 - Registry and repository cache behavior is still a blend of DICE identity,
   lockfile checksums, and filesystem markers. It is better than the old path,
   but it is not yet a complete `RepoSpecFunction` /
@@ -293,8 +292,9 @@ using Rust DICE keys and values:
      `single_version_override(registry/patches)`,
      `multiple_version_override(registry)`, `archive_override`, `git_override`,
      `override_repo`, `inject_repo`, `isolate`, and `bazel_compatibility`.
-   - Preserve root `bazel_dep(dev_dependency=True)` default inclusion while
-     adding explicit `--ignore_dev_dependency` command-policy support.
+   - Preserve root `bazel_dep(dev_dependency=True)` default inclusion and
+     `--ignore_dev_dependency` exclusion while moving command policy out of the
+     transitional resolver.
    - Add negative tests where Bazel 9 fails.
 
 7. Make repository execution replay-correct.

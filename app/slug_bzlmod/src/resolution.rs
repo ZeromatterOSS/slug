@@ -429,6 +429,8 @@ pub struct MvsResolver {
     allowed_yanked_versions: AllowedYankedVersions,
     /// Lockfile mode controls whether mutable yanked metadata is refreshed.
     lockfile_mode: LockfileMode,
+    /// Whether root-module dev dependencies should be ignored for this command.
+    ignore_dev_dependency: bool,
     /// Registry file hashes read from the current visible lockfile.
     known_registry_file_hashes: IndexMap<String, String>,
     /// Selected yanked versions read from the current visible lockfile.
@@ -459,6 +461,7 @@ impl MvsResolver {
             registry_file_hashes: IndexMap::new(),
             allowed_yanked_versions: AllowedYankedVersions::default(),
             lockfile_mode: LockfileMode::default(),
+            ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
         })
@@ -480,6 +483,7 @@ impl MvsResolver {
             registry_file_hashes: IndexMap::new(),
             allowed_yanked_versions: AllowedYankedVersions::default(),
             lockfile_mode: LockfileMode::default(),
+            ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
         })
@@ -497,6 +501,11 @@ impl MvsResolver {
         self.lockfile_mode = lockfile_mode;
         self.known_registry_file_hashes = known_registry_file_hashes;
         self.previously_selected_yanked_versions = previously_selected_yanked_versions;
+    }
+
+    /// Configure Bazel's command-level dev-dependency policy.
+    pub fn set_ignore_dev_dependency(&mut self, ignore_dev_dependency: bool) {
+        self.ignore_dev_dependency = ignore_dev_dependency;
     }
 
     /// Process overrides from the root module.
@@ -558,6 +567,7 @@ impl MvsResolver {
         let override_modules: Vec<_> = root
             .bazel_deps
             .iter()
+            .filter(|dep| !(self.ignore_dev_dependency && dep.dev_dependency))
             .filter_map(|dep| {
                 self.has_non_registry_override(&dep.name, &root.overrides)
                     .cloned()
@@ -605,6 +615,10 @@ impl MvsResolver {
 
         // Add root's direct dependencies to queue
         for dep in &root.bazel_deps {
+            if self.ignore_dev_dependency && dep.dev_dependency {
+                continue;
+            }
+
             // Skip if we already resolved an override for this module
             if self.overridden_modules.contains_key(&dep.name) {
                 continue;
