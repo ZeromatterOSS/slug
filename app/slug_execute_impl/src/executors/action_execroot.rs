@@ -38,6 +38,7 @@ use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 pub(crate) struct ActionExecrootPlan {
     top_level_prefixes: BTreeSet<String>,
     external_repos: BTreeSet<String>,
+    external_paths: BTreeSet<String>,
     buck_out_inputs: BTreeSet<String>,
     buck_out_writable_dirs: BTreeSet<String>,
     buck_out_declared_outputs: BTreeSet<String>,
@@ -60,6 +61,7 @@ pub(crate) fn collect_execroot_plan(
         buck_out_writable_dirs: BTreeSet::new(),
         buck_out_declared_outputs: BTreeSet::new(),
         external_repos: BTreeSet::new(),
+        external_paths: BTreeSet::new(),
     };
 
     let inputs_iter = request.inputs().iter().chain(
@@ -177,7 +179,11 @@ fn add_execroot_path(plan: &mut ActionExecrootPlan, path: &str, writable_dir: bo
             plan.buck_out_inputs.insert(buck_out_rel.to_owned());
         }
     } else if let Some(external_rel) = strip_external_prefix(path) {
-        if let Some(repo) = top_level_component(external_rel) {
+        if let Some((repo, rest)) = external_rel.split_once('/') {
+            if !repo.is_empty() && !rest.is_empty() {
+                plan.external_paths.insert(external_rel.to_owned());
+            }
+        } else if let Some(repo) = top_level_component(external_rel) {
             plan.external_repos.insert(repo.to_owned());
         } else {
             plan.top_level_prefixes.insert("external".to_owned());
@@ -262,6 +268,11 @@ fn digest_plan(plan: &ActionExecrootPlan) -> String {
         repo.hash(&mut hasher);
         0u8.hash(&mut hasher);
     }
+    "external-paths".hash(&mut hasher);
+    for path in &plan.external_paths {
+        path.hash(&mut hasher);
+        0u8.hash(&mut hasher);
+    }
     "buck-out-inputs".hash(&mut hasher);
     for path in &plan.buck_out_inputs {
         path.hash(&mut hasher);
@@ -305,12 +316,16 @@ pub(crate) fn ensure_execroot(
 ) -> Option<AbsNormPathBuf> {
     if plan.top_level_prefixes.is_empty()
         && plan.external_repos.is_empty()
+        && plan.external_paths.is_empty()
         && plan.buck_out_inputs.is_empty()
         && plan.buck_out_writable_dirs.is_empty()
     {
         return None;
     }
-    if !plan.external_repos.is_empty() || plan.top_level_prefixes.contains("external") {
+    if !plan.external_repos.is_empty()
+        || !plan.external_paths.is_empty()
+        || plan.top_level_prefixes.contains("external")
+    {
         slug_core::cells::repair_external_symlink_targets(project_root.as_path());
     }
 
@@ -354,7 +369,13 @@ pub(crate) fn ensure_execroot(
                 .filter_map(|entry| entry.ok())
                 .filter_map(|entry| entry.file_name().into_string().ok())
                 .collect();
-            if !materialize_external_prefix(project_root.as_path(), &target, &link, &repos) {
+            if !materialize_external_prefix(
+                project_root.as_path(),
+                &target,
+                &link,
+                &repos,
+                &BTreeSet::new(),
+            ) {
                 return None;
             }
             continue;
@@ -388,7 +409,7 @@ pub(crate) fn ensure_execroot(
         }
     }
 
-    if !plan.external_repos.is_empty() {
+    if !plan.external_repos.is_empty() || !plan.external_paths.is_empty() {
         let project_external = project_root.as_path().join("external");
         let execroot_external = execroot_abs.join("external");
         if !materialize_external_prefix(
@@ -396,6 +417,7 @@ pub(crate) fn ensure_execroot(
             &project_external,
             &execroot_external,
             &plan.external_repos,
+            &plan.external_paths,
         ) {
             return None;
         }
@@ -518,6 +540,7 @@ fn materialize_external_prefix(
     project_external: &std::path::Path,
     execroot_external: &std::path::Path,
     repos: &BTreeSet<String>,
+    paths: &BTreeSet<String>,
 ) -> bool {
     match execroot_external.symlink_metadata() {
         Ok(meta) if meta.file_type().is_symlink() => {
@@ -550,6 +573,22 @@ fn materialize_external_prefix(
             return false;
         }
         if !link_external_aliases_for_target(project_external, execroot_external, &target) {
+            return false;
+        }
+    }
+
+    for path in paths {
+        let Some((repo, rel)) = path.split_once('/') else {
+            continue;
+        };
+        let Some(target) = external_repo_target(project_root, project_external, repo) else {
+            continue;
+        };
+        if !link_external_path(execroot_external, repo, rel, &target) {
+            return false;
+        }
+        if !link_external_alias_paths_for_target(project_external, execroot_external, &target, rel)
+        {
             return false;
         }
     }
@@ -605,6 +644,100 @@ fn link_external_aliases_for_target(
         }
     }
 
+    true
+}
+
+fn link_external_alias_paths_for_target(
+    project_external: &std::path::Path,
+    execroot_external: &std::path::Path,
+    selected_target: &std::path::Path,
+    rel: &str,
+) -> bool {
+    let entries = match std::fs::read_dir(project_external) {
+        Ok(entries) => entries,
+        Err(e) => {
+            tracing::debug!(
+                ?e,
+                path = %project_external.display(),
+                "failed to read project external aliases"
+            );
+            return false;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let target = canonical_external_entry_target(project_external, &entry.path())
+            .unwrap_or_else(|| entry.path());
+        if target != selected_target {
+            continue;
+        }
+        let Some(name) = entry.file_name().to_str().map(ToOwned::to_owned) else {
+            continue;
+        };
+        if !link_external_path(execroot_external, &name, rel, selected_target) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn link_external_path(
+    execroot_external: &std::path::Path,
+    repo: &str,
+    rel: &str,
+    repo_target: &std::path::Path,
+) -> bool {
+    let target = repo_target.join(rel);
+    if !target.exists() {
+        return true;
+    }
+
+    let link = execroot_external.join(repo).join(rel);
+    let Some(parent) = link.parent() else {
+        return false;
+    };
+    if !ensure_directory_path(parent) {
+        return false;
+    }
+    match link.symlink_metadata() {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            let current = std::fs::read_link(&link).ok();
+            if current.as_deref() == Some(&target) {
+                return true;
+            }
+            if !remove_symlink_path(&link) {
+                tracing::debug!(
+                    link = %link.display(),
+                    target = %target.display(),
+                    "failed to remove stale execroot external file symlink"
+                );
+                return false;
+            }
+        }
+        Ok(_) => return true,
+        Err(_) => {}
+    }
+
+    #[cfg(unix)]
+    let r = std::os::unix::fs::symlink(&target, &link);
+    #[cfg(windows)]
+    let r = if target.is_dir() {
+        std::os::windows::fs::symlink_dir(&target, &link)
+    } else {
+        std::os::windows::fs::symlink_file(&target, &link)
+    };
+    if let Err(e) = r {
+        if e.kind() != std::io::ErrorKind::AlreadyExists {
+            tracing::debug!(
+                ?e,
+                link = %link.display(),
+                target = %target.display(),
+                "failed to populate execroot external file symlink"
+            );
+            return false;
+        }
+    }
     true
 }
 
@@ -752,6 +885,21 @@ mod tests {
     }
 
     #[test]
+    fn digest_changes_with_external_paths() {
+        let mut a = ActionExecrootPlan::default();
+        a.external_paths
+            .insert("llvm++musl+musl_libc/include/float.h".to_owned());
+
+        let mut b = ActionExecrootPlan::default();
+        b.external_paths
+            .insert("llvm++musl+musl_libc/include/float.h".to_owned());
+        b.external_paths
+            .insert("llvm++musl+musl_libc/arch/x86_64/bits/float.h".to_owned());
+
+        assert_ne!(digest_plan(&a), digest_plan(&b));
+    }
+
+    #[test]
     fn execroot_uses_workspace_layout() {
         reset_cache_for_test();
         let tmp = tempfile::tempdir().unwrap();
@@ -888,7 +1036,7 @@ mod tests {
     }
 
     #[test]
-    fn external_paths_track_only_referenced_repos() {
+    fn external_paths_track_only_referenced_files() {
         let mut plan = ActionExecrootPlan::default();
 
         add_execroot_path(
@@ -906,10 +1054,13 @@ mod tests {
         assert!(plan.top_level_prefixes.contains("lib"));
         assert!(!plan.top_level_prefixes.contains("external"));
         assert!(
-            plan.external_repos
-                .contains("rules_rs++crate+crates__serde-1.0.228")
+            plan.external_paths
+                .contains("rules_rs++crate+crates__serde-1.0.228/src/lib.rs")
         );
-        assert!(plan.external_repos.contains("crates__proc-macro2-1.0.106"));
+        assert!(
+            plan.external_paths
+                .contains("crates__proc-macro2-1.0.106/src/lib.rs")
+        );
     }
 
     #[test]
@@ -924,8 +1075,8 @@ mod tests {
         add_execroot_paths_from_command_arg(&mut plan, "'@buck-out/plan61/tmp/params'");
 
         assert!(
-            plan.external_repos
-                .contains("rules_rs++crate+crates__serde_core-1.0.228")
+            plan.external_paths
+                .contains("rules_rs++crate+crates__serde_core-1.0.228/cargo_toml_env_vars.env")
         );
         assert!(plan.buck_out_inputs.contains("plan61/gen/repo/out"));
         assert!(plan.buck_out_inputs.contains("plan61/tmp/params"));
@@ -1047,6 +1198,128 @@ mod tests {
             !exec
                 .as_path()
                 .join("external/crates__unreferenced-1.0.0")
+                .exists()
+        );
+    }
+
+    #[test]
+    fn ensure_execroot_materializes_external_file_paths_with_real_directories() {
+        reset_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path();
+        let external = project.join("external");
+        let repo = project.join("repos").join("diplomat");
+        std::fs::create_dir_all(&external).unwrap();
+        std::fs::create_dir_all(repo.join("tool/src/js")).unwrap();
+        std::fs::create_dir_all(repo.join("tool/templates/js")).unwrap();
+        std::fs::write(repo.join("tool/src/js/gen.rs"), b"source").unwrap();
+        std::fs::write(repo.join("tool/templates/js/base.js.jinja"), b"template").unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&repo, external.join("rules_rs++crate+crates__diplomat.git"))
+            .unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(
+            &repo,
+            external.join("rules_rs++crate+crates__diplomat.git"),
+        )
+        .unwrap();
+
+        let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
+        let mut plan = ActionExecrootPlan::default();
+        plan.external_paths
+            .insert("rules_rs++crate+crates__diplomat.git/tool/src/js/gen.rs".to_owned());
+        plan.external_paths.insert(
+            "rules_rs++crate+crates__diplomat.git/tool/templates/js/base.js.jinja".to_owned(),
+        );
+
+        let exec = ensure_execroot(&project_norm, &plan).unwrap();
+        let exec_repo = exec
+            .as_path()
+            .join("external/rules_rs++crate+crates__diplomat.git");
+        assert!(
+            exec_repo.is_dir(),
+            "external repo parent should be a real execroot directory"
+        );
+        assert!(
+            !exec_repo
+                .symlink_metadata()
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "external repo parent must not be a symlink when nested paths are declared"
+        );
+        assert!(exec_repo.join("tool/src/js/gen.rs").exists());
+        assert!(exec_repo.join("tool/templates/js/base.js.jinja").exists());
+        assert!(
+            exec
+                .as_path()
+                .join(
+                    "external/rules_rs++crate+crates__diplomat.git/tool/src/js/../../templates/js/base.js.jinja"
+                )
+                .exists(),
+            "`..` through declared external source paths should stay inside the execroot"
+        );
+    }
+
+    #[test]
+    fn ensure_execroot_cache_distinguishes_external_path_sets() {
+        reset_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path();
+        let external = project.join("external");
+        let repo = project.join("repos").join("musl");
+        std::fs::create_dir_all(&external).unwrap();
+        std::fs::create_dir_all(repo.join("include")).unwrap();
+        std::fs::create_dir_all(repo.join("arch/x86_64/bits")).unwrap();
+        std::fs::write(repo.join("include/float.h"), b"#include <bits/float.h>\n").unwrap();
+        std::fs::write(repo.join("arch/x86_64/bits/float.h"), b"bits").unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&repo, external.join("llvm++musl+musl_libc")).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&repo, external.join("llvm++musl+musl_libc")).unwrap();
+
+        let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
+        let mut include_only = ActionExecrootPlan::default();
+        include_only
+            .external_paths
+            .insert("llvm++musl+musl_libc/include/float.h".to_owned());
+
+        let include_exec = ensure_execroot(&project_norm, &include_only).unwrap();
+        assert!(
+            include_exec
+                .as_path()
+                .join("external/llvm++musl+musl_libc/include/float.h")
+                .exists()
+        );
+        assert!(
+            !include_exec
+                .as_path()
+                .join("external/llvm++musl+musl_libc/arch/x86_64/bits/float.h")
+                .exists()
+        );
+
+        let mut include_and_arch = ActionExecrootPlan::default();
+        include_and_arch
+            .external_paths
+            .insert("llvm++musl+musl_libc/include/float.h".to_owned());
+        include_and_arch
+            .external_paths
+            .insert("llvm++musl+musl_libc/arch/x86_64/bits/float.h".to_owned());
+
+        let arch_exec = ensure_execroot(&project_norm, &include_and_arch).unwrap();
+        assert_ne!(include_exec, arch_exec);
+        assert!(
+            arch_exec
+                .as_path()
+                .join("external/llvm++musl+musl_libc/include/float.h")
+                .exists()
+        );
+        assert!(
+            arch_exec
+                .as_path()
+                .join("external/llvm++musl+musl_libc/arch/x86_64/bits/float.h")
                 .exists()
         );
     }

@@ -5107,6 +5107,58 @@ Current frontier, `diplomat-tool` compile-data inputs:
   isolation. The fix must make Slug's declared action inputs match Bazel's
   action-input behavior for this rules_rust class.
 
+Implementation slice 2026-05-22, nested external action inputs:
+
+- Ground truth:
+  Bazel 9.0.1 aquery declares the `diplomat-tool` Askama templates as Rustc
+  inputs, and rules_rs passes `compile_data = native.glob(["**"])` through to
+  rules_rust. For the next C frontier, Bazel aquery for
+  `mnemonic("CppCompile", @@llvm++llvm_source+compiler-rt//:builtins)` on
+  `//bazel/platforms:linux-musl` declares both
+  `external/llvm++musl+musl_libc/include/float.h` and
+  `external/llvm++musl+musl_libc/arch/x86_64/bits/float.h` as action inputs.
+  The checked logs are
+  `/tmp/slug-plan61/bazel-aquery-diplomat-tool-templates-20260522-061013.txt`
+  and
+  `/tmp/slug-plan61/bazel-aquery-compiler-rt-builtins-inputs-20260522-133006.txt`.
+- Reflection:
+  the missing semantic was not hardlink behavior and not a target-specific
+  Rust workaround. Bazel's action input tree lets a nested external input path
+  such as `external/<repo>/tool/src/js/...` stay inside the action execroot when
+  code uses `..` from that declared source path. Slug's per-action execroot was
+  linking `external/<repo>` as a symlink to the project-level external repo, so
+  `..` traversal escaped into `bazel-external`. After adding nested external
+  path materialization, the next failure exposed a cache bug: the execroot
+  digest did not include the new `external_paths` set, so an action needing
+  `arch/x86_64/bits/float.h` could reuse an earlier execroot that only linked
+  `include/float.h`.
+- Fix:
+  `app/slug_execute_impl/src/executors/action_execroot.rs` now records nested
+  external paths separately from whole external repos, materializes real parent
+  directories under `external/<repo>` and symlinks only the declared leaf
+  path, mirrors matching apparent aliases for the same repository target, and
+  includes `external_paths` in the per-action execroot digest/cache key.
+- Validation:
+  `cargo test -p slug_execute_impl ensure_execroot -- --nocapture`,
+  `cargo test -p slug_execute_impl action_execroot -- --nocapture`, `cargo
+  build -p slug`, and `git diff --check` passed. New regressions cover
+  `..` traversal through declared external source paths and cache separation
+  between `include/float.h` and `arch/x86_64/bits/float.h` input sets.
+- Smoke:
+  a fresh focused Slug build of
+  `@@llvm++llvm_source+compiler-rt//:builtins` on
+  `//bazel/platforms:linux-musl`
+  (`/tmp/slug-plan61/plan61-builtins-external-path-digest-20260522-133341.log`)
+  moved past the previous `bits/float.h` missing-header failure and entered
+  the compiler-rt C compile fanout. It timed out after 15 minutes while slowly
+  draining the action set rather than failing on missing inputs. Generated
+  state stayed bounded at about `102M` `buck-out`, `227M` `execroot`, and 16
+  first-level staged execroot digests.
+- Next frontier:
+  investigate the compiler-rt action throughput stall systemically. The likely
+  owner is action execution/materialization scheduling or overly expensive
+  per-action input setup for large C compile sets, not missing musl headers.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
