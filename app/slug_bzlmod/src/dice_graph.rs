@@ -770,12 +770,94 @@ pub struct ExtensionRepoExecutionIdentity {
     pub repo_replay_inputs_digest: Arc<str>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "RepoMaterializationManifestKey({}, {}, {})",
+    workspace_id.stable_hash(),
+    canonical_repo,
+    repo_spec_digest
+)]
 pub struct RepoMaterializationManifestKey {
     pub workspace_id: WorkspaceId,
     pub output_base: Arc<PathBuf>,
     pub canonical_repo: Arc<str>,
     pub repo_spec_digest: Arc<str>,
+}
+
+impl RepoMaterializationManifestKey {
+    pub fn for_project_root(
+        project_root: PathBuf,
+        canonical_repo: &str,
+        repo_spec_digest: &str,
+    ) -> Self {
+        let workspace_id = WorkspaceId::for_project_root(project_root);
+        Self {
+            output_base: workspace_id.output_base.clone(),
+            workspace_id,
+            canonical_repo: Arc::from(canonical_repo),
+            repo_spec_digest: Arc::from(repo_spec_digest),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+pub struct RepoMaterializationManifestValue {
+    pub key: RepoMaterializationManifestKey,
+    pub repo_dir: Arc<PathBuf>,
+    pub marker_state: Arc<str>,
+    pub layout_state: Arc<str>,
+    pub recorded_inputs_state: Arc<str>,
+    pub digest: Arc<str>,
+}
+
+impl RepoMaterializationManifestValue {
+    pub fn new(
+        key: RepoMaterializationManifestKey,
+        repo_dir: PathBuf,
+        marker_state: String,
+        layout_state: String,
+        recorded_inputs_state: String,
+    ) -> Self {
+        let digest = repo_materialization_manifest_digest(
+            &key,
+            &marker_state,
+            &layout_state,
+            &recorded_inputs_state,
+        );
+        Self {
+            key,
+            repo_dir: Arc::new(repo_dir),
+            marker_state: Arc::from(marker_state.as_str()),
+            layout_state: Arc::from(layout_state.as_str()),
+            recorded_inputs_state: Arc::from(recorded_inputs_state.as_str()),
+            digest: Arc::from(digest.as_str()),
+        }
+    }
+
+    pub fn state_summary(&self) -> String {
+        format!(
+            "{};{};{}",
+            self.marker_state, self.layout_state, self.recorded_inputs_state
+        )
+    }
+}
+
+fn repo_materialization_manifest_digest(
+    key: &RepoMaterializationManifestKey,
+    marker_state: &str,
+    layout_state: &str,
+    recorded_inputs_state: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"repo-materialization-manifest-v1");
+    hasher.update([0]);
+    update_digest_str(&mut hasher, key.workspace_id.stable_hash());
+    update_digest_str(&mut hasher, &key.canonical_repo);
+    update_digest_str(&mut hasher, &key.repo_spec_digest);
+    update_digest_str(&mut hasher, marker_state);
+    update_digest_str(&mut hasher, layout_state);
+    update_digest_str(&mut hasher, recorded_inputs_state);
+    hex::encode(hasher.finalize())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]

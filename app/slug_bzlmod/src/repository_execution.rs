@@ -45,6 +45,8 @@ use dice::Key;
 use dupe::Dupe;
 
 use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::RepoMaterializationManifestKey;
+use crate::dice_graph::RepoMaterializationManifestValue;
 use crate::dice_graph::record_bzlmod_event;
 use crate::lockfile::compute_sha256_hex;
 use crate::lockfile::validate_recorded_inputs_current;
@@ -231,12 +233,12 @@ pub struct ExtensionRepoExecutionKey {
     /// Repositories are created under {project_root}/bazel-external/{canonical_name}/
     pub project_root: Arc<PathBuf>,
 
-    /// Lightweight pre-materialization disk state for marker/layout reuse.
+    /// DICE-shaped pre-materialization manifest for marker/layout reuse.
     ///
     /// This mirrors Bazel's repository marker-file pruning model: key the
     /// fetch on marker contents and cheap layout checks, not a full tree walk
     /// of every external repo on access.
-    pub materialized_state: Arc<str>,
+    pub materialization_manifest: Arc<RepoMaterializationManifestValue>,
 }
 
 impl std::hash::Hash for ExtensionRepoExecutionKey {
@@ -246,7 +248,7 @@ impl std::hash::Hash for ExtensionRepoExecutionKey {
         self.extension_id.hash(state);
         self.spec_hash.hash(state);
         self.project_root.hash(state);
-        self.materialized_state.hash(state);
+        self.materialization_manifest.hash(state);
     }
 }
 
@@ -257,7 +259,7 @@ impl PartialEq for ExtensionRepoExecutionKey {
             && self.extension_id == other.extension_id
             && self.spec_hash == other.spec_hash
             && self.project_root == other.project_root
-            && self.materialized_state == other.materialized_state
+            && self.materialization_manifest == other.materialization_manifest
     }
 }
 
@@ -272,7 +274,7 @@ impl ExtensionRepoExecutionKey {
         project_root: PathBuf,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
-        let materialized_state = materialized_repo_state(
+        let materialization_manifest = repo_materialization_manifest(
             canonical_name.as_str(),
             &repo_spec,
             &project_root,
@@ -284,7 +286,7 @@ impl ExtensionRepoExecutionKey {
             spec_hash: Arc::from(spec_hash.as_str()),
             repo_spec: Arc::new(repo_spec),
             project_root: Arc::new(project_root),
-            materialized_state: Arc::from(materialized_state.as_str()),
+            materialization_manifest: Arc::new(materialization_manifest),
         }
     }
 
@@ -296,7 +298,7 @@ impl ExtensionRepoExecutionKey {
         project_root: Arc<PathBuf>,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
-        let materialized_state = materialized_repo_state(
+        let materialization_manifest = repo_materialization_manifest(
             canonical_name.as_ref(),
             repo_spec.as_ref(),
             project_root.as_ref(),
@@ -308,7 +310,7 @@ impl ExtensionRepoExecutionKey {
             spec_hash: Arc::from(spec_hash.as_str()),
             repo_spec,
             project_root,
-            materialized_state: Arc::from(materialized_state.as_str()),
+            materialization_manifest: Arc::new(materialization_manifest),
         }
     }
 
@@ -409,12 +411,12 @@ fn write_repository_recorded_inputs(repo_dir: &Path, inputs: &[String]) -> slug_
     Ok(())
 }
 
-fn materialized_repo_state(
+pub fn repo_materialization_manifest(
     canonical_name: &str,
     repo_spec: &RepoSpec,
     project_root: &PathBuf,
     spec_hash: &str,
-) -> String {
+) -> RepoMaterializationManifestValue {
     let repo_dir = project_root.join("bazel-external").join(canonical_name);
     let marker_path = repo_dir.join(".slug_repo_complete");
     let marker_state = if repo_spec.local {
@@ -450,7 +452,17 @@ fn materialized_repo_state(
     };
     let recorded_inputs_state = repository_recorded_inputs_state(&repo_dir);
 
-    format!("{marker_state};{layout_state};{recorded_inputs_state}")
+    RepoMaterializationManifestValue::new(
+        RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            spec_hash,
+        ),
+        repo_dir,
+        marker_state,
+        layout_state,
+        recorded_inputs_state,
+    )
 }
 
 #[async_trait]
@@ -477,20 +489,19 @@ impl Key for ExtensionRepoExecutionKey {
             .join("bazel-external")
             .join(self.canonical_name.as_ref());
 
-        let marker_path = working_dir.join(".slug_repo_complete");
-        let marker_contents = marker_path
-            .exists()
-            .then(|| std::fs::read_to_string(&marker_path).ok())
-            .flatten();
-        let marker_matches = !self.repo_spec.local
-            && marker_contents
-                .as_deref()
-                .is_some_and(|marker| complete_marker_matches(marker, &self.spec_hash));
-        let layout_valid = crate::repository_executor::repo_layout_is_valid_for_invocation(
-            &invocation,
-            &working_dir,
+        let manifest = repo_materialization_manifest(
+            self.canonical_name.as_ref(),
+            self.repo_spec.as_ref(),
+            self.project_root.as_ref(),
+            &self.spec_hash,
         );
-        let recorded_inputs_current = repository_recorded_inputs_current(&working_dir);
+        let marker_path = working_dir.join(".slug_repo_complete");
+        let marker_matches =
+            !self.repo_spec.local && manifest.marker_state.starts_with("marker:complete:");
+        let layout_valid = manifest.layout_state.as_ref() == "layout-valid";
+        let recorded_inputs_current = !manifest
+            .recorded_inputs_state
+            .starts_with("inputs-invalid:");
         if marker_matches && layout_valid && recorded_inputs_current {
             record_bzlmod_event(
                 BzlmodEventKind::RepoMaterializationHit,
@@ -508,9 +519,9 @@ impl Key for ExtensionRepoExecutionKey {
             "recorded_inputs_changed"
         } else if marker_matches && !layout_valid {
             "marker_layout_invalid"
-        } else if marker_contents.is_some() {
+        } else if manifest.marker_state.starts_with("marker-mismatch:") {
             "marker_digest_mismatch"
-        } else if marker_path.exists() {
+        } else if manifest.marker_state.starts_with("marker-unreadable:") || marker_path.exists() {
             "marker_unreadable"
         } else {
             "marker_absent"
@@ -655,8 +666,9 @@ impl Key for ExtensionRepoExecutionKey {
 
     fn validity(x: &Self::Value) -> bool {
         // Don't cache errors - retry on next request. Successful values are
-        // keyed by `materialized_state`, so marker/layout corruption creates a
-        // different key while same-transaction materialization stays deduped.
+        // keyed by `materialization_manifest`, so marker/layout corruption
+        // creates a different key while same-transaction materialization stays
+        // deduped.
         x.is_ok()
     }
 }
@@ -1045,7 +1057,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extension_repo_key_hash_includes_materialized_state() {
+    fn test_extension_repo_key_hash_includes_materialization_manifest() {
         let temp = tempfile::TempDir::new().unwrap();
         let project_root = temp.path().to_path_buf();
         let source_dir = project_root.join("repo_src");
@@ -1108,7 +1120,14 @@ mod tests {
             project_root,
         );
 
-        assert_ne!(valid.materialized_state, corrupt.materialized_state);
+        assert_ne!(
+            valid.materialization_manifest.digest,
+            corrupt.materialization_manifest.digest
+        );
+        assert_ne!(
+            valid.materialization_manifest.state_summary(),
+            corrupt.materialization_manifest.state_summary()
+        );
         assert_ne!(valid, corrupt);
     }
 
@@ -1158,12 +1177,15 @@ mod tests {
             project_root,
         );
 
-        assert_eq!(valid.materialized_state, corrupt.materialized_state);
+        assert_eq!(
+            valid.materialization_manifest.digest,
+            corrupt.materialization_manifest.digest
+        );
         assert_eq!(valid, corrupt);
     }
 
     #[test]
-    fn test_recorded_input_manifest_changes_materialized_state() {
+    fn test_recorded_input_manifest_changes_materialization_manifest() {
         let temp = tempfile::TempDir::new().unwrap();
         let project_root = temp.path().to_path_buf();
         let watched = project_root.join("watched.txt");
@@ -1217,11 +1239,15 @@ mod tests {
             project_root,
         );
 
-        assert_ne!(valid.materialized_state, stale.materialized_state);
+        assert_ne!(
+            valid.materialization_manifest.digest,
+            stale.materialization_manifest.digest
+        );
         assert_ne!(valid, stale);
         assert!(
             stale
-                .materialized_state
+                .materialization_manifest
+                .recorded_inputs_state
                 .contains("inputs-invalid:recorded_input_changed")
         );
     }

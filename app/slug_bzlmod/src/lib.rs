@@ -95,6 +95,7 @@ pub use dice_graph::RegisteredToolchainsValue;
 pub use dice_graph::RepoMappingKey;
 pub use dice_graph::RepoMappingScope;
 pub use dice_graph::RepoMaterializationManifestKey;
+pub use dice_graph::RepoMaterializationManifestValue;
 pub use dice_graph::RepoOriginKind;
 pub use dice_graph::ResolvedModuleIdentity;
 pub use dice_graph::RootModuleFileKey;

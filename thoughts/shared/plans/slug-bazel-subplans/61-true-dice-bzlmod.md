@@ -192,6 +192,12 @@ Observed SDK result at the checkpoint:
   repository execution. New same-daemon guardrails edit a watched root file and
   a nested file under a watched tree, proving the generated repository is
   re-executed rather than serving stale materialization.
+- Extension repository marker/layout/recorded-input reuse is now represented by
+  a typed `RepoMaterializationManifestValue` derived from
+  `RepoMaterializationManifestKey`, and `ExtensionRepoExecutionKey` hashes that
+  manifest value instead of an anonymous materialized-state string. This keeps
+  the existing bounded marker/layout behavior while naming the current
+  materialized tree identity as the next DICE-owned migration surface.
 
 ## Consolidated Learnings
 
