@@ -145,6 +145,11 @@ Observed SDK result at the checkpoint:
   the repository execution key directly. Focused spoke-materialization tests,
   affected-crate checks, `cargo build -p slug`, and the full 50-test Plan 61
   guardrail target passed after the change.
+- `use_repo_rule()` materialization is no longer replayed as a legacy
+  resolution side effect. The existing precomputed `RepoSpec` extension-cell
+  path now owns both builtin and Starlark repo-rule invocations, so repository
+  contents are materialized through the DICE repository execution path when the
+  generated repo is accessed.
 
 ## Consolidated Learnings
 
@@ -194,6 +199,9 @@ What did not work or remains risky:
   registry, but generated repo cells and dynamic alias registration still flow
   through transitional runtime cell-registration plumbing rather than a final
   DICE-owned cell graph.
+- `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
+  the generated repo cell graph that exposes those `RepoSpec`s is still
+  assembled by the transitional legacy cell parser.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
   remaining command policy around non-root dev dependencies.

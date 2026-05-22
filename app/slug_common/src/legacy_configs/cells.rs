@@ -36,7 +36,6 @@ use slug_bzlmod::parse_module_bazel;
 use slug_bzlmod::record_bzlmod_event;
 use slug_bzlmod::resolve_local_modules;
 use slug_bzlmod::types::ParsedModuleFile;
-use slug_bzlmod::types::TagValue;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::CellResolver;
 use slug_core::cells::alias::NonEmptyCellAlias;
@@ -408,7 +407,6 @@ struct BzlmodResolutionResult {
     lockfile_seeded_cells: Vec<BzlmodPendingRepoCell>,
     scoped_repo_aliases: Vec<BzlmodScopedRepoAlias>,
     dynamic_extension_aliases: Vec<BzlmodDynamicAlias>,
-    eager_repo_rule_invocations: Vec<slug_bzlmod::RepositoryInvocation>,
     /// DICE-injected bzlmod facts derived from this resolution.
     session_data: slug_bzlmod::BzlmodSessionData,
 }
@@ -544,20 +542,6 @@ impl BzlmodResolutionResult {
                 alias.apparent_name.clone(),
                 alias.canonical_name.clone(),
             );
-        }
-
-        for invocation in &self.eager_repo_rule_invocations {
-            match slug_bzlmod::execute_repository_rule(invocation, project_root.root().as_path()) {
-                Ok(_) => tracing::debug!(
-                    "Replayed MODULE.bazel repo rule materialization for '{}'",
-                    invocation.name
-                ),
-                Err(e) => tracing::warn!(
-                    "Failed to replay MODULE.bazel repo rule materialization for '{}': {}",
-                    invocation.name,
-                    e
-                ),
-            }
         }
 
         let cell_pairs: Vec<(String, String)> = self
@@ -1857,7 +1841,6 @@ impl BuckConfigBasedCells {
         let mut lockfile_seeded_cells = Vec::new();
         let mut scoped_repo_aliases = Vec::new();
         let dynamic_extension_aliases = Vec::new();
-        let mut eager_repo_rule_invocations = Vec::new();
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::default();
@@ -2604,136 +2587,6 @@ impl BuckConfigBasedCells {
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);
 
-        // Process use_repo_rule() invocations from MODULE.bazel files.
-        // These are direct repo rule calls like http_file(name="toml2json_linux_amd64", ...).
-        // They need to be materialized eagerly and registered as cells.
-        {
-            let project_root_path = project_root.root().to_path_buf();
-            for (_module_name, parsed_mod) in &parsed_modules {
-                let module_name = if parsed_mod.module.name.is_empty() {
-                    "_main"
-                } else {
-                    &parsed_mod.module.name
-                };
-                tracing::info!(
-                    "Module '{}' has {} repo_rule_invocations",
-                    module_name,
-                    parsed_mod.repo_rule_invocations.len()
-                );
-                let is_root = module_name == root_module_name
-                    || module_name == "_main"
-                    || parsed_mod.module.name == root_module_name;
-                for invocation in &parsed_mod.repo_rule_invocations {
-                    if invocation.dev_dependency && (!is_root || options.ignore_dev_dependency) {
-                        tracing::debug!(
-                            "Skipping dev_dependency repo rule '{}' from module '{}'",
-                            invocation.name,
-                            module_name
-                        );
-                        continue;
-                    }
-                    if ext_cells
-                        .iter()
-                        .any(|(_, _, setup)| setup.internal_name.as_ref() == invocation.name)
-                    {
-                        continue;
-                    }
-
-                    let cell_name_str = invocation.name.clone();
-                    let cell_path_str = format!("bazel-external/{}", cell_name_str);
-
-                    // Skip if already registered
-                    if existing_cell_names.contains(cell_name_str.as_str()) {
-                        continue;
-                    }
-
-                    let rule_name = invocation
-                        .rule_source
-                        .split('%')
-                        .last()
-                        .unwrap_or("unknown");
-
-                    // Check if this is a custom Starlark rule (has .bzl source)
-                    let is_custom_rule = !slug_bzlmod::is_builtin_repo_rule(rule_name);
-
-                    if is_custom_rule {
-                        // Register as extension cell for lazy DICE-based Starlark execution.
-                        // In Bazel, use_repo_rule() is syntactic sugar for an implicit extension.
-                        let extension_id = invocation.rule_source.clone();
-                        let mut repo_spec =
-                            slug_bzlmod::RepoSpec::new(invocation.rule_source.clone());
-                        for (k, v) in &invocation.attrs {
-                            repo_spec
-                                .attributes
-                                .insert(k.clone(), tag_value_to_attr_value(v));
-                        }
-                        let spec_hash = repo_spec.compute_hash();
-                        let repo_spec_json = serde_json::to_string(&repo_spec).unwrap_or_default();
-
-                        if let Ok(cell_name) = CellName::unchecked_new(&cell_name_str) {
-                            if let Ok(cell_path) = ProjectRelativePath::new(&cell_path_str)
-                                .map(|p| CellRootPathBuf::new(p.to_owned()))
-                            {
-                                let setup = ExtensionRepoCellSetup {
-                                    canonical_name: Arc::from(cell_name_str.as_str()),
-                                    extension_id: Arc::from(extension_id.as_str()),
-                                    internal_name: Arc::from(cell_name_str.as_str()),
-                                    spec_hash: Arc::from(spec_hash.as_str()),
-                                    repo_spec_json: Arc::from(repo_spec_json.as_str()),
-                                    materialized: false,
-                                };
-                                ext_cells.push((cell_name, cell_path, setup));
-                                tracing::info!(
-                                    "Registered custom repo rule '{}' as extension cell for lazy execution",
-                                    cell_name_str
-                                );
-                            }
-                        }
-                        continue;
-                    }
-
-                    // Convert TagValue attrs to RepositoryInvocation attrs for the executor
-                    let mut inv = slug_bzlmod::RepositoryInvocation::new(
-                        invocation.name.clone(),
-                        rule_name.to_owned(),
-                    );
-                    inv.rule_source = Some(invocation.rule_source.clone());
-                    for (k, v) in &invocation.attrs {
-                        inv.attrs.insert(k.clone(), tag_value_to_repo_attr(v));
-                    }
-
-                    // Materialize the repo
-                    match slug_bzlmod::execute_repository_rule(&inv, &project_root_path) {
-                        Ok(_result) => {
-                            tracing::info!(
-                                "Materialized MODULE.bazel repo '{}' from '{}'",
-                                cell_name_str,
-                                module_name
-                            );
-                            eager_repo_rule_invocations.push(inv);
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to materialize MODULE.bazel repo '{}': {}",
-                                cell_name_str,
-                                e
-                            );
-                            continue;
-                        }
-                    }
-
-                    // Register as a cell
-                    if let Ok(cell_name) = CellName::unchecked_new(&cell_name_str) {
-                        if let Ok(cell_path) = ProjectRelativePath::new(&cell_path_str)
-                            .map(|p| CellRootPathBuf::new(p.to_owned()))
-                        {
-                            cells.push((cell_name, cell_path, None));
-                        }
-                    }
-                }
-            }
-        }
-
         let root_module_name = if parsed.module.name.is_empty() {
             "_main".to_owned()
         } else {
@@ -2749,7 +2602,6 @@ impl BuckConfigBasedCells {
             lockfile_seeded_cells,
             scoped_repo_aliases,
             dynamic_extension_aliases,
-            eager_repo_rule_invocations,
             session_data: bzlmod_session_data,
         }))
     }
@@ -2912,74 +2764,6 @@ fn extract_repo_name_from_label(label: &str) -> Option<String> {
         None
     } else {
         Some(repo.to_owned())
-    }
-}
-
-/// Convert a TagValue to a RepoSpec AttrValue (for extension cell repo specs).
-fn tag_value_to_attr_value(tv: &TagValue) -> slug_bzlmod::repository_invocations::AttrValue {
-    use slug_bzlmod::repository_invocations::AttrValue;
-    match tv {
-        TagValue::String(s) => {
-            if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
-                AttrValue::Label(s.clone())
-            } else {
-                AttrValue::String(s.clone())
-            }
-        }
-        TagValue::Int(i) => AttrValue::Int(*i),
-        TagValue::Bool(b) => AttrValue::Bool(*b),
-        TagValue::None => AttrValue::None,
-        TagValue::Label(s) => AttrValue::Label(s.clone()),
-        TagValue::List(items) => {
-            let strings: Vec<String> = items
-                .iter()
-                .filter_map(|v| match v {
-                    TagValue::String(s) | TagValue::Label(s) => Some(s.clone()),
-                    _ => None,
-                })
-                .collect();
-            AttrValue::StringList(strings)
-        }
-        TagValue::Dict(entries) => {
-            let map: indexmap::IndexMap<String, AttrValue> = entries
-                .iter()
-                .map(|(k, v)| (k.clone(), tag_value_to_attr_value(v)))
-                .collect();
-            AttrValue::Dict(map)
-        }
-    }
-}
-
-fn tag_value_to_repo_attr(tv: &TagValue) -> slug_bzlmod::RepoAttrValue {
-    match tv {
-        TagValue::String(s) => {
-            if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
-                slug_bzlmod::RepoAttrValue::Label(s.clone())
-            } else {
-                slug_bzlmod::RepoAttrValue::String(s.clone())
-            }
-        }
-        TagValue::Int(i) => slug_bzlmod::RepoAttrValue::Int(*i),
-        TagValue::Bool(b) => slug_bzlmod::RepoAttrValue::Bool(*b),
-        TagValue::None => slug_bzlmod::RepoAttrValue::None,
-        TagValue::Label(s) => slug_bzlmod::RepoAttrValue::Label(s.clone()),
-        TagValue::List(items) => {
-            let strings: Vec<String> = items
-                .iter()
-                .filter_map(|v| match v {
-                    TagValue::String(s) | TagValue::Label(s) => Some(s.clone()),
-                    _ => None,
-                })
-                .collect();
-            slug_bzlmod::RepoAttrValue::StringList(strings)
-        }
-        TagValue::Dict(entries) => {
-            let map: indexmap::IndexMap<String, slug_bzlmod::RepoAttrValue> = entries
-                .iter()
-                .map(|(k, v)| (k.clone(), tag_value_to_repo_attr(v)))
-                .collect();
-            slug_bzlmod::RepoAttrValue::Dict(map)
-        }
     }
 }
 
