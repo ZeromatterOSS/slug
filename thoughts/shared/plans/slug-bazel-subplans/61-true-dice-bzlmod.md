@@ -117,7 +117,7 @@ Observed SDK result at the checkpoint:
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
-  skipped.
+  skipped. Focused `slug_common` unit coverage verifies the collection policy.
 
 ## Consolidated Learnings
 

@@ -280,6 +280,49 @@ fn add_scoped_repo_aliases_from_root_overrides(
     }
 }
 
+fn collect_bzlmod_registered_items(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+    ignore_dev_dependency: bool,
+) -> (Vec<slug_bzlmod::RegisteredToolchain>, Vec<String>) {
+    let mut all_toolchains = Vec::new();
+    let mut all_exec_platforms = Vec::new();
+    for (module_name, parsed_mod) in parsed_modules {
+        let is_root = module_name == root_module_name
+            || module_name == "_main"
+            || parsed_mod.module.name == root_module_name;
+        let repo_mapping = slug_bzlmod::BzlmodRepoMapping::for_module(parsed_mod, root_module_name);
+        for item in &parsed_mod.registered_toolchains {
+            if item.dev_dependency && (!is_root || ignore_dev_dependency) {
+                tracing::debug!(
+                    "Skipping dev_dependency toolchain '{}' from module '{}'",
+                    item.label,
+                    module_name
+                );
+                continue;
+            }
+            let label = repo_mapping.canonicalize_label_to_storage_string(&item.label);
+            all_toolchains.push(slug_bzlmod::RegisteredToolchain {
+                module: module_name.clone(),
+                label,
+                is_root,
+            });
+        }
+        for item in &parsed_mod.registered_execution_platforms {
+            if item.dev_dependency && (!is_root || ignore_dev_dependency) {
+                tracing::debug!(
+                    "Skipping dev_dependency execution platform '{}' from module '{}'",
+                    item.label,
+                    module_name
+                );
+                continue;
+            }
+            all_exec_platforms.push(repo_mapping.canonicalize_label_to_storage_string(&item.label));
+        }
+    }
+    (all_toolchains, all_exec_platforms)
+}
+
 /// True iff any toolchain label already references the bundled
 /// `@local_config_python` cell (meaning the user has already wired up
 /// bundled rules_python toolchains and we should skip auto-injection).
@@ -2284,43 +2327,11 @@ impl BuckConfigBasedCells {
         // parsed_modules is already in BFS order (root first from resolution).
         // dev_dependency items from non-root modules are skipped (Bazel 9.0 behavior).
         {
-            let mut all_toolchains: Vec<slug_bzlmod::RegisteredToolchain> = Vec::new();
-            let mut all_exec_platforms = Vec::new();
-            for (module_name, parsed_mod) in &parsed_modules {
-                let is_root = module_name == root_module_name
-                    || module_name == "_main"
-                    || parsed_mod.module.name == root_module_name;
-                let repo_mapping =
-                    slug_bzlmod::BzlmodRepoMapping::for_module(parsed_mod, root_module_name);
-                for item in &parsed_mod.registered_toolchains {
-                    if item.dev_dependency && (!is_root || options.ignore_dev_dependency) {
-                        tracing::debug!(
-                            "Skipping dev_dependency toolchain '{}' from module '{}'",
-                            item.label,
-                            module_name
-                        );
-                        continue;
-                    }
-                    let label = repo_mapping.canonicalize_label_to_storage_string(&item.label);
-                    all_toolchains.push(slug_bzlmod::RegisteredToolchain {
-                        module: module_name.clone(),
-                        label,
-                        is_root,
-                    });
-                }
-                for item in &parsed_mod.registered_execution_platforms {
-                    if item.dev_dependency && (!is_root || options.ignore_dev_dependency) {
-                        tracing::debug!(
-                            "Skipping dev_dependency execution platform '{}' from module '{}'",
-                            item.label,
-                            module_name
-                        );
-                        continue;
-                    }
-                    all_exec_platforms
-                        .push(repo_mapping.canonicalize_label_to_storage_string(&item.label));
-                }
-            }
+            let (mut all_toolchains, all_exec_platforms) = collect_bzlmod_registered_items(
+                &parsed_modules,
+                root_module_name,
+                options.ignore_dev_dependency,
+            );
             // If the module graph depends on rules_python but never registers
             // a py3 toolchain, auto-inject BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS
             // at lowest priority so ctx.toolchains[@rules_python//python:toolchain_type]
@@ -2935,6 +2946,11 @@ mod tests {
     use std::hash::Hash as _;
     use std::hash::Hasher as _;
 
+    use slug_bzlmod::types::Module;
+    use slug_bzlmod::types::ParsedModuleFile;
+    use slug_bzlmod::types::RegisteredItem;
+    use slug_bzlmod::version::Version;
+
     use super::*;
 
     fn lockfile_value(path: &str, digest: &str) -> Arc<slug_bzlmod::LockfileContentValue> {
@@ -2991,6 +3007,41 @@ mod tests {
             }),
             extension_replay_summary_digest: Some(Arc::from("extension-replay")),
         }
+    }
+
+    fn parsed_module(name: &str) -> ParsedModuleFile {
+        ParsedModuleFile {
+            module: Module::new(name.to_owned(), Version::empty()),
+            has_module_directive: true,
+            extension_usages: Vec::new(),
+            repo_rule_invocations: Vec::new(),
+            registered_toolchains: Vec::new(),
+            registered_execution_platforms: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn collect_registered_items_honors_ignore_dev_dependency_for_root() {
+        let mut root = parsed_module("root");
+        root.registered_toolchains.push(RegisteredItem {
+            label: "@root_toolchains//:all".to_owned(),
+            dev_dependency: true,
+        });
+        root.registered_execution_platforms.push(RegisteredItem {
+            label: "@root_platforms//:all".to_owned(),
+            dev_dependency: true,
+        });
+
+        let parsed_modules = vec![("root".to_owned(), root)];
+        let (toolchains, platforms) =
+            collect_bzlmod_registered_items(&parsed_modules, "root", false);
+        assert_eq!(toolchains.len(), 1);
+        assert_eq!(platforms.len(), 1);
+
+        let (toolchains, platforms) =
+            collect_bzlmod_registered_items(&parsed_modules, "root", true);
+        assert!(toolchains.is_empty());
+        assert!(platforms.is_empty());
     }
 
     #[test]
