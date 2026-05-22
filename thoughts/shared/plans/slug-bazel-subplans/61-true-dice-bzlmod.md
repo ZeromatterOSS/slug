@@ -134,6 +134,11 @@ Observed SDK result at the checkpoint:
   explicit option. Focused `slug_common` coverage verifies repo-env option
   parsing, and the full 50-test Plan 61 guardrail target passed after the
   change.
+- The seeded-extension process global was removed. Lazy spoke registration now
+  relies on DICE replay/compute when the extension repo file-ops path needs
+  sibling repos, instead of a cross-command seeded marker. Focused
+  `slug_bzlmod` spoke-materialization tests and the full 50-test Plan 61
+  guardrail target passed after the change.
 
 ## Consolidated Learnings
 
@@ -179,10 +184,9 @@ What did not work or remains risky:
   literal loads and existing external files under `bazel-external/<repo>` are
   hashed, but repo mappings at load sites, load failures, deleted files, and
   the full interpreter load graph are not replay-complete.
-- Extension spoke registration and seeded-extension tracking still use
-  process-global state. The command repo-env global has been removed, but the
-  remaining spoke/seed reset hooks do not provide a replay-pure dependency
-  model.
+- Extension spoke registration still uses process-global state. The command
+  repo-env and seeded-extension globals have been removed, but the remaining
+  spoke registry does not provide a replay-pure dependency model.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
   remaining command policy around non-root dev dependencies.
@@ -308,9 +312,9 @@ using Rust DICE keys and values:
 5. Move extension spoke and generated repo registration out of process globals.
    - Represent generated repo specs, sibling spokes, seeded cells, and
      materialization state as DICE values.
-   - Remove `SPOKE_REGISTRY` / `SEEDED_EXTENSIONS` as semantic state. Temporary
-     instrumentation may remain only if guardrails prove it cannot affect
-     correctness.
+   - `SEEDED_EXTENSIONS` is removed. Remove `SPOKE_REGISTRY` as semantic state.
+     Temporary instrumentation may remain only if guardrails prove it cannot
+     affect correctness.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 

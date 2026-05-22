@@ -82,28 +82,15 @@ pub fn lookup_spoke(canonical_name: &str) -> Option<SpokeRegistration> {
         .and_then(|m| m.get(canonical_name).cloned())
 }
 
-/// Set of extension IDs whose sibling spokes have already been registered as
-/// dynamic cells (or seeded statically from `MODULE.bazel.lock`).
-///
-/// `slug_external_cells::extension_repo::get_file_ops_delegate` consults this
-/// to decide whether it needs to evaluate the extension via DICE just to
-/// discover spoke names. With the lockfile present, startup-time spoke
-/// seeding marks every extension as already-seeded so the DICE compute is
-/// skipped on warm builds. Without the lockfile, the first file-ops call
-/// triggers extension eval (DICE-cached), registers all sibling spokes, and
-/// marks the extension here so subsequent calls short-circuit.
-static SEEDED_EXTENSIONS: RwLock<Option<std::collections::HashSet<String>>> = RwLock::new(None);
-
 fn clear_spoke_state_for_new_root() {
     *SPOKE_REGISTRY.write().unwrap() = None;
-    *SEEDED_EXTENSIONS.write().unwrap() = None;
 }
 
 /// Set the workspace root for the temporary spoke-materialization adapter.
 ///
 /// Plan 61's final owner is a DICE value, not process state. Until that
 /// migration is complete, root transitions must discard spoke registrations
-/// and seeded-extension markers from the previous workspace.
+/// from the previous workspace.
 pub fn set_spoke_materialization_project_root(root: PathBuf) {
     let mut current_root = SPOKE_PROJECT_ROOT.write().unwrap();
     if current_root.as_ref() != Some(&root) {
@@ -117,22 +104,6 @@ pub fn set_spoke_materialization_project_root(root: PathBuf) {
 pub fn reset_spoke_materialization_project_root(root: PathBuf) {
     clear_spoke_state_for_new_root();
     *SPOKE_PROJECT_ROOT.write().unwrap() = Some(root);
-}
-
-/// Mark `extension_id`'s sibling spokes as already registered. Idempotent.
-pub fn mark_extension_spokes_seeded(extension_id: &str) {
-    let mut guard = SEEDED_EXTENSIONS.write().unwrap();
-    let set = guard.get_or_insert_with(std::collections::HashSet::new);
-    set.insert(extension_id.to_owned());
-}
-
-/// Returns true if `extension_id`'s sibling spokes are known to be registered.
-pub fn extension_spokes_seeded(extension_id: &str) -> bool {
-    SEEDED_EXTENSIONS
-        .read()
-        .unwrap()
-        .as_ref()
-        .is_some_and(|s| s.contains(extension_id))
 }
 
 // ============================================================================
@@ -330,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn root_transition_clears_spoke_registrations_and_seeded_extensions() {
+    fn root_transition_clears_spoke_registrations() {
         let _guard = TEST_LOCK.lock().unwrap();
         set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-a"));
         let canonical = "test+ext+root_transition_spoke".to_owned();
@@ -343,14 +314,11 @@ mod tests {
                 project_root: Arc::new(PathBuf::from("/tmp")),
             },
         );
-        mark_extension_spokes_seeded(&extension_id);
 
         assert!(lookup_spoke(&canonical).is_some());
-        assert!(extension_spokes_seeded(&extension_id));
 
         set_spoke_materialization_project_root(PathBuf::from("/tmp/plan61-spoke-b"));
 
         assert!(lookup_spoke(&canonical).is_none());
-        assert!(!extension_spokes_seeded(&extension_id));
     }
 }

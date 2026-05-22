@@ -572,13 +572,6 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             continue;
         }
 
-        // The lockfile entry pins down every spoke this extension generated;
-        // mark the extension as seeded so the runtime path in
-        // `extension_repo::get_file_ops_delegate` skips its DICE compute.
-        if !canonicalized_specs.is_empty() {
-            crate::spoke_materialization::mark_extension_spokes_seeded(ext_id);
-        }
-
         for (repo_name, repo_spec) in canonicalized_specs {
             let canonical = format!("{}+{}+{}", owner, ext_name, repo_name);
             let repo_spec_json = match serde_json::to_string(&repo_spec) {

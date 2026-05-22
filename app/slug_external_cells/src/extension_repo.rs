@@ -475,10 +475,8 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
 }
 
 /// Idempotently register every sibling spoke of `extension_id` as a dynamic
-/// cell. Returns silently if the extension was already seeded (typically by
-/// startup-time lockfile pre-seeding in `slug_common::cells`) or is not a
-/// module extension (e.g. a `use_repo_rule()` invocation, which has no
-/// siblings).
+/// cell. Returns silently if this is not a module extension (e.g. a
+/// `use_repo_rule()` invocation, which has no siblings).
 ///
 /// Failure to register is logged at debug and otherwise ignored: the caller
 /// will still error out cleanly downstream if a needed cell is missing.
@@ -488,9 +486,6 @@ async fn ensure_extension_spokes_registered(
     project_root_path: &std::path::Path,
     requesting_canonical_name: &str,
 ) -> slug_error::Result<()> {
-    if slug_bzlmod::extension_spokes_seeded(extension_id) {
-        return Ok(());
-    }
     let session_data = match ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await {
         Ok(data) => data,
         Err(e) => {
@@ -508,9 +503,7 @@ async fn ensure_extension_spokes_registered(
     let Some(ext_key) = slug_bzlmod::create_extension_execution_key(&session_data, extension_id)
     else {
         // Not a module extension — `use_repo_rule()` and similar produce a
-        // single repo with no siblings, so there is nothing to seed. Mark
-        // seeded so we don't retry on every cell access.
-        slug_bzlmod::mark_extension_spokes_seeded(extension_id);
+        // single repo with no siblings, so there is nothing to seed.
         return Ok(());
     };
 
@@ -586,7 +579,6 @@ async fn ensure_extension_spokes_registered(
         }
     }
 
-    slug_bzlmod::mark_extension_spokes_seeded(extension_id);
     Ok(())
 }
 
