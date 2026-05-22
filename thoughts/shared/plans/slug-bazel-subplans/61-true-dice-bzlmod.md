@@ -161,6 +161,13 @@ Observed SDK result at the checkpoint:
   directly reading those fields from injected `BzlmodSessionData`. The keys are
   still transitional producers over the injected session graph, but analysis
   and execution-platform selection now depend on named DICE values.
+- Interpreter module-version lookup now reads `ModuleVersionsKey` instead of
+  directly reading injected `BzlmodSessionData`. This is still a transitional
+  producer over the injected session graph, but the Starlark interpreter adapter
+  no longer consumes the injected session value directly. The key intentionally
+  disables value cutoffs for now to preserve the previous session-wide
+  invalidation behavior until the remaining bzlmod session fields have explicit
+  interpreter/materialization dependencies.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -221,9 +228,9 @@ What did not work or remains risky:
   wrapped resolver is still not a Skyframe-shaped module graph.
 - The resolved graph, repo mappings, cell graph, and registered toolchain and
   execution platform facts are still assembled during legacy cell setup, then
-  injected as `BzlmodSessionData`. Toolchain/platform consumers now go through
-  DICE keys, but those keys still source their values from the injected
-  transitional session.
+  injected as `BzlmodSessionData`. Module-version and toolchain/platform
+  consumers now go through DICE keys, but those keys still source their values
+  from the injected transitional session.
 - Hidden lockfile identity is included in the transitional bridge key equality
   and hashing path, and hidden replay has same-daemon edit coverage. Broader
   hidden lockfile replay/fail-open behavior now has stronger guardrails, but

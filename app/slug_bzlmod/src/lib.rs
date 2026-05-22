@@ -86,6 +86,8 @@ pub use dice_graph::ModuleExtensionId;
 pub use dice_graph::ModuleExtensionReplayInputKey;
 pub use dice_graph::ModuleFileKey;
 pub use dice_graph::ModuleSourceKey;
+pub use dice_graph::ModuleVersionsKey;
+pub use dice_graph::ModuleVersionsValue;
 pub use dice_graph::RegisteredExecutionPlatformsKey;
 pub use dice_graph::RegisteredExecutionPlatformsValue;
 pub use dice_graph::RegisteredToolchainsKey;

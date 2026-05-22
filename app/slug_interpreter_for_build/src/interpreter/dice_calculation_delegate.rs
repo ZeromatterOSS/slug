@@ -24,6 +24,7 @@ use futures::FutureExt;
 use once_cell::sync::Lazy;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::cycles::CycleGuard;
+use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;
 use slug_common::file_ops::error::FileReadErrorContext;
 use slug_common::find_buildfile::find_buildfile;
@@ -153,12 +154,24 @@ impl<'c, 'd> HasCalculationDelegate<'c, 'd> for DiceComputations<'d> {
                 let dirs_allowing_relative_paths =
                     ctx.dirs_allowing_relative_paths(self.0.clone()).await?;
 
-                let bzlmod_session_data = ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await?;
+                let project_root = ctx
+                    .global_data()
+                    .get_io_provider()
+                    .project_root()
+                    .root()
+                    .to_path_buf();
+                let module_versions = ctx
+                    .compute(&slug_bzlmod::ModuleVersionsKey::for_project_root(
+                        project_root,
+                    ))
+                    .await??
+                    .module_versions
+                    .clone();
                 let cell_info = InterpreterCellInfo::new_with_bzlmod_module_versions(
                     self.1,
                     ctx.get_cell_resolver().await?,
                     cell_alias_resolver,
-                    Arc::new(bzlmod_session_data.module_versions.clone()),
+                    module_versions,
                 )?;
 
                 // Compute package_dir by finding nearest ancestor with a BUILD file.

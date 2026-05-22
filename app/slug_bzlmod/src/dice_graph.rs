@@ -16,6 +16,7 @@
 //! prove when legacy paths compute, replay, or materialize bzlmod state.
 
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -424,6 +425,67 @@ pub struct RepoMappingKey {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
     pub scope: RepoMappingScope,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "ModuleVersionsKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
+pub struct ModuleVersionsKey {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+}
+
+impl ModuleVersionsKey {
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self {
+            workspace_id: WorkspaceId::for_project_root(project_root),
+            resolution_digest: Arc::from("injected-bzlmod-session"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct ModuleVersionsValue {
+    pub workspace_id: WorkspaceId,
+    pub module_versions: Arc<HashMap<String, String>>,
+}
+
+#[async_trait]
+impl Key for ModuleVersionsKey {
+    type Value = slug_error::Result<Arc<ModuleVersionsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        if session_data.project_root != *self.workspace_id.canonical_project_root {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "ModuleVersionsKey was computed with project root '{}', \
+                 but current bzlmod session root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                session_data.project_root.display()
+            ));
+        }
+        Ok(Arc::new(ModuleVersionsValue {
+            workspace_id: self.workspace_id.clone(),
+            module_versions: Arc::new(session_data.module_versions.clone()),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        let _ = (x, y);
+        // Transitional bridge: the interpreter previously depended directly
+        // on the whole injected `BzlmodSessionData`. Do not narrow cutoffs to
+        // the version map until the remaining bzlmod session fields have
+        // explicit interpreter/materialization dependencies.
+        false
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
