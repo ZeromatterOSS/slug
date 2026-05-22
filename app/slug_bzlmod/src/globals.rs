@@ -103,6 +103,8 @@ pub struct RepoRuleInvocation {
     pub name: String,
     /// The rule source: "bzl_path%rule_name".
     pub rule_source: String,
+    /// Whether this repo rule is dev-only.
+    pub dev_dependency: bool,
     /// Attribute values (excluding name).
     ///
     /// `IndexMap` preserves the Starlark kwarg insertion order so the
@@ -825,11 +827,10 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = dev_dependency;
-
         let proxy = RepoRuleProxy {
             rule_bzl_file: rule_bzl_file.to_owned(),
             rule_name: rule_name.to_owned(),
+            dev_dependency,
         };
 
         Ok(eval.heap().alloc(proxy))
@@ -957,6 +958,8 @@ pub struct RepoRuleProxy {
     rule_bzl_file: String,
     /// The repo rule name.
     rule_name: String,
+    /// Whether invocations from this proxy are dev-only.
+    dev_dependency: bool,
 }
 
 impl Display for RepoRuleProxy {
@@ -1008,6 +1011,7 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
                 ctx.repo_rule_invocations.push(RepoRuleInvocation {
                     name: name.to_owned(),
                     rule_source,
+                    dev_dependency: self.dev_dependency,
                     attrs,
                 });
             }

@@ -2190,7 +2190,11 @@ impl BuckConfigBasedCells {
         bzlmod_session_data.repo_mapping_overrides =
             repo_mapping_overrides_for_root(&parsed_modules, root_module_name);
         let (mut pre_computed_cells, pre_computed_aliases) =
-            slug_bzlmod::pre_compute_extension_repo_cells(&parsed_modules, root_module_name)?;
+            slug_bzlmod::pre_compute_extension_repo_cells(
+                &parsed_modules,
+                root_module_name,
+                options.ignore_dev_dependency,
+            )?;
         let mut extension_mapping_cells = pre_computed_cells.clone();
         add_extension_repo_mapping_rows_from_cells(
             &mut bzlmod_session_data.repo_mappings,
@@ -2559,7 +2563,18 @@ impl BuckConfigBasedCells {
                     module_name,
                     parsed_mod.repo_rule_invocations.len()
                 );
+                let is_root = module_name == root_module_name
+                    || module_name == "_main"
+                    || parsed_mod.module.name == root_module_name;
                 for invocation in &parsed_mod.repo_rule_invocations {
+                    if invocation.dev_dependency && (!is_root || options.ignore_dev_dependency) {
+                        tracing::debug!(
+                            "Skipping dev_dependency repo rule '{}' from module '{}'",
+                            invocation.name,
+                            module_name
+                        );
+                        continue;
+                    }
                     if ext_cells
                         .iter()
                         .any(|(_, _, setup)| setup.internal_name.as_ref() == invocation.name)

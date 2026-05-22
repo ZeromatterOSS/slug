@@ -107,6 +107,10 @@ Observed SDK result at the checkpoint:
   and `--ignore_dev_dependency` removes those root dev dependencies from the
   command's bzlmod graph. Local Bazel 9.1.0 evidence showed the same root dev
   dependency builds by default and disappears with `--ignore_dev_dependency`.
+- Root `use_repo_rule(..., dev_dependency = True)` now carries the
+  `dev_dependency` bit into repo-rule invocations, participates by default, and
+  is excluded under `--ignore_dev_dependency`; non-root dev repo rules are
+  filtered from precomputed and eager repo-rule registration paths.
 
 ## Consolidated Learnings
 
@@ -155,9 +159,8 @@ What did not work or remains risky:
   process-global state. Reset hooks reduce the risk but do not provide a
   replay-pure dependency model.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
-  `bazel_dep(max_compatibility_level)`, `use_repo_rule(dev_dependency)`,
-  registry selection on overrides, and remaining command policy around non-root
-  dev dependencies.
+  `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
+  remaining command policy around non-root dev dependencies.
 - Registry and repository cache behavior is still a blend of DICE identity,
   lockfile checksums, and filesystem markers. It is better than the old path,
   but it is not yet a complete `RepoSpecFunction` /
@@ -288,7 +291,7 @@ using Rust DICE keys and values:
 
 6. Complete Bazel 9 directive semantics.
    - Implement or explicitly Bazel-ground the behavior for
-     `max_compatibility_level`, `dev_dependency`, `use_repo_rule(dev_dependency)`,
+     `max_compatibility_level`, remaining `dev_dependency` surfaces,
      `single_version_override(registry/patches)`,
      `multiple_version_override(registry)`, `archive_override`, `git_override`,
      `override_repo`, `inject_repo`, `isolate`, and `bazel_compatibility`.

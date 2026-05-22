@@ -198,6 +198,7 @@ impl ExtensionCellDefinitions {
 pub fn pre_compute_extension_repo_cells(
     parsed_modules: &[(String, ParsedModuleFile)],
     root_module_name: &str,
+    ignore_dev_dependency: bool,
 ) -> slug_error::Result<(Vec<PendingRepoCell>, Vec<RepoAlias>)> {
     let mut cells = Vec::new();
     let mut aliases = Vec::new();
@@ -224,7 +225,7 @@ pub fn pre_compute_extension_repo_cells(
 
         for usage in &parsed.extension_usages {
             // Skip dev_dependency usages from non-root modules (Bazel 9.0 behavior)
-            if usage.dev_dependency && !is_root {
+            if usage.dev_dependency && (!is_root || ignore_dev_dependency) {
                 tracing::debug!(
                     "Skipping dev_dependency extension repo cells for '{}' from non-root module '{}'",
                     usage.extension_id(),
@@ -368,6 +369,14 @@ pub fn pre_compute_extension_repo_cells(
             || parsed.module.name == root_module_name;
 
         for invocation in &parsed.repo_rule_invocations {
+            if invocation.dev_dependency && (!is_root || ignore_dev_dependency) {
+                tracing::debug!(
+                    "Skipping dev_dependency repo rule '{}' from module '{}'",
+                    invocation.name,
+                    cell_name
+                );
+                continue;
+            }
             let canonical = canonicalize_repo_rule_invocation_name(
                 module_name,
                 is_root,
@@ -1231,12 +1240,16 @@ mod tests {
             name: "launcher".to_owned(),
             rule_source: "@toolchain_utils//toolchain/local/select:defs.bzl%toolchain_local_select"
                 .to_owned(),
+            dev_dependency: false,
             attrs,
         });
 
-        let (cells, aliases) =
-            pre_compute_extension_repo_cells(&[("ape+1.0.1".to_owned(), module)], "zeromatter")
-                .unwrap();
+        let (cells, aliases) = pre_compute_extension_repo_cells(
+            &[("ape+1.0.1".to_owned(), module)],
+            "zeromatter",
+            false,
+        )
+        .unwrap();
 
         assert_eq!(cells.len(), 1);
         assert_eq!(
@@ -1282,6 +1295,7 @@ mod tests {
         let (cells, aliases) = pre_compute_extension_repo_cells(
             &[("bazel_lib+3.2.2".to_owned(), module)],
             "zeromatter",
+            false,
         )
         .unwrap();
 
@@ -1317,7 +1331,7 @@ mod tests {
         module.extension_usages.push(usage);
 
         let (cells, aliases) =
-            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root")
+            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false)
                 .unwrap();
 
         assert!(cells.is_empty());
@@ -1353,6 +1367,7 @@ mod tests {
         let (cells, aliases) = pre_compute_extension_repo_cells(
             &[("root".to_owned(), root), ("rules_owner".to_owned(), owner)],
             "root",
+            false,
         )
         .unwrap();
 

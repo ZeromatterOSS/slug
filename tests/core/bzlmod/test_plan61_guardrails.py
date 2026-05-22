@@ -951,6 +951,45 @@ bazel_dep(name = "{module_name}", version = "{module_version}", dev_dependency =
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_use_repo_rule_dev_dependency_follows_ignore_policy(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: use_repo_rule(dev_dependency=True) is root-only unless ignored."""
+    dev_repo = buck.cwd / "repo_rule_dev_repo"
+    dev_repo.mkdir()
+    _write(dev_repo / ".buckroot", "")
+    _write(
+        dev_repo / "BUILD.bazel",
+        """filegroup(
+    name = "lib",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_guardrails")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", dev_dependency = True)
+repo(name = "repo_rule_dev_repo", path = "repo_rule_dev_repo")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_repo_rule_dev_dep",
+    srcs = ["@repo_rule_dev_repo//:lib"],
+)
+""",
+    )
+
+    await buck.build("//:uses_repo_rule_dev_dep")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_repo_rule_dev_dep", "--ignore_dev_dependency")
+    assert "repo_rule_dev_repo" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only(
     buck: Buck,
 ) -> None:
