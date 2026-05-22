@@ -15,6 +15,7 @@
 //! the behavioral authority. Existing code can use the counters immediately to
 //! prove when legacy paths compute, replay, or materialize bzlmod state.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -75,7 +76,12 @@ pub struct BzlmodWorkspaceKey {
     pub output_base: Arc<PathBuf>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodCommandPolicyKey({}, {})",
+    workspace_id.canonical_project_root.display(),
+    bzlmod_flags_digest
+)]
 pub struct BzlmodCommandPolicyKey {
     pub workspace_id: WorkspaceId,
     pub bazel_release_id: Arc<str>,
@@ -91,6 +97,81 @@ pub struct BzlmodCommandPolicyKey {
     pub allow_yanked_versions_digest: Arc<str>,
     pub bazel_compatibility_policy_digest: Arc<str>,
     pub isolated_extension_usages: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCommandPolicyValue {
+    pub workspace_id: WorkspaceId,
+    pub digest: Arc<str>,
+    pub repo_env_digest: Arc<str>,
+    pub lockfile_mode: Arc<str>,
+    pub ignore_dev_dependency: bool,
+}
+
+#[async_trait]
+impl Key for BzlmodCommandPolicyKey {
+    type Value = slug_error::Result<Arc<BzlmodCommandPolicyValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Ok(Arc::new(BzlmodCommandPolicyValue {
+            workspace_id: self.workspace_id.clone(),
+            digest: Arc::from(bzlmod_command_policy_digest(self).as_str()),
+            repo_env_digest: self.repo_env_digest.clone(),
+            lockfile_mode: self.lockfile_mode.clone(),
+            ignore_dev_dependency: self.ignore_dev_dependency,
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+fn bzlmod_command_policy_digest(key: &BzlmodCommandPolicyKey) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"bzlmod-command-policy-v1");
+    update_digest_str(&mut hasher, key.workspace_id.stable_hash());
+    update_digest_str(&mut hasher, &key.bazel_release_id);
+    update_digest_str(&mut hasher, &key.starlark_semantics_digest);
+    update_digest_str(&mut hasher, &key.bzlmod_flags_digest);
+    update_digest_str(&mut hasher, &key.lockfile_mode);
+    update_digest_str(&mut hasher, &key.registry_config_digest);
+    update_digest_str(&mut hasher, &key.repository_cache_config_digest);
+    update_digest_str(&mut hasher, &key.network_policy_digest);
+    update_digest_str(&mut hasher, &key.repo_env_digest);
+    update_digest_str(&mut hasher, &key.nonstrict_repo_env_digest);
+    hasher.update([u8::from(key.ignore_dev_dependency)]);
+    hasher.update([0]);
+    update_digest_str(&mut hasher, &key.allow_yanked_versions_digest);
+    update_digest_str(&mut hasher, &key.bazel_compatibility_policy_digest);
+    hasher.update([u8::from(key.isolated_extension_usages)]);
+    hasher.update([0]);
+    hex::encode(hasher.finalize())
+}
+
+fn update_digest_str(hasher: &mut Sha256, value: &str) {
+    hasher.update(value.as_bytes());
+    hasher.update([0]);
+}
+
+pub fn repo_env_policy_digest(repo_env: &BTreeMap<String, String>) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"repo-env-policy-v1");
+    hasher.update([0]);
+    for (name, value) in repo_env {
+        hasher.update(name.as_bytes());
+        hasher.update([0]);
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+    hex::encode(hasher.finalize())
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]

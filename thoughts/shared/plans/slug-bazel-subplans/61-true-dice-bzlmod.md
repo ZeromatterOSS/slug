@@ -123,6 +123,11 @@ Observed SDK result at the checkpoint:
   guardrails proving the generated repos stay unavailable both by default and
   under `--ignore_dev_dependency`. The full Plan 61 guardrail file passed with
   50 tests after adding this coverage.
+- The command-policy digest feeding the transitional bzlmod resolution key is
+  now produced through `BzlmodCommandPolicyKey`, and the hidden lockfile path is
+  part of policy equality/hashing. Focused `slug_common` coverage verifies
+  hidden-lockfile policy identity, and the full 50-test Plan 61 guardrail target
+  passed after the change.
 
 ## Consolidated Learnings
 
@@ -155,7 +160,8 @@ What worked:
 What did not work or remains risky:
 
 - A single transitional `LegacyBzlmodResolutionDiceKey` still wraps the legacy
-  resolver. This improves warm reuse but is not a Skyframe-shaped module graph.
+  resolver. Its command-policy identity now comes from a DICE key, but the
+  wrapped resolver is still not a Skyframe-shaped module graph.
 - The resolved graph, repo mappings, cell graph, and registered toolchain and
   execution platform facts are still assembled during legacy cell setup, then
   injected as `BzlmodSessionData`.
