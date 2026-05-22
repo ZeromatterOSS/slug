@@ -114,6 +114,10 @@ Observed SDK result at the checkpoint:
 - Root `use_extension(..., dev_dependency = True)` now participates by default
   and is excluded from extension aggregation, precomputed repo cells, and
   lockfile replay under `--ignore_dev_dependency`.
+- Root `register_toolchains(..., dev_dependency = True)` and
+  `register_execution_platforms(..., dev_dependency = True)` are now filtered
+  under `--ignore_dev_dependency`, while non-root dev registrations remain
+  skipped.
 
 ## Consolidated Learnings
 
@@ -163,8 +167,7 @@ What did not work or remains risky:
   replay-pure dependency model.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
-  remaining command policy around non-root dev dependencies and registered
-  toolchain/platform dev-dependency filtering.
+  remaining command policy around non-root dev dependencies.
 - Registry and repository cache behavior is still a blend of DICE identity,
   lockfile checksums, and filesystem markers. It is better than the old path,
   but it is not yet a complete `RepoSpecFunction` /

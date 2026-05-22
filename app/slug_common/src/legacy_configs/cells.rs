@@ -2293,9 +2293,9 @@ impl BuckConfigBasedCells {
                 let repo_mapping =
                     slug_bzlmod::BzlmodRepoMapping::for_module(parsed_mod, root_module_name);
                 for item in &parsed_mod.registered_toolchains {
-                    if item.dev_dependency && !is_root {
+                    if item.dev_dependency && (!is_root || options.ignore_dev_dependency) {
                         tracing::debug!(
-                            "Skipping dev_dependency toolchain '{}' from non-root module '{}'",
+                            "Skipping dev_dependency toolchain '{}' from module '{}'",
                             item.label,
                             module_name
                         );
@@ -2309,9 +2309,9 @@ impl BuckConfigBasedCells {
                     });
                 }
                 for item in &parsed_mod.registered_execution_platforms {
-                    if item.dev_dependency && !is_root {
+                    if item.dev_dependency && (!is_root || options.ignore_dev_dependency) {
                         tracing::debug!(
-                            "Skipping dev_dependency execution platform '{}' from non-root module '{}'",
+                            "Skipping dev_dependency execution platform '{}' from module '{}'",
                             item.label,
                             module_name
                         );
