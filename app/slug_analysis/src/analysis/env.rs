@@ -12,9 +12,9 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::LazyLock;
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
@@ -108,6 +108,7 @@ use starlark_map::small_map::SmallMap;
 
 use crate::analysis::native_rule_analysis::DeclaredToolchainInfo;
 use crate::analysis::native_rule_analysis::DeferredToolchain;
+use crate::analysis::native_rule_analysis::clear_declared_toolchains;
 use crate::analysis::native_rule_analysis::deferred_all_loaded;
 use crate::analysis::native_rule_analysis::deferred_key_already_loaded;
 use crate::analysis::native_rule_analysis::get_declared_toolchains;
@@ -1039,8 +1040,19 @@ pub fn get_deps_from_analysis_results(
 // Eager Toolchain Loading (Phase 6)
 // ============================================================================
 
-/// Flag to ensure registered toolchain packages are loaded only once per session.
-static TOOLCHAINS_LOADING_DONE: AtomicBool = AtomicBool::new(false);
+/// DICE-derived identity for the registered toolchain set currently loaded
+/// into the process-global `DeclaredToolchainInfo` registry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ToolchainLoadingSignature {
+    project_root: PathBuf,
+    registered_toolchains: Vec<slug_bzlmod::RegisteredToolchain>,
+}
+
+/// The global toolchain registry is temporary process state. Key the
+/// "already loaded" fast path by the DICE-owned registration value so same
+/// daemon module/workspace changes do not reuse stale registrations.
+static TOOLCHAINS_LOADED_SIGNATURE: LazyLock<std::sync::RwLock<Option<ToolchainLoadingSignature>>> =
+    LazyLock::new(|| std::sync::RwLock::new(None));
 
 /// Serializes the initial eager registered-toolchain load. Multiple analysis
 /// keys can start concurrently before the done flag flips; only one should
@@ -1057,7 +1069,24 @@ static DEFERRED_TOOLCHAIN_LOAD_LOCK: LazyLock<futures::lock::Mutex<()>> =
 
 /// Reset the eager loading flag (for fresh builds / daemon restart).
 pub fn reset_toolchain_loading() {
-    TOOLCHAINS_LOADING_DONE.store(false, Ordering::SeqCst);
+    if let Ok(mut signature) = TOOLCHAINS_LOADED_SIGNATURE.write() {
+        *signature = None;
+    }
+    clear_declared_toolchains();
+    set_deferred_toolchains(Vec::new());
+}
+
+fn toolchains_loaded_for_signature(signature: &ToolchainLoadingSignature) -> bool {
+    TOOLCHAINS_LOADED_SIGNATURE
+        .read()
+        .map(|loaded| loaded.as_ref() == Some(signature))
+        .unwrap_or(false)
+}
+
+fn mark_toolchains_loaded(signature: ToolchainLoadingSignature) {
+    if let Ok(mut loaded_signature) = TOOLCHAINS_LOADED_SIGNATURE.write() {
+        *loaded_signature = Some(signature);
+    }
 }
 
 fn eager_toolchain_loading_checkpoint(
@@ -1091,29 +1120,17 @@ fn eager_toolchain_loading_checkpoint(
 /// and populates the `DeclaredToolchainInfo` registry by extracting toolchain metadata
 /// from each `toolchain()` target in the loaded packages.
 ///
-/// Runs once per daemon session, guarded by `TOOLCHAINS_LOADING_DONE`.
+/// Runs once per registered-toolchain signature.
 pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>) {
-    if TOOLCHAINS_LOADING_DONE.load(Ordering::SeqCst) {
-        return;
-    }
-
     let started = Instant::now();
-    eager_toolchain_loading_checkpoint(1, "lock_wait_start", started, []);
-    let _guard = EAGER_TOOLCHAIN_LOAD_LOCK.lock().await;
-    eager_toolchain_loading_checkpoint(2, "lock_acquired", started, []);
-
-    if TOOLCHAINS_LOADING_DONE.load(Ordering::SeqCst) {
-        eager_toolchain_loading_checkpoint(3, "already_loaded_after_lock", started, []);
-        return;
-    }
-
     let project_root = dice
         .global_data()
         .get_io_provider()
         .project_root()
         .root()
         .to_path_buf();
-    let registered_key = slug_bzlmod::RegisteredToolchainsKey::for_project_root(project_root);
+    let registered_key =
+        slug_bzlmod::RegisteredToolchainsKey::for_project_root(project_root.clone());
     let registered = match dice.compute(&registered_key).await {
         Ok(Ok(data)) => data.registered_toolchains.clone(),
         Ok(Err(e)) => {
@@ -1131,9 +1148,30 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             Vec::new()
         }
     };
+
+    let signature = ToolchainLoadingSignature {
+        project_root,
+        registered_toolchains: registered.clone(),
+    };
+
+    if toolchains_loaded_for_signature(&signature) {
+        return;
+    }
+
+    eager_toolchain_loading_checkpoint(1, "lock_wait_start", started, []);
+    let _guard = EAGER_TOOLCHAIN_LOAD_LOCK.lock().await;
+    eager_toolchain_loading_checkpoint(2, "lock_acquired", started, []);
+
+    if toolchains_loaded_for_signature(&signature) {
+        eager_toolchain_loading_checkpoint(3, "already_loaded_after_lock", started, []);
+        return;
+    }
+
+    clear_declared_toolchains();
+
     if registered.is_empty() {
-        TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
         set_deferred_toolchains(Vec::new());
+        mark_toolchains_loaded(signature);
         eager_toolchain_loading_checkpoint(4, "no_registered_toolchains", started, []);
         return;
     }
@@ -1174,7 +1212,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         Ok(r) => r,
         Err(e) => {
             tracing::debug!("Failed to get cell resolver for toolchain loading: {}", e);
-            TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+            mark_toolchains_loaded(signature);
             eager_toolchain_loading_checkpoint(6, "cell_resolver_failed", started, []);
             return;
         }
@@ -1269,7 +1307,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         );
     }
 
-    TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+    mark_toolchains_loaded(signature);
     eager_toolchain_loading_checkpoint(9, "done", started, []);
 }
 
@@ -5414,6 +5452,28 @@ mod tests {
             is_root: false,
         };
         assert!(should_eager_load_registered_toolchain(&bundled_transitive));
+    }
+
+    #[test]
+    fn test_toolchain_loading_signature_includes_registered_toolchains() {
+        let first = ToolchainLoadingSignature {
+            project_root: PathBuf::from("/tmp/plan61-toolchains"),
+            registered_toolchains: vec![slug_bzlmod::RegisteredToolchain {
+                module: "root".to_owned(),
+                label: "@first//:all".to_owned(),
+                is_root: true,
+            }],
+        };
+        let second = ToolchainLoadingSignature {
+            project_root: PathBuf::from("/tmp/plan61-toolchains"),
+            registered_toolchains: vec![slug_bzlmod::RegisteredToolchain {
+                module: "root".to_owned(),
+                label: "@second//:all".to_owned(),
+                is_root: true,
+            }],
+        };
+
+        assert_ne!(first, second);
     }
 
     #[test]

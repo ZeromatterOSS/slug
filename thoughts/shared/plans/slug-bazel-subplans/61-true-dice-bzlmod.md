@@ -208,6 +208,11 @@ Observed SDK result at the checkpoint:
   9 no-op rather than an unknown gap. Local Bazel 9.1.0 evidence showed the
   directive only warns that the attribute is a no-op and still builds a local
   override dependency; the new Slug guardrail preserves that accepted behavior.
+- Registered toolchain loading no longer uses a process-global "loaded once"
+  flag that can mask same-daemon bzlmod registration changes. The temporary
+  global registry is still process state, but the fast path is now keyed by the
+  DICE-derived project root plus registered-toolchain list and clears/reloads
+  when that signature changes.
 
 ## Consolidated Learnings
 
@@ -268,6 +273,10 @@ What did not work or remains risky:
   environment through the interpreter build-config adapter. The bzlmod session
   data rewrite is gone, but the runtime environment surface is not yet a
   DICE-owned command value end to end.
+- Registered toolchain facts now reach analysis through a DICE key and the
+  eager-load fast path is keyed by the DICE-derived registration signature, but
+  the final `DeclaredToolchainInfo` registry remains process-global output
+  plumbing rather than a DICE value.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file
   plus recursive `watch_tree()` reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
