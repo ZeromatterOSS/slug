@@ -43,10 +43,12 @@ use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;
 use slug_common::file_ops::metadata::RawPathMetadata;
 use slug_core::cells::CellResolver;
+use slug_core::cells::cell_path::CellPath;
 use slug_core::fs::project::ProjectRoot;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_fs::paths::abs_path::AbsPath;
+use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 use slug_interpreter::load_module::InterpreterCalculation;
 use slug_interpreter::paths::module::StarlarkModulePath;
 use starlark::environment::Module;
@@ -306,13 +308,33 @@ async fn track_repository_watch_inputs(
                 else {
                     continue;
                 };
-                let metadata =
-                    DiceFileComputations::read_path_metadata_if_exists(ctx, cell_path.as_ref())
-                        .await?;
-                if matches!(metadata, Some(RawPathMetadata::Directory)) {
-                    let _ = DiceFileComputations::read_dir(ctx, cell_path.as_ref()).await?;
+                track_repository_watch_tree(ctx, cell_path).await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn track_repository_watch_tree(
+    ctx: &mut DiceComputations<'_>,
+    root: CellPath,
+) -> slug_error::Result<()> {
+    let mut pending = vec![root];
+    while let Some(path) = pending.pop() {
+        let metadata =
+            DiceFileComputations::read_path_metadata_if_exists(ctx, path.as_ref()).await?;
+        match metadata {
+            Some(RawPathMetadata::File(_)) => {
+                let _ = DiceFileComputations::read_file_if_exists(ctx, path.as_ref()).await?;
+            }
+            Some(RawPathMetadata::Directory) => {
+                let entries = DiceFileComputations::read_dir(ctx, path.as_ref()).await?;
+                for entry in entries.included.iter() {
+                    let child = ForwardRelativePath::new(entry.file_name.as_str())?;
+                    pending.push(path.join(child));
                 }
             }
+            Some(RawPathMetadata::Symlink { .. }) | None => {}
         }
     }
     Ok(())
@@ -322,7 +344,7 @@ fn cell_path_for_watch_input(
     cell_resolver: &CellResolver,
     project_root: &ProjectRoot,
     path: &Path,
-) -> Option<slug_core::cells::cell_path::CellPath> {
+) -> Option<CellPath> {
     let abs = AbsPath::new(path).ok()?;
     cell_resolver
         .get_cell_path_from_abs_path(abs, project_root)
