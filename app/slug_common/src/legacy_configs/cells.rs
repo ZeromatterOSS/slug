@@ -17,8 +17,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::LazyLock;
-use std::sync::Mutex;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -578,10 +576,6 @@ impl BzlmodResolutionResult {
     }
 }
 
-static LEGACY_BZLMOD_RESOLUTION_CACHE: LazyLock<
-    Mutex<HashMap<LegacyBzlmodResolutionDiceKey, Arc<Option<BzlmodResolutionResult>>>>,
-> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 struct BzlmodResolutionOptions {
     lockfile_mode: slug_bzlmod::LockfileMode,
@@ -738,92 +732,6 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
     value.allow_yanked_versions_env.hash(state);
     value.allow_yanked_versions_flags.hash(state);
     value.repo_env_digest.hash(state);
-}
-
-fn legacy_bzlmod_resolution_bridge_cacheable(key: &LegacyBzlmodResolutionDiceKey) -> bool {
-    let Some(parsed) = key.root_module_file.parsed.as_ref() else {
-        return true;
-    };
-    if !parsed.repo_rule_invocations.is_empty() {
-        return false;
-    }
-    if parsed
-        .module
-        .overrides
-        .iter()
-        .any(|override_| matches!(override_, slug_bzlmod::types::Override::Git(_)))
-    {
-        return false;
-    }
-    if key.local_override_inputs.has_git_overrides
-        || key.local_override_inputs.has_extension_usages
-        || key.local_override_inputs.has_repo_rule_invocations
-    {
-        return false;
-    }
-
-    let local_override_names = parsed
-        .module
-        .overrides
-        .iter()
-        .filter_map(|override_| match override_ {
-            slug_bzlmod::types::Override::LocalPath(local) => Some(local.module_name.as_str()),
-            _ => None,
-        })
-        .collect::<HashSet<_>>();
-    let has_registry_or_remote_dep = parsed
-        .module
-        .bazel_deps
-        .iter()
-        .any(|dep| !local_override_names.contains(dep.name.as_str()));
-    let needs_registry_file_inputs =
-        has_registry_or_remote_dep || key.local_override_inputs.has_bazel_deps;
-    if needs_registry_file_inputs {
-        if key
-            .visible_lockfile
-            .as_ref()
-            .and_then(|value| value.digest.as_ref())
-            .is_none()
-        {
-            return false;
-        }
-        if !key.registry_file_inputs.cache_safe || !key.registry_file_inputs.has_inputs {
-            return false;
-        }
-    }
-    if !parsed.extension_usages.is_empty() {
-        return key.extension_replay_summary_digest.is_some()
-            || !parsed.module.bazel_deps.is_empty()
-            || !parsed.module.overrides.is_empty();
-    }
-    let lockfile_has_extension_entries = |lockfile: &slug_bzlmod::Lockfile| {
-        !lockfile.module_extensions.is_empty() || !lockfile.facts.is_empty()
-    };
-    if key
-        .visible_lockfile
-        .as_ref()
-        .and_then(|value| value.lockfile.as_deref())
-        .is_some_and(lockfile_has_extension_entries)
-    {
-        return false;
-    }
-    if key
-        .hidden_lockfile
-        .as_ref()
-        .and_then(|value| value.lockfile.as_deref())
-        .is_some_and(lockfile_has_extension_entries)
-    {
-        return false;
-    }
-    true
-}
-
-fn legacy_bzlmod_resolution_result_bridge_cacheable(
-    value: &Arc<Option<BzlmodResolutionResult>>,
-) -> bool {
-    value.as_ref().as_ref().is_none_or(|result| {
-        result.lockfile_seeded_cells.is_empty() && result.eager_repo_rule_invocations.is_empty()
-    })
 }
 
 fn root_extension_replay_summary_digest(
@@ -1347,37 +1255,10 @@ impl BuckConfigBasedCells {
         let mut dice_ctx = updater.existing_state().await;
         let key =
             Self::build_dice_bzlmod_resolution_key(project_fs, config_args, &mut dice_ctx).await?;
-        let bridge_cache_candidate = legacy_bzlmod_resolution_bridge_cacheable(&key);
-        let mut should_seed_bridge_cache = false;
-        let bzlmod_resolution = if bridge_cache_candidate {
-            let cached_resolution = LEGACY_BZLMOD_RESOLUTION_CACHE
-                .lock()
-                .ok()
-                .and_then(|cache| cache.get(&key).cloned());
-            if let Some(bzlmod_resolution) = cached_resolution {
-                should_seed_bridge_cache = true;
-                bzlmod_resolution
-            } else {
-                let bzlmod_resolution = dice_ctx
-                    .compute(&key)
-                    .await?
-                    .buck_error_context("Computing bzlmod resolution through DICE")?;
-                if legacy_bzlmod_resolution_result_bridge_cacheable(&bzlmod_resolution) {
-                    if let Ok(mut cache) = LEGACY_BZLMOD_RESOLUTION_CACHE.lock() {
-                        cache.insert(key.clone(), bzlmod_resolution.clone());
-                    }
-                    should_seed_bridge_cache = true;
-                }
-                bzlmod_resolution
-            }
-        } else {
-            Self::resolve_bzlmod_resolution_from_key(&key)
-                .await
-                .buck_error_context("Computing uncached bzlmod resolution")?
-        };
-        if should_seed_bridge_cache {
-            updater.changed_to([(key, Ok(bzlmod_resolution.clone()))])?;
-        }
+        let bzlmod_resolution = dice_ctx
+            .compute(&key)
+            .await?
+            .buck_error_context("Computing bzlmod resolution through DICE")?;
 
         Self::parse_with_file_ops_and_options_inner(
             config_args,

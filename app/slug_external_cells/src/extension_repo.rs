@@ -1157,9 +1157,10 @@ mod tests {
             std::fs::read_to_string(dir.join("BUILD.bazel")).unwrap(),
             "rust_crate(name = \"x\", deps = [\"@@zstd//:zstd\", \"@@zstd//:zstd\"])\n"
         );
+        let output_digest = slug_bzlmod::repository_output_digest(&dir).unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.join(".slug_repo_complete")).unwrap(),
-            "complete:sha256-new"
+            complete_marker("sha256-new", Some(&output_digest))
         );
 
         let _ = std::fs::remove_dir_all(&dir);
