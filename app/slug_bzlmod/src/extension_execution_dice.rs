@@ -1118,17 +1118,26 @@ fn external_bzl_path_under_project(
     project_root: &Path,
 ) -> Option<PathBuf> {
     let (pkg, name) = target.split_once(':')?;
-    let repo = repo.trim_end_matches('+');
     if repo.is_empty() || repo == "_main" {
         return None;
     }
 
-    let mut path = project_root.join("bazel-external").join(repo);
-    if !pkg.is_empty() {
-        path.push(pkg);
+    let candidates = if repo.ends_with('+') {
+        vec![repo, repo.trim_end_matches('+')]
+    } else {
+        vec![repo]
+    };
+    for candidate in candidates {
+        let mut path = project_root.join("bazel-external").join(candidate);
+        if !pkg.is_empty() {
+            path.push(pkg);
+        }
+        path.push(name);
+        if path.is_file() {
+            return Some(path);
+        }
     }
-    path.push(name);
-    path.is_file().then_some(path)
+    None
 }
 
 fn collect_bzl_transitive_files(
@@ -1705,6 +1714,29 @@ mod tests {
             compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
 
         std::fs::write(&helper_path, "HELPER = \"second\"\n").unwrap();
+        let second =
+            compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
+
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn test_project_bzl_digest_preserves_canonical_external_plus_repo() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("ext.bzl"),
+            "load(\"@rules_python+//python:defs.bzl\", \"PY\")\n",
+        )
+        .unwrap();
+        let helper_dir = temp_dir.path().join("bazel-external/rules_python+/python");
+        std::fs::create_dir_all(&helper_dir).unwrap();
+        let helper_path = helper_dir.join("defs.bzl");
+        std::fs::write(&helper_path, "PY = \"first\"\n").unwrap();
+
+        let first =
+            compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
+
+        std::fs::write(&helper_path, "PY = \"second\"\n").unwrap();
         let second =
             compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
 

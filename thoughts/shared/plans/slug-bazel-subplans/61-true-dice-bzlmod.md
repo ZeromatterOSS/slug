@@ -154,6 +154,10 @@ Observed SDK result at the checkpoint:
   global build config after resolution. The injected session data now keeps the
   same explicit `bzlmod.repo_env_json` value that fed the transitional
   resolution key.
+- The transitional `.bzl` replay digest now preserves Bazel canonical external
+  repo names ending in `+` when resolving existing files under
+  `bazel-external/<repo>`, so edits to files under directories such as
+  `bazel-external/rules_python+/...` change the replay digest.
 
 ## Consolidated Learnings
 
@@ -210,6 +214,9 @@ What did not work or remains risky:
   environment through the interpreter build-config adapter. The bzlmod session
   data rewrite is gone, but the runtime environment surface is not yet a
   DICE-owned command value end to end.
+- The external `+` repo fix only tightens the transitional literal-load scanner.
+  It still does not replace the required Starlark loader graph with repo
+  mappings, load failures, and delete transitions.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
   remaining command policy around non-root dev dependencies.
