@@ -107,6 +107,7 @@ pub use extension_execution_dice::extract_extension_name;
 pub use extension_execution_dice::extract_owning_module;
 pub use extensions::AggregatedExtension;
 pub use extensions::aggregate_extensions;
+pub use extensions::aggregate_extensions_with_policy;
 pub use extensions::aggregate_extensions_with_root;
 pub use extensions::canonical_extension_id;
 pub use extensions::compute_extension_input_hash;

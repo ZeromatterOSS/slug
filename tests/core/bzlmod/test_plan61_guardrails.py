@@ -990,6 +990,63 @@ repo(name = "repo_rule_dev_repo", path = "repo_rule_dev_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_use_extension_dev_dependency_follows_ignore_policy(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: use_extension(dev_dependency=True) is root-only unless ignored."""
+    module_name = "plan61_root_dev_extension"
+    extension_id = "@plan61_root_dev_extension//:dev_ext.bzl%dev_ext"
+    dev_repo = buck.cwd / "dev_extension_repo"
+    dev_repo.mkdir()
+    _write(dev_repo / "data.txt", "dev extension payload\n")
+    _write(
+        dev_repo / "BUILD.bazel",
+        """exports_files(["data.txt"])
+filegroup(name = "data", srcs = ["data.txt"], visibility = ["//visibility:public"])
+""",
+    )
+    _write(
+        buck.cwd / "dev_ext.bzl",
+        """def _dev_ext_impl(module_ctx):
+    fail("dev extension should replay from the lockfile")
+
+dev_ext = module_extension(
+    implementation = _dev_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+dev = use_extension("//:dev_ext.bzl", "dev_ext", dev_dependency = True)
+use_repo(dev, "dev_extension_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=module_name,
+        project_root=buck.cwd,
+        repo_path=dev_repo,
+        repo_paths={"dev_extension_repo": dev_repo},
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_dev_extension_repo",
+    srcs = ["@dev_extension_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_dev_extension_repo")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_dev_extension_repo", "--ignore_dev_dependency")
+    assert "dev_extension_repo" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only(
     buck: Buck,
 ) -> None:

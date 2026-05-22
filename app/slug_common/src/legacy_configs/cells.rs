@@ -2183,8 +2183,11 @@ impl BuckConfigBasedCells {
                 module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
             }
         }
-        let aggregated =
-            slug_bzlmod::aggregate_extensions_with_root(&module_extensions, Some(root_module_name));
+        let aggregated = slug_bzlmod::aggregate_extensions_with_policy(
+            &module_extensions,
+            Some(root_module_name),
+            options.ignore_dev_dependency,
+        );
         bzlmod_session_data.repo_mappings =
             repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
         bzlmod_session_data.repo_mapping_overrides =

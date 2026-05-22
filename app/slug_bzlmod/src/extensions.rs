@@ -139,6 +139,15 @@ pub fn aggregate_extensions_with_root(
     module_extensions: &HashMap<String, Vec<ExtensionUsage>>,
     root_module_name: Option<&str>,
 ) -> HashMap<String, AggregatedExtension> {
+    aggregate_extensions_with_policy(module_extensions, root_module_name, false)
+}
+
+/// Aggregate extension usages with command-level dev-dependency policy.
+pub fn aggregate_extensions_with_policy(
+    module_extensions: &HashMap<String, Vec<ExtensionUsage>>,
+    root_module_name: Option<&str>,
+    ignore_dev_dependency: bool,
+) -> HashMap<String, AggregatedExtension> {
     let mut aggregated: HashMap<String, AggregatedExtension> = HashMap::new();
 
     for (module_name, usages) in module_extensions {
@@ -147,9 +156,9 @@ pub fn aggregate_extensions_with_root(
             if usage.dev_dependency {
                 let is_root = root_module_name
                     .map_or(true, |root| module_name == root || module_name == "_main");
-                if !is_root {
+                if !is_root || ignore_dev_dependency {
                     tracing::debug!(
-                        "Skipping dev_dependency extension '{}' from non-root module '{}'",
+                        "Skipping dev_dependency extension '{}' from module '{}'",
                         usage.extension_id(),
                         module_name
                     );
@@ -439,6 +448,27 @@ mod tests {
         assert_eq!(pip_ext.tags_by_module.len(), 2);
         assert_eq!(pip_ext.all_tags().len(), 2);
         assert_eq!(pip_ext.imported_repos, vec!["pip"]);
+    }
+
+    #[test]
+    fn test_aggregate_extensions_honors_ignore_dev_dependency_for_root() {
+        let mut dev_ext =
+            ExtensionUsage::new("@rules_python//pip.bzl".to_string(), "pip".to_string());
+        dev_ext.dev_dependency = true;
+        dev_ext
+            .imports
+            .push(UseRepo::new().add_repo("pip".to_string()));
+
+        let mut module_extensions = HashMap::new();
+        module_extensions.insert("root".to_string(), vec![dev_ext]);
+
+        let default_aggregated =
+            aggregate_extensions_with_policy(&module_extensions, Some("root"), false);
+        assert_eq!(default_aggregated.len(), 1);
+
+        let ignored_aggregated =
+            aggregate_extensions_with_policy(&module_extensions, Some("root"), true);
+        assert!(ignored_aggregated.is_empty());
     }
 
     #[test]
