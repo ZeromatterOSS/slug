@@ -447,6 +447,40 @@ pub fn canonical_bzlmod_module_cell_name(name: &str) -> Option<String> {
     Some(canonical_name)
 }
 
+pub fn action_external_cell_name(
+    project_root: &std::path::Path,
+    cell_name: &str,
+    cell_path: &str,
+) -> String {
+    canonical_dynamic_extension_cell_name(cell_name)
+        .or_else(|| canonical_bzlmod_module_cell_name(cell_name))
+        .or_else(|| {
+            cell_path
+                .strip_prefix("bazel-external/")
+                .and_then(|path| path.split('/').next())
+                .filter(|name| name.contains('+'))
+                .map(str::to_owned)
+        })
+        .or_else(|| {
+            let suffix = format!("+{cell_name}");
+            let bazel_external = project_root.join("bazel-external");
+            let mut candidates = Vec::new();
+            for entry in std::fs::read_dir(bazel_external).ok()?.flatten() {
+                if !entry.path().is_dir() {
+                    continue;
+                }
+                let dir_name = entry.file_name();
+                let dir_name = dir_name.to_string_lossy();
+                if dir_name.ends_with(&suffix) {
+                    candidates.push(dir_name.into_owned());
+                }
+            }
+            candidates.sort();
+            candidates.into_iter().next()
+        })
+        .unwrap_or_else(|| cell_name.to_owned())
+}
+
 /// Plan 36: register a dynamic extension spoke cell with its
 /// `ExtensionRepoCellSetup` so that `get_or_create_dynamic_cell`
 /// wires `ExternalCellOrigin::ExtensionRepo` onto the synthesized
@@ -1115,14 +1149,18 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
 /// Create `external/` symlinks for all non-root cells.
 /// Called once after cell resolver is set up.
 pub fn ensure_external_symlinks_for_cells(cells: &[(impl AsRef<str>, impl AsRef<str>)]) {
-    if dynamic_project_root().is_none() {
+    let Some(project_root) = dynamic_project_root() else {
         return;
-    }
+    };
     for (cell_name, cell_path) in cells {
         let name = cell_name.as_ref();
         let path = cell_path.as_ref();
         if !is_root_cell_name(name) && !path.is_empty() {
             ensure_external_symlink(name, path);
+            let action_name = action_external_cell_name(&project_root, name, path);
+            if action_name != name {
+                ensure_external_symlink(&action_name, path);
+            }
         }
     }
 }
@@ -2418,6 +2456,27 @@ mod tests {
 
         assert_eq!(priority, 2);
         assert_eq!(target, std::fs::canonicalize(extension_repo).unwrap());
+    }
+
+    #[test]
+    fn ensure_external_symlinks_for_cells_creates_canonical_module_link() {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_root = tmp.path();
+        let module_repo = project_root.join("bazel-external").join("rules_python+");
+        std::fs::create_dir_all(&module_repo).unwrap();
+        set_dynamic_project_root(project_root.to_path_buf());
+
+        ensure_external_symlinks_for_cells(&[("rules_python", "bazel-external/rules_python+")]);
+
+        let external = project_root.join("external");
+        assert_eq!(
+            std::fs::canonicalize(external.join("rules_python")).unwrap(),
+            std::fs::canonicalize(&module_repo).unwrap()
+        );
+        assert_eq!(
+            std::fs::canonicalize(external.join("rules_python+")).unwrap(),
+            std::fs::canonicalize(&module_repo).unwrap()
+        );
     }
 
     #[test]

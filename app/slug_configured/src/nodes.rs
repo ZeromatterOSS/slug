@@ -1398,6 +1398,7 @@ async fn compute_configured_target_node_no_transition(
     );
 
     let mut deps = gathered_deps.deps;
+    let target_deps_count = deps.len();
     let mut exec_deps = Vec::with_capacity(gathered_deps.exec_deps.len());
 
     for dep in toolchain_dep_results {
@@ -1440,6 +1441,7 @@ async fn compute_configured_target_node_no_transition(
         resolved_transitions,
         execution_platform_resolution,
         deps,
+        target_deps_count,
         exec_deps,
         platform_cfgs,
         gathered_deps.plugin_lists,

@@ -185,6 +185,39 @@ runtime boundary:
   result matches Bazel's no-default-output target surface while completing
   analysis instead of stalling at `ctx_toolchain_provider_analysis_start`.
 
+Blocker reflection 2026-05-21, configured dependency edge kind and canonical
+module external symlinks:
+
+- Focused SDK no-exec smoke failed at
+  `reactor//sdk:license_comment` because Slug reported
+  `required dependency platforms//os:windows ... was not found`. Bazel 9 ground
+  truth:
+  `bazel cquery 'deps(//sdk:license_comment, 1)' --output=label_kind`
+  succeeds and includes `constraint_value rule @platforms//os:windows`; this is
+  a normal private attr edge from rules_python's `_windows_constraints`, not a
+  select-key/configuration traversal edge.
+- Systemic fix: configured target nodes now preserve the edge-kind boundary
+  from configured attr traversal. `target_deps()` returns the normal attr
+  prefix recorded before toolchain deps are appended, rather than filtering by
+  the destination target's `RuleKind`. Starlark rule dep pre-analysis uses those
+  target deps plus exec deps, so normal attrs pointing at configuration rules
+  are visible without adding all select/compatibility configuration deps to
+  rule analysis.
+- The next failure was an `expand_template` read from
+  `external/rules_python+/python/private/...`. Bazel's execroot has the
+  canonical module repo symlink `external/rules_python+`; Slug only had the
+  apparent `external/rules_python` link. Source artifact path resolution and
+  `external/` symlink setup now share the same canonical action external-name
+  helper and create both the apparent and canonical links when they differ.
+- Validation:
+  `cargo fmt --check`, `cargo check -p slug_node`, `cargo check -p slug_core`,
+  `cargo check -p slug_analysis`, `cargo build -p slug`, and
+  `cargo test -p slug_core ensure_external_symlinks_for_cells_creates_canonical_module_link -- --nocapture`
+  all pass. Focused Slug validation also passes:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-license-comment-edge-kind-symlink build --jobs=16 --unstable-no-execution //sdk:license_comment`,
+  log
+  `/tmp/slug-plan61/plan61-license-comment-edge-kind-symlink-20260521-201125.log`.
+
 SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
 materialization failures to full execution:
 

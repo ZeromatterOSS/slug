@@ -5113,6 +5113,7 @@ mod tests {
         }));
         let target_node =
             TargetNode::testing_new(label.unconfigured().dupe(), rule_type, attrs, None);
+        let target_deps_count = deps.len();
         ConfiguredTargetNode::new(
             label.dupe(),
             target_node,
@@ -5123,6 +5124,7 @@ mod tests {
             OrderedMap::new(),
             ExecutionPlatformResolution::unspecified(),
             deps,
+            target_deps_count,
             Vec::new(),
             OrderedMap::new(),
             PluginLists::new(),

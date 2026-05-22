@@ -229,6 +229,7 @@ impl ConfiguredTargetNode {
             OrderedMap::new(),
             execution_platform_resolution,
             Vec::new(),
+            0,
             Vec::new(),
             OrderedMap::new(),
             PluginLists::new(),
@@ -242,6 +243,7 @@ impl ConfiguredTargetNode {
         resolved_tr_configurations: OrderedMap<Arc<TransitionId>, Arc<TransitionApplied>>,
         execution_platform_resolution: ExecutionPlatformResolution,
         deps: Vec<ConfiguredTargetNode>,
+        target_deps_count: usize,
         exec_deps: Vec<ConfiguredTargetNode>,
         platform_cfgs: OrderedMap<TargetLabel, ConfigurationData>,
         plugin_lists: PluginLists,
@@ -252,7 +254,7 @@ impl ConfiguredTargetNode {
             resolved_configuration,
             resolved_transition_configurations: resolved_tr_configurations,
             execution_platform_resolution,
-            all_deps: ConfiguredTargetNodeDeps::new(deps, exec_deps),
+            all_deps: ConfiguredTargetNodeDeps::new(deps, target_deps_count, exec_deps),
             platform_cfgs,
             plugin_lists,
         })))
@@ -308,7 +310,7 @@ impl ConfiguredTargetNode {
                     .execution_platform_resolution()
                     .dupe(),
                 plugin_lists: transitioned_node.plugin_lists().clone(),
-                all_deps: ConfiguredTargetNodeDeps::new(vec![transitioned_node], vec![]),
+                all_deps: ConfiguredTargetNodeDeps::new(vec![transitioned_node], 1, vec![]),
                 platform_cfgs: OrderedMap::new(),
             },
         ))))
@@ -358,13 +360,7 @@ impl ConfiguredTargetNode {
     }
 
     pub fn toolchain_deps(&self) -> impl Iterator<Item = &ConfiguredTargetNode> {
-        // Since we validate that all toolchain dependencies are of kind Toolchain,
-        // we can use that to filter the deps.
-        self.0
-            .all_deps
-            .deps()
-            .iter()
-            .filter(|x| x.rule_kind() == RuleKind::Toolchain)
+        self.0.all_deps.toolchain_deps().iter()
     }
 
     pub fn inputs(&self) -> impl Iterator<Item = CellPath> + '_ {
@@ -379,11 +375,7 @@ impl ConfiguredTargetNode {
     }
 
     pub fn target_deps(&self) -> impl Iterator<Item = &ConfiguredTargetNode> {
-        self.0
-            .all_deps
-            .deps()
-            .iter()
-            .filter(|x| x.rule_kind() == RuleKind::Normal)
+        self.0.all_deps.target_deps().iter()
     }
 
     pub fn exec_deps(&self) -> impl Iterator<Item = &ConfiguredTargetNode> {
@@ -559,26 +551,36 @@ impl ConfiguredTargetNode {
 /// (iteration, eq, and hash), but guarantees those aren't recursive of the dep nodes' data.
 #[derive(Allocative)]
 struct ConfiguredTargetNodeDeps {
-    /// Number of deps, excluding exec deps. Used as an index to retrieve exec_deps
+    /// Number of deps created by normal configured attribute traversal.
+    target_deps_count: usize,
+    /// Number of deps, excluding exec deps. Used as an index to retrieve exec_deps.
     deps_count: usize,
     /// (target deps and toolchain deps) followed by `exec_deps`.
     all_deps: Box<[ConfiguredTargetNode]>,
 }
 
 impl ConfiguredTargetNodeDeps {
-    fn new(deps: Vec<ConfiguredTargetNode>, exec_deps: Vec<ConfiguredTargetNode>) -> Self {
+    fn new(
+        deps: Vec<ConfiguredTargetNode>,
+        target_deps_count: usize,
+        exec_deps: Vec<ConfiguredTargetNode>,
+    ) -> Self {
+        assert!(target_deps_count <= deps.len());
         if deps.is_empty() {
             ConfiguredTargetNodeDeps {
+                target_deps_count: 0,
                 deps_count: 0,
                 all_deps: exec_deps.into_boxed_slice(),
             }
         } else if exec_deps.is_empty() {
             ConfiguredTargetNodeDeps {
+                target_deps_count,
                 deps_count: deps.len(),
                 all_deps: deps.into_boxed_slice(),
             }
         } else {
             ConfiguredTargetNodeDeps {
+                target_deps_count,
                 deps_count: deps.len(),
                 all_deps: deps
                     .into_iter()
@@ -593,6 +595,14 @@ impl ConfiguredTargetNodeDeps {
         &self.all_deps[..self.deps_count]
     }
 
+    fn target_deps(&self) -> &[ConfiguredTargetNode] {
+        &self.all_deps[..self.target_deps_count]
+    }
+
+    fn toolchain_deps(&self) -> &[ConfiguredTargetNode] {
+        &self.all_deps[self.target_deps_count..self.deps_count]
+    }
+
     fn exec_deps(&self) -> &[ConfiguredTargetNode] {
         &self.all_deps[self.deps_count..]
     }
@@ -604,14 +614,18 @@ impl ConfiguredTargetNodeDeps {
 impl PartialEq for ConfiguredTargetNodeDeps {
     fn eq(&self, other: &Self) -> bool {
         let ConfiguredTargetNodeDeps {
+            target_deps_count,
             deps_count,
             all_deps,
         } = self;
-        *deps_count == other.deps_count && all_deps.len() == other.all_deps.len() && {
-            let it1 = all_deps.iter();
-            let it2 = other.all_deps.iter();
-            it1.zip(it2).all(|(x, y)| triomphe::Arc::ptr_eq(&x.0, &y.0))
-        }
+        *target_deps_count == other.target_deps_count
+            && *deps_count == other.deps_count
+            && all_deps.len() == other.all_deps.len()
+            && {
+                let it1 = all_deps.iter();
+                let it2 = other.all_deps.iter();
+                it1.zip(it2).all(|(x, y)| triomphe::Arc::ptr_eq(&x.0, &y.0))
+            }
     }
 }
 
@@ -623,9 +637,11 @@ impl Eq for ConfiguredTargetNodeDeps {}
 impl Hash for ConfiguredTargetNodeDeps {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let ConfiguredTargetNodeDeps {
+            target_deps_count,
             deps_count,
             all_deps,
         } = self;
+        state.write_usize(*target_deps_count);
         state.write_usize(*deps_count);
         for node in &**all_deps {
             node.label().hash(state);
@@ -651,16 +667,20 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
     }
 
     pub fn target_deps(self) -> impl Iterator<Item = &'a ConfiguredTargetNode> {
+        self.0.get().all_deps.target_deps().iter()
+    }
+
+    pub fn exec_deps(self) -> impl Iterator<Item = &'a ConfiguredTargetNode> {
+        self.0.get().all_deps.exec_deps().iter()
+    }
+
+    pub fn configuration_deps(self) -> impl Iterator<Item = &'a ConfiguredTargetNode> {
         self.0
             .get()
             .all_deps
             .deps()
             .iter()
-            .filter(|x| x.rule_kind() == RuleKind::Normal)
-    }
-
-    pub fn exec_deps(self) -> impl Iterator<Item = &'a ConfiguredTargetNode> {
-        self.0.get().all_deps.exec_deps().iter()
+            .filter(|x| x.rule_kind() == RuleKind::Configuration)
     }
 
     #[inline]
