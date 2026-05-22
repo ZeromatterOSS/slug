@@ -803,13 +803,16 @@ fn lex_provider_pattern(
     let (cell_alias, pattern) = match split1_opt_ascii(pattern, AsciiStr2::new("//")) {
         Some((a, p)) => {
             // Bazel canonical-prefix semantics:
-            //   `@@//pkg`    = main repo (root cell), distinct from
-            //   `@//pkg`     = current repo
-            //   `@@name//pkg` and `@name//pkg` both resolve `name` via aliases
-            // Preserve a literal "@@" sentinel so the resolver can route empty
-            // canonical alias to the root cell instead of the current cell.
+            //   `@@//pkg`     = main repo (root cell), distinct from
+            //   `@//pkg`      = current repo
+            //   `@@name//pkg` = exact canonical repo identity, distinct from
+            //   `@name//pkg`  = apparent repo name resolved in the current scope
+            // Preserve `@@` for the parser so exact canonical labels bypass
+            // apparent-name alias resolution.
             let alias = if a == "@@" {
                 "@@"
+            } else if a.starts_with("@@") {
+                a
             } else {
                 a.trim_start_matches('@')
             };
@@ -1167,12 +1170,19 @@ where
     }
 
     // We ask for the cell, but if the pattern is relative we might not use it.
-    // Bazel `@@//pkg` (canonical empty alias) routes to the root cell; this is
-    // distinct from `@//pkg` / `//pkg` which mean the current cell.
-    let cell = if cell_alias == Some("@@") {
-        cell_resolver.root_cell()
-    } else {
-        cell_alias_resolver.resolve(cell_alias.unwrap_or_default())?
+    // Bazel canonical labels (`@@repo//pkg`) name the canonical repository
+    // directly. They must not be resolved as apparent aliases: `override_repo()`
+    // may make `@rules_rust` point at selected module content, but Bazel aquery
+    // still renders `@@rules_rs++rules_rust+rules_rust` actions under
+    // `external/rules_rs++rules_rust+rules_rust`.
+    let cell = match cell_alias {
+        Some("@@") => cell_resolver.root_cell(),
+        Some(alias) if alias.starts_with("@@") => {
+            let canonical = &alias[2..];
+            CellName::unchecked_new(canonical)?
+        }
+        Some(alias) => cell_alias_resolver.resolve(alias)?,
+        None => cell_alias_resolver.resolve("")?,
     };
 
     let package_path = pattern.package_path();
@@ -1542,6 +1552,26 @@ mod tests {
             mk_package::<T>("cell2", "package/path"),
             ParsedPattern::<T>::parse_precise(
                 "@alias2//package/path:",
+                CellName::testing_new("root"),
+                &resolver(),
+                &alias_resolver(),
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            mk_package::<T>("alias2", "package/path"),
+            ParsedPattern::<T>::parse_precise(
+                "@@alias2//package/path:",
+                CellName::testing_new("root"),
+                &resolver(),
+                &alias_resolver(),
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            mk_package::<T>("rules_rs++rules_rust+rules_rust", "package/path"),
+            ParsedPattern::<T>::parse_precise(
+                "@@rules_rs++rules_rust+rules_rust//package/path:",
                 CellName::testing_new("root"),
                 &resolver(),
                 &alias_resolver(),

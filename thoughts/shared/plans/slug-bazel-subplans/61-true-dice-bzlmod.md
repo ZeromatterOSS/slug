@@ -135,6 +135,56 @@ Blocker reflection 2026-05-21, broad SDK Rust-rule analysis tail:
   alias, then a systemic fix in the Rust-rule/toolchain/provider analysis owner
   if the focused target stalls.
 
+Blocker reflection 2026-05-21, generated-repo identity and C++ label flag/toolchain
+runtime boundary:
+
+- Focused exact-repo Slug probes showed that `@@rules_rs++rules_rust+rules_rust`
+  labels must stay exact canonical repository identities. Bazel 9 ground truth:
+  `bazel cquery @@rules_rs++rules_rust+rules_rust//rust/private:bootstrapping --output=label`
+  succeeds, and Bazel's `external/rules_rs++rules_rust+rules_rust` symlink points
+  at the selected `override_repo` replacement content. Slug now preserves
+  non-empty `@@repo//...` labels through pattern parsing and registers exact
+  overridden generated repos as their own cell roots backed by symlinks to the
+  selected replacement module content, instead of collapsing them through the
+  apparent alias table.
+- Bazel 9 source for `label_flag` (`LabelBuildSettings.java`,
+  `LateBoundAlias.java`, `AliasConfiguredTarget.java`) shows a late-bound alias:
+  public metadata stores `build_setting_default` as `NODEP_LABEL`, a hidden
+  `:alias` forwards to the default or command-line value, and providers are
+  forwarded from the selected target. Slug no longer returns synthetic CcInfo
+  for `label_flag`; it analyzes label flags through the alias path so
+  `@rules_cc//:link_extra_libs` forwards providers from its default
+  `:empty_lib`. Current implementation is a default-path approximation using a
+  dep-shaped default until Slug has Bazel's exact hidden late-bound alias model.
+- Focused Slug repro
+  `/tmp/slug-plan61/plan61-label-flag-forward-link-extra-lib-sdk-20260521-185031.log`
+  advanced from waiting on `@rules_cc//:link_extra_libs` to waiting on
+  `@rules_cc//:empty_lib`, proving the provider-forwarding fix moved the
+  frontier to C++ toolchain setup.
+- Bazel 9 ground truth for `@rules_cc//:empty_lib`: the target is a real
+  `cc_library` and `bazel aquery @rules_cc//:empty_lib --output=textproto`
+  creates a module-map action for `external/rules_cc+/empty_lib.cppmap`. It is
+  not a no-op target. In rules_cc,
+  `cc_library_impl.bzl` calls `semantics.get_cc_runtimes(ctx, True)`, and
+  `semantics.bzl` returns `[]` for libraries. Therefore C++ runtimes are a
+  link-semantics demand, not an unconditional `ctx.toolchains` construction
+  input.
+- Systemic fix: Slug's native C++ toolchain shim no longer analyzes the
+  selected toolchain implementation target or walks `static_runtime_lib` /
+  `dynamic_runtime_lib` while building `ctx.toolchains`. It still reads
+  registry/config metadata needed for features, compile/link action data, and
+  module-map identity, but runtime vectors stay empty at toolchain-construction
+  time. This matches Bazel's boundary for `cc_library` and avoids pulling the
+  LLVM/glibc/libcxx runtime cone before rule semantics asks for it.
+- Validation:
+  `cargo fmt --check`, `cargo check -p slug_analysis`, `cargo build -p slug`,
+  and
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-empty-lib-runtime-lazy build --jobs=16 @rules_cc//:empty_lib`
+  all pass. The focused successful Slug probe log is
+  `/tmp/slug-plan61/plan61-empty-lib-runtime-lazy-20260521-195105.log`, whose
+  result matches Bazel's no-default-output target surface while completing
+  analysis instead of stalling at `ctx_toolchain_provider_analysis_start`.
+
 SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
 materialization failures to full execution:
 

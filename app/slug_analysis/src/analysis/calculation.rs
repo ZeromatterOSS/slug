@@ -634,9 +634,20 @@ pub async fn get_dep_analysis<'v>(
     configured_node: ConfiguredTargetNodeRef<'v>,
     ctx: &mut DiceComputations<'_>,
 ) -> slug_error::Result<Vec<(&'v ConfiguredTargetLabel, AnalysisResult)>> {
-    let started = Instant::now();
-    let mut labels = configured_node
+    let labels = configured_node
         .deps()
+        .map(|dep| dep.label())
+        .collect::<Vec<_>>();
+    get_dep_analysis_for_labels(configured_node, ctx, labels).await
+}
+
+pub async fn get_starlark_rule_dep_analysis<'v>(
+    configured_node: ConfiguredTargetNodeRef<'v>,
+    ctx: &mut DiceComputations<'_>,
+) -> slug_error::Result<Vec<(&'v ConfiguredTargetLabel, AnalysisResult)>> {
+    let mut labels = configured_node
+        .target_deps()
+        .chain(configured_node.exec_deps())
         .map(|dep| dep.label())
         .collect::<Vec<_>>();
 
@@ -648,6 +659,15 @@ pub async fn get_dep_analysis<'v>(
         labels.clear();
     }
 
+    get_dep_analysis_for_labels(configured_node, ctx, labels).await
+}
+
+async fn get_dep_analysis_for_labels<'v>(
+    configured_node: ConfiguredTargetNodeRef<'v>,
+    ctx: &mut DiceComputations<'_>,
+    labels: Vec<&'v ConfiguredTargetLabel>,
+) -> slug_error::Result<Vec<(&'v ConfiguredTargetLabel, AnalysisResult)>> {
+    let started = Instant::now();
     let total_deps = labels.len();
     let mut results = Vec::with_capacity(labels.len());
     analysis_dep_checkpoint(
@@ -894,6 +914,9 @@ async fn check_config_setting_flag_values(
                                 })
                                 .collect();
                             (None, Some(items))
+                        }
+                        CoercedAttr::Dep(label) | CoercedAttr::Label(label) => {
+                            (Some(label.to_string()), None)
                         }
                         _ => return Ok(false),
                     },
@@ -1390,7 +1413,7 @@ async fn get_analysis_result_inner(
                 &rule_spec,
             )
             .await?;
-            let dep_analysis = get_dep_analysis(configured_node, ctx).await?;
+            let dep_analysis = get_starlark_rule_dep_analysis(configured_node, ctx).await?;
             let query_results = resolve_queries(ctx, configured_node).await?;
             dep_analysis_checkpoint(
                 "analysis_deps_ready",

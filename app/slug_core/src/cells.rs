@@ -249,6 +249,16 @@ pub fn register_dynamic_extension_cell_alias(apparent_name: String, canonical_na
 }
 
 pub fn resolve_dynamic_extension_cell_alias(apparent_name: &str) -> Option<String> {
+    // Exact canonical extension repo names are already Bazel execution
+    // identities. `override_repo()` may map a generated repo to the selected
+    // module for content/repo-mapping purposes, but Bazel aquery still renders
+    // actions for `@@owner++extension+repo` under
+    // `external/owner++extension+repo`. Do not collapse an exact generated
+    // repo name to the override target while computing action paths.
+    if apparent_name.contains('+') && get_dynamic_extension_cell(apparent_name).is_some() {
+        return Some(apparent_name.to_owned());
+    }
+
     DYNAMIC_EXTENSION_CELL_ALIASES
         .lock()
         .ok()

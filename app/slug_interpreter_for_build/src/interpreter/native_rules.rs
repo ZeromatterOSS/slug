@@ -250,19 +250,17 @@ pub(crate) mod rule_defs {
 
     /// Creates the AttributeSpec for label_flag.
     /// label_flag is a Bazel build setting that holds a label value.
-    /// The `build_setting_default` is stored as a STRING (not a dep) because in Bazel,
-    /// label_flag targets do NOT create dependency edges to their default value.
-    /// The label_flag is a configuration flag; its value is resolved at configuration time,
-    /// not at loading time. Treating it as a dep would create false cycles (e.g., in rules_rust
-    /// where process_wrapper → import → import_macro_label → import_macro → import_macro_impl
-    /// → process_wrapper forms a cycle only if import_macro_label follows its default as a dep).
+    /// Bazel implements label_flag as a late-bound alias. The public
+    /// `build_setting_default` attribute is a NODEP_LABEL, but the rule class
+    /// adds an internal `:alias` LABEL whose configured target forwards
+    /// providers from the selected label. Slug stores the default as the
+    /// forwarding dependency directly until it has a separate internal-attr
+    /// late-bound alias model.
     fn label_flag_attributes() -> AttributeSpec {
         let default_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
-                "",
-            ))))),
-            "The default label value for this flag (stored as string, not a dep)",
-            AttrType::string(),
+            None,
+            "The default label value for this flag",
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
         );
 
         AttributeSpec::from(
@@ -1219,16 +1217,15 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "label_flag")?;
 
-        // Accept both string and Label types for build_setting_default.
-        // In Bazel, label_flag accepts Label("//pkg:target") or "//pkg:target" string.
-        let default_str = if let Some(s) = build_setting_default.unpack_str() {
-            s.to_owned()
-        } else {
-            // For Label or other types, use str() representation
-            format!("{}", build_setting_default)
-        };
-        let coerced_default =
-            CoercedAttr::String(StringLiteral(ArcStr::from(default_str.as_str())));
+        // Accept both string and Label values. In Bazel the default is a
+        // NODEP_LABEL feeding a late-bound alias; in Slug this becomes the
+        // forwarded dependency edge used by native analysis.
+        let dep_attr_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let coerced_default = dep_attr_type.coerce(
+            AttrIsConfigurable::No,
+            internals.attr_coercion_context(),
+            build_setting_default,
+        )?;
 
         let target_node = create_native_target_node(
             rule_defs::LABEL_FLAG_RULE.clone(),

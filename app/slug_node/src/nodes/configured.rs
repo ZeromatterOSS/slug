@@ -650,6 +650,19 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
         self.0.get().all_deps.all_deps.iter()
     }
 
+    pub fn target_deps(self) -> impl Iterator<Item = &'a ConfiguredTargetNode> {
+        self.0
+            .get()
+            .all_deps
+            .deps()
+            .iter()
+            .filter(|x| x.rule_kind() == RuleKind::Normal)
+    }
+
+    pub fn exec_deps(self) -> impl Iterator<Item = &'a ConfiguredTargetNode> {
+        self.0.get().all_deps.exec_deps().iter()
+    }
+
     #[inline]
     pub fn ptr_eq(self, other: Self) -> bool {
         triomphe::ArcBorrow::ptr_eq(&self.0, &other.0)

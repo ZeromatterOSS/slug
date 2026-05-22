@@ -31,8 +31,6 @@ use slug_build_api::analysis::registry::RecordedAnalysisValues;
 use slug_build_api::artifact_groups::ArtifactGroup;
 use slug_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
-use slug_build_api::interpreter::rule_defs::cc_common::CcInfoInstanceStub;
-use slug_build_api::interpreter::rule_defs::cc_common::CcInfoProvider;
 use slug_build_api::interpreter::rule_defs::cc_common::OutputGroupInfoInstanceGen;
 use slug_build_api::interpreter::rule_defs::cc_common::OutputGroupInfoProvider;
 use slug_build_api::interpreter::rule_defs::depset::depset_to_list_without_heap;
@@ -238,7 +236,7 @@ pub fn analyze_native_rule(
         }
         NativeRuleKind::Filegroup => analyze_filegroup(target, configured_node, dep_analysis),
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
-        NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis), // dep_analysis is empty (build_setting_default is a string, not a dep)
+        NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
         NativeRuleKind::ConfigSetting => {
             analyze_config_setting(target, dep_analysis, flag_values_match, values_match)
         }
@@ -756,32 +754,16 @@ fn analyze_constraint_value(
 
 /// Analyze a label_flag target.
 /// A label_flag is a Bazel build setting that holds a label value.
-/// Its build_setting_default is stored as a plain string (not a dep), so there are no
-/// deps to forward.
-///
-/// We return DefaultInfo + minimal CcInfo so that when rules (like rules_rust's
-/// rust_binary_without_process_wrapper) resolve their `_import_macro_dep` through
-/// an alias chain ending at a label_flag, the dep is recognized as a cc_library-like
-/// dep (via CcInfo) rather than triggering "rust targets can only depend on rust_library
-/// or cc_library" errors in collect_deps. The CcInfo has an empty linking context,
-/// so it contributes no linker flags.
+/// Bazel implements label_flag as a late-bound alias whose configured target
+/// forwards providers from the selected/default label, plus build-setting
+/// metadata for select() support. Slug does not yet model the internal
+/// `:alias` attribute separately, so native loading stores the default label as
+/// this rule's dependency and analysis forwards that dependency's providers.
 fn analyze_label_flag(
     target: &ConfiguredTargetLabel,
-    _dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> slug_error::Result<AnalysisResult> {
-    let heap = FrozenHeap::new();
-    let default_info = FrozenDefaultInfo::testing_empty(&heap);
-    // Minimal CcInfo with empty linking context - required so that label_flag
-    // deps (via alias chains) pass the rules_rust collect_deps provider check.
-    let cc_info = heap.alloc(CcInfoInstanceStub);
-    let providers = SmallMap::from_iter([
-        (
-            DefaultInfoCallable::provider_id().dupe(),
-            default_info.to_frozen_value(),
-        ),
-        (CcInfoProvider::provider_id().dupe(), cc_info),
-    ]);
-    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
+    analyze_alias(target, dep_analysis)
 }
 
 /// Returns the default value for known Bazel command-line flags.

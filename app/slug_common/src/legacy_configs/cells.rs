@@ -1831,7 +1831,7 @@ impl BuckConfigBasedCells {
         let mut module_symlinks = Vec::new();
         let mut lockfile_seeded_cells = Vec::new();
         let mut scoped_repo_aliases = Vec::new();
-        let mut dynamic_extension_aliases = Vec::new();
+        let dynamic_extension_aliases = Vec::new();
         let mut eager_repo_rule_invocations = Vec::new();
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
@@ -2483,8 +2483,10 @@ impl BuckConfigBasedCells {
 
         // Build a set of existing cell names (from bzlmod deps + synthetic repos)
         // to avoid creating aliases that conflict with cell names.
-        let existing_cell_names: std::collections::HashSet<&str> =
-            cells.iter().map(|(name, _, _)| name.as_str()).collect();
+        let mut existing_cell_names: std::collections::HashSet<String> = cells
+            .iter()
+            .map(|(name, _, _)| name.as_str().to_owned())
+            .collect();
 
         // Convert pre-computed aliases. Apparent names from use_repo() are
         // module-scoped in Bazel; Slug still has a global alias table, so keep
@@ -2515,9 +2517,65 @@ impl BuckConfigBasedCells {
                 });
             }
             if is_generated_override_alias {
-                dynamic_extension_aliases.push(BzlmodDynamicAlias {
-                    apparent_name: alias.apparent_name.clone(),
-                    canonical_name: target_name.clone(),
+                // Bazel `override_repo()` replaces the generated repo's
+                // content, not its canonical execution identity. Exact labels
+                // like `@@rules_rs++rules_rust+rules_rust//...` still render
+                // actions and source inputs under
+                // `external/rules_rs++rules_rust+rules_rust`, but the package
+                // contents come from the selected replacement module. Register
+                // that exact generated name as its own cell pointing at the
+                // selected cell's path, and discard any stale extension/lockfile
+                // registration for the generated repo.
+                if !existing_cell_names.contains(&alias.apparent_name) {
+                    if let Some((_, selected_path, selected_setup)) = cells
+                        .iter()
+                        .find(|(name, _, _)| name.as_str() == target_name)
+                    {
+                        let selected_source_path = selected_setup
+                            .as_ref()
+                            .map(|setup| PathBuf::from(setup.source_path.as_ref()))
+                            .unwrap_or_else(|| {
+                                project_root
+                                    .root()
+                                    .as_path()
+                                    .join(selected_path.as_project_relative_path().as_str())
+                            });
+                        let selected_setup = selected_setup.clone().or_else(|| {
+                            Some(BzlmodCellSetup {
+                                module_name: Arc::from(target_name.as_str()),
+                                version: Arc::from(""),
+                                registry_url: Arc::from("override_repo"),
+                                source_path: Arc::from(
+                                    selected_source_path.to_string_lossy().into_owned(),
+                                ),
+                            })
+                        });
+                        let identity_path =
+                            format!("bazel-external/{}", alias.apparent_name.as_str());
+                        cells.push((
+                            CellName::unchecked_new(&alias.apparent_name)?,
+                            CellRootPathBuf::new(
+                                ProjectRelativePath::new(&identity_path)?.to_owned(),
+                            ),
+                            selected_setup,
+                        ));
+                        module_symlinks.push(BzlmodExternalModuleSymlink {
+                            entry_name: alias.apparent_name.clone(),
+                            source_path: selected_source_path,
+                        });
+                        existing_cell_names.insert(alias.apparent_name.clone());
+                    } else {
+                        tracing::warn!(
+                            "override_repo generated repo '{}' targets '{}', but the selected cell was not registered",
+                            alias.apparent_name,
+                            target_name
+                        );
+                    }
+                }
+                ext_cells.retain(|(name, _, _)| name.as_str() != alias.apparent_name);
+                lockfile_seeded_cells.retain(|cell| {
+                    cell.canonical_name != alias.apparent_name
+                        && cell.internal_name != alias.apparent_name
                 });
             }
             if !is_root_declared_alias {

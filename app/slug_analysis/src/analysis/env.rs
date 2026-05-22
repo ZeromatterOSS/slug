@@ -2826,31 +2826,6 @@ async fn metadata_default_output_data_for_label_configured(
     out
 }
 
-async fn metadata_toolchain_runtime_data(
-    ctx: &mut DiceComputations<'_>,
-    toolchain_impl: &TargetLabel,
-    attr_name: &str,
-    target_cfg: &slug_core::configuration::data::ConfigurationData,
-) -> Vec<(ConfiguredTargetLabel, Arc<str>)> {
-    let Some(toolchain_node) = target_node_for_metadata(ctx, toolchain_impl).await else {
-        return Vec::new();
-    };
-    let Some(runtime_attr) = toolchain_node.attr_or_none(attr_name, AttrInspectOptions::All) else {
-        return Vec::new();
-    };
-
-    let mut runtime_data = Vec::new();
-    for label in labels_from_coerced_attr(&runtime_attr.value, target_cfg) {
-        let label = metadata_canonicalize_label_for_owner(toolchain_impl, label);
-        for (output_label, output_path) in
-            metadata_default_output_data_for_label_configured(ctx, label, target_cfg).await
-        {
-            runtime_data.push((output_label, output_path.into()));
-        }
-    }
-    runtime_data
-}
-
 async fn metadata_toolchain_action_data(
     ctx: &mut DiceComputations<'_>,
     metadata: &CcToolchainFeaturesMetadata,
@@ -3691,34 +3666,16 @@ async fn run_analysis_with_env_underlying(
 
                         let is_mandatory = mandatory_types.contains(type_label);
 
-                        // Analyze the toolchain impl target. For mandatory
-                        // toolchains, propagate analysis errors so the user
-                        // sees the real failure (rather than a cryptic
-                        // "NoneType has no attribute X" at the call site).
+                        // C++ toolchains are represented by the native shim so
+                        // Slug can expose CcToolchainInfo without recursively
+                        // analyzing the selected toolchain implementation.
+                        // Other toolchains still come from pre-rule analysis;
+                        // for mandatory types, propagate analysis errors so the
+                        // user sees the real failure rather than a cryptic
+                        // "NoneType has no attribute X" at the call site.
                         let provider_value: Option<FrozenProviderCollectionValue> =
                             match parse_impl_label_to_target_label(&tc.toolchain_impl) {
-	                                Some(target_label) => {
-	                                    let configured =
-	                                        configured_toolchain_impl_post_transition(
-	                                            dice,
-	                                            &target_label,
-	                                            &target_cfg,
-	                                        )
-	                                        .await?;
-                                    let is_self_dependency = configured.eq(node.label());
-                                    analysis_ctx_toolchain_provider_checkpoint(
-                                        &analysis_env.label,
-                                        type_label,
-                                        &tc.toolchain_impl,
-                                        Some(&configured),
-                                        toolchain_index,
-                                        toolchain_count,
-                                        is_mandatory,
-                                        is_self_dependency,
-                                        1,
-                                        "analysis_start",
-                                        evaluate_rule_started,
-                                    );
+                                Some(target_label) => {
                                     let use_cpp_native_shim =
                                         is_cpp_toolchain_type_label(type_label);
                                     let use_rust_allocator_bootstrap_shim =
@@ -3727,6 +3684,21 @@ async fn run_analysis_with_env_underlying(
                                             &analysis_env.label,
                                         ) && is_rust_toolchain_type_label(type_label);
                                     if use_cpp_native_shim {
+                                        let configured = target_label.configure(target_cfg.dupe());
+                                        let is_self_dependency = configured.eq(node.label());
+                                        analysis_ctx_toolchain_provider_checkpoint(
+                                            &analysis_env.label,
+                                            type_label,
+                                            &tc.toolchain_impl,
+                                            Some(&configured),
+                                            toolchain_index,
+                                            toolchain_count,
+                                            is_mandatory,
+                                            is_self_dependency,
+                                            1,
+                                            "cc_toolchain_native_shim_metadata_start",
+                                            evaluate_rule_started,
+                                        );
                                         let toolchain_config_info = None;
                                         let toolchain_metadata_label = tc
                                             .cc_toolchain_config
@@ -3771,25 +3743,16 @@ async fn run_analysis_with_env_underlying(
 	                                            .as_deref()
 	                                            .and_then(parse_impl_label_to_target_label)
 	                                            .map(|label| metadata_path_for_label(&label, &target_cfg));
-	                                        let static_runtime_data =
-	                                            metadata_toolchain_runtime_data(
-	                                                dice,
-	                                                &target_label,
-	                                                "static_runtime_lib",
-	                                                &target_cfg,
-	                                            )
-	                                            .await;
-	                                        let dynamic_runtime_data =
-	                                            metadata_toolchain_runtime_data(
-	                                                dice,
-	                                                &target_label,
-	                                                "dynamic_runtime_lib",
-	                                                &target_cfg,
-	                                            )
-	                                            .await;
-	                                        analysis_ctx_toolchain_provider_checkpoint(
-	                                            &analysis_env.label,
-	                                            type_label,
+                                        // Bazel's rules_cc asks for C++ runtime libraries from
+                                        // rule semantics at the link point. Plain cc_library
+                                        // analysis, including @rules_cc//:empty_lib, does not
+                                        // force the runtime graph while constructing
+                                        // ctx.toolchains.
+                                        let static_runtime_data = Vec::new();
+                                        let dynamic_runtime_data = Vec::new();
+                                        analysis_ctx_toolchain_provider_checkpoint(
+                                            &analysis_env.label,
+                                            type_label,
                                             &tc.toolchain_impl,
                                             Some(&configured),
                                             toolchain_index,
@@ -3805,13 +3768,21 @@ async fn run_analysis_with_env_underlying(
                                             target_cfg.short_name(),
                                             toolchain_config_info,
                                             toolchain_features,
-	                                            module_map_path,
-	                                            compiler_data,
-	                                            linker_data,
-	                                            static_runtime_data,
-	                                            dynamic_runtime_data,
+                                            module_map_path,
+                                            compiler_data,
+                                            linker_data,
+                                            static_runtime_data,
+                                            dynamic_runtime_data,
                                         ))
-                                    } else if use_rust_allocator_bootstrap_shim {
+                                    } else {
+                                        let configured =
+                                            configured_toolchain_impl_post_transition(
+                                                dice,
+                                                &target_label,
+                                                &target_cfg,
+                                            )
+                                            .await?;
+                                        let is_self_dependency = configured.eq(node.label());
                                         analysis_ctx_toolchain_provider_checkpoint(
                                             &analysis_env.label,
                                             type_label,
@@ -3821,54 +3792,69 @@ async fn run_analysis_with_env_underlying(
                                             toolchain_count,
                                             is_mandatory,
                                             is_self_dependency,
+                                            1,
+                                            "analysis_start",
+                                            evaluate_rule_started,
+                                        );
+                                        if use_rust_allocator_bootstrap_shim {
+                                            analysis_ctx_toolchain_provider_checkpoint(
+                                                &analysis_env.label,
+                                                type_label,
+                                                &tc.toolchain_impl,
+                                                Some(&configured),
+                                                toolchain_index,
+                                                toolchain_count,
+                                                is_mandatory,
+                                                is_self_dependency,
                                             9,
                                             "rust_allocator_bootstrap_shim",
                                             evaluate_rule_started,
                                         );
                                         Some(rust_allocator_bootstrap_toolchain_provider_collection())
-                                    } else if let Some(precomputed) =
-                                        precomputed_toolchain_provider_collection(
-                                            &analysis_env.deps,
-                                            &analysis_env.toolchain_deps,
-                                            &target_label,
-                                        )?
-                                    {
-                                        analysis_ctx_toolchain_provider_checkpoint(
-                                            &analysis_env.label,
-                                            type_label,
-                                            &tc.toolchain_impl,
-                                            Some(&configured),
-                                            toolchain_index,
-                                            toolchain_count,
-                                            is_mandatory,
-                                            is_self_dependency,
-                                            10,
-                                            "precomputed_dep",
-                                            evaluate_rule_started,
-                                        );
-                                        Some(precomputed)
-                                    } else {
-                                        analysis_ctx_toolchain_provider_checkpoint(
-                                            &analysis_env.label,
-                                            type_label,
-                                            &tc.toolchain_impl,
-                                            Some(&configured),
-                                            toolchain_index,
-                                            toolchain_count,
-                                            is_mandatory,
-                                            is_self_dependency,
-                                            11,
-                                            "missing_precomputed_dep",
-                                            evaluate_rule_started,
-                                        );
-                                        return Err(slug_error::slug_error!(
-                                            slug_error::ErrorTag::Tier0,
-                                            "Resolved toolchain impl '{}' for type '{}' was not \
-                                             analyzed as a pre-rule dependency of '{}'",
-                                            tc.toolchain_impl,
-                                            type_label,
-                                            analysis_env.label
-                                        ));
+                                        } else if let Some(precomputed) =
+                                            precomputed_toolchain_provider_collection(
+                                                &analysis_env.deps,
+                                                &analysis_env.toolchain_deps,
+                                                &target_label,
+                                            )?
+                                        {
+                                            analysis_ctx_toolchain_provider_checkpoint(
+                                                &analysis_env.label,
+                                                type_label,
+                                                &tc.toolchain_impl,
+                                                Some(&configured),
+                                                toolchain_index,
+                                                toolchain_count,
+                                                is_mandatory,
+                                                is_self_dependency,
+                                                10,
+                                                "precomputed_dep",
+                                                evaluate_rule_started,
+                                            );
+                                            Some(precomputed)
+                                        } else {
+                                            analysis_ctx_toolchain_provider_checkpoint(
+                                                &analysis_env.label,
+                                                type_label,
+                                                &tc.toolchain_impl,
+                                                Some(&configured),
+                                                toolchain_index,
+                                                toolchain_count,
+                                                is_mandatory,
+                                                is_self_dependency,
+                                                11,
+                                                "missing_precomputed_dep",
+                                                evaluate_rule_started,
+                                            );
+                                            return Err(slug_error::slug_error!(
+                                                slug_error::ErrorTag::Tier0,
+                                                "Resolved toolchain impl '{}' for type '{}' was not \
+                                                 analyzed as a pre-rule dependency of '{}'",
+                                                tc.toolchain_impl,
+                                                type_label,
+                                                analysis_env.label
+                                            ));
+                                        }
                                     }
                                 }
                                 None => {
