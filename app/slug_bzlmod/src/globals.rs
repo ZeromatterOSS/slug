@@ -472,7 +472,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ///
     /// * `name` - The name of the module to depend on.
     /// * `version` - The minimum required version.
-    /// * `max_compatibility_level` - Maximum allowed compatibility level (currently ignored).
+    /// * `max_compatibility_level` - Deprecated Bazel 9 no-op accepted for
+    ///   parsing parity.
     /// * `repo_name` - Override the repository name for this dependency.
     /// * `dev_dependency` - If true, this dependency is only needed for development.
     ///
@@ -515,7 +516,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         ctx.bazel_deps.push(dep);
 
-        // max_compatibility_level is currently ignored
+        // Bazel 9 warns that max_compatibility_level is a no-op. Slug accepts
+        // and ignores it for parity.
         let _ = max_compatibility_level;
 
         Ok(NoneType)

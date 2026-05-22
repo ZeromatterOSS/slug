@@ -803,6 +803,30 @@ async def test_bazel_compatibility_incompatible_version_fails(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_max_compatibility_level_is_bazel9_noop(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: bazel_dep(max_compatibility_level) is warning-only no-op."""
+    dep = buck.cwd / "dep"
+    dep.mkdir()
+    _write(dep / "MODULE.bazel", 'module(name = "dep", version = "1.0")\n')
+    _write(
+        dep / "BUILD.bazel",
+        'filegroup(name = "x", visibility = ["//visibility:public"])\n',
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_max_compatibility")
+bazel_dep(name = "dep", version = "1.0", max_compatibility_level = 1)
+local_path_override(module_name = "dep", path = "dep")
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x", srcs = ["@dep//:x"])\n')
+
+    await buck.build("//:x")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_two_workspaces_do_not_share_bzlmod_state(
     buck: Buck,
 ) -> None:

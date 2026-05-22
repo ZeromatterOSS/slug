@@ -204,6 +204,10 @@ Observed SDK result at the checkpoint:
   evidence showed `bazel_compatibility = [">=99.0.0"]` fails during main
   repository mapping with `Bazel compatibility check failed`, and the new Plan
   61 guardrail covers the same negative class in Slug.
+- `bazel_dep(max_compatibility_level = ...)` is explicitly grounded as a Bazel
+  9 no-op rather than an unknown gap. Local Bazel 9.1.0 evidence showed the
+  directive only warns that the attribute is a no-op and still builds a local
+  override dependency; the new Slug guardrail preserves that accepted behavior.
 
 ## Consolidated Learnings
 
@@ -407,8 +411,7 @@ using Rust DICE keys and values:
 
 6. Complete Bazel 9 directive semantics.
    - Implement or explicitly Bazel-ground the behavior for
-     `max_compatibility_level`, remaining `dev_dependency` surfaces,
-     `single_version_override(registry/patches)`,
+     remaining `dev_dependency` surfaces, `single_version_override(registry/patches)`,
      `multiple_version_override(registry)`, `archive_override`, `git_override`,
      `override_repo`, `inject_repo`, and `isolate`.
    - Preserve root `bazel_dep(dev_dependency=True)` default inclusion and
