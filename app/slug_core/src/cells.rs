@@ -148,6 +148,10 @@ static BZLMOD_APPARENT_ALIAS_CACHE: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<String, Option<String>>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
+static DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, Option<String>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
 #[cfg(test)]
 static BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
@@ -227,6 +231,7 @@ pub fn register_dynamic_extension_cell(canonical_name: String, path: String) {
         cells.insert(canonical_name.clone(), path.clone());
     }
     cache_bzlmod_apparent_alias_for_canonical_name(&canonical_name);
+    cache_dynamic_extension_suffix_for_canonical_name(&canonical_name);
     // Always write the canonical-name symlink (`<owner>+<ext>+<repo>`).
     // Action commands, file-watch paths, and `bazel-external/` consumers
     // all use the canonical form as the source of truth.
@@ -407,25 +412,11 @@ pub fn canonical_dynamic_extension_cell_name(name: &str) -> Option<String> {
         .min()
         .cloned()
     {
+        cache_dynamic_extension_suffix_for_canonical_name(&canonical);
         return Some(canonical);
     }
 
-    let bazel_ext_dir = dynamic_project_root()
-        .map(|root| root.join("bazel-external"))
-        .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
-    let mut candidates = Vec::new();
-    for entry in std::fs::read_dir(bazel_ext_dir).ok()?.flatten() {
-        if !entry.path().is_dir() {
-            continue;
-        }
-        let dir_name = entry.file_name();
-        let dir_name = dir_name.to_string_lossy();
-        if dir_name.ends_with(&suffix) {
-            candidates.push(dir_name.into_owned());
-        }
-    }
-    candidates.sort();
-    candidates.into_iter().next()
+    scan_dynamic_extension_suffix_from_external_dir(name)
 }
 
 pub fn canonical_bzlmod_module_cell_name(name: &str) -> Option<String> {
@@ -1515,6 +1506,93 @@ fn cache_bzlmod_apparent_alias_for_canonical_name(canonical_name: &str) {
     }
 }
 
+fn scan_dynamic_extension_suffix_from_external_dir(name: &str) -> Option<String> {
+    if name.contains('+') {
+        return scan_exact_dynamic_extension_from_external_dir(name);
+    }
+
+    let cached = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE
+        .lock()
+        .ok()
+        .and_then(|cache| cache.get(name).cloned());
+    if let Some(cached) = cached {
+        return cached;
+    }
+
+    let discovered = scan_dynamic_extension_suffix_from_external_dir_uncached(name);
+    if let Ok(mut cache) = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE.lock() {
+        cache.insert(name.to_owned(), discovered.clone());
+    }
+    discovered
+}
+
+fn scan_exact_dynamic_extension_from_external_dir(name: &str) -> Option<String> {
+    let cached = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE
+        .lock()
+        .ok()
+        .and_then(|cache| cache.get(name).cloned());
+    if let Some(cached) = cached {
+        return cached;
+    }
+
+    let discovered = dynamic_project_root()
+        .map(|root| root.join("bazel-external").join(name))
+        .or_else(|| Some(std::path::PathBuf::from("bazel-external").join(name)))
+        .filter(|path| path.is_dir())
+        .map(|_| name.to_owned());
+    if let Ok(mut cache) = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE.lock() {
+        cache.insert(name.to_owned(), discovered.clone());
+    }
+    discovered
+}
+
+fn scan_dynamic_extension_suffix_from_external_dir_uncached(name: &str) -> Option<String> {
+    let bazel_ext_dir = dynamic_project_root()
+        .map(|root| root.join("bazel-external"))
+        .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
+    let suffix = format!("+{name}");
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(bazel_ext_dir).ok()?.flatten() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if !file_type.is_dir() && !file_type.is_symlink() {
+            continue;
+        }
+        let dir_name = entry.file_name();
+        let dir_name = dir_name.to_string_lossy();
+        if dir_name.ends_with(&suffix) {
+            candidates.push(dir_name.into_owned());
+        }
+    }
+    candidates.sort();
+    candidates.into_iter().next()
+}
+
+fn cache_dynamic_extension_suffix_for_canonical_name(canonical_name: &str) {
+    let Some((_, suffix)) = canonical_name.rsplit_once('+') else {
+        return;
+    };
+    if suffix.is_empty() {
+        return;
+    }
+    if let Ok(mut cache) = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE.lock() {
+        match cache.get_mut(suffix) {
+            Some(Some(existing)) if canonical_name < existing.as_str() => {
+                *existing = canonical_name.to_owned();
+            }
+            Some(None) => {
+                cache.insert(suffix.to_owned(), Some(canonical_name.to_owned()));
+            }
+            Some(Some(_)) => {}
+            None => {
+                cache.insert(suffix.to_owned(), Some(canonical_name.to_owned()));
+            }
+        }
+        cache.insert(canonical_name.to_owned(), Some(canonical_name.to_owned()));
+    }
+}
+
 #[cfg(test)]
 fn clear_bzlmod_apparent_alias_cache_for_tests() {
     if let Ok(mut cache) = BZLMOD_APPARENT_ALIAS_CACHE.lock() {
@@ -1523,8 +1601,23 @@ fn clear_bzlmod_apparent_alias_cache_for_tests() {
 }
 
 #[cfg(test)]
+fn clear_dynamic_extension_suffix_scan_cache_for_tests() {
+    if let Ok(mut cache) = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE.lock() {
+        cache.clear();
+    }
+}
+
+#[cfg(test)]
 fn cached_bzlmod_apparent_alias_for_tests(alias: &str) -> Option<Option<String>> {
     BZLMOD_APPARENT_ALIAS_CACHE
+        .lock()
+        .ok()
+        .and_then(|cache| cache.get(alias).cloned())
+}
+
+#[cfg(test)]
+fn cached_dynamic_extension_suffix_for_tests(alias: &str) -> Option<Option<String>> {
+    DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE
         .lock()
         .ok()
         .and_then(|cache| cache.get(alias).cloned())
@@ -1566,6 +1659,30 @@ mod bzlmod_apparent_alias_cache_tests {
         assert_eq!(
             cached_bzlmod_apparent_alias_for_tests("rules_cc"),
             Some(Some("rules_cc+0.2.9".to_owned()))
+        );
+    }
+
+    #[test]
+    fn dynamic_extension_suffix_cache_updates_negative_lookup_when_repo_registers_later() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        clear_dynamic_extension_suffix_scan_cache_for_tests();
+
+        DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE
+            .lock()
+            .unwrap()
+            .insert("generated".to_owned(), None);
+        register_dynamic_extension_cell(
+            "owner++extension+generated".to_owned(),
+            "bazel-external/owner++extension+generated".to_owned(),
+        );
+
+        assert_eq!(
+            cached_dynamic_extension_suffix_for_tests("generated"),
+            Some(Some("owner++extension+generated".to_owned()))
+        );
+        assert_eq!(
+            cached_dynamic_extension_suffix_for_tests("owner++extension+generated"),
+            Some(Some("owner++extension+generated".to_owned()))
         );
     }
 }

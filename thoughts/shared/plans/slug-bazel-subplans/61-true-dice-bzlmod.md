@@ -5043,6 +5043,70 @@ Implementation update:
   `plan61-*` isolation dirs and old execroot entries between smokes so generated
   output does not grow unbounded.
 
+Dynamic extension repository fallback performance checkpoint 2026-05-22:
+
+- Failure/perf evidence:
+  broad `//sdk:sdk_contents` retry after the symlink-input checkpoint spent
+  minutes in analysis around
+  `rules_rust+//ffi/cc/allocator_library:cc_allocator_library`. `strace` of the
+  running daemon showed repeated `statx` calls over every
+  `/var/mnt/dev/zeromatter-kuro/bazel-external/*` repository. The hot path was
+  `canonical_dynamic_extension_cell_name()` falling back to a full
+  `bazel-external` directory scan for every apparent dynamic-extension repo
+  lookup.
+- Bazel ground truth:
+  Bazel does not discover canonical repository identity by repeatedly scanning
+  external repository directories during analysis. Repository identity and
+  apparent-name resolution come from repository mappings/Skyframe values; the
+  Slug filesystem scan is only a temporary compatibility fallback while Plan 61
+  moves bzlmod identity into typed DICE ownership.
+- Fix:
+  Slug now caches dynamic-extension suffix lookup results and updates the cache
+  when a dynamic extension cell registers. Exact canonical names containing `+`
+  use one cached exact path check instead of a suffix scan. Negative cache
+  entries are replaced when the matching repository later registers, so the
+  fallback keeps correctness while removing repeated broad directory walks.
+- Validation:
+  `cargo test -p slug_core
+  dynamic_extension_suffix_cache_updates_negative_lookup_when_repo_registers_later
+  -- --nocapture`, `cargo build -p slug`, and `git diff --check` passed.
+  A fresh broad SDK smoke
+  `/tmp/slug-plan61/plan61-sdk-dynsuffix-cache-20260522-054350.log` moved past
+  the previous allocator-library analysis stall quickly and advanced to the
+  next `diplomat-tool` execution frontier.
+- Cleanup:
+  stale Plan 61 daemons, `buck-out/plan61-*`, and staged `execroot/*` trees were
+  removed after preserving logs. ZeroMatter disk use returned to about `4.2M`
+  `buck-out` and `28K` `execroot`.
+
+Current frontier, `diplomat-tool` compile-data inputs:
+
+- Slug failure:
+  the fresh SDK smoke failed compiling
+  `@@rules_rs++crate+crates__github.com_Reactor-Inc_diplomat.git_e70a1099//tool:diplomat-tool`.
+  Rust/Askama reported missing files such as
+  `external/rules_rs++crate+crates__github.com_Reactor-Inc_diplomat.git_e70a1099/tool/templates/js/enum.js.jinja`
+  through paths rooted at the generated crate's `tool/src` directory.
+- Bazel ground truth:
+  Bazel 9.0.1 aquery for
+  `mnemonic("Rustc", @@rules_rs++crate+crates__github.com_Reactor-Inc_diplomat.git_e70a1099//tool:diplomat-tool)`
+  with `--platforms=//bazel/platforms:linux-gnu-host` analyzes successfully and
+  declares the template files as Rustc action inputs, including
+  `external/rules_rs++crate+crates__github.com_Reactor-Inc_diplomat.git_e70a1099/tool/templates/js/base.js.jinja`.
+  The checked log is
+  `/tmp/slug-plan61/bazel-aquery-diplomat-tool-templates-20260522-061013.txt`.
+- Systemic direction:
+  inspect rules_rust's Starlark action construction for this crate and Slug's
+  `ctx.actions.run` input flattening/materialization. The missing semantic is
+  likely that declared source/compile-data inputs from Starlark are not reaching
+  Slug's Rustc action input set or per-action execroot, not that the templates
+  need target-specific copying.
+- Rejected shortcuts:
+  do not special-case `diplomat-tool`, scan rustc/Askama error paths to copy
+  templates, expose broad undeclared repository trees, or disable action
+  isolation. The fix must make Slug's declared action inputs match Bazel's
+  action-input behavior for this rules_rust class.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
