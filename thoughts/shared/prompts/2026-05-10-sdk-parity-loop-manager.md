@@ -204,6 +204,20 @@ ps -eo pid,ppid,stat,etime,rss,args | rg 'slugd\[' || true
 Always report final daemon state. Do not leave long-running Slug, smoke, or
 daemon sessions alive when handing off.
 
+When wrapping Slug or Bazel smokes with `timeout` and `tee`, enable pipeline
+failure propagation so a timed-out client is not reported as success:
+
+```sh
+set -o pipefail
+timeout 1800s <command> 2>&1 | tee "$log"
+status=$?
+set +o pipefail
+```
+
+After any bounded smoke exits, check for leftover `slugd` and forkserver
+processes before interpreting the result. A timed-out client can otherwise leave
+the daemon continuing work in the background.
+
 ## Standing Output-Tree Cleanup Rule
 
 SDK parity smokes create one `buck-out/<isolation-dir>` tree per run in

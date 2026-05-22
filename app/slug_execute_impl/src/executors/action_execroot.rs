@@ -22,6 +22,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::path::Path;
@@ -295,7 +296,63 @@ static MATERIALIZED_EXECROOTS: Mutex<Option<MaterializedSet>> = Mutex::new(None)
 
 struct MaterializedSet {
     project_root: PathBuf,
-    digests: std::collections::HashSet<String>,
+    active: HashMap<String, usize>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ActionExecrootLease {
+    project_root: PathBuf,
+    digest: String,
+    path: AbsNormPathBuf,
+}
+
+impl ActionExecrootLease {
+    #[cfg(test)]
+    pub(crate) fn as_path(&self) -> &Path {
+        self.path.as_path()
+    }
+
+    pub(crate) fn as_abs_norm_path(&self) -> &AbsNormPath {
+        self.path.as_ref()
+    }
+}
+
+impl PartialEq for ActionExecrootLease {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+
+impl Eq for ActionExecrootLease {}
+
+impl Drop for ActionExecrootLease {
+    fn drop(&mut self) {
+        let should_remove = {
+            let Ok(mut guard) = MATERIALIZED_EXECROOTS.lock() else {
+                return;
+            };
+            let Some(entry) = guard.as_mut() else {
+                return;
+            };
+            if entry.project_root != self.project_root {
+                return;
+            }
+            let Some(count) = entry.active.get_mut(&self.digest) else {
+                return;
+            };
+            if *count > 1 {
+                *count -= 1;
+                false
+            } else {
+                entry.active.remove(&self.digest);
+                true
+            }
+        };
+
+        if should_remove {
+            let _ = std::fs::remove_dir_all(self.path.as_path());
+        }
+    }
 }
 
 /// Build (or return the cached path of) a per-action execroot
@@ -314,7 +371,7 @@ struct MaterializedSet {
 pub(crate) fn ensure_execroot(
     project_root: &AbsNormPath,
     plan: &ActionExecrootPlan,
-) -> Option<AbsNormPathBuf> {
+) -> Option<ActionExecrootLease> {
     if plan.top_level_prefixes.is_empty()
         && plan.external_repos.is_empty()
         && plan.external_paths.is_empty()
@@ -336,16 +393,22 @@ pub(crate) fn ensure_execroot(
     let mut guard = MATERIALIZED_EXECROOTS.lock().ok()?;
     let entry = guard.get_or_insert_with(|| MaterializedSet {
         project_root: project_root.as_path().to_path_buf(),
-        digests: Default::default(),
+        active: Default::default(),
     });
     // Reset cache if the project root changed (e.g. test isolation).
     if entry.project_root != project_root.as_path() {
         entry.project_root = project_root.as_path().to_path_buf();
-        entry.digests.clear();
+        entry.active.clear();
     }
 
-    if entry.digests.contains(&digest) {
-        return AbsNormPathBuf::new(execroot_abs).ok();
+    if let Some(count) = entry.active.get_mut(&digest) {
+        *count += 1;
+        let path = AbsNormPathBuf::new(execroot_abs).ok()?;
+        return Some(ActionExecrootLease {
+            project_root: project_root.as_path().to_path_buf(),
+            digest,
+            path,
+        });
     }
 
     if let Err(e) = std::fs::create_dir_all(&execroot_abs) {
@@ -448,8 +511,13 @@ pub(crate) fn ensure_execroot(
         }
     }
 
-    entry.digests.insert(digest);
-    AbsNormPathBuf::new(execroot_abs).ok()
+    entry.active.insert(digest.clone(), 1);
+    let path = AbsNormPathBuf::new(execroot_abs).ok()?;
+    Some(ActionExecrootLease {
+        project_root: project_root.as_path().to_path_buf(),
+        digest,
+        path,
+    })
 }
 
 fn buck_out_inputs_to_link(project_root: &Path, inputs: &BTreeSet<String>) -> Vec<String> {
@@ -1036,6 +1104,33 @@ mod tests {
         let a = ensure_execroot(&project_norm, &test_plan(prefixes.clone())).unwrap();
         let b = ensure_execroot(&project_norm, &test_plan(prefixes)).unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn execroot_lease_removes_directory_after_last_user() {
+        reset_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path();
+        std::fs::create_dir(project.join("src")).unwrap();
+        let project_norm = AbsNormPathBuf::new(project.to_path_buf()).unwrap();
+        let prefixes = BTreeSet::from(["src".to_owned()]);
+
+        let first = ensure_execroot(&project_norm, &test_plan(prefixes.clone())).unwrap();
+        let execroot_path = first.as_path().to_path_buf();
+        assert!(execroot_path.exists());
+
+        let second = ensure_execroot(&project_norm, &test_plan(prefixes)).unwrap();
+        assert_eq!(first, second);
+        drop(first);
+        assert!(
+            execroot_path.exists(),
+            "shared execroot should stay until the last lease drops"
+        );
+        drop(second);
+        assert!(
+            !execroot_path.exists(),
+            "execroot should be removed after the last live action lease"
+        );
     }
 
     #[test]

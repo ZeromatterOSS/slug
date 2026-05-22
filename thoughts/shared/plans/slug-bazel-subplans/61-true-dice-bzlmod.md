@@ -5260,6 +5260,52 @@ Implementation slice 2026-05-22, generated LLVM subproject symlink layout:
   removed from `/var/mnt/dev/zeromatter-kuro/execroot`; sizes returned to about
   `buck-out=3.3M` and `execroot=480K`.
 
+Blocker reflection 2026-05-22, retained per-action execroot growth:
+
+- Broad smoke:
+  after the generated-repo symlink fix, a fresh Slug SDK build
+  `/tmp/slug-plan61/plan61-sdk-after-symlink-materialization-20260522-142312.log`
+  advanced past the missing libcxx source input and drained through the C/C++
+  runtime cone into the Rust crate tail. At the 30-minute bound it still had
+  about 208 actions remaining, so this was progress rather than a semantic
+  action failure.
+- Process bug:
+  the smoke was wrapped as `timeout ... | tee ...` without `pipefail`, so the
+  shell reported the pipeline as successful while the timeout had killed the
+  client and left the Slug daemon/forkserver running. The loop-manager prompt
+  now requires `set -o pipefail` for timed `tee` pipelines and a daemon/forkserver
+  check after every bounded smoke.
+- Disk evidence:
+  during the run, `/var/mnt/dev/zeromatter-kuro/execroot` grew to at least
+  `37G` with more than 3,100 first-level staged action-root directories. After
+  killing the daemon, cleanup of the stale execroot tree took several minutes;
+  `buck-out` returned to about `3.3M` and `execroot` was removed.
+- Reflection:
+  the growth was not a Bazel-required hardlink behavior and not a new bzlmod
+  label/materialization bug. Slug's per-action execroot cache retained every
+  unique plan digest for the life of the daemon. Bazel's sandbox/action
+  execution model does not require Slug to retain all historical per-action
+  execroots after the actions using them have completed.
+- Fix:
+  `app/slug_execute_impl/src/executors/action_execroot.rs` now returns an
+  active `ActionExecrootLease` instead of a bare path. Identical live action
+  plans still share one staged execroot through a refcount, but the directory
+  is removed when the last lease drops. `local.rs` holds that lease through
+  execution and output sync, bounding staged execroot retention by live actions
+  rather than by all actions seen by the daemon.
+- Validation:
+  `cargo fmt`, `cargo test -p slug_execute_impl
+  execroot_lease_removes_directory_after_last_user -- --nocapture`, `cargo
+  test -p slug_execute_impl identical_prefix_sets_share_execroot --
+  --nocapture`, `cargo check -p slug_execute_impl`, and `git diff --check`
+  pass. The new regression proves shared digests remain live until the final
+  lease drops and are then removed.
+- Next frontier:
+  rerun the broad SDK smoke with `pipefail` and a longer bound after committing
+  this cleanup fix. Monitor `buck-out` and `execroot` during the run; if
+  throughput remains too slow without unbounded execroot growth, the next owner
+  is action throughput/scheduling rather than repository layout.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.

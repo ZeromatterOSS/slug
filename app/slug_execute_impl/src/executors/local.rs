@@ -407,7 +407,9 @@ impl LocalExecutor {
                 if should_add_rustc_paramfile_execroot_remap(&new_args) {
                     add_rustc_flags_execroot_remap(
                         &mut slot_args_for_file,
-                        action_execroot.as_deref(),
+                        action_execroot
+                            .as_ref()
+                            .map(|execroot| execroot.as_abs_norm_path()),
                     );
                 }
                 if cfg!(windows) {
@@ -455,7 +457,10 @@ impl LocalExecutor {
                 tracing::warn!("Failed to prepare inline rustc linker wrapper: {e}");
             }
         }
-        if let Some(execroot) = action_execroot.as_deref() {
+        if let Some(execroot) = action_execroot
+            .as_ref()
+            .map(|execroot| execroot.as_abs_norm_path())
+        {
             let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
             if rewrite_process_wrapper_execroot_substitutions(
                 &mut rewritten_args,
@@ -467,12 +472,22 @@ impl LocalExecutor {
             }
         }
         if let Some(args) = args_owned.as_mut() {
-            if add_rustc_execroot_remap(args, action_execroot.as_deref()) {
+            if add_rustc_execroot_remap(
+                args,
+                action_execroot
+                    .as_ref()
+                    .map(|execroot| execroot.as_abs_norm_path()),
+            ) {
                 tracing::debug!("Added rustc remap for physical action execroot");
             }
         } else if args_owned.is_none() {
             let mut rewritten_args = args.to_vec();
-            if add_rustc_execroot_remap(&mut rewritten_args, action_execroot.as_deref()) {
+            if add_rustc_execroot_remap(
+                &mut rewritten_args,
+                action_execroot
+                    .as_ref()
+                    .map(|execroot| execroot.as_abs_norm_path()),
+            ) {
                 args_owned = Some(rewritten_args);
                 tracing::debug!("Added rustc remap for physical action execroot");
             }
@@ -481,7 +496,9 @@ impl LocalExecutor {
             let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
             if rewrite_windows_cargo_build_script_runner_args(
                 &mut rewritten_args,
-                action_execroot.as_deref(),
+                action_execroot
+                    .as_ref()
+                    .map(|execroot| execroot.as_abs_norm_path()),
             ) {
                 args_owned = Some(rewritten_args);
             }
@@ -490,7 +507,9 @@ impl LocalExecutor {
             let mut rewritten_args = args_owned.as_deref().unwrap_or(args).to_vec();
             if rewrite_windows_process_wrapper_child_tool_path(
                 &mut rewritten_args,
-                action_execroot.as_deref(),
+                action_execroot
+                    .as_ref()
+                    .map(|execroot| execroot.as_abs_norm_path()),
                 self.root.as_path(),
             ) {
                 args_owned = Some(rewritten_args);
@@ -554,7 +573,9 @@ impl LocalExecutor {
                 let args = if rewrite_windows_cargo_manifest_dir_env(
                     &mut args_for_exec,
                     &mut env,
-                    action_execroot.as_deref(),
+                    action_execroot
+                        .as_ref()
+                        .map(|execroot| execroot.as_abs_norm_path()),
                 ) {
                     args_for_exec.as_slice()
                 } else {
@@ -578,12 +599,19 @@ impl LocalExecutor {
                         cgroup,
                         freeze_rx,
                         sandbox,
-                        action_execroot.as_deref(),
+                        action_execroot
+                            .as_ref()
+                            .map(|execroot| execroot.as_abs_norm_path()),
                     )
                     .await
                 };
 
-                let r = match (r, action_execroot.as_deref()) {
+                let r = match (
+                    r,
+                    action_execroot
+                        .as_ref()
+                        .map(|execroot| execroot.as_abs_norm_path()),
+                ) {
                     (Ok(res), Some(execroot)) => sync_outputs_from_action_execroot(
                         execroot.as_path(),
                         self.root.as_path(),
