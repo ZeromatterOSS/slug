@@ -128,6 +128,12 @@ Observed SDK result at the checkpoint:
   part of policy equality/hashing. Focused `slug_common` coverage verifies
   hidden-lockfile policy identity, and the full 50-test Plan 61 guardrail target
   passed after the change.
+- The legacy bzlmod repo-env process global was removed. The server now threads
+  the effective command repo environment through config overrides as
+  `bzlmod.repo_env_json`, and bzlmod resolution/replay digests consume that
+  explicit option. Focused `slug_common` coverage verifies repo-env option
+  parsing, and the full 50-test Plan 61 guardrail target passed after the
+  change.
 
 ## Consolidated Learnings
 
@@ -174,8 +180,9 @@ What did not work or remains risky:
   hashed, but repo mappings at load sites, load failures, deleted files, and
   the full interpreter load graph are not replay-complete.
 - Extension spoke registration and seeded-extension tracking still use
-  process-global state. Reset hooks reduce the risk but do not provide a
-  replay-pure dependency model.
+  process-global state. The command repo-env global has been removed, but the
+  remaining spoke/seed reset hooks do not provide a replay-pure dependency
+  model.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
   remaining command policy around non-root dev dependencies.
@@ -336,7 +343,8 @@ using Rust DICE keys and values:
 
 9. Delete transitional APIs.
    - Remove `BzlmodSessionData` fields as the authority for graph semantics.
-   - Remove legacy command repo-env global state.
+   - Legacy command repo-env global state is removed; keep command repo-env
+     threaded through explicit DICE/key inputs as the remaining graph migrates.
    - Remove bridge cache fast paths whose correctness depends on hand-curated
      cacheability predicates.
    - Keep only compatibility shims that are demonstrably non-semantic or needed

@@ -56,8 +56,6 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::LazyLock;
-use std::sync::RwLock;
 
 use allocative::Allocative;
 pub use cache::ModuleCache;
@@ -238,27 +236,6 @@ pub struct BzlmodSessionData {
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
     pub repo_mappings: RepoMappingSnapshot,
     pub repo_mapping_overrides: RepoMappingOverrides,
-}
-
-static LEGACY_COMMAND_REPO_ENV: LazyLock<RwLock<BTreeMap<String, String>>> =
-    LazyLock::new(|| RwLock::new(BTreeMap::new()));
-
-/// Transitional command-scoped repo-env bridge for legacy pre-DICE bzlmod setup.
-///
-/// Final Plan 61 ownership belongs in `BzlmodCommandPolicyKey`; this exists so
-/// lockfile replay performed during legacy cell setup uses the same Bazel
-/// repository environment as DICE extension execution.
-pub fn set_legacy_bzlmod_repo_env(repo_env: BTreeMap<String, String>) {
-    if let Ok(mut guard) = LEGACY_COMMAND_REPO_ENV.write() {
-        *guard = repo_env;
-    }
-}
-
-pub fn legacy_bzlmod_repo_env() -> BTreeMap<String, String> {
-    LEGACY_COMMAND_REPO_ENV
-        .read()
-        .map(|guard| guard.clone())
-        .unwrap_or_default()
 }
 
 #[derive(

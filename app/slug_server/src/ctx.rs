@@ -325,11 +325,6 @@ impl<'a> ServerCommandContext<'a> {
                 .to_string_lossy()
                 .as_ref(),
         );
-        slug_bzlmod::set_legacy_bzlmod_repo_env(
-            slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
-                .into_iter()
-                .collect(),
-        );
         slug_build_api::interpreter::rule_defs::build_config::set_copts(&client_context.copts);
         slug_build_api::interpreter::rule_defs::build_config::set_cxxopts(&client_context.cxxopts);
         slug_build_api::interpreter::rule_defs::build_config::set_conlyopts(
@@ -556,6 +551,15 @@ impl ServerCommandContext<'_> {
                 "bzlmod.hidden_lockfile_path={}/MODULE.bazel.lock",
                 self.base_context.daemon_dir
             ),
+            config_type: ConfigType::Value as i32,
+        });
+        let repo_env: std::collections::BTreeMap<_, _> =
+            slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
+                .into_iter()
+                .collect();
+        config_overrides.push(ConfigOverride {
+            cell: None,
+            config_override: format!("bzlmod.repo_env_json={}", serde_json::to_string(&repo_env)?),
             config_type: ConfigType::Value as i32,
         });
 
