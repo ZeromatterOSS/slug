@@ -12,17 +12,21 @@ parity loop. The current guardrail file has 42 passing tests and no xfails. The
 broader DICE-owned bzlmod plan is not complete until the acceptance criteria
 below are satisfied or a real blocker is recorded.
 
-Current SDK parity checkpoint 2026-05-20: complete under the user-approved
-output-root exception. Slug builds `//sdk:sdk_contents`; directory/file
-manifests and modes match Bazel 9 exactly; all non-ELF file hashes match; the
-only remaining byte differences are the four ELF outputs `bin/zm`,
-`bin/zerobuf`, `bin/zerosystem`, and `lib/libzeromatter_ffi.so`. Those four
-differences are accepted for this checkpoint because the demonstrated remaining
-class is output-root strings embedded in ELF/debug/build metadata
-(`buck-out`/future `slug-out` versus Bazel's `bazel-out`). Exact-byte parity
-remains a follow-up design item: add a Bazel-grounded optional output-root mode
-that stores or exposes generated artifacts under `bazel-out` instead of
-post-link string rewriting.
+Current SDK parity checkpoint 2026-05-22: Slug again builds
+`//sdk:sdk_contents` after the later DICE/bzlmod and action-execroot fixes. The
+fresh post-lease build completed in 39m01s with 8,360 local commands and bounded
+staged execroot retention. Output parity must be refreshed against Bazel 9 for
+this latest tree. The previous 2026-05-20 parity checkpoint was complete under
+the user-approved output-root exception: directory/file manifests and modes
+matched Bazel 9 exactly, all non-ELF file hashes matched, and the only byte
+differences were the four ELF outputs `bin/zm`, `bin/zerobuf`,
+`bin/zerosystem`, and `lib/libzeromatter_ffi.so`. Those four differences are
+accepted for that checkpoint because the demonstrated remaining class was
+output-root strings embedded in ELF/debug/build metadata (`buck-out`/future
+`slug-out` versus Bazel's `bazel-out`). Exact-byte parity remains a follow-up
+design item: add a Bazel-grounded optional output-root mode that stores or
+exposes generated artifacts under `bazel-out` instead of post-link string
+rewriting.
 
 Current evidence:
 
@@ -39,6 +43,8 @@ Current evidence:
   tree. After later Plan 61 cleanup and the 2026-05-21 no-exec smoke, stale
   `plan61-*` generated trees were removed; `buck-out` was back to about 3.3M
   and logs remain preserved under `/tmp/slug-plan61`.
+- Fresh post-lease Slug full SDK build log:
+  `/tmp/slug-plan61/plan61-sdk-after-execroot-lease-20260522-151708.log`.
 
 Implementation update 2026-05-21, warm DICE bzlmod smoke blockers:
 
@@ -5305,6 +5311,31 @@ Blocker reflection 2026-05-22, retained per-action execroot growth:
   this cleanup fix. Monitor `buck-out` and `execroot` during the run; if
   throughput remains too slow without unbounded execroot growth, the next owner
   is action throughput/scheduling rather than repository layout.
+
+Implementation checkpoint 2026-05-22, post-lease full SDK smoke:
+
+- Fresh broad Slug smoke:
+  `SLUG_MEMORY_CHECKPOINTS=1 timeout 3600s /var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-sdk-after-execroot-lease-20260522-151708 build --jobs=16 //sdk:sdk_contents`
+  completed successfully. Log:
+  `/tmp/slug-plan61/plan61-sdk-after-execroot-lease-20260522-151708.log`.
+  The run reported `BUILD SUCCEEDED`, 8,360 local commands, load 16.1s,
+  analysis 26.2s, execute/materialize 38m30s, and total 39m01s.
+- Disk evidence during the run showed the lease fix bounded staged action-root
+  retention: sampled `execroot` sizes stayed around 155M-230M during the Rust
+  tail, with 7-16 first-level staged roots, instead of the previous 37G and
+  3,100+ retained roots. After the build completed, `buck-out` was about 7.7G,
+  `execroot` was 8.0K, and only one first-level execroot directory remained.
+- Reflection:
+  this closes the retained-execroot growth blocker. The remaining Plan 61
+  acceptance work is no longer "can Slug build the SDK" for the latest tree; it
+  is refreshing Bazel 9 output parity for this tree, then deciding whether any
+  remaining differences are the already accepted output-root string class or a
+  new semantic mismatch.
+- Next frontier:
+  keep `buck-out/plan61-sdk-after-execroot-lease-20260522-151708` as the Slug
+  evidence tree, clean live Slug daemon/forkserver state, run the Bazel 9
+  `//sdk:sdk_contents` build from the same ZeroMatter checkout, and refresh
+  manifest/mode/hash comparison.
 
 Exit criteria:
 
