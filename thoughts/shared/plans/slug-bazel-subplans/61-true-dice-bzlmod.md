@@ -218,6 +218,32 @@ module external symlinks:
   log
   `/tmp/slug-plan61/plan61-license-comment-edge-kind-symlink-20260521-201125.log`.
 
+SDK checkpoint 2026-05-21, broad target after edge-kind/canonical symlink fix:
+
+- Broad Slug SDK smoke passed:
+  `SLUG_MEMORY_CHECKPOINTS=1 timeout 900s /var/mnt/dev/slug/target/debug/slug --isolation-dir plan61-sdk-noexec-edge-kind-symlink build --jobs=16 --unstable-no-execution //sdk:sdk_contents`,
+  log
+  `/tmp/slug-plan61/plan61-sdk-noexec-edge-kind-symlink-20260521-201317.log`.
+  The run completed with `BUILD SUCCEEDED`, 7,779 local commands, phases
+  `load=32.0s analyze=3m08s execute=1m27s materialize=0ms total=4m47s`, and
+  final daemon RSS about 1.5GiB.
+- Despite the command carrying `--unstable-no-execution`, this invocation
+  executed local actions. Treat the result as a successful broad execution
+  smoke for the current SDK frontier, not as proof that the dry-run/no-exec path
+  still has Bazel-shaped behavior. If future Plan 61 work depends on dry-run
+  semantics, re-ground the flag behavior in Slug source and focused tests before
+  using it as evidence.
+- Peak analysis RSS remained high: memory checkpoints reached
+  `max_rss_bytes=11242799104` while analysis active snapshots were in the LLVM
+  runtime/CRT cone. This is no longer a correctness blocker for the SDK smoke,
+  but it is still a Plan 61 performance/memory frontier because the loop target
+  calls for equivalent or better performance and memory behavior, not merely
+  eventual success.
+- After validation, the idle Slug daemon was terminated and stale generated
+  `buck-out/plan61-*` / `execroot/*` trees in `/var/mnt/dev/zeromatter-kuro`
+  were removed. Evidence logs remain under `/tmp/slug-plan61`; generated output
+  sizes after cleanup were about `buck-out=3.3M` and `execroot=256K`.
+
 SDK parity loop slice 2026-05-19 advanced the frontier from lockfile/repo
 materialization failures to full execution:
 
