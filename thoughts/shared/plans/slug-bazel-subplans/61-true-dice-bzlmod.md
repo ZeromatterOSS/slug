@@ -6,27 +6,24 @@
 
 ## Status
 
-In progress overall. Phase 61.1 guardrails started 2026-05-18 and now cover the
-observable bzlmod replay/materialization bug shapes that blocked the current SDK
-parity loop. The current guardrail file has 42 passing tests and no xfails. The
-broader DICE-owned bzlmod plan is not complete until the acceptance criteria
-below are satisfied or a real blocker is recorded.
+Complete for the Plan 61 scope as of 2026-05-22. Phase 61.1 guardrails cover
+the observable bzlmod replay/materialization bug shapes that blocked the SDK
+parity loop; the current guardrail file has 42 passing tests and no xfails.
+The refreshed ZeroMatter SDK build/parity check also passes under the
+user-approved output-root ELF exception.
 
-Current SDK parity checkpoint 2026-05-22: Slug again builds
-`//sdk:sdk_contents` after the later DICE/bzlmod and action-execroot fixes. The
-fresh post-lease build completed in 39m01s with 8,360 local commands and bounded
-staged execroot retention. Output parity must be refreshed against Bazel 9 for
-this latest tree. The previous 2026-05-20 parity checkpoint was complete under
-the user-approved output-root exception: directory/file manifests and modes
-matched Bazel 9 exactly, all non-ELF file hashes matched, and the only byte
-differences were the four ELF outputs `bin/zm`, `bin/zerobuf`,
-`bin/zerosystem`, and `lib/libzeromatter_ffi.so`. Those four differences are
-accepted for that checkpoint because the demonstrated remaining class was
-output-root strings embedded in ELF/debug/build metadata (`buck-out`/future
-`slug-out` versus Bazel's `bazel-out`). Exact-byte parity remains a follow-up
-design item: add a Bazel-grounded optional output-root mode that stores or
-exposes generated artifacts under `bazel-out` instead of post-link string
-rewriting.
+Current SDK parity checkpoint 2026-05-22: Slug builds `//sdk:sdk_contents`
+after the later DICE/bzlmod and action-execroot fixes. The fresh post-lease
+build completed in 39m01s with 8,360 local commands and bounded staged execroot
+retention. Bazel 9.0.1 also builds `//sdk:sdk_contents`; directory/file
+manifests and modes match exactly, all non-ELF file hashes match, and the only
+byte differences are the same four ELF outputs `bin/zm`, `bin/zerobuf`,
+`bin/zerosystem`, and `lib/libzeromatter_ffi.so`. Those four differences remain
+accepted because the demonstrated class is output-root strings embedded in
+ELF/debug/build metadata (`buck-out`/future `slug-out` versus Bazel's
+`bazel-out`). Exact-byte parity remains a follow-up design item: add a
+Bazel-grounded optional output-root mode that stores or exposes generated
+artifacts under `bazel-out` instead of post-link string rewriting.
 
 Current evidence:
 
@@ -45,6 +42,18 @@ Current evidence:
   and logs remain preserved under `/tmp/slug-plan61`.
 - Fresh post-lease Slug full SDK build log:
   `/tmp/slug-plan61/plan61-sdk-after-execroot-lease-20260522-151708.log`.
+- Fresh Bazel 9.0.1 full SDK build log:
+  `/tmp/slug-plan61/bazel-sdk-contents-after-execroot-lease-20260522-155820.log`.
+- Bazel/Slug mode manifests:
+  `/tmp/slug-plan61/bazel-sdk-contents-modes-after-execroot-lease.txt` and
+  `/tmp/slug-plan61/slug-sdk-contents-modes-after-execroot-lease.txt`.
+- Bazel/Slug SHA manifests:
+  `/tmp/slug-plan61/bazel-sdk-contents-sha-after-execroot-lease.txt` and
+  `/tmp/slug-plan61/slug-sdk-contents-sha-after-execroot-lease.txt`.
+- Final warm-audit logs:
+  `/tmp/slug-plan61/plan61-audit-cell-final-20260522-160543.log`,
+  `/tmp/slug-plan61/plan61-audit-cell-final-20260522-160543-warm.out`, and
+  `/tmp/slug-plan61/plan61-audit-cell-final-20260522-160543-counters.json`.
 
 Implementation update 2026-05-21, warm DICE bzlmod smoke blockers:
 
@@ -5336,6 +5345,47 @@ Implementation checkpoint 2026-05-22, post-lease full SDK smoke:
   evidence tree, clean live Slug daemon/forkserver state, run the Bazel 9
   `//sdk:sdk_contents` build from the same ZeroMatter checkout, and refresh
   manifest/mode/hash comparison.
+
+Completion checkpoint 2026-05-22, refreshed SDK parity and warm audit:
+
+- Bazel 9.0.1 ground truth:
+  `timeout 3600s bazel build //sdk:sdk_contents` from the same ZeroMatter
+  checkout completed successfully in 192.668s. Log:
+  `/tmp/slug-plan61/bazel-sdk-contents-after-execroot-lease-20260522-155820.log`.
+- Refreshed output comparison:
+  the Slug output tree
+  `buck-out/plan61-sdk-after-execroot-lease-20260522-151708/gen/reactor/2ea54b82f664ea72/sdk/sdk_contents`
+  and Bazel `bazel-bin/sdk/sdk_contents` both contained 551 files and 28
+  directories. Relative directory/file manifests and modes matched exactly.
+  SHA comparison differed only for `bin/zm`, `bin/zerobuf`,
+  `bin/zerosystem`, and `lib/libzeromatter_ffi.so`.
+- ELF-difference classification:
+  all four differing files are ELF outputs. `strings` still shows the known
+  output-root/debug/build metadata class: Bazel embeds `bazel-out/...` and
+  sandbox execroot paths, while Slug embeds the generated
+  `buck-out/plan61-sdk-after-execroot-lease-20260522-151708/...` paths. Per the
+  user-approved output-root exception, this is accepted for Plan 61 rather than
+  treated as a bzlmod blocker.
+- Guardrails:
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` passed with 42
+  tests in 40.51s. `./target/debug/slug test
+  tests/core/bzlmod:test_plan61_guardrails` also passed with 42 tests inside
+  pytest.
+- Warm same-daemon audit:
+  fresh isolation `plan61-audit-cell-final-20260522-160543` passed `audit
+  cell` cold in `elapsed=0:22.60 maxrss_kb=80588`, then warm in
+  `elapsed=0:09.85 maxrss_kb=81644`, satisfying the `<10s` warm-audit exit
+  budget. Final counters were `bzlmod_resolution_compute=2`,
+  `module_file_parse=739`, `extension_eval=0`,
+  `extension_replay_miss_reason=13`, and `lockfile_read=2`.
+- Plan 61 completion:
+  no current Plan 61 guardrail xfails remain, the SDK build succeeds under
+  Slug, refreshed Bazel-vs-Slug output parity matches except for the accepted
+  ELF output-root string class, and the warm DICE reuse budget is still met.
+  The remaining exact-byte ELF parity work belongs to the optional
+  Bazel-compatible `bazel-out` output-root follow-up, not to Plan 61's bzlmod
+  blocker loop.
 
 Exit criteria:
 
