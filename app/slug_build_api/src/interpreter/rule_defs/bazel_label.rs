@@ -31,7 +31,20 @@ use starlark::values::ValueLike;
 use starlark::values::starlark_value;
 
 pub(crate) fn bazel_label_from_configured(label: &ConfiguredProvidersLabel) -> BazelLabel {
-    BazelLabel::parse(&label.target().unconfigured().to_string())
+    let target = label.target().unconfigured();
+    let cell = target.pkg().cell_name().as_str();
+    let workspace_name = if slug_core::cells::is_root_cell_name(cell) {
+        String::new()
+    } else {
+        slug_core::cells::canonical_dynamic_extension_cell_name(cell)
+            .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell))
+            .unwrap_or_else(|| cell.to_owned())
+    };
+    BazelLabel::new(
+        workspace_name,
+        target.pkg().cell_relative_path().as_str().to_owned(),
+        target.name().as_str().to_owned(),
+    )
 }
 
 /// A Bazel-compatible Label value returned by `Label()` and `ctx.package_relative_label()`.
@@ -184,6 +197,22 @@ impl<'v> StarlarkValue<'v> for BazelLabel {
 }
 
 impl BazelLabel {
+    fn new(workspace_name: String, package: String, name: String) -> Self {
+        let full =
+            if workspace_name.is_empty() || slug_core::cells::is_root_cell_name(&workspace_name) {
+                format!("@@//{}:{}", package, name)
+            } else {
+                format!("@@{}//{}:{}", workspace_name, package, name)
+            };
+
+        BazelLabel {
+            full,
+            name,
+            package,
+            workspace_name,
+        }
+    }
+
     /// Parse a fully-resolved label string like "@repo//pkg:target" into a BazelLabel.
     ///
     /// The label_str is assumed to be already resolved (absolute, not relative).
@@ -220,19 +249,7 @@ impl BazelLabel {
             (rest.to_owned(), last.to_owned())
         };
 
-        // Store canonical form with @@ prefix (Bazel 9.0+ bzlmod format)
-        let full = if workspace.is_empty() || slug_core::cells::is_root_cell_name(&workspace) {
-            format!("@@//{}:{}", package, name)
-        } else {
-            format!("@@{}//{}:{}", workspace, package, name)
-        };
-
-        BazelLabel {
-            full,
-            name,
-            package,
-            workspace_name: workspace,
-        }
+        Self::new(workspace, package, name)
     }
 
     /// Get the full label string.
@@ -258,6 +275,10 @@ impl BazelLabel {
 
 #[cfg(test)]
 mod tests {
+    use slug_core::configuration::data::ConfigurationData;
+    use slug_core::provider::label::ProvidersName;
+    use slug_core::target::label::label::TargetLabel;
+
     use super::*;
 
     #[test]
@@ -278,5 +299,24 @@ mod tests {
         assert_eq!(label.name(), "");
         assert_eq!(label.package(), "");
         assert_eq!(label.workspace_name(), "zstd");
+    }
+
+    #[test]
+    fn configured_label_uses_bazel_canonical_crate_workspace() {
+        let target = TargetLabel::testing_parse("crates__serde_core-1.0.228//:_bs")
+            .configure(ConfigurationData::testing_new());
+        let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
+        let bazel_label = bazel_label_from_configured(&label);
+
+        assert_eq!(bazel_label.package(), "");
+        assert_eq!(bazel_label.name(), "_bs");
+        assert_eq!(
+            bazel_label.workspace_name(),
+            "rules_rs++crate+crates__serde_core-1.0.228"
+        );
+        assert_eq!(
+            bazel_label.full(),
+            "@@rules_rs++crate+crates__serde_core-1.0.228//:_bs"
+        );
     }
 }

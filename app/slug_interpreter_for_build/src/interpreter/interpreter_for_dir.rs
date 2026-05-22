@@ -275,6 +275,8 @@ impl LoadResolver for InterpreterLoadResolver {
 
 fn are_bzlmod_alias_equivalent(apparent: &str, canonical: &str) -> bool {
     apparent == canonical
+        || canonical.strip_suffix('+') == Some(apparent)
+        || apparent.strip_suffix('+') == Some(canonical)
         || slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref()
             == Some(canonical)
         || slug_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
@@ -304,6 +306,12 @@ mod tests {
 
         assert!(are_bzlmod_alias_equivalent(apparent, canonical));
         assert!(are_bzlmod_alias_equivalent(canonical, apparent));
+    }
+
+    #[test]
+    fn load_cell_equivalence_accepts_empty_version_module_suffix() {
+        assert!(are_bzlmod_alias_equivalent("rules_rust", "rules_rust+"));
+        assert!(are_bzlmod_alias_equivalent("rules_rust+", "rules_rust"));
     }
 
     #[test]

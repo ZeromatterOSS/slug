@@ -202,8 +202,14 @@ fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
             let cell_name = match plus_count {
                 0 => dir_name.to_owned(),
                 1 => {
-                    // "{cell_name}+{version}"
-                    dir_name[..dir_name.find('+').unwrap()].to_owned()
+                    // "{cell_name}+{version}", or the canonical module repo
+                    // name form "{cell_name}+" for modules without an explicit
+                    // version suffix in the repo directory.
+                    if dir_name.ends_with('+') {
+                        dir_name.to_owned()
+                    } else {
+                        dir_name[..dir_name.find('+').unwrap()].to_owned()
+                    }
                 }
                 _ => {
                     // "{owner}+{extension}+{repo_name}[+...]"
@@ -262,6 +268,17 @@ fn canonical_repo_name_for_label_context(
     }
 
     apparent_repo_name.to_owned()
+}
+
+fn lexical_current_repo_name_for_label_context(file_cell: &str) -> String {
+    if file_cell.is_empty() || slug_core::cells::is_root_cell_name(file_cell) {
+        return String::new();
+    }
+
+    slug_core::cells::canonical_bzlmod_module_cell_name(file_cell)
+        .or_else(|| file_cell.contains('+').then(|| file_cell.to_owned()))
+        .or_else(|| slug_core::cells::canonical_dynamic_extension_cell_name(file_cell))
+        .unwrap_or_else(|| file_cell.to_owned())
 }
 
 fn scoped_canonical_repo_name_for_label_context(
@@ -351,7 +368,7 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             }
         };
 
-        let current_repo = canonical_repo_name_for_label_context(eval, &file_cell);
+        let current_repo = lexical_current_repo_name_for_label_context(&file_cell);
         let resolved = slug_bzlmod::canonicalize_label_with_package_context_and_repo_resolver(
             label_string,
             current_repo,
@@ -996,6 +1013,7 @@ pub const SLUG_BAZEL_VERSION: &str = "9.0.1";
 #[cfg(test)]
 mod tests {
     use super::extract_cell_and_package_from_filename;
+    use super::lexical_current_repo_name_for_label_context;
 
     #[test]
     fn label_context_for_bzlmod_module_strips_version_suffix() {
@@ -1004,6 +1022,41 @@ mod tests {
                 "bazel-external/rules_cc+0.2.17/cc/toolchains/defs.bzl"
             ),
             ("rules_cc".to_owned(), "cc/toolchains".to_owned())
+        );
+    }
+
+    #[test]
+    fn label_context_for_bzlmod_module_keeps_empty_version_suffix() {
+        assert_eq!(
+            extract_cell_and_package_from_filename(
+                "bazel-external/rules_rust+/rust/private/rustc.bzl"
+            ),
+            ("rules_rust+".to_owned(), "rust/private".to_owned())
+        );
+    }
+
+    #[test]
+    fn label_context_current_repo_keeps_empty_version_module_suffix() {
+        assert_eq!(
+            lexical_current_repo_name_for_label_context("rules_rust+"),
+            "rules_rust+"
+        );
+    }
+
+    #[test]
+    fn label_context_current_repo_does_not_alias_canonical_module_repo() {
+        slug_core::cells::register_dynamic_extension_cell(
+            "label_ctx_owner++ext+repo".to_owned(),
+            "bazel-external/label_ctx_owner++ext+repo".to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            "label_ctx_module+".to_owned(),
+            "label_ctx_owner++ext+repo".to_owned(),
+        );
+
+        assert_eq!(
+            lexical_current_repo_name_for_label_context("label_ctx_module+"),
+            "label_ctx_module+"
         );
     }
 

@@ -77,6 +77,25 @@ impl<'a> LabelFilesystemResolver<'a> {
             };
         }
 
+        if let Some(repo_path) = self.cell_path_for_repo(repo) {
+            return join_label_fragment(repo_path, label.package(), label.target());
+        }
+
+        if let Some(cell_path) = slug_core::cells::get_dynamic_extension_cell(repo) {
+            if let Some(project_root) = self.project_root_path() {
+                return join_label_fragment(
+                    project_root.join(cell_path),
+                    label.package(),
+                    label.target(),
+                );
+            }
+        }
+
+        if let Some(path) = self.scan_bazel_external_fallback(repo, label.package(), label.target())
+        {
+            return path;
+        }
+
         let resolved_repo = slug_core::cells::resolve_dynamic_extension_cell_alias(repo)
             .unwrap_or_else(|| repo.to_owned());
         let repo_names = || {
@@ -131,9 +150,12 @@ impl<'a> LabelFilesystemResolver<'a> {
         cell_paths
             .get(repo)
             .or_else(|| {
+                let module_prefix = format!("{}+", repo);
                 cell_paths
                     .iter()
-                    .find(|(name, _)| name.starts_with(&format!("{}+", repo)))
+                    .find(|(name, _)| {
+                        name.starts_with(&module_prefix) && name.matches('+').count() == 1
+                    })
                     .map(|(_, path)| path)
             })
             .cloned()
@@ -241,7 +263,6 @@ mod tests {
         let project_root = temp.path();
         let apparent = "label_fs_alias_tool_test";
         let canonical = "label_fs_alias_owner+http_file+tool_test";
-        slug_core::cells::set_dynamic_project_root(project_root.to_path_buf());
         slug_core::cells::register_dynamic_extension_cell(
             canonical.to_owned(),
             format!("bazel-external/{canonical}"),
@@ -264,6 +285,69 @@ mod tests {
                 .join(canonical)
                 .join("file")
                 .join("downloaded")
+        );
+    }
+
+    #[test]
+    fn preserves_exact_canonical_module_repo_before_dynamic_aliases() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path();
+        let module_repo = "label_fs_module+";
+        let generated_repo = "label_fs_module++ext+tool_test";
+        std::fs::create_dir_all(project_root.join("bazel-external").join(module_repo)).unwrap();
+        slug_core::cells::register_dynamic_extension_cell(
+            generated_repo.to_owned(),
+            format!("bazel-external/{generated_repo}"),
+        );
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            module_repo.to_owned(),
+            generated_repo.to_owned(),
+        );
+
+        let resolved = LabelFilesystemResolver::new(project_root)
+            .with_project_root(Some(project_root))
+            .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
+            .resolve_label_string(&format!("@@{module_repo}//:data"))
+            .unwrap();
+
+        assert_eq!(
+            resolved,
+            project_root
+                .join("bazel-external")
+                .join(module_repo)
+                .join("data")
+        );
+    }
+
+    #[test]
+    fn apparent_module_repo_cell_path_ignores_generated_repo_prefixes() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path();
+        let mut cell_paths = HashMap::new();
+        cell_paths.insert(
+            "label_fs_owner++ext+spoke".to_owned(),
+            project_root
+                .join("bazel-external")
+                .join("label_fs_owner++ext+spoke"),
+        );
+        cell_paths.insert(
+            "label_fs_owner+".to_owned(),
+            project_root.join("bazel-external").join("label_fs_owner+"),
+        );
+
+        let resolved = LabelFilesystemResolver::new(project_root)
+            .with_project_root(Some(project_root))
+            .with_cell_paths(&cell_paths)
+            .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
+            .resolve_label_string("@@label_fs_owner//:data")
+            .unwrap();
+
+        assert_eq!(
+            resolved,
+            project_root
+                .join("bazel-external")
+                .join("label_fs_owner+")
+                .join("data")
         );
     }
 }

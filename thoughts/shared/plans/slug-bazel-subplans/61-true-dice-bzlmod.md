@@ -4805,6 +4805,65 @@ canonicalization:
   symlinking `buck-out/.../gen/llvm` to `llvm+`, disabling hardlink/copydir
   semantics, or rewriting only `-resource-dir` at link time.
 
+Blocker reflection 2026-05-22, module-extension `Label()` lexical repository
+identity:
+
+- Focused Slug repro
+  `/tmp/slug-plan61/plan61-serde-core-canonical-labels-v3-20260522-060414.log`
+  advanced past the previous `rules_rust` / `rules_rust+` load mismatch and
+  failed while evaluating `@llvm//extensions:llvm_source.bzl%llvm_source`.
+  Inside that extension, `mctx.read(Label("//:llvm_versions.json"))` resolved
+  the label to
+  `bazel-external/llvm++llvm_source+compiler-rt/llvm_versions.json` instead of
+  the lexical extension file's module repo `bazel-external/llvm+`.
+- Bazel 9 source ground truth:
+  `LabelConverter.forBzlEvaluatingThread` uses
+  `BazelModuleContext.ofInnermostBzlOrThrow(thread).packageContext()`, so
+  `Label("//...")` in a function defined by a `.bzl` file is resolved against
+  that innermost `.bzl` module's package and repository mapping. During module
+  extension execution, `RegularRunnableExtension` stores
+  `ModuleExtensionEvalStarlarkThreadContext`, and `module_ctx.read(Label(...))`
+  then goes through `StarlarkBaseExternalContext.getPathFromLabel`.
+- Class boundary: this affects every module extension or repository rule helper
+  where `Label("//...")` appears in a `.bzl` function while an ambient BUILD or
+  generated-repo context is active. The missing semantic is lexical `.bzl`
+  repository identity for `Label()` current-repo resolution, not LLVM-specific
+  repository contents and not hardlink/output-tree behavior.
+- Owning abstraction: Slug's Bazel `Label()` native in
+  `app/slug_interpreter_for_build/src/interpreter/natives.rs`. It already
+  extracts the lexical call-stack filename, but its current-repo canonicalizer
+  still allowed the ambient `BuildContext` alias resolver to remap the lexical
+  file repo. The systemic fix is to derive the current repo directly from the
+  lexical file cell, canonicalizing known dynamic extension and ordinary bzlmod
+  module cells, while keeping scoped repo-mapping lookup for explicit
+  `@repo//...` label strings.
+- Rejected workarounds: copying `llvm_versions.json` into the generated
+  `compiler-rt` repo, special-casing LLVM, forcing eager materialization of all
+  LLVM spokes, or changing `module_ctx.read` to search fallback repos after a
+  bad label has already been constructed.
+- Implementation update: Slug's `Label()` current-repo path now derives the
+  current repository directly from the lexical `.bzl` file cell, preserving
+  already-canonical module and generated repo names before consulting ambient
+  contexts. The shared label filesystem resolver now checks exact repo cell
+  paths and exact external directories before applying dynamic extension
+  aliases, and its apparent-module fallback only accepts single-plus bzlmod
+  module repo names so generated repos such as `llvm++musl+musl_libc` cannot
+  masquerade as `@llvm`.
+- Validation:
+  `cargo fmt --check`,
+  `cargo test -p slug_interpreter_for_build label_context_ -- --nocapture`,
+  `cargo test -p slug_interpreter_for_build label_filesystem -- --nocapture`,
+  and `cargo build -p slug` pass. Focused Slug repro
+  `/tmp/slug-plan61/plan61-serde-core-lexical-label-v4-20260522-061907.log`
+  advanced past the LLVM `module_ctx.read(Label("//:llvm_versions.json"))`
+  failure and reached action execution.
+- New frontier from that focused repro:
+  `llvm//runtimes/libunwind:libunwind_library_search_directory` failed because
+  the `copy_to_directory` local command completed without producing
+  `buck-out/plan61-serde-core-lexical-label-v4/gen/llvm+/c28174a22cb22604/external/llvm+/runtimes/libunwind/libunwind_library_search_directory`.
+  This is a new action-output/materialization frontier; analyze it separately
+  against Bazel's action behavior before changing Slug.
+
 Exit criteria:
 
 - Tests prove warm daemon reuse without stale cross-workspace state.
