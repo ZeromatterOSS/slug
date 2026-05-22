@@ -68,6 +68,29 @@ def _write_minimal_lockfile(path: Path) -> None:
     )
 
 
+def _write_minimal_lockfile_with_facts(
+    path: Path,
+    *,
+    extension_id: str,
+    facts: dict[str, object],
+) -> None:
+    _write(
+        path,
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {},
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {extension_id: facts},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -902,6 +925,98 @@ use_repo(replay, "replayed_repo")
 
     assert "hidden lockfile replay should have been used" in failure_stderr
     assert after["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_hidden_lockfile_facts_create_edit_delete_are_observed(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: hidden lockfile facts feed module_ctx.facts before eval."""
+    module_name = "plan61_hidden_facts"
+    extension_id = f"@{module_name}//:hidden_facts_ext.bzl%hidden_facts_ext"
+    _write(
+        buck.cwd / "hidden_facts_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "hidden facts payload\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+hidden_facts_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _hidden_facts_ext_impl(module_ctx):
+    resource = module_ctx.facts.get("resource")
+    if resource != "ok":
+        fail("hidden facts missing or stale: %s" % resource)
+    hidden_facts_repo_rule(name = "hidden_facts_repo")
+
+hidden_facts_ext = module_extension(
+    implementation = _hidden_facts_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+hidden_facts = use_extension("//:hidden_facts_ext.bzl", "hidden_facts_ext")
+use_repo(hidden_facts, "hidden_facts_repo")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_hidden_facts",
+    srcs = ["@hidden_facts_repo//:data"],
+)
+""",
+    )
+
+    daemon_dir = Path((await buck.debug("daemon-dir")).stdout.strip())
+    hidden_lockfile = daemon_dir / "MODULE.bazel.lock"
+    await _bzlmod_counters(buck, "--lockfile_mode=off")
+    hidden_lockfile.parent.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(BuckException) as absent_failure:
+        await buck.build("//:uses_hidden_facts")
+    assert "hidden facts missing or stale" in absent_failure.value.stderr
+
+    _write_minimal_lockfile_with_facts(
+        hidden_lockfile,
+        extension_id=extension_id,
+        facts={"resource": "ok"},
+    )
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_hidden_facts")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_eval"] > before["extension_eval"]
+
+    _write_minimal_lockfile_with_facts(
+        hidden_lockfile,
+        extension_id=extension_id,
+        facts={"resource": "stale"},
+    )
+    with pytest.raises(BuckException) as edited_failure:
+        await buck.build("//:uses_hidden_facts")
+    edited = await _bzlmod_counters(buck)
+    assert "hidden facts missing or stale: stale" in edited_failure.value.stderr
+    assert edited["extension_eval"] > first["extension_eval"]
+
+    _write_minimal_lockfile_with_facts(
+        hidden_lockfile,
+        extension_id=extension_id,
+        facts={"resource": "ok"},
+    )
+    await buck.build("//:uses_hidden_facts")
+    restored = await _bzlmod_counters(buck)
+    assert restored["extension_eval"] > edited["extension_eval"]
+
+    hidden_lockfile.unlink()
+    with pytest.raises(BuckException) as deleted_failure:
+        await buck.build("//:uses_hidden_facts")
+    deleted = await _bzlmod_counters(buck)
+    assert "hidden facts missing or stale" in deleted_failure.value.stderr
+    assert deleted["extension_eval"] > restored["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

@@ -93,6 +93,11 @@ Observed SDK result at the checkpoint:
   first replays from the daemon hidden lockfile, then editing that hidden
   lockfile removes the cached extension entry and forces the extension to run
   and fail instead of reusing stale replay state.
+- Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
+  extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
+  when the hidden facts are created with the expected value, fails after an
+  edit to stale facts, succeeds after restoration, and fails again after the
+  hidden lockfile is deleted.
 
 ## Consolidated Learnings
 
@@ -131,8 +136,8 @@ What did not work or remains risky:
   injected as `BzlmodSessionData`.
 - Hidden lockfile identity is included in the transitional bridge key equality
   and hashing path, and hidden replay has same-daemon edit coverage. Broader
-  create/delete/facts-mode coverage is still needed before lockfile replay can
-  be treated as complete.
+  hidden lockfile replay/fail-open behavior now has stronger guardrails, but
+  lockfile replay still depends on the transitional graph and is not complete.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads are hashed; external and full interpreter load graphs are not
   replay-complete.
@@ -246,8 +251,8 @@ using Rust DICE keys and values:
      consume their contents.
    - Preserve Bazel's hidden-lockfile fail-open behavior without hiding
      invalidation.
-   - Broaden same-daemon hidden-lockfile coverage beyond replay edits to
-     create/delete/facts-mode transitions.
+   - Preserve same-daemon hidden-lockfile create/edit/delete/facts coverage
+     while moving the implementation out of the transitional graph.
    - Model facts, selected yanked versions, registry file hashes, recorded
      inputs, and lockfile mode as explicit dependencies.
    - Keep ordinary build/query paths read-only; count write attempts as test
