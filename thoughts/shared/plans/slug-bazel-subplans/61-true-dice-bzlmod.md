@@ -198,6 +198,12 @@ Observed SDK result at the checkpoint:
   manifest value instead of an anonymous materialized-state string. This keeps
   the existing bounded marker/layout behavior while naming the current
   materialized tree identity as the next DICE-owned migration surface.
+- `module(bazel_compatibility = [...])` is no longer parsed-and-ignored.
+  Slug now validates the declared constraints against its Bazel 9.0.1
+  compatibility target and fails incompatible modules. Local Bazel 9.1.0
+  evidence showed `bazel_compatibility = [">=99.0.0"]` fails during main
+  repository mapping with `Bazel compatibility check failed`, and the new Plan
+  61 guardrail covers the same negative class in Slug.
 
 ## Consolidated Learnings
 
@@ -404,7 +410,7 @@ using Rust DICE keys and values:
      `max_compatibility_level`, remaining `dev_dependency` surfaces,
      `single_version_override(registry/patches)`,
      `multiple_version_override(registry)`, `archive_override`, `git_override`,
-     `override_repo`, `inject_repo`, `isolate`, and `bazel_compatibility`.
+     `override_repo`, `inject_repo`, and `isolate`.
    - Preserve root `bazel_dep(dev_dependency=True)` default inclusion and
      `--ignore_dev_dependency` exclusion while moving command policy out of the
      transitional resolver.

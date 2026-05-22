@@ -780,6 +780,29 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_bazel_compatibility_incompatible_version_fails(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: incompatible module(bazel_compatibility) fails resolution."""
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(
+    name = "plan61_bazel_compatibility",
+    version = "1.0",
+    bazel_compatibility = [">=99.0.0"],
+)
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "Bazel version 9.0.1 is not compatible" in str(exc.value)
+    assert "bazel_compatibility: [>=99.0.0]" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_two_workspaces_do_not_share_bzlmod_state(
     buck: Buck,
 ) -> None:

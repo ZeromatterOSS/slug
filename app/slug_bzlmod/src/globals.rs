@@ -22,6 +22,7 @@
 //! - `use_repo()` - imports repositories from an extension (Phase 5)
 
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Display;
 
@@ -57,6 +58,8 @@ use crate::types::SingleVersionOverride;
 use crate::types::TagValue;
 use crate::types::UseRepo;
 use crate::version::Version;
+
+const SLUG_BAZEL_COMPATIBILITY_VERSION: &str = "9.0.1";
 
 /// Context for MODULE.bazel evaluation.
 ///
@@ -253,6 +256,65 @@ fn canonicalize_relative_label(s: &str, owning_module: Option<&str>) -> String {
     s.to_string()
 }
 
+fn validate_bazel_compatibility(module_name: &str, constraints: &[&str]) -> starlark::Result<()> {
+    if constraints.is_empty() {
+        return Ok(());
+    }
+
+    let current = Version::parse(SLUG_BAZEL_COMPATIBILITY_VERSION)
+        .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?;
+    for constraint in constraints {
+        if !bazel_compatibility_constraint_matches(&current, constraint)? {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "Bazel version {} is not compatible with module \"{}\" (bazel_compatibility: [{}])",
+                SLUG_BAZEL_COMPATIBILITY_VERSION,
+                if module_name.is_empty() {
+                    "<root>"
+                } else {
+                    module_name
+                },
+                constraints.join(", "),
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn bazel_compatibility_constraint_matches(
+    current: &Version,
+    constraint: &str,
+) -> starlark::Result<bool> {
+    let constraint = constraint.trim();
+    let (op, required) = if let Some(required) = constraint.strip_prefix(">=") {
+        (">=", required)
+    } else if let Some(required) = constraint.strip_prefix("<=") {
+        ("<=", required)
+    } else if let Some(required) = constraint.strip_prefix("==") {
+        ("=", required)
+    } else if let Some(required) = constraint.strip_prefix('>') {
+        (">", required)
+    } else if let Some(required) = constraint.strip_prefix('<') {
+        ("<", required)
+    } else if let Some(required) = constraint.strip_prefix('=') {
+        ("=", required)
+    } else {
+        ("=", constraint)
+    };
+
+    let required = Version::parse(required.trim())
+        .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?;
+    let ordering = current.cmp(&required);
+    Ok(match op {
+        ">=" => ordering != Ordering::Less,
+        ">" => ordering == Ordering::Greater,
+        "<=" => ordering != Ordering::Greater,
+        "<" => ordering == Ordering::Less,
+        "=" => ordering == Ordering::Equal,
+        _ => false,
+    })
+}
+
 /// Convert a Starlark value to a TagValue.
 ///
 /// `owning_module` is the name of the module whose MODULE.bazel is being
@@ -349,7 +411,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     /// * `compatibility_level` - Deprecated Bazel 9 no-op accepted for parsing
     ///   parity. The stored compatibility level is always 0.
     /// * `repo_name` - The repository name for the module (defaults to `name`).
-    /// * `bazel_compatibility` - List of Bazel version constraints (currently ignored).
+    /// * `bazel_compatibility` - List of Bazel version constraints.
     ///
     /// # Example
     ///
@@ -385,6 +447,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                 .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
 
+        validate_bazel_compatibility(name, &bazel_compatibility.items)?;
+
         ctx.module = Some(ModuleDecl {
             name: name.to_owned(),
             version: parsed_version,
@@ -398,8 +462,6 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         // Bazel 9 accepts compatibility_level but ModuleFileGlobals stores 0.
         let _ = compatibility_level;
-        // bazel_compatibility is currently accepted for parsing parity only.
-        let _ = bazel_compatibility;
 
         Ok(NoneType)
     }
@@ -1037,6 +1099,39 @@ fn get_module_context<'v, 'a>(
 /// Creates a new ModuleFileContext.
 pub fn new_module_file_context() -> RefCell<ModuleFileContext> {
     RefCell::new(ModuleFileContext::default())
+}
+
+#[cfg(test)]
+mod bazel_compatibility_tests {
+    use super::SLUG_BAZEL_COMPATIBILITY_VERSION;
+    use super::Version;
+    use super::bazel_compatibility_constraint_matches;
+    use super::validate_bazel_compatibility;
+
+    #[test]
+    fn accepts_matching_bazel_compatibility_constraints() {
+        validate_bazel_compatibility("root", &[">=6.0.0", "<99.0.0"]).unwrap();
+        validate_bazel_compatibility("root", &[SLUG_BAZEL_COMPATIBILITY_VERSION]).unwrap();
+    }
+
+    #[test]
+    fn rejects_incompatible_bazel_compatibility_constraint() {
+        let err = validate_bazel_compatibility("root", &[">=99.0.0"])
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Bazel version 9.0.1 is not compatible"));
+        assert!(err.contains("bazel_compatibility: [>=99.0.0]"));
+    }
+
+    #[test]
+    fn matches_bazel_compatibility_constraint_operators() {
+        let current = Version::parse(SLUG_BAZEL_COMPATIBILITY_VERSION).unwrap();
+        assert!(bazel_compatibility_constraint_matches(&current, ">=9.0.0").unwrap());
+        assert!(bazel_compatibility_constraint_matches(&current, "<=9.0.1").unwrap());
+        assert!(bazel_compatibility_constraint_matches(&current, "=9.0.1").unwrap());
+        assert!(!bazel_compatibility_constraint_matches(&current, ">9.0.1").unwrap());
+        assert!(!bazel_compatibility_constraint_matches(&current, "<9.0.1").unwrap());
+    }
 }
 
 #[cfg(test)]

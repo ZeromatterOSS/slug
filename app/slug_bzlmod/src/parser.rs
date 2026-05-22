@@ -429,6 +429,23 @@ module(
     }
 
     #[test]
+    fn test_parse_module_bazel_compatibility_rejects_incompatible_version() {
+        let content = r#"
+module(
+    name = "my_project",
+    version = "2.0.0",
+    bazel_compatibility = [">=99.0.0"],
+)
+"#;
+
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Bazel version 9.0.1 is not compatible"));
+        assert!(err.contains("bazel_compatibility: [>=99.0.0]"));
+    }
+
+    #[test]
     fn test_parse_bazel_dep() {
         let content = r#"
 module(name = "test", version = "1.0.0")
