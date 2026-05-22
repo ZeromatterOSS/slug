@@ -36,6 +36,7 @@ use crate::lockfile::compute_file_hash;
 use crate::lockfile::compute_sha256_hex;
 use crate::parser::ModuleFileInputDigest;
 use crate::parser::parse_module_bazel_content_from_path;
+use crate::repo_spec::RepoSpec;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
 use crate::types::ParsedModuleFile;
@@ -490,10 +491,49 @@ pub struct InnateExtensionKey {
     pub invocation_id: Arc<str>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("ExtensionSpokesKey({}, {})", workspace_id.stable_hash(), extension_id)]
 pub struct ExtensionSpokesKey {
     pub workspace_id: WorkspaceId,
-    pub extension_instance_id: ModuleExtensionId,
+    pub extension_id: Arc<str>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct ExtensionSpoke {
+    pub internal_name: Arc<str>,
+    pub canonical_name: Arc<str>,
+    pub spec_hash: Arc<str>,
+    pub repo_spec_json: Arc<str>,
+    pub repo_spec: Arc<RepoSpec>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct ExtensionSpokesValue {
+    pub workspace_id: WorkspaceId,
+    pub extension_id: Arc<str>,
+    pub project_root: Arc<PathBuf>,
+    pub spokes: BTreeMap<String, ExtensionSpoke>,
+}
+
+impl ExtensionSpokesValue {
+    pub fn by_internal_name(&self, internal_name: &str) -> Option<&ExtensionSpoke> {
+        self.spokes.get(internal_name)
+    }
+
+    pub fn by_canonical_name(&self, canonical_name: &str) -> Option<&ExtensionSpoke> {
+        self.spokes
+            .values()
+            .find(|spoke| spoke.canonical_name.as_ref() == canonical_name)
+    }
+
+    pub fn by_canonical_or_internal_name(&self, name: &str) -> Option<&ExtensionSpoke> {
+        self.by_canonical_name(name)
+            .or_else(|| self.by_internal_name(name))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ExtensionSpoke> {
+        self.spokes.values()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -527,6 +567,7 @@ pub enum BzlmodEventKind {
     ExtensionEval,
     ExtensionReplayHit,
     ExtensionReplayMissReason,
+    ExtensionSpokesCompute,
     RepoMaterializationHit,
     RepoMaterializationMissReason,
     LockfileRead,
@@ -541,6 +582,7 @@ impl BzlmodEventKind {
             Self::ExtensionEval => "extension_eval",
             Self::ExtensionReplayHit => "extension_replay_hit",
             Self::ExtensionReplayMissReason => "extension_replay_miss_reason",
+            Self::ExtensionSpokesCompute => "extension_spokes_compute",
             Self::RepoMaterializationHit => "repo_materialization_hit",
             Self::RepoMaterializationMissReason => "repo_materialization_miss_reason",
             Self::LockfileRead => "lockfile_read",
@@ -556,6 +598,7 @@ pub struct BzlmodEventCounters {
     pub extension_eval: u64,
     pub extension_replay_hit: u64,
     pub extension_replay_miss_reason: u64,
+    pub extension_spokes_compute: u64,
     pub repo_materialization_hit: u64,
     pub repo_materialization_miss_reason: u64,
     pub lockfile_read: u64,
@@ -567,6 +610,7 @@ static MODULE_FILE_PARSE: AtomicU64 = AtomicU64::new(0);
 static EXTENSION_EVAL: AtomicU64 = AtomicU64::new(0);
 static EXTENSION_REPLAY_HIT: AtomicU64 = AtomicU64::new(0);
 static EXTENSION_REPLAY_MISS_REASON: AtomicU64 = AtomicU64::new(0);
+static EXTENSION_SPOKES_COMPUTE: AtomicU64 = AtomicU64::new(0);
 static REPO_MATERIALIZATION_HIT: AtomicU64 = AtomicU64::new(0);
 static REPO_MATERIALIZATION_MISS_REASON: AtomicU64 = AtomicU64::new(0);
 static LOCKFILE_READ: AtomicU64 = AtomicU64::new(0);
@@ -579,6 +623,7 @@ fn counter(kind: BzlmodEventKind) -> &'static AtomicU64 {
         BzlmodEventKind::ExtensionEval => &EXTENSION_EVAL,
         BzlmodEventKind::ExtensionReplayHit => &EXTENSION_REPLAY_HIT,
         BzlmodEventKind::ExtensionReplayMissReason => &EXTENSION_REPLAY_MISS_REASON,
+        BzlmodEventKind::ExtensionSpokesCompute => &EXTENSION_SPOKES_COMPUTE,
         BzlmodEventKind::RepoMaterializationHit => &REPO_MATERIALIZATION_HIT,
         BzlmodEventKind::RepoMaterializationMissReason => &REPO_MATERIALIZATION_MISS_REASON,
         BzlmodEventKind::LockfileRead => &LOCKFILE_READ,
@@ -605,6 +650,7 @@ pub fn bzlmod_event_counters() -> BzlmodEventCounters {
         extension_eval: EXTENSION_EVAL.load(Ordering::Relaxed),
         extension_replay_hit: EXTENSION_REPLAY_HIT.load(Ordering::Relaxed),
         extension_replay_miss_reason: EXTENSION_REPLAY_MISS_REASON.load(Ordering::Relaxed),
+        extension_spokes_compute: EXTENSION_SPOKES_COMPUTE.load(Ordering::Relaxed),
         repo_materialization_hit: REPO_MATERIALIZATION_HIT.load(Ordering::Relaxed),
         repo_materialization_miss_reason: REPO_MATERIALIZATION_MISS_REASON.load(Ordering::Relaxed),
         lockfile_read: LOCKFILE_READ.load(Ordering::Relaxed),
@@ -673,6 +719,11 @@ mod tests {
                 BzlmodEventKind::ExtensionReplayMissReason,
                 |c: &BzlmodEventCounters| c.extension_replay_miss_reason,
                 "extension_replay_miss_reason",
+            ),
+            (
+                BzlmodEventKind::ExtensionSpokesCompute,
+                |c: &BzlmodEventCounters| c.extension_spokes_compute,
+                "extension_spokes_compute",
             ),
             (
                 BzlmodEventKind::RepoMaterializationHit,

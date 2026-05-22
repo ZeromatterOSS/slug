@@ -145,6 +145,11 @@ Observed SDK result at the checkpoint:
   the repository execution key directly. Focused spoke-materialization tests,
   affected-crate checks, `cargo build -p slug`, and the full 50-test Plan 61
   guardrail target passed after the change.
+- Extension spoke lookup now goes through `ExtensionSpokesKey`, a DICE-owned
+  value for one module extension's generated repo specs, canonical names, spec
+  hashes, and serialized repo specs. Runtime materialization still registers
+  temporary dynamic cells as transitional output plumbing, but sibling lookup
+  no longer scans extension aggregations by extension name alone.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -215,9 +220,9 @@ What did not work or remains risky:
   hashed, but repo mappings at load sites, load failures, deleted files, and
   the full interpreter load graph are not replay-complete.
 - Extension spoke materialization no longer uses a bzlmod process-global
-  registry, but generated repo cells and dynamic alias registration still flow
-  through transitional runtime cell-registration plumbing rather than a final
-  DICE-owned cell graph.
+  registry or extension-name-only scans for sibling lookup. Generated repo
+  cells and dynamic alias registration still flow through transitional runtime
+  cell-registration plumbing rather than a final DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.

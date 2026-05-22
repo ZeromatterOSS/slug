@@ -500,20 +500,21 @@ async fn ensure_extension_spokes_registered(
             .into());
         }
     };
-    let Some(ext_key) = slug_bzlmod::create_extension_execution_key(&session_data, extension_id)
+    let Some(spokes_key) =
+        slug_bzlmod::extension_spokes_key_for_extension_id(&session_data, extension_id)
     else {
         // Not a module extension — `use_repo_rule()` and similar produce a
         // single repo with no siblings, so there is nothing to seed.
         return Ok(());
     };
 
-    let ext_result = match ctx.compute(&ext_key).await {
+    let spokes = match ctx.compute(&spokes_key).await {
         Ok(Ok(r)) => r,
         Ok(Err(e)) => {
             return Err(ExtensionRepoError::MaterializationFailed {
                 canonical_name: requesting_canonical_name.to_owned(),
                 reason: format!(
-                    "Extension '{}' execution failed while registering spokes: {}",
+                    "Extension '{}' spoke computation failed while registering spokes: {}",
                     extension_id,
                     diagnostic_summary(&e)
                 ),
@@ -524,7 +525,7 @@ async fn ensure_extension_spokes_registered(
             return Err(ExtensionRepoError::MaterializationFailed {
                 canonical_name: requesting_canonical_name.to_owned(),
                 reason: format!(
-                    "Extension '{}' DICE error while registering spokes: {}",
+                    "Extension '{}' DICE error while computing spokes: {}",
                     extension_id,
                     diagnostic_summary(&e)
                 ),
@@ -533,44 +534,37 @@ async fn ensure_extension_spokes_registered(
         }
     };
 
-    for (internal_name, spec) in ext_result.generated_repo_specs.iter() {
-        let canonical = match ext_result.canonical_names.get(internal_name) {
-            Some(c) => c.clone(),
-            None => {
-                tracing::warn!(
-                    "Extension '{}' result has spec for '{}' but no canonical \
-                     name; skipping dynamic cell registration",
-                    extension_id,
-                    internal_name
-                );
-                continue;
-            }
-        };
-        let spec_hash = spec.compute_hash();
-        let repo_spec_json = serde_json::to_string(spec).unwrap_or_default();
-        let cell_setup = slug_core::cells::external::ExtensionRepoCellSetup {
-            canonical_name: std::sync::Arc::from(canonical.as_str()),
-            extension_id: std::sync::Arc::from(extension_id),
-            internal_name: std::sync::Arc::from(internal_name.as_str()),
-            spec_hash: std::sync::Arc::from(spec_hash.as_str()),
-            repo_spec_json: std::sync::Arc::from(repo_spec_json.as_str()),
-            materialized: false,
-        };
+    for spoke in spokes.iter() {
+        let cell_setup = extension_repo_cell_setup_from_spoke(extension_id, spoke);
         slug_core::cells::register_dynamic_extension_cell_with_setup(
-            canonical.clone(),
-            format!("bazel-external/{}", canonical),
+            spoke.canonical_name.to_string(),
+            format!("bazel-external/{}", spoke.canonical_name),
             cell_setup.clone(),
         );
-        if internal_name != &canonical {
+        if spoke.internal_name != spoke.canonical_name {
             slug_core::cells::register_dynamic_extension_cell_with_setup(
-                internal_name.clone(),
-                format!("bazel-external/{}", canonical),
+                spoke.internal_name.to_string(),
+                format!("bazel-external/{}", spoke.canonical_name),
                 cell_setup,
             );
         }
     }
 
     Ok(())
+}
+
+fn extension_repo_cell_setup_from_spoke(
+    extension_id: &str,
+    spoke: &slug_bzlmod::ExtensionSpoke,
+) -> ExtensionRepoCellSetup {
+    ExtensionRepoCellSetup {
+        canonical_name: spoke.canonical_name.clone(),
+        extension_id: std::sync::Arc::from(extension_id),
+        internal_name: spoke.internal_name.clone(),
+        spec_hash: spoke.spec_hash.clone(),
+        repo_spec_json: spoke.repo_spec_json.clone(),
+        materialized: false,
+    }
 }
 
 /// Get the file ops delegate for an extension-generated repository cell.
@@ -721,7 +715,7 @@ pub(crate) async fn get_file_ops_delegate(
                     canonical_name: setup.canonical_name.to_string(),
                     reason: format!("bzlmod session data unavailable: {}", e),
                 })?;
-            let ext_key = match slug_bzlmod::create_extension_execution_key(
+            let spokes_key = match slug_bzlmod::extension_spokes_key_for_extension_id(
                 &session_data,
                 &setup.extension_id,
             ) {
@@ -798,13 +792,13 @@ pub(crate) async fn get_file_ops_delegate(
                 }
             };
 
-            let ext_result = match ctx.compute(&ext_key).await {
+            let spokes = match ctx.compute(&spokes_key).await {
                 Ok(Ok(result)) => result,
                 Ok(Err(e)) => {
                     return Err(ExtensionRepoError::MaterializationFailed {
                         canonical_name: setup.canonical_name.to_string(),
                         reason: format!(
-                            "Extension '{}' execution failed: {}",
+                            "Extension '{}' spoke computation failed: {}",
                             setup.extension_id,
                             diagnostic_summary(&e)
                         ),
@@ -815,7 +809,7 @@ pub(crate) async fn get_file_ops_delegate(
                     return Err(ExtensionRepoError::MaterializationFailed {
                         canonical_name: setup.canonical_name.to_string(),
                         reason: format!(
-                            "Extension '{}' DICE error: {}",
+                            "Extension '{}' DICE error while computing spokes: {}",
                             setup.extension_id,
                             diagnostic_summary(&e)
                         ),
@@ -826,11 +820,14 @@ pub(crate) async fn get_file_ops_delegate(
 
             // Spoke registration moved to `ensure_extension_spokes_registered`
             // at the top of `get_file_ops_delegate` so it runs even when the
-            // hub already has `.slug_repo_complete`. This block now only
-            // resolves the current repo's spec out of the same eval result.
+            // hub already has `.slug_repo_complete`. This block now resolves
+            // the current repo's spec out of the DICE-owned spoke value.
 
-            match ext_result.get_repo_spec(&setup.internal_name).cloned() {
-                Some(spec) => spec,
+            match spokes
+                .by_internal_name(&setup.internal_name)
+                .or_else(|| spokes.by_canonical_name(&setup.canonical_name))
+            {
+                Some(spoke) => spoke.repo_spec.as_ref().clone(),
                 None => {
                     return Err(ExtensionRepoError::MaterializationFailed {
                         canonical_name: setup.canonical_name.to_string(),
@@ -838,7 +835,7 @@ pub(crate) async fn get_file_ops_delegate(
                             "Extension '{}' did not generate repo '{}' (available: {})",
                             setup.extension_id,
                             setup.internal_name,
-                            repo_names_summary(ext_result.repo_names())
+                            repo_names_summary(spokes.spokes.keys().map(|name| name.as_str()))
                         ),
                     }
                     .into());

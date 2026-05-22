@@ -1727,6 +1727,7 @@ use_repo(replay, "replayed_repo")
     after = await _bzlmod_counters(buck)
 
     assert after["extension_replay_hit"] > before["extension_replay_hit"]
+    assert after["extension_spokes_compute"] > before["extension_spokes_compute"]
     assert after["extension_eval"] == before["extension_eval"]
 
 

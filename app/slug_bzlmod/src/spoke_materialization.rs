@@ -34,7 +34,6 @@
 //! only thing running on this thread during that scope.
 
 use std::cell::Cell;
-use std::sync::Arc;
 
 use dice::DiceComputations;
 
@@ -131,7 +130,7 @@ async fn spoke_execution_key(
     ctx: &mut DiceComputations<'_>,
     canonical_name: &str,
 ) -> slug_error::Result<Option<ExtensionRepoExecutionKey>> {
-    let Some((_, extension_name, _)) = crate::parse_canonical_name(canonical_name) else {
+    let Some(_) = crate::parse_canonical_name(canonical_name) else {
         return Ok(None);
     };
     let session_data = ctx
@@ -145,48 +144,30 @@ async fn spoke_execution_key(
                 e
             )
         })?;
-    let mut extension_ids = session_data
-        .extension_aggregations
-        .iter()
-        .filter_map(|(extension_id, aggregation)| {
-            (aggregation.extension_name == extension_name).then_some(extension_id.as_str())
-        })
-        .collect::<Vec<_>>();
-    extension_ids.sort_unstable();
-
-    for extension_id in extension_ids {
-        let Some(extension_key) =
-            crate::create_extension_execution_key(&session_data, extension_id)
-        else {
-            continue;
-        };
-        let result = match ctx.compute(&extension_key).await {
-            Ok(Ok(result)) => result,
-            Ok(Err(e)) => return Err(e),
-            Err(e) => {
-                return Err(slug_error::slug_error!(
-                    slug_error::ErrorTag::Tier0,
-                    "DICE compute failed for extension '{}' while looking up spoke '{}': {}",
-                    extension_id,
-                    canonical_name,
-                    e
-                ));
-            }
-        };
-        for (internal_name, repo_spec) in result.generated_repo_specs.iter() {
-            let Some(canonical) = result.canonical_name(internal_name) else {
-                continue;
-            };
-            if canonical != canonical_name && internal_name != canonical_name {
-                continue;
-            }
-            return Ok(Some(ExtensionRepoExecutionKey::from_arcs(
-                Arc::from(canonical),
-                result.extension_id.clone(),
-                Arc::new(repo_spec.clone()),
-                Arc::new(session_data.project_root.clone()),
-            )));
+    let Some(spokes_key) =
+        crate::extension_spokes_key_for_canonical_repo(&session_data, canonical_name)
+    else {
+        return Ok(None);
+    };
+    let spokes = match ctx.compute(&spokes_key).await {
+        Ok(Ok(spokes)) => spokes,
+        Ok(Err(e)) => return Err(e),
+        Err(e) => {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "DICE compute failed for extension spokes while looking up '{}': {}",
+                canonical_name,
+                e
+            ));
         }
+    };
+    if let Some(spoke) = spokes.by_canonical_or_internal_name(canonical_name) {
+        return Ok(Some(ExtensionRepoExecutionKey::from_arcs(
+            spoke.canonical_name.clone(),
+            spokes.extension_id.clone(),
+            spoke.repo_spec.clone(),
+            spokes.project_root.clone(),
+        )));
     }
 
     Ok(None)
