@@ -655,13 +655,9 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
         mut ctx: DiceTransactionUpdater,
         early_timings: &mut EarlyCommandTimingBuilder,
     ) -> slug_error::Result<(DiceTransactionUpdater, UserComputationData)> {
-        let mut cells_and_configs = self.cmd_ctx.load_new_configs(&mut ctx).await?;
+        let cells_and_configs = self.cmd_ctx.load_new_configs(&mut ctx).await?;
         let is_bzlmod = cells_and_configs.is_bzlmod;
         let cell_resolver = cells_and_configs.cell_resolver;
-        cells_and_configs.bzlmod_session_data.repo_env =
-            slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
-                .into_iter()
-                .collect();
 
         let configuror = BuildInterpreterConfiguror::new(
             self.interpreter_platform,

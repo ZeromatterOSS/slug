@@ -150,6 +150,10 @@ Observed SDK result at the checkpoint:
   path now owns both builtin and Starlark repo-rule invocations, so repository
   contents are materialized through the DICE repository execution path when the
   generated repo is accessed.
+- The server no longer rewrites `BzlmodSessionData.repo_env` from process
+  global build config after resolution. The injected session data now keeps the
+  same explicit `bzlmod.repo_env_json` value that fed the transitional
+  resolution key.
 
 ## Consolidated Learnings
 
@@ -202,6 +206,10 @@ What did not work or remains risky:
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.
+- Module and repository Starlark APIs still read their effective repo
+  environment through the interpreter build-config adapter. The bzlmod session
+  data rewrite is gone, but the runtime environment surface is not yet a
+  DICE-owned command value end to end.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
   remaining command policy around non-root dev dependencies.
