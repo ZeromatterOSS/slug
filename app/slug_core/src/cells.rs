@@ -567,6 +567,9 @@ fn clear_dynamic_bzlmod_state_for_new_root() {
     if let Ok(mut cache) = BZLMOD_APPARENT_ALIAS_CACHE.lock() {
         cache.clear();
     }
+    if let Ok(mut cache) = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE.lock() {
+        cache.clear();
+    }
 }
 
 /// Set the project root for dynamic cell filesystem scanning.
@@ -1684,6 +1687,22 @@ mod bzlmod_apparent_alias_cache_tests {
             cached_dynamic_extension_suffix_for_tests("owner++extension+generated"),
             Some(Some("owner++extension+generated".to_owned()))
         );
+    }
+
+    #[test]
+    fn dynamic_extension_suffix_cache_clears_on_bzlmod_root_reset() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        clear_dynamic_extension_suffix_scan_cache_for_tests();
+
+        DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE.lock().unwrap().insert(
+            "generated".to_owned(),
+            Some("old++ext+generated".to_owned()),
+        );
+
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        assert_eq!(cached_dynamic_extension_suffix_for_tests("generated"), None);
     }
 }
 

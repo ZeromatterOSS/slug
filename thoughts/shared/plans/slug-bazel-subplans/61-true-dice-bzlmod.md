@@ -158,6 +158,10 @@ Observed SDK result at the checkpoint:
   repo names ending in `+` when resolving existing files under
   `bazel-external/<repo>`, so edits to files under directories such as
   `bazel-external/rules_python+/...` change the replay digest.
+- Dynamic generated-repo suffix scan caches are now cleared by the same
+  bzlmod-root reset path that clears dynamic cells, setups, apparent aliases,
+  and scoped aliases, preventing stale suffix lookups from surviving a fresh
+  root reset.
 
 ## Consolidated Learnings
 
@@ -217,6 +221,9 @@ What did not work or remains risky:
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
+- Dynamic generated-repo state is still held in process-global maps. Clearing
+  the suffix cache closes one leak in the transitional reset path but does not
+  make the bzlmod cell graph a DICE-owned value.
 - Some Bazel 9 semantics are parsed but not fully modeled, including
   `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
   remaining command policy around non-root dev dependencies.
