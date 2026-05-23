@@ -311,6 +311,14 @@ Observed SDK result at the checkpoint:
   direct-`std::fs` bridge was removed. Same-daemon root and included module
   edit guardrails now assert a warm no-op first, then prove the edit bumps
   module-file parse and bzlmod-resolution counters.
+- Non-root `MODULE.bazel` files used by extension aggregation now flow through
+  `NonRootModuleFilesKey` instead of an inline `Path::exists()` plus direct
+  `parse_module_bazel()` scan. Project-local dependency module files and their
+  included segments are DICE project-file reads; out-of-project module paths feed
+  a polled digest into the key. A same-daemon guardrail edits a non-root included
+  module segment so a dependency module starts importing a generated extension
+  repo, proving the aggregation graph invalidates instead of keeping the warm
+  parsed-module list.
 - Extension evaluation no longer eagerly computes `ExtensionRepoExecutionKey`
   for every generated spoke. It still registers generated spoke cells as
   transitional lookup plumbing, but repository materialization dependencies now
@@ -474,6 +482,12 @@ Observed SDK result at the checkpoint:
   --nocapture`, the focused Plan 61 Python guardrail
   `mapped_external_extension_bzl_load_deletion_rejects_replay`, and the full
   Plan 61 Python guardrail with 69 tests.
+- Non-root module parse key validation passed with `cargo check -p
+  slug_common`, `cargo build -p slug`, `cargo test -p slug_common bzlmod --
+  --nocapture`, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p
+  slug_external_cells -- --nocapture`, the focused Plan 61 Python guardrail
+  `non_root_included_module_segment_edit_invalidates_extension_graph`, and the
+  full Plan 61 Python guardrail with 70 tests.
 
 ## Consolidated Learnings
 
@@ -514,6 +528,9 @@ What did not work or remains risky:
   injected as `BzlmodSessionData`. Module-version and toolchain/platform
   consumers now go through DICE keys, but those keys still source their values
   from the injected transitional session.
+- Non-root module parsing for extension aggregation is now a named DICE key, but
+  module source discovery, fetch/cache layout, selected graph construction, and
+  the final parsed-module list still live inside the legacy resolution bridge.
 - Visible workspace lockfile content is now a tracked project-file DICE input.
   Hidden lockfile identity is included in the transitional bridge key equality
   and hashing path, and hidden replay has same-daemon edit coverage. Extension

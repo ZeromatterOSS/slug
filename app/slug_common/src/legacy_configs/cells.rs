@@ -1379,6 +1379,27 @@ struct RegistryFileInputsValue {
     has_untracked_inputs: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+struct NonRootModuleFileInput {
+    module_key: String,
+    module_bazel_path: PathBuf,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("NonRootModuleFilesKey({}, {})", project_root.display(), inputs.len())]
+struct NonRootModuleFilesKey {
+    project_root: AbsNormPathBuf,
+    inputs: Vec<NonRootModuleFileInput>,
+    poll_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct NonRootModuleFilesValue {
+    digest: String,
+    parsed_modules: Vec<(String, ParsedModuleFile)>,
+    has_untracked_inputs: bool,
+}
+
 fn local_overrides_from_root_module(
     root_module_file: &slug_bzlmod::RootModuleFileValue,
     ignore_dev_dependency: bool,
@@ -1781,6 +1802,186 @@ fn non_registry_override_inputs_poll_digest(
     Ok(hex::encode(hasher.finalize()))
 }
 
+fn non_root_module_file_inputs(
+    project_root: &ProjectRoot,
+    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    module_symlinks: &[BzlmodExternalModuleSymlink],
+) -> Vec<NonRootModuleFileInput> {
+    let symlink_sources: HashMap<_, _> = module_symlinks
+        .iter()
+        .map(|symlink| (symlink.entry_name.as_str(), symlink.source_path.as_path()))
+        .collect();
+    cells
+        .iter()
+        .filter_map(|(cell_name, cell_path, setup)| {
+            let module_bazel_path = if let Some(setup) = setup {
+                if setup.source_path.is_empty() {
+                    return None;
+                }
+                PathBuf::from(setup.source_path.as_ref()).join("MODULE.bazel")
+            } else {
+                let project_relative = cell_path.as_project_relative_path().as_str();
+                if let Some(source_path) = project_relative
+                    .strip_prefix("bazel-external/")
+                    .and_then(|entry| symlink_sources.get(entry))
+                {
+                    source_path.join("MODULE.bazel")
+                } else {
+                    project_root
+                        .root()
+                        .as_path()
+                        .join(project_relative)
+                        .join("MODULE.bazel")
+                }
+            };
+            Some(NonRootModuleFileInput {
+                module_key: cell_name.as_str().to_owned(),
+                module_bazel_path,
+            })
+        })
+        .collect()
+}
+
+fn non_root_module_files_poll_digest(
+    project_fs: &ProjectRoot,
+    inputs: &[NonRootModuleFileInput],
+) -> slug_error::Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"non-root-module-files-poll-v1");
+    hasher.update([0]);
+    for input in inputs {
+        hasher.update(input.module_key.as_bytes());
+        hasher.update([0]);
+        hasher.update(input.module_bazel_path.to_string_lossy().as_bytes());
+        hasher.update([0]);
+
+        if project_relative_path_for_abs_path(project_fs, &input.module_bazel_path).is_some() {
+            hasher.update(b"project-tracked");
+            hasher.update([0]);
+            continue;
+        }
+
+        match read_absolute_text_file_input(&input.module_bazel_path)? {
+            (Some(content), Some(content_digest)) => {
+                hasher.update(b"present");
+                hasher.update([0]);
+                hasher.update(content_digest.as_bytes());
+                hasher.update([0]);
+                let parsed_with_inputs =
+                    parse_module_with_polled_includes(&input.module_bazel_path, content)
+                        .with_buck_error_context(|| {
+                            format!(
+                                "Failed to parse non-root MODULE.bazel for '{}' at {:?}",
+                                input.module_key, input.module_bazel_path
+                            )
+                        })?;
+                for parsed_input in &parsed_with_inputs.inputs {
+                    hasher.update(parsed_input.path.to_string_lossy().as_bytes());
+                    hasher.update([0]);
+                    hasher.update(parsed_input.digest.as_bytes());
+                    hasher.update([0]);
+                }
+            }
+            (None, None) => {
+                hasher.update(b"missing");
+                hasher.update([0]);
+            }
+            _ => unreachable!("absolute text file reads return content and digest together"),
+        }
+        hasher.update([0]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+async fn parse_non_root_module_files(
+    ctx: &mut DiceComputations<'_>,
+    project_root: &AbsNormPathBuf,
+    inputs: &[NonRootModuleFileInput],
+) -> slug_error::Result<NonRootModuleFilesValue> {
+    let project_fs = ProjectRoot::new_unchecked(project_root.clone());
+    let mut hasher = Sha256::new();
+    hasher.update(b"non-root-module-files-v1");
+    hasher.update([0]);
+    let mut parsed_modules = Vec::new();
+
+    for input in inputs {
+        hasher.update(input.module_key.as_bytes());
+        hasher.update([0]);
+        hasher.update(input.module_bazel_path.to_string_lossy().as_bytes());
+        hasher.update([0]);
+
+        let (module_read, _tracking) =
+            read_bzlmod_file_for_module_inputs(ctx, &project_fs, &input.module_bazel_path).await?;
+        let Some((content, _content_digest)) = module_read else {
+            hasher.update(b"missing");
+            hasher.update([0]);
+            continue;
+        };
+
+        hasher.update(b"present");
+        hasher.update([0]);
+        let parsed_with_inputs = parse_module_with_tracked_project_includes(
+            ctx,
+            &project_fs,
+            &input.module_bazel_path,
+            content,
+        )
+        .await
+        .with_buck_error_context(|| {
+            format!(
+                "Failed to parse non-root MODULE.bazel for '{}' at {:?}",
+                input.module_key, input.module_bazel_path
+            )
+        })?;
+        for parsed_input in &parsed_with_inputs.inputs {
+            hasher.update(parsed_input.path.to_string_lossy().as_bytes());
+            hasher.update([0]);
+            hasher.update(parsed_input.digest.as_bytes());
+            hasher.update([0]);
+        }
+
+        let parsed = parsed_with_inputs.parsed;
+        let module_key = if parsed.module.name.is_empty() {
+            input.module_key.clone()
+        } else {
+            parsed.module.name.clone()
+        };
+        parsed_modules.push((module_key, parsed));
+        hasher.update([0]);
+    }
+
+    Ok(NonRootModuleFilesValue {
+        digest: hex::encode(hasher.finalize()),
+        parsed_modules,
+        has_untracked_inputs: false,
+    })
+}
+
+fn parse_non_root_module_files_direct(
+    inputs: &[NonRootModuleFileInput],
+) -> slug_error::Result<Vec<(String, ParsedModuleFile)>> {
+    let mut parsed_modules = Vec::new();
+    for input in inputs {
+        if !input.module_bazel_path.exists() {
+            continue;
+        }
+        let parsed =
+            parse_module_bazel(&input.module_bazel_path).with_buck_error_context(|| {
+                format!(
+                    "Failed to parse non-root MODULE.bazel for '{}' at {:?}",
+                    input.module_key, input.module_bazel_path
+                )
+            })?;
+        let module_key = if parsed.module.name.is_empty() {
+            input.module_key.clone()
+        } else {
+            parsed.module.name.clone()
+        };
+        parsed_modules.push((module_key, parsed));
+    }
+    Ok(parsed_modules)
+}
+
 fn resolve_local_override_module_dir(
     base: &AbsNormPathBuf,
     path: &str,
@@ -2007,15 +2208,44 @@ impl Key for RegistryFileInputsKey {
 }
 
 #[async_trait]
+impl Key for NonRootModuleFilesKey {
+    type Value = slug_error::Result<Arc<NonRootModuleFilesValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        parse_non_root_module_files(ctx, &self.project_root, &self.inputs)
+            .await
+            .map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.digest == y.digest && x.parsed_modules == y.parsed_modules,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_untracked_inputs,
+            Err(_) => false,
+        }
+    }
+}
+
+#[async_trait]
 impl Key for LegacyBzlmodResolutionDiceKey {
     type Value = slug_error::Result<Arc<Option<BzlmodResolutionResult>>>;
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        BuckConfigBasedCells::resolve_bzlmod_resolution_from_key(self).await
+        BuckConfigBasedCells::resolve_bzlmod_resolution_from_key(self, ctx).await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2344,6 +2574,7 @@ impl BuckConfigBasedCells {
                 root_module_file.as_deref(),
                 visible_lockfile.clone(),
                 None,
+                None,
             )
             .await?
         } else {
@@ -2546,6 +2777,7 @@ impl BuckConfigBasedCells {
 
     async fn resolve_bzlmod_resolution_from_key(
         key: &LegacyBzlmodResolutionDiceKey,
+        dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<Arc<Option<BzlmodResolutionResult>>> {
         let root_module_file = key.root_module_file.clone();
         if root_module_file.parsed.is_none() {
@@ -2559,6 +2791,7 @@ impl BuckConfigBasedCells {
             Some(root_module_file.as_ref()),
             key.visible_lockfile.clone(),
             key.hidden_lockfile.clone(),
+            Some(dice_ctx),
         )
         .await
         .map(Arc::new)
@@ -2580,6 +2813,7 @@ impl BuckConfigBasedCells {
         root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
+        mut dice_ctx: Option<&mut DiceComputations<'_>>,
     ) -> slug_error::Result<Option<BzlmodResolutionResult>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
@@ -2978,32 +3212,22 @@ impl BuckConfigBasedCells {
         // Build parsed_modules list for extension resolution
         let mut parsed_modules: Vec<(String, ParsedModuleFile)> = Vec::new();
         parsed_modules.push((parsed.module.name.clone(), parsed.clone()));
-        for (cell_name, _cell_path, setup) in &cells {
-            let module_bazel_path = if let Some(bzlmod_setup) = setup {
-                std::path::PathBuf::from(bzlmod_setup.source_path.as_ref()).join("MODULE.bazel")
-            } else {
-                project_root
-                    .root()
-                    .as_path()
-                    .join(_cell_path.as_project_relative_path().as_str())
-                    .join("MODULE.bazel")
-            };
-            if module_bazel_path.exists() {
-                if let Ok(dep_parsed) = parse_module_bazel(&module_bazel_path) {
-                    // Use the module's declared name for aggregation, not the cell name
-                    // (which includes version suffix like "bazel_features+1.42.0").
-                    // This ensures extension IDs are consistent: "//private:ext.bzl" from
-                    // bazel_features resolves to "@bazel_features//private:ext.bzl", matching
-                    // what other modules use when referencing this extension.
-                    let module_key = if dep_parsed.module.name.is_empty() {
-                        cell_name.as_str().to_string()
-                    } else {
-                        dep_parsed.module.name.clone()
-                    };
-                    parsed_modules.push((module_key, dep_parsed));
-                }
-            }
-        }
+        let non_root_inputs = non_root_module_file_inputs(project_root, &cells, &module_symlinks);
+        let mut non_root_parsed_modules = if let Some(ctx) = dice_ctx.as_mut() {
+            let poll_digest = non_root_module_files_poll_digest(project_root, &non_root_inputs)?;
+            ctx.compute(&NonRootModuleFilesKey {
+                project_root: project_root_abs.clone(),
+                inputs: non_root_inputs,
+                poll_digest,
+            })
+            .await?
+            .buck_error_context("Computing non-root MODULE.bazel inputs for bzlmod resolution")?
+            .parsed_modules
+            .clone()
+        } else {
+            parse_non_root_module_files_direct(&non_root_inputs)?
+        };
+        parsed_modules.append(&mut non_root_parsed_modules);
 
         if let Some(resolved_graph) = &resolved_graph_for_aliases {
             for (module_name, parsed_mod) in &parsed_modules {

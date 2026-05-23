@@ -1299,6 +1299,67 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_non_root_included_module_segment_edit_invalidates_extension_graph(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: non-root ModuleFileValue include inputs feed extension aggregation."""
+    dep = buck.cwd / "libs/dep_with_included_extension"
+    dep.mkdir(parents=True)
+    _write(
+        dep / "MODULE.bazel",
+        """module(name = "dep_with_included_extension", version = "1.0")
+include("//:ext.MODULE.bazel")
+""",
+    )
+    _write(dep / "ext.MODULE.bazel", "# initially no extension usage\n")
+    _write(
+        dep / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
+    _write(dep / "BUILD.bazel", 'filegroup(name = "dep", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_non_root_include")
+bazel_dep(name = "dep_with_included_extension", version = "1.0")
+local_path_override(
+    module_name = "dep_with_included_extension",
+    path = "libs/dep_with_included_extension",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert "dep_with_included_extension" in output
+    assert "dep_generated_repo" not in output
+    assert first["module_file_parse"] > before["module_file_parse"]
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "dep_generated_repo" not in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(
+        dep / "ext.MODULE.bazel",
+        """dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "dep_generated_repo")
+""",
+    )
+
+    output, second = await _audit_cells_and_counters(buck)
+    assert "dep_generated_repo" in output
+    assert second["module_file_parse"] > warm["module_file_parse"]
+    assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_included_module_segment_variables_do_not_leak_to_root(
     buck: Buck,
 ) -> None:
