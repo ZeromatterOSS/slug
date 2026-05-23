@@ -306,6 +306,12 @@ Observed SDK result at the checkpoint:
   outside the project root. The visible-lockfile guardrail now proves a
   same-daemon warm no-op does not reread the lockfile before an invalid edit is
   observed and rejected under `--lockfile_mode=error`.
+- Locked registry cache files now use tracked project-file DICE reads when the
+  configured `XDG_CACHE_HOME` is under the project root, covering cached
+  registry `MODULE.bazel`, `source.json`, and `bazel_registry.json` checksum
+  inputs. Cache files outside the project root remain non-cacheable direct
+  filesystem reads. Existing guardrails prove warm bzlmod reuse and same-daemon
+  checksum failures after editing each cached registry file class.
 - Current slice validation passed with `cargo build -p slug`, `cargo test -p
   slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
@@ -328,6 +334,11 @@ Observed SDK result at the checkpoint:
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k
   'visible_lockfile_edit_is_observed_in_same_daemon' -rx --tb=short`, the full
   Plan 61 Python guardrail, `cargo fmt --check`, and `git diff --check`.
+- Registry-cache tracked-input validation passed with `cargo build -p slug`,
+  `cargo test -p slug_common bzlmod -- --nocapture`, focused Plan 61 guardrails
+  for `warm_noop_locked_registry_dep_reuses_bzlmod_resolution` and
+  `locked_registry_source_json_and_registry_metadata_are_bridge_inputs`, the
+  full Plan 61 Python guardrail, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -499,11 +510,14 @@ using Rust DICE keys and values:
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.
 
-2. Finish module-file DICE inputs for registry, git, archive, and
-   out-of-project local override sources.
+2. Finish module-file DICE inputs for git, archive, and out-of-project local
+   override/registry-cache sources.
    - Root, included, and project-local local override module segments now use
      tracked project-file DICE inputs; keep extending that shape to every
      non-root module source.
+   - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
+     files are tracked when the cache lives under the project root; out-of-root
+     cache paths still need a watched or explicitly keyed filesystem input.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes.
    - Include create/delete transitions, parse failures, include cycles, and

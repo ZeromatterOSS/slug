@@ -344,6 +344,8 @@ fn is_bzlmod_config_project_file(path: &ProjectRelativePath) -> bool {
         || path.ends_with("/MODULE.bazel")
         || path.ends_with("/MODULE.bazel.lock")
         || path.ends_with(".MODULE.bazel")
+        || (path.contains("slug/registry/")
+            && (path.ends_with("/source.json") || path.ends_with("/bazel_registry.json")))
 }
 
 /// The return value of a `ReadFileKey` computation.

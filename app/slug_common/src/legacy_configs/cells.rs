@@ -1213,6 +1213,7 @@ struct LocalOverrideModuleInputsValue {
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("RegistryFileInputsKey")]
 struct RegistryFileInputsKey {
+    project_root: AbsNormPathBuf,
     registry_file_hashes: Vec<(String, String)>,
 }
 
@@ -1221,6 +1222,7 @@ struct RegistryFileInputsValue {
     digest: String,
     has_inputs: bool,
     cache_safe: bool,
+    has_untracked_inputs: bool,
 }
 
 fn local_overrides_from_root_module(
@@ -1450,7 +1452,7 @@ impl Key for RegistryFileInputsKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let mut hasher = Sha256::new();
@@ -1461,10 +1463,13 @@ impl Key for RegistryFileInputsKey {
                 digest: hex::encode(hasher.finalize()),
                 has_inputs: false,
                 cache_safe: true,
+                has_untracked_inputs: false,
             }));
         }
         let cache = ModuleCache::new()?;
         let mut cache_safe = true;
+        let mut has_untracked_inputs = false;
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
         for (url, expected_hash) in &self.registry_file_hashes {
             hasher.update(url.as_bytes());
             hasher.update([0]);
@@ -1478,11 +1483,14 @@ impl Key for RegistryFileInputsKey {
             };
             hasher.update(path.to_string_lossy().as_bytes());
             hasher.update([0]);
-            match std::fs::read(&path) {
-                Ok(content) => {
+            let (content, tracked_by_dice) =
+                read_text_file_for_project_input(ctx, &project_fs, &path).await?;
+            has_untracked_inputs |= !tracked_by_dice;
+            match content {
+                Some(content) => {
                     hasher.update(b"present");
                     hasher.update([0]);
-                    let actual_hash = slug_bzlmod::lockfile::compute_sha256_hex(&content);
+                    let actual_hash = slug_bzlmod::lockfile::compute_sha256_hex(content.as_bytes());
                     if &actual_hash != expected_hash {
                         return Err(slug_error::slug_error!(
                             slug_error::ErrorTag::Input,
@@ -1494,10 +1502,9 @@ impl Key for RegistryFileInputsKey {
                     }
                     hasher.update(actual_hash);
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                None => {
                     hasher.update(b"missing");
                 }
-                Err(e) => return Err(e.into()),
             }
             hasher.update([0]);
         }
@@ -1506,6 +1513,7 @@ impl Key for RegistryFileInputsKey {
             digest: hex::encode(hasher.finalize()),
             has_inputs: !self.registry_file_hashes.is_empty(),
             cache_safe,
+            has_untracked_inputs,
         }))
     }
 
@@ -1516,8 +1524,11 @@ impl Key for RegistryFileInputsKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => value.cache_safe && !value.has_untracked_inputs,
+            Err(_) => false,
+        }
     }
 }
 
@@ -1739,6 +1750,7 @@ impl BuckConfigBasedCells {
         };
         let registry_file_inputs = dice_ctx
             .compute(&RegistryFileInputsKey {
+                project_root: project_root.clone(),
                 registry_file_hashes: visible_lockfile
                     .as_ref()
                     .and_then(|value| value.lockfile.as_deref())
@@ -3105,6 +3117,7 @@ mod tests {
                 digest: "registry-files".to_owned(),
                 has_inputs: false,
                 cache_safe: true,
+                has_untracked_inputs: false,
             }),
             extension_replay_summary_digest: Some(Arc::from("extension-replay")),
         }
