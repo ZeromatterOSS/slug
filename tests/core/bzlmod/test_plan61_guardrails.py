@@ -889,6 +889,11 @@ local_path_override(
     assert first["module_file_parse"] > before["module_file_parse"]
     assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
 
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "local_lib" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
     _write(
         buck.cwd / "libs/local_lib/MODULE.bazel",
         """module(name = "local_lib", version = "1.1")\n""",
@@ -896,8 +901,8 @@ local_path_override(
 
     output, second = await _audit_cells_and_counters(buck)
     assert "local_lib" in output
-    assert second["module_file_parse"] > first["module_file_parse"]
-    assert second["bzlmod_resolution_compute"] > first["bzlmod_resolution_compute"]
+    assert second["module_file_parse"] > warm["module_file_parse"]
+    assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

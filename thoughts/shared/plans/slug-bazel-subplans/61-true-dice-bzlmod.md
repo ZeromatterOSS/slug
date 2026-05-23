@@ -291,6 +291,14 @@ Observed SDK result at the checkpoint:
   evaluation inputs. This fixes the missing-lockfile same-daemon warm replay
   guardrail: the extension executes once on the cold command and is reused on
   the warm command.
+- Project-local `local_path_override()` module files now use the same tracked
+  project-file read path as root and included module segments. The transitional
+  `LocalOverrideModuleInputsKey` is cacheable when every observed local module
+  input is project-tracked, and it falls back to non-cacheable direct filesystem
+  reads for out-of-project local override paths. The local-override guardrail
+  now proves a same-daemon warm no-op does not reparse or rerun bzlmod
+  resolution before an edit to `libs/local_lib/MODULE.bazel` invalidates the
+  graph.
 - Current slice validation passed with `cargo build -p slug`, `cargo test -p
   slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
@@ -300,6 +308,13 @@ Observed SDK result at the checkpoint:
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`, `cargo fmt
   --check`, and `git diff --check`. The full Plan 61 Python guardrail passed
   with 61 tests.
+- Local-override tracked-input validation passed with `cargo build -p slug`,
+  `cargo test -p slug_common bzlmod -- --nocapture`, focused
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -k
+  'local_override_module_edit_invalidates_only_affected_nodes' -rx --tb=short`,
+  the full Plan 61 Python guardrail, `cargo fmt --check`, and
+  `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -312,7 +327,7 @@ What worked:
 - Extension evaluation and extension repository execution now run through DICE
   keys instead of immediate startup-side materialization.
 - Lockfile replay reads, facts validation, registry checksum policy,
-  yanked-version policy, include invalidation, and local override input
+  yanked-version policy, include invalidation, and local override module input
   invalidation gained focused guardrails.
 - Repository materialization no longer blindly trusts stale marker files. The
   marker path distinguishes known repo-spec/output-state cases and rejects old
@@ -469,10 +484,11 @@ using Rust DICE keys and values:
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.
 
-2. Finish module-file DICE inputs for local override, registry, git, and
-   archive sources.
-   - Root and included module segments now use tracked project-file DICE inputs;
-     keep extending that shape to every non-root module source.
+2. Finish module-file DICE inputs for registry, git, archive, and
+   out-of-project local override sources.
+   - Root, included, and project-local local override module segments now use
+     tracked project-file DICE inputs; keep extending that shape to every
+     non-root module source.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes.
    - Include create/delete transitions, parse failures, include cycles, and

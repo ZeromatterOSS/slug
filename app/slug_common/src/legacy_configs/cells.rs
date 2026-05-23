@@ -49,10 +49,12 @@ use slug_core::cells::external::GitObjectFormat;
 use slug_core::cells::name::CellName;
 use slug_core::fs::project::ProjectRoot;
 use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_error::BuckErrorContext;
 use slug_fs::fs_util;
 use slug_fs::paths::RelativePath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
+use slug_fs::paths::abs_path::AbsPath;
 
 use crate::external_cells::EXTERNAL_CELLS_IMPL;
 use crate::file_ops::dice::DiceFileComputations;
@@ -751,8 +753,14 @@ impl Key for TrackedRootModuleFileKey {
             }));
         };
 
-        let parsed_with_inputs =
-            parse_root_module_with_tracked_includes(ctx, root_path.as_ref(), content).await?;
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        let parsed_with_inputs = parse_module_with_tracked_project_includes(
+            ctx,
+            &project_fs,
+            root_path.as_ref(),
+            content,
+        )
+        .await?;
         let input_digest = slug_bzlmod::module_file_inputs_digest(&parsed_with_inputs.inputs);
         let input_count = parsed_with_inputs.inputs.len();
 
@@ -772,18 +780,19 @@ impl Key for TrackedRootModuleFileKey {
     }
 }
 
-async fn parse_root_module_with_tracked_includes(
+async fn parse_module_with_tracked_project_includes(
     ctx: &mut DiceComputations<'_>,
-    root_path: &Path,
-    root_content: String,
+    project_fs: &ProjectRoot,
+    module_path: &Path,
+    module_content: String,
 ) -> slug_error::Result<slug_bzlmod::ParsedModuleFileWithInputs> {
-    let module_root = root_path
+    let module_root = module_path
         .parent()
         .unwrap_or_else(|| Path::new(""))
         .to_path_buf();
     let mut session = slug_bzlmod::ModuleFileParseSession::new(module_root.clone());
-    let root_digest = slug_bzlmod::lockfile::compute_sha256_hex(root_content.as_bytes());
-    let include_labels = session.eval_segment(root_path, &root_content, root_digest)?;
+    let module_digest = slug_bzlmod::lockfile::compute_sha256_hex(module_content.as_bytes());
+    let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
     let mut pending = Vec::new();
     push_pending_include_labels(&mut pending, include_labels, Vec::new());
 
@@ -800,36 +809,15 @@ async fn parse_root_module_with_tracked_includes(
             .into());
         }
 
-        let include_rel = include_path
-            .strip_prefix(&module_root)
-            .map_err(|_| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Input,
-                    "included MODULE.bazel segment at {:?} is outside module root {:?}",
-                    include_path,
-                    module_root
-                )
-            })?
-            .to_str()
-            .ok_or_else(|| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Input,
-                    "included MODULE.bazel segment path {:?} is not UTF-8",
-                    include_path
-                )
-            })?
-            .to_owned();
-        let include_project_path = ProjectRelativePath::new(&include_rel)?;
-        let include_content = DiceFileComputations::read_project_file(ctx, include_project_path)
-            .await
-            .map_err(|e| e.without_package_context_information())
-            .with_buck_error_context(|| {
-                format!(
-                    "Failed to read included MODULE.bazel segment at {:?}",
-                    include_path
-                )
-            })?;
-        let include_digest = slug_bzlmod::lockfile::compute_sha256_hex(include_content.as_bytes());
+        let (include_read, _tracked_by_dice) =
+            read_bzlmod_file_for_module_inputs(ctx, project_fs, &include_path).await?;
+        let Some((include_content, include_digest)) = include_read else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to read included MODULE.bazel segment at {:?}: file not found",
+                include_path
+            ));
+        };
         let nested_labels =
             session.eval_segment(&include_path, &include_content, include_digest)?;
         let mut nested_ancestors = ancestors;
@@ -848,6 +836,47 @@ fn push_pending_include_labels(
     for label in include_labels.into_iter().rev() {
         pending.push((label, ancestors.clone()));
     }
+}
+
+async fn read_bzlmod_file_for_module_inputs(
+    ctx: &mut DiceComputations<'_>,
+    project_fs: &ProjectRoot,
+    path: &Path,
+) -> slug_error::Result<(Option<(String, String)>, bool)> {
+    if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
+        let Some(content) =
+            DiceFileComputations::read_project_file_if_exists(ctx, &project_path).await?
+        else {
+            return Ok((None, true));
+        };
+        let digest = slug_bzlmod::lockfile::compute_sha256_hex(content.as_bytes());
+        return Ok((Some((content, digest)), true));
+    }
+
+    match std::fs::read(path) {
+        Ok(bytes) => {
+            let digest = slug_bzlmod::lockfile::compute_sha256_hex(&bytes);
+            let content = String::from_utf8(bytes).map_err(|e| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "Failed to read MODULE.bazel-like file at {:?} as UTF-8: {}",
+                    path,
+                    e
+                )
+            })?;
+            Ok((Some((content, digest)), false))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok((None, false)),
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn project_relative_path_for_abs_path(
+    project_fs: &ProjectRoot,
+    path: &Path,
+) -> Option<ProjectRelativePathBuf> {
+    let path = AbsPath::new(path).ok()?;
+    project_fs.relativize_any(path).ok()
 }
 
 #[derive(Clone, Debug, Display, Allocative)]
@@ -1088,6 +1117,7 @@ struct LocalOverrideModuleInputsValue {
     has_extension_usages: bool,
     has_repo_rule_invocations: bool,
     has_git_overrides: bool,
+    has_untracked_inputs: bool,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -1157,20 +1187,18 @@ fn active_root_overrides(
         .collect()
 }
 
-fn local_override_module_inputs_digest(
-    project_root: &Path,
+async fn local_override_module_inputs_digest(
+    ctx: &mut DiceComputations<'_>,
+    project_root: &AbsNormPathBuf,
     overrides: &[(String, String)],
 ) -> slug_error::Result<LocalOverrideModuleInputsValue> {
+    let project_fs = ProjectRoot::new_unchecked(project_root.clone());
     let mut hasher = Sha256::new();
     hasher.update(b"local-override-module-inputs-v2");
     hasher.update([0]);
     let mut queue = VecDeque::new();
     for (module_name, path) in overrides {
-        queue.push_back((
-            module_name.clone(),
-            project_root.to_path_buf(),
-            path.clone(),
-        ));
+        queue.push_back((module_name.clone(), project_root.clone(), path.clone()));
     }
 
     let mut visited_module_dirs = HashSet::new();
@@ -1178,12 +1206,14 @@ fn local_override_module_inputs_digest(
     let mut has_extension_usages = false;
     let mut has_repo_rule_invocations = false;
     let mut has_git_overrides = false;
+    let mut has_untracked_inputs = false;
 
     while let Some((module_name, base, path)) = queue.pop_front() {
-        let module_dir = base.join(&path);
-        let normalized_module_dir = module_dir
-            .canonicalize()
-            .unwrap_or_else(|_| module_dir.clone());
+        let module_dir = resolve_local_override_module_dir(&base, &path)?;
+        let normalized_module_dir = match module_dir.as_path().canonicalize() {
+            Ok(canonical) => AbsNormPathBuf::try_from(canonical)?,
+            Err(_) => module_dir.clone(),
+        };
         hasher.update(module_name.as_bytes());
         hasher.update([0]);
         hasher.update(base.to_string_lossy().as_bytes());
@@ -1199,26 +1229,21 @@ fn local_override_module_inputs_digest(
             continue;
         }
 
-        let module_bazel_path = normalized_module_dir.join("MODULE.bazel");
-        match std::fs::read(&module_bazel_path) {
-            Ok(content) => {
+        let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
+        let (module_read, tracked_by_dice) =
+            read_bzlmod_file_for_module_inputs(ctx, &project_fs, &module_bazel_path).await?;
+        has_untracked_inputs |= !tracked_by_dice;
+        match module_read {
+            Some((content, _content_digest)) => {
                 hasher.update(b"present");
                 hasher.update([0]);
-                let content_digest = slug_bzlmod::lockfile::compute_sha256_hex(&content);
-                let content = String::from_utf8(content).map_err(|e| {
-                    slug_error::slug_error!(
-                        slug_error::ErrorTag::Input,
-                        "Failed to read MODULE.bazel for local override '{}' at {:?}: {}",
-                        module_name,
-                        module_bazel_path,
-                        e
-                    )
-                })?;
-                let parsed_with_inputs = slug_bzlmod::parser::parse_module_bazel_content_from_path(
+                let parsed_with_inputs = parse_module_with_tracked_project_includes(
+                    ctx,
+                    &project_fs,
                     &module_bazel_path,
-                    &content,
-                    content_digest,
+                    content,
                 )
+                .await
                 .with_buck_error_context(|| {
                     format!(
                         "Failed to parse MODULE.bazel for local override '{}' at {:?}",
@@ -1252,11 +1277,10 @@ fn local_override_module_inputs_digest(
                     }
                 }
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            None => {
                 hasher.update(b"missing");
                 hasher.update([0]);
             }
-            Err(e) => return Err(e.into()),
         }
     }
 
@@ -1266,7 +1290,19 @@ fn local_override_module_inputs_digest(
         has_extension_usages,
         has_repo_rule_invocations,
         has_git_overrides,
+        has_untracked_inputs,
     })
+}
+
+fn resolve_local_override_module_dir(
+    base: &AbsNormPathBuf,
+    path: &str,
+) -> slug_error::Result<AbsNormPathBuf> {
+    let path_obj = Path::new(path);
+    if path_obj.is_absolute() {
+        return AbsNormPathBuf::try_from(path_obj.to_path_buf());
+    }
+    base.join_normalized(RelativePath::new(path))
 }
 
 #[async_trait]
@@ -1275,14 +1311,12 @@ impl Key for LocalOverrideModuleInputsKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        local_override_module_inputs_digest(
-            AsRef::<Path>::as_ref(&self.project_root),
-            &self.overrides,
-        )
-        .map(Arc::new)
+        local_override_module_inputs_digest(ctx, &self.project_root, &self.overrides)
+            .await
+            .map(Arc::new)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1292,8 +1326,11 @@ impl Key for LocalOverrideModuleInputsKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_untracked_inputs,
+            Err(_) => false,
+        }
     }
 }
 
@@ -2971,6 +3008,7 @@ mod tests {
                 has_extension_usages: false,
                 has_repo_rule_invocations: false,
                 has_git_overrides: false,
+                has_untracked_inputs: false,
             }),
             registry_file_inputs: Arc::new(RegistryFileInputsValue {
                 digest: "registry-files".to_owned(),
