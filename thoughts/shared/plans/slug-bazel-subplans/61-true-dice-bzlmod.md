@@ -720,6 +720,16 @@ Observed SDK result at the checkpoint:
   owning extension through `ExtensionIdByCanonicalRepoKey`, so canonical repo
   lookup no longer directly depends on the whole injected extension aggregation
   map.
+- Spoke lookup wrapper dependency validation passed with `cargo check -p
+  slug_bzlmod`, `cargo test -p slug_bzlmod
+  missing_extension_spoke_lookup_does_not_require_replay_inputs --
+  --nocapture`, `cargo test -p slug_bzlmod extension_spokes -- --nocapture`,
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo build -p slug`, the same
+  focused Plan 61 Python replay subset, and the full Plan 61 Python guardrail
+  with 72 tests. `ExtensionSpokesByExtensionIdKey` and
+  `ExtensionSpokesByCanonicalRepoKey` now leave replay-data and repo-mapping
+  reads to `ExtensionSpokesKey`, so absent-extension lookups can return `None`
+  without depending on unrelated injected replay inputs.
 
 ## Consolidated Learnings
 
@@ -796,12 +806,12 @@ What did not work or remains risky:
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity,
   projects canonical repos to owning extension ids, reads per-extension
-  aggregation projections plus narrower repo-mapping and replay-input values,
-  and uses DICE spoke repo-env where available. Generated repo cells and
-  dynamic alias registration now go through a typed runtime install snapshot
-  and installer boundary in `slug_core::cells`, but the backing state is still
-  process-global transitional cell-registration plumbing rather than a final
-  DICE-owned cell graph.
+  aggregation projections, leaves repo-mapping and replay-input reads to the
+  final execution key, and uses DICE spoke repo-env where available. Generated
+  repo cells and dynamic alias registration now go through a typed runtime
+  install snapshot and installer boundary in `slug_core::cells`, but the
+  backing state is still process-global transitional cell-registration plumbing
+  rather than a final DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.

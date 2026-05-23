@@ -421,20 +421,6 @@ impl Key for ExtensionSpokesByExtensionIdKey {
                 extension_id: self.extension_id.clone(),
             })
             .await??;
-        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
-        let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        ensure_repo_mappings_workspace(
-            &self.workspace_id,
-            repo_mappings.as_ref(),
-            "ExtensionSpokesByExtensionIdKey",
-            &self.extension_id,
-        )?;
-        ensure_replay_data_workspace(
-            &self.workspace_id,
-            replay_data.as_ref(),
-            "ExtensionSpokesByExtensionIdKey",
-            &self.extension_id,
-        )?;
         if aggregation.is_none() {
             return Ok(None);
         }
@@ -526,20 +512,6 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         let Some(extension_id) = extension_id else {
             return Ok(None);
         };
-        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
-        let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        ensure_repo_mappings_workspace(
-            &self.workspace_id,
-            repo_mappings.as_ref(),
-            "ExtensionSpokesByCanonicalRepoKey",
-            &self.canonical_name,
-        )?;
-        ensure_replay_data_workspace(
-            &self.workspace_id,
-            replay_data.as_ref(),
-            "ExtensionSpokesByCanonicalRepoKey",
-            &self.canonical_name,
-        )?;
         let bzl_transitive_digest = ctx
             .compute(&ExtensionBzlTransitiveDigestKey {
                 workspace_id: self.workspace_id.clone(),
@@ -2281,6 +2253,39 @@ mod tests {
         assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
             &first_digest
         ));
+    }
+
+    #[tokio::test]
+    async fn missing_extension_spoke_lookup_does_not_require_replay_inputs()
+    -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-missing-spoke-lookup");
+        let workspace_id = crate::WorkspaceId::for_project_root(project_root.clone());
+        let aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
+            workspace_id: workspace_id.clone(),
+            extension_aggregations: Arc::new(std::collections::HashMap::new()),
+            root_module_name: Arc::from("root"),
+        });
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(BzlmodExtensionAggregationsDataKey, aggregations)])?;
+        let mut dice = updater.commit().await;
+
+        let by_id = ExtensionSpokesByExtensionIdKey::for_project_root(
+            project_root,
+            "@root//:missing.bzl%missing",
+        );
+        assert!(dice.compute(&by_id).await??.is_none());
+
+        let by_canonical =
+            ExtensionSpokesByCanonicalRepoKey::for_workspace_id(workspace_id, "_main+missing+repo");
+        assert!(dice.compute(&by_canonical).await??.is_none());
+
+        Ok(())
     }
 
     #[tokio::test]
