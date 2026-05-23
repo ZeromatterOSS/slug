@@ -697,6 +697,19 @@ Observed SDK result at the checkpoint:
   -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo fmt --check`, `git diff --check`, and the full Plan 61
   Python guardrail with 72 tests.
+- Extension-spoke aggregation projection validation passed with `cargo check
+  -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  extension_aggregation_key_projects_single_extension -- --nocapture`, `cargo
+  test -p slug_bzlmod extension_spokes -- --nocapture`, `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo build -p slug`, focused Plan 61 Python
+  guardrails for warm replay, two-workspace isolation, valid-lockfile replay
+  materialization, missing-lockfile extension reuse, and mapped external `.bzl`
+  edits, `cargo fmt --check`, `git diff --check`, and the full Plan 61 Python
+  guardrail with 72 tests. `ExtensionSpokesByExtensionIdKey` and
+  `ExtensionSpokesKey` now project the injected aggregation map through
+  `BzlmodExtensionAggregationKey`, so unrelated extension aggregation changes
+  can cut off at a narrower per-extension value before execution-key
+  construction.
 
 ## Consolidated Learnings
 
@@ -772,12 +785,12 @@ What did not work or remains risky:
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity,
-  reads narrower extension-aggregation, repo-mapping, and replay-input values,
-  and uses DICE spoke repo-env where available. Generated repo cells and
-  dynamic alias registration now go through a typed runtime install snapshot
-  and installer boundary in `slug_core::cells`, but the backing state is still
-  process-global transitional cell-registration plumbing rather than a final
-  DICE-owned cell graph.
+  reads per-extension aggregation projections plus narrower repo-mapping and
+  replay-input values, and uses DICE spoke repo-env where available. Generated
+  repo cells and dynamic alias registration now go through a typed runtime
+  install snapshot and installer boundary in `slug_core::cells`, but the
+  backing state is still process-global transitional cell-registration plumbing
+  rather than a final DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.

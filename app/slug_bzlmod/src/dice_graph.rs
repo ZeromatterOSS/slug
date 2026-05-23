@@ -352,6 +352,14 @@ pub struct BzlmodExtensionAggregationsDataValue {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodExtensionAggregationValue {
+    pub workspace_id: WorkspaceId,
+    pub extension_id: Arc<str>,
+    pub aggregated: Arc<AggregatedExtension>,
+    pub root_module_name: Arc<str>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionReplayDataValue {
     pub workspace_id: WorkspaceId,
     pub hidden_lockfile_path: Option<PathBuf>,
@@ -707,6 +715,30 @@ pub struct InnateExtensionKey {
 pub struct ExtensionBzlTransitiveDigestKey {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodExtensionAggregationKey({}, {})",
+    workspace_id.stable_hash(),
+    extension_id
+)]
+pub struct BzlmodExtensionAggregationKey {
+    pub workspace_id: WorkspaceId,
+    pub extension_id: Arc<str>,
+}
+
+impl BzlmodExtensionAggregationKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
+        Self {
+            workspace_id,
+            extension_id: Arc::from(extension_id),
+        }
+    }
+
+    pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root), extension_id)
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]

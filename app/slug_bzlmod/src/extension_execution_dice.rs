@@ -49,11 +49,13 @@ use starlark::syntax::Dialect;
 use starlark_syntax::syntax::ast::AstStmt;
 use starlark_syntax::syntax::ast::StmtP;
 
+use crate::BzlmodExtensionAggregationValue;
 use crate::BzlmodExtensionAggregationsDataValue;
 use crate::BzlmodExtensionReplayDataValue;
 use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::BzlmodExtensionAggregationKey;
 use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
 use crate::dice_graph::BzlmodExtensionReplayDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataKey;
@@ -128,34 +130,30 @@ pub fn create_extension_execution_key(
     ))
 }
 
-fn create_extension_execution_key_with_bzl_digest(
-    aggregations: &BzlmodExtensionAggregationsDataValue,
+fn create_extension_execution_key_from_aggregation(
+    aggregation: &BzlmodExtensionAggregationValue,
     replay_data: &BzlmodExtensionReplayDataValue,
     repo_mappings: &BzlmodRepoMappingsDataValue,
-    extension_id: &str,
     bzl_transitive_digest: Arc<str>,
-) -> Option<ModuleExtensionExecutionKey> {
-    let aggregated = extension_aggregation(aggregations, extension_id)?;
-    Some(
-        ModuleExtensionExecutionKey::new_with_tracked_lockfiles_and_bzl_digest(
-            aggregated.clone(),
-            aggregations.root_module_name.to_string(),
-            aggregations
-                .workspace_id
-                .canonical_project_root
-                .as_ref()
-                .clone(),
-            replay_data.hidden_lockfile_path.clone(),
-            replay_data.visible_lockfile_digest.clone(),
-            replay_data.hidden_lockfile_digest.clone(),
-            replay_data.visible_lockfile.clone(),
-            replay_data.hidden_lockfile.clone(),
-            replay_data.lockfile_mode,
-            replay_data.repo_env.as_ref().clone(),
-            repo_mappings.repo_mappings.as_ref().clone(),
-            repo_mappings.repo_mapping_overrides.as_ref().clone(),
-            bzl_transitive_digest,
-        ),
+) -> ModuleExtensionExecutionKey {
+    ModuleExtensionExecutionKey::new_with_tracked_lockfiles_and_bzl_digest(
+        aggregation.aggregated.as_ref().clone(),
+        aggregation.root_module_name.to_string(),
+        aggregation
+            .workspace_id
+            .canonical_project_root
+            .as_ref()
+            .clone(),
+        replay_data.hidden_lockfile_path.clone(),
+        replay_data.visible_lockfile_digest.clone(),
+        replay_data.hidden_lockfile_digest.clone(),
+        replay_data.visible_lockfile.clone(),
+        replay_data.hidden_lockfile.clone(),
+        replay_data.lockfile_mode,
+        replay_data.repo_env.as_ref().clone(),
+        repo_mappings.repo_mappings.as_ref().clone(),
+        repo_mappings.repo_mapping_overrides.as_ref().clone(),
+        bzl_transitive_digest,
     )
 }
 
@@ -284,6 +282,26 @@ fn ensure_extension_aggregations_workspace(
     Ok(())
 }
 
+fn ensure_extension_aggregation_workspace(
+    workspace_id: &crate::WorkspaceId,
+    aggregation: &BzlmodExtensionAggregationValue,
+    key_name: &str,
+    subject: &str,
+) -> slug_error::Result<()> {
+    if &aggregation.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} for '{}' was computed with project root '{}', \
+             but current bzlmod extension aggregation root is '{}'",
+            key_name,
+            subject,
+            workspace_id.canonical_project_root.display(),
+            aggregation.workspace_id.canonical_project_root.display()
+        ));
+    }
+    Ok(())
+}
+
 fn ensure_replay_data_workspace(
     workspace_id: &crate::WorkspaceId,
     replay_data: &BzlmodExtensionReplayDataValue,
@@ -302,6 +320,48 @@ fn ensure_replay_data_workspace(
         ));
     }
     Ok(())
+}
+
+#[async_trait]
+impl Key for BzlmodExtensionAggregationKey {
+    type Value = slug_error::Result<Option<Arc<BzlmodExtensionAggregationValue>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        ensure_extension_aggregations_workspace(
+            &self.workspace_id,
+            aggregations.as_ref(),
+            "BzlmodExtensionAggregationKey",
+            &self.extension_id,
+        )?;
+        let Some(aggregated) = aggregations
+            .extension_aggregations
+            .get(self.extension_id.as_ref())
+        else {
+            return Ok(None);
+        };
+        Ok(Some(Arc::new(BzlmodExtensionAggregationValue {
+            workspace_id: self.workspace_id.clone(),
+            extension_id: self.extension_id.clone(),
+            aggregated: Arc::new(aggregated.clone()),
+            root_module_name: aggregations.root_module_name.clone(),
+        })))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[async_trait]
@@ -354,15 +414,14 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        let aggregation = ctx
+            .compute(&BzlmodExtensionAggregationKey {
+                workspace_id: self.workspace_id.clone(),
+                extension_id: self.extension_id.clone(),
+            })
+            .await??;
         let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        ensure_extension_aggregations_workspace(
-            &self.workspace_id,
-            aggregations.as_ref(),
-            "ExtensionSpokesByExtensionIdKey",
-            &self.extension_id,
-        )?;
         ensure_repo_mappings_workspace(
             &self.workspace_id,
             repo_mappings.as_ref(),
@@ -375,10 +434,7 @@ impl Key for ExtensionSpokesByExtensionIdKey {
             "ExtensionSpokesByExtensionIdKey",
             &self.extension_id,
         )?;
-        if !aggregations
-            .extension_aggregations
-            .contains_key(self.extension_id.as_ref())
-        {
+        if aggregation.is_none() {
             return Ok(None);
         }
         let bzl_transitive_digest = ctx
@@ -497,12 +553,24 @@ impl Key for ExtensionSpokesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        let aggregation = ctx
+            .compute(&BzlmodExtensionAggregationKey {
+                workspace_id: self.workspace_id.clone(),
+                extension_id: self.extension_id.clone(),
+            })
+            .await??;
         let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        ensure_extension_aggregations_workspace(
+        let Some(aggregation) = aggregation else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Extension '{}' not found while computing generated repo spokes",
+                self.extension_id
+            ));
+        };
+        ensure_extension_aggregation_workspace(
             &self.workspace_id,
-            aggregations.as_ref(),
+            aggregation.as_ref(),
             "ExtensionSpokesKey",
             &self.extension_id,
         )?;
@@ -518,19 +586,12 @@ impl Key for ExtensionSpokesKey {
             "ExtensionSpokesKey",
             &self.extension_id,
         )?;
-        let Some(extension_key) = create_extension_execution_key_with_bzl_digest(
-            aggregations.as_ref(),
+        let extension_key = create_extension_execution_key_from_aggregation(
+            aggregation.as_ref(),
             replay_data.as_ref(),
             repo_mappings.as_ref(),
-            &self.extension_id,
             self.bzl_transitive_digest.clone(),
-        ) else {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "Extension '{}' not found while computing generated repo spokes",
-                self.extension_id
-            ));
-        };
+        );
         record_bzlmod_event(
             BzlmodEventKind::ExtensionSpokesCompute,
             self.extension_id.as_ref(),
@@ -2137,10 +2198,23 @@ mod tests {
         let failed_lookup: slug_error::Result<Option<Arc<ExtensionSpokesValue>>> = Err(
             slug_error::slug_error!(slug_error::ErrorTag::Tier0, "lookup failed"),
         );
+        let missing_aggregation: slug_error::Result<Option<Arc<BzlmodExtensionAggregationValue>>> =
+            Ok(None);
+        let failed_aggregation: slug_error::Result<Option<Arc<BzlmodExtensionAggregationValue>>> =
+            Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "aggregation failed"
+            ));
         let first_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
         let same_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
         let changed_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("second"));
 
+        assert!(<BzlmodExtensionAggregationKey as Key>::validity(
+            &missing_aggregation
+        ));
+        assert!(!<BzlmodExtensionAggregationKey as Key>::validity(
+            &failed_aggregation
+        ));
         assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &missing_extension
         ));
@@ -2165,6 +2239,74 @@ mod tests {
         assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
             &first_digest
         ));
+    }
+
+    #[tokio::test]
+    async fn extension_aggregation_key_projects_single_extension() -> slug_error::Result<()> {
+        fn aggregations_value(
+            workspace_id: &crate::WorkspaceId,
+            target: AggregatedExtension,
+            other: AggregatedExtension,
+        ) -> Arc<BzlmodExtensionAggregationsDataValue> {
+            let mut extension_aggregations = std::collections::HashMap::new();
+            extension_aggregations.insert(target.extension_id.clone(), target);
+            extension_aggregations.insert(other.extension_id.clone(), other);
+            Arc::new(BzlmodExtensionAggregationsDataValue {
+                workspace_id: workspace_id.clone(),
+                extension_aggregations: Arc::new(extension_aggregations),
+                root_module_name: Arc::from("root"),
+            })
+        }
+
+        let workspace_id =
+            crate::WorkspaceId::for_project_root(PathBuf::from("/tmp/slug-plan61-aggregation-key"));
+        let mut target = AggregatedExtension::new("@root//:ext.bzl", "ext");
+        target.extension_id = "@root//:ext.bzl%ext".to_owned();
+        target.add_imported_repos(["target_repo".to_owned()]);
+        let mut other = AggregatedExtension::new("@other//:ext.bzl", "ext");
+        other.extension_id = "@other//:ext.bzl%ext".to_owned();
+        other.add_imported_repos(["other_repo".to_owned()]);
+        let key = BzlmodExtensionAggregationKey::for_workspace_id(
+            workspace_id.clone(),
+            &target.extension_id,
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            aggregations_value(&workspace_id, target.clone(), other.clone()),
+        )])?;
+        let mut dice = updater.commit().await;
+        let first = dice.compute(&key).await??.unwrap();
+
+        let mut changed_other = other.clone();
+        changed_other.add_imported_repos(["changed_other_repo".to_owned()]);
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            aggregations_value(&workspace_id, target.clone(), changed_other),
+        )])?;
+        let mut dice = updater.commit().await;
+        let second = dice.compute(&key).await??.unwrap();
+        assert_eq!(first, second);
+
+        let mut changed_target = target.clone();
+        changed_target.add_imported_repos(["changed_target_repo".to_owned()]);
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            aggregations_value(&workspace_id, changed_target, other),
+        )])?;
+        let mut dice = updater.commit().await;
+        let third = dice.compute(&key).await??.unwrap();
+        assert_ne!(first, third);
+
+        Ok(())
     }
 
     #[test]
@@ -2223,14 +2365,18 @@ mod tests {
         assert_eq!(key.lockfile_mode, LockfileMode::Error);
         assert_eq!(key.repo_env.as_ref(), &repo_env);
 
-        let key_with_digest = create_extension_execution_key_with_bzl_digest(
-            &data,
+        let aggregation = BzlmodExtensionAggregationValue {
+            workspace_id: data.workspace_id.clone(),
+            extension_id: Arc::from(extension_id.as_str()),
+            aggregated: Arc::new(data.extension_aggregations[&extension_id].clone()),
+            root_module_name: data.root_module_name.clone(),
+        };
+        let key_with_digest = create_extension_execution_key_from_aggregation(
+            &aggregation,
             &replay_data,
             &repo_mappings,
-            &extension_id,
             Arc::from("digest-from-dice-key"),
-        )
-        .unwrap();
+        );
         assert_eq!(
             key_with_digest.bzl_transitive_digest.as_ref(),
             "digest-from-dice-key"

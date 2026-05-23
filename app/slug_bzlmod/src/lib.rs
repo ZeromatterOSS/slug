@@ -64,6 +64,8 @@ pub use dice_graph::BzlmodCommandPolicyKey;
 pub use dice_graph::BzlmodCommandPolicyValue;
 pub use dice_graph::BzlmodEventCounters;
 pub use dice_graph::BzlmodEventKind;
+pub use dice_graph::BzlmodExtensionAggregationKey;
+pub use dice_graph::BzlmodExtensionAggregationValue;
 pub use dice_graph::BzlmodExtensionAggregationsDataKey;
 pub use dice_graph::BzlmodExtensionAggregationsDataValue;
 pub use dice_graph::BzlmodExtensionReplayDataKey;
