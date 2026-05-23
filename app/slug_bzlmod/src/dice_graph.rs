@@ -17,6 +17,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -770,7 +771,7 @@ pub struct ExtensionRepoExecutionIdentity {
     pub repo_replay_inputs_digest: Arc<str>,
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, Eq, Allocative)]
 #[display(
     "RepoMaterializationManifestKey({}, {}, {})",
     workspace_id.stable_hash(),
@@ -782,21 +783,42 @@ pub struct RepoMaterializationManifestKey {
     pub output_base: Arc<PathBuf>,
     pub canonical_repo: Arc<str>,
     pub repo_spec_digest: Arc<str>,
+    pub repo_spec: Arc<RepoSpec>,
 }
 
 impl RepoMaterializationManifestKey {
     pub fn for_project_root(
         project_root: PathBuf,
         canonical_repo: &str,
-        repo_spec_digest: &str,
+        repo_spec: Arc<RepoSpec>,
     ) -> Self {
         let workspace_id = WorkspaceId::for_project_root(project_root);
+        let repo_spec_digest = repo_spec.compute_hash();
         Self {
             output_base: workspace_id.output_base.clone(),
             workspace_id,
             canonical_repo: Arc::from(canonical_repo),
-            repo_spec_digest: Arc::from(repo_spec_digest),
+            repo_spec_digest: Arc::from(repo_spec_digest.as_str()),
+            repo_spec,
         }
+    }
+}
+
+impl PartialEq for RepoMaterializationManifestKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.workspace_id == other.workspace_id
+            && self.output_base == other.output_base
+            && self.canonical_repo == other.canonical_repo
+            && self.repo_spec_digest == other.repo_spec_digest
+    }
+}
+
+impl std::hash::Hash for RepoMaterializationManifestKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.workspace_id.hash(state);
+        self.output_base.hash(state);
+        self.canonical_repo.hash(state);
+        self.repo_spec_digest.hash(state);
     }
 }
 

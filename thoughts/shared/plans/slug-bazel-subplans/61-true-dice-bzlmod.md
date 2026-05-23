@@ -244,6 +244,14 @@ Observed SDK result at the checkpoint:
   manifest value instead of an anonymous materialized-state string. This keeps
   the existing bounded marker/layout behavior while naming the current
   materialized tree identity as the next DICE-owned migration surface.
+- Extension repository execution now consumes `RepoMaterializationManifestKey`
+  through DICE instead of recomputing the manifest helper directly inside
+  `ExtensionRepoExecutionKey::compute`. The key carries the repo spec needed for
+  the same marker/layout/recorded-input classification and remains
+  non-cacheable until those filesystem reads become tracked DICE dependencies.
+  Focused Rust coverage proves execution follows the named manifest key, and
+  `cargo test -p slug_bzlmod`, `cargo fmt --check`, and
+  `cargo check -p slug_bzlmod` passed after the migration.
 - `module(bazel_compatibility = [...])` is no longer parsed-and-ignored.
   Slug now validates the declared constraints against its Bazel 9.0.1
   compatibility target and fails incompatible modules. Local Bazel 9.1.0

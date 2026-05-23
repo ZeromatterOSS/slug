@@ -233,12 +233,12 @@ pub struct ExtensionRepoExecutionKey {
     /// Repositories are created under {project_root}/bazel-external/{canonical_name}/
     pub project_root: Arc<PathBuf>,
 
-    /// DICE-shaped pre-materialization manifest for marker/layout reuse.
+    /// DICE-owned pre-materialization manifest key for marker/layout reuse.
     ///
     /// This mirrors Bazel's repository marker-file pruning model: key the
     /// fetch on marker contents and cheap layout checks, not a full tree walk
     /// of every external repo on access.
-    pub materialization_manifest: Arc<RepoMaterializationManifestValue>,
+    pub materialization_manifest_key: Arc<RepoMaterializationManifestKey>,
 }
 
 impl std::hash::Hash for ExtensionRepoExecutionKey {
@@ -248,7 +248,7 @@ impl std::hash::Hash for ExtensionRepoExecutionKey {
         self.extension_id.hash(state);
         self.spec_hash.hash(state);
         self.project_root.hash(state);
-        self.materialization_manifest.hash(state);
+        self.materialization_manifest_key.hash(state);
     }
 }
 
@@ -259,7 +259,7 @@ impl PartialEq for ExtensionRepoExecutionKey {
             && self.extension_id == other.extension_id
             && self.spec_hash == other.spec_hash
             && self.project_root == other.project_root
-            && self.materialization_manifest == other.materialization_manifest
+            && self.materialization_manifest_key == other.materialization_manifest_key
     }
 }
 
@@ -274,19 +274,19 @@ impl ExtensionRepoExecutionKey {
         project_root: PathBuf,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
-        let materialization_manifest = repo_materialization_manifest(
+        let repo_spec = Arc::new(repo_spec);
+        let materialization_manifest_key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
             canonical_name.as_str(),
-            &repo_spec,
-            &project_root,
-            &spec_hash,
+            repo_spec.clone(),
         );
         Self {
             canonical_name: Arc::from(canonical_name.as_str()),
             extension_id: Arc::from(extension_id.as_str()),
             spec_hash: Arc::from(spec_hash.as_str()),
-            repo_spec: Arc::new(repo_spec),
+            repo_spec,
             project_root: Arc::new(project_root),
-            materialization_manifest: Arc::new(materialization_manifest),
+            materialization_manifest_key: Arc::new(materialization_manifest_key),
         }
     }
 
@@ -298,11 +298,10 @@ impl ExtensionRepoExecutionKey {
         project_root: Arc<PathBuf>,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
-        let materialization_manifest = repo_materialization_manifest(
+        let materialization_manifest_key = RepoMaterializationManifestKey::for_project_root(
+            project_root.as_ref().clone(),
             canonical_name.as_ref(),
-            repo_spec.as_ref(),
-            project_root.as_ref(),
-            &spec_hash,
+            repo_spec.clone(),
         );
         Self {
             canonical_name,
@@ -310,7 +309,7 @@ impl ExtensionRepoExecutionKey {
             spec_hash: Arc::from(spec_hash.as_str()),
             repo_spec,
             project_root,
-            materialization_manifest: Arc::new(materialization_manifest),
+            materialization_manifest_key: Arc::new(materialization_manifest_key),
         }
     }
 
@@ -415,8 +414,22 @@ pub fn repo_materialization_manifest(
     canonical_name: &str,
     repo_spec: &RepoSpec,
     project_root: &PathBuf,
-    spec_hash: &str,
 ) -> RepoMaterializationManifestValue {
+    let key = RepoMaterializationManifestKey::for_project_root(
+        project_root.clone(),
+        canonical_name,
+        Arc::new(repo_spec.clone()),
+    );
+    repo_materialization_manifest_for_key(&key)
+}
+
+fn repo_materialization_manifest_for_key(
+    key: &RepoMaterializationManifestKey,
+) -> RepoMaterializationManifestValue {
+    let canonical_name = key.canonical_repo.as_ref();
+    let repo_spec = key.repo_spec.as_ref();
+    let spec_hash = key.repo_spec_digest.as_ref();
+    let project_root = key.workspace_id.canonical_project_root.as_ref();
     let repo_dir = project_root.join("bazel-external").join(canonical_name);
     let marker_path = repo_dir.join(".slug_repo_complete");
     let marker_state = if repo_spec.local {
@@ -453,16 +466,38 @@ pub fn repo_materialization_manifest(
     let recorded_inputs_state = repository_recorded_inputs_state(&repo_dir);
 
     RepoMaterializationManifestValue::new(
-        RepoMaterializationManifestKey::for_project_root(
-            project_root.clone(),
-            canonical_name,
-            spec_hash,
-        ),
+        key.clone(),
         repo_dir,
         marker_state,
         layout_state,
         recorded_inputs_state,
     )
+}
+
+#[async_trait]
+impl Key for RepoMaterializationManifestKey {
+    type Value = slug_error::Result<Arc<RepoMaterializationManifestValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Ok(Arc::new(repo_materialization_manifest_for_key(self)))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.digest == y.digest && x.key == y.key,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // Recompute every request until marker/layout/recorded-input reads are
+        // backed by tracked DICE filesystem dependencies.
+        false
+    }
 }
 
 #[async_trait]
@@ -489,12 +524,9 @@ impl Key for ExtensionRepoExecutionKey {
             .join("bazel-external")
             .join(self.canonical_name.as_ref());
 
-        let manifest = repo_materialization_manifest(
-            self.canonical_name.as_ref(),
-            self.repo_spec.as_ref(),
-            self.project_root.as_ref(),
-            &self.spec_hash,
-        );
+        let manifest = ctx
+            .compute(self.materialization_manifest_key.as_ref())
+            .await??;
         let marker_path = working_dir.join(".slug_repo_complete");
         let marker_matches =
             !self.repo_spec.local && manifest.marker_state.starts_with("marker:complete:");
@@ -666,9 +698,9 @@ impl Key for ExtensionRepoExecutionKey {
 
     fn validity(x: &Self::Value) -> bool {
         // Don't cache errors - retry on next request. Successful values are
-        // keyed by `materialization_manifest`, so marker/layout corruption
-        // creates a different key while same-transaction materialization stays
-        // deduped.
+        // guarded by `RepoMaterializationManifestKey`, so marker/layout
+        // corruption dirties the DICE dependency while same-transaction
+        // materialization stays deduped.
         x.is_ok()
     }
 }
@@ -1057,7 +1089,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extension_repo_key_hash_includes_materialization_manifest() {
+    fn test_materialization_manifest_value_tracks_layout_state() {
         let temp = tempfile::TempDir::new().unwrap();
         let project_root = temp.path().to_path_buf();
         let source_dir = project_root.join("repo_src");
@@ -1102,6 +1134,8 @@ mod tests {
             repo_spec.clone(),
             project_root.clone(),
         );
+        let valid_manifest =
+            repo_materialization_manifest_for_key(&valid.materialization_manifest_key);
 
         #[cfg(unix)]
         {
@@ -1119,16 +1153,15 @@ mod tests {
             repo_spec,
             project_root,
         );
+        let corrupt_manifest =
+            repo_materialization_manifest_for_key(&corrupt.materialization_manifest_key);
 
+        assert_ne!(valid_manifest.digest, corrupt_manifest.digest);
         assert_ne!(
-            valid.materialization_manifest.digest,
-            corrupt.materialization_manifest.digest
+            valid_manifest.state_summary(),
+            corrupt_manifest.state_summary()
         );
-        assert_ne!(
-            valid.materialization_manifest.state_summary(),
-            corrupt.materialization_manifest.state_summary()
-        );
-        assert_ne!(valid, corrupt);
+        assert_eq!(valid, corrupt);
     }
 
     #[test]
@@ -1167,6 +1200,8 @@ mod tests {
             repo_spec.clone(),
             project_root.clone(),
         );
+        let valid_manifest =
+            repo_materialization_manifest_for_key(&valid.materialization_manifest_key);
 
         std::fs::write(repo_dir.join("data.txt"), "corrupt").unwrap();
 
@@ -1176,11 +1211,10 @@ mod tests {
             repo_spec,
             project_root,
         );
+        let corrupt_manifest =
+            repo_materialization_manifest_for_key(&corrupt.materialization_manifest_key);
 
-        assert_eq!(
-            valid.materialization_manifest.digest,
-            corrupt.materialization_manifest.digest
-        );
+        assert_eq!(valid_manifest.digest, corrupt_manifest.digest);
         assert_eq!(valid, corrupt);
     }
 
@@ -1229,6 +1263,8 @@ mod tests {
             repo_spec.clone(),
             project_root.clone(),
         );
+        let valid_manifest =
+            repo_materialization_manifest_for_key(&valid.materialization_manifest_key);
 
         std::fs::write(&watched, "second").unwrap();
 
@@ -1238,18 +1274,81 @@ mod tests {
             repo_spec,
             project_root,
         );
+        let stale_manifest =
+            repo_materialization_manifest_for_key(&stale.materialization_manifest_key);
 
-        assert_ne!(
-            valid.materialization_manifest.digest,
-            stale.materialization_manifest.digest
-        );
-        assert_ne!(valid, stale);
+        assert_ne!(valid_manifest.digest, stale_manifest.digest);
+        assert_eq!(valid, stale);
         assert!(
-            stale
-                .materialization_manifest
+            stale_manifest
                 .recorded_inputs_state
                 .contains("inputs-invalid:recorded_input_changed")
         );
+    }
+
+    #[tokio::test]
+    async fn extension_repo_execution_consumes_materialization_manifest_key() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+archive_repo";
+        let exec_repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.invalid/archive.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let manifest_repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.invalid/archive.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("def456".to_owned()));
+        let manifest_spec_hash = manifest_repo_spec.compute_hash();
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&manifest_spec_hash, &output_digest),
+        )
+        .unwrap();
+
+        let mut key = ExtensionRepoExecutionKey::new(
+            canonical_name.to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            exec_repo_spec,
+            project_root.clone(),
+        );
+        key.materialization_manifest_key =
+            Arc::new(RepoMaterializationManifestKey::for_project_root(
+                project_root.clone(),
+                canonical_name,
+                Arc::new(manifest_repo_spec),
+            ));
+
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let result = dice.compute(&key).await.unwrap().unwrap();
+
+        assert_eq!(result.repo_name, canonical_name);
+        assert_eq!(
+            result.repo_path,
+            project_root.join("bazel-external").join(canonical_name)
+        );
+        assert!(result.repo_path.exists());
     }
 
     // Tests for repo_spec_to_invocation
