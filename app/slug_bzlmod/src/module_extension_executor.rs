@@ -111,7 +111,7 @@ pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
         repo_env: Arc<BTreeMap<String, String>>,
-        workspace_id: Option<WorkspaceId>,
+        workspace_id: WorkspaceId,
     ) -> slug_error::Result<ExtensionExecutionOutput>;
 }
 

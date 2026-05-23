@@ -781,6 +781,16 @@ Observed SDK result at the checkpoint:
   extension Starlark execution, and the synchronous spoke-materialization
   bridge; Starlark repository-rule execution also uses the workspace identity
   from its materialization key when it enters the same sync bridge.
+- Module-extension executor workspace-id API hardening validation passed with
+  `cargo check -p slug_bzlmod -p slug_interpreter_for_build`, `cargo test -p
+  slug_bzlmod test_extension_execution_requires_workspace_id -- --nocapture`,
+  `cargo test -p slug_bzlmod module_extension_key -- --nocapture`, full
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo build -p slug`, the
+  focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
+  72 tests, `cargo fmt --check`, and `git diff --check`. The late-bound module
+  extension executor now requires a concrete `WorkspaceId`; execution keys
+  without one fail before Starlark evaluation instead of letting the
+  interpreter implementation re-derive workspace identity from project root.
 
 ## Consolidated Learnings
 
@@ -863,7 +873,8 @@ What did not work or remains risky:
   final execution key, uses DICE spoke repo-env where available, and threads
   the exact `WorkspaceId` into extension execution and the sync
   materialization bridge instead of re-deriving workspace identity from project
-  root. Generated repo cells and dynamic alias registration now go through a
+  root; the late-bound executor API now rejects missing workspace identity.
+  Generated repo cells and dynamic alias registration now go through a
   typed runtime install snapshot and installer boundary in `slug_core::cells`,
   but the backing state is still process-global transitional cell-registration
   plumbing rather than a final DICE-owned cell graph. The direct public helpers

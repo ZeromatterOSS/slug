@@ -1065,6 +1065,15 @@ impl ModuleExtensionExecutionKey {
     pub fn project_root(&self) -> Option<&PathBuf> {
         self.project_root.as_ref().map(|p| p.as_ref())
     }
+
+    fn execution_workspace_id(&self) -> Result<crate::WorkspaceId, ModuleExtensionError> {
+        self.workspace_id
+            .clone()
+            .ok_or_else(|| ModuleExtensionError::ExecutionFailed {
+                extension_id: self.extension_id.to_string(),
+                reason: "missing DICE workspace identity for module extension execution".to_owned(),
+            })
+    }
 }
 
 fn empty_facts() -> serde_json::Value {
@@ -1269,6 +1278,7 @@ impl Key for ModuleExtensionExecutionKey {
         );
 
         // 2. Create temporary working directory for module_ctx I/O
+        let workspace_id = self.execution_workspace_id()?;
         record_bzlmod_event(BzlmodEventKind::ExtensionEval, self.extension_id.as_ref());
         let temp_dir = create_temp_extension_dir(&self.extension_id)?;
 
@@ -1290,7 +1300,7 @@ impl Key for ModuleExtensionExecutionKey {
                         &temp_dir,
                         prior_facts,
                         self.repo_env.clone(),
-                        self.workspace_id.clone(),
+                        workspace_id,
                     )
                     .await
             }
@@ -2653,6 +2663,42 @@ mod tests {
         assert_eq!(
             workspace_id.output_base.as_ref(),
             &PathBuf::from("/tmp/project/buck-out/v2")
+        );
+    }
+
+    #[test]
+    fn test_extension_execution_requires_workspace_id() {
+        use crate::extensions::AggregatedExtension;
+
+        let missing = ModuleExtensionExecutionKey::new(
+            AggregatedExtension::new("@@module//ext.bzl", "test"),
+            "_main".to_owned(),
+        );
+        let err = missing.execution_workspace_id().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("missing DICE workspace identity for module extension execution")
+        );
+
+        let present = ModuleExtensionExecutionKey::new_with_lockfile(
+            AggregatedExtension::new("@@module//ext.bzl", "test"),
+            "_main".to_owned(),
+            PathBuf::from("/tmp/project"),
+            None,
+            None,
+            None,
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
+        );
+        assert_eq!(
+            present
+                .execution_workspace_id()
+                .unwrap()
+                .canonical_project_root
+                .as_ref(),
+            &PathBuf::from("/tmp/project")
         );
     }
 

@@ -373,7 +373,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
         repo_env: Arc<BTreeMap<String, String>>,
-        workspace_id: Option<WorkspaceId>,
+        workspace_id: WorkspaceId,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
         tracing::debug!(
             "Executing extension '{}' (slug_interpreter_for_build)",
@@ -387,8 +387,6 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         let cell_resolver = ctx.get_cell_resolver().await?;
         let io = ctx.global_data().get_io_provider();
         let project_root = io.project_root().root().to_path_buf();
-        let workspace_id =
-            workspace_id.unwrap_or_else(|| WorkspaceId::for_project_root(project_root.clone()));
         let mut cell_paths = std::collections::HashMap::new();
         for (cell_name, cell_instance) in cell_resolver.cells() {
             let rel_path = cell_instance.path().as_project_relative_path();
