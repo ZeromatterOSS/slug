@@ -755,6 +755,15 @@ Observed SDK result at the checkpoint:
   capture registry now restores the previous scope on drop, so nested or
   unwinding extension-evaluation plumbing cannot silently erase or leak the
   surrounding capture context.
+- Extension execution constructor surface cleanup validation passed with
+  `cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  module_extension_key -- --nocapture`, full `cargo test -p slug_bzlmod --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
+  subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
+  --check`, and `git diff --check`. Test-only constructors that recompute the
+  best-effort `.bzl` digest directly are no longer public production APIs; the
+  production constructor remains the keyed-digest path used by
+  `ExtensionSpokesKey`.
 
 ## Consolidated Learnings
 
@@ -826,7 +835,9 @@ What did not work or remains risky:
   `DiceFileComputations`, but both digest producers intentionally mark
   themselves invalid across transactions because the shared scanner is still
   not the actual Starlark loader graph and some path discovery remains
-  transitional.
+  transitional. Production extension execution no longer exposes convenience
+  constructors that recompute this digest directly; remaining direct-digest
+  constructors are compiled only for tests.
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity,

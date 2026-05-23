@@ -834,7 +834,8 @@ impl Dupe for ModuleExtensionExecutionKey {
 
 impl ModuleExtensionExecutionKey {
     /// Create a new extension execution key from aggregated extension data.
-    pub fn new(aggregated: AggregatedExtension, root_module_name: String) -> Self {
+    #[cfg(test)]
+    fn new(aggregated: AggregatedExtension, root_module_name: String) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
         let bzl_transitive_digest =
@@ -859,7 +860,8 @@ impl ModuleExtensionExecutionKey {
     }
 
     /// Create a new extension execution key with lockfile support.
-    pub fn new_with_lockfile(
+    #[cfg(test)]
+    fn new_with_lockfile(
         aggregated: AggregatedExtension,
         root_module_name: String,
         project_root: PathBuf,
@@ -888,7 +890,8 @@ impl ModuleExtensionExecutionKey {
     }
 
     /// Create a new extension execution key with DICE-tracked lockfile values.
-    pub fn new_with_tracked_lockfiles(
+    #[cfg(test)]
+    fn new_with_tracked_lockfiles(
         aggregated: AggregatedExtension,
         root_module_name: String,
         project_root: PathBuf,
@@ -928,7 +931,7 @@ impl ModuleExtensionExecutionKey {
         )
     }
 
-    pub fn new_with_tracked_lockfiles_and_bzl_digest(
+    fn new_with_tracked_lockfiles_and_bzl_digest(
         aggregated: AggregatedExtension,
         root_module_name: String,
         project_root: PathBuf,
@@ -964,36 +967,9 @@ impl ModuleExtensionExecutionKey {
         }
     }
 
-    /// Create from Arc references (avoids cloning for repeated use).
-    pub fn from_arcs(
-        extension_id: Arc<str>,
-        input_hash: Arc<str>,
-        aggregated: Arc<AggregatedExtension>,
-        root_module_name: Arc<str>,
-    ) -> Self {
-        let bzl_transitive_digest =
-            Arc::from(compute_bzl_transitive_digest(&extension_id).as_str());
-        Self {
-            extension_id,
-            input_hash,
-            bzl_transitive_digest,
-            aggregated,
-            root_module_name,
-            project_root: None,
-            hidden_lockfile_path: None,
-            visible_lockfile_digest: None,
-            hidden_lockfile_digest: None,
-            visible_lockfile: None,
-            hidden_lockfile: None,
-            lockfile_mode: LockfileMode::Update,
-            repo_env: Arc::new(BTreeMap::new()),
-            repo_mappings: Arc::new(RepoMappingSnapshot::new()),
-            repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
-        }
-    }
-
     /// Create from Arc references with lockfile support.
-    pub fn from_arcs_with_lockfile(
+    #[cfg(test)]
+    fn from_arcs_with_lockfile(
         extension_id: Arc<str>,
         input_hash: Arc<str>,
         aggregated: Arc<AggregatedExtension>,
@@ -1036,7 +1012,8 @@ impl ModuleExtensionExecutionKey {
 
     /// Create a minimal key (for testing or when aggregated data is not available).
     /// This is primarily for backward compatibility with tests.
-    pub fn new_minimal(extension_id: String, input_hash: String) -> Self {
+    #[cfg(test)]
+    fn new_minimal(extension_id: String, input_hash: String) -> Self {
         let bzl_transitive_digest = compute_bzl_transitive_digest(&extension_id);
         Self {
             extension_id: Arc::from(extension_id.as_str()),
