@@ -519,6 +519,75 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_warm_noop_out_of_project_registry_cache_reuses_polled_dice_input(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: registry cache files are Skyframe module-resolution inputs."""
+    module_name = "external_cache_lib"
+    module_version = "1.0.0"
+    cache_home = buck.cwd.parent / f"{buck.cwd.name}_cache_home"
+    module_cache = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        module_name,
+        module_version,
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_external_registry_cache")
+
+bazel_dep(name = "{module_name}", version = "{module_version}")
+""",
+    )
+
+    module_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel"
+    )
+    source_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
+    )
+    registry_url = "https://bcr.bazel.build/bazel_registry.json"
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    registry_url: _sha256(registry_cache / "bazel_registry.json"),
+                    module_url: _sha256(module_cache / "MODULE.bazel"),
+                    source_url: _sha256(module_cache / "source.json"),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    before = await _bzlmod_counters(buck, env=env)
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, second = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(registry_cache / "bazel_registry.json", '{"mirrors": []}\n')
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    assert "Registry file checksum mismatch" in str(exc.value)
+    assert registry_url in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_single_version_override_registry_uses_override_registry(
     buck: Buck,
 ) -> None:

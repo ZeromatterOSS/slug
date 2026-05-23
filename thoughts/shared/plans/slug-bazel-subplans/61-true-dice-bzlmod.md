@@ -309,9 +309,12 @@ Observed SDK result at the checkpoint:
 - Locked registry cache files now use tracked project-file DICE reads when the
   configured `XDG_CACHE_HOME` is under the project root, covering cached
   registry `MODULE.bazel`, `source.json`, and `bazel_registry.json` checksum
-  inputs. Cache files outside the project root remain non-cacheable direct
-  filesystem reads. Existing guardrails prove warm bzlmod reuse and same-daemon
-  checksum failures after editing each cached registry file class.
+  inputs. Cache files outside the project root remain polled direct filesystem
+  reads, but the transitional `RegistryFileInputsKey` now includes a digest of
+  those external files so warm reuse is keyed by the observed external cache
+  state instead of a stale path-only child value. Guardrails prove warm bzlmod
+  reuse and same-daemon checksum failures after editing each cached registry
+  file class, including an out-of-project `bazel_registry.json`.
 - The unused non-cacheable `slug_bzlmod::LockfileContentKey` bridge was removed
   after visible and hidden lockfile reads moved to the tracked key in
   `slug_common`.
@@ -337,11 +340,15 @@ Observed SDK result at the checkpoint:
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k
   'visible_lockfile_edit_is_observed_in_same_daemon' -rx --tb=short`, the full
   Plan 61 Python guardrail, `cargo fmt --check`, and `git diff --check`.
-- Registry-cache tracked-input validation passed with `cargo build -p slug`,
-  `cargo test -p slug_common bzlmod -- --nocapture`, focused Plan 61 guardrails
-  for `warm_noop_locked_registry_dep_reuses_bzlmod_resolution` and
-  `locked_registry_source_json_and_registry_metadata_are_bridge_inputs`, the
-  full Plan 61 Python guardrail, `cargo fmt --check`, and `git diff --check`.
+- Registry-cache tracked/polled-input validation passed with `cargo build -p
+  slug`, `cargo test -p slug_common bzlmod -- --nocapture`, `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo test -p slug_external_cells --
+  --nocapture`, focused Plan 61 guardrails for
+  `warm_noop_locked_registry_dep_reuses_bzlmod_resolution`,
+  `locked_registry_source_json_and_registry_metadata_are_bridge_inputs`, and
+  `warm_noop_out_of_project_registry_cache_reuses_polled_dice_input`, the full
+  Plan 61 Python guardrail with 62 tests, `cargo fmt --check`, and `git diff
+  --check`.
 - Lockfile bridge cleanup validation passed with `cargo test -p slug_bzlmod --
   --nocapture`.
 

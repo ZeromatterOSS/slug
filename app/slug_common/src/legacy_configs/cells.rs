@@ -809,7 +809,7 @@ async fn parse_module_with_tracked_project_includes(
             .into());
         }
 
-        let (include_read, _tracked_by_dice) =
+        let (include_read, _tracking) =
             read_bzlmod_file_for_module_inputs(ctx, project_fs, &include_path).await?;
         let Some((include_content, include_digest)) = include_read else {
             return Err(slug_error::slug_error!(
@@ -838,37 +838,40 @@ fn push_pending_include_labels(
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+enum BzlmodFileInputTracking {
+    Project,
+    Polled,
+}
+
+impl BzlmodFileInputTracking {
+    fn is_project(&self) -> bool {
+        matches!(self, Self::Project)
+    }
+}
+
 async fn read_bzlmod_file_for_module_inputs(
     ctx: &mut DiceComputations<'_>,
     project_fs: &ProjectRoot,
     path: &Path,
-) -> slug_error::Result<(Option<(String, String)>, bool)> {
+) -> slug_error::Result<(Option<(String, String)>, BzlmodFileInputTracking)> {
     if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
         let Some(content) =
             DiceFileComputations::read_project_file_if_exists(ctx, &project_path).await?
         else {
-            return Ok((None, true));
+            return Ok((None, BzlmodFileInputTracking::Project));
         };
         let digest = slug_bzlmod::lockfile::compute_sha256_hex(content.as_bytes());
-        return Ok((Some((content, digest)), true));
+        return Ok((Some((content, digest)), BzlmodFileInputTracking::Project));
     }
 
-    match std::fs::read(path) {
-        Ok(bytes) => {
-            let digest = slug_bzlmod::lockfile::compute_sha256_hex(&bytes);
-            let content = String::from_utf8(bytes).map_err(|e| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Input,
-                    "Failed to read MODULE.bazel-like file at {:?} as UTF-8: {}",
-                    path,
-                    e
-                )
-            })?;
-            Ok((Some((content, digest)), false))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok((None, false)),
-        Err(e) => Err(e.into()),
-    }
+    let (content, digest) = read_absolute_text_file_input(path)?;
+    Ok((
+        content
+            .zip(digest)
+            .map(|(content, digest)| (content, digest)),
+        BzlmodFileInputTracking::Polled,
+    ))
 }
 
 fn project_relative_path_for_abs_path(
@@ -883,17 +886,42 @@ async fn read_text_file_for_project_input(
     ctx: &mut DiceComputations<'_>,
     project_fs: &ProjectRoot,
     path: &Path,
-) -> slug_error::Result<(Option<String>, bool)> {
+) -> slug_error::Result<(Option<String>, BzlmodFileInputTracking)> {
     if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
         return Ok((
             DiceFileComputations::read_project_file_if_exists(ctx, &project_path).await?,
-            true,
+            BzlmodFileInputTracking::Project,
         ));
     }
 
-    match std::fs::read_to_string(path) {
-        Ok(content) => Ok((Some(content), false)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok((None, false)),
+    let (content, _digest) = read_absolute_text_file_input(path)?;
+    Ok((content, BzlmodFileInputTracking::Polled))
+}
+
+fn read_absolute_text_file_input(
+    path: &Path,
+) -> slug_error::Result<(Option<String>, Option<String>)> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((None, None)),
+        Err(e) => return Err(e.into()),
+    };
+    let digest = slug_bzlmod::lockfile::compute_sha256_hex(&bytes);
+    let content = String::from_utf8(bytes).map_err(|e| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "Failed to read MODULE.bazel-like file at {:?} as UTF-8: {}",
+            path,
+            e
+        )
+    })?;
+    Ok((Some(content), Some(digest)))
+}
+
+fn absolute_text_file_digest(path: &Path) -> slug_error::Result<Option<String>> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Some(slug_bzlmod::lockfile::compute_sha256_hex(&bytes))),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e.into()),
     }
 }
@@ -934,8 +962,9 @@ impl Key for TrackedLockfileContentKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        let (content, tracked_by_dice) =
+        let (content, tracking) =
             read_text_file_for_project_input(ctx, &project_fs, &self.path).await?;
+        let tracked_by_dice = tracking.is_project();
         let path = self.path.clone();
         let Some(content) = content else {
             return Ok(Arc::new(slug_bzlmod::LockfileContentValue {
@@ -1215,6 +1244,7 @@ struct LocalOverrideModuleInputsValue {
 struct RegistryFileInputsKey {
     project_root: AbsNormPathBuf,
     registry_file_hashes: Vec<(String, String)>,
+    poll_digest: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -1322,9 +1352,9 @@ async fn local_override_module_inputs_digest(
         }
 
         let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
-        let (module_read, tracked_by_dice) =
+        let (module_read, tracking) =
             read_bzlmod_file_for_module_inputs(ctx, &project_fs, &module_bazel_path).await?;
-        has_untracked_inputs |= !tracked_by_dice;
+        has_untracked_inputs |= !tracking.is_project();
         match module_read {
             Some((content, _content_digest)) => {
                 hasher.update(b"present");
@@ -1446,6 +1476,39 @@ fn cached_registry_file_path(cache: &ModuleCache, url: &str) -> Option<PathBuf> 
     }
 }
 
+fn registry_file_inputs_poll_digest(
+    registry_file_hashes: &[(String, String)],
+) -> slug_error::Result<String> {
+    let cache = ModuleCache::new()?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"registry-file-inputs-poll-v1");
+    hasher.update([0]);
+
+    for (url, expected_hash) in registry_file_hashes {
+        let Some(path) = cached_registry_file_path(&cache, url) else {
+            continue;
+        };
+
+        hasher.update(url.as_bytes());
+        hasher.update([0]);
+        hasher.update(expected_hash.as_bytes());
+        hasher.update([0]);
+        hasher.update(path.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        match absolute_text_file_digest(&path)? {
+            Some(digest) => {
+                hasher.update(b"present");
+                hasher.update([0]);
+                hasher.update(digest.as_bytes());
+            }
+            None => hasher.update(b"missing"),
+        }
+        hasher.update([0]);
+    }
+
+    Ok(hex::encode(hasher.finalize()))
+}
+
 #[async_trait]
 impl Key for RegistryFileInputsKey {
     type Value = slug_error::Result<Arc<RegistryFileInputsValue>>;
@@ -1468,7 +1531,7 @@ impl Key for RegistryFileInputsKey {
         }
         let cache = ModuleCache::new()?;
         let mut cache_safe = true;
-        let mut has_untracked_inputs = false;
+        let has_untracked_inputs = false;
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
         for (url, expected_hash) in &self.registry_file_hashes {
             hasher.update(url.as_bytes());
@@ -1483,9 +1546,8 @@ impl Key for RegistryFileInputsKey {
             };
             hasher.update(path.to_string_lossy().as_bytes());
             hasher.update([0]);
-            let (content, tracked_by_dice) =
+            let (content, _tracking) =
                 read_text_file_for_project_input(ctx, &project_fs, &path).await?;
-            has_untracked_inputs |= !tracked_by_dice;
             match content {
                 Some(content) => {
                     hasher.update(b"present");
@@ -1748,20 +1810,23 @@ impl BuckConfigBasedCells {
         } else {
             None
         };
+        let registry_file_hashes = visible_lockfile
+            .as_ref()
+            .and_then(|value| value.lockfile.as_deref())
+            .map(|lockfile| {
+                lockfile
+                    .registry_file_hashes
+                    .iter()
+                    .map(|(url, hash)| (url.clone(), hash.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let registry_file_poll_digest = registry_file_inputs_poll_digest(&registry_file_hashes)?;
         let registry_file_inputs = dice_ctx
             .compute(&RegistryFileInputsKey {
                 project_root: project_root.clone(),
-                registry_file_hashes: visible_lockfile
-                    .as_ref()
-                    .and_then(|value| value.lockfile.as_deref())
-                    .map(|lockfile| {
-                        lockfile
-                            .registry_file_hashes
-                            .iter()
-                            .map(|(url, hash)| (url.clone(), hash.clone()))
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default(),
+                registry_file_hashes,
+                poll_digest: registry_file_poll_digest,
             })
             .await?
             .buck_error_context("Computing registry file inputs for bzlmod resolution bridge")?;
