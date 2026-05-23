@@ -847,6 +847,16 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay subset,
   the full Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
   `git diff --check`.
+- The transitional apparent-module alias and generated-repo suffix scan caches
+  now store root-scoped positive and negative lookup results. A stale directory
+  scan result from one bzlmod root can no longer satisfy a later lookup after the
+  active root changes without reset. Validation passed with `cargo check -p
+  slug_core`, `cargo test -p slug_core
+  dynamic_bzlmod_entries_are_scoped_to_current_project_root -- --nocapture`,
+  `cargo test -p slug_core cells::bzlmod_apparent_alias_cache_tests --
+  --nocapture --test-threads=1`, `cargo build -p slug`, the focused Plan 61
+  Python replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo
+  fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -980,9 +990,9 @@ What did not work or remains risky:
   mappings, load failures, and delete transitions.
 - Dynamic generated-repo state is still held in process-global maps. Clearing
   the suffix cache, making suffix lookup deterministic, and scoping registered
-  and promoted dynamic entries to the active project root close leaks in the
-  transitional reset/lookup path, but do not make the bzlmod cell graph a
-  DICE-owned value.
+  dynamic entries, promoted dynamic entries, and directory-scan cache entries to
+  the active project root close leaks in the transitional reset/lookup path, but
+  do not make the bzlmod cell graph a DICE-owned value.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
@@ -1136,7 +1146,9 @@ using Rust DICE keys and values:
    - Dynamic generated-repo cell maps are now project-root scoped, but they
      remain process-global maps rather than a DICE-owned `BzlmodCellGraphKey`.
      Resolver-local promoted dynamic cells also carry project-root identity, but
-     remain a cache over that transitional global graph.
+     remain a cache over that transitional global graph. Directory-scan caches
+     are also root-scoped, including negative entries, but still process-local
+     lookup accelerators rather than DICE inputs.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
