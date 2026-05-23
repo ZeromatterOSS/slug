@@ -1646,14 +1646,14 @@ pub fn compute_bzl_transitive_digest_for_project_with_repo_mappings(
     base64::engine::general_purpose::STANDARD.encode(hash)
 }
 
-#[derive(Clone, Debug)]
-struct BzlLoadLocation {
-    path: PathBuf,
-    repo: String,
-    package: String,
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BzlLoadLocation {
+    pub path: PathBuf,
+    pub repo: String,
+    pub package: String,
 }
 
-fn extension_bzl_location_under_project(
+pub fn extension_bzl_location_under_project(
     extension_id: &str,
     project_root: &Path,
     repo_mappings: Option<&RepoMappingSnapshot>,
@@ -1662,7 +1662,7 @@ fn extension_bzl_location_under_project(
     label_bzl_location_under_project(label, project_root, None, repo_mappings)
 }
 
-fn label_bzl_location_under_project(
+pub fn label_bzl_location_under_project(
     label: &str,
     project_root: &Path,
     current: Option<&BzlLoadLocation>,
@@ -1935,7 +1935,7 @@ fn collect_bzl_transitive_files(
     }
 }
 
-fn literal_loads(path: &Path, content: &str) -> Vec<String> {
+pub fn literal_loads(path: &Path, content: &str) -> Vec<String> {
     let filename = path.to_string_lossy().into_owned();
     let Ok(ast) = AstModule::parse(&filename, content.to_owned(), &Dialect::Standard) else {
         return Vec::new();

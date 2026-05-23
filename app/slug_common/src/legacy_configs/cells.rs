@@ -9,6 +9,7 @@
  */
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -20,6 +21,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use base64::Engine;
 use derive_more::Display;
 use dice::CancellationContext;
 use dice::DiceComputations;
@@ -1247,20 +1249,243 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
     value.hidden_lockfile_path.hash(state);
 }
 
-fn root_extension_replay_summary_digest(
-    parsed: &ParsedModuleFile,
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("TrackedExtensionBzlDigestKey({}, {})", project_root.display(), extension_id)]
+struct TrackedExtensionBzlDigestKey {
+    project_root: AbsNormPathBuf,
+    extension_id: Arc<str>,
+    repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
+}
+
+#[async_trait]
+impl Key for TrackedExtensionBzlDigestKey {
+    type Value = slug_error::Result<Arc<str>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        let digest = tracked_extension_bzl_digest_for_project(
+            ctx,
+            &project_fs,
+            &self.extension_id,
+            self.repo_mappings.as_ref(),
+        )
+        .await?;
+        Ok(Arc::from(digest.as_str()))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // This producer now reads project-local implementation files through
+        // DICE, but it still shares the transitional literal-load scanner and
+        // can see missing-file creations that are not yet a stable child-key
+        // cutoff boundary. Recompute it each transaction so replay summary
+        // hits are counted only after the digest is refreshed.
+        false
+    }
+}
+
+#[derive(Clone, Debug)]
+enum BzlDigestFileInput {
+    Present {
+        bytes: Vec<u8>,
+        text: Option<String>,
+    },
+    Missing {
+        error: String,
+    },
+    ReadError {
+        error: String,
+    },
+}
+
+impl BzlDigestFileInput {
+    fn bytes_for_hash(&self) -> Option<&[u8]> {
+        match self {
+            Self::Present { bytes, .. } => Some(bytes.as_slice()),
+            Self::Missing { .. } | Self::ReadError { .. } => None,
+        }
+    }
+
+    fn text_for_loads(&self) -> Option<&str> {
+        match self {
+            Self::Present {
+                text: Some(text), ..
+            } => Some(text),
+            Self::Present { text: None, .. } | Self::Missing { .. } | Self::ReadError { .. } => {
+                None
+            }
+        }
+    }
+
+    fn error_for_hash(&self) -> Option<&str> {
+        match self {
+            Self::Present { .. } => None,
+            Self::Missing { error } | Self::ReadError { error } => Some(error.as_str()),
+        }
+    }
+}
+
+async fn tracked_extension_bzl_digest_for_project(
+    ctx: &mut DiceComputations<'_>,
+    project_fs: &ProjectRoot,
+    extension_id: &str,
+    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
+) -> slug_error::Result<String> {
+    let Some(root_bzl) = slug_bzlmod::extension_bzl_location_under_project(
+        extension_id,
+        project_fs.root().as_path(),
+        Some(repo_mappings),
+    ) else {
+        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    };
+
+    if !matches!(
+        read_bzl_digest_file_input(ctx, project_fs, &root_bzl.path).await?,
+        BzlDigestFileInput::Present { .. }
+    ) {
+        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    }
+
+    let mut pending = VecDeque::from([root_bzl]);
+    let mut seen_locations = BTreeSet::new();
+    let mut file_inputs = BTreeMap::new();
+    while let Some(location) = pending.pop_front() {
+        let location_key = (
+            location.path.clone(),
+            location.repo.clone(),
+            location.package.clone(),
+        );
+        if !seen_locations.insert(location_key) {
+            continue;
+        }
+
+        let input = read_bzl_digest_file_input(ctx, project_fs, &location.path).await?;
+        let text = input.text_for_loads().map(str::to_owned);
+        file_inputs.insert(location.path.clone(), input);
+        let Some(text) = text else {
+            continue;
+        };
+
+        for load in slug_bzlmod::literal_loads(&location.path, &text) {
+            let Some(load_location) = slug_bzlmod::label_bzl_location_under_project(
+                &load,
+                project_fs.root().as_path(),
+                Some(&location),
+                Some(repo_mappings),
+            ) else {
+                continue;
+            };
+            if load_location.path.starts_with(project_fs.root().as_path()) {
+                pending.push_back(load_location);
+            }
+        }
+    }
+
+    if file_inputs.is_empty() {
+        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    }
+
+    Ok(hash_extension_bzl_digest_inputs(
+        extension_id,
+        project_fs.root().as_path(),
+        file_inputs,
+    ))
+}
+
+async fn read_bzl_digest_file_input(
+    ctx: &mut DiceComputations<'_>,
+    project_fs: &ProjectRoot,
+    path: &Path,
+) -> slug_error::Result<BzlDigestFileInput> {
+    if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
+        return Ok(
+            match DiceFileComputations::read_project_file_if_exists(ctx, &project_path).await {
+                Ok(Some(content)) => BzlDigestFileInput::Present {
+                    bytes: content.as_bytes().to_vec(),
+                    text: Some(content),
+                },
+                Ok(None) => BzlDigestFileInput::Missing {
+                    error: std_fs_read_error(path),
+                },
+                Err(e) => BzlDigestFileInput::ReadError {
+                    error: e.to_string(),
+                },
+            },
+        );
+    }
+
+    Ok(match std::fs::read(path) {
+        Ok(bytes) => BzlDigestFileInput::Present {
+            text: String::from_utf8(bytes.clone()).ok(),
+            bytes,
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => BzlDigestFileInput::Missing {
+            error: e.to_string(),
+        },
+        Err(e) => BzlDigestFileInput::ReadError {
+            error: e.to_string(),
+        },
+    })
+}
+
+fn std_fs_read_error(path: &Path) -> String {
+    match std::fs::read(path) {
+        Ok(_) => std::io::Error::from(std::io::ErrorKind::NotFound).to_string(),
+        Err(e) => e.to_string(),
+    }
+}
+
+fn hash_extension_bzl_digest_inputs(
+    extension_id: &str,
     project_root: &Path,
+    file_inputs: BTreeMap<PathBuf, BzlDigestFileInput>,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"bzl_transitive_v2:");
+    hasher.update(extension_id.as_bytes());
+    hasher.update([0]);
+    for (path, input) in file_inputs {
+        let rel = path.strip_prefix(project_root).unwrap_or(path.as_path());
+        hasher.update(rel.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        if let Some(bytes) = input.bytes_for_hash() {
+            hasher.update(bytes);
+        } else if let Some(error) = input.error_for_hash() {
+            hasher.update(b"read_error:");
+            hasher.update(error.as_bytes());
+        }
+        hasher.update([0]);
+    }
+
+    let hash = hasher.finalize();
+    base64::engine::general_purpose::STANDARD.encode(hash)
+}
+
+async fn root_extension_replay_summary_digest(
+    ctx: &mut DiceComputations<'_>,
+    parsed: &ParsedModuleFile,
+    project_fs: &ProjectRoot,
     visible_lockfile: Option<&slug_bzlmod::Lockfile>,
     hidden_lockfile: Option<&slug_bzlmod::Lockfile>,
     repo_env: &BTreeMap<String, String>,
     ignore_dev_dependency: bool,
-) -> Option<String> {
+) -> slug_error::Result<Option<String>> {
     if parsed.extension_usages.is_empty()
         || !parsed.module.bazel_deps.is_empty()
         || !parsed.module.overrides.is_empty()
         || !parsed.repo_rule_invocations.is_empty()
     {
-        return None;
+        return Ok(None);
     }
 
     let root_module_name = if parsed.module.name.is_empty() {
@@ -1277,10 +1502,11 @@ fn root_extension_replay_summary_digest(
         ignore_dev_dependency,
     );
     if aggregated.is_empty() {
-        return None;
+        return Ok(None);
     }
 
     let repo_mappings = repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
+    let repo_mappings = Arc::new(repo_mappings);
     let repo_mapping_overrides =
         repo_mapping_overrides_for_root(&parsed_modules, root_module_name, ignore_dev_dependency);
 
@@ -1307,22 +1533,25 @@ fn root_extension_replay_summary_digest(
     let mut extension_ids = aggregated.keys().cloned().collect::<Vec<_>>();
     extension_ids.sort();
     for extension_id in extension_ids {
-        let extension = aggregated.get(&extension_id)?;
-        let bzl_transitive_digest =
-            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
-                &extension_id,
-                project_root,
-                Some(&repo_mappings),
-            );
+        let Some(extension) = aggregated.get(&extension_id) else {
+            return Ok(None);
+        };
+        let bzl_transitive_digest = ctx
+            .compute(&TrackedExtensionBzlDigestKey {
+                project_root: AbsNormPathBuf::try_from(project_fs.root().as_path().to_path_buf())?,
+                extension_id: Arc::from(extension_id.as_str()),
+                repo_mappings: repo_mappings.clone(),
+            })
+            .await??;
         let usages_digest = slug_bzlmod::compute_extension_input_hash(extension);
         let visible_specs = visible_lockfile.and_then(|lockfile| {
             lockfile.get_extension_cache_for_workspace(
                 &extension_id,
                 &bzl_transitive_digest,
                 &usages_digest,
-                Some(project_root),
+                Some(project_fs.root().as_path()),
                 Some(repo_env),
-                Some(&repo_mappings),
+                Some(repo_mappings.as_ref()),
                 Some(root_module_name),
                 Some(&repo_mapping_overrides),
             )
@@ -1334,16 +1563,16 @@ fn root_extension_replay_summary_digest(
                 &extension_id,
                 &bzl_transitive_digest,
                 &usages_digest,
-                Some(project_root),
+                Some(project_fs.root().as_path()),
                 Some(repo_env),
-                Some(&repo_mappings),
+                Some(repo_mappings.as_ref()),
                 Some(root_module_name),
                 Some(&repo_mapping_overrides),
             )
         }) {
             ("hidden", cached_specs)
         } else {
-            return None;
+            return Ok(None);
         };
 
         hasher.update(extension_id.as_bytes());
@@ -1357,7 +1586,9 @@ fn root_extension_replay_summary_digest(
         let mut repo_names = cached_specs.keys().cloned().collect::<Vec<_>>();
         repo_names.sort();
         for repo_name in repo_names {
-            let spec = cached_specs.get(&repo_name)?;
+            let Some(spec) = cached_specs.get(&repo_name) else {
+                return Ok(None);
+            };
             hasher.update(repo_name.as_bytes());
             hasher.update([0]);
             hasher.update(spec.compute_hash().as_bytes());
@@ -1365,7 +1596,7 @@ fn root_extension_replay_summary_digest(
         }
     }
 
-    Some(hex::encode(hasher.finalize()))
+    Ok(Some(hex::encode(hasher.finalize())))
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -2537,20 +2768,25 @@ impl BuckConfigBasedCells {
             })
             .await?
             .buck_error_context("Computing registry file inputs for bzlmod resolution bridge")?;
-        let extension_replay_summary_digest = root_module_file.parsed.as_ref().and_then(|parsed| {
-            root_extension_replay_summary_digest(
-                parsed,
-                project_fs.root().as_path(),
-                visible_lockfile
-                    .as_ref()
-                    .and_then(|value| value.lockfile.as_deref()),
-                hidden_lockfile
-                    .as_ref()
-                    .and_then(|value| value.lockfile.as_deref()),
-                &options.repo_env,
-                options.ignore_dev_dependency,
-            )
-        });
+        let extension_replay_summary_digest = match root_module_file.parsed.as_ref() {
+            Some(parsed) => {
+                root_extension_replay_summary_digest(
+                    dice_ctx,
+                    parsed,
+                    project_fs,
+                    visible_lockfile
+                        .as_ref()
+                        .and_then(|value| value.lockfile.as_deref()),
+                    hidden_lockfile
+                        .as_ref()
+                        .and_then(|value| value.lockfile.as_deref()),
+                    &options.repo_env,
+                    options.ignore_dev_dependency,
+                )
+                .await?
+            }
+            None => None,
+        };
         let key = LegacyBzlmodResolutionDiceKey {
             project_root,
             resolution_key,
@@ -3849,12 +4085,16 @@ mod tests {
     use std::hash::Hash as _;
     use std::hash::Hasher as _;
 
+    use dice::UserComputationData;
+    use dice::testing::DiceBuilder;
     use slug_bzlmod::types::Module;
     use slug_bzlmod::types::ParsedModuleFile;
     use slug_bzlmod::types::RegisteredItem;
     use slug_bzlmod::version::Version;
+    use slug_core::fs::project::ProjectRootTemp;
 
     use super::*;
+    use crate::dice::data::testing::SetTestingIoProvider;
 
     fn lockfile_value(path: &str, digest: &str) -> Arc<slug_bzlmod::LockfileContentValue> {
         Arc::new(slug_bzlmod::LockfileContentValue {
@@ -3997,6 +4237,53 @@ mod tests {
             options.repo_env_digest,
             slug_bzlmod::repo_env_policy_digest(&repo_env)
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn tracked_extension_bzl_digest_matches_legacy_project_load_digest()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file(
+            "ext.bzl",
+            r#"
+load(":helper.bzl", "HELPER")
+
+def _impl(module_ctx):
+    pass
+
+ext = module_extension(implementation = _impl)
+"#,
+        );
+        fs.write_file("helper.bzl", "HELPER = 'tracked'\n");
+
+        let extension_id = "@@root//:ext.bzl%ext";
+        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
+        let direct = slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            extension_id,
+            fs.path().root().as_path(),
+            Some(&repo_mappings),
+        );
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let tracked = dice
+            .compute(&TrackedExtensionBzlDigestKey {
+                project_root: AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?,
+                extension_id: Arc::from(extension_id),
+                repo_mappings: Arc::new(repo_mappings),
+            })
+            .await??;
+
+        assert_eq!(tracked.as_ref(), direct);
+        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
+            tracked
+        )));
         Ok(())
     }
 

@@ -679,6 +679,24 @@ Observed SDK result at the checkpoint:
   guardrails for warm replay, valid lockfile replay materialization,
   missing-lockfile extension reuse, and mapped external `.bzl` load edits, and
   the full Plan 61 Python guardrail with 72 tests.
+- Root extension replay-summary `.bzl` digesting now has a
+  `slug_common` DICE key. `TrackedExtensionBzlDigestKey` reuses the
+  `slug_bzlmod` literal-load and label-resolution helpers, but reads
+  project-root implementation files through `DiceFileComputations` while
+  forming the legacy resolution bridge's replay-summary digest. The key remains
+  intentionally non-cacheable because it still shares the transitional scanner
+  and missing-file creations are not yet a stable child-key cutoff boundary.
+  A cacheable attempt regressed
+  `missing_transitive_extension_bzl_load_creation_rejects_replay` by counting
+  stale replay hits before the refreshed digest was observed. Validation passed
+  with `cargo test -p slug_common
+  tracked_extension_bzl_digest_matches_legacy_project_load_digest --
+  --nocapture`, `cargo test -p slug_bzlmod extension_spokes -- --nocapture`,
+  `cargo build -p slug`, a focused Plan 61 Python replay subset covering warm
+  replay plus project/mapped `.bzl` create/edit/delete transitions, `cargo test
+  -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
+  --nocapture`, `cargo fmt --check`, `git diff --check`, and the full Plan 61
+  Python guardrail with 72 tests.
 
 ## Consolidated Learnings
 
@@ -744,10 +762,13 @@ What did not work or remains risky:
   rejects replay after mapped external helper create/edit/delete transitions
   and after a missing project-local helper is created. Other external load
   failures, audit-cell-only external load changes, and the full interpreter
-  load graph are not replay-complete. The digest now has an explicit DICE key
-  for spoke lookup invalidation, but that key intentionally marks itself
-  invalid across transactions because it is still backed by direct filesystem
-  scanning rather than tracked loader/file dependencies.
+  load graph are not replay-complete. The digest now has explicit DICE keys for
+  spoke lookup invalidation and for the legacy root replay-summary bridge. The
+  root bridge key reads project-local implementation files through
+  `DiceFileComputations`, but both digest producers intentionally mark
+  themselves invalid across transactions because the shared scanner is still
+  not the actual Starlark loader graph and some path discovery remains
+  transitional.
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity,
