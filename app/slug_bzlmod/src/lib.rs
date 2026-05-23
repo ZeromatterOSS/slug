@@ -77,6 +77,7 @@ pub use dice_graph::BzlmodRepoMappingsDataKey;
 pub use dice_graph::BzlmodRepoMappingsDataValue;
 pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodWorkspaceKey;
+pub use dice_graph::ExtensionBzlTransitiveDigestKey;
 pub use dice_graph::ExtensionRepoExecutionIdentity;
 pub use dice_graph::ExtensionSpoke;
 pub use dice_graph::ExtensionSpokesByCanonicalRepoKey;

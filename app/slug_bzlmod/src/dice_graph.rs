@@ -700,6 +700,17 @@ pub struct InnateExtensionKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
+    "ExtensionBzlTransitiveDigestKey({}, {})",
+    workspace_id.stable_hash(),
+    extension_id
+)]
+pub struct ExtensionBzlTransitiveDigestKey {
+    pub workspace_id: WorkspaceId,
+    pub extension_id: Arc<str>,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
     "ExtensionSpokesKey({}, {}, {})",
     workspace_id.stable_hash(),
     extension_id,

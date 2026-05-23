@@ -58,6 +58,7 @@ use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
 use crate::dice_graph::BzlmodExtensionReplayDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataValue;
+use crate::dice_graph::ExtensionBzlTransitiveDigestKey;
 use crate::dice_graph::ExtensionSpoke;
 use crate::dice_graph::ExtensionSpokesByCanonicalRepoKey;
 use crate::dice_graph::ExtensionSpokesByExtensionIdKey;
@@ -165,6 +166,14 @@ pub fn extension_spokes_key_for_canonical_repo(
     repo_mappings: &BzlmodRepoMappingsDataValue,
     canonical_name: &str,
 ) -> Option<ExtensionSpokesKey> {
+    let extension_id = extension_id_for_canonical_repo(aggregations, canonical_name)?;
+    extension_spokes_key_for_extension_id(aggregations, repo_mappings, extension_id)
+}
+
+fn extension_id_for_canonical_repo<'a>(
+    aggregations: &'a BzlmodExtensionAggregationsDataValue,
+    canonical_name: &str,
+) -> Option<&'a str> {
     let (owner_module, extension_name, _) = crate::parse_canonical_name(canonical_name)?;
     let mut matches = aggregations
         .extension_aggregations
@@ -186,9 +195,7 @@ pub fn extension_spokes_key_for_canonical_repo(
             matches
         );
     }
-    matches.first().and_then(|extension_id| {
-        extension_spokes_key_for_extension_id(aggregations, repo_mappings, extension_id)
-    })
+    matches.first().copied()
 }
 
 fn owning_module_matches(canonical_owner: &str, extension_owner: &str) -> bool {
@@ -259,6 +266,47 @@ fn ensure_replay_data_workspace(
 }
 
 #[async_trait]
+impl Key for ExtensionBzlTransitiveDigestKey {
+    type Value = slug_error::Result<Arc<str>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
+        ensure_repo_mappings_workspace(
+            &self.workspace_id,
+            repo_mappings.as_ref(),
+            "ExtensionBzlTransitiveDigestKey",
+            &self.extension_id,
+        )?;
+        Ok(Arc::from(
+            compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                &self.extension_id,
+                self.workspace_id.canonical_project_root.as_path(),
+                Some(repo_mappings.repo_mappings.as_ref()),
+            )
+            .as_str(),
+        ))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // The current digest producer still performs best-effort direct
+        // filesystem reads. Recompute it each transaction so parent lookup
+        // keys can cut off only after this scanned digest is refreshed.
+        false
+    }
+}
+
+#[async_trait]
 impl Key for ExtensionSpokesByExtensionIdKey {
     type Value = slug_error::Result<Option<Arc<ExtensionSpokesValue>>>;
 
@@ -288,13 +336,23 @@ impl Key for ExtensionSpokesByExtensionIdKey {
             "ExtensionSpokesByExtensionIdKey",
             &self.extension_id,
         )?;
-        let Some(spokes_key) = extension_spokes_key_for_extension_id(
-            aggregations.as_ref(),
-            repo_mappings.as_ref(),
-            &self.extension_id,
-        ) else {
+        if !aggregations
+            .extension_aggregations
+            .contains_key(self.extension_id.as_ref())
+        {
             return Ok(None);
-        };
+        }
+        let bzl_transitive_digest = ctx
+            .compute(&ExtensionBzlTransitiveDigestKey {
+                workspace_id: self.workspace_id.clone(),
+                extension_id: self.extension_id.clone(),
+            })
+            .await??;
+        let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
+            self.workspace_id.clone(),
+            &self.extension_id,
+            &bzl_transitive_digest,
+        );
 
         match ctx.compute(&spokes_key).await {
             Ok(Ok(spokes)) => Ok(Some(spokes)),
@@ -315,8 +373,8 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -350,13 +408,22 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
             "ExtensionSpokesByCanonicalRepoKey",
             &self.canonical_name,
         )?;
-        let Some(spokes_key) = extension_spokes_key_for_canonical_repo(
-            aggregations.as_ref(),
-            repo_mappings.as_ref(),
-            &self.canonical_name,
-        ) else {
+        let Some(extension_id) =
+            extension_id_for_canonical_repo(aggregations.as_ref(), &self.canonical_name)
+        else {
             return Ok(None);
         };
+        let bzl_transitive_digest = ctx
+            .compute(&ExtensionBzlTransitiveDigestKey {
+                workspace_id: self.workspace_id.clone(),
+                extension_id: Arc::from(extension_id),
+            })
+            .await??;
+        let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
+            self.workspace_id.clone(),
+            extension_id,
+            &bzl_transitive_digest,
+        );
 
         match ctx.compute(&spokes_key).await {
             Ok(Ok(spokes)) => Ok(Some(spokes)),
@@ -377,8 +444,8 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -1990,6 +2057,42 @@ mod tests {
             extension_spokes_key_for_canonical_repo(&data, &repo_mappings, "_main+ext+tool")
                 .unwrap();
         assert_eq!(root_key.extension_id.as_ref(), "@root//:ext.bzl%ext");
+    }
+
+    #[test]
+    fn extension_spokes_lookup_keys_cache_after_digest_dependency() {
+        let missing_extension: slug_error::Result<Option<Arc<ExtensionSpokesValue>>> = Ok(None);
+        let failed_lookup: slug_error::Result<Option<Arc<ExtensionSpokesValue>>> = Err(
+            slug_error::slug_error!(slug_error::ErrorTag::Tier0, "lookup failed"),
+        );
+        let first_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
+        let same_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
+        let changed_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("second"));
+
+        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
+            &missing_extension
+        ));
+        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+            &missing_extension
+        ));
+        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
+            &failed_lookup
+        ));
+        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+            &failed_lookup
+        ));
+
+        assert!(<ExtensionBzlTransitiveDigestKey as Key>::equality(
+            &first_digest,
+            &same_digest
+        ));
+        assert!(!<ExtensionBzlTransitiveDigestKey as Key>::equality(
+            &first_digest,
+            &changed_digest
+        ));
+        assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
+            &first_digest
+        ));
     }
 
     #[test]
