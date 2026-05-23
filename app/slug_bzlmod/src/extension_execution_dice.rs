@@ -49,7 +49,7 @@ use starlark::syntax::Dialect;
 use starlark_syntax::syntax::ast::AstStmt;
 use starlark_syntax::syntax::ast::StmtP;
 
-use crate::BzlmodSessionData;
+use crate::BzlmodExtensionSessionData;
 use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
@@ -96,7 +96,7 @@ fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) ->
 /// Returns `None` if the extension is not found in the current command's
 /// DICE-injected bzlmod session data.
 pub fn create_extension_execution_key(
-    data: &BzlmodSessionData,
+    data: &BzlmodExtensionSessionData,
     extension_id: &str,
 ) -> Option<ModuleExtensionExecutionKey> {
     let aggregated = match data.extension_aggregations.get(extension_id) {
@@ -127,7 +127,7 @@ pub fn create_extension_execution_key(
 }
 
 pub fn extension_spokes_key_for_extension_id(
-    data: &BzlmodSessionData,
+    data: &BzlmodExtensionSessionData,
     extension_id: &str,
 ) -> Option<ExtensionSpokesKey> {
     data.extension_aggregations
@@ -148,7 +148,7 @@ pub fn extension_spokes_key_for_extension_id(
 }
 
 pub fn extension_spokes_key_for_canonical_repo(
-    data: &BzlmodSessionData,
+    data: &BzlmodExtensionSessionData,
     canonical_name: &str,
 ) -> Option<ExtensionSpokesKey> {
     let (owner_module, extension_name, _) = crate::parse_canonical_name(canonical_name)?;
@@ -177,7 +177,7 @@ pub fn extension_spokes_key_for_canonical_repo(
         .and_then(|extension_id| extension_spokes_key_for_extension_id(data, extension_id))
 }
 
-fn workspace_id_for_session_data(data: &BzlmodSessionData) -> crate::WorkspaceId {
+fn workspace_id_for_session_data(data: &BzlmodExtensionSessionData) -> crate::WorkspaceId {
     crate::WorkspaceId::new(
         data.project_root.clone(),
         data.project_root.join("buck-out/v2"),
@@ -200,7 +200,7 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
         if session_data.project_root != *self.workspace_id.canonical_project_root {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
@@ -250,7 +250,7 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
         if session_data.project_root != *self.workspace_id.canonical_project_root {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
@@ -300,7 +300,7 @@ impl Key for ExtensionSpokesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
+        let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
         if session_data.project_root != *self.workspace_id.canonical_project_root {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
@@ -1800,10 +1800,10 @@ mod tests {
 
     #[test]
     fn extension_spokes_key_for_canonical_repo_matches_owner_module() {
-        use crate::BzlmodSessionData;
+        use crate::BzlmodExtensionSessionData;
         use crate::extensions::AggregatedExtension;
 
-        let mut data = BzlmodSessionData {
+        let mut data = BzlmodExtensionSessionData {
             root_module_name: "root".to_owned(),
             project_root: PathBuf::from("/tmp/slug-plan61-spokes"),
             ..Default::default()

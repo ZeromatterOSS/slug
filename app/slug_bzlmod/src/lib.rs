@@ -252,6 +252,68 @@ pub struct BzlmodSessionData {
     pub repo_mapping_overrides: RepoMappingOverrides,
 }
 
+/// Extension-specific transitional session data.
+///
+/// This is still injected from the legacy bzlmod resolver, but it narrows
+/// extension replay/materialization consumers away from unrelated session
+/// fields while preserving the lockfile, repo-env, and repo-mapping inputs
+/// needed by `ModuleExtensionExecutionKey`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Allocative)]
+pub struct BzlmodExtensionSessionData {
+    pub extension_aggregations: HashMap<String, AggregatedExtension>,
+    pub root_module_name: String,
+    pub project_root: PathBuf,
+    pub hidden_lockfile_path: Option<PathBuf>,
+    pub visible_lockfile_digest: Option<String>,
+    pub hidden_lockfile_digest: Option<String>,
+    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
+    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
+    pub lockfile_mode: LockfileMode,
+    pub repo_env: BTreeMap<String, String>,
+    pub repo_mappings: RepoMappingSnapshot,
+    pub repo_mapping_overrides: RepoMappingOverrides,
+}
+
+impl From<&BzlmodSessionData> for BzlmodExtensionSessionData {
+    fn from(data: &BzlmodSessionData) -> Self {
+        Self {
+            extension_aggregations: data.extension_aggregations.clone(),
+            root_module_name: data.root_module_name.clone(),
+            project_root: data.project_root.clone(),
+            hidden_lockfile_path: data.hidden_lockfile_path.clone(),
+            visible_lockfile_digest: data.visible_lockfile_digest.clone(),
+            hidden_lockfile_digest: data.hidden_lockfile_digest.clone(),
+            visible_lockfile: data.visible_lockfile.clone(),
+            hidden_lockfile: data.hidden_lockfile.clone(),
+            lockfile_mode: data.lockfile_mode,
+            repo_env: data.repo_env.clone(),
+            repo_mappings: data.repo_mappings.clone(),
+            repo_mapping_overrides: data.repo_mapping_overrides.clone(),
+        }
+    }
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodExtensionSessionDataKey")]
+pub struct BzlmodExtensionSessionDataKey;
+
+impl dice::InjectedKey for BzlmodExtensionSessionDataKey {
+    type Value = Arc<BzlmodExtensionSessionData>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[derive(
     derive_more::Display,
     Debug,
@@ -280,6 +342,7 @@ pub trait SetBzlmodSessionData {
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::for_project_root(data.project_root.clone());
+        let extension_session = Arc::new(BzlmodExtensionSessionData::from(&data));
         let registered_toolchains = Arc::new(RegisteredToolchainsValue {
             workspace_id: workspace_id.clone(),
             registered_toolchains: data.registered_toolchains.clone(),
@@ -296,6 +359,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             BzlmodRegisteredExecutionPlatformsDataKey,
             registered_execution_platforms,
         )])?;
+        self.changed_to(vec![(BzlmodExtensionSessionDataKey, extension_session)])?;
         Ok(self.changed_to(vec![(BzlmodSessionDataKey, Arc::new(data))])?)
     }
 }
