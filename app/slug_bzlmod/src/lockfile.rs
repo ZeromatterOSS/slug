@@ -1196,7 +1196,7 @@ impl Lockfile {
     }
 }
 
-fn parse_lockfile_content(path: &Path, content: &str) -> slug_error::Result<Lockfile> {
+pub fn parse_lockfile_content(path: &Path, content: &str) -> slug_error::Result<Lockfile> {
     let lockfile: Lockfile = serde_json::from_str(content)
         .map_err(|e| LockfileError::ParseError(format!("{}: {}", path.display(), e)))?;
     lockfile.validate_extension_digests(path)?;

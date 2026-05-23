@@ -246,6 +246,7 @@ pub struct LockfileContentKey {
 pub struct LockfileContentValue {
     pub path: Arc<PathBuf>,
     pub digest: Option<String>,
+    pub tracked_by_dice: bool,
     #[allocative(skip)]
     pub lockfile: Option<Arc<Lockfile>>,
 }
@@ -264,6 +265,7 @@ impl Key for LockfileContentKey {
             return Ok(Arc::new(LockfileContentValue {
                 path,
                 digest: None,
+                tracked_by_dice: false,
                 lockfile: None,
             }));
         }
@@ -277,6 +279,7 @@ impl Key for LockfileContentKey {
             Ok((lockfile, digest)) => Ok(Arc::new(LockfileContentValue {
                 path,
                 digest: Some(digest),
+                tracked_by_dice: false,
                 lockfile: Some(Arc::new(lockfile)),
             })),
             Err(e) if self.kind == LockfileContentKind::Hidden => {
@@ -288,6 +291,7 @@ impl Key for LockfileContentKey {
                 Ok(Arc::new(LockfileContentValue {
                     path,
                     digest: None,
+                    tracked_by_dice: false,
                     lockfile: None,
                 }))
             }
@@ -1016,6 +1020,7 @@ mod tests {
         let value = Ok(Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from("/tmp/MODULE.bazel.lock")),
             digest: None,
+            tracked_by_dice: false,
             lockfile: None,
         }));
 

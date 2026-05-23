@@ -879,6 +879,25 @@ fn project_relative_path_for_abs_path(
     project_fs.relativize_any(path).ok()
 }
 
+async fn read_text_file_for_project_input(
+    ctx: &mut DiceComputations<'_>,
+    project_fs: &ProjectRoot,
+    path: &Path,
+) -> slug_error::Result<(Option<String>, bool)> {
+    if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
+        return Ok((
+            DiceFileComputations::read_project_file_if_exists(ctx, &project_path).await?,
+            true,
+        ));
+    }
+
+    match std::fs::read_to_string(path) {
+        Ok(content) => Ok((Some(content), false)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok((None, false)),
+        Err(e) => Err(e.into()),
+    }
+}
+
 #[derive(Clone, Debug, Display, Allocative)]
 #[display(
     "LegacyBzlmodResolutionDiceKey({}, {})",
@@ -895,6 +914,77 @@ struct LegacyBzlmodResolutionDiceKey {
     local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
     registry_file_inputs: Arc<RegistryFileInputsValue>,
     extension_replay_summary_digest: Option<Arc<str>>,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("TrackedLockfileContentKey({:?}, {})", kind, path.display())]
+struct TrackedLockfileContentKey {
+    project_root: AbsNormPathBuf,
+    kind: slug_bzlmod::LockfileContentKind,
+    path: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for TrackedLockfileContentKey {
+    type Value = slug_error::Result<Arc<slug_bzlmod::LockfileContentValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        let (content, tracked_by_dice) =
+            read_text_file_for_project_input(ctx, &project_fs, &self.path).await?;
+        let path = self.path.clone();
+        let Some(content) = content else {
+            return Ok(Arc::new(slug_bzlmod::LockfileContentValue {
+                path,
+                digest: None,
+                tracked_by_dice,
+                lockfile: None,
+            }));
+        };
+
+        record_bzlmod_event(BzlmodEventKind::LockfileRead, path.display().to_string());
+        let digest = slug_bzlmod::lockfile::compute_sri_hash(content.as_bytes());
+        match slug_bzlmod::lockfile::parse_lockfile_content(&path, &content) {
+            Ok(lockfile) => Ok(Arc::new(slug_bzlmod::LockfileContentValue {
+                path,
+                digest: Some(digest),
+                tracked_by_dice,
+                lockfile: Some(Arc::new(lockfile)),
+            })),
+            Err(e) if self.kind == slug_bzlmod::LockfileContentKind::Hidden => {
+                tracing::warn!(
+                    "Ignoring unreadable hidden lockfile '{}': {}",
+                    path.display(),
+                    e
+                );
+                Ok(Arc::new(slug_bzlmod::LockfileContentValue {
+                    path,
+                    digest: None,
+                    tracked_by_dice,
+                    lockfile: None,
+                }))
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.digest == y.digest && x.path == y.path,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => value.tracked_by_dice,
+            Err(_) => false,
+        }
+    }
 }
 
 impl PartialEq for LegacyBzlmodResolutionDiceKey {
@@ -1612,8 +1702,8 @@ impl BuckConfigBasedCells {
         {
             Some(
                 dice_ctx
-                    .compute(&slug_bzlmod::LockfileContentKey {
-                        workspace_id: workspace_id.clone(),
+                    .compute(&TrackedLockfileContentKey {
+                        project_root: project_root.clone(),
                         kind: slug_bzlmod::LockfileContentKind::Workspace,
                         path: Arc::new(slug_bzlmod::lockfile_path(project_fs.root().as_path())),
                     })
@@ -1631,8 +1721,8 @@ impl BuckConfigBasedCells {
             if let Some(path) = &options.hidden_lockfile_path {
                 Some(
                     dice_ctx
-                        .compute(&slug_bzlmod::LockfileContentKey {
-                            workspace_id,
+                        .compute(&TrackedLockfileContentKey {
+                            project_root: project_root.clone(),
                             kind: slug_bzlmod::LockfileContentKind::Hidden,
                             path: Arc::new(path.clone()),
                         })
@@ -2965,6 +3055,7 @@ mod tests {
         Arc::new(slug_bzlmod::LockfileContentValue {
             path: Arc::new(PathBuf::from(path)),
             digest: Some(digest.to_owned()),
+            tracked_by_dice: false,
             lockfile: None,
         })
     }

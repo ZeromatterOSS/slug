@@ -1766,7 +1766,14 @@ async def test_visible_lockfile_edit_is_observed_in_same_daemon(
     lockfile = buck.cwd / "MODULE.bazel.lock"
     _write_minimal_lockfile(lockfile)
 
+    before = await _bzlmod_counters(buck, "--lockfile_mode=error")
     await buck.audit("cell", "--lockfile_mode=error")
+    first = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    assert first["lockfile_read"] > before["lockfile_read"]
+
+    await buck.audit("cell", "--lockfile_mode=error")
+    warm = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    assert warm["lockfile_read"] == first["lockfile_read"]
 
     _write(lockfile, "{ this is not json }\n")
     with pytest.raises(BuckException):

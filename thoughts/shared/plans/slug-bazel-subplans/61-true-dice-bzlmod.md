@@ -299,6 +299,13 @@ Observed SDK result at the checkpoint:
   now proves a same-daemon warm no-op does not reparse or rerun bzlmod
   resolution before an edit to `libs/local_lib/MODULE.bazel` invalidates the
   graph.
+- Visible workspace `MODULE.bazel.lock` reads now flow through a tracked
+  project-file DICE key in `slug_common`, and the file watcher treats
+  `MODULE.bazel.lock` changes as pre-config invalidations. Hidden/output-base
+  lockfiles still use the same value type but remain non-cacheable when read
+  outside the project root. The visible-lockfile guardrail now proves a
+  same-daemon warm no-op does not reread the lockfile before an invalid edit is
+  observed and rejected under `--lockfile_mode=error`.
 - Current slice validation passed with `cargo build -p slug`, `cargo test -p
   slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
@@ -315,6 +322,12 @@ Observed SDK result at the checkpoint:
   'local_override_module_edit_invalidates_only_affected_nodes' -rx --tb=short`,
   the full Plan 61 Python guardrail, `cargo fmt --check`, and
   `git diff --check`.
+- Visible-lockfile tracked-input validation passed with `cargo build -p slug`,
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, focused `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k
+  'visible_lockfile_edit_is_observed_in_same_daemon' -rx --tb=short`, the full
+  Plan 61 Python guardrail, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -355,10 +368,12 @@ What did not work or remains risky:
   injected as `BzlmodSessionData`. Module-version and toolchain/platform
   consumers now go through DICE keys, but those keys still source their values
   from the injected transitional session.
-- Hidden lockfile identity is included in the transitional bridge key equality
+- Visible workspace lockfile content is now a tracked project-file DICE input.
+  Hidden lockfile identity is included in the transitional bridge key equality
   and hashing path, and hidden replay has same-daemon edit coverage. Broader
   hidden lockfile replay/fail-open behavior now has stronger guardrails, but
-  lockfile replay still depends on the transitional graph and is not complete.
+  hidden/output-base lockfile reads and replay policy still depend on the
+  transitional graph and are not complete.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads and existing external files under `bazel-external/<repo>` are
   hashed, but repo mappings at load sites, load failures, deleted files, and
@@ -496,8 +511,9 @@ using Rust DICE keys and values:
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
-   - Maintain visible and hidden lockfile identity in every key that can
-     consume their contents.
+   - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
+     keep hidden/output-base lockfile identity explicit in every key that can
+     consume hidden contents.
    - Preserve Bazel's hidden-lockfile fail-open behavior without hiding
      invalidation.
    - Preserve same-daemon hidden-lockfile create/edit/delete/facts coverage

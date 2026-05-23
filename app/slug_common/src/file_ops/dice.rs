@@ -339,7 +339,11 @@ impl FileChangeTracker {
 
 fn is_bzlmod_config_project_file(path: &ProjectRelativePath) -> bool {
     let path = path.as_str();
-    path == "MODULE.bazel" || path.ends_with("/MODULE.bazel") || path.ends_with(".MODULE.bazel")
+    path == "MODULE.bazel"
+        || path == "MODULE.bazel.lock"
+        || path.ends_with("/MODULE.bazel")
+        || path.ends_with("/MODULE.bazel.lock")
+        || path.ends_with(".MODULE.bazel")
 }
 
 /// The return value of a `ReadFileKey` computation.
