@@ -774,11 +774,11 @@ pub(crate) async fn get_file_ops_delegate(
                 reason: e.to_string(),
             }
         })?;
-        let key = ExtensionRepoExecutionKey::new_with_repo_env(
+        let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
             setup.canonical_name.to_string(),
             setup.extension_id.to_string(),
             repo_spec,
-            project_root_path.clone(),
+            extension_lookup_workspace_id.clone(),
             repo_env.clone(),
         );
         match ctx.compute(&key).await {
@@ -864,11 +864,11 @@ pub(crate) async fn get_file_ops_delegate(
                     );
                     inv.rule_source = Some(setup.extension_id.to_string());
                     let repo_spec = slug_bzlmod::RepoSpec::new(setup.extension_id.to_string());
-                    let key = ExtensionRepoExecutionKey::new_with_repo_env(
+                    let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
                         setup.canonical_name.to_string(),
                         setup.extension_id.to_string(),
                         repo_spec,
-                        project_root_path.clone(),
+                        extension_lookup_workspace_id.clone(),
                         repo_env.clone(),
                     );
                     match ctx.compute(&key).await {
@@ -966,11 +966,11 @@ pub(crate) async fn get_file_ops_delegate(
         };
 
         // Create the execution key for lazy materialization of this specific repo
-        let key = ExtensionRepoExecutionKey::new_with_repo_env(
+        let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
             setup.canonical_name.to_string(),
             setup.extension_id.to_string(),
             repo_spec,
-            project_root_path.clone(),
+            extension_lookup_workspace_id.clone(),
             repo_env.clone(),
         );
         let key_spec_hash = key.spec_hash.clone();

@@ -238,6 +238,11 @@ Observed SDK result at the checkpoint:
   non-default output base to prove the injected identity is preserved, and the
   full `slug_bzlmod`, `slug_external_cells`, and Plan 61 Python guardrails
   passed after the change.
+- Extension repo execution and `RepoMaterializationManifestKey` now have
+  explicit `WorkspaceId` constructors. Runtime extension repo file-ops and
+  synchronous spoke materialization use the session/active workspace identity,
+  so repository materialization keys preserve a non-default output base instead
+  of silently rebuilding identity from the project root.
 - Extension spoke lookup keys now depend on `ExtensionBzlTransitiveDigestKey`
   before forming the `ExtensionSpokesKey`. The digest key still recomputes the
   transitional best-effort `.bzl` scanner every transaction, but successful
@@ -1105,6 +1110,9 @@ using Rust DICE keys and values:
    - Runtime file-ops spoke lookup now uses the injected bzlmod workspace
      identity instead of deriving one from the project root, but generated repo
      cell registration itself remains process-global transitional plumbing.
+   - Extension repo execution/materialization keys now preserve the workspace
+     identity and output base, but generated repo cell graph ownership and
+     final materialization state are still not fully DICE-owned.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 

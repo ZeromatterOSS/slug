@@ -322,11 +322,46 @@ impl ExtensionRepoExecutionKey {
         project_root: PathBuf,
         repo_env: Arc<BTreeMap<String, String>>,
     ) -> Self {
+        Self::new_with_workspace_id_and_repo_env(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            crate::WorkspaceId::for_project_root(project_root),
+            repo_env,
+        )
+    }
+
+    /// Create a new extension repo execution key with explicit workspace identity.
+    pub fn new_with_workspace_id(
+        canonical_name: String,
+        extension_id: String,
+        repo_spec: RepoSpec,
+        workspace_id: crate::WorkspaceId,
+    ) -> Self {
+        Self::new_with_workspace_id_and_repo_env(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            workspace_id,
+            Arc::new(BTreeMap::new()),
+        )
+    }
+
+    /// Create a new extension repo execution key with explicit workspace
+    /// identity and command repo-env.
+    pub fn new_with_workspace_id_and_repo_env(
+        canonical_name: String,
+        extension_id: String,
+        repo_spec: RepoSpec,
+        workspace_id: crate::WorkspaceId,
+        repo_env: Arc<BTreeMap<String, String>>,
+    ) -> Self {
+        let project_root = workspace_id.canonical_project_root.as_ref().clone();
         let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
         let repo_spec = Arc::new(repo_spec);
         let materialization_manifest_key =
-            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest_and_repo_env(
-                project_root.clone(),
+            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_and_repo_env(
+                workspace_id,
                 canonical_name.as_str(),
                 repo_spec.clone(),
                 spec_hash.clone(),
@@ -367,10 +402,28 @@ impl ExtensionRepoExecutionKey {
         project_root: Arc<PathBuf>,
         repo_env: Arc<BTreeMap<String, String>>,
     ) -> Self {
+        Self::from_arcs_with_workspace_id_and_repo_env(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            crate::WorkspaceId::for_project_root(project_root.as_ref().clone()),
+            repo_env,
+        )
+    }
+
+    /// Create from Arc references with explicit workspace identity and command repo-env.
+    pub fn from_arcs_with_workspace_id_and_repo_env(
+        canonical_name: Arc<str>,
+        extension_id: Arc<str>,
+        repo_spec: Arc<RepoSpec>,
+        workspace_id: crate::WorkspaceId,
+        repo_env: Arc<BTreeMap<String, String>>,
+    ) -> Self {
+        let project_root = workspace_id.canonical_project_root.clone();
         let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
         let materialization_manifest_key =
-            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest_and_repo_env(
-                project_root.as_ref().clone(),
+            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_and_repo_env(
+                workspace_id,
                 canonical_name.as_ref(),
                 repo_spec.clone(),
                 spec_hash.clone(),
@@ -1255,6 +1308,40 @@ mod tests {
             "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive"
         );
         assert_eq!(key.project_root.as_ref(), &PathBuf::from("/tmp/project"));
+    }
+
+    #[test]
+    fn test_extension_repo_key_preserves_workspace_output_base() {
+        let project_root = PathBuf::from("/tmp/slug-plan61-repo-key-workspace");
+        let workspace_id = crate::WorkspaceId::new(
+            project_root.clone(),
+            PathBuf::from("/tmp/slug-plan61-repo-key-output-base"),
+        );
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+
+        let key = ExtensionRepoExecutionKey::new_with_workspace_id(
+            "_main+pip+numpy".to_owned(),
+            "@@rules_python//pip:pip.bzl%pip".to_owned(),
+            repo_spec,
+            workspace_id.clone(),
+        );
+
+        assert_eq!(key.project_root.as_ref(), &project_root);
+        assert_eq!(key.materialization_manifest_key.workspace_id, workspace_id);
+        assert_eq!(
+            key.materialization_manifest_key.output_base,
+            workspace_id.output_base
+        );
+        assert_ne!(
+            key.materialization_manifest_key.workspace_id,
+            crate::WorkspaceId::for_project_root(project_root)
+        );
     }
 
     #[test]

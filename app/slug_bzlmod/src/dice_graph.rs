@@ -921,17 +921,44 @@ pub struct RepoMaterializationManifestKey {
 }
 
 impl RepoMaterializationManifestKey {
+    pub fn for_workspace_id(
+        workspace_id: WorkspaceId,
+        canonical_repo: &str,
+        repo_spec: Arc<RepoSpec>,
+    ) -> Self {
+        let repo_spec_digest = repo_spec.compute_hash();
+        Self::for_workspace_id_with_repo_spec_digest(
+            workspace_id,
+            canonical_repo,
+            repo_spec,
+            repo_spec_digest,
+        )
+    }
+
     pub fn for_project_root(
         project_root: PathBuf,
         canonical_repo: &str,
         repo_spec: Arc<RepoSpec>,
     ) -> Self {
-        let repo_spec_digest = repo_spec.compute_hash();
-        Self::for_project_root_with_repo_spec_digest(
-            project_root,
+        Self::for_workspace_id(
+            WorkspaceId::for_project_root(project_root),
+            canonical_repo,
+            repo_spec,
+        )
+    }
+
+    pub fn for_workspace_id_with_repo_spec_digest(
+        workspace_id: WorkspaceId,
+        canonical_repo: &str,
+        repo_spec: Arc<RepoSpec>,
+        repo_spec_digest: String,
+    ) -> Self {
+        Self::for_workspace_id_with_repo_spec_digest_and_repo_env(
+            workspace_id,
             canonical_repo,
             repo_spec,
             repo_spec_digest,
+            Arc::new(BTreeMap::new()),
         )
     }
 
@@ -941,13 +968,29 @@ impl RepoMaterializationManifestKey {
         repo_spec: Arc<RepoSpec>,
         repo_spec_digest: String,
     ) -> Self {
-        Self::for_project_root_with_repo_spec_digest_and_repo_env(
-            project_root,
+        Self::for_workspace_id_with_repo_spec_digest(
+            WorkspaceId::for_project_root(project_root),
             canonical_repo,
             repo_spec,
             repo_spec_digest,
-            Arc::new(BTreeMap::new()),
         )
+    }
+
+    pub fn for_workspace_id_with_repo_spec_digest_and_repo_env(
+        workspace_id: WorkspaceId,
+        canonical_repo: &str,
+        repo_spec: Arc<RepoSpec>,
+        repo_spec_digest: String,
+        repo_env: Arc<BTreeMap<String, String>>,
+    ) -> Self {
+        Self {
+            output_base: workspace_id.output_base.clone(),
+            workspace_id,
+            canonical_repo: Arc::from(canonical_repo),
+            repo_spec_digest: Arc::from(repo_spec_digest.as_str()),
+            repo_spec,
+            repo_env,
+        }
     }
 
     pub fn for_project_root_with_repo_spec_digest_and_repo_env(
@@ -957,15 +1000,13 @@ impl RepoMaterializationManifestKey {
         repo_spec_digest: String,
         repo_env: Arc<BTreeMap<String, String>>,
     ) -> Self {
-        let workspace_id = WorkspaceId::for_project_root(project_root);
-        Self {
-            output_base: workspace_id.output_base.clone(),
-            workspace_id,
-            canonical_repo: Arc::from(canonical_repo),
-            repo_spec_digest: Arc::from(repo_spec_digest.as_str()),
+        Self::for_workspace_id_with_repo_spec_digest_and_repo_env(
+            WorkspaceId::for_project_root(project_root),
+            canonical_repo,
             repo_spec,
+            repo_spec_digest,
             repo_env,
-        }
+        )
     }
 }
 
