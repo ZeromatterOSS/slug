@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::io::BufWriter;
@@ -190,6 +191,7 @@ pub struct ServerCommandContext<'a> {
 
     reuse_current_config: bool,
     config_overrides: Vec<ConfigOverride>,
+    repo_env: BTreeMap<String, String>,
 
     // This ensures that there's only one RE connection during the lifetime of this context. It's possible
     // that we give out other handles, but we don't depend on the lifetimes of those for this guarantee. We
@@ -316,14 +318,22 @@ impl<'a> ServerCommandContext<'a> {
         slug_build_api::interpreter::rule_defs::build_config::set_action_env(
             &client_context.action_env,
         );
+        let workspace_root = base_context
+            .project_root
+            .root()
+            .as_path()
+            .to_string_lossy()
+            .into_owned();
+        let repo_env: BTreeMap<_, _> =
+            slug_build_api::interpreter::rule_defs::build_config::effective_repo_env_from_flags(
+                &client_context.repo_env,
+                &workspace_root,
+            )
+            .into_iter()
+            .collect();
         slug_build_api::interpreter::rule_defs::build_config::set_repo_env(
             &client_context.repo_env,
-            base_context
-                .project_root
-                .root()
-                .as_path()
-                .to_string_lossy()
-                .as_ref(),
+            &workspace_root,
         );
         slug_build_api::interpreter::rule_defs::build_config::set_copts(&client_context.copts);
         slug_build_api::interpreter::rule_defs::build_config::set_cxxopts(&client_context.cxxopts);
@@ -386,6 +396,7 @@ impl<'a> ServerCommandContext<'a> {
             host_xcode_version_override: client_context.host_xcode_version.clone(),
             reuse_current_config: client_context.reuse_current_config,
             config_overrides: client_context.config_overrides.clone(),
+            repo_env,
             oncall,
             client_id_from_client_metadata,
             _re_connection_handle: re_connection_handle,
@@ -553,13 +564,12 @@ impl ServerCommandContext<'_> {
             ),
             config_type: ConfigType::Value as i32,
         });
-        let repo_env: std::collections::BTreeMap<_, _> =
-            slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
-                .into_iter()
-                .collect();
         config_overrides.push(ConfigOverride {
             cell: None,
-            config_override: format!("bzlmod.repo_env_json={}", serde_json::to_string(&repo_env)?),
+            config_override: format!(
+                "bzlmod.repo_env_json={}",
+                serde_json::to_string(&self.repo_env)?
+            ),
             config_type: ConfigType::Value as i32,
         });
 

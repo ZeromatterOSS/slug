@@ -185,12 +185,16 @@ Observed SDK result at the checkpoint:
   part of policy equality/hashing. Focused `slug_common` coverage verifies
   hidden-lockfile policy identity, and the full 50-test Plan 61 guardrail target
   passed after the change.
-- The legacy bzlmod repo-env process global was removed. The server now threads
-  the effective command repo environment through config overrides as
-  `bzlmod.repo_env_json`, and bzlmod resolution/replay digests consume that
-  explicit option. Focused `slug_common` coverage verifies repo-env option
-  parsing, and the full 50-test Plan 61 guardrail target passed after the
-  change.
+- The bzlmod config-loading path no longer re-reads the interpreter
+  build-config repo-env process global. `ServerCommandContext` stores the
+  effective command repo environment computed from request flags and workspace
+  root, then threads that value through config overrides as
+  `bzlmod.repo_env_json`; bzlmod resolution/replay digests consume that
+  explicit option. Module and repository Starlark APIs still use the
+  transitional build-config repo-env adapter until that runtime surface moves to
+  explicit DICE/key inputs. Focused `slug_common` coverage verifies repo-env
+  option parsing, and the full 50-test Plan 61 guardrail target passed after
+  the earlier config-key change.
 - The seeded-extension process global was removed. Lazy spoke registration now
   relies on DICE replay/compute when the extension repo file-ops path needs
   sibling repos, instead of a cross-command seeded marker. Focused
@@ -413,6 +417,11 @@ Observed SDK result at the checkpoint:
   `cached_git_override_module_edit_invalidates_bzlmod_resolution`, and the full
   Plan 61 Python guardrail with 65 tests, `cargo fmt --check`, and `git diff
   --check`.
+- Command-context repo-env threading validation passed with `cargo build -p
+  slug`, focused Plan 61 Python guardrails for
+  `recorded_env_input_change_rejects_cache` and
+  `recorded_env_input_change_rejects_mixed_graph_cache`, and the full Plan 61
+  Python guardrail with 65 tests.
 
 ## Consolidated Learnings
 
@@ -663,8 +672,9 @@ using Rust DICE keys and values:
 
 9. Delete transitional APIs.
    - Remove `BzlmodSessionData` fields as the authority for graph semantics.
-   - Legacy command repo-env global state is removed; keep command repo-env
-     threaded through explicit DICE/key inputs as the remaining graph migrates.
+   - The config-load command repo-env global readback is removed; replace the
+     remaining runtime Starlark repo-env build-config adapter with explicit
+     DICE/key inputs as the graph migrates.
    - Remove bridge cache fast paths whose correctness depends on hand-curated
      cacheability predicates.
    - Keep only compatibility shims that are demonstrably non-semantic or needed
