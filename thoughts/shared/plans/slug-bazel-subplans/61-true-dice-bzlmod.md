@@ -255,6 +255,11 @@ Observed SDK result at the checkpoint:
   identity for lockfile contents/digests, lockfile mode, repo env, registry and
   yanked-version facts, and repo mappings, so warm no-op builds can still reuse
   DICE state without losing hidden-lockfile/facts invalidation.
+- The monolithic injected `BzlmodSessionDataKey` was removed after the
+  module-version split left it with no live consumers. `BzlmodSessionData`
+  remains as the legacy resolver payload for populating the narrower injected
+  DICE values, but the DICE graph no longer exposes that payload as a direct
+  computed dependency.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -552,6 +557,12 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, focused Plan 61 Python guardrails for missing-lockfile
   warm reuse, hidden-lockfile facts, and repo-env inputs, the full Plan 61
   Python guardrail with 70 tests, `cargo fmt --check`, and `git diff --check`.
+- Monolithic session-key removal validation passed with `cargo fmt --check`,
+  `cargo check -p slug_bzlmod -p slug_interpreter_for_build`,
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo build -p slug`, focused
+  Plan 61 Python guardrails for missing-lockfile warm reuse, hidden-lockfile
+  facts, and repo-env inputs, the full Plan 61 Python guardrail with 70 tests,
+  and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -593,7 +604,9 @@ What did not work or remains risky:
   consumers, extension replay/spoke consumers, and module-version consumers now
   read narrower injected DICE values. The module-version value still carries a
   conservative session invalidation identity until the remaining
-  interpreter/materialization inputs are explicit.
+  interpreter/materialization inputs are explicit, and `BzlmodSessionData`
+  still exists as the legacy resolver payload even though it is no longer an
+  injected DICE key.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.

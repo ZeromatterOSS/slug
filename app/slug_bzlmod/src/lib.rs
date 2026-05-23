@@ -317,27 +317,6 @@ impl dice::InjectedKey for BzlmodExtensionSessionDataKey {
     }
 }
 
-#[derive(
-    derive_more::Display,
-    Debug,
-    Hash,
-    Eq,
-    Clone,
-    Dupe,
-    PartialEq,
-    Allocative
-)]
-#[display("BzlmodSessionDataKey")]
-pub struct BzlmodSessionDataKey;
-
-impl dice::InjectedKey for BzlmodSessionDataKey {
-    type Value = Arc<BzlmodSessionData>;
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x == y
-    }
-}
-
 pub trait SetBzlmodSessionData {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()>;
 }
@@ -382,6 +361,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             registered_execution_platforms,
         )])?;
         self.changed_to(vec![(BzlmodExtensionSessionDataKey, extension_session)])?;
-        Ok(self.changed_to(vec![(BzlmodSessionDataKey, Arc::new(data))])?)
+        Ok(())
     }
 }

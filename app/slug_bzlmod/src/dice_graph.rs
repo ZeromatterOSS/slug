@@ -350,10 +350,10 @@ impl dice::InjectedKey for BzlmodModuleVersionsDataKey {
     type Value = Arc<BzlmodModuleVersionsDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        // Transitional bridge: this narrow value replaces a direct
-        // `BzlmodSessionDataKey` dependency, but it still carries a
-        // conservative invalidation identity until the interpreter
-        // dependencies are fully explicit.
+        // Transitional bridge: this narrow value replaces the former direct
+        // monolithic session dependency, but it still carries a conservative
+        // invalidation identity until the interpreter dependencies are fully
+        // explicit.
         x == y
     }
 }
