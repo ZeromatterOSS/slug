@@ -30,6 +30,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use sha2::Digest;
+use sha2::Sha256;
 use slug_error::BuckErrorContext;
 
 /// Errors that can occur during cache operations.
@@ -135,28 +137,20 @@ impl ModuleCache {
 
     /// Get the cache directory for a git override.
     pub fn git_override_dir(&self, git: &crate::types::GitOverride) -> PathBuf {
+        let source_identity = git_override_source_identity(git);
         self.base_dir
             .join("overrides")
             .join(&git.module_name)
-            .join(format!("git-{}", git.commit))
+            .join(format!("git-{}-{}", git.commit, source_identity))
     }
 
     /// Get the cache directory for an archive override.
     pub fn archive_override_dir(&self, archive: &crate::types::ArchiveOverride) -> PathBuf {
-        let cache_key = {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::Hash;
-            use std::hash::Hasher;
-
-            let mut hasher = DefaultHasher::new();
-            archive.urls.hash(&mut hasher);
-            archive.integrity.hash(&mut hasher);
-            format!("archive-{:x}", hasher.finish())
-        };
+        let source_identity = archive_override_source_identity(archive);
         self.base_dir
             .join("overrides")
             .join(&archive.module_name)
-            .join(cache_key)
+            .join(format!("archive-{}", source_identity))
     }
 
     /// Check if a module is cached.
@@ -306,6 +300,41 @@ impl ModuleCache {
     }
 }
 
+fn git_override_source_identity(git: &crate::types::GitOverride) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"slug-git-override-cache-v1");
+    update_digest_str(&mut hasher, &git.remote);
+    update_digest_str(&mut hasher, &git.commit);
+    update_digest_optional_str(&mut hasher, git.shallow_since.as_deref());
+    hex::encode(hasher.finalize())[..16].to_owned()
+}
+
+fn archive_override_source_identity(archive: &crate::types::ArchiveOverride) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"slug-archive-override-cache-v1");
+    for url in &archive.urls {
+        update_digest_str(&mut hasher, url);
+    }
+    update_digest_optional_str(&mut hasher, archive.integrity.as_deref());
+    update_digest_optional_str(&mut hasher, archive.strip_prefix.as_deref());
+    hex::encode(hasher.finalize())[..16].to_owned()
+}
+
+fn update_digest_str(hasher: &mut Sha256, value: &str) {
+    hasher.update([0]);
+    hasher.update(value.as_bytes());
+}
+
+fn update_digest_optional_str(hasher: &mut Sha256, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            hasher.update([1]);
+            hasher.update(value.as_bytes());
+        }
+        None => hasher.update([0]),
+    }
+}
+
 impl Default for ModuleCache {
     fn default() -> Self {
         Self::new().expect("Failed to create default module cache")
@@ -372,6 +401,63 @@ mod tests {
         let path = cache.download_path("sha256-abc123+def/ghi=");
         let filename = path.file_name().unwrap().to_str().unwrap();
         assert!(filename.contains("sha256-abc123_def_ghi_"));
+    }
+
+    #[test]
+    fn git_override_dir_includes_source_identity() {
+        let (_dir, cache) = create_test_cache();
+        let base = crate::types::GitOverride {
+            module_name: "dep".to_owned(),
+            remote: "https://example.invalid/one.git".to_owned(),
+            commit: "abcdef".to_owned(),
+            shallow_since: None,
+            patches: Vec::new(),
+            patch_strip: 0,
+        };
+        let same = crate::types::GitOverride {
+            remote: base.remote.clone(),
+            ..base.clone()
+        };
+        let different_remote = crate::types::GitOverride {
+            remote: "https://example.invalid/two.git".to_owned(),
+            ..base.clone()
+        };
+
+        assert_eq!(cache.git_override_dir(&base), cache.git_override_dir(&same));
+        assert_ne!(
+            cache.git_override_dir(&base),
+            cache.git_override_dir(&different_remote)
+        );
+    }
+
+    #[test]
+    fn archive_override_dir_includes_extraction_identity() {
+        let (_dir, cache) = create_test_cache();
+        let base = crate::types::ArchiveOverride {
+            module_name: "dep".to_owned(),
+            urls: vec!["https://example.invalid/archive.tar.gz".to_owned()],
+            integrity: Some("sha256-example".to_owned()),
+            strip_prefix: Some("one".to_owned()),
+            patches: Vec::new(),
+            patch_strip: 0,
+        };
+        let same = crate::types::ArchiveOverride {
+            strip_prefix: base.strip_prefix.clone(),
+            ..base.clone()
+        };
+        let different_strip_prefix = crate::types::ArchiveOverride {
+            strip_prefix: Some("two".to_owned()),
+            ..base.clone()
+        };
+
+        assert_eq!(
+            cache.archive_override_dir(&base),
+            cache.archive_override_dir(&same)
+        );
+        assert_ne!(
+            cache.archive_override_dir(&base),
+            cache.archive_override_dir(&different_strip_prefix)
+        );
     }
 
     #[test]

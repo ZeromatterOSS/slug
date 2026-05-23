@@ -335,6 +335,14 @@ Observed SDK result at the checkpoint:
   cache contents into key identity. A same-daemon guardrail proves a cached
   `git_override` `MODULE.bazel` warm no-op reuses bzlmod resolution, then an
   edit to that cached module file forces resolution to recompute.
+- Non-registry override fetch cache directories now include the Bazel-relevant
+  source/extraction identity instead of only commit or archive URL/integrity:
+  `git_override` includes remote, commit, and shallow-since, while
+  `archive_override` includes URLs, integrity, and strip prefix. Bazel source
+  anchors: `ModuleFileGlobals.archiveOverride`/`gitOverride` forward override
+  kwargs into `RepoSpec`, `GitRepoSpecBuilder` models remote/commit/shallow
+  attrs, and `ArchiveRepoSpecBuilder` models URLs/integrity/strip-prefix attrs.
+  Patch identity remains blocked with override patch support.
 - The unused non-cacheable `slug_bzlmod::LockfileContentKey` bridge was removed
   after visible and hidden lockfile reads moved to the tracked key in
   `slug_common`.
@@ -397,6 +405,13 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo build -p slug`, the focused Plan 61 Python guardrail
   `cached_git_override_module_edit_invalidates_bzlmod_resolution`, the full Plan
   61 Python guardrail with 65 tests, `cargo fmt --check`, and `git diff
+  --check`.
+- Non-registry override source-identity validation passed with `cargo test -p
+  slug_bzlmod cache -- --nocapture`, `cargo test -p slug_bzlmod --
+  --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build
+  -p slug`, the focused Plan 61 Python guardrail
+  `cached_git_override_module_edit_invalidates_bzlmod_resolution`, and the full
+  Plan 61 Python guardrail with 65 tests, `cargo fmt --check`, and `git diff
   --check`.
 
 ## Consolidated Learnings

@@ -15,6 +15,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from buck2.tests.e2e_util.api.buck import Buck
@@ -23,6 +24,10 @@ from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
 BzlmodCounters = dict[str, int]
+
+
+class _HashLike(Protocol):
+    def update(self, data: bytes) -> None: ...
 
 
 async def _bzlmod_counters(
@@ -119,6 +124,35 @@ def _write_cached_registry_module(
     _write(source_dir / ".complete", "")
     _write(source_dir / "BUILD.bazel", build_file)
     return module_cache
+
+
+def _git_override_cache_dir(
+    cache_home: Path,
+    module_name: str,
+    remote: str,
+    commit: str,
+    shallow_since: str | None = None,
+) -> Path:
+    hasher = hashlib.sha256()
+    hasher.update(b"slug-git-override-cache-v1")
+    _update_digest_str(hasher, remote)
+    _update_digest_str(hasher, commit)
+    _update_digest_optional_str(hasher, shallow_since)
+    source_identity = hasher.hexdigest()[:16]
+    return cache_home / "slug" / "overrides" / module_name / f"git-{commit}-{source_identity}"
+
+
+def _update_digest_str(hasher: _HashLike, value: str) -> None:
+    hasher.update(b"\0")
+    hasher.update(value.encode())
+
+
+def _update_digest_optional_str(hasher: _HashLike, value: str | None) -> None:
+    if value is None:
+        hasher.update(b"\0")
+        return
+    hasher.update(b"\1")
+    hasher.update(value.encode())
 
 
 def _protobuf_varint(value: int) -> bytes:
@@ -629,8 +663,9 @@ async def test_cached_git_override_module_edit_invalidates_bzlmod_resolution(
     """Bazel anchor: git_override fetched MODULE.bazel is a module-resolution input."""
     module_name = "git_override_lib"
     commit = "abcdef1234567890"
+    remote = f"https://example.invalid/{module_name}.git"
     cache_home = buck.cwd.parent / f"{buck.cwd.name}_git_override_cache_home"
-    override_dir = cache_home / "slug" / "overrides" / module_name / f"git-{commit}"
+    override_dir = _git_override_cache_dir(cache_home, module_name, remote, commit)
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
     _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
@@ -642,7 +677,7 @@ async def test_cached_git_override_module_edit_invalidates_bzlmod_resolution(
 bazel_dep(name = "{module_name}")
 git_override(
     module_name = "{module_name}",
-    remote = "https://example.invalid/{module_name}.git",
+    remote = "{remote}",
     commit = "{commit}",
 )
 """,
