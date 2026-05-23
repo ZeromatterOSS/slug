@@ -440,6 +440,35 @@ fn bazel_canonical_module_repo_name(module_name: &str, version: &str) -> String 
     }
 }
 
+fn local_override_cell_path_and_symlink(
+    project_root: &ProjectRoot,
+    project_root_abs: &AbsNormPathBuf,
+    module_name: &str,
+    module_version: &str,
+    override_path: &str,
+) -> slug_error::Result<(CellRootPathBuf, Option<BzlmodExternalModuleSymlink>)> {
+    let module_dir = resolve_local_override_module_dir(project_root_abs, override_path)?;
+    if let Some(project_path) =
+        project_relative_path_for_abs_path(project_root, module_dir.as_path())
+    {
+        return Ok((CellRootPathBuf::new(project_path), None));
+    }
+
+    let canonical_repo = bazel_canonical_module_repo_name(module_name, module_version);
+    let external_path = format!("bazel-external/{canonical_repo}");
+    let source_path = module_dir
+        .as_path()
+        .canonicalize()
+        .unwrap_or_else(|_| module_dir.as_path().to_path_buf());
+    Ok((
+        CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned()),
+        Some(BzlmodExternalModuleSymlink {
+            entry_name: canonical_repo,
+            source_path,
+        }),
+    ))
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodPendingRepoCell {
     canonical_name: String,
@@ -812,6 +841,51 @@ async fn parse_module_with_tracked_project_includes(
         let (include_read, _tracking) =
             read_bzlmod_file_for_module_inputs(ctx, project_fs, &include_path).await?;
         let Some((include_content, include_digest)) = include_read else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to read included MODULE.bazel segment at {:?}: file not found",
+                include_path
+            ));
+        };
+        let nested_labels =
+            session.eval_segment(&include_path, &include_content, include_digest)?;
+        let mut nested_ancestors = ancestors;
+        nested_ancestors.push(canonical);
+        push_pending_include_labels(&mut pending, nested_labels, nested_ancestors);
+    }
+
+    session.finish()
+}
+
+fn parse_module_with_polled_includes(
+    module_path: &Path,
+    module_content: String,
+) -> slug_error::Result<slug_bzlmod::ParsedModuleFileWithInputs> {
+    let module_root = module_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_path_buf();
+    let mut session = slug_bzlmod::ModuleFileParseSession::new_silent(module_root.clone());
+    let module_digest = slug_bzlmod::lockfile::compute_sha256_hex(module_content.as_bytes());
+    let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
+    let mut pending = Vec::new();
+    push_pending_include_labels(&mut pending, include_labels, Vec::new());
+
+    while let Some((label, ancestors)) = pending.pop() {
+        let include_path = slug_bzlmod::include_label_to_path(&module_root, &label)?;
+        let canonical = include_path
+            .canonicalize()
+            .unwrap_or_else(|_| include_path.clone());
+        if ancestors.contains(&canonical) {
+            return Err(slug_bzlmod::parser::ModuleParseError::IncludeError(format!(
+                "cyclic include of {}",
+                label
+            ))
+            .into());
+        }
+
+        let (include_content, include_digest) = read_absolute_text_file_input(&include_path)?;
+        let Some((include_content, include_digest)) = include_content.zip(include_digest) else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
                 "Failed to read included MODULE.bazel segment at {:?}: file not found",
@@ -1227,6 +1301,7 @@ fn root_extension_replay_summary_digest(
 struct LocalOverrideModuleInputsKey {
     project_root: AbsNormPathBuf,
     overrides: Vec<(String, String)>,
+    poll_digest: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -1328,7 +1403,7 @@ async fn local_override_module_inputs_digest(
     let mut has_extension_usages = false;
     let mut has_repo_rule_invocations = false;
     let mut has_git_overrides = false;
-    let mut has_untracked_inputs = false;
+    let has_untracked_inputs = false;
 
     while let Some((module_name, base, path)) = queue.pop_front() {
         let module_dir = resolve_local_override_module_dir(&base, &path)?;
@@ -1352,9 +1427,8 @@ async fn local_override_module_inputs_digest(
         }
 
         let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
-        let (module_read, tracking) =
+        let (module_read, _tracking) =
             read_bzlmod_file_for_module_inputs(ctx, &project_fs, &module_bazel_path).await?;
-        has_untracked_inputs |= !tracking.is_project();
         match module_read {
             Some((content, _content_digest)) => {
                 hasher.update(b"present");
@@ -1416,15 +1490,121 @@ async fn local_override_module_inputs_digest(
     })
 }
 
+fn local_override_inputs_poll_digest(
+    project_fs: &ProjectRoot,
+    project_root: &AbsNormPathBuf,
+    overrides: &[(String, String)],
+) -> slug_error::Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"local-override-module-inputs-poll-v1");
+    hasher.update([0]);
+
+    let mut queue = VecDeque::new();
+    for (module_name, path) in overrides {
+        queue.push_back((module_name.clone(), project_root.clone(), path.clone()));
+    }
+
+    let mut visited_module_dirs = HashSet::new();
+    while let Some((module_name, base, path)) = queue.pop_front() {
+        let module_dir = resolve_local_override_module_dir(&base, &path)?;
+        let normalized_module_dir = match module_dir.as_path().canonicalize() {
+            Ok(canonical) => AbsNormPathBuf::try_from(canonical)?,
+            Err(_) => module_dir.clone(),
+        };
+
+        hasher.update(module_name.as_bytes());
+        hasher.update([0]);
+        hasher.update(base.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(path.as_bytes());
+        hasher.update([0]);
+        hasher.update(normalized_module_dir.to_string_lossy().as_bytes());
+        hasher.update([0]);
+
+        if project_relative_path_for_abs_path(project_fs, normalized_module_dir.as_path()).is_some()
+        {
+            hasher.update(b"project-tracked");
+            hasher.update([0]);
+            continue;
+        }
+
+        if !visited_module_dirs.insert(normalized_module_dir.clone()) {
+            hasher.update(b"already-seen");
+            hasher.update([0]);
+            continue;
+        }
+
+        let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
+        match read_absolute_text_file_input(&module_bazel_path)? {
+            (Some(content), Some(content_digest)) => {
+                hasher.update(b"present");
+                hasher.update([0]);
+                hasher.update(content_digest.as_bytes());
+                hasher.update([0]);
+
+                let parsed_with_inputs =
+                    parse_module_with_polled_includes(&module_bazel_path, content)
+                        .with_buck_error_context(|| {
+                            format!(
+                                "Failed to parse MODULE.bazel for local override '{}' at {:?}",
+                                module_name, module_bazel_path
+                            )
+                        })?;
+                for input in &parsed_with_inputs.inputs {
+                    hasher.update(input.path.to_string_lossy().as_bytes());
+                    hasher.update([0]);
+                    hasher.update(input.digest.as_bytes());
+                    hasher.update([0]);
+                }
+
+                for override_ in &parsed_with_inputs.parsed.module.overrides {
+                    if let slug_bzlmod::types::Override::LocalPath(local) = override_ {
+                        queue.push_back((
+                            local.module_name.clone(),
+                            normalized_module_dir.clone(),
+                            local.path.clone(),
+                        ));
+                    }
+                }
+            }
+            (None, None) => {
+                hasher.update(b"missing");
+                hasher.update([0]);
+            }
+            _ => unreachable!("absolute text file reads return content and digest together"),
+        }
+    }
+
+    Ok(hex::encode(hasher.finalize()))
+}
+
 fn resolve_local_override_module_dir(
     base: &AbsNormPathBuf,
     path: &str,
 ) -> slug_error::Result<AbsNormPathBuf> {
     let path_obj = Path::new(path);
-    if path_obj.is_absolute() {
-        return AbsNormPathBuf::try_from(path_obj.to_path_buf());
+    let joined = if path_obj.is_absolute() {
+        path_obj.to_path_buf()
+    } else {
+        base.as_path().join(path_obj)
+    };
+    AbsNormPathBuf::try_from(normalize_path_lexically(joined))
+}
+
+fn normalize_path_lexically(path: PathBuf) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                normalized.pop();
+            }
+            std::path::Component::Prefix(_)
+            | std::path::Component::RootDir
+            | std::path::Component::Normal(_) => normalized.push(component.as_os_str()),
+        }
     }
-    base.join_normalized(RelativePath::new(path))
+    normalized
 }
 
 #[async_trait]
@@ -1758,13 +1938,17 @@ impl BuckConfigBasedCells {
             .await?
             .buck_error_context("Computing root MODULE.bazel for bzlmod resolution")?;
         let project_root = AbsNormPathBuf::try_from(project_root_path)?;
+        let local_overrides = local_overrides_from_root_module(
+            root_module_file.as_ref(),
+            options.ignore_dev_dependency,
+        );
+        let local_override_poll_digest =
+            local_override_inputs_poll_digest(project_fs, &project_root, &local_overrides)?;
         let local_override_inputs = dice_ctx
             .compute(&LocalOverrideModuleInputsKey {
                 project_root: project_root.clone(),
-                overrides: local_overrides_from_root_module(
-                    root_module_file.as_ref(),
-                    options.ignore_dev_dependency,
-                ),
+                overrides: local_overrides,
+                poll_digest: local_override_poll_digest,
             })
             .await?
             .buck_error_context(
@@ -2194,6 +2378,7 @@ impl BuckConfigBasedCells {
             options.allow_yanked_versions_env.as_deref(),
             &options.allow_yanked_versions_flags,
         )?;
+        let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let visible_lockfile_digest = visible_lockfile.and_then(|value| value.digest.clone());
         let hidden_lockfile_digest = hidden_lockfile.and_then(|value| value.digest.clone());
         let visible_lockfile = if options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
@@ -2221,8 +2406,16 @@ impl BuckConfigBasedCells {
         let local_modules = resolve_local_modules(&active_overrides, workspace_root)?;
         for (name, resolved) in local_modules.iter() {
             let cell_name = CellName::unchecked_new(name)?;
-            let cell_path =
-                CellRootPathBuf::new(ProjectRelativePath::new(&resolved.relative_path)?.to_owned());
+            let (cell_path, symlink) = local_override_cell_path_and_symlink(
+                project_root,
+                &project_root_abs,
+                name,
+                resolved.version.as_str(),
+                &resolved.relative_path,
+            )?;
+            if let Some(symlink) = symlink {
+                module_symlinks.push(symlink);
+            }
             // Local modules don't need BzlmodCellSetup - they use LocalPath external origin
             // which is handled separately if needed
             cells.push((cell_name, cell_path, None));
@@ -2392,8 +2585,16 @@ impl BuckConfigBasedCells {
                     }
                     ModuleSource::LocalPath { path } => {
                         // Local path modules from overrides are handled separately
-                        let cell_path =
-                            CellRootPathBuf::new(ProjectRelativePath::new(path)?.to_owned());
+                        let (cell_path, symlink) = local_override_cell_path_and_symlink(
+                            project_root,
+                            &project_root_abs,
+                            module_name,
+                            &module_info.version,
+                            path,
+                        )?;
+                        if let Some(symlink) = symlink {
+                            module_symlinks.push(symlink);
+                        }
                         cells.push((cell_name, cell_path, None));
                         tracing::info!("Registered local module: {} -> {}", module_name, path);
                     }

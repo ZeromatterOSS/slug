@@ -437,6 +437,43 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_warm_noop_out_of_project_local_override_reuses_polled_dice_input(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: DiscoveryTest.testLocalPathOverride uses an absolute override path."""
+    local_lib = buck.cwd.parent / f"{buck.cwd.name}_external_local_lib"
+    local_lib.mkdir(parents=True, exist_ok=True)
+    _write(local_lib / "MODULE.bazel", 'module(name = "external_local", version = "1.0")\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_external_local_override")
+
+bazel_dep(name = "external_local")
+local_path_override(
+    module_name = "external_local",
+    path = "{local_lib.as_posix()}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert "external_local" in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, second = await _audit_cells_and_counters(buck)
+    assert "external_local" in output
+    assert second["module_file_parse"] == first["module_file_parse"]
+    assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(local_lib / "MODULE.bazel", 'module(name = "external_local", version = "1.1")\n')
+    output, third = await _audit_cells_and_counters(buck)
+    assert "external_local" in output
+    assert third["module_file_parse"] > second["module_file_parse"]
+    assert third["bzlmod_resolution_compute"] > second["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_warm_noop_locked_registry_dep_reuses_bzlmod_resolution(
     buck: Buck,
 ) -> None:

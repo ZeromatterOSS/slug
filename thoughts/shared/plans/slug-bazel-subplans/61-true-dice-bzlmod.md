@@ -292,13 +292,14 @@ Observed SDK result at the checkpoint:
   guardrail: the extension executes once on the cold command and is reused on
   the warm command.
 - Project-local `local_path_override()` module files now use the same tracked
-  project-file read path as root and included module segments. The transitional
-  `LocalOverrideModuleInputsKey` is cacheable when every observed local module
-  input is project-tracked, and it falls back to non-cacheable direct filesystem
-  reads for out-of-project local override paths. The local-override guardrail
-  now proves a same-daemon warm no-op does not reparse or rerun bzlmod
-  resolution before an edit to `libs/local_lib/MODULE.bazel` invalidates the
-  graph.
+  project-file read path as root and included module segments. Out-of-project
+  absolute/normalized local override paths are registered through
+  `bazel-external/<module>+` symlinks and feed a polled digest into the
+  transitional `LocalOverrideModuleInputsKey`, so warm reuse is keyed by the
+  observed external module state. Local-override guardrails now prove
+  same-daemon warm no-ops do not reparse or rerun bzlmod resolution for either
+  project-local or out-of-project override module files, and edits to either
+  source class invalidate the graph.
 - Visible workspace `MODULE.bazel.lock` reads now flow through a tracked
   project-file DICE key in `slug_common`, and the file watcher treats
   `MODULE.bazel.lock` changes as pre-config invalidations. Hidden/output-base
@@ -349,6 +350,13 @@ Observed SDK result at the checkpoint:
   `warm_noop_out_of_project_registry_cache_reuses_polled_dice_input`, the full
   Plan 61 Python guardrail with 62 tests, `cargo fmt --check`, and `git diff
   --check`.
+- Out-of-project local-override validation passed with `cargo build -p slug`,
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, focused Plan 61 guardrails for
+  `warm_noop_local_override_audit_cell_reuses_bzlmod_resolution`,
+  `warm_noop_out_of_project_local_override_reuses_polled_dice_input`, and
+  `local_override_module_edit_invalidates_only_affected_nodes`, and the full
+  Plan 61 Python guardrail with 63 tests.
 - Lockfile bridge cleanup validation passed with `cargo test -p slug_bzlmod --
   --nocapture`.
 
@@ -525,11 +533,13 @@ using Rust DICE keys and values:
 2. Finish module-file DICE inputs for git, archive, and out-of-project local
    override/registry-cache sources.
    - Root, included, and project-local local override module segments now use
-     tracked project-file DICE inputs; keep extending that shape to every
+     tracked project-file DICE inputs; out-of-project local override module
+     files are polled into key identity. Keep extending that shape to every
      non-root module source.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
-     files are tracked when the cache lives under the project root; out-of-root
-     cache paths still need a watched or explicitly keyed filesystem input.
+     files are tracked when the cache lives under the project root, and
+     out-of-root cache paths are polled into key identity while the final
+     watched-input graph is still pending.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes.
    - Include create/delete transitions, parse failures, include cycles, and

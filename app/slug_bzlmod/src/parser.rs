@@ -54,6 +54,7 @@ pub struct ModuleFileParseSession {
     context: std::cell::RefCell<ModuleFileContext>,
     module_root: PathBuf,
     inputs: Vec<ModuleFileInputDigest>,
+    record_events: bool,
 }
 
 impl ModuleFileParseSession {
@@ -62,6 +63,16 @@ impl ModuleFileParseSession {
             context: new_module_file_context(),
             module_root,
             inputs: Vec::new(),
+            record_events: true,
+        }
+    }
+
+    pub fn new_silent(module_root: PathBuf) -> Self {
+        Self {
+            context: new_module_file_context(),
+            module_root,
+            inputs: Vec::new(),
+            record_events: false,
         }
     }
 
@@ -85,7 +96,12 @@ impl ModuleFileParseSession {
             .and_then(|s| s.to_str())
             .unwrap_or("MODULE.bazel");
         let include_start = self.context.borrow().include_labels.len();
-        eval_module_bazel_content_into_context(content, filename, &self.context)?;
+        eval_module_bazel_content_into_context(
+            content,
+            filename,
+            &self.context,
+            self.record_events,
+        )?;
         let include_labels = {
             let mut ctx = self.context.borrow_mut();
             ctx.include_labels.split_off(include_start)
@@ -174,7 +190,7 @@ pub fn parse_module_bazel_content(
     filename: &str,
 ) -> slug_error::Result<ParsedModuleFile> {
     let context = new_module_file_context();
-    eval_module_bazel_content_into_context(content, filename, &context)?;
+    eval_module_bazel_content_into_context(content, filename, &context, true)?;
 
     if !context.borrow().include_labels.is_empty() {
         return Err(ModuleParseError::IncludeError(
@@ -190,8 +206,11 @@ fn eval_module_bazel_content_into_context(
     content: &str,
     filename: &str,
     context: &std::cell::RefCell<ModuleFileContext>,
+    record_events: bool,
 ) -> slug_error::Result<()> {
-    record_bzlmod_event(BzlmodEventKind::ModuleFileParse, filename);
+    if record_events {
+        record_bzlmod_event(BzlmodEventKind::ModuleFileParse, filename);
+    }
 
     // Parse the Starlark code
     let ast = AstModule::parse(filename, content.to_owned(), &module_bazel_dialect())
