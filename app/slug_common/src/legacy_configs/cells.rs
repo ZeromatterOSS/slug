@@ -3709,51 +3709,9 @@ impl BuckConfigBasedCells {
             bzlmod_session_data.registered_toolchains = all_toolchains.clone();
             bzlmod_session_data.registered_execution_platforms = all_exec_platforms;
 
-            // Ensure toolchain repos referenced in register_toolchains() exist.
-            // Extract repo names from label patterns and check if the repo directories
-            // are present. Extension repos that haven't materialized will be triggered
-            // when their ExtensionRepoCellSetup is first accessed during analysis.
-            // Here we just log which repos are pending to aid debugging.
-            let project_root_path = project_root.root().to_path_buf();
-            let bazel_ext_dir = project_root_path.join("bazel-external");
-            let mut repos_needing_materialization = Vec::new();
-            for tc in &all_toolchains {
-                let tc_label = &tc.label;
-                if let Some(repo_name) = extract_repo_name_from_label(tc_label) {
-                    // Diagnostic/materialization bookkeeping only: label
-                    // resolution itself goes through the typed resolvers.
-                    // This scan checks whether a registered toolchain's repo
-                    // already has a materialized legacy/module-version
-                    // directory so we can log pending repos.
-                    let has_dir = if bazel_ext_dir.is_dir() {
-                        std::fs::read_dir(&bazel_ext_dir)
-                            .ok()
-                            .map(|entries| {
-                                entries.flatten().any(|e| {
-                                    let name = e.file_name();
-                                    let s = name.to_string_lossy();
-                                    // Match: exact name, "name+version", or "ext+name+name"
-                                    s.as_ref() == repo_name
-                                        || s.starts_with(&format!("{}+", repo_name))
-                                        || s.ends_with(&format!("+{}", repo_name))
-                                })
-                            })
-                            .unwrap_or(false)
-                    } else {
-                        false
-                    };
-                    if !has_dir {
-                        repos_needing_materialization.push(repo_name.to_owned());
-                    }
-                }
-            }
-            if !repos_needing_materialization.is_empty() {
-                tracing::info!(
-                    "{} toolchain repo(s) pending materialization: {:?}",
-                    repos_needing_materialization.len(),
-                    repos_needing_materialization
-                );
-            }
+            // Toolchain repo materialization is intentionally lazy. Label
+            // resolution and the external-cell delegates own the semantic
+            // materialization path; do not poll `bazel-external` here.
         }
 
         // Convert pre-computed cells to the format expected by
@@ -4064,19 +4022,6 @@ fn selected_bzlmod_cell_name_for_dep<'a>(
     }
 
     None
-}
-
-/// Extract the repo name from a toolchain/platform label.
-/// E.g., "@local_config_cc_toolchains//:all" → "local_config_cc_toolchains"
-///       "//cc/private/toolchain/test:default_test_runner_toolchain" → None (relative)
-fn extract_repo_name_from_label(label: &str) -> Option<String> {
-    let parsed = slug_bzlmod::canonicalize_label_with_package_context(label, "", "", None)?;
-    let repo = parsed.repo().as_str();
-    if repo.is_empty() {
-        None
-    } else {
-        Some(repo.to_owned())
-    }
 }
 
 #[cfg(test)]

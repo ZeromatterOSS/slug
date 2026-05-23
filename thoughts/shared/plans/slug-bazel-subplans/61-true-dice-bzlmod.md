@@ -730,6 +730,13 @@ Observed SDK result at the checkpoint:
   `ExtensionSpokesByCanonicalRepoKey` now leave replay-data and repo-mapping
   reads to `ExtensionSpokesKey`, so absent-extension lookups can return `None`
   without depending on unrelated injected replay inputs.
+- Diagnostic toolchain materialization scan removal validation passed with
+  `cargo check -p slug_common`, `cargo test -p slug_common bzlmod --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
+  subset, and the full Plan 61 Python guardrail with 72 tests. Legacy bzlmod
+  cell setup no longer polls `bazel-external` to log pending toolchain repos;
+  semantic repo materialization remains owned by label resolution and
+  external-cell delegates.
 
 ## Consolidated Learnings
 
@@ -836,6 +843,10 @@ What did not work or remains risky:
   narrower DICE values, and the eager-load fast path is keyed by the
   DICE-derived registration signature, but the final `DeclaredToolchainInfo`
   registry remains process-global output plumbing rather than a DICE value.
+  The legacy setup path also no longer scans `bazel-external` for
+  diagnostic-only pending toolchain repo logs; removing that poll reduces
+  incidental filesystem state without completing the final DICE-owned
+  toolchain/materialization graph.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
