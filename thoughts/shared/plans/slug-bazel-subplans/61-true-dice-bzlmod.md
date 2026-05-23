@@ -249,6 +249,12 @@ Observed SDK result at the checkpoint:
   disables value cutoffs for now to preserve the previous session-wide
   invalidation behavior until the remaining bzlmod session fields have explicit
   interpreter/materialization dependencies.
+- `ModuleVersionsKey` now computes a narrower
+  `BzlmodModuleVersionsDataKey` instead of the whole `BzlmodSessionDataKey`.
+  The injected module-version value carries a conservative invalidation
+  identity for lockfile contents/digests, lockfile mode, repo env, registry and
+  yanked-version facts, and repo mappings, so warm no-op builds can still reuse
+  DICE state without losing hidden-lockfile/facts invalidation.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -528,19 +534,24 @@ Observed SDK result at the checkpoint:
 - Registered toolchain and execution-platform facts now have their own
   injected DICE values. `RegisteredToolchainsKey` and
   `RegisteredExecutionPlatformsKey` no longer compute the whole
-  `BzlmodSessionDataKey`; `ModuleVersionsKey` intentionally remains on the
-  wider injected session with value cutoffs disabled because narrowing it
-  prematurely regressed hidden-lockfile fact invalidation. Validation passed
-  with `cargo check -p slug_bzlmod -p slug_analysis -p slug_configured`,
-  `cargo test -p slug_bzlmod -- --nocapture`, `cargo build -p slug`, the
-  focused hidden-lockfile facts guardrail, and the full Plan 61 Python
-  guardrail with 70 tests.
+  `BzlmodSessionDataKey`. At this checkpoint `ModuleVersionsKey` intentionally
+  remained on the wider injected session with value cutoffs disabled because
+  narrowing it prematurely regressed hidden-lockfile fact invalidation.
+  Validation passed with `cargo check -p slug_bzlmod -p slug_analysis -p
+  slug_configured`, `cargo test -p slug_bzlmod -- --nocapture`, `cargo build
+  -p slug`, the focused hidden-lockfile facts guardrail, and the full Plan 61
+  Python guardrail with 70 tests.
 - Extension replay/session split validation passed with `cargo fmt --check`,
   `cargo check -p slug_bzlmod -p slug_external_cells`, `cargo test -p
   slug_bzlmod -- --nocapture`, `cargo build -p slug`, focused Plan 61 Python
   guardrails for hidden-lockfile facts, repo-env input, and warm extension
   replay, the full Plan 61 Python guardrail with 70 tests, and `git diff
   --check`.
+- Module-version split validation passed with `cargo check -p slug_bzlmod -p
+  slug_interpreter_for_build`, `cargo test -p slug_bzlmod -- --nocapture`,
+  `cargo build -p slug`, focused Plan 61 Python guardrails for missing-lockfile
+  warm reuse, hidden-lockfile facts, and repo-env inputs, the full Plan 61
+  Python guardrail with 70 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -579,10 +590,10 @@ What did not work or remains risky:
 - The resolved graph, repo mappings, cell graph, and registered toolchain and
   execution platform facts are still assembled during legacy cell setup, then
   injected as transitional command data. Registered toolchain/platform
-  consumers and extension replay/spoke consumers now read narrower injected
-  DICE values, but module-version consumers intentionally still source their
-  values from the injected session until the remaining interpreter/materialization
-  inputs are explicit.
+  consumers, extension replay/spoke consumers, and module-version consumers now
+  read narrower injected DICE values. The module-version value still carries a
+  conservative session invalidation identity until the remaining
+  interpreter/materialization inputs are explicit.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.

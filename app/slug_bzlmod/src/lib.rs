@@ -64,6 +64,9 @@ pub use dice_graph::BzlmodCommandPolicyKey;
 pub use dice_graph::BzlmodCommandPolicyValue;
 pub use dice_graph::BzlmodEventCounters;
 pub use dice_graph::BzlmodEventKind;
+pub use dice_graph::BzlmodModuleVersionsDataKey;
+pub use dice_graph::BzlmodModuleVersionsDataValue;
+pub use dice_graph::BzlmodModuleVersionsInvalidation;
 pub use dice_graph::BzlmodRegisteredExecutionPlatformsDataKey;
 pub use dice_graph::BzlmodRegisteredToolchainsDataKey;
 pub use dice_graph::BzlmodResolutionKey;
@@ -342,6 +345,24 @@ pub trait SetBzlmodSessionData {
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::for_project_root(data.project_root.clone());
+        let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
+            workspace_id: workspace_id.clone(),
+            module_versions: Arc::new(data.module_versions.clone()),
+            invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
+                root_module_name: data.root_module_name.clone(),
+                hidden_lockfile_path: data.hidden_lockfile_path.clone(),
+                visible_lockfile_digest: data.visible_lockfile_digest.clone(),
+                hidden_lockfile_digest: data.hidden_lockfile_digest.clone(),
+                visible_lockfile: data.visible_lockfile.clone(),
+                hidden_lockfile: data.hidden_lockfile.clone(),
+                lockfile_mode: data.lockfile_mode,
+                repo_env: data.repo_env.clone(),
+                registry_file_hashes: data.registry_file_hashes.clone(),
+                selected_yanked_versions: data.selected_yanked_versions.clone(),
+                repo_mappings: data.repo_mappings.clone(),
+                repo_mapping_overrides: data.repo_mapping_overrides.clone(),
+            }),
+        });
         let extension_session = Arc::new(BzlmodExtensionSessionData::from(&data));
         let registered_toolchains = Arc::new(RegisteredToolchainsValue {
             workspace_id: workspace_id.clone(),
@@ -351,6 +372,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             workspace_id,
             registered_execution_platforms: data.registered_execution_platforms.clone(),
         });
+        self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
         self.changed_to(vec![(
             BzlmodRegisteredToolchainsDataKey,
             registered_toolchains,

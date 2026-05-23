@@ -310,6 +310,54 @@ pub struct ModuleVersionsValue {
     pub module_versions: Arc<HashMap<String, String>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodModuleVersionsInvalidation {
+    pub root_module_name: String,
+    pub hidden_lockfile_path: Option<PathBuf>,
+    pub visible_lockfile_digest: Option<String>,
+    pub hidden_lockfile_digest: Option<String>,
+    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
+    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
+    pub lockfile_mode: crate::LockfileMode,
+    pub repo_env: BTreeMap<String, String>,
+    pub registry_file_hashes: indexmap::IndexMap<String, String>,
+    pub selected_yanked_versions: indexmap::IndexMap<String, String>,
+    pub repo_mappings: crate::RepoMappingSnapshot,
+    pub repo_mapping_overrides: crate::RepoMappingOverrides,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodModuleVersionsDataValue {
+    pub workspace_id: WorkspaceId,
+    pub module_versions: Arc<HashMap<String, String>>,
+    pub invalidation: Arc<BzlmodModuleVersionsInvalidation>,
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodModuleVersionsDataKey")]
+pub struct BzlmodModuleVersionsDataKey;
+
+impl dice::InjectedKey for BzlmodModuleVersionsDataKey {
+    type Value = Arc<BzlmodModuleVersionsDataValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        // Transitional bridge: this narrow value replaces a direct
+        // `BzlmodSessionDataKey` dependency, but it still carries a
+        // conservative invalidation identity until the interpreter
+        // dependencies are fully explicit.
+        x == y
+    }
+}
+
 #[async_trait]
 impl Key for ModuleVersionsKey {
     type Value = slug_error::Result<Arc<ModuleVersionsValue>>;
@@ -319,19 +367,19 @@ impl Key for ModuleVersionsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
-        if session_data.project_root != *self.workspace_id.canonical_project_root {
+        let data = ctx.compute(&BzlmodModuleVersionsDataKey).await?;
+        if data.workspace_id != self.workspace_id {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
                 "ModuleVersionsKey was computed with project root '{}', \
-                 but current bzlmod session root is '{}'",
+                 but current bzlmod module-version root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
-                session_data.project_root.display()
+                data.workspace_id.canonical_project_root.display()
             ));
         }
         Ok(Arc::new(ModuleVersionsValue {
-            workspace_id: self.workspace_id.clone(),
-            module_versions: Arc::new(session_data.module_versions.clone()),
+            workspace_id: data.workspace_id.clone(),
+            module_versions: data.module_versions.clone(),
         }))
     }
 
