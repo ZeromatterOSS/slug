@@ -730,6 +730,24 @@ use_repo(pip, "pip", "pip_internal")
     }
 
     #[test]
+    fn test_parse_override_repo_positional_and_keyword() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, "generated", public = "replacement")
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        let ext = &parsed.extension_usages[0];
+        assert_eq!(
+            ext.repo_overrides,
+            vec![
+                ("generated".to_owned(), "generated".to_owned()),
+                ("public".to_owned(), "replacement".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
     fn test_parse_multiple_extensions() {
         let content = r#"
 module(name = "test", version = "1.0.0")

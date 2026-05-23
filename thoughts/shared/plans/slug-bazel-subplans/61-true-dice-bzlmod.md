@@ -130,6 +130,10 @@ Observed SDK result at the checkpoint:
   `ModuleFileGlobals` early return for those calls. A focused guardrail verifies
   that an injected helper repo is available by default and invisible with
   `--ignore_dev_dependency`.
+- `override_repo(ext, "repo")` now accepts Bazel's positional same-name
+  shorthand in addition to keyword mappings. A focused guardrail verifies that a
+  generated repo's sibling mapping resolves `@repo` to the same-named root
+  module replacement.
 - `use_extension(..., isolate = True)` has been Bazel-grounded as a larger
   blocker, not a safe small patch. Bazel 9.0.1 rejects it unless
   `--experimental_isolated_extension_usages` is set; with the flag, each

@@ -963,7 +963,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     /// ```
     fn override_repo<'v>(
         #[starlark(require = pos)] extension_proxy: Value<'v>,
-        #[starlark(kwargs)] kwargs: Value<'v>,
+        #[starlark(args)] repos: UnpackTuple<&str>,
+        #[starlark(kwargs)] kwargs: starlark::collections::SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let proxy = extension_proxy
@@ -979,14 +980,13 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         // Record the overrides on the extension
         if let Some(ext) = ctx.extensions.get_mut(proxy.index()) {
-            if let Some(dict) = DictRef::from_value(kwargs) {
-                for (key, value) in dict.iter() {
-                    if let (Some(repo_name), Some(dep_name)) =
-                        (key.unpack_str(), value.unpack_str())
-                    {
-                        ext.repo_overrides
-                            .push((repo_name.to_owned(), dep_name.to_owned()));
-                    }
+            for repo in repos.items {
+                ext.repo_overrides.push((repo.to_owned(), repo.to_owned()));
+            }
+            for (repo_name, dep_value) in kwargs.iter() {
+                if let Some(dep_name) = dep_value.unpack_str() {
+                    ext.repo_overrides
+                        .push((repo_name.clone(), dep_name.to_owned()));
                 }
             }
         }

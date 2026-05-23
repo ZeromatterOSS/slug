@@ -3124,6 +3124,52 @@ use_repo(ext, "generated")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_override_repo_positional_maps_same_named_generated_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: override_repo(ext, "repo") maps repo to same-named root repo."""
+    replacement = buck.cwd / "generated"
+    replacement.mkdir()
+    _write(replacement / "MODULE.bazel", 'module(name = "generated", version = "1.0")\n')
+    _write(replacement / "BUILD.bazel", 'exports_files(["payload.txt"])\n')
+    _write(replacement / "payload.txt", "payload from root replacement\n")
+    _write(
+        buck.cwd / "ext.bzl",
+        """def _repo_impl(ctx):
+    ctx.file("BUILD.bazel", "filegroup(name = \\"empty\\", srcs = [])\\n")
+
+def _consumer_impl(ctx):
+    ctx.file(
+        "BUILD.bazel",
+        "filegroup(name = \\"from_override\\", srcs = [\\"@generated//:payload.txt\\"])\\n",
+    )
+
+repo = repository_rule(implementation = _repo_impl)
+consumer = repository_rule(implementation = _consumer_impl)
+
+def _ext_impl(module_ctx):
+    repo(name = "generated")
+    consumer(name = "consumer")
+
+ext = module_extension(implementation = _ext_impl)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_override_repo_positional")
+bazel_dep(name = "generated", version = "1.0")
+local_path_override(module_name = "generated", path = "generated")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, "generated")
+use_repo(ext, "consumer")
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "root")\n')
+
+    await buck.build("@consumer//:from_override")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_inject_repo_is_ignored_under_ignore_dev_dependency(
     buck: Buck,
 ) -> None:
