@@ -231,6 +231,13 @@ Observed SDK result at the checkpoint:
   lookup keys. The sync bridge carries the active workspace identity, so
   materialization plumbing no longer reads injected `BzlmodSessionData`
   directly to find sibling spokes.
+- Extension repo file-ops spoke lookup now obtains its `WorkspaceId` from
+  `BzlmodExtensionAggregationsDataKey` and forms
+  `ExtensionSpokesByExtensionIdKey::for_workspace_id`; it no longer derives
+  spoke lookup identity from the project root. Focused coverage uses a
+  non-default output base to prove the injected identity is preserved, and the
+  full `slug_bzlmod`, `slug_external_cells`, and Plan 61 Python guardrails
+  passed after the change.
 - Extension spoke lookup keys now depend on `ExtensionBzlTransitiveDigestKey`
   before forming the `ExtensionSpokesKey`. The digest key still recomputes the
   transitional best-effort `.bzl` scanner every transaction, but successful
@@ -1086,6 +1093,9 @@ using Rust DICE keys and values:
    - `SEEDED_EXTENSIONS` and `SPOKE_REGISTRY` are removed as bzlmod semantic
      state. Continue moving generated repo cell registration and materialized
      output state into DICE-owned values.
+   - Runtime file-ops spoke lookup now uses the injected bzlmod workspace
+     identity instead of deriving one from the project root, but generated repo
+     cell registration itself remains process-global transitional plumbing.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 

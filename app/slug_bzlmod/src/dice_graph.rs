@@ -788,11 +788,15 @@ pub struct ExtensionSpokesByExtensionIdKey {
 }
 
 impl ExtensionSpokesByExtensionIdKey {
-    pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
+    pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
         Self {
-            workspace_id: WorkspaceId::for_project_root(project_root),
+            workspace_id,
             extension_id: Arc::from(extension_id),
         }
+    }
+
+    pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root), extension_id)
     }
 }
 

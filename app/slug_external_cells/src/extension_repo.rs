@@ -503,12 +503,12 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
 /// will still error out cleanly downstream if a needed cell is missing.
 async fn ensure_extension_spokes_registered(
     ctx: &mut DiceComputations<'_>,
+    workspace_id: &slug_bzlmod::WorkspaceId,
     extension_id: &str,
-    project_root_path: &std::path::Path,
     requesting_canonical_name: &str,
 ) -> slug_error::Result<Option<Arc<slug_bzlmod::ExtensionSpokesValue>>> {
-    let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_project_root(
-        project_root_path.to_path_buf(),
+    let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
+        workspace_id.clone(),
         extension_id,
     );
     let Some(spokes) = (match ctx.compute(&lookup_key).await {
@@ -559,6 +559,25 @@ async fn ensure_extension_spokes_registered(
     }
 
     Ok(Some(spokes))
+}
+
+async fn workspace_id_for_extension_spoke_lookup(
+    ctx: &mut DiceComputations<'_>,
+    requesting_canonical_name: &str,
+) -> slug_error::Result<slug_bzlmod::WorkspaceId> {
+    ctx.compute(&slug_bzlmod::BzlmodExtensionAggregationsDataKey)
+        .await
+        .map(|data| data.workspace_id.clone())
+        .map_err(|e| {
+            ExtensionRepoError::MaterializationFailed {
+                canonical_name: requesting_canonical_name.to_owned(),
+                reason: format!(
+                    "DICE error while reading bzlmod workspace identity: {}",
+                    diagnostic_summary(&e)
+                ),
+            }
+            .into()
+        })
 }
 
 fn extension_repo_cell_setup_from_spoke(
@@ -633,10 +652,12 @@ pub(crate) async fn get_file_ops_delegate(
     // it. Necessary on warm builds where `.slug_repo_complete` markers would
     // otherwise skip the materialization block below, leaving spoke lookups
     // unresolvable.
+    let extension_lookup_workspace_id =
+        workspace_id_for_extension_spoke_lookup(ctx, setup.canonical_name.as_ref()).await?;
     let registered_spokes = ensure_extension_spokes_registered(
         ctx,
+        &extension_lookup_workspace_id,
         &setup.extension_id,
-        &project_root_path,
         setup.canonical_name.as_ref(),
     )
     .await?;
@@ -818,8 +839,8 @@ pub(crate) async fn get_file_ops_delegate(
                 setup.extension_id
             );
 
-            let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_project_root(
-                project_root_path.clone(),
+            let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
+                extension_lookup_workspace_id.clone(),
                 &setup.extension_id,
             );
             let spokes = match ctx.compute(&lookup_key).await {
@@ -1160,6 +1181,44 @@ pub(crate) async fn copy_to_destination(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn extension_spoke_lookup_uses_injected_workspace_identity() -> slug_error::Result<()> {
+        let project_root = std::env::temp_dir().join(format!(
+            "slug-spoke-lookup-workspace-{}",
+            std::process::id()
+        ));
+        let output_base =
+            std::env::temp_dir().join(format!("slug-spoke-lookup-output-{}", std::process::id()));
+        let workspace_id = slug_bzlmod::WorkspaceId::new(project_root.clone(), output_base);
+        let injected = Arc::new(slug_bzlmod::BzlmodExtensionAggregationsDataValue {
+            workspace_id: workspace_id.clone(),
+            extension_aggregations: Arc::new(std::collections::HashMap::new()),
+            root_module_name: Arc::from("root"),
+        });
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            slug_bzlmod::BzlmodExtensionAggregationsDataKey,
+            injected,
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let actual = workspace_id_for_extension_spoke_lookup(&mut dice, "_main+ext+tool").await?;
+
+        assert_eq!(actual, workspace_id);
+        assert_ne!(
+            actual,
+            slug_bzlmod::WorkspaceId::for_project_root(project_root)
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn complete_marker_detection_requires_current_spec_hash_when_available() {
