@@ -508,6 +508,17 @@ Observed SDK result at the checkpoint:
   guardrails for repository repo-env, recorded env replay, warm replay, and
   mapped external load edit replay, and the full Plan 61 Python guardrail with
   70 tests.
+- Repository rule env reads now become explicit recorded inputs:
+  `repository_ctx.getenv()` records `ENV` entries in the materialization
+  sidecar, `repository_ctx.os.environ` records the current visible repo-env
+  snapshot, and `RepoMaterializationManifestKey` carries the command repo-env
+  needed to validate those sidecar entries. Validation passed with `cargo check
+  -p slug_bzlmod -p slug_interpreter_for_build -p slug_external_cells`, `cargo
+  test -p slug_bzlmod recorded_env -- --nocapture`, `cargo test -p
+  slug_interpreter_for_build test_repository_context_records_env_inputs --
+  --nocapture`, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p
+  slug_external_cells -- --nocapture`, `cargo build -p slug`, and focused Plan
+  61 repo-env/replay guardrails.
 
 ## Consolidated Learnings
 
@@ -585,8 +596,8 @@ What did not work or remains risky:
   eager-load fast path is keyed by the DICE-derived registration signature, but
   the final `DeclaredToolchainInfo` registry remains process-global output
   plumbing rather than a DICE value.
-- Repository-rule watched inputs are now captured in a sidecar, and root-file
-  plus recursive `watch_tree()` reads participate in same-daemon DICE
+- Repository-rule watched inputs are now captured in a sidecar, and root-file,
+  recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
   DICE-owned repository materialization manifest.
 - The external `+` repo fix only tightens the transitional literal-load scanner.

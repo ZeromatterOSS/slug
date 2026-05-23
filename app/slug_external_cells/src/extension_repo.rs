@@ -696,7 +696,7 @@ pub(crate) async fn get_file_ops_delegate(
             &source_path,
         );
     let is_stale_recorded_inputs = marker_contents.as_deref().is_some_and(is_complete_marker)
-        && !slug_bzlmod::repository_recorded_inputs_current(&source_path);
+        && !slug_bzlmod::repository_recorded_inputs_current(&source_path, Some(repo_env.as_ref()));
     if is_stale_non_complete_marker
         || is_stale_complete
         || is_stale_spec_unknown_complete

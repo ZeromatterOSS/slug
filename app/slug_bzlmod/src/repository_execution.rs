@@ -325,11 +325,12 @@ impl ExtensionRepoExecutionKey {
         let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
         let repo_spec = Arc::new(repo_spec);
         let materialization_manifest_key =
-            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest(
+            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest_and_repo_env(
                 project_root.clone(),
                 canonical_name.as_str(),
                 repo_spec.clone(),
                 spec_hash.clone(),
+                repo_env.clone(),
             );
         Self {
             canonical_name: Arc::from(canonical_name.as_str()),
@@ -368,11 +369,12 @@ impl ExtensionRepoExecutionKey {
     ) -> Self {
         let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
         let materialization_manifest_key =
-            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest(
+            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest_and_repo_env(
                 project_root.as_ref().clone(),
                 canonical_name.as_ref(),
                 repo_spec.clone(),
                 spec_hash.clone(),
+                repo_env.clone(),
             );
         Self {
             canonical_name,
@@ -419,19 +421,28 @@ fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
         .is_some_and(|output_digest| !output_digest.is_empty())
 }
 
-pub fn repository_recorded_inputs_current(repo_dir: &Path) -> bool {
-    repository_recorded_inputs_digest(repo_dir).is_ok()
+pub fn repository_recorded_inputs_current(
+    repo_dir: &Path,
+    repo_env: Option<&BTreeMap<String, String>>,
+) -> bool {
+    repository_recorded_inputs_digest(repo_dir, repo_env).is_ok()
 }
 
-fn repository_recorded_inputs_state(repo_dir: &Path) -> String {
-    match repository_recorded_inputs_digest(repo_dir) {
+fn repository_recorded_inputs_state(
+    repo_dir: &Path,
+    repo_env: Option<&BTreeMap<String, String>>,
+) -> String {
+    match repository_recorded_inputs_digest(repo_dir, repo_env) {
         Ok(None) => "inputs:none".to_owned(),
         Ok(Some(digest)) => format!("inputs:{digest}:valid"),
         Err(reason) => format!("inputs-invalid:{reason}"),
     }
 }
 
-fn repository_recorded_inputs_digest(repo_dir: &Path) -> Result<Option<String>, String> {
+fn repository_recorded_inputs_digest(
+    repo_dir: &Path,
+    repo_env: Option<&BTreeMap<String, String>>,
+) -> Result<Option<String>, String> {
     let manifest_path = repo_dir.join(REPO_RECORDED_INPUTS_FILE);
     if !manifest_path.exists() {
         return Ok(None);
@@ -443,7 +454,7 @@ fn repository_recorded_inputs_digest(repo_dir: &Path) -> Result<Option<String>, 
         .filter(|line| !line.trim().is_empty())
         .map(ToOwned::to_owned)
         .collect();
-    validate_recorded_inputs_current(&recorded_inputs, None, None, None)?;
+    validate_recorded_inputs_current(&recorded_inputs, None, repo_env, None)?;
     Ok(Some(compute_sha256_hex(content.as_bytes())))
 }
 
@@ -535,7 +546,8 @@ fn repo_materialization_manifest_for_key(
         }
         Err(e) => format!("layout-unclassifiable:{e}"),
     };
-    let recorded_inputs_state = repository_recorded_inputs_state(&repo_dir);
+    let recorded_inputs_state =
+        repository_recorded_inputs_state(&repo_dir, Some(key.repo_env.as_ref()));
 
     RepoMaterializationManifestValue::new(
         key.clone(),
@@ -1383,6 +1395,77 @@ mod tests {
 
         assert_ne!(valid_manifest.digest, stale_manifest.digest);
         assert_eq!(valid, stale);
+        assert!(
+            stale_manifest
+                .recorded_inputs_state
+                .contains("inputs-invalid:recorded_input_changed")
+        );
+    }
+
+    #[test]
+    fn test_recorded_env_input_manifest_uses_repo_env() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let repo_dir = project_root
+            .join("bazel-external")
+            .join("_main+ext+env_repo");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "stable").unwrap();
+
+        let repo_spec = RepoSpec::new("@@//:env_repo.bzl%env_repository".to_owned())
+            .with_attr("name".to_owned(), AttrValue::String("env_repo".to_owned()));
+        let mut first_env = BTreeMap::new();
+        first_env.insert("PLAN61_REPO_ENV".to_owned(), "first".to_owned());
+        let first = ExtensionRepoExecutionKey::new_with_repo_env(
+            "_main+ext+env_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec.clone(),
+            project_root.clone(),
+            Arc::new(first_env),
+        );
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&first.spec_hash, &output_digest),
+        )
+        .unwrap();
+        std::fs::write(
+            repo_dir.join(REPO_RECORDED_INPUTS_FILE),
+            format!(
+                "{}\n",
+                crate::lockfile::recorded_env_input("PLAN61_REPO_ENV", Some("first"))
+            ),
+        )
+        .unwrap();
+
+        let valid_manifest =
+            repo_materialization_manifest_for_key(&first.materialization_manifest_key);
+        assert!(valid_manifest.recorded_inputs_state.ends_with(":valid"));
+
+        let mut second_env = BTreeMap::new();
+        second_env.insert("PLAN61_REPO_ENV".to_owned(), "second".to_owned());
+        let stale = ExtensionRepoExecutionKey::new_with_repo_env(
+            "_main+ext+env_repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            repo_spec,
+            project_root,
+            Arc::new(second_env),
+        );
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&stale.spec_hash, &output_digest),
+        )
+        .unwrap();
+
+        let stale_manifest =
+            repo_materialization_manifest_for_key(&stale.materialization_manifest_key);
+        assert_ne!(valid_manifest.digest, stale_manifest.digest);
         assert!(
             stale_manifest
                 .recorded_inputs_state

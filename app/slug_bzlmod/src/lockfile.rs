@@ -316,6 +316,15 @@ pub fn recorded_dirtree_input(path: &Path) -> std::io::Result<String> {
     ))
 }
 
+/// Build a Bazel-style recorded ENV input marker for current repo-env state.
+pub fn recorded_env_input(name: &str, value: Option<&str>) -> String {
+    let input = format!("ENV:{name}");
+    let value = value
+        .map(escape_recorded_input_part)
+        .unwrap_or_else(|| "\\0".to_owned());
+    format!("{} {}", escape_recorded_input_part(&input), value)
+}
+
 /// Validate recorded inputs against current filesystem/env/repo-mapping state.
 pub fn validate_recorded_inputs_current(
     recorded_inputs: &[String],

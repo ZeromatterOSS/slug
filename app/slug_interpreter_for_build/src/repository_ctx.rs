@@ -785,6 +785,21 @@ impl RepositoryContext {
         self.record_watch_input(RepositoryWatchInput::DirTree(path.to_path_buf()))
     }
 
+    fn record_env_input(&self, name: &str) -> starlark::Result<()> {
+        let recorded = slug_bzlmod::lockfile::recorded_env_input(
+            name,
+            self.repo_env.get(name).map(String::as_str),
+        );
+        self.record_input(recorded)
+    }
+
+    fn record_all_repo_env_inputs(&self) -> starlark::Result<()> {
+        for name in self.repo_env.keys() {
+            self.record_env_input(name)?;
+        }
+        Ok(())
+    }
+
     fn record_input(&self, recorded: String) -> starlark::Result<()> {
         let mut inputs = self.recorded_inputs.lock().map_err(|_| {
             starlark::Error::from(slug_error::slug_error!(
@@ -2782,6 +2797,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(default = NoneOr::None)] default: NoneOr<&str>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
+        this.record_env_input(name)?;
         match this.repo_env().get(name) {
             Some(v) => Ok(heap.alloc(v)),
             None => match default.into_option() {
@@ -2856,7 +2872,12 @@ impl<'v> StarlarkValue<'v> for RepositoryContext {
             "name" => Some(heap.alloc(&self.name as &str)),
             "original_name" => Some(heap.alloc(&self.original_name as &str)),
             "attr" => Some(heap.alloc(self.attr.clone())),
-            "os" => Some(heap.alloc(RepositoryOs::new_with_environ(self.repo_env.clone()))),
+            "os" => {
+                if let Err(e) = self.record_all_repo_env_inputs() {
+                    tracing::warn!("Failed to record repository_ctx.os.environ inputs: {e}");
+                }
+                Some(heap.alloc(RepositoryOs::new_with_environ(self.repo_env.clone())))
+            }
             "workspace_root" => Some(heap.alloc(RepositoryPath::with_base_dir(
                 self.workspace_root.to_string_lossy().to_string(),
                 self.workspace_root.clone(),
@@ -2945,6 +2966,21 @@ mod tests {
         let ctx = RepositoryContext::stub("test_repo").with_repo_env(Arc::new(repo_env.clone()));
 
         assert_eq!(ctx.repo_env(), &repo_env);
+    }
+
+    #[test]
+    fn test_repository_context_records_env_inputs() {
+        let mut repo_env = BTreeMap::new();
+        repo_env.insert("PLAN61_REPO_ENV".to_owned(), "from-context".to_owned());
+
+        let ctx = RepositoryContext::stub("test_repo").with_repo_env(Arc::new(repo_env));
+
+        ctx.record_env_input("PLAN61_REPO_ENV").unwrap();
+        ctx.record_env_input("PLAN61_REPO_ENV_MISSING").unwrap();
+
+        let inputs = ctx.recorded_inputs().unwrap();
+        assert!(inputs.contains(&"ENV:PLAN61_REPO_ENV from-context".to_owned()));
+        assert!(inputs.contains(&"ENV:PLAN61_REPO_ENV_MISSING \\0".to_owned()));
     }
 
     #[test]
