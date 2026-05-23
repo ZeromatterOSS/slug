@@ -252,7 +252,6 @@ pub struct BzlmodSessionData {
     pub registered_execution_platforms: Vec<String>,
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
     pub root_module_name: String,
-    pub project_root: PathBuf,
     pub hidden_lockfile_path: Option<PathBuf>,
     pub visible_lockfile_digest: Option<String>,
     pub hidden_lockfile_digest: Option<String>,
@@ -269,7 +268,6 @@ pub struct BzlmodSessionData {
 impl BzlmodSessionData {
     pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
         Self {
-            project_root: workspace_id.canonical_project_root.as_ref().clone(),
             workspace_id,
             module_versions: HashMap::new(),
             registered_toolchains: Vec::new(),

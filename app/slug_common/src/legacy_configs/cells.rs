@@ -3652,7 +3652,6 @@ impl BuckConfigBasedCells {
         // extension repos are lazily executed inside DICE.
         bzlmod_session_data.extension_aggregations = aggregated;
         bzlmod_session_data.root_module_name = root_module_name.to_owned();
-        bzlmod_session_data.project_root = project_root.root().to_path_buf();
         bzlmod_session_data.hidden_lockfile_path = hidden_lockfile_path;
         bzlmod_session_data.visible_lockfile_digest = visible_lockfile_digest;
         bzlmod_session_data.hidden_lockfile_digest = hidden_lockfile_digest;
