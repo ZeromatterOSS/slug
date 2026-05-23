@@ -49,11 +49,12 @@ use starlark::syntax::Dialect;
 use starlark_syntax::syntax::ast::AstStmt;
 use starlark_syntax::syntax::ast::StmtP;
 
+use crate::BzlmodExtensionAggregationsDataValue;
 use crate::BzlmodExtensionReplayDataValue;
-use crate::BzlmodExtensionSessionData;
 use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
 use crate::dice_graph::BzlmodExtensionReplayDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataValue;
@@ -98,28 +99,32 @@ fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) ->
 /// Look up the aggregated extension data and create a `ModuleExtensionExecutionKey`.
 ///
 /// Returns `None` if the extension is not found in the current command's
-/// DICE-injected bzlmod session data.
+/// DICE-injected bzlmod extension aggregations.
 pub fn create_extension_execution_key(
-    data: &BzlmodExtensionSessionData,
+    aggregations: &BzlmodExtensionAggregationsDataValue,
     replay_data: &BzlmodExtensionReplayDataValue,
     repo_mappings: &BzlmodRepoMappingsDataValue,
     extension_id: &str,
 ) -> Option<ModuleExtensionExecutionKey> {
-    let aggregated = match data.extension_aggregations.get(extension_id) {
+    let aggregated = match aggregations.extension_aggregations.get(extension_id) {
         Some(a) => a,
         None => {
             tracing::warn!(
                 "create_extension_execution_key: extension '{}' not found in aggregations. Available: {}",
                 extension_id,
-                extension_ids_summary(data.extension_aggregations.keys())
+                extension_ids_summary(aggregations.extension_aggregations.keys())
             );
             return None;
         }
     };
     Some(ModuleExtensionExecutionKey::new_with_tracked_lockfiles(
         aggregated.clone(),
-        data.root_module_name.clone(),
-        data.project_root.clone(),
+        aggregations.root_module_name.to_string(),
+        aggregations
+            .workspace_id
+            .canonical_project_root
+            .as_ref()
+            .clone(),
         replay_data.hidden_lockfile_path.clone(),
         replay_data.visible_lockfile_digest.clone(),
         replay_data.hidden_lockfile_digest.clone(),
@@ -133,21 +138,22 @@ pub fn create_extension_execution_key(
 }
 
 pub fn extension_spokes_key_for_extension_id(
-    data: &BzlmodExtensionSessionData,
+    aggregations: &BzlmodExtensionAggregationsDataValue,
     repo_mappings: &BzlmodRepoMappingsDataValue,
     extension_id: &str,
 ) -> Option<ExtensionSpokesKey> {
-    data.extension_aggregations
+    aggregations
+        .extension_aggregations
         .contains_key(extension_id)
         .then(|| {
             let bzl_transitive_digest =
                 compute_bzl_transitive_digest_for_project_with_repo_mappings(
                     extension_id,
-                    &data.project_root,
+                    aggregations.workspace_id.canonical_project_root.as_path(),
                     Some(repo_mappings.repo_mappings.as_ref()),
                 );
             ExtensionSpokesKey::for_workspace_id_with_digest(
-                repo_mappings.workspace_id.clone(),
+                aggregations.workspace_id.clone(),
                 extension_id,
                 &bzl_transitive_digest,
             )
@@ -155,19 +161,19 @@ pub fn extension_spokes_key_for_extension_id(
 }
 
 pub fn extension_spokes_key_for_canonical_repo(
-    data: &BzlmodExtensionSessionData,
+    aggregations: &BzlmodExtensionAggregationsDataValue,
     repo_mappings: &BzlmodRepoMappingsDataValue,
     canonical_name: &str,
 ) -> Option<ExtensionSpokesKey> {
     let (owner_module, extension_name, _) = crate::parse_canonical_name(canonical_name)?;
-    let mut matches = data
+    let mut matches = aggregations
         .extension_aggregations
         .iter()
         .filter_map(|(extension_id, aggregation)| {
             if aggregation.extension_name != extension_name {
                 return None;
             }
-            let owner = extract_owning_module(extension_id, &data.root_module_name);
+            let owner = extract_owning_module(extension_id, aggregations.root_module_name.as_ref());
             owning_module_matches(owner_module, &owner).then_some(extension_id.as_str())
         })
         .collect::<Vec<_>>();
@@ -181,7 +187,7 @@ pub fn extension_spokes_key_for_canonical_repo(
         );
     }
     matches.first().and_then(|extension_id| {
-        extension_spokes_key_for_extension_id(data, repo_mappings, extension_id)
+        extension_spokes_key_for_extension_id(aggregations, repo_mappings, extension_id)
     })
 }
 
@@ -207,6 +213,26 @@ fn ensure_repo_mappings_workspace(
             subject,
             workspace_id.canonical_project_root.display(),
             repo_mappings.workspace_id.canonical_project_root.display()
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_extension_aggregations_workspace(
+    workspace_id: &crate::WorkspaceId,
+    aggregations: &BzlmodExtensionAggregationsDataValue,
+    key_name: &str,
+    subject: &str,
+) -> slug_error::Result<()> {
+    if &aggregations.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} for '{}' was computed with project root '{}', \
+             but current bzlmod extension aggregation root is '{}'",
+            key_name,
+            subject,
+            workspace_id.canonical_project_root.display(),
+            aggregations.workspace_id.canonical_project_root.display()
         ));
     }
     Ok(())
@@ -241,19 +267,15 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
+        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
         let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        if session_data.project_root != *self.workspace_id.canonical_project_root {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "ExtensionSpokesByExtensionIdKey for '{}' was computed with project root '{}', \
-                 but current bzlmod session root is '{}'",
-                self.extension_id,
-                self.workspace_id.canonical_project_root.display(),
-                session_data.project_root.display()
-            ));
-        }
+        ensure_extension_aggregations_workspace(
+            &self.workspace_id,
+            aggregations.as_ref(),
+            "ExtensionSpokesByExtensionIdKey",
+            &self.extension_id,
+        )?;
         ensure_repo_mappings_workspace(
             &self.workspace_id,
             repo_mappings.as_ref(),
@@ -267,7 +289,7 @@ impl Key for ExtensionSpokesByExtensionIdKey {
             &self.extension_id,
         )?;
         let Some(spokes_key) = extension_spokes_key_for_extension_id(
-            &session_data,
+            aggregations.as_ref(),
             repo_mappings.as_ref(),
             &self.extension_id,
         ) else {
@@ -307,19 +329,15 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
+        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
         let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        if session_data.project_root != *self.workspace_id.canonical_project_root {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "ExtensionSpokesByCanonicalRepoKey for '{}' was computed with project root '{}', \
-                 but current bzlmod session root is '{}'",
-                self.canonical_name,
-                self.workspace_id.canonical_project_root.display(),
-                session_data.project_root.display()
-            ));
-        }
+        ensure_extension_aggregations_workspace(
+            &self.workspace_id,
+            aggregations.as_ref(),
+            "ExtensionSpokesByCanonicalRepoKey",
+            &self.canonical_name,
+        )?;
         ensure_repo_mappings_workspace(
             &self.workspace_id,
             repo_mappings.as_ref(),
@@ -333,7 +351,7 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
             &self.canonical_name,
         )?;
         let Some(spokes_key) = extension_spokes_key_for_canonical_repo(
-            &session_data,
+            aggregations.as_ref(),
             repo_mappings.as_ref(),
             &self.canonical_name,
         ) else {
@@ -373,19 +391,15 @@ impl Key for ExtensionSpokesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
+        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
         let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        if session_data.project_root != *self.workspace_id.canonical_project_root {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "ExtensionSpokesKey for '{}' was computed with project root '{}', \
-                 but current bzlmod session root is '{}'",
-                self.extension_id,
-                self.workspace_id.canonical_project_root.display(),
-                session_data.project_root.display()
-            ));
-        }
+        ensure_extension_aggregations_workspace(
+            &self.workspace_id,
+            aggregations.as_ref(),
+            "ExtensionSpokesKey",
+            &self.extension_id,
+        )?;
         ensure_repo_mappings_workspace(
             &self.workspace_id,
             repo_mappings.as_ref(),
@@ -399,7 +413,7 @@ impl Key for ExtensionSpokesKey {
             &self.extension_id,
         )?;
         let Some(mut extension_key) = create_extension_execution_key(
-            &session_data,
+            aggregations.as_ref(),
             replay_data.as_ref(),
             repo_mappings.as_ref(),
             &self.extension_id,
@@ -1890,18 +1904,20 @@ mod tests {
 
     #[test]
     fn extension_spokes_key_for_canonical_repo_matches_owner_module() {
-        use crate::BzlmodExtensionSessionData;
+        use crate::BzlmodExtensionAggregationsDataValue;
         use crate::BzlmodRepoMappingsDataValue;
         use crate::WorkspaceId;
         use crate::extensions::AggregatedExtension;
 
-        let mut data = BzlmodExtensionSessionData {
-            root_module_name: "root".to_owned(),
-            project_root: PathBuf::from("/tmp/slug-plan61-spokes"),
-            ..Default::default()
+        let project_root = PathBuf::from("/tmp/slug-plan61-spokes");
+        let workspace_id = WorkspaceId::for_project_root(project_root);
+        let mut data = BzlmodExtensionAggregationsDataValue {
+            workspace_id: workspace_id.clone(),
+            extension_aggregations: Arc::new(std::collections::HashMap::new()),
+            root_module_name: Arc::from("root"),
         };
         let repo_mappings = BzlmodRepoMappingsDataValue {
-            workspace_id: WorkspaceId::for_project_root(data.project_root.clone()),
+            workspace_id,
             repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
             repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
         };
@@ -1909,9 +1925,11 @@ mod tests {
         root_ext.extension_id = "@root//:ext.bzl%ext".to_owned();
         let mut dep_ext = AggregatedExtension::new("@dep//:ext.bzl", "ext");
         dep_ext.extension_id = "@dep//:ext.bzl%ext".to_owned();
-        data.extension_aggregations
+        Arc::get_mut(&mut data.extension_aggregations)
+            .unwrap()
             .insert(root_ext.extension_id.clone(), root_ext);
-        data.extension_aggregations
+        Arc::get_mut(&mut data.extension_aggregations)
+            .unwrap()
             .insert(dep_ext.extension_id.clone(), dep_ext);
 
         let dep_key =
@@ -1927,8 +1945,8 @@ mod tests {
 
     #[test]
     fn create_extension_execution_key_uses_replay_data() {
+        use crate::BzlmodExtensionAggregationsDataValue;
         use crate::BzlmodExtensionReplayDataValue;
-        use crate::BzlmodExtensionSessionData;
         use crate::BzlmodRepoMappingsDataValue;
         use crate::WorkspaceId;
         use crate::extensions::AggregatedExtension;
@@ -1937,18 +1955,20 @@ mod tests {
         let hidden_lockfile_path = project_root.join("buck-out/v2/MODULE.bazel.lock");
         let mut repo_env = BTreeMap::new();
         repo_env.insert("TOKEN".to_owned(), "from-replay-data".to_owned());
-        let mut data = BzlmodExtensionSessionData {
-            root_module_name: "root".to_owned(),
-            project_root: project_root.clone(),
-            ..Default::default()
+        let workspace_id = WorkspaceId::for_project_root(project_root.clone());
+        let mut data = BzlmodExtensionAggregationsDataValue {
+            workspace_id: workspace_id.clone(),
+            extension_aggregations: Arc::new(std::collections::HashMap::new()),
+            root_module_name: Arc::from("root"),
         };
         let mut aggregated = AggregatedExtension::new("@root//:ext.bzl", "ext");
         aggregated.extension_id = "@root//:ext.bzl%ext".to_owned();
         let extension_id = aggregated.extension_id.clone();
-        data.extension_aggregations
+        Arc::get_mut(&mut data.extension_aggregations)
+            .unwrap()
             .insert(extension_id.clone(), aggregated);
         let replay_data = BzlmodExtensionReplayDataValue {
-            workspace_id: WorkspaceId::for_project_root(project_root.clone()),
+            workspace_id: workspace_id.clone(),
             hidden_lockfile_path: Some(hidden_lockfile_path.clone()),
             visible_lockfile_digest: Some("visible-digest".to_owned()),
             hidden_lockfile_digest: Some("hidden-digest".to_owned()),
@@ -1958,7 +1978,7 @@ mod tests {
             repo_env: Arc::new(repo_env.clone()),
         };
         let repo_mappings = BzlmodRepoMappingsDataValue {
-            workspace_id: WorkspaceId::for_project_root(project_root),
+            workspace_id,
             repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
             repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
         };

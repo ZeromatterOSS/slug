@@ -237,21 +237,19 @@ Observed SDK result at the checkpoint:
   still transitional producers over the injected session graph, but analysis
   and execution-platform selection now depend on named DICE values.
 - Extension replay and generated-repo spoke lookup now read
-  `BzlmodExtensionSessionDataKey` instead of the whole
-  `BzlmodSessionDataKey`. The narrower injected value carries extension
-  aggregations, root module name, and project root, but
-  extension consumers no longer depend on unrelated
-  registered toolchain/platform, module-version, repo-mapping, or replay-input
-  session fields.
+  `BzlmodExtensionAggregationsDataKey`. The narrower injected value carries
+  extension aggregations, root module name, and workspace identity.
+  `BzlmodExtensionSessionDataKey` was removed, so extension consumers no longer
+  depend on unrelated registered toolchain/platform, module-version,
+  repo-mapping, or replay-input session fields.
 - Extension repo mappings and root override rows now read through
   `BzlmodRepoMappingsDataKey`. Extension replay and generated-repo spoke lookup
   still use a transitional injected value produced by the legacy resolver, but
-  repo mapping state is no longer bundled into `BzlmodExtensionSessionData`.
+  repo mapping state is no longer bundled with extension aggregation state.
 - Extension replay inputs now read through `BzlmodExtensionReplayDataKey`.
-  Extension replay and generated-repo spoke lookup still use transitional
-  injected data, but lockfile paths, tracked visible/hidden lockfile contents
-  and digests, lockfile mode, and command repo env are no longer bundled into
-  `BzlmodExtensionSessionData`.
+  Lockfile paths, tracked visible/hidden lockfile contents and digests,
+  lockfile mode, and command repo env are no longer bundled with extension
+  aggregation state.
 - Interpreter module-version lookup now reads `ModuleVersionsKey` instead of
   directly reading injected `BzlmodSessionData`. This is still a transitional
   producer over the injected session graph, but the Starlark interpreter adapter
@@ -597,6 +595,12 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, focused Plan 61 Python guardrails for visible/hidden
   lockfiles, repo env, missing-lockfile warm reuse, mapped external loads, and
   recorded repo mappings, and the full Plan 61 Python guardrail with 70 tests.
+- Extension aggregation split validation passed with `cargo fmt --check`,
+  `git diff --check`, `cargo check -p slug_bzlmod -p slug_external_cells -p
+  slug_interpreter_for_build`, `cargo test -p slug_bzlmod -- --nocapture`,
+  `cargo build -p slug`, focused Plan 61 Python guardrails for visible/hidden
+  lockfiles, repo env, missing-lockfile warm reuse, mapped external loads, and
+  recorded repo mappings, and the full Plan 61 Python guardrail with 70 tests.
 
 ## Consolidated Learnings
 
@@ -632,12 +636,12 @@ What did not work or remains risky:
 - A single transitional `LegacyBzlmodResolutionDiceKey` still wraps the legacy
   resolver. Its command-policy identity now comes from a DICE key, but the
   wrapped resolver is still not a Skyframe-shaped module graph.
-- The resolved graph, repo mappings, cell graph, and registered toolchain and
-  execution platform facts are still assembled during legacy cell setup, then
-  injected as transitional command data. Registered toolchain/platform
-  consumers, extension aggregation consumers, extension replay-input consumers,
-  repo-mapping consumers, and module-version consumers now read narrower
-  injected DICE values. The module-version value still carries a
+- The resolved graph, repo-mapping snapshots, cell graph, and registered
+  toolchain and execution platform facts are still assembled during legacy
+  cell setup, then injected as transitional command data. Registered
+  toolchain/platform consumers, extension aggregation consumers, extension
+  replay-input consumers, repo-mapping consumers, and module-version consumers
+  now read narrower injected DICE values. The module-version value still carries a
   conservative session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
@@ -663,8 +667,8 @@ What did not work or remains risky:
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity,
-  reads narrower extension-session, repo-mapping, and replay-input values, and
-  uses DICE spoke repo-env where available, but generated repo cells and
+  reads narrower extension-aggregation, repo-mapping, and replay-input values,
+  and uses DICE spoke repo-env where available, but generated repo cells and
   dynamic alias registration still flow through transitional runtime
   cell-registration plumbing rather than a final DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but

@@ -64,6 +64,8 @@ pub use dice_graph::BzlmodCommandPolicyKey;
 pub use dice_graph::BzlmodCommandPolicyValue;
 pub use dice_graph::BzlmodEventCounters;
 pub use dice_graph::BzlmodEventKind;
+pub use dice_graph::BzlmodExtensionAggregationsDataKey;
+pub use dice_graph::BzlmodExtensionAggregationsDataValue;
 pub use dice_graph::BzlmodExtensionReplayDataKey;
 pub use dice_graph::BzlmodExtensionReplayDataValue;
 pub use dice_graph::BzlmodModuleVersionsDataKey;
@@ -112,7 +114,6 @@ pub use dice_graph::bzlmod_event_counters;
 pub use dice_graph::module_file_inputs_digest;
 pub use dice_graph::record_bzlmod_event;
 pub use dice_graph::repo_env_policy_digest;
-use dupe::Dupe;
 pub use extension_execution_dice::ModuleExtensionError;
 pub use extension_execution_dice::ModuleExtensionExecutionKey;
 pub use extension_execution_dice::ModuleExtensionResult;
@@ -259,49 +260,6 @@ pub struct BzlmodSessionData {
     pub repo_mapping_overrides: RepoMappingOverrides,
 }
 
-/// Extension-specific transitional session data.
-///
-/// This is still injected from the legacy bzlmod resolver, but it narrows
-/// extension replay/materialization consumers away from unrelated session and
-/// replay-input fields.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Allocative)]
-pub struct BzlmodExtensionSessionData {
-    pub extension_aggregations: HashMap<String, AggregatedExtension>,
-    pub root_module_name: String,
-    pub project_root: PathBuf,
-}
-
-impl From<&BzlmodSessionData> for BzlmodExtensionSessionData {
-    fn from(data: &BzlmodSessionData) -> Self {
-        Self {
-            extension_aggregations: data.extension_aggregations.clone(),
-            root_module_name: data.root_module_name.clone(),
-            project_root: data.project_root.clone(),
-        }
-    }
-}
-
-#[derive(
-    derive_more::Display,
-    Debug,
-    Hash,
-    Eq,
-    Clone,
-    Dupe,
-    PartialEq,
-    Allocative
-)]
-#[display("BzlmodExtensionSessionDataKey")]
-pub struct BzlmodExtensionSessionDataKey;
-
-impl dice::InjectedKey for BzlmodExtensionSessionDataKey {
-    type Value = Arc<BzlmodExtensionSessionData>;
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x == y
-    }
-}
-
 pub trait SetBzlmodSessionData {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()>;
 }
@@ -342,7 +300,11 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             lockfile_mode: data.lockfile_mode,
             repo_env: Arc::new(data.repo_env.clone()),
         });
-        let extension_session = Arc::new(BzlmodExtensionSessionData::from(&data));
+        let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
+            workspace_id: workspace_id.clone(),
+            extension_aggregations: Arc::new(data.extension_aggregations.clone()),
+            root_module_name: Arc::from(data.root_module_name.as_str()),
+        });
         let registered_toolchains = Arc::new(RegisteredToolchainsValue {
             workspace_id: workspace_id.clone(),
             registered_toolchains: data.registered_toolchains.clone(),
@@ -362,7 +324,10 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         )])?;
         self.changed_to(vec![(BzlmodRepoMappingsDataKey, repo_mappings)])?;
         self.changed_to(vec![(BzlmodExtensionReplayDataKey, extension_replay_data)])?;
-        self.changed_to(vec![(BzlmodExtensionSessionDataKey, extension_session)])?;
+        self.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            extension_aggregations,
+        )])?;
         Ok(())
     }
 }

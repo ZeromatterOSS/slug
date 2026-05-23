@@ -34,6 +34,7 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 
+use crate::extensions::AggregatedExtension;
 use crate::lockfile::Lockfile;
 use crate::parser::ModuleFileInputDigest;
 use crate::repo_spec::RepoSpec;
@@ -341,6 +342,13 @@ pub struct BzlmodRepoMappingsDataValue {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodExtensionAggregationsDataValue {
+    pub workspace_id: WorkspaceId,
+    pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
+    pub root_module_name: Arc<str>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionReplayDataValue {
     pub workspace_id: WorkspaceId,
     pub hidden_lockfile_path: Option<PathBuf>,
@@ -367,6 +375,27 @@ pub struct BzlmodExtensionReplayDataKey;
 
 impl dice::InjectedKey for BzlmodExtensionReplayDataKey {
     type Value = Arc<BzlmodExtensionReplayDataValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodExtensionAggregationsDataKey")]
+pub struct BzlmodExtensionAggregationsDataKey;
+
+impl dice::InjectedKey for BzlmodExtensionAggregationsDataKey {
+    type Value = Arc<BzlmodExtensionAggregationsDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
