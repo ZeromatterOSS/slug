@@ -144,6 +144,19 @@ thread_local! {
         const { RefCell::new(None) };
 }
 
+struct RepoSpecRegistryScope {
+    previous: Option<RepoSpecRegistry>,
+}
+
+impl Drop for RepoSpecRegistryScope {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        REPO_SPEC_REGISTRY.with(|cell| {
+            *cell.borrow_mut() = previous;
+        });
+    }
+}
+
 /// Set up a RepoSpec registry for extension execution.
 ///
 /// This function establishes the extension execution context. While active,
@@ -152,18 +165,14 @@ thread_local! {
 ///
 /// Returns a tuple of (result, captured_specs).
 pub fn with_repo_spec_registry<R>(f: impl FnOnce() -> R) -> (R, FxHashMap<String, RepoSpec>) {
-    REPO_SPEC_REGISTRY.with(|cell| {
-        *cell.borrow_mut() = Some(RepoSpecRegistry::new());
-    });
+    let previous = REPO_SPEC_REGISTRY.with(|cell| cell.borrow_mut().take());
+    let _scope = RepoSpecRegistryScope { previous };
+    REPO_SPEC_REGISTRY.with(|cell| *cell.borrow_mut() = Some(RepoSpecRegistry::new()));
 
     let result = f();
 
     let specs = REPO_SPEC_REGISTRY
         .with(|cell| cell.borrow().as_ref().map(|r| r.take()).unwrap_or_default());
-
-    REPO_SPEC_REGISTRY.with(|cell| {
-        *cell.borrow_mut() = None;
-    });
 
     (result, specs)
 }
@@ -304,23 +313,39 @@ mod tests {
 
     #[test]
     fn test_nested_contexts() {
-        // Test that nested contexts work correctly (inner overwrites outer)
         let (_, outer_specs) = with_repo_spec_registry(|| {
             record_repo_spec("outer".to_owned(), RepoSpec::new("outer_rule".to_owned()));
 
-            // Nested context
             let (_, inner_specs) = with_repo_spec_registry(|| {
                 record_repo_spec("inner".to_owned(), RepoSpec::new("inner_rule".to_owned()));
             });
 
-            // Inner specs should be collected
             assert_eq!(inner_specs.len(), 1);
             assert!(inner_specs.contains_key("inner"));
+
+            assert!(in_extension_context());
+            record_repo_spec(
+                "outer_after_inner".to_owned(),
+                RepoSpec::new("outer_after_inner_rule".to_owned()),
+            );
         });
 
-        // Outer specs should only contain what was recorded before nesting
-        // Note: Due to how the thread-local works, the nested context clears the registry
-        // This is expected behavior - extensions shouldn't nest
-        assert_eq!(outer_specs.len(), 0);
+        assert_eq!(outer_specs.len(), 2);
+        assert!(outer_specs.contains_key("outer"));
+        assert!(outer_specs.contains_key("outer_after_inner"));
+        assert!(!in_extension_context());
+    }
+
+    #[test]
+    fn registry_scope_restores_context_after_panic() {
+        let panic_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            with_repo_spec_registry(|| {
+                assert!(in_extension_context());
+                record_repo_spec("panic".to_owned(), RepoSpec::new("panic_rule".to_owned()));
+                panic!("forced repo spec registry panic");
+            });
+        }));
+        assert!(panic_result.is_err());
+        assert!(!in_extension_context());
     }
 }

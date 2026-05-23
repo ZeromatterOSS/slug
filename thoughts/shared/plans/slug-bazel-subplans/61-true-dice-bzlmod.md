@@ -747,6 +747,14 @@ Observed SDK result at the checkpoint:
   formed extension execution/spoke keys directly from injected
   session-shaped data were removed from the crate API; production lookup now
   goes through the DICE keys.
+- Extension repo-spec capture registry scope validation passed with `cargo
+  test -p slug_bzlmod repo_spec -- --nocapture`, full `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61
+  Python replay subset, the full Plan 61 Python guardrail with 72 tests,
+  `cargo fmt --check`, and `git diff --check`. The thread-local RepoSpec
+  capture registry now restores the previous scope on drop, so nested or
+  unwinding extension-evaluation plumbing cannot silently erase or leak the
+  surrounding capture context.
 
 ## Consolidated Learnings
 
@@ -834,7 +842,9 @@ What did not work or remains risky:
   that remaining cell-graph ownership gap.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
-  assembled by the transitional legacy cell parser.
+  assembled by the transitional legacy cell parser. Extension repo-spec
+  capture remains thread-local plumbing, but the capture scope now restores
+  previous state on drop instead of clearing ambient state unconditionally.
 - Known-spec extension repo file-ops access now routes through the DICE
   repository execution/materialization manifest key, but
   `RepoMaterializationManifestKey` still relies on polling marker/layout and
