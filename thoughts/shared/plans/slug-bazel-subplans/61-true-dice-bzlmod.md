@@ -519,6 +519,16 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p
   slug_external_cells -- --nocapture`, `cargo build -p slug`, and focused Plan
   61 repo-env/replay guardrails.
+- Registered toolchain and execution-platform facts now have their own
+  injected DICE values. `RegisteredToolchainsKey` and
+  `RegisteredExecutionPlatformsKey` no longer compute the whole
+  `BzlmodSessionDataKey`; `ModuleVersionsKey` intentionally remains on the
+  wider injected session with value cutoffs disabled because narrowing it
+  prematurely regressed hidden-lockfile fact invalidation. Validation passed
+  with `cargo check -p slug_bzlmod -p slug_analysis -p slug_configured`,
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo build -p slug`, the
+  focused hidden-lockfile facts guardrail, and the full Plan 61 Python
+  guardrail with 70 tests.
 
 ## Consolidated Learnings
 
@@ -556,9 +566,10 @@ What did not work or remains risky:
   wrapped resolver is still not a Skyframe-shaped module graph.
 - The resolved graph, repo mappings, cell graph, and registered toolchain and
   execution platform facts are still assembled during legacy cell setup, then
-  injected as `BzlmodSessionData`. Module-version and toolchain/platform
-  consumers now go through DICE keys, but those keys still source their values
-  from the injected transitional session.
+  injected as transitional command data. Registered toolchain/platform
+  consumers now read narrower injected DICE values, but module-version consumers
+  intentionally still source their values from the injected session until the
+  remaining interpreter/materialization inputs are explicit.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.
@@ -592,10 +603,10 @@ What did not work or remains risky:
   transitional, but repo-env itself no longer comes from the interpreter
   build-config adapter or a materialization-time injected-session lookup at
   runtime.
-- Registered toolchain facts now reach analysis through a DICE key and the
-  eager-load fast path is keyed by the DICE-derived registration signature, but
-  the final `DeclaredToolchainInfo` registry remains process-global output
-  plumbing rather than a DICE value.
+- Registered toolchain and execution-platform facts now reach analysis through
+  narrower DICE values, and the eager-load fast path is keyed by the
+  DICE-derived registration signature, but the final `DeclaredToolchainInfo`
+  registry remains process-global output plumbing rather than a DICE value.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final

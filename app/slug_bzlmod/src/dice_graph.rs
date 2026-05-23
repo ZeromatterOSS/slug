@@ -30,6 +30,7 @@ use derive_more::Display;
 use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
+use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 
@@ -370,6 +371,27 @@ pub struct RegisteredToolchainsValue {
     pub registered_toolchains: Vec<crate::RegisteredToolchain>,
 }
 
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodRegisteredToolchainsDataKey")]
+pub struct BzlmodRegisteredToolchainsDataKey;
+
+impl dice::InjectedKey for BzlmodRegisteredToolchainsDataKey {
+    type Value = Arc<RegisteredToolchainsValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[async_trait]
 impl Key for RegisteredToolchainsKey {
     type Value = slug_error::Result<Arc<RegisteredToolchainsValue>>;
@@ -379,20 +401,17 @@ impl Key for RegisteredToolchainsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
-        if session_data.project_root != *self.workspace_id.canonical_project_root {
+        let value = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
+        if value.workspace_id != self.workspace_id {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
                 "RegisteredToolchainsKey was computed with project root '{}', \
-                 but current bzlmod session root is '{}'",
+                 but current bzlmod registered-toolchain root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
-                session_data.project_root.display()
+                value.workspace_id.canonical_project_root.display()
             ));
         }
-        Ok(Arc::new(RegisteredToolchainsValue {
-            workspace_id: self.workspace_id.clone(),
-            registered_toolchains: session_data.registered_toolchains.clone(),
-        }))
+        Ok(value)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -429,6 +448,27 @@ pub struct RegisteredExecutionPlatformsValue {
     pub registered_execution_platforms: Vec<String>,
 }
 
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodRegisteredExecutionPlatformsDataKey")]
+pub struct BzlmodRegisteredExecutionPlatformsDataKey;
+
+impl dice::InjectedKey for BzlmodRegisteredExecutionPlatformsDataKey {
+    type Value = Arc<RegisteredExecutionPlatformsValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[async_trait]
 impl Key for RegisteredExecutionPlatformsKey {
     type Value = slug_error::Result<Arc<RegisteredExecutionPlatformsValue>>;
@@ -438,20 +478,19 @@ impl Key for RegisteredExecutionPlatformsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let session_data = ctx.compute(&crate::BzlmodSessionDataKey).await?;
-        if session_data.project_root != *self.workspace_id.canonical_project_root {
+        let value = ctx
+            .compute(&BzlmodRegisteredExecutionPlatformsDataKey)
+            .await?;
+        if value.workspace_id != self.workspace_id {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
                 "RegisteredExecutionPlatformsKey was computed with project root '{}', \
-                 but current bzlmod session root is '{}'",
+                 but current bzlmod execution-platform root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
-                session_data.project_root.display()
+                value.workspace_id.canonical_project_root.display()
             ));
         }
-        Ok(Arc::new(RegisteredExecutionPlatformsValue {
-            workspace_id: self.workspace_id.clone(),
-            registered_execution_platforms: session_data.registered_execution_platforms.clone(),
-        }))
+        Ok(value)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

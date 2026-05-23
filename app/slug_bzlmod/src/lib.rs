@@ -64,6 +64,8 @@ pub use dice_graph::BzlmodCommandPolicyKey;
 pub use dice_graph::BzlmodCommandPolicyValue;
 pub use dice_graph::BzlmodEventCounters;
 pub use dice_graph::BzlmodEventKind;
+pub use dice_graph::BzlmodRegisteredExecutionPlatformsDataKey;
+pub use dice_graph::BzlmodRegisteredToolchainsDataKey;
 pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionRepoExecutionIdentity;
@@ -277,6 +279,23 @@ pub trait SetBzlmodSessionData {
 
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::for_project_root(data.project_root.clone());
+        let registered_toolchains = Arc::new(RegisteredToolchainsValue {
+            workspace_id: workspace_id.clone(),
+            registered_toolchains: data.registered_toolchains.clone(),
+        });
+        let registered_execution_platforms = Arc::new(RegisteredExecutionPlatformsValue {
+            workspace_id,
+            registered_execution_platforms: data.registered_execution_platforms.clone(),
+        });
+        self.changed_to(vec![(
+            BzlmodRegisteredToolchainsDataKey,
+            registered_toolchains,
+        )])?;
+        self.changed_to(vec![(
+            BzlmodRegisteredExecutionPlatformsDataKey,
+            registered_execution_platforms,
+        )])?;
         Ok(self.changed_to(vec![(BzlmodSessionDataKey, Arc::new(data))])?)
     }
 }
