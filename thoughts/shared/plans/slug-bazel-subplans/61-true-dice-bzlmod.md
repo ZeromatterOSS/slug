@@ -303,10 +303,13 @@ Observed SDK result at the checkpoint:
 - Visible workspace `MODULE.bazel.lock` reads now flow through a tracked
   project-file DICE key in `slug_common`, and the file watcher treats
   `MODULE.bazel.lock` changes as pre-config invalidations. Hidden/output-base
-  lockfiles still use the same value type but remain non-cacheable when read
-  outside the project root. The visible-lockfile guardrail now proves a
+  lockfiles use the same value type and now feed a polled content digest into
+  the lockfile key when read outside the project root, so warm same-daemon
+  commands reuse the hidden-lockfile value while create/edit/delete transitions
+  still change key identity. The visible-lockfile guardrail proves a
   same-daemon warm no-op does not reread the lockfile before an invalid edit is
-  observed and rejected under `--lockfile_mode=error`.
+  observed and rejected under `--lockfile_mode=error`, and hidden-lockfile
+  guardrails cover warm reuse plus replay/facts create-edit-delete transitions.
 - Locked registry cache files now use tracked project-file DICE reads when the
   configured `XDG_CACHE_HOME` is under the project root, covering cached
   registry `MODULE.bazel`, `source.json`, and `bazel_registry.json` checksum
@@ -357,6 +360,13 @@ Observed SDK result at the checkpoint:
   `warm_noop_out_of_project_local_override_reuses_polled_dice_input`, and
   `local_override_module_edit_invalidates_only_affected_nodes`, and the full
   Plan 61 Python guardrail with 63 tests.
+- Hidden-lockfile polled-input validation passed with `cargo build -p slug`,
+  `cargo test -p slug_common bzlmod -- --nocapture`, focused Plan 61 guardrails
+  for `hidden_lockfile_read_is_observable_before_extension_replay`,
+  `malformed_hidden_lockfile_is_ignored`,
+  `hidden_lockfile_edit_invalidates_replay_in_same_daemon`, and
+  `hidden_lockfile_facts_create_edit_delete_are_observed`, and the full Plan 61
+  Python guardrail with 63 tests.
 - Lockfile bridge cleanup validation passed with `cargo test -p slug_bzlmod --
   --nocapture`.
 
@@ -548,8 +558,8 @@ using Rust DICE keys and values:
 
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
-     keep hidden/output-base lockfile identity explicit in every key that can
-     consume hidden contents.
+     hidden/output-base lockfile bytes are polled into lockfile key identity
+     while the final watched-input graph is still pending.
    - Preserve Bazel's hidden-lockfile fail-open behavior without hiding
      invalidation.
    - Preserve same-daemon hidden-lockfile create/edit/delete/facts coverage

@@ -918,12 +918,6 @@ enum BzlmodFileInputTracking {
     Polled,
 }
 
-impl BzlmodFileInputTracking {
-    fn is_project(&self) -> bool {
-        matches!(self, Self::Project)
-    }
-}
-
 async fn read_bzlmod_file_for_module_inputs(
     ctx: &mut DiceComputations<'_>,
     project_fs: &ProjectRoot,
@@ -1000,6 +994,35 @@ fn absolute_text_file_digest(path: &Path) -> slug_error::Result<Option<String>> 
     }
 }
 
+fn text_file_poll_digest(
+    project_fs: &ProjectRoot,
+    path: &Path,
+    domain: &[u8],
+) -> slug_error::Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update([0]);
+    hasher.update(path.to_string_lossy().as_bytes());
+    hasher.update([0]);
+
+    if project_relative_path_for_abs_path(project_fs, path).is_some() {
+        hasher.update(b"project-tracked");
+        hasher.update([0]);
+        return Ok(hex::encode(hasher.finalize()));
+    }
+
+    match absolute_text_file_digest(path)? {
+        Some(digest) => {
+            hasher.update(b"present");
+            hasher.update([0]);
+            hasher.update(digest.as_bytes());
+        }
+        None => hasher.update(b"missing"),
+    }
+    hasher.update([0]);
+    Ok(hex::encode(hasher.finalize()))
+}
+
 #[derive(Clone, Debug, Display, Allocative)]
 #[display(
     "LegacyBzlmodResolutionDiceKey({}, {})",
@@ -1024,6 +1047,7 @@ struct TrackedLockfileContentKey {
     project_root: AbsNormPathBuf,
     kind: slug_bzlmod::LockfileContentKind,
     path: Arc<PathBuf>,
+    poll_digest: String,
 }
 
 #[async_trait]
@@ -1036,9 +1060,12 @@ impl Key for TrackedLockfileContentKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        let (content, tracking) =
+        let (content, _tracking) =
             read_text_file_for_project_input(ctx, &project_fs, &self.path).await?;
-        let tracked_by_dice = tracking.is_project();
+        // Project-root lockfiles are tracked by DICE file deps. Hidden/output-base
+        // lockfiles are outside the project root, so their current bytes are part of
+        // this key's poll digest.
+        let tracked_by_dice = true;
         let path = self.path.clone();
         let Some(content) = content else {
             return Ok(Arc::new(slug_bzlmod::LockfileContentValue {
@@ -1957,12 +1984,16 @@ impl BuckConfigBasedCells {
         let visible_lockfile = if root_module_file.parsed.is_some()
             && options.lockfile_mode != slug_bzlmod::LockfileMode::Off
         {
+            let visible_path = slug_bzlmod::lockfile_path(project_fs.root().as_path());
+            let visible_poll_digest =
+                text_file_poll_digest(project_fs, &visible_path, b"lockfile-content-poll-v1")?;
             Some(
                 dice_ctx
                     .compute(&TrackedLockfileContentKey {
                         project_root: project_root.clone(),
                         kind: slug_bzlmod::LockfileContentKind::Workspace,
-                        path: Arc::new(slug_bzlmod::lockfile_path(project_fs.root().as_path())),
+                        path: Arc::new(visible_path),
+                        poll_digest: visible_poll_digest,
                     })
                     .await?
                     .buck_error_context(
@@ -1976,12 +2007,15 @@ impl BuckConfigBasedCells {
             && options.lockfile_mode != slug_bzlmod::LockfileMode::Off
         {
             if let Some(path) = &options.hidden_lockfile_path {
+                let hidden_poll_digest =
+                    text_file_poll_digest(project_fs, path, b"lockfile-content-poll-v1")?;
                 Some(
                     dice_ctx
                         .compute(&TrackedLockfileContentKey {
                             project_root: project_root.clone(),
                             kind: slug_bzlmod::LockfileContentKind::Hidden,
                             path: Arc::new(path.clone()),
+                            poll_digest: hidden_poll_digest,
                         })
                         .await?
                         .buck_error_context(

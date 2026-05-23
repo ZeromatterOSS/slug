@@ -1647,9 +1647,14 @@ async def test_hidden_lockfile_read_is_observable_before_extension_replay(
     _write_minimal_lockfile(hidden_lockfile)
 
     await buck.audit("cell")
-    after = await _bzlmod_counters(buck, "--lockfile_mode=off")
+    first = await _bzlmod_counters(buck, "--lockfile_mode=off")
 
-    assert after["lockfile_read"] > before["lockfile_read"]
+    assert first["lockfile_read"] > before["lockfile_read"]
+
+    await buck.audit("cell")
+    warm = await _bzlmod_counters(buck, "--lockfile_mode=off")
+
+    assert warm["lockfile_read"] == first["lockfile_read"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
