@@ -59,7 +59,15 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 pub use cache::ModuleCache;
+pub use dice_graph::BzlmodCellGraphAlias;
+pub use dice_graph::BzlmodCellGraphCell;
+pub use dice_graph::BzlmodCellGraphDataKey;
+pub use dice_graph::BzlmodCellGraphDynamicAlias;
+pub use dice_graph::BzlmodCellGraphExtensionCell;
 pub use dice_graph::BzlmodCellGraphKey;
+pub use dice_graph::BzlmodCellGraphModuleSymlink;
+pub use dice_graph::BzlmodCellGraphScopedAlias;
+pub use dice_graph::BzlmodCellGraphValue;
 pub use dice_graph::BzlmodCommandPolicyKey;
 pub use dice_graph::BzlmodCommandPolicyValue;
 pub use dice_graph::BzlmodEventCounters;
@@ -263,12 +271,13 @@ pub struct BzlmodSessionData {
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
     pub repo_mappings: RepoMappingSnapshot,
     pub repo_mapping_overrides: RepoMappingOverrides,
+    pub cell_graph: BzlmodCellGraphValue,
 }
 
 impl BzlmodSessionData {
     pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
         Self {
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             module_versions: HashMap::new(),
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
@@ -285,6 +294,7 @@ impl BzlmodSessionData {
             selected_yanked_versions: indexmap::IndexMap::new(),
             repo_mappings: RepoMappingSnapshot::new(),
             repo_mapping_overrides: RepoMappingOverrides::new(),
+            cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
         }
     }
 }
@@ -340,6 +350,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             extension_aggregations: Arc::new(data.extension_aggregations.clone()),
             root_module_name: Arc::from(data.root_module_name.as_str()),
         });
+        let cell_graph = Arc::new(data.cell_graph.clone());
         let registered_toolchains = Arc::new(RegisteredToolchainsValue {
             workspace_id: workspace_id.clone(),
             registered_toolchains: data.registered_toolchains.clone(),
@@ -363,6 +374,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
         )])?;
+        self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph)])?;
         Ok(())
     }
 }
@@ -403,7 +415,23 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-session-workspace"),
             PathBuf::from("/tmp/slug-plan61-custom-output-base"),
         );
-        let data = BzlmodSessionData::for_workspace(workspace_id.clone());
+        let mut data = BzlmodSessionData::for_workspace(workspace_id.clone());
+        data.cell_graph = BzlmodCellGraphValue {
+            workspace_id: workspace_id.clone(),
+            root_module_name: "root_mod".to_owned(),
+            cells: Arc::new(vec![BzlmodCellGraphCell {
+                name: "root_mod".to_owned(),
+                path: String::new(),
+            }]),
+            extension_cells: Arc::new(Vec::new()),
+            root_aliases: Arc::new(vec![BzlmodCellGraphAlias {
+                apparent_name: "dep".to_owned(),
+                target_name: "dep+".to_owned(),
+            }]),
+            module_symlinks: Arc::new(Vec::new()),
+            scoped_aliases: Arc::new(Vec::new()),
+            dynamic_aliases: Arc::new(Vec::new()),
+        };
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -416,6 +444,13 @@ mod tests {
 
         let repo_mappings = dice.compute(&BzlmodRepoMappingsDataKey).await?;
         assert_eq!(repo_mappings.workspace_id, workspace_id);
+        let cell_graph = dice
+            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
+            .await??;
+        assert_eq!(cell_graph.workspace_id, workspace_id);
+        assert_eq!(cell_graph.root_module_name, "root_mod");
+        assert_eq!(cell_graph.cells[0].name, "root_mod");
+        assert_eq!(cell_graph.root_aliases[0].apparent_name, "dep");
 
         Ok(())
     }

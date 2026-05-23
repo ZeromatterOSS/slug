@@ -264,10 +264,150 @@ pub struct ResolvedModuleIdentity {
     pub version: Arc<str>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodCellGraphKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
 pub struct BzlmodCellGraphKey {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
+}
+
+impl BzlmodCellGraphKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest: Arc::from("injected-bzlmod-session"),
+        }
+    }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphCell {
+    pub name: String,
+    pub path: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphExtensionCell {
+    pub canonical_name: String,
+    pub internal_name: String,
+    pub path: String,
+    pub extension_id: String,
+    pub spec_hash: String,
+    pub repo_spec_json: String,
+    pub repo_env_json: String,
+    pub materialized: bool,
+    pub lazy: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphAlias {
+    pub apparent_name: String,
+    pub target_name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphModuleSymlink {
+    pub entry_name: String,
+    pub source_path: Arc<PathBuf>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphScopedAlias {
+    pub owner_module: String,
+    pub apparent_name: String,
+    pub target_name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphDynamicAlias {
+    pub apparent_name: String,
+    pub canonical_name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphValue {
+    pub workspace_id: WorkspaceId,
+    pub root_module_name: String,
+    pub cells: Arc<Vec<BzlmodCellGraphCell>>,
+    pub extension_cells: Arc<Vec<BzlmodCellGraphExtensionCell>>,
+    pub root_aliases: Arc<Vec<BzlmodCellGraphAlias>>,
+    pub module_symlinks: Arc<Vec<BzlmodCellGraphModuleSymlink>>,
+    pub scoped_aliases: Arc<Vec<BzlmodCellGraphScopedAlias>>,
+    pub dynamic_aliases: Arc<Vec<BzlmodCellGraphDynamicAlias>>,
+}
+
+impl BzlmodCellGraphValue {
+    pub fn empty_for_workspace(workspace_id: WorkspaceId) -> Self {
+        Self {
+            workspace_id,
+            root_module_name: String::new(),
+            cells: Arc::new(Vec::new()),
+            extension_cells: Arc::new(Vec::new()),
+            root_aliases: Arc::new(Vec::new()),
+            module_symlinks: Arc::new(Vec::new()),
+            scoped_aliases: Arc::new(Vec::new()),
+            dynamic_aliases: Arc::new(Vec::new()),
+        }
+    }
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodCellGraphDataKey")]
+pub struct BzlmodCellGraphDataKey;
+
+impl dice::InjectedKey for BzlmodCellGraphDataKey {
+    type Value = Arc<BzlmodCellGraphValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[async_trait]
+impl Key for BzlmodCellGraphKey {
+    type Value = slug_error::Result<Arc<BzlmodCellGraphValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        if value.workspace_id != self.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodCellGraphKey was computed with project root '{}', \
+                 but current bzlmod cell graph root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                value.workspace_id.canonical_project_root.display()
+            ));
+        }
+        Ok(value)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]

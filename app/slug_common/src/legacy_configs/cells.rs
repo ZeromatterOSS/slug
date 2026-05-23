@@ -3133,7 +3133,7 @@ impl BuckConfigBasedCells {
         let mut module_symlinks = Vec::new();
         let mut lockfile_seeded_cells = Vec::new();
         let mut scoped_repo_aliases = Vec::new();
-        let dynamic_extension_aliases = Vec::new();
+        let dynamic_extension_aliases: Vec<BzlmodDynamicAlias> = Vec::new();
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
@@ -3862,6 +3862,89 @@ impl BuckConfigBasedCells {
         } else {
             parsed.module.name.clone()
         };
+        let lockfile_repo_env_json = repo_env_json(&bzlmod_session_data.repo_env);
+        let cell_graph = slug_bzlmod::BzlmodCellGraphValue {
+            workspace_id: bzlmod_session_data.workspace_id.clone(),
+            root_module_name: root_module_name.clone(),
+            cells: Arc::new(
+                cells
+                    .iter()
+                    .map(|(name, path, _)| slug_bzlmod::BzlmodCellGraphCell {
+                        name: name.as_str().to_owned(),
+                        path: path.as_str().to_owned(),
+                    })
+                    .collect(),
+            ),
+            extension_cells: Arc::new(
+                ext_cells
+                    .iter()
+                    .map(
+                        |(_name, path, setup)| slug_bzlmod::BzlmodCellGraphExtensionCell {
+                            canonical_name: setup.canonical_name.to_string(),
+                            internal_name: setup.internal_name.to_string(),
+                            path: path.as_str().to_owned(),
+                            extension_id: setup.extension_id.to_string(),
+                            spec_hash: setup.spec_hash.to_string(),
+                            repo_spec_json: setup.repo_spec_json.to_string(),
+                            repo_env_json: setup.repo_env_json.to_string(),
+                            materialized: setup.materialized,
+                            lazy: false,
+                        },
+                    )
+                    .chain(lockfile_seeded_cells.iter().map(|cell| {
+                        slug_bzlmod::BzlmodCellGraphExtensionCell {
+                            canonical_name: cell.canonical_name.clone(),
+                            internal_name: cell.internal_name.clone(),
+                            path: cell.path.clone(),
+                            extension_id: cell.extension_id.clone(),
+                            spec_hash: cell.spec_hash.clone(),
+                            repo_spec_json: cell.repo_spec_json.clone(),
+                            repo_env_json: lockfile_repo_env_json.to_string(),
+                            materialized: false,
+                            lazy: true,
+                        }
+                    }))
+                    .collect(),
+            ),
+            root_aliases: Arc::new(
+                aliases
+                    .iter()
+                    .map(|(alias, target)| slug_bzlmod::BzlmodCellGraphAlias {
+                        apparent_name: alias.as_str().to_owned(),
+                        target_name: target.as_str().to_owned(),
+                    })
+                    .collect(),
+            ),
+            module_symlinks: Arc::new(
+                module_symlinks
+                    .iter()
+                    .map(|symlink| slug_bzlmod::BzlmodCellGraphModuleSymlink {
+                        entry_name: symlink.entry_name.clone(),
+                        source_path: Arc::new(symlink.source_path.clone()),
+                    })
+                    .collect(),
+            ),
+            scoped_aliases: Arc::new(
+                scoped_repo_aliases
+                    .iter()
+                    .map(|alias| slug_bzlmod::BzlmodCellGraphScopedAlias {
+                        owner_module: alias.owner_module.clone(),
+                        apparent_name: alias.apparent_name.clone(),
+                        target_name: alias.target_name.clone(),
+                    })
+                    .collect(),
+            ),
+            dynamic_aliases: Arc::new(
+                dynamic_extension_aliases
+                    .iter()
+                    .map(|alias| slug_bzlmod::BzlmodCellGraphDynamicAlias {
+                        apparent_name: alias.apparent_name.clone(),
+                        canonical_name: alias.canonical_name.clone(),
+                    })
+                    .collect(),
+            ),
+        };
+        bzlmod_session_data.cell_graph = cell_graph;
 
         Ok(Some(BzlmodResolutionResult {
             root_module_name,
