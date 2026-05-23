@@ -1315,8 +1315,8 @@ pub fn lockfile_canonical_extension_id(internal_id: &str) -> String {
 /// Returns `None` if the lockfile is absent. Existing lockfiles that cannot be
 /// read or parsed are hard errors in every mode that reads lockfiles, matching
 /// Bazel 9's default lockfile behavior. There is deliberately no process-wide
-/// parse cache here: until Plan 61 has a real `LockfileContentKey`, the file
-/// bytes on disk remain the only read authority.
+/// parse cache here: callers that need replayable lockfile identity must go
+/// through their DICE-owned lockfile content key.
 fn read_lockfile_at_path(
     path: PathBuf,
     mode: LockfileMode,

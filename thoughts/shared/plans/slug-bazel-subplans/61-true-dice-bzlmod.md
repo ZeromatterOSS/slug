@@ -312,6 +312,9 @@ Observed SDK result at the checkpoint:
   inputs. Cache files outside the project root remain non-cacheable direct
   filesystem reads. Existing guardrails prove warm bzlmod reuse and same-daemon
   checksum failures after editing each cached registry file class.
+- The unused non-cacheable `slug_bzlmod::LockfileContentKey` bridge was removed
+  after visible and hidden lockfile reads moved to the tracked key in
+  `slug_common`.
 - Current slice validation passed with `cargo build -p slug`, `cargo test -p
   slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
@@ -339,6 +342,8 @@ Observed SDK result at the checkpoint:
   for `warm_noop_locked_registry_dep_reuses_bzlmod_resolution` and
   `locked_registry_source_json_and_registry_metadata_are_bridge_inputs`, the
   full Plan 61 Python guardrail, `cargo fmt --check`, and `git diff --check`.
+- Lockfile bridge cleanup validation passed with `cargo test -p slug_bzlmod --
+  --nocapture`.
 
 ## Consolidated Learnings
 

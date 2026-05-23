@@ -76,7 +76,6 @@ pub use dice_graph::ExtensionUniqueName;
 pub use dice_graph::ExternalSymlinkLayoutKey;
 pub use dice_graph::InnateExtensionKey;
 pub use dice_graph::LocalOverrideSourceKey;
-pub use dice_graph::LockfileContentKey;
 pub use dice_graph::LockfileContentKind;
 pub use dice_graph::LockfileContentValue;
 pub use dice_graph::LockfileExtensionEntryKey;
