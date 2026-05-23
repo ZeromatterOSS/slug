@@ -1081,6 +1081,32 @@ ext = module_extension(implementation = _ext_impl)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_single_version_override_patches_fail_until_supported(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SVO patches affect both MODULE.bazel and final RepoSpec."""
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_svo_patches_unsupported")
+bazel_dep(name = "dep", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patches = ["//:fix.patch"],
+)
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    _write(buck.cwd / "fix.patch", "")
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "single_version_override(patches = ...)" in str(exc.value)
+    assert "MODULE.bazel discovery" in str(exc.value)
+    assert "repository materialization" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_two_workspaces_do_not_share_bzlmod_state(
     buck: Buck,
 ) -> None:

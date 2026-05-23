@@ -143,10 +143,14 @@ Observed SDK result at the checkpoint:
   registry when non-empty, and `RegistryOverride` is implemented by both single
   and multiple version overrides. Focused Plan 61 guardrails prove both
   directives select a cached override registry instead of the default registry.
-  `single_version_override(patches = ..., patch_strip = ...)` remains blocked:
-  Bazel applies main-repo patch labels to the discovered `MODULE.bazel` and
-  appends them to the final repo spec, while Slug's source materialization patch
-  path is separate from this slice's allowed files.
+  Override patch fields remain blocked: Bazel validates main-repo patch labels,
+  applies `single_version_override` patches to the discovered `MODULE.bazel`,
+  and appends the same patches to the final repo spec; non-registry
+  `archive_override`/`git_override` patches also affect repository
+  materialization. Slug now fails loudly when override `patches = [...]` are
+  present instead of silently ignoring part of Bazel's behavior. Full support
+  still needs DICE-tracked patch-file inputs plus repository materialization
+  patch identity.
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
@@ -320,9 +324,10 @@ What did not work or remains risky:
 - Dynamic generated-repo state is still held in process-global maps. Clearing
   the suffix cache closes one leak in the transitional reset path but does not
   make the bzlmod cell graph a DICE-owned value.
-- Some Bazel 9 semantics are parsed but not fully modeled, including
-  `single_version_override` patch materialization, isolated extension usages,
-  and remaining command policy around non-root dev dependencies.
+- Some Bazel 9 semantics are explicitly rejected until fully modeled, including
+  override patch materialization and isolated extension usages. Remaining
+  command policy around non-root dev dependencies still needs migration out of
+  the transitional resolver.
 - Registry and repository cache behavior is still a blend of DICE identity,
   lockfile checksums, and filesystem markers. It is better than the old path,
   but it is not yet a complete `RepoSpecFunction` /

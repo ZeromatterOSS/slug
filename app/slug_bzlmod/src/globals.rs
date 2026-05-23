@@ -61,6 +61,19 @@ use crate::version::Version;
 
 const SLUG_BAZEL_COMPATIBILITY_VERSION: &str = "9.0.1";
 
+fn reject_unsupported_override_patches(
+    directive: &str,
+    patches: &UnpackList<&str>,
+) -> starlark::Result<Vec<String>> {
+    if patches.items.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    Err(starlark::Error::new_other(anyhow::anyhow!(
+        "{directive}(patches = ...) is not yet supported by Slug; Bazel applies override patches during MODULE.bazel discovery and repository materialization"
+    )))
+}
+
 /// Context for MODULE.bazel evaluation.
 ///
 /// This context accumulates the parsed directives during evaluation.
@@ -589,6 +602,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             Version::parse(version)
                 .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
+        let patches = reject_unsupported_override_patches("single_version_override", &patches)?;
 
         ctx.overrides
             .push(Override::SingleVersion(SingleVersionOverride {
@@ -599,7 +613,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                 } else {
                     Some(registry.to_owned())
                 },
-                patches: patches.items.iter().map(|s| s.to_string()).collect(),
+                patches,
                 patch_strip: patch_strip as u32,
             }));
 
@@ -683,6 +697,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        let patches = reject_unsupported_override_patches("archive_override", &patches)?;
 
         ctx.overrides.push(Override::Archive(ArchiveOverride {
             module_name: module_name.to_owned(),
@@ -697,7 +712,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             } else {
                 Some(strip_prefix.to_owned())
             },
-            patches: patches.items.iter().map(|s| s.to_string()).collect(),
+            patches,
             patch_strip: patch_strip as u32,
         }));
 
@@ -735,6 +750,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        let patches = reject_unsupported_override_patches("git_override", &patches)?;
 
         ctx.overrides.push(Override::Git(GitOverride {
             module_name: module_name.to_owned(),
@@ -745,7 +761,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             } else {
                 Some(shallow_since.to_owned())
             },
-            patches: patches.items.iter().map(|s| s.to_string()).collect(),
+            patches,
             patch_strip: patch_strip as u32,
         }));
 

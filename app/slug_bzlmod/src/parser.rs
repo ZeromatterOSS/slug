@@ -527,6 +527,57 @@ git_override(
     }
 
     #[test]
+    fn test_parse_single_version_override_with_patches_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+bazel_dep(name = "rules_rust", version = "1.0.0")
+single_version_override(
+    module_name = "rules_rust",
+    patches = ["//:fix.patch"],
+)
+"#;
+
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("single_version_override(patches = ...)"));
+        assert!(err.contains("MODULE.bazel discovery"));
+        assert!(err.contains("repository materialization"));
+    }
+
+    #[test]
+    fn test_parse_non_registry_override_with_patches_errors() {
+        let archive = r#"
+module(name = "test", version = "1.0.0")
+archive_override(
+    module_name = "dep",
+    urls = ["https://example.test/dep.tar.gz"],
+    patches = ["//:fix.patch"],
+)
+"#;
+
+        let err = parse_module_bazel_content(archive, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("archive_override(patches = ...)"));
+
+        let git = r#"
+module(name = "test", version = "1.0.0")
+git_override(
+    module_name = "dep",
+    remote = "https://example.test/dep.git",
+    commit = "abc123",
+    patches = ["//:fix.patch"],
+)
+"#;
+
+        let err = parse_module_bazel_content(git, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("git_override(patches = ...)"));
+    }
+
+    #[test]
     fn test_parse_no_module_directive() {
         let content = r#"
 bazel_dep(name = "rules_cc", version = "0.0.9")
