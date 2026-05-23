@@ -236,6 +236,9 @@ Observed SDK result at the checkpoint:
   transitional best-effort `.bzl` scanner every transaction, but successful
   spoke lookup values can now cut off only after the scanned digest has been
   refreshed.
+- `ExtensionSpokesKey` now passes its already-keyed `.bzl` digest into the
+  module-extension execution key instead of rebuilding the execution key with a
+  second direct scanner read and mutating the digest afterward.
 - Registered toolchain and execution platform consumers now read
   `RegisteredToolchainsKey` and `RegisteredExecutionPlatformsKey` instead of
   directly reading those fields from injected `BzlmodSessionData`. The keys are
@@ -668,6 +671,14 @@ Observed SDK result at the checkpoint:
   dependency regressed the mapped external load-edit replay guardrail, so the
   digest remains an always-recomputed child key until the real Starlark load
   graph replaces the scanner.
+- Extension-spoke execution-key digest reuse validation passed with `cargo
+  fmt --check`, `cargo test -p slug_bzlmod
+  create_extension_execution_key_uses_replay_data -- --nocapture`, `cargo test
+  -p slug_bzlmod extension_spokes -- --nocapture`, `cargo build -p slug`,
+  `cargo test -p slug_bzlmod -- --nocapture`, focused Plan 61 Python replay
+  guardrails for warm replay, valid lockfile replay materialization,
+  missing-lockfile extension reuse, and mapped external `.bzl` load edits, and
+  the full Plan 61 Python guardrail with 72 tests.
 
 ## Consolidated Learnings
 
