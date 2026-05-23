@@ -267,15 +267,18 @@ pub fn clear_registry() {
 }
 
 /// A guard that manages the lifecycle of the repository invocation registry.
-pub struct RegistryGuard;
+pub struct RegistryGuard {
+    previous: Option<RepositoryInvocationRegistry>,
+}
 
 impl RegistryGuard {
     /// Create a new registry guard, setting up the thread-local registry.
     pub fn new() -> Self {
+        let previous = CURRENT_REGISTRY.with(|cell| cell.borrow_mut().take());
         CURRENT_REGISTRY.with(|cell| {
             *cell.borrow_mut() = Some(RepositoryInvocationRegistry::new());
         });
-        RegistryGuard
+        RegistryGuard { previous }
     }
 
     /// Take all invocations from the registry.
@@ -286,7 +289,10 @@ impl RegistryGuard {
 
 impl Drop for RegistryGuard {
     fn drop(&mut self) {
-        clear_registry();
+        let previous = self.previous.take();
+        CURRENT_REGISTRY.with(|cell| {
+            *cell.borrow_mut() = previous;
+        });
     }
 }
 
@@ -377,6 +383,36 @@ mod tests {
 
         // After guard is dropped, registry should be cleared
         assert!(!has_active_registry());
+    }
+
+    #[test]
+    fn registry_guard_restores_outer_registry() {
+        let outer = RegistryGuard::new();
+        record_invocation(RepositoryInvocation::new(
+            "outer".to_owned(),
+            "local_repository".to_owned(),
+        ));
+
+        {
+            let inner = RegistryGuard::new();
+            record_invocation(RepositoryInvocation::new(
+                "inner".to_owned(),
+                "http_archive".to_owned(),
+            ));
+            let inner_invocations = inner.take();
+            assert_eq!(inner_invocations.len(), 1);
+            assert_eq!(inner_invocations[0].name, "inner");
+        }
+
+        assert!(has_active_registry());
+        record_invocation(RepositoryInvocation::new(
+            "outer_after_inner".to_owned(),
+            "git_repository".to_owned(),
+        ));
+        let outer_invocations = outer.take();
+        assert_eq!(outer_invocations.len(), 2);
+        assert_eq!(outer_invocations[0].name, "outer");
+        assert_eq!(outer_invocations[1].name, "outer_after_inner");
     }
 
     #[test]

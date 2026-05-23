@@ -764,6 +764,13 @@ Observed SDK result at the checkpoint:
   best-effort `.bzl` digest directly are no longer public production APIs; the
   production constructor remains the keyed-digest path used by
   `ExtensionSpokesKey`.
+- Repository invocation registry guard validation passed with `cargo test -p
+  slug_bzlmod repository_invocations -- --nocapture`, full `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61
+  Python replay subset, the full Plan 61 Python guardrail with 72 tests,
+  `cargo fmt --check`, and `git diff --check`. The thread-local MODULE/repo
+  rule invocation registry guard now restores any previous registry on drop
+  instead of clearing ambient state unconditionally.
 
 ## Consolidated Learnings
 
@@ -856,6 +863,8 @@ What did not work or remains risky:
   assembled by the transitional legacy cell parser. Extension repo-spec
   capture remains thread-local plumbing, but the capture scope now restores
   previous state on drop instead of clearing ambient state unconditionally.
+  MODULE/repo-rule invocation capture uses the same restore-on-drop guard shape
+  for its thread-local registry.
 - Known-spec extension repo file-ops access now routes through the DICE
   repository execution/materialization manifest key, but
   `RepoMaterializationManifestKey` still relies on polling marker/layout and
