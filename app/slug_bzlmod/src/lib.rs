@@ -367,6 +367,32 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     }
 }
 
+pub async fn module_versions_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<Arc<ModuleVersionsValue>> {
+    let data = ctx.compute(&BzlmodModuleVersionsDataKey).await?;
+    let key = ModuleVersionsKey::for_workspace_id(data.workspace_id.clone());
+    ctx.compute(&key).await?
+}
+
+pub async fn registered_toolchains_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<Arc<RegisteredToolchainsValue>> {
+    let data = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
+    let key = RegisteredToolchainsKey::for_workspace_id(data.workspace_id.clone());
+    ctx.compute(&key).await?
+}
+
+pub async fn registered_execution_platforms_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<Arc<RegisteredExecutionPlatformsValue>> {
+    let data = ctx
+        .compute(&BzlmodRegisteredExecutionPlatformsDataKey)
+        .await?;
+    let key = RegisteredExecutionPlatformsKey::for_workspace_id(data.workspace_id.clone());
+    ctx.compute(&key).await?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,6 +416,40 @@ mod tests {
 
         let repo_mappings = dice.compute(&BzlmodRepoMappingsDataKey).await?;
         assert_eq!(repo_mappings.workspace_id, workspace_id);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn current_workspace_helpers_use_session_workspace_id() -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-current-workspace-helper");
+        let workspace_id = WorkspaceId::new(
+            project_root.clone(),
+            PathBuf::from("/tmp/slug-plan61-current-workspace-output-base"),
+        );
+        let data = BzlmodSessionData::for_workspace(workspace_id.clone());
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_bzlmod_session_data(data)?;
+        let mut dice = updater.commit().await;
+
+        let module_versions = module_versions_for_current_workspace(&mut dice).await?;
+        let registered_toolchains = registered_toolchains_for_current_workspace(&mut dice).await?;
+        let registered_execution_platforms =
+            registered_execution_platforms_for_current_workspace(&mut dice).await?;
+
+        assert_eq!(module_versions.workspace_id, workspace_id);
+        assert_eq!(registered_toolchains.workspace_id, workspace_id);
+        assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
+        assert_ne!(
+            module_versions.workspace_id,
+            WorkspaceId::for_project_root(project_root)
+        );
 
         Ok(())
     }

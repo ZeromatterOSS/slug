@@ -1129,20 +1129,11 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         .project_root()
         .root()
         .to_path_buf();
-    let registered_key =
-        slug_bzlmod::RegisteredToolchainsKey::for_project_root(project_root.clone());
-    let registered = match dice.compute(&registered_key).await {
-        Ok(Ok(data)) => data.registered_toolchains.clone(),
-        Ok(Err(e)) => {
-            tracing::warn!(
-                "Bzlmod registered toolchains unavailable while loading toolchains: {}",
-                e
-            );
-            Vec::new()
-        }
+    let registered = match slug_bzlmod::registered_toolchains_for_current_workspace(dice).await {
+        Ok(data) => data.registered_toolchains.clone(),
         Err(e) => {
             tracing::warn!(
-                "DICE error while loading registered bzlmod toolchains: {}",
+                "Bzlmod registered toolchains unavailable while loading toolchains: {}",
                 e
             );
             Vec::new()

@@ -24,7 +24,6 @@ use futures::FutureExt;
 use once_cell::sync::Lazy;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::cycles::CycleGuard;
-use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;
 use slug_common::file_ops::error::FileReadErrorContext;
 use slug_common::find_buildfile::find_buildfile;
@@ -154,17 +153,8 @@ impl<'c, 'd> HasCalculationDelegate<'c, 'd> for DiceComputations<'d> {
                 let dirs_allowing_relative_paths =
                     ctx.dirs_allowing_relative_paths(self.0.clone()).await?;
 
-                let project_root = ctx
-                    .global_data()
-                    .get_io_provider()
-                    .project_root()
-                    .root()
-                    .to_path_buf();
-                let module_versions = ctx
-                    .compute(&slug_bzlmod::ModuleVersionsKey::for_project_root(
-                        project_root,
-                    ))
-                    .await??
+                let module_versions = slug_bzlmod::module_versions_for_current_workspace(ctx)
+                    .await?
                     .module_versions
                     .clone();
                 let cell_info = InterpreterCellInfo::new_with_bzlmod_module_versions(

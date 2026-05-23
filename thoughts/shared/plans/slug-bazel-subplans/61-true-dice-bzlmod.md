@@ -272,6 +272,12 @@ Observed SDK result at the checkpoint:
   DICE value equality over the module-version map plus the transitional session
   invalidation identity, so warm no-op cutoffs are allowed only when lockfile,
   repo-env, registry/yanked-version, and repo-mapping bridge inputs still match.
+- Module-version, registered-toolchain, and registered-execution-platform
+  consumers now obtain the current workspace identity from their narrower
+  injected DICE data and then compute the corresponding keyed value. These
+  consumers no longer derive key identity from the IO project root, and focused
+  coverage uses a non-default output base to prove the session workspace
+  identity is preserved.
 - `ModuleVersionsKey` now computes a narrower
   `BzlmodModuleVersionsDataKey` instead of the whole `BzlmodSessionDataKey`.
   The injected module-version value carries a conservative invalidation
@@ -1042,6 +1048,9 @@ using Rust DICE keys and values:
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
+   - Module-version/toolchain/platform consumers no longer rebuild workspace
+     identity from project root, but their current-workspace helpers still read
+     transitional values injected from the legacy resolver.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.

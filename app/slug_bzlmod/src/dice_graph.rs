@@ -297,11 +297,15 @@ pub struct ModuleVersionsKey {
 }
 
 impl ModuleVersionsKey {
-    pub fn for_project_root(project_root: PathBuf) -> Self {
+    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
-            workspace_id: WorkspaceId::for_project_root(project_root),
+            workspace_id,
             resolution_digest: Arc::from("injected-bzlmod-session"),
         }
+    }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
 }
 
@@ -505,11 +509,15 @@ pub struct RegisteredToolchainsKey {
 }
 
 impl RegisteredToolchainsKey {
-    pub fn for_project_root(project_root: PathBuf) -> Self {
+    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
-            workspace_id: WorkspaceId::for_project_root(project_root),
+            workspace_id,
             resolution_digest: Arc::from("injected-bzlmod-session"),
         }
+    }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
 }
 
@@ -582,11 +590,15 @@ pub struct RegisteredExecutionPlatformsKey {
 }
 
 impl RegisteredExecutionPlatformsKey {
-    pub fn for_project_root(project_root: PathBuf) -> Self {
+    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
-            workspace_id: WorkspaceId::for_project_root(project_root),
+            workspace_id,
             resolution_digest: Arc::from("injected-bzlmod-session"),
         }
+    }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
 }
 
