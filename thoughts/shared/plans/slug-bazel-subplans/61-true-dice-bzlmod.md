@@ -771,6 +771,16 @@ Observed SDK result at the checkpoint:
   `cargo fmt --check`, and `git diff --check`. The thread-local MODULE/repo
   rule invocation registry guard now restores any previous registry on drop
   instead of clearing ambient state unconditionally.
+- Extension execution workspace-identity threading validation passed with
+  `cargo check -p slug_bzlmod -p slug_interpreter_for_build`, focused
+  `slug_bzlmod` module-extension-key and spoke tests, full `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61
+  Python replay subset, the full Plan 61 Python guardrail with 72 tests,
+  `cargo fmt --check`, and `git diff --check`. `ExtensionSpokesKey` now
+  carries its exact `WorkspaceId` into `ModuleExtensionExecutionKey`, module
+  extension Starlark execution, and the synchronous spoke-materialization
+  bridge; Starlark repository-rule execution also uses the workspace identity
+  from its materialization key when it enters the same sync bridge.
 
 ## Consolidated Learnings
 
@@ -850,12 +860,14 @@ What did not work or remains risky:
   materialization now goes through DICE lookup keys with workspace identity,
   projects canonical repos to owning extension ids, reads per-extension
   aggregation projections, leaves repo-mapping and replay-input reads to the
-  final execution key, and uses DICE spoke repo-env where available. Generated
-  repo cells and dynamic alias registration now go through a typed runtime
-  install snapshot and installer boundary in `slug_core::cells`, but the
-  backing state is still process-global transitional cell-registration plumbing
-  rather than a final DICE-owned cell graph. The direct public helpers for
-  forming extension execution and spoke keys from injected session-shaped
+  final execution key, uses DICE spoke repo-env where available, and threads
+  the exact `WorkspaceId` into extension execution and the sync
+  materialization bridge instead of re-deriving workspace identity from project
+  root. Generated repo cells and dynamic alias registration now go through a
+  typed runtime install snapshot and installer boundary in `slug_core::cells`,
+  but the backing state is still process-global transitional cell-registration
+  plumbing rather than a final DICE-owned cell graph. The direct public helpers
+  for forming extension execution and spoke keys from injected session-shaped
   values were removed, reducing accidental bypass surfaces without changing
   that remaining cell-graph ownership gap.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but

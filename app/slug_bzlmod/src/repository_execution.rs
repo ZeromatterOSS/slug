@@ -895,6 +895,7 @@ impl Key for ExtensionRepoExecutionKey {
                                 rule_fn_name,
                                 &working_dir,
                                 self.repo_env.clone(),
+                                self.materialization_manifest_key.workspace_id.clone(),
                             )
                             .await
                         {

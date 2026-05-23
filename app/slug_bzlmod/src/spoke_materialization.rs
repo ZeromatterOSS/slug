@@ -35,7 +35,6 @@
 
 use std::cell::Cell;
 use std::cell::RefCell;
-use std::path::PathBuf;
 
 use dice::DiceComputations;
 
@@ -69,7 +68,7 @@ thread_local! {
 /// Nesting: the previous pointer (if any) is restored on exit.
 pub fn with_extension_dice<R>(
     ctx: &mut DiceComputations<'_>,
-    project_root: PathBuf,
+    workspace_id: crate::WorkspaceId,
     f: impl FnOnce() -> R,
 ) -> R {
     // Cast away the lifetime. SAFETY: `f` runs synchronously to completion
@@ -77,7 +76,6 @@ pub fn with_extension_dice<R>(
     // We restore the previous pointer on exit so nested scopes work.
     let raw = ctx as *mut DiceComputations<'_> as *mut DiceComputations<'static>;
     let prev = EXTENSION_DICE_PTR.with(|c| c.replace(Some(raw)));
-    let workspace_id = crate::WorkspaceId::for_project_root(project_root);
     let prev_workspace = EXTENSION_WORKSPACE_ID.with(|c| c.replace(Some(workspace_id)));
     // Use a guard so we restore on panic too.
     struct Guard {

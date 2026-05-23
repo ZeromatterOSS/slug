@@ -100,6 +100,7 @@ fn create_extension_execution_key_from_aggregation(
         repo_mappings.repo_mappings.as_ref().clone(),
         repo_mappings.repo_mapping_overrides.as_ref().clone(),
         bzl_transitive_digest,
+        Some(aggregation.workspace_id.clone()),
     )
 }
 
@@ -735,6 +736,11 @@ pub struct ModuleExtensionExecutionKey {
     /// surface, not a Slug-private extension cache.
     pub project_root: Option<Arc<PathBuf>>,
 
+    /// Workspace identity for DICE lookups triggered while executing the
+    /// extension. This carries the exact workspace/output-base identity from
+    /// the parent DICE key instead of re-deriving it from project root.
+    pub workspace_id: Option<crate::WorkspaceId>,
+
     /// Hidden lockfile path used as a fallback for replay data and prior facts.
     ///
     /// Bazel reads the workspace lockfile first, then the hidden lockfile.
@@ -779,6 +785,7 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
         self.bzl_transitive_digest.hash(state);
         self.root_module_name.hash(state);
         self.project_root.hash(state);
+        self.workspace_id.hash(state);
         self.hidden_lockfile_path.hash(state);
         self.visible_lockfile_digest.hash(state);
         self.hidden_lockfile_digest.hash(state);
@@ -797,6 +804,7 @@ impl PartialEq for ModuleExtensionExecutionKey {
             && self.bzl_transitive_digest == other.bzl_transitive_digest
             && self.root_module_name == other.root_module_name
             && self.project_root == other.project_root
+            && self.workspace_id == other.workspace_id
             && self.hidden_lockfile_path == other.hidden_lockfile_path
             && self.visible_lockfile_digest == other.visible_lockfile_digest
             && self.hidden_lockfile_digest == other.hidden_lockfile_digest
@@ -819,6 +827,7 @@ impl Dupe for ModuleExtensionExecutionKey {
             aggregated: self.aggregated.dupe(),
             root_module_name: self.root_module_name.dupe(),
             project_root: self.project_root.clone(),
+            workspace_id: self.workspace_id.clone(),
             hidden_lockfile_path: self.hidden_lockfile_path.clone(),
             visible_lockfile_digest: self.visible_lockfile_digest.clone(),
             hidden_lockfile_digest: self.hidden_lockfile_digest.clone(),
@@ -847,6 +856,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: None,
+            workspace_id: None,
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
@@ -906,6 +916,7 @@ impl ModuleExtensionExecutionKey {
         repo_mapping_overrides: RepoMappingOverrides,
     ) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
+        let workspace_id = crate::WorkspaceId::for_project_root(project_root.clone());
         let bzl_transitive_digest = Arc::from(
             compute_bzl_transitive_digest_for_project_with_repo_mappings(
                 &extension_id,
@@ -928,6 +939,7 @@ impl ModuleExtensionExecutionKey {
             repo_mappings,
             repo_mapping_overrides,
             bzl_transitive_digest,
+            Some(workspace_id),
         )
     }
 
@@ -945,6 +957,7 @@ impl ModuleExtensionExecutionKey {
         repo_mappings: RepoMappingSnapshot,
         repo_mapping_overrides: RepoMappingOverrides,
         bzl_transitive_digest: Arc<str>,
+        workspace_id: Option<crate::WorkspaceId>,
     ) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
@@ -955,6 +968,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: Some(Arc::new(project_root)),
+            workspace_id,
             hidden_lockfile_path: hidden_lockfile_path.map(Arc::new),
             visible_lockfile_digest: visible_lockfile_digest.map(Arc::from),
             hidden_lockfile_digest: hidden_lockfile_digest.map(Arc::from),
@@ -983,6 +997,7 @@ impl ModuleExtensionExecutionKey {
         repo_mappings: Arc<RepoMappingSnapshot>,
         repo_mapping_overrides: Arc<RepoMappingOverrides>,
     ) -> Self {
+        let workspace_id = crate::WorkspaceId::for_project_root(project_root.as_ref().clone());
         let bzl_transitive_digest = Arc::from(
             compute_bzl_transitive_digest_for_project_with_repo_mappings(
                 &extension_id,
@@ -998,6 +1013,7 @@ impl ModuleExtensionExecutionKey {
             aggregated,
             root_module_name,
             project_root: Some(project_root),
+            workspace_id: Some(workspace_id),
             hidden_lockfile_path,
             visible_lockfile_digest,
             hidden_lockfile_digest,
@@ -1022,6 +1038,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(AggregatedExtension::default()),
             root_module_name: Arc::from("_main"),
             project_root: None,
+            workspace_id: None,
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
@@ -1273,6 +1290,7 @@ impl Key for ModuleExtensionExecutionKey {
                         &temp_dir,
                         prior_facts,
                         self.repo_env.clone(),
+                        self.workspace_id.clone(),
                     )
                     .await
             }
@@ -2627,6 +2645,15 @@ mod tests {
         assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
         assert!(key.project_root.is_some());
         assert_eq!(key.project_root().unwrap(), &PathBuf::from("/tmp/project"));
+        let workspace_id = key.workspace_id.as_ref().unwrap();
+        assert_eq!(
+            workspace_id.canonical_project_root.as_ref(),
+            &PathBuf::from("/tmp/project")
+        );
+        assert_eq!(
+            workspace_id.output_base.as_ref(),
+            &PathBuf::from("/tmp/project/buck-out/v2")
+        );
     }
 
     #[test]
@@ -2672,6 +2699,31 @@ mod tests {
         key1.hash(&mut hasher1);
         key2.hash(&mut hasher2);
         assert_ne!(hasher1.finish(), hasher2.finish());
+
+        let mut key3 = ModuleExtensionExecutionKey::new_with_lockfile(
+            AggregatedExtension::new("@@mod//ext.bzl", "ext"),
+            "_main".to_owned(),
+            PathBuf::from("/project1"),
+            None,
+            None,
+            None,
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
+        );
+        key3.workspace_id = Some(crate::WorkspaceId::new(
+            PathBuf::from("/project1"),
+            PathBuf::from("/alternate-output-base"),
+        ));
+
+        assert_ne!(key1, key3);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher3 = DefaultHasher::new();
+        key1.hash(&mut hasher1);
+        key3.hash(&mut hasher3);
+        assert_ne!(hasher1.finish(), hasher3.finish());
     }
 
     #[test]

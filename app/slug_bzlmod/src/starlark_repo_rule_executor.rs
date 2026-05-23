@@ -36,6 +36,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use slug_util::late_binding::LateBinding;
 
+use crate::WorkspaceId;
 use crate::repository_invocations::RepositoryInvocation;
 
 /// Result returned by a Starlark repository rule execution.
@@ -101,6 +102,7 @@ pub trait StarlarkRepoRuleExecutorImpl: Send + Sync + 'static {
         rule_name: &str,
         working_dir: &Path,
         repo_env: Arc<BTreeMap<String, String>>,
+        workspace_id: WorkspaceId,
     ) -> slug_error::Result<StarlarkRepoRuleExecution>;
 }
 

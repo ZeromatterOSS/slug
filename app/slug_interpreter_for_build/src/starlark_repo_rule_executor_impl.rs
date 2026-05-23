@@ -39,6 +39,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use slug_bzlmod::StarlarkRepoRuleExecution;
 use slug_bzlmod::StarlarkRepoRuleExecutorImpl;
+use slug_bzlmod::WorkspaceId;
 use slug_bzlmod::repository_invocations::RepositoryInvocation;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
@@ -162,6 +163,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         rule_name: &str,
         working_dir: &Path,
         repo_env: Arc<BTreeMap<String, String>>,
+        workspace_id: WorkspaceId,
     ) -> slug_error::Result<StarlarkRepoRuleExecution> {
         tracing::debug!(
             "Executing Starlark repository rule '{}' from '{}' for repo '{}'",
@@ -254,7 +256,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             let starlark_module = Module::new();
             let ctx_value = starlark_module.heap().alloc(repo_ctx.clone());
             let mut eval = Evaluator::new(&starlark_module);
-            slug_bzlmod::with_extension_dice(ctx, workspace_root.root().to_path_buf(), || {
+            slug_bzlmod::with_extension_dice(ctx, workspace_id, || {
                 eval.eval_function(impl_fn.to_value(), &[ctx_value], &[])
             })
             .map(|_| ())

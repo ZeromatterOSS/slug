@@ -51,6 +51,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use slug_bzlmod::ExtensionExecutionOutput;
 use slug_bzlmod::ModuleExtensionExecutorImpl;
+use slug_bzlmod::WorkspaceId;
 use slug_bzlmod::extensions::AggregatedExtension;
 use slug_bzlmod::with_repo_spec_registry;
 use slug_common::dice::cells::HasCellResolver;
@@ -208,7 +209,7 @@ impl ConcreteModuleExtensionExecutor {
         &self,
         ctx: &mut DiceComputations<'_>,
         aggregated: &AggregatedExtension,
-        project_root: PathBuf,
+        workspace_id: WorkspaceId,
         mut module_ctx: crate::module_ctx::ModuleContext,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
         // 1. Get the cell resolver to parse the bzl path
@@ -296,7 +297,7 @@ impl ConcreteModuleExtensionExecutor {
         // `mctx.path(Label)` / `mctx.read(Label)` calls inside the eval
         // can drive lazy materialization of sibling-extension spoke
         // repos via `slug_bzlmod::materialize_spoke_sync`.
-        let (result, specs) = slug_bzlmod::with_extension_dice(ctx, project_root, || {
+        let (result, specs) = slug_bzlmod::with_extension_dice(ctx, workspace_id, || {
             with_repo_spec_registry(|| {
                 // Create a Starlark module for evaluation
                 let starlark_module = Module::new();
@@ -372,6 +373,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
         repo_env: Arc<BTreeMap<String, String>>,
+        workspace_id: Option<WorkspaceId>,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
         tracing::debug!(
             "Executing extension '{}' (slug_interpreter_for_build)",
@@ -385,6 +387,8 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         let cell_resolver = ctx.get_cell_resolver().await?;
         let io = ctx.global_data().get_io_provider();
         let project_root = io.project_root().root().to_path_buf();
+        let workspace_id =
+            workspace_id.unwrap_or_else(|| WorkspaceId::for_project_root(project_root.clone()));
         let mut cell_paths = std::collections::HashMap::new();
         for (cell_name, cell_instance) in cell_resolver.cells() {
             let rel_path = cell_instance.path().as_project_relative_path();
@@ -428,7 +432,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         }
 
         let output = self
-            .try_execute_starlark(ctx, aggregated, project_root.clone(), module_ctx)
+            .try_execute_starlark(ctx, aggregated, workspace_id, module_ctx)
             .await
             .buck_error_context(format!(
                 "module extension '{}' failed",

@@ -35,6 +35,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use slug_util::late_binding::LateBinding;
 
+use crate::WorkspaceId;
 use crate::extensions::AggregatedExtension;
 use crate::repo_spec::RepoSpec;
 
@@ -110,6 +111,7 @@ pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
         repo_env: Arc<BTreeMap<String, String>>,
+        workspace_id: Option<WorkspaceId>,
     ) -> slug_error::Result<ExtensionExecutionOutput>;
 }
 
