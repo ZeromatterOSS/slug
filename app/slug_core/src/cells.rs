@@ -1851,7 +1851,7 @@ struct CellResolverInternals {
     cells: HashMap<CellName, CellInstance>,
     /// Dynamically-added cells from extension execution (spoke repos, etc.)
     #[allocative(skip)]
-    dynamic_cells: RwLock<HashMap<CellName, &'static CellInstance>>,
+    dynamic_cells: RwLock<HashMap<CellName, DynamicBzlmodEntry<&'static CellInstance>>>,
     #[allocative(visit = crate::cells::sequence_trie_allocative::visit_sequence_trie)]
     path_mappings: SequenceTrie<FileNameBuf, CellName>,
     root_cell: CellName,
@@ -1969,7 +1969,10 @@ impl CellResolver {
         // If found, promote to "static" by leaking the reference (safe: cells live for
         // the duration of the build). This avoids holding the RwLock across returns.
         if let Ok(dynamic) = self.0.dynamic_cells.read() {
-            if dynamic.contains_key(&cell) {
+            if dynamic
+                .get(&cell)
+                .is_some_and(dynamic_bzlmod_entry_matches_current_root)
+            {
                 // Drop the read lock, get a write lock, and leak a reference
                 drop(dynamic);
                 return self.get_or_create_dynamic_cell(cell);
@@ -1997,7 +2000,7 @@ impl CellResolver {
                     // Create external/ symlink for action execution
                     ensure_external_symlink(cell.as_str(), &path);
                     if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                        dynamic.insert(cell, Box::leak(Box::new(instance)));
+                        dynamic.insert(cell, dynamic_bzlmod_entry(Box::leak(Box::new(instance))));
                     }
                     return self.get_or_create_dynamic_cell(cell);
                 }
@@ -2022,7 +2025,8 @@ impl CellResolver {
                     if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
                         register_dynamic_extension_cell(cell_str.to_owned(), path);
                         if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                            dynamic.insert(cell, Box::leak(Box::new(instance)));
+                            dynamic
+                                .insert(cell, dynamic_bzlmod_entry(Box::leak(Box::new(instance))));
                         }
                         return self.get_or_create_dynamic_cell(cell);
                     }
@@ -2040,7 +2044,8 @@ impl CellResolver {
                         // Also register in dynamic registry for future lookups
                         register_dynamic_extension_cell(canonical, path);
                         if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                            dynamic.insert(cell, Box::leak(Box::new(instance)));
+                            dynamic
+                                .insert(cell, dynamic_bzlmod_entry(Box::leak(Box::new(instance))));
                         }
                         return self.get_or_create_dynamic_cell(cell);
                     }
@@ -2064,8 +2069,11 @@ impl CellResolver {
         let dynamic = self.0.dynamic_cells.read().map_err(|_| {
             CellError::UnknownCellName(cell, self.0.cells.keys().copied().collect())
         })?;
-        if let Some(instance) = dynamic.get(&cell) {
-            Ok(*instance)
+        if let Some(instance) = dynamic
+            .get(&cell)
+            .and_then(dynamic_bzlmod_value_for_current_root)
+        {
+            Ok(instance)
         } else {
             Err(slug_error::Error::from(CellError::UnknownCellName(
                 cell,
@@ -2107,7 +2115,11 @@ impl CellResolver {
         let path = path.as_ref();
         if let Ok(dynamic_cells) = self.0.dynamic_cells.read() {
             let mut best_dynamic: Option<(usize, CellPath)> = None;
-            for (cell, instance) in dynamic_cells.iter() {
+            for (cell, instance) in dynamic_cells
+                .iter()
+                .filter(|(_, entry)| dynamic_bzlmod_entry_matches_current_root(entry))
+                .map(|(cell, entry)| (cell, entry.value))
+            {
                 let cell_root = instance.path().as_project_relative_path();
                 let Some(relative) = path.strip_prefix_opt(cell_root) else {
                     continue;
@@ -2482,6 +2494,21 @@ mod tests {
             resolve_scoped_bzlmod_repo_alias("owner+", "dep").as_deref(),
             Some("dep+1.0")
         );
+        let cells = CellResolver::testing_with_names_and_paths(&[(
+            CellName::testing_new("root"),
+            CellRootPathBuf::testing_new(""),
+        )]);
+        let dynamic_cell = CellName::testing_new(canonical);
+        assert_eq!(cells.get(dynamic_cell)?.name(), dynamic_cell);
+        assert_eq!(
+            cells.get_cell_path(ProjectRelativePath::new(&format!(
+                "{canonical_path}/defs.bzl"
+            ))?),
+            CellPath::new(
+                dynamic_cell,
+                ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
+            )
+        );
 
         *DYNAMIC_PROJECT_ROOT.write().unwrap() = Some(root_b.clone());
 
@@ -2489,6 +2516,16 @@ mod tests {
         assert_eq!(resolve_dynamic_extension_cell_alias("repo_alias"), None);
         assert_eq!(get_dynamic_extension_cell_setup(canonical), None);
         assert_eq!(resolve_scoped_bzlmod_repo_alias("owner+", "dep"), None);
+        assert!(cells.get(dynamic_cell).is_err());
+        assert_eq!(
+            cells.get_cell_path(ProjectRelativePath::new(&format!(
+                "{canonical_path}/defs.bzl"
+            ))?),
+            CellPath::new(
+                CellName::testing_new("root"),
+                ForwardRelativePathBuf::unchecked_new(format!("{canonical_path}/defs.bzl")).into()
+            )
+        );
 
         reset_dynamic_bzlmod_state_for_project_root(root_b);
         Ok(())

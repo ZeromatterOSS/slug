@@ -838,6 +838,15 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, the focused Plan 61 Python replay subset, the full
   Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
   `git diff --check`.
+- Resolver-local promoted dynamic cells now carry the same dynamic project-root
+  identity as the global generated-repo maps. `CellResolver::get()` and
+  `get_cell_path()` ignore promoted dynamic cells after the active bzlmod root
+  changes, so a stale resolver cache cannot bypass the root-scoped registry
+  checks. Validation passed with `cargo check -p slug_core`, `cargo test -p
+  slug_core dynamic_bzlmod_entries_are_scoped_to_current_project_root --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay subset,
+  the full Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
+  `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -971,8 +980,9 @@ What did not work or remains risky:
   mappings, load failures, and delete transitions.
 - Dynamic generated-repo state is still held in process-global maps. Clearing
   the suffix cache, making suffix lookup deterministic, and scoping registered
-  dynamic entries to the active project root close leaks in the transitional
-  reset/lookup path, but do not make the bzlmod cell graph a DICE-owned value.
+  and promoted dynamic entries to the active project root close leaks in the
+  transitional reset/lookup path, but do not make the bzlmod cell graph a
+  DICE-owned value.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
@@ -1125,6 +1135,8 @@ using Rust DICE keys and values:
      final materialization state are still not fully DICE-owned.
    - Dynamic generated-repo cell maps are now project-root scoped, but they
      remain process-global maps rather than a DICE-owned `BzlmodCellGraphKey`.
+     Resolver-local promoted dynamic cells also carry project-root identity, but
+     remain a cache over that transitional global graph.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
