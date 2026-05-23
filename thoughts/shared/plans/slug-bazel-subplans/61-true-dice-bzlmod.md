@@ -106,6 +106,12 @@ Observed SDK result at the checkpoint:
   behavior: a replayed generated repo first hits the lockfile, then editing the
   mapped external helper loaded through an apparent repo alias rejects replay
   and runs the edited extension implementation.
+- Best-effort extension `.bzl` digests also include missing project-local load
+  paths as read-error state, so creating a helper that had been absent when the
+  lockfile digest was written rejects stale replay instead of silently trusting
+  the old generated repo spec.
+- The same best-effort digest path now has explicit same-daemon coverage for
+  deletion of a previously loaded mapped external helper file.
 - Root `bazel_dep(..., dev_dependency = True)` now participates in normal
   resolution by default for both local overrides and registry-backed modules,
   and `--ignore_dev_dependency` removes those root dev dependencies from the
@@ -458,6 +464,16 @@ Observed SDK result at the checkpoint:
   stale marker fix, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p
   slug_external_cells -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, and the full Plan 61 Python guardrail passed with 67 tests.
+- Missing `.bzl` load replay validation passed with `cargo test -p slug_bzlmod
+  test_project_bzl_digest_includes_missing_project_load_state -- --nocapture`,
+  `cargo build -p slug`, the focused Plan 61 Python guardrail
+  `missing_transitive_extension_bzl_load_creation_rejects_replay`, and the full
+  Plan 61 Python guardrail with 68 tests.
+- Mapped external `.bzl` delete replay validation passed with `cargo test -p
+  slug_bzlmod test_project_bzl_digest_includes_existing_external_loads --
+  --nocapture`, the focused Plan 61 Python guardrail
+  `mapped_external_extension_bzl_load_deletion_rejects_replay`, and the full
+  Plan 61 Python guardrail with 69 tests.
 
 ## Consolidated Learnings
 
@@ -506,12 +522,13 @@ What did not work or remains risky:
   but the lockfile values still flow through the injected transitional session
   rather than a final replay-input key.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
-  literal loads and existing external files under `bazel-external/<repo>` are
-  hashed, and repo mappings are applied where the caller has a
-  `RepoMappingSnapshot`. Same-daemon generated-repo access now rejects replay
-  after a mapped external helper edit, but load failures, deleted files,
-  audit-cell-only external load changes, and the full interpreter load graph
-  are not replay-complete.
+  literal loads, missing project-local load paths, and existing external files
+  under `bazel-external/<repo>` are hashed, and repo mappings are applied where
+  the caller has a `RepoMappingSnapshot`. Same-daemon generated-repo access now
+  rejects replay after a mapped external helper edit and after a missing
+  project-local helper is created, with explicit coverage for mapped external
+  helper deletion. Other external load failures, audit-cell-only external load
+  changes, and the full interpreter load graph are not replay-complete.
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity, but

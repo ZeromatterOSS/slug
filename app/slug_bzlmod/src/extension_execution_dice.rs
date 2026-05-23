@@ -1631,7 +1631,7 @@ fn collect_bzl_transitive_files(
         else {
             continue;
         };
-        if load_location.path.starts_with(project_root) && load_location.path.is_file() {
+        if load_location.path.starts_with(project_root) {
             collect_bzl_transitive_files(
                 project_root,
                 load_location,
@@ -2224,6 +2224,34 @@ mod tests {
             compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
 
         assert_ne!(first, second);
+
+        std::fs::remove_file(&helper_path).unwrap();
+        let deleted =
+            compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
+
+        assert_ne!(second, deleted);
+    }
+
+    #[test]
+    fn test_project_bzl_digest_includes_missing_project_load_state() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("ext.bzl"),
+            "load(\"//tools:helper.bzl\", \"HELPER\")\n",
+        )
+        .unwrap();
+        let helper_dir = temp_dir.path().join("tools");
+        std::fs::create_dir_all(&helper_dir).unwrap();
+        let helper_path = helper_dir.join("helper.bzl");
+
+        let missing =
+            compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
+
+        std::fs::write(&helper_path, "HELPER = \"created\"\n").unwrap();
+        let created =
+            compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
+
+        assert_ne!(missing, created);
     }
 
     #[test]

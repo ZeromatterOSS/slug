@@ -223,7 +223,10 @@ def _slug_bzl_transitive_digest(
                     return
                 seen_locations.add(location)
                 seen_files.add(path)
-                content = path.read_text()
+                try:
+                    content = path.read_text()
+                except OSError:
+                    return
                 for load in re.findall(r"""load\(\s*["']([^"']+)["']""", content):
                     loaded = _label_bzl_location(
                         load,
@@ -231,7 +234,7 @@ def _slug_bzl_transitive_digest(
                         (path, repo, package),
                         repo_mappings,
                     )
-                    if loaded is None or not loaded[0].is_file():
+                    if loaded is None:
                         continue
                     try:
                         loaded[0].relative_to(project_root)
@@ -248,7 +251,14 @@ def _slug_bzl_transitive_digest(
                 for path in sorted(seen_files):
                     hasher.update(path.relative_to(project_root).as_posix().encode())
                     hasher.update(b"\0")
-                    hasher.update(path.read_bytes())
+                    try:
+                        hasher.update(path.read_bytes())
+                    except FileNotFoundError:
+                        hasher.update(b"read_error:")
+                        hasher.update(b"No such file or directory (os error 2)")
+                    except OSError as e:
+                        hasher.update(b"read_error:")
+                        hasher.update(str(e).encode())
                     hasher.update(b"\0")
                 return base64.b64encode(hasher.digest()).decode()
 
@@ -2362,6 +2372,71 @@ use_repo(replay, "replayed_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_missing_transitive_extension_bzl_load_creation_rejects_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction uses the loaded .bzl graph digest."""
+    module_name = "plan61_missing_transitive_load"
+    extension_id = "@plan61_missing_transitive_load//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    replayed_repo.mkdir(exist_ok=True)
+    _write(replayed_repo / "BUILD.bazel", "filegroup(name = \"data\")\n")
+    _write(
+        buck.cwd / "replay_ext.bzl",
+        """load("//tools:helper.bzl", "HELPER_SENTINEL")
+
+def _replay_ext_impl(module_ctx):
+    fail("missing helper creation should make replay stale: %s" % HELPER_SENTINEL)
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=module_name,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_replayed_repo")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    helper_dir = buck.cwd / "tools"
+    helper_dir.mkdir(exist_ok=True)
+    _write(helper_dir / "helper.bzl", 'HELPER_SENTINEL = "created helper"\n')
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_replayed_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert "missing helper creation should make replay stale: created helper" in str(exc.value)
+    assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_mapped_external_extension_bzl_load_edit_rejects_replay(
     buck: Buck,
 ) -> None:
@@ -2454,6 +2529,98 @@ use_repo(replay, "replayed_repo")
     second = await _bzlmod_counters(buck)
 
     assert "mapped helper edit should make replay stale: edited mapped helper" in str(exc.value)
+    assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_mapped_external_extension_bzl_load_deletion_rejects_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction loaded .bzl digest includes deletes."""
+    owner_module = "plan61_rules_owner_delete"
+    helper_module = "plan61_real_helper_delete"
+    helper_alias = "plan61_helper_alias_delete"
+    root_module = "plan61_mapped_load_delete_replay"
+    extension_id = f"@{owner_module}//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    owner_dir = buck.cwd.parent / f"{buck.cwd.name}_rules_owner_delete"
+    helper_dir = buck.cwd.parent / f"{buck.cwd.name}_real_helper_delete"
+    external_dir = buck.cwd / "bazel-external"
+
+    replayed_repo.mkdir(exist_ok=True)
+    owner_dir.mkdir(parents=True, exist_ok=True)
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    external_dir.mkdir(exist_ok=True)
+
+    _write(replayed_repo / "BUILD.bazel", "filegroup(name = \"data\")\n")
+    _write(
+        owner_dir / "MODULE.bazel",
+        f"""module(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", repo_name = "{helper_alias}")
+""",
+    )
+    _write(
+        owner_dir / "replay_ext.bzl",
+        f"""load("@{helper_alias}//:helper.bzl", "HELPER_SENTINEL")
+
+def _replay_ext_impl(module_ctx):
+    fail("external helper deletion should make replay stale: %s" % HELPER_SENTINEL)
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(helper_dir / "MODULE.bazel", f'module(name = "{helper_module}", version = "1.0")\n')
+    helper_path = helper_dir / "helper.bzl"
+    _write(helper_path, 'HELPER_SENTINEL = "initial mapped helper"\n')
+
+    (external_dir / f"{owner_module}+").symlink_to(owner_dir, target_is_directory=True)
+    (external_dir / f"{helper_module}+").symlink_to(helper_dir, target_is_directory=True)
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{root_module}")
+bazel_dep(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", version = "1.0")
+local_path_override(module_name = "{owner_module}", path = "{owner_dir.as_posix()}")
+local_path_override(module_name = "{helper_module}", path = "{helper_dir.as_posix()}")
+
+replay = use_extension("@{owner_module}//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=root_module,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+        repo_mappings={owner_module: {helper_alias: helper_module}},
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_replayed_repo")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    helper_path.unlink()
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_replayed_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert "helper.bzl" in str(exc.value)
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
 
