@@ -3124,6 +3124,51 @@ use_repo(ext, "generated")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_inject_repo_is_ignored_under_ignore_dev_dependency(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: inject_repo() is ignored by --ignore_dev_dependency."""
+    helper = buck.cwd / "helper"
+    helper.mkdir()
+    _write(helper / "MODULE.bazel", 'module(name = "helper", version = "1.0")\n')
+    _write(helper / "BUILD.bazel", 'exports_files(["payload.txt"])\n')
+    _write(helper / "payload.txt", "payload from helper\n")
+    _write(
+        buck.cwd / "ext.bzl",
+        """def _made_impl(ctx):
+    ctx.file(
+        "BUILD.bazel",
+        "filegroup(name = \\"from_injected\\", srcs = [\\"@injected_helper//:payload.txt\\"])\\n",
+    )
+
+made = repository_rule(implementation = _made_impl)
+
+def _ext_impl(module_ctx):
+    made(name = "generated")
+
+ext = module_extension(implementation = _ext_impl)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_inject_repo_ignore_dev")
+bazel_dep(name = "helper", version = "1.0")
+local_path_override(module_name = "helper", path = "helper")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, injected_helper = "helper")
+use_repo(ext, "generated")
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "root")\n')
+
+    await buck.build("@generated//:from_injected")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("@generated//:from_injected", "--ignore_dev_dependency")
+
+    assert "injected_helper" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source(
     buck: Buck,
 ) -> None:

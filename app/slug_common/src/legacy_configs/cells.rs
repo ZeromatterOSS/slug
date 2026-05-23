@@ -154,8 +154,12 @@ fn repo_mapping_snapshot_for_modules(
 fn repo_mapping_overrides_for_root(
     parsed_modules: &[(String, ParsedModuleFile)],
     root_module_name: &str,
+    ignore_dev_dependency: bool,
 ) -> slug_bzlmod::RepoMappingOverrides {
     let mut overrides = slug_bzlmod::RepoMappingOverrides::new();
+    if ignore_dev_dependency {
+        return overrides;
+    }
     for (cell_name, parsed_mod) in parsed_modules {
         let module_name = if parsed_mod.module.name.is_empty() {
             root_module_name
@@ -831,6 +835,7 @@ fn root_extension_replay_summary_digest(
     visible_lockfile: Option<&slug_bzlmod::Lockfile>,
     hidden_lockfile: Option<&slug_bzlmod::Lockfile>,
     repo_env: &BTreeMap<String, String>,
+    ignore_dev_dependency: bool,
 ) -> Option<String> {
     if parsed.extension_usages.is_empty()
         || !parsed.module.bazel_deps.is_empty()
@@ -848,14 +853,18 @@ fn root_extension_replay_summary_digest(
     let parsed_modules = vec![(root_module_name.to_owned(), parsed.clone())];
     let mut module_extensions = HashMap::new();
     module_extensions.insert(root_module_name.to_owned(), parsed.extension_usages.clone());
-    let aggregated =
-        slug_bzlmod::aggregate_extensions_with_root(&module_extensions, Some(root_module_name));
+    let aggregated = slug_bzlmod::aggregate_extensions_with_policy(
+        &module_extensions,
+        Some(root_module_name),
+        ignore_dev_dependency,
+    );
     if aggregated.is_empty() {
         return None;
     }
 
     let repo_mappings = repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
-    let repo_mapping_overrides = repo_mapping_overrides_for_root(&parsed_modules, root_module_name);
+    let repo_mapping_overrides =
+        repo_mapping_overrides_for_root(&parsed_modules, root_module_name, ignore_dev_dependency);
 
     let mut hasher = Sha256::new();
     hasher.update(b"root-extension-replay-summary-v1");
@@ -1500,6 +1509,7 @@ impl BuckConfigBasedCells {
                     .as_ref()
                     .and_then(|value| value.lockfile.as_deref()),
                 &options.repo_env,
+                options.ignore_dev_dependency,
             )
         });
         let key = LegacyBzlmodResolutionDiceKey {
@@ -2262,8 +2272,11 @@ impl BuckConfigBasedCells {
         );
         bzlmod_session_data.repo_mappings =
             repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
-        bzlmod_session_data.repo_mapping_overrides =
-            repo_mapping_overrides_for_root(&parsed_modules, root_module_name);
+        bzlmod_session_data.repo_mapping_overrides = repo_mapping_overrides_for_root(
+            &parsed_modules,
+            root_module_name,
+            options.ignore_dev_dependency,
+        );
         let (mut pre_computed_cells, pre_computed_aliases) =
             slug_bzlmod::pre_compute_extension_repo_cells(
                 &parsed_modules,

@@ -86,8 +86,12 @@ pub struct RepoAlias {
 fn collect_root_extension_repo_overrides(
     parsed_modules: &[(String, ParsedModuleFile)],
     root_module_name: &str,
+    ignore_dev_dependency: bool,
 ) -> std::collections::HashMap<(String, String), String> {
     let mut overrides = std::collections::HashMap::new();
+    if ignore_dev_dependency {
+        return overrides;
+    }
 
     for (cell_name, parsed) in parsed_modules {
         let module_name = if parsed.module.name.is_empty() {
@@ -208,8 +212,11 @@ pub fn pre_compute_extension_repo_cells(
     // Track which canonical names we've already registered to avoid duplicates
     // (same repo may appear in use_repo() from multiple modules).
     let mut seen_canonical: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let root_repo_overrides =
-        collect_root_extension_repo_overrides(parsed_modules, root_module_name);
+    let root_repo_overrides = collect_root_extension_repo_overrides(
+        parsed_modules,
+        root_module_name,
+        ignore_dev_dependency,
+    );
 
     for (cell_name, parsed) in parsed_modules {
         // Use the module's own name from its MODULE.bazel for canonical naming.
@@ -269,34 +276,36 @@ pub fn pre_compute_extension_repo_cells(
                 extracted_owner
             };
 
-            // `override_repo(ext, generated = "actual_dep")` replaces the
-            // extension's repo named `generated` with the selected bzlmod
-            // dependency `actual_dep`. That replacement is visible from
-            // repos owned by the extension even when the root module does not
-            // also import the generated repo with `use_repo()`.
-            for (repo_name, dep_name) in &usage.repo_overrides {
-                aliases.push(RepoAlias {
-                    apparent_name: repo_name.clone(),
-                    canonical_name: dep_name.clone(),
-                    declaring_module: Some(owner_module.clone()),
-                });
-                aliases.push(RepoAlias {
-                    apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
-                    canonical_name: dep_name.clone(),
-                    declaring_module: None,
-                });
-            }
-            for (repo_name, dep_name) in &usage.injected_repos {
-                aliases.push(RepoAlias {
-                    apparent_name: repo_name.clone(),
-                    canonical_name: dep_name.clone(),
-                    declaring_module: Some(owner_module.clone()),
-                });
-                aliases.push(RepoAlias {
-                    apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
-                    canonical_name: dep_name.clone(),
-                    declaring_module: None,
-                });
+            if !ignore_dev_dependency {
+                // `override_repo(ext, generated = "actual_dep")` replaces the
+                // extension's repo named `generated` with the selected bzlmod
+                // dependency `actual_dep`. That replacement is visible from
+                // repos owned by the extension even when the root module does not
+                // also import the generated repo with `use_repo()`.
+                for (repo_name, dep_name) in &usage.repo_overrides {
+                    aliases.push(RepoAlias {
+                        apparent_name: repo_name.clone(),
+                        canonical_name: dep_name.clone(),
+                        declaring_module: Some(owner_module.clone()),
+                    });
+                    aliases.push(RepoAlias {
+                        apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
+                        canonical_name: dep_name.clone(),
+                        declaring_module: None,
+                    });
+                }
+                for (repo_name, dep_name) in &usage.injected_repos {
+                    aliases.push(RepoAlias {
+                        apparent_name: repo_name.clone(),
+                        canonical_name: dep_name.clone(),
+                        declaring_module: Some(owner_module.clone()),
+                    });
+                    aliases.push(RepoAlias {
+                        apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
+                        canonical_name: dep_name.clone(),
+                        declaring_module: None,
+                    });
+                }
             }
 
             for import in &usage.imports {
@@ -1353,6 +1362,36 @@ mod tests {
                 && alias.canonical_name == "actual_dep"
                 && alias.declaring_module.as_deref() == Some("rules_owner")
         }));
+    }
+
+    #[test]
+    fn test_root_override_repo_ignored_under_ignore_dev_dependency() {
+        let mut root = parsed_module("root");
+        let mut root_usage =
+            ExtensionUsage::new("@rules_owner//:extensions.bzl".to_owned(), "ext".to_owned());
+        root_usage
+            .repo_overrides
+            .push(("generated".to_owned(), "actual_dep".to_owned()));
+        root.extension_usages.push(root_usage);
+
+        let mut owner = parsed_module("rules_owner");
+        let mut owner_usage = ExtensionUsage::new("//:extensions.bzl".to_owned(), "ext".to_owned());
+        owner_usage
+            .imports
+            .push(UseRepo::new().add_repo("generated".to_owned()));
+        owner.extension_usages.push(owner_usage);
+
+        let (cells, aliases) = pre_compute_extension_repo_cells(
+            &[("root".to_owned(), root), ("rules_owner".to_owned(), owner)],
+            "root",
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].canonical_name, "rules_owner++ext+generated");
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].canonical_name, "rules_owner++ext+generated");
     }
 
     #[test]

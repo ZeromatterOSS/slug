@@ -125,6 +125,11 @@ Observed SDK result at the checkpoint:
   directive fails with "No repository visible as '@injected_helper' from
   repository '@@+ext+generated'"; Slug now has a same-daemon guardrail for the
   keyword alias and repo-mapping replay transition.
+- Root `inject_repo()`/`override_repo()` rows are now omitted from generated
+  repo mappings under `--ignore_dev_dependency`, matching Bazel's
+  `ModuleFileGlobals` early return for those calls. A focused guardrail verifies
+  that an injected helper repo is available by default and invisible with
+  `--ignore_dev_dependency`.
 - `use_extension(..., isolate = True)` has been Bazel-grounded as a larger
   blocker, not a safe small patch. Bazel 9.0.1 rejects it unless
   `--experimental_isolated_extension_usages` is set; with the flag, each
