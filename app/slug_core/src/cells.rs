@@ -180,6 +180,34 @@ static DYNAMIC_PROJECT_ROOT: std::sync::LazyLock<std::sync::RwLock<Option<std::p
 
 const MAX_UNKNOWN_CELL_ALIAS_SUGGESTIONS: usize = 50;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BzlmodRuntimeExtensionCellRegistration {
+    Eager,
+    Lazy,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BzlmodRuntimeExtensionCell {
+    pub canonical_name: String,
+    pub internal_name: String,
+    pub path: String,
+    pub setup: crate::cells::external::ExtensionRepoCellSetup,
+    pub registration: BzlmodRuntimeExtensionCellRegistration,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BzlmodRuntimeScopedRepoAlias {
+    pub owner_module: String,
+    pub apparent_name: String,
+    pub target_name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BzlmodRuntimeDynamicAlias {
+    pub apparent_name: String,
+    pub canonical_name: String,
+}
+
 #[derive(Debug)]
 struct KnownCellAliasesForError {
     aliases: Vec<NonEmptyCellAlias>,
@@ -542,6 +570,64 @@ pub fn get_dynamic_extension_cell_setup(
         .lock()
         .ok()
         .and_then(|m| m.get(name).cloned())
+}
+
+pub fn install_bzlmod_runtime_extension_cells(
+    extension_cells: &[BzlmodRuntimeExtensionCell],
+    scoped_aliases: &[BzlmodRuntimeScopedRepoAlias],
+    dynamic_aliases: &[BzlmodRuntimeDynamicAlias],
+) {
+    for cell in extension_cells {
+        install_bzlmod_runtime_extension_cell_name(
+            &cell.canonical_name,
+            &cell.path,
+            cell.setup.dupe(),
+            &cell.registration,
+        );
+        if cell.internal_name != cell.canonical_name {
+            install_bzlmod_runtime_extension_cell_name(
+                &cell.internal_name,
+                &cell.path,
+                cell.setup.dupe(),
+                &cell.registration,
+            );
+        }
+    }
+
+    for alias in scoped_aliases {
+        register_scoped_bzlmod_repo_alias(
+            alias.owner_module.clone(),
+            alias.apparent_name.clone(),
+            alias.target_name.clone(),
+        );
+    }
+
+    for alias in dynamic_aliases {
+        register_dynamic_extension_cell_alias(
+            alias.apparent_name.clone(),
+            alias.canonical_name.clone(),
+        );
+    }
+}
+
+fn install_bzlmod_runtime_extension_cell_name(
+    name: &str,
+    path: &str,
+    setup: crate::cells::external::ExtensionRepoCellSetup,
+    registration: &BzlmodRuntimeExtensionCellRegistration,
+) {
+    match registration {
+        BzlmodRuntimeExtensionCellRegistration::Eager => {
+            register_dynamic_extension_cell_with_setup(name.to_owned(), path.to_owned(), setup);
+        }
+        BzlmodRuntimeExtensionCellRegistration::Lazy => {
+            register_dynamic_extension_cell_with_setup_lazy(
+                name.to_owned(),
+                path.to_owned(),
+                setup,
+            );
+        }
+    }
 }
 
 fn dynamic_project_root() -> Option<std::path::PathBuf> {
