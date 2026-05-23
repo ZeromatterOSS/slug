@@ -421,6 +421,33 @@ fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
         .is_some_and(|output_digest| !output_digest.is_empty())
 }
 
+fn complete_marker_expected_output<'a>(marker: &'a str, spec_hash: &str) -> Option<&'a str> {
+    let marker = marker.trim();
+    if spec_hash.is_empty() {
+        return marker.strip_prefix("complete:output:");
+    }
+    marker.strip_prefix(&format!("complete:{spec_hash}:output:"))
+}
+
+fn complete_marker_state(marker: &str, spec_hash: &str, repo_dir: &Path) -> String {
+    let marker = marker.trim();
+    if !complete_marker_matches(marker, spec_hash) {
+        return format!("marker-mismatch:{marker}");
+    }
+    let Some(expected_output_digest) = complete_marker_expected_output(marker, spec_hash) else {
+        return format!("marker:{marker}");
+    };
+    match crate::repository_executor::repository_output_digest(repo_dir) {
+        Ok(current_output_digest) if current_output_digest == expected_output_digest => {
+            format!("marker:{marker}")
+        }
+        Ok(current_output_digest) => {
+            format!("marker-output-mismatch:{marker}:current:{current_output_digest}")
+        }
+        Err(e) => format!("marker-output-unreadable:{marker}:{e}"),
+    }
+}
+
 pub fn repository_recorded_inputs_current(
     repo_dir: &Path,
     repo_env: Option<&BTreeMap<String, String>>,
@@ -539,11 +566,7 @@ fn repo_materialization_marker_state_for_key(key: &RepoMaterializationManifestKe
         match std::fs::read_to_string(&marker_path) {
             Ok(marker) => {
                 let trimmed = marker.trim();
-                if complete_marker_matches(trimmed, spec_hash) {
-                    format!("marker:{trimmed}")
-                } else {
-                    format!("marker-mismatch:{trimmed}")
-                }
+                complete_marker_state(trimmed, spec_hash, &repo_dir)
             }
             Err(e) => format!("marker-unreadable:{e}"),
         }
@@ -801,6 +824,13 @@ impl Key for ExtensionRepoExecutionKey {
             "marker_layout_invalid"
         } else if manifest.marker_state.starts_with("marker-mismatch:") {
             "marker_digest_mismatch"
+        } else if manifest.marker_state.starts_with("marker-output-mismatch:") {
+            "marker_output_mismatch"
+        } else if manifest
+            .marker_state
+            .starts_with("marker-output-unreadable:")
+        {
+            "marker_output_unreadable"
         } else if manifest.marker_state.starts_with("marker-unreadable:") || marker_path.exists() {
             "marker_unreadable"
         } else {
@@ -1284,6 +1314,13 @@ mod tests {
             "complete:sha256-abc123:output:sha256-out",
             "sha256-abc123"
         ));
+        assert_eq!(
+            complete_marker_expected_output(
+                "complete:sha256-abc123:output:sha256-out",
+                "sha256-abc123"
+            ),
+            Some("sha256-out")
+        );
         assert!(!complete_marker_matches(
             "complete:sha256-abc123",
             "sha256-abc123"
@@ -1445,7 +1482,7 @@ mod tests {
     }
 
     #[test]
-    fn test_archive_repo_key_hash_includes_marker_state() {
+    fn test_archive_repo_manifest_tracks_output_digest_marker_state() {
         let temp = tempfile::TempDir::new().unwrap();
         let project_root = temp.path().to_path_buf();
         let repo_dir = project_root
@@ -1494,7 +1531,12 @@ mod tests {
         let corrupt_manifest =
             repo_materialization_manifest_for_key(&corrupt.materialization_manifest_key);
 
-        assert_eq!(valid_manifest.digest, corrupt_manifest.digest);
+        assert_ne!(valid_manifest.digest, corrupt_manifest.digest);
+        assert!(
+            corrupt_manifest
+                .marker_state
+                .starts_with("marker-output-mismatch:")
+        );
         assert_eq!(valid, corrupt);
     }
 

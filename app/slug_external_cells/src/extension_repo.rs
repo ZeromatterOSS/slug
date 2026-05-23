@@ -143,6 +143,14 @@ fn is_output_state_marker(marker: &str) -> bool {
     marker.trim().contains(":output:")
 }
 
+fn complete_marker_expected_output<'a>(marker: &'a str, spec_hash: &str) -> Option<&'a str> {
+    let marker = marker.trim();
+    if spec_hash.is_empty() {
+        return marker.strip_prefix("complete:output:");
+    }
+    marker.strip_prefix(&format!("complete:{spec_hash}:output:"))
+}
+
 fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
     let marker = marker.trim();
     if spec_hash.is_empty() {
@@ -151,6 +159,19 @@ fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
     marker
         .strip_prefix(&format!("complete:{spec_hash}:output:"))
         .is_some_and(|output_digest| !output_digest.is_empty())
+}
+
+fn complete_marker_output_state_is_stale(
+    repo_path: &std::path::Path,
+    marker: &str,
+    spec_hash: &str,
+) -> bool {
+    let Some(expected_output_digest) = complete_marker_expected_output(marker, spec_hash) else {
+        return false;
+    };
+    slug_bzlmod::repository_output_digest(repo_path)
+        .map(|current_output_digest| current_output_digest != expected_output_digest)
+        .unwrap_or(true)
 }
 
 fn build_file_has_invalid_empty_target_label(repo_path: &std::path::Path) -> bool {
@@ -666,6 +687,11 @@ pub(crate) async fn get_file_ops_delegate(
                 .as_deref()
                 .is_some_and(|s| is_complete_marker(s) && !complete_marker_matches(s, spec_hash))
     });
+    let output_marker_spec_hash = setup_marker_spec_hash.as_deref().unwrap_or("");
+    let is_stale_output_state = marker_contents.as_deref().is_some_and(|s| {
+        is_complete_marker(s)
+            && complete_marker_output_state_is_stale(&source_path, s, output_marker_spec_hash)
+    });
     let is_stale_spec_unknown_complete = setup.repo_spec_json.is_empty()
         && marker_contents
             .as_deref()
@@ -699,6 +725,7 @@ pub(crate) async fn get_file_ops_delegate(
         && !slug_bzlmod::repository_recorded_inputs_current(&source_path, Some(repo_env.as_ref()));
     if is_stale_non_complete_marker
         || is_stale_complete
+        || is_stale_output_state
         || is_stale_spec_unknown_complete
         || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
         || is_stale_missing_build
@@ -1163,6 +1190,23 @@ mod tests {
         assert!(!is_output_state_marker("complete:sha256-old"));
         assert!(is_output_state_marker(
             "complete:sha256-old:output:sha256-out"
+        ));
+        let output_digest = slug_bzlmod::repository_output_digest(&repo).unwrap();
+        let marker = complete_marker("sha256-new", Some(&output_digest));
+        assert_eq!(
+            complete_marker_expected_output(&marker, "sha256-new"),
+            Some(output_digest.as_str())
+        );
+        assert!(!complete_marker_output_state_is_stale(
+            &repo,
+            &marker,
+            "sha256-new"
+        ));
+        std::fs::write(repo.join("data.txt"), "corrupt").unwrap();
+        assert!(complete_marker_output_state_is_stale(
+            &repo,
+            &marker,
+            "sha256-new"
         ));
         assert!(!is_complete_marker("stub:sha256-old"));
         let _ = std::fs::remove_dir_all(&base);

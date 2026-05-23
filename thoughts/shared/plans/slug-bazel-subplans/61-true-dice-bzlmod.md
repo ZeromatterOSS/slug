@@ -626,6 +626,20 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_bzlmod -- --nocapture`, `cargo build -p slug`, focused
   Plan 61 Python guardrails for repository watch/watch-tree and stale marker
   behavior, and the full Plan 61 Python guardrail with 71 tests.
+- Repository output-state marker validation passed with `cargo fmt --check`,
+  `git diff --check`, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test
+  -p slug_external_cells -- --nocapture`, `cargo build -p slug`, the focused
+  Plan 61 Python guardrail
+  `materialized_repo_marker_revalidates_corrupted_output_digest`, and the full
+  Plan 61 Python guardrail with 72 tests. Slug now treats its
+  `complete:<spec>:output:<digest>` marker as current only when the current
+  repository tree digest still matches the marker, and the external-cell
+  marker gate applies the same stale-output check before trusting an existing
+  materialized repo directory. This tightens Slug's internal marker authority;
+  Bazel source anchor: `RepositoryDirectoryValue` intentionally disables
+  change pruning because the success value does not capture fetched contents,
+  and `RepoRecordedInput` explains marker-recorded inputs used to decide
+  whether a repository is up to date.
 
 ## Consolidated Learnings
 
@@ -642,7 +656,9 @@ What worked:
   module input invalidation gained focused guardrails.
 - Repository materialization no longer blindly trusts stale marker files. The
   marker path distinguishes known repo-spec/output-state cases and rejects old
-  incomplete layouts.
+  incomplete layouts. Slug output-state markers are now verified against the
+  current materialized tree before the DICE repository execution path or the
+  external-cell marker gate accepts them.
 - The process-global legacy bzlmod resolution bridge cache was removed from
   the persisted config load path. Warm no-op reuse now has to come from the
   DICE key path rather than `LEGACY_BZLMOD_RESOLUTION_CACHE`; focused warm
@@ -708,6 +724,11 @@ What did not work or remains risky:
   recorded-input state through child DICE keys. This is cacheable at the parent
   manifest layer but remains transitional until the child reads are backed by
   lower-level tracked filesystem keys instead of direct `std::fs` polling.
+  Output-state marker digest checks now catch corrupt existing repo trees when
+  materialization is requested or when the external-cell gate inspects an
+  existing directory, but already-loaded same-daemon package/target state can
+  still avoid asking the repository materialization key until a higher-level
+  invalidation path reaches it.
 - Module extension and repository rule Starlark APIs now read their effective
   repo environment from explicit contexts seeded by command-key inputs. The
   generated repo cell graph that exposes repository rule specs remains

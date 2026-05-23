@@ -4580,6 +4580,69 @@ repo(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_materialized_repo_marker_revalidates_corrupted_output_digest(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepositoryDirectoryValue and RepoRecordedInput marker checks."""
+    canonical_repo = "_main+output_digest_ext+output_digest_repo"
+    repo_dir = buck.cwd / "bazel-external" / canonical_repo
+    marker = repo_dir / ".slug_repo_complete"
+    _write(
+        buck.cwd / "output_digest_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "fresh output from repo rule\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+output_digest_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _output_digest_ext_impl(module_ctx):
+    output_digest_repo_rule(name = "output_digest_repo")
+
+output_digest_ext = module_extension(
+    implementation = _output_digest_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_output_digest_marker")
+
+ext = use_extension("//:output_digest_ext.bzl", "output_digest_ext")
+use_repo(ext, "output_digest_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_output_digest_repo",
+    srcs = ["@output_digest_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_output_digest_repo")
+    assert marker.exists()
+    assert ":output:" in marker.read_text()
+    materialized_file = repo_dir / "data.txt"
+    assert materialized_file.read_text() == "fresh output from repo rule\n"
+
+    _write(materialized_file, "corrupted materialized output\n")
+
+    await buck.kill()
+    before_refetch = await _bzlmod_counters(buck)
+    await buck.build("//:uses_output_digest_repo")
+    after_refetch = await _bzlmod_counters(buck)
+
+    assert materialized_file.read_text() == "fresh output from repo rule\n"
+    assert after_refetch["repo_materialization_miss_reason"] > before_refetch[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_no_stub_failures_cover_missing_generated_repo_and_repo_rule_failure(
     buck: Buck,
 ) -> None:
