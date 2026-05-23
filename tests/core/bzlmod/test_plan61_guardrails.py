@@ -95,6 +95,32 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _write_cached_registry_module(
+    cache_home: Path,
+    registry_host: str,
+    module_name: str,
+    module_version: str,
+    module_file: str,
+    build_file: str = 'filegroup(name = "ok", srcs = [])\n',
+) -> Path:
+    module_cache = (
+        cache_home
+        / "slug"
+        / "registry"
+        / registry_host
+        / "modules"
+        / module_name
+        / module_version
+    )
+    source_dir = module_cache / "source"
+    source_dir.mkdir(parents=True)
+    _write(module_cache / "MODULE.bazel", module_file)
+    _write(module_cache / "source.json", "{}\n")
+    _write(source_dir / ".complete", "")
+    _write(source_dir / "BUILD.bazel", build_file)
+    return module_cache
+
+
 def _protobuf_varint(value: int) -> bytes:
     out = bytearray()
     while value >= 0x80:
@@ -493,6 +519,205 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_single_version_override_registry_uses_override_registry(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleFileFunction uses RegistryOverride.getRegistry()."""
+    cache_home = buck.cwd / "cache_home"
+    default_registry = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    override_registry = cache_home / "slug" / "registry" / "override.example"
+    default_registry.mkdir(parents=True)
+    override_registry.mkdir(parents=True)
+    _write(default_registry / "bazel_registry.json", "{}\n")
+    _write(override_registry / "bazel_registry.json", "{}\n")
+
+    bbb = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "bbb",
+        "1.0.0",
+        'module(name = "bbb", version = "1.0.0")\n'
+        'bazel_dep(name = "ccc", version = "1.0.0")\n',
+    )
+    _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "ccc",
+        "1.0.0",
+        'module(name = "ccc", version = "1.0.0")\n',
+    )
+    ccc_override = _write_cached_registry_module(
+        cache_home,
+        "override.example",
+        "ccc",
+        "1.0.0",
+        'module(name = "ccc", version = "1.0.0")\n',
+        """filegroup(
+    name = "alt_only",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_single_override_registry")
+
+bazel_dep(name = "bbb", version = "1.0.0")
+single_version_override(
+    module_name = "ccc",
+    registry = "https://override.example",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_override_ccc",
+    srcs = ["@ccc//:alt_only"],
+)
+""",
+    )
+
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                        default_registry / "bazel_registry.json"
+                    ),
+                    "https://override.example/bazel_registry.json": _sha256(
+                        override_registry / "bazel_registry.json"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/MODULE.bazel": _sha256(
+                        bbb / "MODULE.bazel"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/source.json": _sha256(
+                        bbb / "source.json"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/MODULE.bazel": _sha256(
+                        ccc_override / "MODULE.bazel"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/source.json": _sha256(
+                        ccc_override / "source.json"
+                    ),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    await buck.build("//:uses_override_ccc", env={"XDG_CACHE_HOME": str(cache_home)})
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_multiple_version_override_registry_uses_override_registry(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: multiple_version_override is a RegistryOverride."""
+    cache_home = buck.cwd / "cache_home"
+    default_registry = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    override_registry = cache_home / "slug" / "registry" / "override.example"
+    default_registry.mkdir(parents=True)
+    override_registry.mkdir(parents=True)
+    _write(default_registry / "bazel_registry.json", "{}\n")
+    _write(override_registry / "bazel_registry.json", "{}\n")
+
+    bbb = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "bbb",
+        "1.0.0",
+        'module(name = "bbb", version = "1.0.0")\n'
+        'bazel_dep(name = "ccc", version = "1.0.0")\n',
+    )
+    _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "ccc",
+        "1.0.0",
+        'module(name = "ccc", version = "1.0.0")\n',
+    )
+    ccc_override = _write_cached_registry_module(
+        cache_home,
+        "override.example",
+        "ccc",
+        "1.0.0",
+        'module(name = "ccc", version = "1.0.0")\n',
+        """filegroup(
+    name = "alt_only",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_multiple_override_registry")
+
+bazel_dep(name = "bbb", version = "1.0.0")
+multiple_version_override(
+    module_name = "ccc",
+    versions = ["1.0.0"],
+    registry = "https://override.example",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_override_ccc",
+    srcs = ["@ccc//:alt_only"],
+)
+""",
+    )
+
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                        default_registry / "bazel_registry.json"
+                    ),
+                    "https://override.example/bazel_registry.json": _sha256(
+                        override_registry / "bazel_registry.json"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/MODULE.bazel": _sha256(
+                        bbb / "MODULE.bazel"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/source.json": _sha256(
+                        bbb / "source.json"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/MODULE.bazel": _sha256(
+                        ccc_override / "MODULE.bazel"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/source.json": _sha256(
+                        ccc_override / "source.json"
+                    ),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    await buck.build("//:uses_override_ccc", env={"XDG_CACHE_HOME": str(cache_home)})
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_locked_registry_source_json_and_registry_metadata_are_bridge_inputs(
     buck: Buck,
 ) -> None:
@@ -824,6 +1049,35 @@ local_path_override(module_name = "dep", path = "dep")
     _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x", srcs = ["@dep//:x"])\n')
 
     await buck.build("//:x")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_isolated_extension_usage_fails_until_supported(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: isolate=True requires experimental isolated-extension semantics."""
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_isolate_unsupported")
+ext = use_extension("//:ext.bzl", "ext", isolate = True)
+use_repo(ext, "generated")
+""",
+    )
+    _write(
+        buck.cwd / "ext.bzl",
+        """def _ext_impl(module_ctx):
+    pass
+
+ext = module_extension(implementation = _ext_impl)
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "use_extension(isolate = True)" in str(exc.value)
+    assert "experimental_isolated_extension_usages" in str(exc.value)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

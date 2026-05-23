@@ -598,6 +598,19 @@ pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_depen
     }
 
     #[test]
+    fn test_parse_use_extension_with_isolate_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", isolate = True)
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("use_extension(isolate = True)"));
+        assert!(err.contains("experimental_isolated_extension_usages"));
+    }
+
+    #[test]
     fn test_parse_use_repo_rule_with_dev_dependency() {
         let content = r#"
 module(name = "test", version = "1.0.0")

@@ -778,6 +778,14 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
 
+        if isolate {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "use_extension(isolate = True) requires Bazel's \
+                 --experimental_isolated_extension_usages semantics, which Slug does not yet \
+                 implement"
+            )));
+        }
+
         // Create the extension usage record
         let mut ext = ExtensionUsage::new(extension_bzl_file.to_owned(), extension_name.to_owned());
         ext.dev_dependency = dev_dependency;

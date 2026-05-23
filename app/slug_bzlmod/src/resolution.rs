@@ -530,9 +530,33 @@ impl MvsResolver {
     fn get_effective_version(&self, dep: &BazelDep) -> Version {
         // Check for single version override
         if let Some(sv) = self.single_version_overrides.get(&dep.name) {
-            return sv.version.clone();
+            if !sv.version.is_empty() {
+                return sv.version.clone();
+            }
         }
         dep.version.clone()
+    }
+
+    async fn registry_client_for_module(
+        &self,
+        module_name: &str,
+    ) -> slug_error::Result<RegistryClient> {
+        let registry = self
+            .single_version_overrides
+            .get(module_name)
+            .and_then(|sv| sv.registry.as_deref())
+            .or_else(|| {
+                self.multiple_version_overrides
+                    .get(module_name)
+                    .and_then(|mv| mv.registry.as_deref())
+            });
+
+        match registry {
+            Some(registry) if registry != self.registry_client.base_url() => {
+                RegistryClient::new(registry, self.cache.clone()).await
+            }
+            _ => Ok(self.registry_client.clone()),
+        }
     }
 
     /// Check if a module has a non-registry override.
@@ -687,15 +711,21 @@ impl MvsResolver {
     ) -> slug_error::Result<DiscoveredModule> {
         let version_str = dep.version.as_str();
         let key = ModuleKey::from_dep(dep);
-        let module_bazel_url = self.module_bazel_url(&key);
+        let registry_client = self.registry_client_for_module(&dep.name).await?;
+        let registry_url = registry_client.base_url();
+        let module_bazel_url = Self::module_bazel_url_for(registry_url, &key);
 
-        tracing::debug!("Fetching {}@{} from registry", dep.name, version_str);
+        tracing::debug!(
+            "Fetching {}@{} from registry {}",
+            dep.name,
+            version_str,
+            registry_url
+        );
 
-        self.validate_registry_file_hash(&module_bazel_url, None)?;
+        self.validate_registry_file_hash_for_registry(registry_url, &module_bazel_url, None)?;
 
         // Fetch MODULE.bazel content
-        let module_bazel_file = self
-            .registry_client
+        let module_bazel_file = registry_client
             .fetch_module_bazel_file(&dep.name, version_str)
             .await
             .map_err(|e| MvsResolutionError::DependencyResolutionFailed {
@@ -703,7 +733,11 @@ impl MvsResolver {
                 version: version_str.to_string(),
                 reason: format!("Failed to fetch MODULE.bazel: {}", e),
             })?;
-        self.validate_registry_file_hash(&module_bazel_file.url, Some(&module_bazel_file.hash))?;
+        self.validate_registry_file_hash_for_registry(
+            registry_url,
+            &module_bazel_file.url,
+            Some(&module_bazel_file.hash),
+        )?;
         self.registry_file_hashes.insert(
             module_bazel_file.url.clone(),
             module_bazel_file.hash.clone(),
@@ -725,7 +759,7 @@ impl MvsResolver {
             compatibility_level: parsed.module.compatibility_level,
             module: parsed.module,
             source: ModuleSource::Registry {
-                url: self.registry_client.base_url().to_string(),
+                url: registry_url.to_string(),
             },
         })
     }
@@ -1157,18 +1191,28 @@ impl MvsResolver {
                 continue;
             }
 
+            let ModuleSource::Registry { url } = &info.source else {
+                continue;
+            };
+
             let key = ModuleKey::new(&info.name, &info.version);
-            let reason = match self.yanked_reason_from_lockfile(&key) {
+            let source_json_url = Self::source_json_url_for(url, &key);
+            let reason = match self.yanked_reason_from_lockfile(&source_json_url, &key) {
                 YankedVersionStatus::KnownNotYanked => None,
                 YankedVersionStatus::KnownYanked(reason) => Some(reason),
                 YankedVersionStatus::Unknown => {
-                    match self.registry_client.fetch_metadata(&info.name).await {
+                    let registry_client = if url == self.registry_client.base_url() {
+                        self.registry_client.clone()
+                    } else {
+                        RegistryClient::new(url, self.cache.clone()).await?
+                    };
+                    match registry_client.fetch_metadata(&info.name).await {
                         Ok(metadata) => metadata.yanked_versions.get(&info.version).cloned(),
                         Err(e) => {
                             tracing::warn!(
                                 "Could not read metadata file for module {} from registry {}: {}",
                                 info.name,
-                                self.registry_client.base_url(),
+                                url,
                                 e
                             );
                             None
@@ -1196,42 +1240,43 @@ impl MvsResolver {
         Ok(selected_yanked_versions)
     }
 
-    fn yanked_reason_from_lockfile(&self, key: &ModuleKey) -> YankedVersionStatus {
+    fn yanked_reason_from_lockfile(
+        &self,
+        source_json_url: &str,
+        key: &ModuleKey,
+    ) -> YankedVersionStatus {
         yanked_reason_from_lockfile_facts(
             self.lockfile_mode,
             &self.known_registry_file_hashes,
             &self.previously_selected_yanked_versions,
-            &self.source_json_url(key),
+            source_json_url,
             key,
         )
     }
 
-    fn source_json_url(&self, key: &ModuleKey) -> String {
+    fn source_json_url_for(registry_url: &str, key: &ModuleKey) -> String {
         format!(
             "{}/modules/{}/{}/source.json",
-            self.registry_client.base_url(),
-            key.name,
-            key.version
+            registry_url, key.name, key.version
         )
     }
 
-    fn module_bazel_url(&self, key: &ModuleKey) -> String {
+    fn module_bazel_url_for(registry_url: &str, key: &ModuleKey) -> String {
         format!(
             "{}/modules/{}/{}/MODULE.bazel",
-            self.registry_client.base_url(),
-            key.name,
-            key.version
+            registry_url, key.name, key.version
         )
     }
 
-    fn validate_registry_file_hash(
+    fn validate_registry_file_hash_for_registry(
         &self,
+        registry_base_url: &str,
         url: &str,
         actual_hash: Option<&str>,
     ) -> slug_error::Result<()> {
         validate_registry_file_hash_facts(
             self.lockfile_mode,
-            self.registry_client.base_url(),
+            registry_base_url,
             &self.known_registry_file_hashes,
             url,
             actual_hash,
@@ -1298,18 +1343,24 @@ impl MvsResolver {
 
         for (name, info) in &mut graph.modules {
             let source_path = match &info.source {
-                ModuleSource::Registry { url: _ } => {
+                ModuleSource::Registry { url } => {
                     // Fetch from registry
                     let result = async {
                         let key = ModuleKey::new(name.as_str(), info.version.as_str());
-                        let source_json_url = self.source_json_url(&key);
-                        self.validate_registry_file_hash(&source_json_url, None)?;
+                        let source_json_url = Self::source_json_url_for(url, &key);
+                        self.validate_registry_file_hash_for_registry(url, &source_json_url, None)?;
 
-                        let source_info_file = self
-                            .registry_client
+                        let registry_client = if url == self.registry_client.base_url() {
+                            self.registry_client.clone()
+                        } else {
+                            RegistryClient::new(url, self.cache.clone()).await?
+                        };
+
+                        let source_info_file = registry_client
                             .fetch_source_info_file(name, &info.version)
                             .await?;
-                        self.validate_registry_file_hash(
+                        self.validate_registry_file_hash_for_registry(
+                            url,
                             &source_info_file.file.url,
                             Some(&source_info_file.file.hash),
                         )?;
@@ -1317,7 +1368,7 @@ impl MvsResolver {
                         let source_path = self
                             .source_fetcher
                             .fetch_source(
-                                self.registry_client.base_url(),
+                                registry_client.base_url(),
                                 name,
                                 &info.version,
                                 &source_info_file.source_info,

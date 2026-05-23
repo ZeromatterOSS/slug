@@ -132,7 +132,21 @@ Observed SDK result at the checkpoint:
   isolation key, and `module_ctx.is_isolated` is true. Slug currently lacks the
   exported proxy variable name needed for Bazel's `IsolationKey`, aggregates by
   extension id only, names generated repos without the isolation component, and
-  hard-codes `module_ctx.is_isolated` false.
+  hard-codes `module_ctx.is_isolated` false. Until Slug implements that
+  experimental mode, `use_extension(isolate = True)` now fails instead of
+  silently running with non-isolated semantics.
+- Registry selection for `single_version_override(registry = ...)` and
+  `multiple_version_override(registry = ...)` now follows Bazel's
+  `RegistryOverride.getRegistry()` behavior for module discovery, yanked
+  metadata, source fetching, and lockfile registry-file validation. Bazel source
+  anchors: `ModuleFileFunction` restricts registry lookup to the override
+  registry when non-empty, and `RegistryOverride` is implemented by both single
+  and multiple version overrides. Focused Plan 61 guardrails prove both
+  directives select a cached override registry instead of the default registry.
+  `single_version_override(patches = ..., patch_strip = ...)` remains blocked:
+  Bazel applies main-repo patch labels to the discovered `MODULE.bazel` and
+  appends them to the final repo spec, while Slug's source materialization patch
+  path is separate from this slice's allowed files.
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
@@ -306,9 +320,9 @@ What did not work or remains risky:
 - Dynamic generated-repo state is still held in process-global maps. Clearing
   the suffix cache closes one leak in the transitional reset path but does not
   make the bzlmod cell graph a DICE-owned value.
-- Some Bazel 9 semantics are parsed but not fully modeled, including registry
-  selection on overrides, isolated extension usages, and remaining command
-  policy around non-root dev dependencies.
+- Some Bazel 9 semantics are parsed but not fully modeled, including
+  `single_version_override` patch materialization, isolated extension usages,
+  and remaining command policy around non-root dev dependencies.
 - Registry and repository cache behavior is still a blend of DICE identity,
   lockfile checksums, and filesystem markers. It is better than the old path,
   but it is not yet a complete `RepoSpecFunction` /
