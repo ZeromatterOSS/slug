@@ -1851,24 +1851,12 @@ impl CellResolver {
         }
 
         // Check global dynamic registry (populated by extension execution).
-        // First try exact match, then try finding canonical name by suffix match
-        // (handles placeholder labels that use bare names like "crates__tempfile-3.26.0"
-        // instead of canonical "rules_rs+crate+crates__tempfile-3.26.0").
-        let dynamic_lookup = {
-            let exact =
-                get_dynamic_extension_cell(cell.as_str()).map(|p| (cell.as_str().to_owned(), p));
-            exact.or_else(|| {
-                let suffix = format!("+{}", cell.as_str());
-                if let Ok(cells) = DYNAMIC_EXTENSION_CELLS.lock() {
-                    for (canonical, path) in cells.iter() {
-                        if canonical.ends_with(&suffix) {
-                            return Some((canonical.clone(), path.clone()));
-                        }
-                    }
-                }
-                None
-            })
-        };
+        // Resolve through the canonical helper so apparent-name/suffix fallback is
+        // deterministic and respects known module-cell collisions.
+        let dynamic_lookup =
+            canonical_dynamic_extension_cell_name(cell.as_str()).and_then(|canonical| {
+                get_dynamic_extension_cell(&canonical).map(|path| (canonical, path))
+            });
         if let Some((canonical, path)) = dynamic_lookup {
             // Auto-register this cell
             if let Ok(rel_path) = ProjectRelativePath::new(&path) {
@@ -1915,25 +1903,20 @@ impl CellResolver {
                 }
             }
 
-            let suffix = format!("+{}", cell_str);
-            if let Ok(entries) = std::fs::read_dir(&bazel_ext_dir) {
-                for entry in entries.flatten() {
-                    let dir_name = entry.file_name();
-                    let dir_name_str = dir_name.to_string_lossy();
-                    if dir_name_str.ends_with(&suffix) && entry.path().is_dir() {
-                        let path = format!("bazel-external/{}", dir_name_str);
-                        if let Ok(rel_path) = ProjectRelativePath::new(&path) {
-                            let cell_path = CellRootPathBuf::new(rel_path.to_owned());
-                            let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
-                            if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
-                                // Also register in dynamic registry for future lookups
-                                register_dynamic_extension_cell(dir_name_str.to_string(), path);
-                                if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                                    dynamic.insert(cell, Box::leak(Box::new(instance)));
-                                }
-                                return self.get_or_create_dynamic_cell(cell);
-                            }
+            if let Some(canonical) =
+                scan_dynamic_extension_suffix_from_external_dir_uncached(cell_str)
+            {
+                let path = format!("bazel-external/{canonical}");
+                if let Ok(rel_path) = ProjectRelativePath::new(&path) {
+                    let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+                    let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+                    if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                        // Also register in dynamic registry for future lookups
+                        register_dynamic_extension_cell(canonical, path);
+                        if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
+                            dynamic.insert(cell, Box::leak(Box::new(instance)));
                         }
+                        return self.get_or_create_dynamic_cell(cell);
                     }
                 }
             }
@@ -2296,6 +2279,36 @@ mod tests {
 
         assert_eq!(cells.get(dynamic_cell)?.name(), dynamic_cell);
 
+        Ok(())
+    }
+
+    #[test]
+    fn cell_resolver_dynamic_suffix_lookup_is_deterministic() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        register_dynamic_extension_cell(
+            "z_owner++ext+generated".to_owned(),
+            "bazel-external/z_owner++ext+generated".to_owned(),
+        );
+        register_dynamic_extension_cell(
+            "a_owner++ext+generated".to_owned(),
+            "bazel-external/a_owner++ext+generated".to_owned(),
+        );
+        let cells = CellResolver::testing_with_names_and_paths(&[(
+            CellName::testing_new("root"),
+            CellRootPathBuf::testing_new(""),
+        )]);
+        let apparent = CellName::testing_new("generated");
+
+        let cell = cells.get(apparent)?;
+
+        assert_eq!(apparent, cell.name());
+        assert_eq!(
+            "bazel-external/a_owner++ext+generated",
+            cell.path().as_str()
+        );
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().join("after"));
         Ok(())
     }
 

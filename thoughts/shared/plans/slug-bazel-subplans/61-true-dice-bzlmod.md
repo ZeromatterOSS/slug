@@ -488,6 +488,14 @@ Observed SDK result at the checkpoint:
   slug_external_cells -- --nocapture`, the focused Plan 61 Python guardrail
   `non_root_included_module_segment_edit_invalidates_extension_graph`, and the
   full Plan 61 Python guardrail with 70 tests.
+- Dynamic generated-repo suffix lookup is now deterministic in the transitional
+  cell resolver path: apparent/suffix lookups use the canonical helper instead
+  of unordered process-global map iteration, and the last-resort
+  `bazel-external/` directory scan sorts candidates before selecting a match.
+  Focused validation passed with `cargo test -p slug_core
+  cell_resolver_dynamic_suffix_lookup_is_deterministic -- --nocapture`,
+  `cargo build -p slug`, and the focused Plan 61 Python guardrail
+  `two_workspaces_do_not_share_bzlmod_state`.
 
 ## Consolidated Learnings
 
@@ -572,8 +580,9 @@ What did not work or remains risky:
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
 - Dynamic generated-repo state is still held in process-global maps. Clearing
-  the suffix cache closes one leak in the transitional reset path but does not
-  make the bzlmod cell graph a DICE-owned value.
+  the suffix cache and making suffix lookup deterministic close leaks in the
+  transitional reset/lookup path, but do not make the bzlmod cell graph a
+  DICE-owned value.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
