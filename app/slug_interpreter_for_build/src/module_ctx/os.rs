@@ -11,6 +11,9 @@
 //! `RepositoryOs` — information about the host operating system exposed as
 //! `module_ctx.os` / `repository_ctx.os`.
 
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use allocative::Allocative;
 use derive_more::Display;
 use starlark::any::ProvidesStaticType;
@@ -25,7 +28,6 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
-use starlark::values::ValueLike;
 use starlark::values::dict::Dict;
 use starlark::values::starlark_value;
 
@@ -41,12 +43,22 @@ pub struct RepositoryOs {
     pub(super) name: String,
     /// The CPU architecture (e.g., "x86_64", "aarch64").
     pub(super) arch: String,
+    /// Effective repository environment visible to this context.
+    #[allocative(skip)]
+    pub(super) environ: Arc<BTreeMap<String, String>>,
 }
 
 starlark_simple_value!(RepositoryOs);
 
 impl RepositoryOs {
     pub fn new() -> Self {
+        let environ = slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
+            .into_iter()
+            .collect();
+        Self::new_with_environ(Arc::new(environ))
+    }
+
+    pub fn new_with_environ(environ: Arc<BTreeMap<String, String>>) -> Self {
         let name = if cfg!(target_os = "linux") {
             "linux"
         } else if cfg!(target_os = "macos") {
@@ -70,6 +82,7 @@ impl RepositoryOs {
         Self {
             name: name.to_owned(),
             arch: arch.to_owned(),
+            environ,
         }
     }
 }
@@ -104,7 +117,7 @@ fn repository_os_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn environ<'v>(this: &RepositoryOs, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let mut map = SmallMap::new();
-        for (key, val) in slug_build_api::interpreter::rule_defs::build_config::get_repo_env() {
+        for (key, val) in this.environ.iter() {
             map.insert_hashed(
                 heap.alloc_str(&key).to_value().get_hashed().unwrap(),
                 heap.alloc_str(&val).to_value(),

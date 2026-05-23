@@ -1091,6 +1091,7 @@ impl Key for ModuleExtensionExecutionKey {
                         &self.root_module_name,
                         &temp_dir,
                         prior_facts,
+                        self.repo_env.clone(),
                     )
                     .await
             }

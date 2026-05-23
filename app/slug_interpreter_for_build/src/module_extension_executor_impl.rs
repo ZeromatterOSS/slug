@@ -43,7 +43,9 @@
 //! RepoSpecs are captured via `with_repo_spec_registry()` - any repository rule
 //! calls during extension execution record their specs instead of executing.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
@@ -369,6 +371,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         root_module_name: &str,
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
+        repo_env: Arc<BTreeMap<String, String>>,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
         tracing::debug!(
             "Executing extension '{}' (slug_interpreter_for_build)",
@@ -395,7 +398,8 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         let module_ctx = build_module_context(aggregated, root_module_name)
             .with_temp_working_dir(working_dir.clone())
             .with_label_resolution(project_root.clone(), cell_paths)
-            .with_facts(prior_facts);
+            .with_facts(prior_facts)
+            .with_repo_env(repo_env);
 
         tracing::debug!(
             "Built module_ctx with {} module(s), working_dir: {:?}",

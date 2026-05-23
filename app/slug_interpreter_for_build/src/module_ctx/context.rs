@@ -12,6 +12,7 @@
 //! implementation functions. Holds the list of modules using this extension
 //! plus helpers to resolve Labels to filesystem paths.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -94,6 +95,9 @@ pub struct ModuleContext {
     /// Facts returned by a previous execution of this extension.
     #[allocative(skip)]
     facts: serde_json::Value,
+    /// Effective command repository environment for this extension execution.
+    #[allocative(skip)]
+    repo_env: Arc<BTreeMap<String, String>>,
 }
 
 starlark_simple_value!(ModuleContext);
@@ -118,6 +122,7 @@ impl ModuleContext {
             project_root: None,
             cell_paths: HashMap::new(),
             facts: empty_facts(),
+            repo_env: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -134,6 +139,7 @@ impl ModuleContext {
             project_root: None,
             cell_paths: HashMap::new(),
             facts: empty_facts(),
+            repo_env: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -147,6 +153,7 @@ impl ModuleContext {
             project_root: None,
             cell_paths: HashMap::new(),
             facts: empty_facts(),
+            repo_env: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -193,6 +200,12 @@ impl ModuleContext {
             serde_json::Value::Object(_) => facts,
             _ => empty_facts(),
         };
+        self
+    }
+
+    /// Set the effective repository environment for module extension APIs.
+    pub fn with_repo_env(mut self, repo_env: Arc<BTreeMap<String, String>>) -> Self {
+        self.repo_env = repo_env;
         self
     }
 
@@ -274,6 +287,11 @@ impl ModuleContext {
     pub fn get_modules(&self) -> &[SerializedModule] {
         &self.modules
     }
+
+    /// Effective repository environment for module_ctx.getenv/os.environ.
+    pub fn repo_env(&self) -> &BTreeMap<String, String> {
+        &self.repo_env
+    }
 }
 
 #[starlark_value(type = "module_ctx")]
@@ -308,7 +326,7 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
                     .collect();
                 Some(heap.alloc(modules))
             }
-            "os" => Some(heap.alloc(RepositoryOs::new())),
+            "os" => Some(heap.alloc(RepositoryOs::new_with_environ(self.repo_env.clone()))),
             "root_module_has_non_dev_dependency" => {
                 Some(Value::new_bool(self.root_module_has_non_dev_dependency))
             }

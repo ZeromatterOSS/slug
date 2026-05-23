@@ -2571,6 +2571,54 @@ use_repo(live, "live_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_repo_env_uses_command_key_input(buck: Buck) -> None:
+    """Bazel anchors: ModuleExtensionContext.getenv and repository_os.environ."""
+    _write(
+        buck.cwd / "env_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "env payload\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+env_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _env_ext_impl(module_ctx):
+    if module_ctx.getenv("PLAN61_REPO_ENV") != "from-flag":
+        fail("PLAN61_MODULE_CTX_GETENV_NOT_FROM_COMMAND")
+    if module_ctx.getenv("PLAN61_REPO_ENV_MISSING", "fallback") != "fallback":
+        fail("PLAN61_MODULE_CTX_GETENV_DEFAULT_NOT_USED")
+    if module_ctx.os.environ.get("PLAN61_REPO_ENV") != "from-flag":
+        fail("PLAN61_MODULE_CTX_OS_ENVIRON_NOT_FROM_COMMAND")
+    env_repo_rule(name = "env_repo")
+
+env_ext = module_extension(
+    implementation = _env_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_repo_env")
+
+env = use_extension("//:env_ext.bzl", "env_ext")
+use_repo(env, "env_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_env_repo",
+    srcs = ["@env_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_env_repo", "--repo_env=PLAN61_REPO_ENV=from-flag")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_label_taking_operations_materialize_or_fail_directly(
     buck: Buck,
 ) -> None:

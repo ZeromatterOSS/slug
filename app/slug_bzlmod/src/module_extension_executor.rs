@@ -27,7 +27,9 @@
 //! The late binding pattern allows `ModuleExtensionExecutionKey::compute()` in
 //! `slug_bzlmod` to call into `slug_interpreter_for_build` without a direct dependency.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
@@ -107,6 +109,7 @@ pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
         root_module_name: &str,
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
+        repo_env: Arc<BTreeMap<String, String>>,
     ) -> slug_error::Result<ExtensionExecutionOutput>;
 }
 

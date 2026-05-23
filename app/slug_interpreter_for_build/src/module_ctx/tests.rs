@@ -8,8 +8,10 @@
  * above-listed licenses.
  */
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use tempfile::TempDir;
 
@@ -46,6 +48,34 @@ fn test_module_context_exposes_facts_attr() {
         facts.at(heap.alloc("resource"), heap).unwrap().unpack_str(),
         Some("stored")
     );
+}
+
+#[test]
+fn test_module_context_repo_env_is_context_owned() {
+    use starlark::environment::Globals;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    let mut repo_env = BTreeMap::new();
+    repo_env.insert("PLAN61_REPO_ENV".to_owned(), "from-context".to_owned());
+    let ctx = ModuleContext::empty().with_repo_env(Arc::new(repo_env));
+
+    let module = Module::new();
+    let heap = module.heap();
+    module.set("mctx", heap.alloc(ctx));
+
+    let ast = AstModule::parse(
+        "repo_env.star",
+        "mctx.getenv('PLAN61_REPO_ENV') + ':' + mctx.os.environ['PLAN61_REPO_ENV']".to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    let result = eval.eval_module(ast, &Globals::standard()).unwrap();
+
+    assert_eq!(result.unpack_str(), Some("from-context:from-context"));
 }
 
 #[test]
