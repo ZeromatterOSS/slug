@@ -69,6 +69,8 @@ pub use dice_graph::BzlmodModuleVersionsDataValue;
 pub use dice_graph::BzlmodModuleVersionsInvalidation;
 pub use dice_graph::BzlmodRegisteredExecutionPlatformsDataKey;
 pub use dice_graph::BzlmodRegisteredToolchainsDataKey;
+pub use dice_graph::BzlmodRepoMappingsDataKey;
+pub use dice_graph::BzlmodRepoMappingsDataValue;
 pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionRepoExecutionIdentity;
@@ -259,8 +261,8 @@ pub struct BzlmodSessionData {
 ///
 /// This is still injected from the legacy bzlmod resolver, but it narrows
 /// extension replay/materialization consumers away from unrelated session
-/// fields while preserving the lockfile, repo-env, and repo-mapping inputs
-/// needed by `ModuleExtensionExecutionKey`.
+/// fields while preserving the lockfile and repo-env inputs needed by
+/// `ModuleExtensionExecutionKey`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionSessionData {
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
@@ -273,8 +275,6 @@ pub struct BzlmodExtensionSessionData {
     pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
     pub lockfile_mode: LockfileMode,
     pub repo_env: BTreeMap<String, String>,
-    pub repo_mappings: RepoMappingSnapshot,
-    pub repo_mapping_overrides: RepoMappingOverrides,
 }
 
 impl From<&BzlmodSessionData> for BzlmodExtensionSessionData {
@@ -290,8 +290,6 @@ impl From<&BzlmodSessionData> for BzlmodExtensionSessionData {
             hidden_lockfile: data.hidden_lockfile.clone(),
             lockfile_mode: data.lockfile_mode,
             repo_env: data.repo_env.clone(),
-            repo_mappings: data.repo_mappings.clone(),
-            repo_mapping_overrides: data.repo_mapping_overrides.clone(),
         }
     }
 }
@@ -342,6 +340,11 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
                 repo_mapping_overrides: data.repo_mapping_overrides.clone(),
             }),
         });
+        let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
+            workspace_id: workspace_id.clone(),
+            repo_mappings: Arc::new(data.repo_mappings.clone()),
+            repo_mapping_overrides: Arc::new(data.repo_mapping_overrides.clone()),
+        });
         let extension_session = Arc::new(BzlmodExtensionSessionData::from(&data));
         let registered_toolchains = Arc::new(RegisteredToolchainsValue {
             workspace_id: workspace_id.clone(),
@@ -360,6 +363,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             BzlmodRegisteredExecutionPlatformsDataKey,
             registered_execution_platforms,
         )])?;
+        self.changed_to(vec![(BzlmodRepoMappingsDataKey, repo_mappings)])?;
         self.changed_to(vec![(BzlmodExtensionSessionDataKey, extension_session)])?;
         Ok(())
     }

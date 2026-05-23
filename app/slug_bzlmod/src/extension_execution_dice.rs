@@ -53,6 +53,8 @@ use crate::BzlmodExtensionSessionData;
 use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
+use crate::dice_graph::BzlmodRepoMappingsDataKey;
+use crate::dice_graph::BzlmodRepoMappingsDataValue;
 use crate::dice_graph::ExtensionSpoke;
 use crate::dice_graph::ExtensionSpokesByCanonicalRepoKey;
 use crate::dice_graph::ExtensionSpokesByExtensionIdKey;
@@ -97,6 +99,7 @@ fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) ->
 /// DICE-injected bzlmod session data.
 pub fn create_extension_execution_key(
     data: &BzlmodExtensionSessionData,
+    repo_mappings: &BzlmodRepoMappingsDataValue,
     extension_id: &str,
 ) -> Option<ModuleExtensionExecutionKey> {
     let aggregated = match data.extension_aggregations.get(extension_id) {
@@ -121,13 +124,14 @@ pub fn create_extension_execution_key(
         data.hidden_lockfile.clone(),
         data.lockfile_mode,
         data.repo_env.clone(),
-        data.repo_mappings.clone(),
-        data.repo_mapping_overrides.clone(),
+        repo_mappings.repo_mappings.as_ref().clone(),
+        repo_mappings.repo_mapping_overrides.as_ref().clone(),
     ))
 }
 
 pub fn extension_spokes_key_for_extension_id(
     data: &BzlmodExtensionSessionData,
+    repo_mappings: &BzlmodRepoMappingsDataValue,
     extension_id: &str,
 ) -> Option<ExtensionSpokesKey> {
     data.extension_aggregations
@@ -137,10 +141,10 @@ pub fn extension_spokes_key_for_extension_id(
                 compute_bzl_transitive_digest_for_project_with_repo_mappings(
                     extension_id,
                     &data.project_root,
-                    Some(&data.repo_mappings),
+                    Some(repo_mappings.repo_mappings.as_ref()),
                 );
             ExtensionSpokesKey::for_workspace_id_with_digest(
-                workspace_id_for_session_data(data),
+                repo_mappings.workspace_id.clone(),
                 extension_id,
                 &bzl_transitive_digest,
             )
@@ -149,6 +153,7 @@ pub fn extension_spokes_key_for_extension_id(
 
 pub fn extension_spokes_key_for_canonical_repo(
     data: &BzlmodExtensionSessionData,
+    repo_mappings: &BzlmodRepoMappingsDataValue,
     canonical_name: &str,
 ) -> Option<ExtensionSpokesKey> {
     let (owner_module, extension_name, _) = crate::parse_canonical_name(canonical_name)?;
@@ -172,16 +177,9 @@ pub fn extension_spokes_key_for_canonical_repo(
             matches
         );
     }
-    matches
-        .first()
-        .and_then(|extension_id| extension_spokes_key_for_extension_id(data, extension_id))
-}
-
-fn workspace_id_for_session_data(data: &BzlmodExtensionSessionData) -> crate::WorkspaceId {
-    crate::WorkspaceId::new(
-        data.project_root.clone(),
-        data.project_root.join("buck-out/v2"),
-    )
+    matches.first().and_then(|extension_id| {
+        extension_spokes_key_for_extension_id(data, repo_mappings, extension_id)
+    })
 }
 
 fn owning_module_matches(canonical_owner: &str, extension_owner: &str) -> bool {
@@ -189,6 +187,26 @@ fn owning_module_matches(canonical_owner: &str, extension_owner: &str) -> bool {
         || (!canonical_owner.ends_with('+') && extension_owner == format!("{canonical_owner}+"))
         || (canonical_owner.ends_with('+')
             && extension_owner.strip_suffix('+') == Some(canonical_owner.trim_end_matches('+')))
+}
+
+fn ensure_repo_mappings_workspace(
+    workspace_id: &crate::WorkspaceId,
+    repo_mappings: &BzlmodRepoMappingsDataValue,
+    key_name: &str,
+    subject: &str,
+) -> slug_error::Result<()> {
+    if &repo_mappings.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} for '{}' was computed with project root '{}', \
+             but current bzlmod repo-mapping root is '{}'",
+            key_name,
+            subject,
+            workspace_id.canonical_project_root.display(),
+            repo_mappings.workspace_id.canonical_project_root.display()
+        ));
+    }
+    Ok(())
 }
 
 #[async_trait]
@@ -201,6 +219,7 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
+        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         if session_data.project_root != *self.workspace_id.canonical_project_root {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
@@ -211,9 +230,17 @@ impl Key for ExtensionSpokesByExtensionIdKey {
                 session_data.project_root.display()
             ));
         }
-        let Some(spokes_key) =
-            extension_spokes_key_for_extension_id(&session_data, &self.extension_id)
-        else {
+        ensure_repo_mappings_workspace(
+            &self.workspace_id,
+            repo_mappings.as_ref(),
+            "ExtensionSpokesByExtensionIdKey",
+            &self.extension_id,
+        )?;
+        let Some(spokes_key) = extension_spokes_key_for_extension_id(
+            &session_data,
+            repo_mappings.as_ref(),
+            &self.extension_id,
+        ) else {
             return Ok(None);
         };
 
@@ -251,6 +278,7 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
+        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         if session_data.project_root != *self.workspace_id.canonical_project_root {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
@@ -261,9 +289,17 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
                 session_data.project_root.display()
             ));
         }
-        let Some(spokes_key) =
-            extension_spokes_key_for_canonical_repo(&session_data, &self.canonical_name)
-        else {
+        ensure_repo_mappings_workspace(
+            &self.workspace_id,
+            repo_mappings.as_ref(),
+            "ExtensionSpokesByCanonicalRepoKey",
+            &self.canonical_name,
+        )?;
+        let Some(spokes_key) = extension_spokes_key_for_canonical_repo(
+            &session_data,
+            repo_mappings.as_ref(),
+            &self.canonical_name,
+        ) else {
             return Ok(None);
         };
 
@@ -301,6 +337,7 @@ impl Key for ExtensionSpokesKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let session_data = ctx.compute(&crate::BzlmodExtensionSessionDataKey).await?;
+        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         if session_data.project_root != *self.workspace_id.canonical_project_root {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
@@ -311,9 +348,17 @@ impl Key for ExtensionSpokesKey {
                 session_data.project_root.display()
             ));
         }
-        let Some(mut extension_key) =
-            create_extension_execution_key(&session_data, &self.extension_id)
-        else {
+        ensure_repo_mappings_workspace(
+            &self.workspace_id,
+            repo_mappings.as_ref(),
+            "ExtensionSpokesKey",
+            &self.extension_id,
+        )?;
+        let Some(mut extension_key) = create_extension_execution_key(
+            &session_data,
+            repo_mappings.as_ref(),
+            &self.extension_id,
+        ) else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
                 "Extension '{}' not found while computing generated repo spokes",
@@ -1801,12 +1846,19 @@ mod tests {
     #[test]
     fn extension_spokes_key_for_canonical_repo_matches_owner_module() {
         use crate::BzlmodExtensionSessionData;
+        use crate::BzlmodRepoMappingsDataValue;
+        use crate::WorkspaceId;
         use crate::extensions::AggregatedExtension;
 
         let mut data = BzlmodExtensionSessionData {
             root_module_name: "root".to_owned(),
             project_root: PathBuf::from("/tmp/slug-plan61-spokes"),
             ..Default::default()
+        };
+        let repo_mappings = BzlmodRepoMappingsDataValue {
+            workspace_id: WorkspaceId::for_project_root(data.project_root.clone()),
+            repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
+            repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
         };
         let mut root_ext = AggregatedExtension::new("@root//:ext.bzl", "ext");
         root_ext.extension_id = "@root//:ext.bzl%ext".to_owned();
@@ -1817,10 +1869,14 @@ mod tests {
         data.extension_aggregations
             .insert(dep_ext.extension_id.clone(), dep_ext);
 
-        let dep_key = extension_spokes_key_for_canonical_repo(&data, "dep++ext+tool").unwrap();
+        let dep_key =
+            extension_spokes_key_for_canonical_repo(&data, &repo_mappings, "dep++ext+tool")
+                .unwrap();
         assert_eq!(dep_key.extension_id.as_ref(), "@dep//:ext.bzl%ext");
 
-        let root_key = extension_spokes_key_for_canonical_repo(&data, "_main+ext+tool").unwrap();
+        let root_key =
+            extension_spokes_key_for_canonical_repo(&data, &repo_mappings, "_main+ext+tool")
+                .unwrap();
         assert_eq!(root_key.extension_id.as_ref(), "@root//:ext.bzl%ext");
     }
 

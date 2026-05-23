@@ -333,6 +333,34 @@ pub struct BzlmodModuleVersionsDataValue {
     pub invalidation: Arc<BzlmodModuleVersionsInvalidation>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodRepoMappingsDataValue {
+    pub workspace_id: WorkspaceId,
+    pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
+    pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodRepoMappingsDataKey")]
+pub struct BzlmodRepoMappingsDataKey;
+
+impl dice::InjectedKey for BzlmodRepoMappingsDataKey {
+    type Value = Arc<BzlmodRepoMappingsDataValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[derive(
     derive_more::Display,
     Debug,
