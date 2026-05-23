@@ -110,6 +110,7 @@ pub use extension_execution_dice::ModuleExtensionResult;
 pub use extension_execution_dice::build_canonical_names;
 pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::compute_bzl_transitive_digest_for_project;
+pub use extension_execution_dice::compute_bzl_transitive_digest_for_project_with_repo_mappings;
 pub use extension_execution_dice::create_extension_execution_key;
 pub use extension_execution_dice::extension_spokes_key_for_canonical_repo;
 pub use extension_execution_dice::extension_spokes_key_for_extension_id;

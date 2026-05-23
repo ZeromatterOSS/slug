@@ -31,6 +31,7 @@
 //! This follows the `RepositoryRuleExecutionKey` pattern from `repository_execution.rs`.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -133,7 +134,17 @@ pub fn extension_spokes_key_for_extension_id(
     data.extension_aggregations
         .contains_key(extension_id)
         .then(|| {
-            ExtensionSpokesKey::for_workspace_id(workspace_id_for_session_data(data), extension_id)
+            let bzl_transitive_digest =
+                compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                    extension_id,
+                    &data.project_root,
+                    Some(&data.repo_mappings),
+                );
+            ExtensionSpokesKey::for_workspace_id_with_digest(
+                workspace_id_for_session_data(data),
+                extension_id,
+                &bzl_transitive_digest,
+            )
         })
 }
 
@@ -225,6 +236,10 @@ impl Key for ExtensionSpokesByExtensionIdKey {
             _ => false,
         }
     }
+
+    fn validity(_x: &Self::Value) -> bool {
+        false
+    }
 }
 
 #[async_trait]
@@ -271,6 +286,10 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
             _ => false,
         }
     }
+
+    fn validity(_x: &Self::Value) -> bool {
+        false
+    }
 }
 
 #[async_trait]
@@ -293,7 +312,8 @@ impl Key for ExtensionSpokesKey {
                 session_data.project_root.display()
             ));
         }
-        let Some(extension_key) = create_extension_execution_key(&session_data, &self.extension_id)
+        let Some(mut extension_key) =
+            create_extension_execution_key(&session_data, &self.extension_id)
         else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -301,6 +321,7 @@ impl Key for ExtensionSpokesKey {
                 self.extension_id
             ));
         };
+        extension_key.bzl_transitive_digest = self.bzl_transitive_digest.clone();
         record_bzlmod_event(
             BzlmodEventKind::ExtensionSpokesCompute,
             self.extension_id.as_ref(),
@@ -673,8 +694,12 @@ impl ModuleExtensionExecutionKey {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
         let bzl_transitive_digest = Arc::from(
-            compute_bzl_transitive_digest_for_project(&extension_id, project_root.as_path())
-                .as_str(),
+            compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                &extension_id,
+                project_root.as_path(),
+                Some(&repo_mappings),
+            )
+            .as_str(),
         );
         Self {
             extension_id,
@@ -735,8 +760,12 @@ impl ModuleExtensionExecutionKey {
         repo_mapping_overrides: Arc<RepoMappingOverrides>,
     ) -> Self {
         let bzl_transitive_digest = Arc::from(
-            compute_bzl_transitive_digest_for_project(&extension_id, project_root.as_ref())
-                .as_str(),
+            compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                &extension_id,
+                project_root.as_ref(),
+                Some(repo_mappings.as_ref()),
+            )
+            .as_str(),
         );
         Self {
             extension_id,
@@ -1261,16 +1290,33 @@ pub fn compute_bzl_transitive_digest_for_project(
     extension_id: &str,
     project_root: &Path,
 ) -> String {
-    let Some(root_bzl) = extension_bzl_path_under_project(extension_id, project_root) else {
+    compute_bzl_transitive_digest_for_project_with_repo_mappings(extension_id, project_root, None)
+}
+
+pub fn compute_bzl_transitive_digest_for_project_with_repo_mappings(
+    extension_id: &str,
+    project_root: &Path,
+    repo_mappings: Option<&RepoMappingSnapshot>,
+) -> String {
+    let Some(root_bzl) =
+        extension_bzl_location_under_project(extension_id, project_root, repo_mappings)
+    else {
         return compute_bzl_transitive_digest(extension_id);
     };
-    if !root_bzl.is_file() {
+    if !root_bzl.path.is_file() {
         return compute_bzl_transitive_digest(extension_id);
     }
 
-    let mut seen = std::collections::BTreeSet::new();
-    collect_bzl_transitive_files(project_root, &root_bzl, &mut seen);
-    if seen.is_empty() {
+    let mut seen_locations = BTreeSet::new();
+    let mut seen_files = BTreeSet::new();
+    collect_bzl_transitive_files(
+        project_root,
+        root_bzl,
+        repo_mappings,
+        &mut seen_locations,
+        &mut seen_files,
+    );
+    if seen_files.is_empty() {
         return compute_bzl_transitive_digest(extension_id);
     }
 
@@ -1282,7 +1328,7 @@ pub fn compute_bzl_transitive_digest_for_project(
     hasher.update(b"bzl_transitive_v2:");
     hasher.update(extension_id.as_bytes());
     hasher.update([0]);
-    for path in seen {
+    for path in seen_files {
         let rel = path.strip_prefix(project_root).unwrap_or(path.as_path());
         hasher.update(rel.to_string_lossy().as_bytes());
         hasher.update([0]);
@@ -1300,98 +1346,242 @@ pub fn compute_bzl_transitive_digest_for_project(
     base64::engine::general_purpose::STANDARD.encode(hash)
 }
 
-fn extension_bzl_path_under_project(extension_id: &str, project_root: &Path) -> Option<PathBuf> {
-    let label = extension_id.split('%').next().unwrap_or(extension_id);
-    label_bzl_path_under_project(label, project_root, None)
+#[derive(Clone, Debug)]
+struct BzlLoadLocation {
+    path: PathBuf,
+    repo: String,
+    package: String,
 }
 
-fn label_bzl_path_under_project(
+fn extension_bzl_location_under_project(
+    extension_id: &str,
+    project_root: &Path,
+    repo_mappings: Option<&RepoMappingSnapshot>,
+) -> Option<BzlLoadLocation> {
+    let label = extension_id.split('%').next().unwrap_or(extension_id);
+    label_bzl_location_under_project(label, project_root, None, repo_mappings)
+}
+
+fn label_bzl_location_under_project(
     label: &str,
     project_root: &Path,
-    current_dir: Option<&Path>,
-) -> Option<PathBuf> {
-    let without_repo = if let Some(rest) = label.strip_prefix("@@") {
+    current: Option<&BzlLoadLocation>,
+    repo_mappings: Option<&RepoMappingSnapshot>,
+) -> Option<BzlLoadLocation> {
+    if let Some(rest) = label.strip_prefix("@@") {
         let (repo, target) = rest.split_once("//")?;
-        if let Some(path) = external_bzl_path_under_project(repo, target, project_root) {
-            return Some(path);
+        let (pkg, name) = split_bzl_label_target(target)?;
+        if let Some(location) = bzl_location_for_repo(repo, pkg, name, project_root) {
+            return Some(location);
         }
-        target
+        if !repo.contains('+') {
+            return Some(project_bzl_location(project_root, pkg, name));
+        }
+        None
     } else if let Some(rest) = label.strip_prefix('@') {
         let (repo, target) = rest.split_once("//")?;
-        if let Some(path) = external_bzl_path_under_project(repo, target, project_root) {
-            return Some(path);
+        let (pkg, name) = split_bzl_label_target(target)?;
+        let mut mapped = false;
+        let repo = if repo.contains('+') {
+            repo.to_owned()
+        } else if let (Some(current), Some(repo_mappings)) = (current, repo_mappings) {
+            if let Some(canonical_repo) =
+                mapped_repo_for_apparent(repo_mappings, &current.repo, repo)
+            {
+                mapped = canonical_repo != repo;
+                canonical_repo
+            } else {
+                repo.to_owned()
+            }
+        } else {
+            repo.to_owned()
+        };
+        if let Some(location) = bzl_location_for_repo(&repo, pkg, name, project_root) {
+            return Some(location);
         }
-        target
+        if !mapped && !repo.contains('+') {
+            return Some(project_bzl_location(project_root, pkg, name));
+        }
+        None
     } else if let Some(rest) = label.strip_prefix("//") {
-        rest
+        let current_repo = current.map(|location| location.repo.as_str()).unwrap_or("");
+        let (pkg, name) = split_bzl_label_target(rest)?;
+        bzl_location_for_repo(current_repo, pkg, name, project_root)
     } else if let Some(name) = label.strip_prefix(':') {
-        return current_dir.map(|dir| dir.join(name));
+        let current = current?;
+        bzl_location_for_repo(&current.repo, &current.package, name, project_root)
     } else if label.contains("//") {
         let (repo, target) = label.split_once("//")?;
-        if let Some(path) = external_bzl_path_under_project(repo, target, project_root) {
-            return Some(path);
+        let (pkg, name) = split_bzl_label_target(target)?;
+        let mut mapped = false;
+        let repo = if repo.contains('+') {
+            repo.to_owned()
+        } else if let (Some(current), Some(repo_mappings)) = (current, repo_mappings) {
+            if let Some(canonical_repo) =
+                mapped_repo_for_apparent(repo_mappings, &current.repo, repo)
+            {
+                mapped = canonical_repo != repo;
+                canonical_repo
+            } else {
+                repo.to_owned()
+            }
+        } else {
+            repo.to_owned()
+        };
+        if let Some(location) = bzl_location_for_repo(&repo, pkg, name, project_root) {
+            return Some(location);
         }
-        target
+        if !mapped && !repo.contains('+') {
+            return Some(project_bzl_location(project_root, pkg, name));
+        }
+        None
     } else {
-        return current_dir.map(|dir| dir.join(label));
-    };
-
-    let (pkg, name) = without_repo.split_once(':')?;
-    let mut path = project_root.to_path_buf();
-    if !pkg.is_empty() {
-        path.push(pkg);
+        let current = current?;
+        let mut path = current.path.parent()?.to_path_buf();
+        path.push(label);
+        Some(BzlLoadLocation {
+            path,
+            repo: current.repo.clone(),
+            package: current.package.clone(),
+        })
     }
-    path.push(name);
-    Some(path)
 }
 
-fn external_bzl_path_under_project(
+fn bzl_location_for_repo(
     repo: &str,
-    target: &str,
+    package: &str,
+    name: &str,
     project_root: &Path,
-) -> Option<PathBuf> {
-    let (pkg, name) = target.split_once(':')?;
+) -> Option<BzlLoadLocation> {
     if repo.is_empty() || repo == "_main" {
-        return None;
+        return Some(project_bzl_location(project_root, package, name));
     }
 
-    let candidates = if repo.ends_with('+') {
-        vec![repo, repo.trim_end_matches('+')]
-    } else {
-        vec![repo]
-    };
-    for candidate in candidates {
-        let mut path = project_root.join("bazel-external").join(candidate);
-        if !pkg.is_empty() {
-            path.push(pkg);
+    for candidate in external_repo_candidates(repo) {
+        let mut path = project_root.join("bazel-external").join(&candidate);
+        if !package.is_empty() {
+            path.push(package);
         }
         path.push(name);
         if path.is_file() {
-            return Some(path);
+            return Some(BzlLoadLocation {
+                path,
+                repo: candidate,
+                package: package.to_owned(),
+            });
         }
     }
     None
 }
 
+fn project_bzl_location(project_root: &Path, package: &str, name: &str) -> BzlLoadLocation {
+    let mut path = project_root.to_path_buf();
+    if !package.is_empty() {
+        path.push(package);
+    }
+    path.push(name);
+    BzlLoadLocation {
+        path,
+        repo: String::new(),
+        package: package.to_owned(),
+    }
+}
+
+fn external_repo_candidates(repo: &str) -> Vec<String> {
+    if repo.is_empty() || repo == "_main" {
+        return Vec::new();
+    }
+    let mut candidates = vec![repo.to_owned()];
+    if repo.ends_with('+') {
+        candidates.push(repo.trim_end_matches('+').to_owned());
+    } else if !repo.contains('+') {
+        candidates.push(format!("{repo}+"));
+    }
+    candidates
+}
+
+fn mapped_repo_for_apparent(
+    repo_mappings: &RepoMappingSnapshot,
+    current_repo: &str,
+    apparent_repo: &str,
+) -> Option<String> {
+    mapping_for_source_repo(repo_mappings, current_repo)
+        .and_then(|mapping| mapping.get(apparent_repo).cloned())
+}
+
+fn mapping_for_source_repo<'a>(
+    repo_mappings: &'a RepoMappingSnapshot,
+    current_repo: &str,
+) -> Option<&'a BTreeMap<String, String>> {
+    for candidate in source_repo_mapping_candidates(current_repo) {
+        if let Some(mapping) = repo_mappings.get(&candidate) {
+            return Some(mapping);
+        }
+    }
+    None
+}
+
+fn source_repo_mapping_candidates(current_repo: &str) -> Vec<String> {
+    let mut candidates = Vec::new();
+    push_unique_candidate(&mut candidates, current_repo.to_owned());
+    if current_repo.is_empty() || current_repo == "_main" {
+        push_unique_candidate(&mut candidates, "_main".to_owned());
+        push_unique_candidate(&mut candidates, String::new());
+    } else if current_repo.ends_with('+') {
+        push_unique_candidate(
+            &mut candidates,
+            current_repo.trim_end_matches('+').to_owned(),
+        );
+    } else if !current_repo.contains('+') {
+        push_unique_candidate(&mut candidates, format!("{current_repo}+"));
+    }
+    candidates
+}
+
+fn push_unique_candidate(candidates: &mut Vec<String>, candidate: String) {
+    if !candidates.contains(&candidate) {
+        candidates.push(candidate);
+    }
+}
+
+fn split_bzl_label_target(target: &str) -> Option<(&str, &str)> {
+    target.split_once(':')
+}
+
 fn collect_bzl_transitive_files(
     project_root: &Path,
-    path: &Path,
-    seen: &mut std::collections::BTreeSet<PathBuf>,
+    location: BzlLoadLocation,
+    repo_mappings: Option<&RepoMappingSnapshot>,
+    seen_locations: &mut BTreeSet<(PathBuf, String, String)>,
+    seen_files: &mut BTreeSet<PathBuf>,
 ) {
-    let path = path.to_path_buf();
-    if !seen.insert(path.clone()) {
+    let key = (
+        location.path.clone(),
+        location.repo.clone(),
+        location.package.clone(),
+    );
+    if !seen_locations.insert(key) {
         return;
     }
+    seen_files.insert(location.path.clone());
+    let path = location.path.clone();
     let Ok(content) = std::fs::read_to_string(&path) else {
         return;
     };
     for load in literal_loads(&path, &content) {
-        let Some(load_path) = label_bzl_path_under_project(&load, project_root, path.parent())
+        let Some(load_location) =
+            label_bzl_location_under_project(&load, project_root, Some(&location), repo_mappings)
         else {
             continue;
         };
-        if load_path.starts_with(project_root) && load_path.is_file() {
-            collect_bzl_transitive_files(project_root, &load_path, seen);
+        if load_location.path.starts_with(project_root) && load_location.path.is_file() {
+            collect_bzl_transitive_files(
+                project_root,
+                load_location,
+                repo_mappings,
+                seen_locations,
+                seen_files,
+            );
         }
     }
 }
@@ -2000,6 +2190,73 @@ mod tests {
             compute_bzl_transitive_digest_for_project("@@mod//:ext.bzl%ext", temp_dir.path());
 
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn test_project_bzl_digest_resolves_mapped_apparent_external_loads() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let owner_dir = temp_dir.path().join("bazel-external/rules_owner+");
+        std::fs::create_dir_all(&owner_dir).unwrap();
+        std::fs::write(
+            owner_dir.join("ext.bzl"),
+            "load(\"@apparent_helper//:helper.bzl\", \"HELPER\")\n",
+        )
+        .unwrap();
+
+        let apparent_dir = temp_dir.path().join("bazel-external/apparent_helper");
+        std::fs::create_dir_all(&apparent_dir).unwrap();
+        let apparent_helper = apparent_dir.join("helper.bzl");
+        std::fs::write(&apparent_helper, "HELPER = \"wrong repo\"\n").unwrap();
+
+        let real_dir = temp_dir.path().join("bazel-external/real_helper+");
+        std::fs::create_dir_all(&real_dir).unwrap();
+        let real_helper = real_dir.join("helper.bzl");
+        std::fs::write(&real_helper, "HELPER = \"first\"\n").unwrap();
+
+        let wrong_dir = temp_dir.path().join("bazel-external/wrong_helper+");
+        std::fs::create_dir_all(&wrong_dir).unwrap();
+        let wrong_helper = wrong_dir.join("helper.bzl");
+        std::fs::write(&wrong_helper, "HELPER = \"wrong mapped repo\"\n").unwrap();
+
+        let mut source_mapping = BTreeMap::new();
+        source_mapping.insert("apparent_helper".to_owned(), "real_helper".to_owned());
+        let mut fallback_source_mapping = BTreeMap::new();
+        fallback_source_mapping.insert("apparent_helper".to_owned(), "wrong_helper".to_owned());
+        let mut repo_mappings = crate::RepoMappingSnapshot::new();
+        repo_mappings.insert("rules_owner+".to_owned(), source_mapping);
+        repo_mappings.insert("rules_owner".to_owned(), fallback_source_mapping);
+
+        let first = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            "@@rules_owner+//:ext.bzl%ext",
+            temp_dir.path(),
+            Some(&repo_mappings),
+        );
+
+        std::fs::write(&apparent_helper, "HELPER = \"still wrong repo\"\n").unwrap();
+        let after_apparent_edit = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            "@@rules_owner+//:ext.bzl%ext",
+            temp_dir.path(),
+            Some(&repo_mappings),
+        );
+        assert_eq!(first, after_apparent_edit);
+
+        std::fs::write(&wrong_helper, "HELPER = \"still wrong mapped repo\"\n").unwrap();
+        let after_unsuffixed_mapping_edit =
+            compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                "@@rules_owner+//:ext.bzl%ext",
+                temp_dir.path(),
+                Some(&repo_mappings),
+            );
+        assert_eq!(first, after_unsuffixed_mapping_edit);
+
+        std::fs::write(&real_helper, "HELPER = \"second\"\n").unwrap();
+        let after_real_edit = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            "@@rules_owner+//:ext.bzl%ext",
+            temp_dir.path(),
+            Some(&repo_mappings),
+        );
+
+        assert_ne!(first, after_real_edit);
     }
 
     #[test]

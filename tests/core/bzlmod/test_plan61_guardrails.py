@@ -175,30 +175,43 @@ def _dirtree_digest(path: Path) -> str:
 def _slug_bzl_transitive_digest(
     extension_id: str,
     project_root: Path | None = None,
+    repo_mappings: dict[str, dict[str, str]] | None = None,
 ) -> str:
     if project_root is not None:
-        root_bzl = _extension_bzl_path(extension_id, project_root)
-        if root_bzl is not None and root_bzl.is_file():
-            seen: set[Path] = set()
+        root_bzl = _extension_bzl_location(extension_id, project_root, repo_mappings)
+        if root_bzl is not None and root_bzl[0].is_file():
+            seen_locations: set[tuple[Path, str, str]] = set()
+            seen_files: set[Path] = set()
 
-            def collect(path: Path) -> None:
-                path = path.resolve()
-                if path in seen:
+            def collect(location: tuple[Path, str, str]) -> None:
+                path, repo, package = location
+                if location in seen_locations:
                     return
-                seen.add(path)
+                seen_locations.add(location)
+                seen_files.add(path)
                 content = path.read_text()
                 for load in re.findall(r"""load\(\s*["']([^"']+)["']""", content):
-                    loaded = _label_bzl_path(load, project_root, path.parent)
-                    if loaded is not None and loaded.is_file():
-                        collect(loaded)
+                    loaded = _label_bzl_location(
+                        load,
+                        project_root,
+                        (path, repo, package),
+                        repo_mappings,
+                    )
+                    if loaded is None or not loaded[0].is_file():
+                        continue
+                    try:
+                        loaded[0].relative_to(project_root)
+                    except ValueError:
+                        continue
+                    collect(loaded)
 
             collect(root_bzl)
-            if seen:
+            if seen_files:
                 hasher = hashlib.sha256()
                 hasher.update(b"bzl_transitive_v2:")
                 hasher.update(extension_id.encode())
                 hasher.update(b"\0")
-                for path in sorted(seen):
+                for path in sorted(seen_files):
                     hasher.update(path.relative_to(project_root).as_posix().encode())
                     hasher.update(b"\0")
                     hasher.update(path.read_bytes())
@@ -210,7 +223,21 @@ def _slug_bzl_transitive_digest(
 
 
 def _extension_bzl_path(extension_id: str, project_root: Path) -> Path | None:
-    return _label_bzl_path(extension_id.split("%", 1)[0], project_root, None)
+    location = _extension_bzl_location(extension_id, project_root, None)
+    return location[0] if location is not None else None
+
+
+def _extension_bzl_location(
+    extension_id: str,
+    project_root: Path,
+    repo_mappings: dict[str, dict[str, str]] | None,
+) -> tuple[Path, str, str] | None:
+    return _label_bzl_location(
+        extension_id.split("%", 1)[0],
+        project_root,
+        None,
+        repo_mappings,
+    )
 
 
 def _label_bzl_path(
@@ -218,50 +245,170 @@ def _label_bzl_path(
     project_root: Path,
     current_dir: Path | None,
 ) -> Path | None:
+    current = None
+    if current_dir is not None:
+        try:
+            package = current_dir.relative_to(project_root).as_posix()
+        except ValueError:
+            package = ""
+        current = (current_dir / "__relative_placeholder__.bzl", "", package)
+    location = _label_bzl_location(label, project_root, current, None)
+    return location[0] if location is not None else None
+
+
+def _label_bzl_location(
+    label: str,
+    project_root: Path,
+    current: tuple[Path, str, str] | None,
+    repo_mappings: dict[str, dict[str, str]] | None,
+) -> tuple[Path, str, str] | None:
     if label.startswith("@@"):
         if "//" not in label:
             return None
         repo, target = label[2:].split("//", 1)
-        external = _external_bzl_path(repo, target, project_root)
+        target_parts = _split_bzl_label_target(target)
+        if target_parts is None:
+            return None
+        package, name = target_parts
+        external = _bzl_location_for_repo(repo, package, name, project_root)
         if external is not None:
             return external
+        return _project_bzl_location(project_root, package, name) if "+" not in repo else None
     elif label.startswith("@"):
         if "//" not in label:
             return None
         repo, target = label[1:].split("//", 1)
-        external = _external_bzl_path(repo, target, project_root)
+        target_parts = _split_bzl_label_target(target)
+        if target_parts is None:
+            return None
+        package, name = target_parts
+        mapped = False
+        if "+" not in repo and current is not None and repo_mappings is not None:
+            canonical = _mapped_repo(repo_mappings, current[1], repo)
+            if canonical is not None:
+                mapped = canonical != repo
+                repo = canonical
+        external = _bzl_location_for_repo(repo, package, name, project_root)
         if external is not None:
             return external
+        return (
+            _project_bzl_location(project_root, package, name)
+            if not mapped and "+" not in repo
+            else None
+        )
     elif label.startswith("//"):
-        target = label[2:]
+        if current is None:
+            repo = ""
+        else:
+            repo = current[1]
+        target_parts = _split_bzl_label_target(label[2:])
+        if target_parts is None:
+            return None
+        package, name = target_parts
+        return _bzl_location_for_repo(repo, package, name, project_root)
     elif label.startswith(":"):
-        return current_dir / label[1:] if current_dir is not None else None
+        if current is None:
+            return None
+        return _bzl_location_for_repo(current[1], current[2], label[1:], project_root)
     elif "//" in label:
         repo, target = label.split("//", 1)
-        external = _external_bzl_path(repo, target, project_root)
+        target_parts = _split_bzl_label_target(target)
+        if target_parts is None:
+            return None
+        package, name = target_parts
+        mapped = False
+        if "+" not in repo and current is not None and repo_mappings is not None:
+            canonical = _mapped_repo(repo_mappings, current[1], repo)
+            if canonical is not None:
+                mapped = canonical != repo
+                repo = canonical
+        external = _bzl_location_for_repo(repo, package, name, project_root)
         if external is not None:
             return external
+        return (
+            _project_bzl_location(project_root, package, name)
+            if not mapped and "+" not in repo
+            else None
+        )
     else:
-        return current_dir / label if current_dir is not None else None
+        if current is None:
+            return None
+        return (current[0].parent / label, current[1], current[2])
 
+
+def _split_bzl_label_target(target: str) -> tuple[str, str] | None:
     if ":" not in target:
         return None
     package, name = target.split(":", 1)
-    return project_root / package / name if package else project_root / name
+    return package, name
 
 
-def _external_bzl_path(repo: str, target: str, project_root: Path) -> Path | None:
-    if ":" not in target:
-        return None
-    repo = repo.removesuffix("+")
+def _bzl_location_for_repo(
+    repo: str,
+    package: str,
+    name: str,
+    project_root: Path,
+) -> tuple[Path, str, str] | None:
     if not repo or repo == "_main":
-        return None
-    package, name = target.split(":", 1)
-    path = project_root / "bazel-external" / repo
-    if package:
-        path = path / package
-    path = path / name
-    return path if path.is_file() else None
+        return _project_bzl_location(project_root, package, name)
+    for candidate in _external_repo_candidates(repo):
+        path = project_root / "bazel-external" / candidate
+        if package:
+            path = path / package
+        path = path / name
+        if path.is_file():
+            return path, candidate, package
+    return None
+
+
+def _project_bzl_location(
+    project_root: Path,
+    package: str,
+    name: str,
+) -> tuple[Path, str, str]:
+    path = project_root / package / name if package else project_root / name
+    return path, "", package
+
+
+def _external_repo_candidates(repo: str) -> list[str]:
+    if not repo or repo == "_main":
+        return []
+    candidates = [repo]
+    if repo.endswith("+"):
+        candidates.append(repo.removesuffix("+"))
+    elif "+" not in repo:
+        candidates.append(f"{repo}+")
+    return candidates
+
+
+def _mapped_repo(
+    repo_mappings: dict[str, dict[str, str]],
+    current_repo: str,
+    apparent_repo: str,
+) -> str | None:
+    for candidate in _source_repo_mapping_candidates(current_repo):
+        mapping = repo_mappings.get(candidate)
+        if mapping is not None and apparent_repo in mapping:
+            return mapping[apparent_repo]
+    return None
+
+
+def _source_repo_mapping_candidates(current_repo: str) -> list[str]:
+    candidates: list[str] = []
+
+    def push(candidate: str) -> None:
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    push(current_repo)
+    if not current_repo or current_repo == "_main":
+        push("_main")
+        push("")
+    elif current_repo.endswith("+"):
+        push(current_repo.removesuffix("+"))
+    elif "+" not in current_repo:
+        push(f"{current_repo}+")
+    return candidates
 
 
 def _slug_usages_digest_without_tags(extension_id: str, module_name: str) -> str:
@@ -337,6 +484,7 @@ def _write_replay_lockfile(
     module_name: str,
     project_root: Path,
     repo_path: Path,
+    repo_mappings: dict[str, dict[str, str]] | None = None,
     recorded_inputs: list[str] | None = None,
     repo_paths: dict[str, Path] | None = None,
     facts: dict[str, object] | None = None,
@@ -366,6 +514,7 @@ def _write_replay_lockfile(
                             "bzlTransitiveDigest": _slug_bzl_transitive_digest(
                                 extension_id,
                                 project_root,
+                                repo_mappings,
                             ),
                             "usagesDigest": _slug_usages_digest_without_tags(
                                 extension_id, module_name
@@ -2129,6 +2278,103 @@ use_repo(replay, "replayed_repo")
     await buck.audit("cell")
     second = await _bzlmod_counters(buck)
 
+    assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_mapped_external_extension_bzl_load_edit_rejects_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: extension loads are resolved through the source repo mapping."""
+    owner_module = "plan61_rules_owner"
+    helper_module = "plan61_real_helper"
+    helper_alias = "plan61_helper_alias"
+    root_module = "plan61_mapped_load_replay"
+    extension_id = f"@{owner_module}//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    owner_dir = buck.cwd.parent / f"{buck.cwd.name}_rules_owner"
+    helper_dir = buck.cwd.parent / f"{buck.cwd.name}_real_helper"
+    external_dir = buck.cwd / "bazel-external"
+    wrong_alias_dir = external_dir / helper_alias
+
+    replayed_repo.mkdir(exist_ok=True)
+    owner_dir.mkdir(parents=True, exist_ok=True)
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    external_dir.mkdir(exist_ok=True)
+    wrong_alias_dir.mkdir(exist_ok=True)
+
+    _write(replayed_repo / "BUILD.bazel", "filegroup(name = \"data\")\n")
+    _write(
+        owner_dir / "MODULE.bazel",
+        f"""module(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", repo_name = "{helper_alias}")
+""",
+    )
+    _write(
+        owner_dir / "replay_ext.bzl",
+        f"""load("@{helper_alias}//:helper.bzl", "HELPER_SENTINEL")
+
+def _replay_ext_impl(module_ctx):
+    fail("mapped helper edit should make replay stale: %s" % HELPER_SENTINEL)
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(helper_dir / "MODULE.bazel", f'module(name = "{helper_module}", version = "1.0")\n')
+    _write(helper_dir / "helper.bzl", 'HELPER_SENTINEL = "initial mapped helper"\n')
+    _write(wrong_alias_dir / "helper.bzl", 'HELPER_SENTINEL = "wrong apparent helper"\n')
+
+    (external_dir / f"{owner_module}+").symlink_to(owner_dir, target_is_directory=True)
+    (external_dir / f"{helper_module}+").symlink_to(helper_dir, target_is_directory=True)
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{root_module}")
+bazel_dep(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", version = "1.0")
+local_path_override(module_name = "{owner_module}", path = "{owner_dir.as_posix()}")
+local_path_override(module_name = "{helper_module}", path = "{helper_dir.as_posix()}")
+
+replay = use_extension("@{owner_module}//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=root_module,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+        repo_mappings={owner_module: {helper_alias: helper_module}},
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_replayed_repo")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    _write(
+        external_dir / f"{helper_module}+" / "helper.bzl",
+        'HELPER_SENTINEL = "edited mapped helper"\n',
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_replayed_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert "mapped helper edit should make replay stale: edited mapped helper" in str(exc.value)
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
 

@@ -1268,7 +1268,11 @@ fn root_extension_replay_summary_digest(
     for extension_id in extension_ids {
         let extension = aggregated.get(&extension_id)?;
         let bzl_transitive_digest =
-            slug_bzlmod::compute_bzl_transitive_digest_for_project(&extension_id, project_root);
+            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                &extension_id,
+                project_root,
+                Some(&repo_mappings),
+            );
         let usages_digest = slug_bzlmod::compute_extension_input_hash(extension);
         let visible_specs = visible_lockfile.and_then(|lockfile| {
             lockfile.get_extension_cache_for_workspace(

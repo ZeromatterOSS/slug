@@ -550,7 +550,11 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             continue;
         };
         let bzl_transitive_digest =
-            crate::compute_bzl_transitive_digest_for_project(current_ext_id, project_root);
+            crate::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                current_ext_id,
+                project_root,
+                repo_mappings,
+            );
         let usages_digest = compute_extension_input_hash(current_extension);
         let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
             current_ext_id,

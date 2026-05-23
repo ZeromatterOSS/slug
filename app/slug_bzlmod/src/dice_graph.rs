@@ -520,17 +520,32 @@ pub struct InnateExtensionKey {
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display("ExtensionSpokesKey({}, {})", workspace_id.stable_hash(), extension_id)]
+#[display(
+    "ExtensionSpokesKey({}, {}, {})",
+    workspace_id.stable_hash(),
+    extension_id,
+    bzl_transitive_digest
+)]
 pub struct ExtensionSpokesKey {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
+    pub bzl_transitive_digest: Arc<str>,
 }
 
 impl ExtensionSpokesKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
+        Self::for_workspace_id_with_digest(workspace_id, extension_id, "")
+    }
+
+    pub fn for_workspace_id_with_digest(
+        workspace_id: WorkspaceId,
+        extension_id: &str,
+        bzl_transitive_digest: &str,
+    ) -> Self {
         Self {
             workspace_id,
             extension_id: Arc::from(extension_id),
+            bzl_transitive_digest: Arc::from(bzl_transitive_digest),
         }
     }
 

@@ -100,8 +100,12 @@ Observed SDK result at the checkpoint:
   hidden lockfile is deleted.
 - Best-effort extension `.bzl` digests now include existing external
   repository load files materialized under `bazel-external/<repo>` in addition
-  to project-local literal loads. Focused Rust coverage and the Plan 61 Python
-  replay guardrails pass for this transitional digest behavior.
+  to project-local literal loads, and resolve apparent external loads through
+  the caller's available `RepoMappingSnapshot`. Focused Rust coverage and a
+  Plan 61 Python same-daemon build guardrail cover this transitional digest
+  behavior: a replayed generated repo first hits the lockfile, then editing the
+  mapped external helper loaded through an apparent repo alias rejects replay
+  and runs the edited extension implementation.
 - Root `bazel_dep(..., dev_dependency = True)` now participates in normal
   resolution by default for both local overrides and registry-backed modules,
   and `--ignore_dev_dependency` removes those root dev dependencies from the
@@ -234,6 +238,11 @@ Observed SDK result at the checkpoint:
   repo names ending in `+` when resolving existing files under
   `bazel-external/<repo>`, so edits to files under directories such as
   `bazel-external/rules_python+/...` change the replay digest.
+- The transitional `.bzl` replay digest now applies repo mappings at literal
+  `load()` sites when a `RepoMappingSnapshot` is available to the caller, so an
+  extension implementation load such as `@apparent_helper//:helper.bzl` can be
+  hashed from the mapped canonical repository under `bazel-external/` instead
+  of the apparent name.
 - Dynamic generated-repo suffix scan caches are now cleared by the same
   bzlmod-root reset path that clears dynamic cells, setups, apparent aliases,
   and scoped aliases, preventing stale suffix lookups from surviving a fresh
@@ -359,16 +368,23 @@ Observed SDK result at the checkpoint:
   `warm_noop_local_override_audit_cell_reuses_bzlmod_resolution`,
   `warm_noop_out_of_project_local_override_reuses_polled_dice_input`, and
   `local_override_module_edit_invalidates_only_affected_nodes`, and the full
-  Plan 61 Python guardrail with 63 tests.
+  Plan 61 Python guardrail with 64 tests.
 - Hidden-lockfile polled-input validation passed with `cargo build -p slug`,
   `cargo test -p slug_common bzlmod -- --nocapture`, focused Plan 61 guardrails
   for `hidden_lockfile_read_is_observable_before_extension_replay`,
   `malformed_hidden_lockfile_is_ignored`,
   `hidden_lockfile_edit_invalidates_replay_in_same_daemon`, and
   `hidden_lockfile_facts_create_edit_delete_are_observed`, and the full Plan 61
-  Python guardrail with 63 tests.
+  Python guardrail with 64 tests.
 - Lockfile bridge cleanup validation passed with `cargo test -p slug_bzlmod --
   --nocapture`.
+- Mapped extension `.bzl` digest validation passed with `cargo test -p
+  slug_bzlmod test_project_bzl_digest_resolves_mapped_apparent_external_loads
+  -- --nocapture`, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p
+  slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan
+  61 Python guardrail
+  `mapped_external_extension_bzl_load_edit_rejects_replay`, the full Plan 61
+  Python guardrail with 64 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -417,8 +433,11 @@ What did not work or remains risky:
   transitional graph and are not complete.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads and existing external files under `bazel-external/<repo>` are
-  hashed, but repo mappings at load sites, load failures, deleted files, and
-  the full interpreter load graph are not replay-complete.
+  hashed, and repo mappings are applied where the caller has a
+  `RepoMappingSnapshot`. Same-daemon generated-repo access now rejects replay
+  after a mapped external helper edit, but load failures, deleted files,
+  audit-cell-only external load changes, and the full interpreter load graph
+  are not replay-complete.
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity, but
@@ -572,9 +591,9 @@ using Rust DICE keys and values:
 4. Replace best-effort extension `.bzl` digesting with the actual loaded module
    graph.
    - Reuse the Starlark loader or expose its load graph to bzlmod keys.
-   - Keep the current external `bazel-external/<repo>` digest coverage while
-     adding repo mappings at load sites, file digest changes from the actual
-     loader graph, load failures, and deleted files.
+   - Keep the current external `bazel-external/<repo>` and mapped literal-load
+     digest coverage while replacing it with file digest changes from the
+     actual loader graph, load failures, and deleted files.
    - Reject replay when any loaded implementation file changes, not only
      literal loads that the transitional scanner can find.
 
