@@ -253,10 +253,10 @@ Observed SDK result at the checkpoint:
 - Interpreter module-version lookup now reads `ModuleVersionsKey` instead of
   directly reading injected `BzlmodSessionData`. This is still a transitional
   producer over the injected session graph, but the Starlark interpreter adapter
-  no longer consumes the injected session value directly. The key intentionally
-  disables value cutoffs for now to preserve the previous session-wide
-  invalidation behavior until the remaining bzlmod session fields have explicit
-  interpreter/materialization dependencies.
+  no longer consumes the injected session value directly. The key uses normal
+  DICE value equality over the module-version map plus the transitional session
+  invalidation identity, so warm no-op cutoffs are allowed only when lockfile,
+  repo-env, registry/yanked-version, and repo-mapping bridge inputs still match.
 - `ModuleVersionsKey` now computes a narrower
   `BzlmodModuleVersionsDataKey` instead of the whole `BzlmodSessionDataKey`.
   The injected module-version value carries a conservative invalidation
@@ -640,6 +640,17 @@ Observed SDK result at the checkpoint:
   change pruning because the success value does not capture fetched contents,
   and `RepoRecordedInput` explains marker-recorded inputs used to decide
   whether a repository is up to date.
+- Module-version equality validation passed with `cargo fmt --check`, `cargo
+  test -p slug_bzlmod
+  module_versions_key_equality_tracks_versions_value_and_invalidation --
+  --nocapture`, `cargo build -p slug`, focused Plan 61 Python guardrails for
+  hidden-lockfile replay/facts, warm extension replay, and module repo-env, the
+  full `cargo test -p slug_bzlmod -- --nocapture`, and the full Plan 61 Python
+  guardrail with 72 tests. A version-map-only equality attempt regressed the
+  hidden-lockfile facts restore transition, so `ModuleVersionsValue` now carries
+  the same conservative invalidation identity as the injected
+  `BzlmodModuleVersionsDataValue` until the remaining interpreter inputs are
+  explicit DICE dependencies.
 
 ## Consolidated Learnings
 

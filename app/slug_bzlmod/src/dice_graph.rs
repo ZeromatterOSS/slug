@@ -309,6 +309,9 @@ impl ModuleVersionsKey {
 pub struct ModuleVersionsValue {
     pub workspace_id: WorkspaceId,
     pub module_versions: Arc<HashMap<String, String>>,
+    /// Transitional invalidation identity for interpreter state that still
+    /// depends on more than the module-name version map.
+    pub invalidation: Arc<BzlmodModuleVersionsInvalidation>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -470,16 +473,15 @@ impl Key for ModuleVersionsKey {
         Ok(Arc::new(ModuleVersionsValue {
             workspace_id: data.workspace_id.clone(),
             module_versions: data.module_versions.clone(),
+            invalidation: data.invalidation.clone(),
         }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        let _ = (x, y);
-        // Transitional bridge: the interpreter previously depended directly
-        // on the whole injected `BzlmodSessionData`. Do not narrow cutoffs to
-        // the version map until the remaining bzlmod session fields have
-        // explicit interpreter/materialization dependencies.
-        false
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
     }
 }
 
@@ -1080,6 +1082,60 @@ mod tests {
 
         assert_ne!(first, second);
         assert_ne!(first.stable_hash(), second.stable_hash());
+    }
+
+    #[test]
+    fn module_versions_key_equality_tracks_versions_value_and_invalidation() {
+        let workspace_id = WorkspaceId::new(PathBuf::from("/tmp/ws"), PathBuf::from("/tmp/out"));
+        let mut first_versions = HashMap::new();
+        first_versions.insert("root".to_owned(), "1.0.0".to_owned());
+
+        let mut second_versions = first_versions.clone();
+        second_versions.insert("dep".to_owned(), "2.0.0".to_owned());
+
+        let first = Ok(Arc::new(ModuleVersionsValue {
+            workspace_id: workspace_id.clone(),
+            module_versions: Arc::new(first_versions.clone()),
+            invalidation: module_versions_invalidation(Some("first")),
+        }));
+        let same = Ok(Arc::new(ModuleVersionsValue {
+            workspace_id: workspace_id.clone(),
+            module_versions: Arc::new(first_versions),
+            invalidation: module_versions_invalidation(Some("first")),
+        }));
+        let changed = Ok(Arc::new(ModuleVersionsValue {
+            workspace_id: workspace_id.clone(),
+            module_versions: Arc::new(second_versions),
+            invalidation: module_versions_invalidation(Some("first")),
+        }));
+        let invalidated = Ok(Arc::new(ModuleVersionsValue {
+            workspace_id,
+            module_versions: same.as_ref().unwrap().module_versions.clone(),
+            invalidation: module_versions_invalidation(Some("second")),
+        }));
+
+        assert!(<ModuleVersionsKey as Key>::equality(&first, &same));
+        assert!(!<ModuleVersionsKey as Key>::equality(&first, &changed));
+        assert!(!<ModuleVersionsKey as Key>::equality(&first, &invalidated));
+    }
+
+    fn module_versions_invalidation(
+        hidden_lockfile_digest: Option<&str>,
+    ) -> Arc<BzlmodModuleVersionsInvalidation> {
+        Arc::new(BzlmodModuleVersionsInvalidation {
+            root_module_name: "root".to_owned(),
+            hidden_lockfile_path: None,
+            visible_lockfile_digest: None,
+            hidden_lockfile_digest: hidden_lockfile_digest.map(str::to_owned),
+            visible_lockfile: None,
+            hidden_lockfile: None,
+            lockfile_mode: crate::LockfileMode::Update,
+            repo_env: BTreeMap::new(),
+            registry_file_hashes: indexmap::IndexMap::new(),
+            selected_yanked_versions: indexmap::IndexMap::new(),
+            repo_mappings: crate::RepoMappingSnapshot::new(),
+            repo_mapping_overrides: crate::RepoMappingOverrides::new(),
+        })
     }
 
     #[test]
