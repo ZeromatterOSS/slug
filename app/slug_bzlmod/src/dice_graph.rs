@@ -228,7 +228,7 @@ pub enum LockfileContentKind {
 }
 
 /// DICE-owned lockfile read result.
-#[derive(Clone, Debug, Allocative)]
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct LockfileContentValue {
     pub path: Arc<PathBuf>,
     pub digest: Option<String>,

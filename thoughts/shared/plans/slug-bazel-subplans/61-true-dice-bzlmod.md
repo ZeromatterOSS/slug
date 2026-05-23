@@ -350,6 +350,13 @@ Observed SDK result at the checkpoint:
 - The unused non-cacheable `slug_bzlmod::LockfileContentKey` bridge was removed
   after visible and hidden lockfile reads moved to the tracked key in
   `slug_common`.
+- Extension replay now consumes the tracked visible and hidden
+  `LockfileContentValue`s carried in `BzlmodSessionData` instead of reopening
+  those lockfiles inside `ModuleExtensionExecutionKey::compute`. A focused
+  replay guardrail now proves a visible-lockfile replay hit consumes exactly the
+  one tracked lockfile read and does not add a second direct read from extension
+  execution. This is still transitional because the values are carried through
+  injected session data rather than a final lockfile replay-input key.
 - Current slice validation passed with `cargo build -p slug`, `cargo test -p
   slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
@@ -422,6 +429,12 @@ Observed SDK result at the checkpoint:
   `recorded_env_input_change_rejects_cache` and
   `recorded_env_input_change_rejects_mixed_graph_cache`, and the full Plan 61
   Python guardrail with 65 tests.
+- Tracked-lockfile extension-replay validation passed with `cargo check -p
+  slug_common`, `cargo build -p slug`, `cargo test -p slug_bzlmod --
+  --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, the focused
+  Plan 61 Python guardrail
+  `warm_noop_extension_replay_audit_cell_reuses_bzlmod_resolution`, and the full
+  Plan 61 Python guardrail with 65 tests.
 
 ## Consolidated Learnings
 
@@ -464,10 +477,11 @@ What did not work or remains risky:
   from the injected transitional session.
 - Visible workspace lockfile content is now a tracked project-file DICE input.
   Hidden lockfile identity is included in the transitional bridge key equality
-  and hashing path, and hidden replay has same-daemon edit coverage. Broader
-  hidden lockfile replay/fail-open behavior now has stronger guardrails, but
-  hidden/output-base lockfile reads and replay policy still depend on the
-  transitional graph and are not complete.
+  and hashing path, and hidden replay has same-daemon edit coverage. Extension
+  replay no longer reopens those lockfiles after the tracked values are computed.
+  Broader hidden lockfile replay/fail-open behavior now has stronger guardrails,
+  but the lockfile values still flow through the injected transitional session
+  rather than a final replay-input key.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads and existing external files under `bazel-external/<repo>` are
   hashed, and repo mappings are applied where the caller has a

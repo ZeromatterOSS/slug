@@ -58,14 +58,11 @@ use crate::dice_graph::ExtensionSpokesByCanonicalRepoKey;
 use crate::dice_graph::ExtensionSpokesByExtensionIdKey;
 use crate::dice_graph::ExtensionSpokesKey;
 use crate::dice_graph::ExtensionSpokesValue;
+use crate::dice_graph::LockfileContentValue;
 use crate::dice_graph::record_bzlmod_event;
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
 use crate::lockfile::LockfileMode;
-use crate::lockfile::compute_file_hash;
-use crate::lockfile::lockfile_path;
-use crate::lockfile::read_hidden_lockfile_path;
-use crate::lockfile::read_lockfile_with_mode;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 use crate::module_extension_executor::ModuleExtensionMetadata;
 use crate::repo_spec::RepoSpec;
@@ -113,13 +110,15 @@ pub fn create_extension_execution_key(
             return None;
         }
     };
-    Some(ModuleExtensionExecutionKey::new_with_lockfile(
+    Some(ModuleExtensionExecutionKey::new_with_tracked_lockfiles(
         aggregated.clone(),
         data.root_module_name.clone(),
         data.project_root.clone(),
         data.hidden_lockfile_path.clone(),
         data.visible_lockfile_digest.clone(),
         data.hidden_lockfile_digest.clone(),
+        data.visible_lockfile.clone(),
+        data.hidden_lockfile.clone(),
         data.lockfile_mode,
         data.repo_env.clone(),
         data.repo_mappings.clone(),
@@ -579,6 +578,12 @@ pub struct ModuleExtensionExecutionKey {
     /// Digest of the hidden lockfile as observed during command startup.
     pub hidden_lockfile_digest: Option<Arc<str>>,
 
+    /// Tracked visible workspace lockfile value computed before legacy bzlmod resolution.
+    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
+
+    /// Tracked hidden/output-base lockfile value computed before legacy bzlmod resolution.
+    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
+
     /// Lockfile policy for extension replay reads.
     ///
     /// This is part of the key identity because Bazel lockfile mode changes
@@ -646,6 +651,8 @@ impl Dupe for ModuleExtensionExecutionKey {
             hidden_lockfile_path: self.hidden_lockfile_path.clone(),
             visible_lockfile_digest: self.visible_lockfile_digest.clone(),
             hidden_lockfile_digest: self.hidden_lockfile_digest.clone(),
+            visible_lockfile: self.visible_lockfile.clone(),
+            hidden_lockfile: self.hidden_lockfile.clone(),
             lockfile_mode: self.lockfile_mode,
             repo_env: self.repo_env.clone(),
             repo_mappings: self.repo_mappings.clone(),
@@ -671,6 +678,8 @@ impl ModuleExtensionExecutionKey {
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
+            visible_lockfile: None,
+            hidden_lockfile: None,
             lockfile_mode: LockfileMode::Update,
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
@@ -686,6 +695,37 @@ impl ModuleExtensionExecutionKey {
         hidden_lockfile_path: Option<PathBuf>,
         visible_lockfile_digest: Option<String>,
         hidden_lockfile_digest: Option<String>,
+        lockfile_mode: LockfileMode,
+        repo_env: BTreeMap<String, String>,
+        repo_mappings: RepoMappingSnapshot,
+        repo_mapping_overrides: RepoMappingOverrides,
+    ) -> Self {
+        Self::new_with_tracked_lockfiles(
+            aggregated,
+            root_module_name,
+            project_root,
+            hidden_lockfile_path,
+            visible_lockfile_digest,
+            hidden_lockfile_digest,
+            None,
+            None,
+            lockfile_mode,
+            repo_env,
+            repo_mappings,
+            repo_mapping_overrides,
+        )
+    }
+
+    /// Create a new extension execution key with DICE-tracked lockfile values.
+    pub fn new_with_tracked_lockfiles(
+        aggregated: AggregatedExtension,
+        root_module_name: String,
+        project_root: PathBuf,
+        hidden_lockfile_path: Option<PathBuf>,
+        visible_lockfile_digest: Option<String>,
+        hidden_lockfile_digest: Option<String>,
+        visible_lockfile: Option<Arc<LockfileContentValue>>,
+        hidden_lockfile: Option<Arc<LockfileContentValue>>,
         lockfile_mode: LockfileMode,
         repo_env: BTreeMap<String, String>,
         repo_mappings: RepoMappingSnapshot,
@@ -711,6 +751,8 @@ impl ModuleExtensionExecutionKey {
             hidden_lockfile_path: hidden_lockfile_path.map(Arc::new),
             visible_lockfile_digest: visible_lockfile_digest.map(Arc::from),
             hidden_lockfile_digest: hidden_lockfile_digest.map(Arc::from),
+            visible_lockfile,
+            hidden_lockfile,
             lockfile_mode,
             repo_env: Arc::new(repo_env),
             repo_mappings: Arc::new(repo_mappings),
@@ -737,6 +779,8 @@ impl ModuleExtensionExecutionKey {
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
+            visible_lockfile: None,
+            hidden_lockfile: None,
             lockfile_mode: LockfileMode::Update,
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
@@ -777,6 +821,8 @@ impl ModuleExtensionExecutionKey {
             hidden_lockfile_path,
             visible_lockfile_digest,
             hidden_lockfile_digest,
+            visible_lockfile: None,
+            hidden_lockfile: None,
             lockfile_mode,
             repo_env,
             repo_mappings,
@@ -798,6 +844,8 @@ impl ModuleExtensionExecutionKey {
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
+            visible_lockfile: None,
+            hidden_lockfile: None,
             lockfile_mode: LockfileMode::Update,
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
@@ -850,20 +898,28 @@ fn validate_error_mode_facts(
 }
 
 fn verify_observed_lockfile_digest(
-    path: &Path,
+    value: &LockfileContentValue,
     expected_digest: Option<&str>,
     label: &str,
 ) -> slug_error::Result<()> {
     if let Some(expected_digest) = expected_digest {
-        let actual_digest = compute_file_hash(path)?;
-        if actual_digest != expected_digest {
-            return Err(slug_error::slug_error!(
+        let actual_digest = value.digest.as_deref().ok_or_else(|| {
+            slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
-                "{label} changed while computing module extension: expected digest {}, got {}",
-                expected_digest,
-                actual_digest
-            ));
+                "{label} became unreadable while computing module extension: expected digest {}",
+                expected_digest
+            )
+        })?;
+        if actual_digest == expected_digest {
+            return Ok(());
         }
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "{label} changed while computing module extension: expected digest {}, got {} at {}",
+            expected_digest,
+            actual_digest,
+            value.path.display()
+        ));
     }
     Ok(())
 }
@@ -891,17 +947,17 @@ impl Key for ModuleExtensionExecutionKey {
         let mut workspace_lockfile_facts = empty_facts();
         let mut workspace_lockfile_facts_present = false;
 
-        // 1. Read lockfile facts through the Plan 61 lockfile content key if
-        //    project_root is set. This is read-only; normal extension replay
-        //    must not mutate the visible lockfile.
+        // 1. Consume lockfile facts from the Plan 61 lockfile content values.
+        //    These values were computed by the DICE-backed config path before
+        //    legacy bzlmod resolution; extension replay must not reopen the
+        //    lockfiles here.
         if self.lockfile_mode != LockfileMode::Off
             && let Some(project_root) = &self.project_root
+            && let Some(lockfile_value) = &self.visible_lockfile
         {
-            let path = lockfile_path(project_root);
-            let lockfile = read_lockfile_with_mode(project_root, self.lockfile_mode)?;
-            if let Some(lockfile) = lockfile.as_ref() {
+            if let Some(lockfile) = lockfile_value.lockfile.as_ref() {
                 verify_observed_lockfile_digest(
-                    &path,
+                    lockfile_value,
                     self.visible_lockfile_digest.as_deref(),
                     "workspace lockfile",
                 )?;
@@ -955,12 +1011,11 @@ impl Key for ModuleExtensionExecutionKey {
             }
         }
         if self.lockfile_mode != LockfileMode::Off
-            && let Some(hidden_lockfile_path) = &self.hidden_lockfile_path
+            && let Some(lockfile_value) = &self.hidden_lockfile
         {
-            let lockfile = read_hidden_lockfile_path(hidden_lockfile_path)?;
-            if let Some(lockfile) = lockfile.as_ref() {
+            if let Some(lockfile) = lockfile_value.lockfile.as_ref() {
                 verify_observed_lockfile_digest(
-                    hidden_lockfile_path,
+                    lockfile_value,
                     self.hidden_lockfile_digest.as_deref(),
                     "hidden lockfile",
                 )?;

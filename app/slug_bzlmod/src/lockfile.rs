@@ -118,7 +118,7 @@ pub enum LockfileWritePurpose {
 /// Compatible with Bazel 9.0's lockfile format (lockFileVersion 26).
 /// Deprecated fields from older formats are preserved for backwards-compatible
 /// deserialization but are no longer written.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Lockfile {
     /// Lockfile format version.

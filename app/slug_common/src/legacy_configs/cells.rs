@@ -2342,7 +2342,7 @@ impl BuckConfigBasedCells {
                 project_fs,
                 &options,
                 root_module_file.as_deref(),
-                visible_lockfile.as_deref(),
+                visible_lockfile.clone(),
                 None,
             )
             .await?
@@ -2557,8 +2557,8 @@ impl BuckConfigBasedCells {
             &project_root,
             &key.options,
             Some(root_module_file.as_ref()),
-            key.visible_lockfile.as_deref(),
-            key.hidden_lockfile.as_deref(),
+            key.visible_lockfile.clone(),
+            key.hidden_lockfile.clone(),
         )
         .await
         .map(Arc::new)
@@ -2578,8 +2578,8 @@ impl BuckConfigBasedCells {
         project_root: &ProjectRoot,
         options: &BzlmodResolutionOptions,
         root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
-        visible_lockfile: Option<&slug_bzlmod::LockfileContentValue>,
-        hidden_lockfile: Option<&slug_bzlmod::LockfileContentValue>,
+        visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
+        hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     ) -> slug_error::Result<Option<BzlmodResolutionResult>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
@@ -2635,11 +2635,17 @@ impl BuckConfigBasedCells {
             &options.allow_yanked_versions_flags,
         )?;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
-        let visible_lockfile_digest = visible_lockfile.and_then(|value| value.digest.clone());
-        let hidden_lockfile_digest = hidden_lockfile.and_then(|value| value.digest.clone());
+        let visible_lockfile_value = visible_lockfile;
+        let hidden_lockfile_value = hidden_lockfile;
+        let visible_lockfile_digest = visible_lockfile_value
+            .as_ref()
+            .and_then(|value| value.digest.clone());
+        let hidden_lockfile_digest = hidden_lockfile_value
+            .as_ref()
+            .and_then(|value| value.digest.clone());
         let visible_lockfile = if options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
             None
-        } else if let Some(visible_lockfile) = visible_lockfile {
+        } else if let Some(visible_lockfile) = visible_lockfile_value.as_ref() {
             visible_lockfile.lockfile.clone()
         } else {
             slug_bzlmod::read_lockfile_with_mode(
@@ -2649,7 +2655,7 @@ impl BuckConfigBasedCells {
         };
         let hidden_lockfile = if options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
             None
-        } else if let Some(hidden_lockfile) = hidden_lockfile {
+        } else if let Some(hidden_lockfile) = hidden_lockfile_value.as_ref() {
             hidden_lockfile.lockfile.clone()
         } else if let Some(hidden_lockfile_path) = options.hidden_lockfile_path.as_ref() {
             slug_bzlmod::read_hidden_lockfile_path(hidden_lockfile_path)?
@@ -3151,6 +3157,8 @@ impl BuckConfigBasedCells {
         bzlmod_session_data.hidden_lockfile_path = hidden_lockfile_path;
         bzlmod_session_data.visible_lockfile_digest = visible_lockfile_digest;
         bzlmod_session_data.hidden_lockfile_digest = hidden_lockfile_digest;
+        bzlmod_session_data.visible_lockfile = visible_lockfile_value;
+        bzlmod_session_data.hidden_lockfile = hidden_lockfile_value;
         bzlmod_session_data.lockfile_mode = options.lockfile_mode;
 
         // Collect toolchain and execution platform registrations from all modules.

@@ -1168,6 +1168,7 @@ use_repo(replay, "replayed_repo")
     assert module_name in output
     assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
     assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["lockfile_read"] == before["lockfile_read"] + 1
 
     output, second = await _audit_cells_and_counters(buck)
     assert module_name in output
