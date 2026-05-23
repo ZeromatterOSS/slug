@@ -509,13 +509,31 @@ pub fn repo_materialization_manifest(
 fn repo_materialization_manifest_for_key(
     key: &RepoMaterializationManifestKey,
 ) -> RepoMaterializationManifestValue {
+    let marker_state = repo_materialization_marker_state_for_key(key);
+    let layout_state = repo_materialization_layout_state_for_key(key);
+    let recorded_inputs_state = repo_materialization_recorded_inputs_state_for_key(key);
+    repo_materialization_manifest_from_states(
+        key,
+        Arc::from(marker_state.as_str()),
+        Arc::from(layout_state.as_str()),
+        Arc::from(recorded_inputs_state.as_str()),
+    )
+}
+
+fn repo_dir_for_materialization_manifest_key(key: &RepoMaterializationManifestKey) -> PathBuf {
     let canonical_name = key.canonical_repo.as_ref();
+    key.workspace_id
+        .canonical_project_root
+        .join("bazel-external")
+        .join(canonical_name)
+}
+
+fn repo_materialization_marker_state_for_key(key: &RepoMaterializationManifestKey) -> String {
     let repo_spec = key.repo_spec.as_ref();
     let spec_hash = key.repo_spec_digest.as_ref();
-    let project_root = key.workspace_id.canonical_project_root.as_ref();
-    let repo_dir = project_root.join("bazel-external").join(canonical_name);
+    let repo_dir = repo_dir_for_materialization_manifest_key(key);
     let marker_path = repo_dir.join(".slug_repo_complete");
-    let marker_state = if repo_spec.local {
+    if repo_spec.local {
         "local-rule".to_owned()
     } else if marker_path.exists() {
         match std::fs::read_to_string(&marker_path) {
@@ -531,9 +549,14 @@ fn repo_materialization_manifest_for_key(
         }
     } else {
         "marker-absent".to_owned()
-    };
+    }
+}
 
-    let layout_state = match repo_spec_to_invocation(canonical_name, repo_spec) {
+fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKey) -> String {
+    let canonical_name = key.canonical_repo.as_ref();
+    let repo_spec = key.repo_spec.as_ref();
+    let repo_dir = repo_dir_for_materialization_manifest_key(key);
+    match repo_spec_to_invocation(canonical_name, repo_spec) {
         Ok(invocation) => {
             if crate::repository_executor::repo_layout_is_valid_for_invocation(
                 &invocation,
@@ -545,17 +568,146 @@ fn repo_materialization_manifest_for_key(
             }
         }
         Err(e) => format!("layout-unclassifiable:{e}"),
-    };
-    let recorded_inputs_state =
-        repository_recorded_inputs_state(&repo_dir, Some(key.repo_env.as_ref()));
+    }
+}
 
+fn repo_materialization_recorded_inputs_state_for_key(
+    key: &RepoMaterializationManifestKey,
+) -> String {
+    let repo_dir = repo_dir_for_materialization_manifest_key(key);
+    repository_recorded_inputs_state(&repo_dir, Some(key.repo_env.as_ref()))
+}
+
+fn repo_materialization_manifest_from_states(
+    key: &RepoMaterializationManifestKey,
+    marker_state: Arc<str>,
+    layout_state: Arc<str>,
+    recorded_inputs_state: Arc<str>,
+) -> RepoMaterializationManifestValue {
     RepoMaterializationManifestValue::new(
         key.clone(),
-        repo_dir,
-        marker_state,
-        layout_state,
-        recorded_inputs_state,
+        repo_dir_for_materialization_manifest_key(key),
+        marker_state.as_ref().to_owned(),
+        layout_state.as_ref().to_owned(),
+        recorded_inputs_state.as_ref().to_owned(),
     )
+}
+
+#[derive(Clone, Debug, Display, Eq, Allocative)]
+#[display("RepoMaterializationMarkerStateKey({})", _0)]
+struct RepoMaterializationMarkerStateKey(RepoMaterializationManifestKey);
+
+impl PartialEq for RepoMaterializationMarkerStateKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl std::hash::Hash for RepoMaterializationMarkerStateKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+#[async_trait]
+impl Key for RepoMaterializationMarkerStateKey {
+    type Value = Arc<str>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Arc::from(repo_materialization_marker_state_for_key(&self.0).as_str())
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // This repo-state read still polls disk because slug_bzlmod cannot use
+        // slug_common's project file watcher without creating a crate cycle.
+        // Keeping it as a child key lets unchanged state cut off the parent
+        // manifest while changed state invalidates repository execution.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, Eq, Allocative)]
+#[display("RepoMaterializationLayoutStateKey({})", _0)]
+struct RepoMaterializationLayoutStateKey(RepoMaterializationManifestKey);
+
+impl PartialEq for RepoMaterializationLayoutStateKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl std::hash::Hash for RepoMaterializationLayoutStateKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+#[async_trait]
+impl Key for RepoMaterializationLayoutStateKey {
+    type Value = Arc<str>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Arc::from(repo_materialization_layout_state_for_key(&self.0).as_str())
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, Eq, Allocative)]
+#[display("RepoMaterializationRecordedInputsStateKey({})", _0)]
+struct RepoMaterializationRecordedInputsStateKey(RepoMaterializationManifestKey);
+
+impl PartialEq for RepoMaterializationRecordedInputsStateKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl std::hash::Hash for RepoMaterializationRecordedInputsStateKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+#[async_trait]
+impl Key for RepoMaterializationRecordedInputsStateKey {
+    type Value = Arc<str>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Arc::from(repo_materialization_recorded_inputs_state_for_key(&self.0).as_str())
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
 }
 
 #[async_trait]
@@ -564,10 +716,24 @@ impl Key for RepoMaterializationManifestKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Ok(Arc::new(repo_materialization_manifest_for_key(self)))
+        let marker_state = ctx
+            .compute(&RepoMaterializationMarkerStateKey(self.clone()))
+            .await?;
+        let layout_state = ctx
+            .compute(&RepoMaterializationLayoutStateKey(self.clone()))
+            .await?;
+        let recorded_inputs_state = ctx
+            .compute(&RepoMaterializationRecordedInputsStateKey(self.clone()))
+            .await?;
+        Ok(Arc::new(repo_materialization_manifest_from_states(
+            self,
+            marker_state,
+            layout_state,
+            recorded_inputs_state,
+        )))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -577,10 +743,8 @@ impl Key for RepoMaterializationManifestKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // Recompute every request until marker/layout/recorded-input reads are
-        // backed by tracked DICE filesystem dependencies.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -1471,6 +1635,56 @@ mod tests {
                 .recorded_inputs_state
                 .contains("inputs-invalid:recorded_input_changed")
         );
+    }
+
+    #[tokio::test]
+    async fn materialization_manifest_key_observes_marker_state_dependency() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+archive_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.invalid/archive.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let spec_hash = repo_spec.compute_hash();
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await.unwrap().unwrap();
+        assert_eq!(first.marker_state.as_ref(), "marker-absent");
+        assert!(<RepoMaterializationManifestKey as Key>::validity(&Ok(
+            first.dupe()
+        )));
+
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        let marker = complete_marker(&spec_hash, &output_digest);
+        std::fs::write(repo_dir.join(".slug_repo_complete"), format!("{marker}\n")).unwrap();
+
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await.unwrap().unwrap();
+        assert_ne!(first.digest, second.digest);
+        assert_eq!(second.marker_state.as_ref(), format!("marker:{marker}"));
     }
 
     #[tokio::test]

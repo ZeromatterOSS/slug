@@ -312,11 +312,15 @@ Observed SDK result at the checkpoint:
 - Extension repository execution now consumes `RepoMaterializationManifestKey`
   through DICE instead of recomputing the manifest helper directly inside
   `ExtensionRepoExecutionKey::compute`. The key carries the repo spec needed for
-  the same marker/layout/recorded-input classification and remains
-  non-cacheable until those filesystem reads become tracked DICE dependencies.
-  Focused Rust coverage proves execution follows the named manifest key, and
-  `cargo test -p slug_bzlmod`, `cargo fmt --check`, and
-  `cargo check -p slug_bzlmod` passed after the migration.
+  the same marker/layout/recorded-input classification. Marker state, layout
+  state, and recorded-input state now compute as separate child DICE keys, so
+  the manifest value itself can remain valid while those child dependencies
+  explain marker/layout/input-state changes. These child keys still poll disk
+  because the tracked project-file APIs currently live in `slug_common`, which
+  already depends on `slug_bzlmod`; moving them to lower-level filesystem keys
+  remains required for final replay completeness. Focused Rust coverage proves
+  execution follows the named manifest key and that marker child-state changes
+  invalidate the manifest across DICE transactions.
 - `module(bazel_compatibility = [...])` is no longer parsed-and-ignored.
   Slug now validates the declared constraints against its Bazel 9.0.1
   compatibility target and fails incompatible modules. Local Bazel 9.1.0
@@ -616,6 +620,12 @@ Observed SDK result at the checkpoint:
   dynamic_extension -- --nocapture` remains order-sensitive because it runs
   process-global dynamic-cell tests in parallel, so the cache submodule was run
   serially for signal.
+- Repository materialization manifest child-key validation passed with
+  `cargo fmt --check`, `git diff --check`, `cargo check -p slug_bzlmod`,
+  `cargo test -p slug_bzlmod materialization_manifest -- --nocapture`,
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo build -p slug`, focused
+  Plan 61 Python guardrails for repository watch/watch-tree and stale marker
+  behavior, and the full Plan 61 Python guardrail with 71 tests.
 
 ## Consolidated Learnings
 
@@ -694,9 +704,10 @@ What did not work or remains risky:
   assembled by the transitional legacy cell parser.
 - Known-spec extension repo file-ops access now routes through the DICE
   repository execution/materialization manifest key, but
-  `RepoMaterializationManifestKey` still directly polls marker/layout and
-  recorded-input files and remains non-cacheable until those reads are tracked
-  by lower-level DICE filesystem keys.
+  `RepoMaterializationManifestKey` still relies on polling marker/layout and
+  recorded-input state through child DICE keys. This is cacheable at the parent
+  manifest layer but remains transitional until the child reads are backed by
+  lower-level tracked filesystem keys instead of direct `std::fs` polling.
 - Module extension and repository rule Starlark APIs now read their effective
   repo environment from explicit contexts seeded by command-key inputs. The
   generated repo cell graph that exposes repository rule specs remains
@@ -823,7 +834,10 @@ using Rust DICE keys and values:
      out-of-root cache paths are polled into key identity while the final
      watched-input graph is still pending.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
-     dependencies or equivalent DICE input nodes.
+     dependencies or equivalent DICE input nodes. Repository materialization
+     marker/layout/recorded-input reads are now child DICE nodes, but those
+     children still poll until the tracked filesystem API is available below
+     `slug_common`.
    - Include create/delete transitions, parse failures, include cycles, and
      UTF-8 failures for every module source class.
    - Model registry selection and source metadata for overrides.
@@ -875,7 +889,9 @@ using Rust DICE keys and values:
      reads, label paths, downloads, archive/git source identity, patches,
      overlays, and generated files.
    - Replace marker-file trust with a manifest value that proves the current
-     repo spec and observed output tree are compatible.
+     repo spec and observed output tree are compatible. The current manifest
+     value has DICE child state for marker/layout/recorded-input checks, but
+     does not yet own the full repository output-tree identity.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 
