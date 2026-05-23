@@ -340,6 +340,39 @@ pub struct BzlmodRepoMappingsDataValue {
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodExtensionReplayDataValue {
+    pub workspace_id: WorkspaceId,
+    pub hidden_lockfile_path: Option<PathBuf>,
+    pub visible_lockfile_digest: Option<String>,
+    pub hidden_lockfile_digest: Option<String>,
+    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
+    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
+    pub lockfile_mode: crate::LockfileMode,
+    pub repo_env: Arc<BTreeMap<String, String>>,
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodExtensionReplayDataKey")]
+pub struct BzlmodExtensionReplayDataKey;
+
+impl dice::InjectedKey for BzlmodExtensionReplayDataKey {
+    type Value = Arc<BzlmodExtensionReplayDataValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[derive(
     derive_more::Display,
     Debug,

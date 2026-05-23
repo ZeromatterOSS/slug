@@ -238,14 +238,20 @@ Observed SDK result at the checkpoint:
   and execution-platform selection now depend on named DICE values.
 - Extension replay and generated-repo spoke lookup now read
   `BzlmodExtensionSessionDataKey` instead of the whole
-  `BzlmodSessionDataKey`. The narrower injected value still carries extension
-  aggregations, tracked lockfile contents and digests, and repo env, but
+  `BzlmodSessionDataKey`. The narrower injected value carries extension
+  aggregations, root module name, and project root, but
   extension consumers no longer depend on unrelated
-  registered toolchain/platform or module-version session fields.
+  registered toolchain/platform, module-version, repo-mapping, or replay-input
+  session fields.
 - Extension repo mappings and root override rows now read through
   `BzlmodRepoMappingsDataKey`. Extension replay and generated-repo spoke lookup
   still use a transitional injected value produced by the legacy resolver, but
   repo mapping state is no longer bundled into `BzlmodExtensionSessionData`.
+- Extension replay inputs now read through `BzlmodExtensionReplayDataKey`.
+  Extension replay and generated-repo spoke lookup still use transitional
+  injected data, but lockfile paths, tracked visible/hidden lockfile contents
+  and digests, lockfile mode, and command repo env are no longer bundled into
+  `BzlmodExtensionSessionData`.
 - Interpreter module-version lookup now reads `ModuleVersionsKey` instead of
   directly reading injected `BzlmodSessionData`. This is still a transitional
   producer over the injected session graph, but the Starlark interpreter adapter
@@ -585,6 +591,12 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, focused Plan 61 Python guardrails for mapped external
   loads, recorded repo mappings, `inject_repo()`, and `override_repo()`, and
   the full Plan 61 Python guardrail with 70 tests.
+- Extension replay-input split validation passed with `cargo fmt --check`,
+  `git diff --check`, `cargo check -p slug_bzlmod -p slug_external_cells -p
+  slug_interpreter_for_build`, `cargo test -p slug_bzlmod -- --nocapture`,
+  `cargo build -p slug`, focused Plan 61 Python guardrails for visible/hidden
+  lockfiles, repo env, missing-lockfile warm reuse, mapped external loads, and
+  recorded repo mappings, and the full Plan 61 Python guardrail with 70 tests.
 
 ## Consolidated Learnings
 
@@ -623,9 +635,9 @@ What did not work or remains risky:
 - The resolved graph, repo mappings, cell graph, and registered toolchain and
   execution platform facts are still assembled during legacy cell setup, then
   injected as transitional command data. Registered toolchain/platform
-  consumers, extension replay/spoke consumers, repo-mapping consumers, and
-  module-version consumers now read narrower injected DICE values. The
-  module-version value still carries a
+  consumers, extension aggregation consumers, extension replay-input consumers,
+  repo-mapping consumers, and module-version consumers now read narrower
+  injected DICE values. The module-version value still carries a
   conservative session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
@@ -638,8 +650,8 @@ What did not work or remains risky:
   and hashing path, and hidden replay has same-daemon edit coverage. Extension
   replay no longer reopens those lockfiles after the tracked values are computed.
   Broader hidden lockfile replay/fail-open behavior now has stronger guardrails,
-  but the lockfile values still flow through the injected transitional session
-  rather than a final replay-input key.
+  but the lockfile values still flow through an injected transitional
+  replay-input value rather than final lockfile/replay-input producer keys.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads, missing project-local load paths, and existing external files
   under `bazel-external/<repo>` are hashed, and repo mappings are applied where
@@ -651,10 +663,10 @@ What did not work or remains risky:
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity,
-  reads narrower extension-session and repo-mapping values, and uses DICE spoke
-  repo-env where available, but generated repo cells and dynamic alias
-  registration still flow through transitional runtime cell-registration
-  plumbing rather than a final DICE-owned cell graph.
+  reads narrower extension-session, repo-mapping, and replay-input values, and
+  uses DICE spoke repo-env where available, but generated repo cells and
+  dynamic alias registration still flow through transitional runtime
+  cell-registration plumbing rather than a final DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.
