@@ -130,6 +130,13 @@ Observed SDK result at the checkpoint:
   `ModuleFileGlobals` early return for those calls. A focused guardrail verifies
   that an injected helper repo is available by default and invisible with
   `--ignore_dev_dependency`.
+- Root `inject_repo()`/`override_repo()` directive validation now matches the
+  Bazel `ModuleExtensionUsageBuilder` shape for this slice: duplicate
+  generated/injected repo names on one extension usage fail across both
+  directives and across same-extension proxies, and `use_repo()` cannot import
+  a repo that was injected with `mustExist = false`. Focused `slug_bzlmod`
+  parser regressions cover duplicate override, override-vs-inject, and
+  injected-use_repo cases.
 - `override_repo(ext, "repo")` now accepts Bazel's positional same-name
   shorthand in addition to keyword mappings. A focused guardrail verifies that a
   generated repo's sibling mapping resolves `@repo` to the same-named root

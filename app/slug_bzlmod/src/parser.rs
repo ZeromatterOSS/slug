@@ -165,6 +165,7 @@ fn parsed_module_file_from_context(
 ) -> slug_error::Result<ParsedModuleFile> {
     // Extract results from context
     let ctx = context.borrow();
+    validate_extension_repo_directives(&ctx.extensions)?;
 
     let (module_info, has_module_directive) = match &ctx.module {
         Some(decl) => {
@@ -192,6 +193,76 @@ fn parsed_module_file_from_context(
         registered_toolchains: ctx.registered_toolchains.clone(),
         registered_execution_platforms: ctx.registered_execution_platforms.clone(),
     })
+}
+
+fn validate_extension_repo_directives(
+    extension_usages: &[crate::types::ExtensionUsage],
+) -> slug_error::Result<()> {
+    struct ExtensionDirectiveState<'a> {
+        extension_name: &'a str,
+        repo_overrides: std::collections::HashMap<&'a str, &'a str>,
+        injected_repos: std::collections::HashMap<&'a str, &'a str>,
+    }
+
+    let mut states = std::collections::HashMap::<String, ExtensionDirectiveState<'_>>::new();
+    for ext in extension_usages {
+        let state = states
+            .entry(ext.extension_id())
+            .or_insert_with(|| ExtensionDirectiveState {
+                extension_name: &ext.extension_name,
+                repo_overrides: std::collections::HashMap::new(),
+                injected_repos: std::collections::HashMap::new(),
+            });
+
+        for (repo_name, overriding_repo) in
+            ext.repo_overrides.iter().chain(ext.injected_repos.iter())
+        {
+            if let Some(previous_override) = state
+                .repo_overrides
+                .insert(repo_name.as_str(), overriding_repo.as_str())
+            {
+                return Err(ModuleParseError::EvalError(format!(
+                    "The repo exported as '{}' by module extension '{}' is already overridden with '{}'",
+                    repo_name, state.extension_name, previous_override
+                ))
+                .into());
+            }
+        }
+
+        state.injected_repos.extend(
+            ext.injected_repos
+                .iter()
+                .map(|(repo_name, overriding_repo)| (repo_name.as_str(), overriding_repo.as_str())),
+        );
+    }
+
+    for ext in extension_usages {
+        let Some(state) = states.get(&ext.extension_id()) else {
+            continue;
+        };
+        for use_repo in &ext.imports {
+            for repo_name in &use_repo.repos {
+                if let Some(overriding_repo) = state.injected_repos.get(repo_name.as_str()) {
+                    return Err(ModuleParseError::EvalError(format!(
+                        "Cannot import repo '{}' that has been injected into module extension '{}'. Please refer to @{} directly.",
+                        repo_name, state.extension_name, overriding_repo
+                    ))
+                    .into());
+                }
+            }
+            for (_apparent_name, repo_name) in &use_repo.repo_mapping {
+                if let Some(overriding_repo) = state.injected_repos.get(repo_name.as_str()) {
+                    return Err(ModuleParseError::EvalError(format!(
+                        "Cannot import repo '{}' that has been injected into module extension '{}'. Please refer to @{} directly.",
+                        repo_name, state.extension_name, overriding_repo
+                    ))
+                    .into());
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Parse a MODULE.bazel file from a path.
@@ -745,6 +816,88 @@ override_repo(ext, "generated", public = "replacement")
                 ("public".to_owned(), "replacement".to_owned()),
             ]
         );
+    }
+
+    #[test]
+    fn test_parse_duplicate_override_repo_rows_error() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, "generated")
+override_repo(ext, generated = "replacement")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo exported as 'generated'"));
+        assert!(err.contains("module extension 'ext'"));
+        assert!(err.contains("already overridden"));
+    }
+
+    #[test]
+    fn test_parse_duplicate_override_and_inject_repo_rows_error() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, generated = "replacement")
+inject_repo(ext, generated = "helper")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo exported as 'generated'"));
+        assert!(err.contains("module extension 'ext'"));
+        assert!(err.contains("already overridden"));
+    }
+
+    #[test]
+    fn test_parse_duplicate_override_repo_across_same_extension_proxies_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+first = use_extension("//:ext.bzl", "ext")
+second = use_extension("//:ext.bzl", "ext")
+override_repo(first, generated = "replacement")
+inject_repo(second, generated = "helper")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo exported as 'generated'"));
+        assert!(err.contains("module extension 'ext'"));
+        assert!(err.contains("already overridden"));
+    }
+
+    #[test]
+    fn test_parse_use_repo_of_injected_repo_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "generated")
+inject_repo(ext, generated = "helper")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Cannot import repo 'generated'"));
+        assert!(err.contains("has been injected into module extension 'ext'"));
+        assert!(err.contains("Please refer to @helper directly"));
+    }
+
+    #[test]
+    fn test_parse_use_repo_of_injected_repo_across_same_extension_proxies_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+first = use_extension("//:ext.bzl", "ext")
+second = use_extension("//:ext.bzl", "ext")
+use_repo(first, alias = "generated")
+inject_repo(second, generated = "helper")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Cannot import repo 'generated'"));
+        assert!(err.contains("has been injected into module extension 'ext'"));
+        assert!(err.contains("Please refer to @helper directly"));
     }
 
     #[test]
