@@ -49,6 +49,58 @@ pub struct ParsedModuleFileWithInputs {
     pub inputs: Vec<ModuleFileInputDigest>,
 }
 
+/// Incremental MODULE.bazel parse/eval session for callers that own file reads.
+pub struct ModuleFileParseSession {
+    context: std::cell::RefCell<ModuleFileContext>,
+    module_root: PathBuf,
+    inputs: Vec<ModuleFileInputDigest>,
+}
+
+impl ModuleFileParseSession {
+    pub fn new(module_root: PathBuf) -> Self {
+        Self {
+            context: new_module_file_context(),
+            module_root,
+            inputs: Vec::new(),
+        }
+    }
+
+    pub fn module_root(&self) -> &Path {
+        &self.module_root
+    }
+
+    pub fn eval_segment(
+        &mut self,
+        path: &Path,
+        content: &str,
+        digest: String,
+    ) -> slug_error::Result<Vec<String>> {
+        self.inputs.push(ModuleFileInputDigest {
+            path: path.to_path_buf(),
+            digest,
+        });
+
+        let filename = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("MODULE.bazel");
+        let include_start = self.context.borrow().include_labels.len();
+        eval_module_bazel_content_into_context(content, filename, &self.context)?;
+        let include_labels = {
+            let mut ctx = self.context.borrow_mut();
+            ctx.include_labels.split_off(include_start)
+        };
+        Ok(include_labels)
+    }
+
+    pub fn finish(self) -> slug_error::Result<ParsedModuleFileWithInputs> {
+        Ok(ParsedModuleFileWithInputs {
+            parsed: parsed_module_file_from_context(&self.context)?,
+            inputs: self.inputs,
+        })
+    }
+}
+
 /// Errors that can occur during MODULE.bazel parsing.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -288,51 +340,43 @@ pub fn parse_module_bazel_content_from_path(
     content: &str,
     digest: String,
 ) -> slug_error::Result<ParsedModuleFileWithInputs> {
-    let context = new_module_file_context();
-    let mut inputs = Vec::new();
-    inputs.push(ModuleFileInputDigest {
-        path: path.to_path_buf(),
-        digest,
-    });
-
-    let filename = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("MODULE.bazel");
-
+    let module_root = path.parent().unwrap_or_else(|| Path::new("")).to_path_buf();
+    let mut session = ModuleFileParseSession::new(module_root);
     let mut include_stack = Vec::new();
-    eval_module_bazel_file_with_includes(
-        path.parent().unwrap_or_else(|| Path::new("")),
-        &content,
-        filename,
-        &context,
+    let include_labels = session.eval_segment(path, content, digest)?;
+    eval_module_bazel_includes_with_reader(
+        &mut session,
+        include_labels,
         &mut include_stack,
-        &mut inputs,
+        &mut |include_path| {
+            std::fs::read(include_path)
+                .buck_error_context(format!(
+                    "Failed to read included MODULE.bazel segment at {:?}",
+                    include_path
+                ))
+                .and_then(|include_bytes| {
+                    String::from_utf8(include_bytes).map_err(|e| {
+                        ModuleParseError::ReadError(format!(
+                            "included MODULE.bazel segment at {:?} is not UTF-8: {}",
+                            include_path, e
+                        ))
+                        .into()
+                    })
+                })
+        },
     )?;
 
-    Ok(ParsedModuleFileWithInputs {
-        parsed: parsed_module_file_from_context(&context)?,
-        inputs,
-    })
+    session.finish()
 }
 
-fn eval_module_bazel_file_with_includes(
-    module_root: &Path,
-    content: &str,
-    filename: &str,
-    context: &std::cell::RefCell<ModuleFileContext>,
+fn eval_module_bazel_includes_with_reader(
+    session: &mut ModuleFileParseSession,
+    include_labels: Vec<String>,
     include_stack: &mut Vec<PathBuf>,
-    inputs: &mut Vec<ModuleFileInputDigest>,
+    reader: &mut impl FnMut(&Path) -> slug_error::Result<String>,
 ) -> slug_error::Result<()> {
-    let include_start = context.borrow().include_labels.len();
-    eval_module_bazel_content_into_context(content, filename, context)?;
-    let include_labels = {
-        let mut ctx = context.borrow_mut();
-        ctx.include_labels.split_off(include_start)
-    };
-
     for label in include_labels {
-        let include_path = include_label_to_path(module_root, &label)?;
+        let include_path = include_label_to_path(session.module_root(), &label)?;
         let canonical = include_path
             .canonicalize()
             .unwrap_or_else(|_| include_path.clone());
@@ -342,30 +386,17 @@ fn eval_module_bazel_file_with_includes(
             );
         }
         include_stack.push(canonical);
-        let include_bytes = std::fs::read(&include_path).buck_error_context(format!(
-            "Failed to read included MODULE.bazel segment at {:?}",
-            include_path
-        ))?;
-        let include_content = String::from_utf8(include_bytes).map_err(|e| {
-            ModuleParseError::ReadError(format!(
-                "included MODULE.bazel segment at {:?} is not UTF-8: {}",
-                include_path, e
-            ))
-        })?;
-        inputs.push(ModuleFileInputDigest {
-            path: include_path.clone(),
-            digest: sha256_hex(include_content.as_bytes()),
-        });
-        eval_module_bazel_file_with_includes(
-            module_root,
+        let include_content = reader(&include_path)?;
+        let nested_include_labels = session.eval_segment(
+            &include_path,
             &include_content,
-            include_path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("MODULE.bazel"),
-            context,
+            sha256_hex(include_content.as_bytes()),
+        )?;
+        eval_module_bazel_includes_with_reader(
+            session,
+            nested_include_labels,
             include_stack,
-            inputs,
+            reader,
         )?;
         include_stack.pop();
     }
@@ -373,7 +404,7 @@ fn eval_module_bazel_file_with_includes(
     Ok(())
 }
 
-fn include_label_to_path(module_root: &Path, label: &str) -> slug_error::Result<PathBuf> {
+pub fn include_label_to_path(module_root: &Path, label: &str) -> slug_error::Result<PathBuf> {
     if !label.starts_with("//") {
         return Err(ModuleParseError::IncludeError(format!(
             "bad include label '{}': include() must be called with repo-relative labels",
@@ -456,6 +487,42 @@ local_path_override(
         assert_eq!(parsed.module.bazel_deps.len(), 1);
         assert_eq!(parsed.module.bazel_deps[0].name, "local_dep");
         assert_eq!(parsed.module.overrides.len(), 1);
+    }
+
+    #[test]
+    fn test_module_file_parse_session_returns_include_labels_for_caller_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        let root_module = dir.path().join("MODULE.bazel");
+        let included = dir.path().join("deps.MODULE.bazel");
+        let mut session = ModuleFileParseSession::new(dir.path().to_path_buf());
+
+        let labels = session
+            .eval_segment(
+                &root_module,
+                r#"
+module(name = "root")
+include("//:deps.MODULE.bazel")
+"#,
+                "root-digest".to_owned(),
+            )
+            .unwrap();
+        assert_eq!(labels, vec!["//:deps.MODULE.bazel".to_owned()]);
+
+        let nested = session
+            .eval_segment(
+                &included,
+                r#"bazel_dep(name = "rules_cc", version = "0.2.16")"#,
+                "include-digest".to_owned(),
+            )
+            .unwrap();
+        assert!(nested.is_empty());
+
+        let parsed = session.finish().unwrap();
+        assert_eq!(parsed.inputs.len(), 2);
+        assert_eq!(parsed.inputs[0].path, root_module);
+        assert_eq!(parsed.inputs[1].path, included);
+        assert_eq!(parsed.parsed.module.name, "root");
+        assert_eq!(parsed.parsed.module.bazel_deps.len(), 1);
     }
 
     #[test]

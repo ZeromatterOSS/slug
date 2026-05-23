@@ -35,9 +35,7 @@ use sha2::Sha256;
 
 use crate::lockfile::Lockfile;
 use crate::lockfile::compute_file_hash;
-use crate::lockfile::compute_sha256_hex;
 use crate::parser::ModuleFileInputDigest;
-use crate::parser::parse_module_bazel_content_from_path;
 use crate::repo_spec::RepoSpec;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
@@ -181,21 +179,7 @@ pub fn repo_env_policy_digest(repo_env: &BTreeMap<String, String>) -> String {
     hex::encode(hasher.finalize())
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display(
-    "RootModuleFileKey({})",
-    workspace_id.canonical_project_root.display()
-)]
-pub struct RootModuleFileKey {
-    pub workspace_id: WorkspaceId,
-}
-
 /// DICE-owned root `MODULE.bazel` read/parse result.
-///
-/// This is a narrow Plan 61 bridge: root module parsing moves into DICE before
-/// the broader MVS/cell-graph migration. Like `LockfileContentKey`, this key is
-/// deliberately non-cacheable until the file read is backed by tracked DICE
-/// filesystem inputs.
 #[derive(Clone, Debug, Allocative)]
 pub struct RootModuleFileValue {
     pub path: Arc<PathBuf>,
@@ -204,65 +188,7 @@ pub struct RootModuleFileValue {
     pub parsed: Option<ParsedModuleFile>,
 }
 
-#[async_trait]
-impl Key for RootModuleFileKey {
-    type Value = slug_error::Result<Arc<RootModuleFileValue>>;
-
-    async fn compute(
-        &self,
-        _ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        let path = Arc::new(
-            self.workspace_id
-                .canonical_project_root
-                .join("MODULE.bazel"),
-        );
-        if !path.exists() {
-            return Ok(Arc::new(RootModuleFileValue {
-                path,
-                input_digest: None,
-                input_count: 0,
-                parsed: None,
-            }));
-        }
-
-        let content = std::fs::read(path.as_ref())?;
-        let digest = compute_sha256_hex(&content);
-        let content = String::from_utf8(content).map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "Failed to read MODULE.bazel at {:?}: {}",
-                path,
-                e
-            )
-        })?;
-        let parsed_with_inputs =
-            parse_module_bazel_content_from_path(path.as_ref(), &content, digest)?;
-        let input_digest = module_file_inputs_digest(&parsed_with_inputs.inputs);
-        let input_count = parsed_with_inputs.inputs.len();
-
-        Ok(Arc::new(RootModuleFileValue {
-            path,
-            input_digest: Some(input_digest),
-            input_count,
-            parsed: Some(parsed_with_inputs.parsed),
-        }))
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        match (x, y) {
-            (Ok(x), Ok(y)) => x.path == y.path && x.input_digest == y.input_digest,
-            _ => false,
-        }
-    }
-
-    fn validity(_x: &Self::Value) -> bool {
-        false
-    }
-}
-
-fn module_file_inputs_digest(inputs: &[ModuleFileInputDigest]) -> String {
+pub fn module_file_inputs_digest(inputs: &[ModuleFileInputDigest]) -> String {
     let mut hasher = Sha256::new();
     for input in inputs {
         hasher.update(input.path.to_string_lossy().as_bytes());
@@ -1097,38 +1023,22 @@ mod tests {
     }
 
     #[test]
-    fn root_module_file_key_is_non_cacheable_until_file_deps_are_tracked() {
-        let value = Ok(Arc::new(RootModuleFileValue {
-            path: Arc::new(PathBuf::from("/tmp/MODULE.bazel")),
-            input_digest: None,
-            input_count: 0,
-            parsed: None,
-        }));
-
-        assert!(!<RootModuleFileKey as Key>::validity(&value));
-    }
-
-    #[test]
-    fn root_module_file_value_equality_tracks_digest() {
+    fn root_module_file_inputs_digest_tracks_digest() {
         let path = Arc::new(PathBuf::from("/tmp/MODULE.bazel"));
-        let first = Ok(Arc::new(RootModuleFileValue {
-            path: path.clone(),
-            input_digest: Some("first".to_owned()),
-            input_count: 1,
-            parsed: None,
-        }));
-        let second = Ok(Arc::new(RootModuleFileValue {
-            path,
-            input_digest: Some("second".to_owned()),
-            input_count: 1,
-            parsed: None,
-        }));
+        let first = module_file_inputs_digest(&[ModuleFileInputDigest {
+            path: path.as_ref().clone(),
+            digest: "first".to_owned(),
+        }]);
+        let second = module_file_inputs_digest(&[ModuleFileInputDigest {
+            path: path.as_ref().clone(),
+            digest: "second".to_owned(),
+        }]);
 
-        assert!(!<RootModuleFileKey as Key>::equality(&first, &second));
+        assert_ne!(first, second);
     }
 
     #[test]
-    fn root_module_file_value_equality_tracks_include_digest() {
+    fn root_module_file_inputs_digest_tracks_include_digest() {
         let path = Arc::new(PathBuf::from("/tmp/MODULE.bazel"));
         let root_only = module_file_inputs_digest(&[ModuleFileInputDigest {
             path: path.as_ref().clone(),
@@ -1144,19 +1054,6 @@ mod tests {
                 digest: "include".to_owned(),
             },
         ]);
-        let first = Ok(Arc::new(RootModuleFileValue {
-            path: path.clone(),
-            input_digest: Some(root_only),
-            input_count: 1,
-            parsed: None,
-        }));
-        let second = Ok(Arc::new(RootModuleFileValue {
-            path,
-            input_digest: Some(with_include),
-            input_count: 2,
-            parsed: None,
-        }));
-
-        assert!(!<RootModuleFileKey as Key>::equality(&first, &second));
+        assert_ne!(root_only, with_include);
     }
 }

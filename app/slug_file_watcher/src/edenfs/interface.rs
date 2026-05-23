@@ -145,7 +145,7 @@ impl EdenFsFileWatcher {
     async fn update(
         &self,
         dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(slug_data::FileWatcherStats, DiceTransactionUpdater)> {
+    ) -> slug_error::Result<(slug_data::FileWatcherStats, DiceTransactionUpdater, bool)> {
         let position = self.position.read().await.clone();
         let changes_since_v2_params = ChangesSinceV2Params {
             mountPoint: self.mount_point.clone(),
@@ -198,8 +198,9 @@ impl EdenFsFileWatcher {
                 .buck_error_context("Failed to handle large or unknown change.")?;
         }
 
+        let requires_pre_config_commit = file_change_tracker.requires_pre_config_commit();
         file_change_tracker.write_to_dice(&mut dice)?;
-        Ok((stats.finish(), dice))
+        Ok((stats.finish(), dice, requires_pre_config_commit))
     }
 
     async fn process_change(
@@ -493,15 +494,22 @@ impl EdenFsFileWatcher {
                             cell_path
                         );
                     }
+                    tracker.project_file_added_or_removed(project_rel_path.to_buf());
                     tracker.file_added_or_removed(cell_path)
                 }
                 (Type::Modify, Kind::Directory) => {
                     // FIXME(JakobDegen): This should not be needed
                     tracker.dir_entries_changed_force_invalidate(cell_path)
                 }
-                (Type::Modify, _) => tracker.file_contents_changed(cell_path),
+                (Type::Modify, _) => {
+                    tracker.project_file_contents_changed(project_rel_path.to_buf());
+                    tracker.file_contents_changed(cell_path)
+                }
                 (Type::Delete, Kind::Directory) => tracker.dir_added_or_removed(cell_path),
-                (Type::Delete, _) => tracker.file_added_or_removed(cell_path),
+                (Type::Delete, _) => {
+                    tracker.project_file_added_or_removed(project_rel_path.to_buf());
+                    tracker.file_added_or_removed(cell_path)
+                }
             };
         }
 
@@ -804,16 +812,17 @@ impl FileWatcher for EdenFsFileWatcher {
     async fn sync(
         &self,
         dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase)> {
+    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase, bool)> {
         span_async(
             slug_data::FileWatcherStart {
                 provider: slug_data::FileWatcherProvider::EdenFs as i32,
             },
             async {
                 let (stats, res) = match self.update(dice).await {
-                    Ok((stats, dice)) => {
+                    Ok((stats, dice, requires_pre_config_commit)) => {
                         let mergebase = Mergebase(Arc::new(stats.branched_from_revision.clone()));
-                        ((Some(stats)), Ok((dice, mergebase)))
+                        let has_changes = stats.fresh_instance || requires_pre_config_commit;
+                        ((Some(stats)), Ok((dice, mergebase, has_changes)))
                     }
                     Err(e) => (None, Err(e)),
                 };

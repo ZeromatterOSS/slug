@@ -55,6 +55,7 @@ use slug_fs::paths::RelativePath;
 use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
 
 use crate::external_cells::EXTERNAL_CELLS_IMPL;
+use crate::file_ops::dice::DiceFileComputations;
 use crate::legacy_configs::aggregator::CellsAggregator;
 use crate::legacy_configs::args::ResolvedLegacyConfigArg;
 use crate::legacy_configs::args::resolve_config_args;
@@ -720,6 +721,133 @@ fn allow_yanked_versions_digest(from_env: Option<&str>, from_flags: &[String]) -
         hasher.update([0]);
     }
     hex::encode(hasher.finalize())
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("TrackedRootModuleFileKey({})", project_root.display())]
+struct TrackedRootModuleFileKey {
+    project_root: AbsNormPathBuf,
+}
+
+#[async_trait]
+impl Key for TrackedRootModuleFileKey {
+    type Value = slug_error::Result<Arc<slug_bzlmod::RootModuleFileValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let root_path = Arc::new(self.project_root.as_path().join("MODULE.bazel"));
+        let root_project_path = ProjectRelativePath::new("MODULE.bazel")?;
+        let Some(content) =
+            DiceFileComputations::read_project_file_if_exists(ctx, root_project_path).await?
+        else {
+            return Ok(Arc::new(slug_bzlmod::RootModuleFileValue {
+                path: root_path,
+                input_digest: None,
+                input_count: 0,
+                parsed: None,
+            }));
+        };
+
+        let parsed_with_inputs =
+            parse_root_module_with_tracked_includes(ctx, root_path.as_ref(), content).await?;
+        let input_digest = slug_bzlmod::module_file_inputs_digest(&parsed_with_inputs.inputs);
+        let input_count = parsed_with_inputs.inputs.len();
+
+        Ok(Arc::new(slug_bzlmod::RootModuleFileValue {
+            path: root_path,
+            input_digest: Some(input_digest),
+            input_count,
+            parsed: Some(parsed_with_inputs.parsed),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.path == y.path && x.input_digest == y.input_digest,
+            _ => false,
+        }
+    }
+}
+
+async fn parse_root_module_with_tracked_includes(
+    ctx: &mut DiceComputations<'_>,
+    root_path: &Path,
+    root_content: String,
+) -> slug_error::Result<slug_bzlmod::ParsedModuleFileWithInputs> {
+    let module_root = root_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_path_buf();
+    let mut session = slug_bzlmod::ModuleFileParseSession::new(module_root.clone());
+    let root_digest = slug_bzlmod::lockfile::compute_sha256_hex(root_content.as_bytes());
+    let include_labels = session.eval_segment(root_path, &root_content, root_digest)?;
+    let mut pending = Vec::new();
+    push_pending_include_labels(&mut pending, include_labels, Vec::new());
+
+    while let Some((label, ancestors)) = pending.pop() {
+        let include_path = slug_bzlmod::include_label_to_path(&module_root, &label)?;
+        let canonical = include_path
+            .canonicalize()
+            .unwrap_or_else(|_| include_path.clone());
+        if ancestors.contains(&canonical) {
+            return Err(slug_bzlmod::parser::ModuleParseError::IncludeError(format!(
+                "cyclic include of {}",
+                label
+            ))
+            .into());
+        }
+
+        let include_rel = include_path
+            .strip_prefix(&module_root)
+            .map_err(|_| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "included MODULE.bazel segment at {:?} is outside module root {:?}",
+                    include_path,
+                    module_root
+                )
+            })?
+            .to_str()
+            .ok_or_else(|| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "included MODULE.bazel segment path {:?} is not UTF-8",
+                    include_path
+                )
+            })?
+            .to_owned();
+        let include_project_path = ProjectRelativePath::new(&include_rel)?;
+        let include_content = DiceFileComputations::read_project_file(ctx, include_project_path)
+            .await
+            .map_err(|e| e.without_package_context_information())
+            .with_buck_error_context(|| {
+                format!(
+                    "Failed to read included MODULE.bazel segment at {:?}",
+                    include_path
+                )
+            })?;
+        let include_digest = slug_bzlmod::lockfile::compute_sha256_hex(include_content.as_bytes());
+        let nested_labels =
+            session.eval_segment(&include_path, &include_content, include_digest)?;
+        let mut nested_ancestors = ancestors;
+        nested_ancestors.push(canonical);
+        push_pending_include_labels(&mut pending, nested_labels, nested_ancestors);
+    }
+
+    session.finish()
+}
+
+fn push_pending_include_labels(
+    pending: &mut Vec<(String, Vec<PathBuf>)>,
+    include_labels: Vec<String>,
+    ancestors: Vec<PathBuf>,
+) {
+    for label in include_labels.into_iter().rev() {
+        pending.push((label, ancestors.clone()));
+    }
 }
 
 #[derive(Clone, Debug, Display, Allocative)]
@@ -1424,8 +1552,8 @@ impl BuckConfigBasedCells {
             command_policy_digest: command_policy.digest.clone(),
         };
         let root_module_file = dice_ctx
-            .compute(&slug_bzlmod::RootModuleFileKey {
-                workspace_id: workspace_id.clone(),
+            .compute(&TrackedRootModuleFileKey {
+                project_root: AbsNormPathBuf::try_from(project_root_path.clone())?,
             })
             .await?
             .buck_error_context("Computing root MODULE.bazel for bzlmod resolution")?;
@@ -1817,7 +1945,7 @@ impl BuckConfigBasedCells {
                 return Ok(None);
             };
             tracing::info!(
-                "Found MODULE.bazel through RootModuleFileKey, resolving bzlmod dependencies"
+                "Found MODULE.bazel through tracked DICE file inputs, resolving bzlmod dependencies"
             );
             record_bzlmod_event(
                 BzlmodEventKind::BzlmodResolutionCompute,

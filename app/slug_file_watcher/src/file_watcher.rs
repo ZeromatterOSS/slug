@@ -38,7 +38,7 @@ pub trait FileWatcher: Allocative + Send + Sync + 'static {
     async fn sync(
         &self,
         dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase)>;
+    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase, bool)>;
 }
 
 impl dyn FileWatcher {

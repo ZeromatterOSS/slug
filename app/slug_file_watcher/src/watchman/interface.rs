@@ -140,14 +140,17 @@ impl WatchmanQueryProcessor {
                         log_kind = slug_data::FileWatcherKind::File;
                         match typ {
                             WatchmanEventType::Modify => {
+                                handler.project_file_contents_changed(path.to_buf());
                                 handler.file_contents_changed(cell_path);
                                 log_event = slug_data::FileWatcherEventType::Modify;
                             }
                             WatchmanEventType::Create => {
+                                handler.project_file_added_or_removed(path.to_buf());
                                 handler.file_added_or_removed(cell_path);
                                 log_event = slug_data::FileWatcherEventType::Create;
                             }
                             WatchmanEventType::Delete => {
+                                handler.project_file_added_or_removed(path.to_buf());
                                 handler.file_added_or_removed(cell_path);
                                 log_event = slug_data::FileWatcherEventType::Delete;
                             }
@@ -174,6 +177,7 @@ impl WatchmanQueryProcessor {
                         log_kind = slug_data::FileWatcherKind::Symlink;
                         match typ {
                             WatchmanEventType::Modify => {
+                                handler.project_file_contents_changed(path.to_buf());
                                 handler.file_contents_changed(cell_path);
                                 log_event = slug_data::FileWatcherEventType::Modify;
                             }
@@ -182,10 +186,12 @@ impl WatchmanQueryProcessor {
                                     "New symlink detected (source symlinks are not supported): {}",
                                     cell_path
                                 );
+                                handler.project_file_added_or_removed(path.to_buf());
                                 handler.file_added_or_removed(cell_path);
                                 log_event = slug_data::FileWatcherEventType::Create;
                             }
                             WatchmanEventType::Delete => {
+                                handler.project_file_added_or_removed(path.to_buf());
                                 handler.file_added_or_removed(cell_path);
                                 log_event = slug_data::FileWatcherEventType::Delete;
                             }
@@ -392,7 +398,7 @@ impl FileWatcher for WatchmanFileWatcher {
     async fn sync(
         &self,
         dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase)> {
+    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase, bool)> {
         span_async(
             slug_data::FileWatcherStart {
                 provider: slug_data::FileWatcherProvider::Watchman as i32,
@@ -401,7 +407,12 @@ impl FileWatcher for WatchmanFileWatcher {
                 let (stats, res) = match self.query.sync(dice).await {
                     Ok((stats, dice)) => {
                         let mergebase = Mergebase(Arc::new(stats.branched_from_revision.clone()));
-                        ((Some(stats)), Ok((dice, mergebase)))
+                        let has_changes = stats.fresh_instance
+                            || stats.events.iter().any(|event| {
+                                let path = event.path.as_str();
+                                path.ends_with("MODULE.bazel") || path.ends_with(".MODULE.bazel")
+                            });
+                        ((Some(stats)), Ok((dice, mergebase, has_changes)))
                     }
                     Err(e) => (None, Err(e)),
                 };

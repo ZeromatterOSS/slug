@@ -850,6 +850,11 @@ async def test_root_module_bazel_edit_invalidates_bzlmod_graph(buck: Buck) -> No
     assert first["module_file_parse"] > before["module_file_parse"]
     assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
 
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_guardrails" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
     _write(
         buck.cwd / "MODULE.bazel",
         """module(name = "plan61_guardrails_edited")\n""",
@@ -857,8 +862,8 @@ async def test_root_module_bazel_edit_invalidates_bzlmod_graph(buck: Buck) -> No
 
     output, second = await _audit_cells_and_counters(buck)
     assert "plan61_guardrails_edited" in output
-    assert second["module_file_parse"] > first["module_file_parse"]
-    assert second["bzlmod_resolution_compute"] > first["bzlmod_resolution_compute"]
+    assert second["module_file_parse"] > warm["module_file_parse"]
+    assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -918,6 +923,12 @@ include("//:deps.MODULE.bazel")
     assert first["module_file_parse"] > before["module_file_parse"]
     assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
 
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_guardrails" in output
+    assert "included_lib" not in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
     included_lib = buck.cwd / "libs/included_lib"
     included_lib.mkdir(parents=True)
     _write(included_lib / "MODULE.bazel", 'module(name = "included_lib", version = "1.0")\n')
@@ -934,8 +945,8 @@ local_path_override(
 
     output, second = await _audit_cells_and_counters(buck)
     assert "included_lib" in output
-    assert second["module_file_parse"] > first["module_file_parse"]
-    assert second["bzlmod_resolution_compute"] > first["bzlmod_resolution_compute"]
+    assert second["module_file_parse"] > warm["module_file_parse"]
+    assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

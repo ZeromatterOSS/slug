@@ -28,9 +28,12 @@ use futures::future::BoxFuture;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path::CellPathRef;
 use slug_core::cells::name::CellName;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_fs::paths::file_name::FileNameBuf;
 
 use crate::buildfiles::HasBuildfiles;
+use crate::dice::data::HasIoProvider;
 use crate::file_ops::delegate::get_delegated_file_ops;
 use crate::file_ops::error::FileReadError;
 use crate::file_ops::error::extended_ignore_error;
@@ -107,6 +110,31 @@ impl DiceFileComputations {
         path: CellPathRef<'_>,
     ) -> Result<String, FileReadError> {
         match Self::read_file_if_exists(ctx, path).await {
+            Ok(result) => result.ok_or_else(|| FileReadError::NotFound(path.to_string())),
+            Err(e) => Err(FileReadError::Buck(e)),
+        }
+    }
+
+    /// Reads a project-relative file without going through a cell resolver.
+    ///
+    /// This is for bootstrap inputs that define the cell graph itself, such as
+    /// root MODULE.bazel files. Normal build inputs should use `CellPath` reads.
+    pub async fn read_project_file_if_exists(
+        ctx: &mut DiceComputations<'_>,
+        path: &ProjectRelativePath,
+    ) -> slug_error::Result<Option<String>> {
+        (ctx.compute(&ProjectReadFileKey(Arc::new(path.to_owned())))
+            .await??
+            .0)()
+        .await
+    }
+
+    /// Reads a project-relative file without going through a cell resolver.
+    pub async fn read_project_file(
+        ctx: &mut DiceComputations<'_>,
+        path: &ProjectRelativePath,
+    ) -> Result<String, FileReadError> {
+        match Self::read_project_file_if_exists(ctx, path).await {
             Ok(result) => result.ok_or_else(|| FileReadError::NotFound(path.to_string())),
             Err(e) => Err(FileReadError::Buck(e)),
         }
@@ -190,6 +218,8 @@ fn read_dir_entry_stats(entries: &[SimpleDirEntry]) -> (usize, usize, usize, usi
 #[derive(Allocative)]
 pub struct FileChangeTracker {
     files_to_dirty: HashSet<ReadFileKey>,
+    project_files_to_dirty: HashSet<ProjectReadFileKey>,
+    project_files_requiring_pre_config_commit: bool,
     dirs_to_dirty: HashSet<ReadDirKey>,
     paths_to_dirty: HashSet<PathMetadataKey>,
     exists_matching_exact_case_to_dirty: HashSet<ExistsMatchingExactCaseKey>,
@@ -201,6 +231,8 @@ impl FileChangeTracker {
     pub fn new() -> Self {
         Self {
             files_to_dirty: Default::default(),
+            project_files_to_dirty: Default::default(),
+            project_files_requiring_pre_config_commit: false,
             dirs_to_dirty: Default::default(),
             paths_to_dirty: Default::default(),
             maybe_modified_dirs: Default::default(),
@@ -219,11 +251,16 @@ impl FileChangeTracker {
         }
 
         ctx.changed(self.files_to_dirty)?;
+        ctx.changed(self.project_files_to_dirty)?;
         ctx.changed(self.dirs_to_dirty)?;
         ctx.changed(self.paths_to_dirty)?;
         ctx.changed(self.exists_matching_exact_case_to_dirty)?;
 
         Ok(())
+    }
+
+    pub fn requires_pre_config_commit(&self) -> bool {
+        self.project_files_requiring_pre_config_commit
     }
 
     fn entry_added_or_removed(&mut self, path: CellPath) {
@@ -266,6 +303,19 @@ impl FileChangeTracker {
         self.paths_to_dirty.insert(PathMetadataKey(path.clone()));
     }
 
+    pub fn project_file_added_or_removed(&mut self, path: ProjectRelativePathBuf) {
+        self.project_file_contents_changed(path);
+    }
+
+    pub fn project_file_contents_changed(&mut self, path: ProjectRelativePathBuf) {
+        if !is_bzlmod_config_project_file(&path) {
+            return;
+        }
+        self.project_files_requiring_pre_config_commit = true;
+        self.project_files_to_dirty
+            .insert(ProjectReadFileKey(Arc::new(path)));
+    }
+
     /// Normally, buck does not need the file watcher to tell it that a directory's entries have
     /// changed. However, in some cases file watcher want to force-invalidate directory listings,
     /// and so this exists. It should not normally be used.
@@ -285,6 +335,11 @@ impl FileChangeTracker {
     pub fn dir_entries_changed_for_watchman_bug(&mut self, path: CellPath) {
         self.maybe_modified_dirs.insert(path);
     }
+}
+
+fn is_bzlmod_config_project_file(path: &ProjectRelativePath) -> bool {
+    let path = path.as_str();
+    path == "MODULE.bazel" || path.ends_with("/MODULE.bazel") || path.ends_with(".MODULE.bazel")
 }
 
 /// The return value of a `ReadFileKey` computation.
@@ -331,6 +386,36 @@ impl Key for ReadFileKey {
             .await?
             .read_file_if_exists(ctx, self.0.path())
             .await
+    }
+
+    fn equality(_: &Self::Value, _: &Self::Value) -> bool {
+        false
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
+
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("ProjectReadFileKey({})", _0)]
+struct ProjectReadFileKey(Arc<ProjectRelativePathBuf>);
+
+#[async_trait]
+impl Key for ProjectReadFileKey {
+    type Value = slug_error::Result<ReadFileProxy>;
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Ok(ReadFileProxy::new_with_captures(
+            (
+                self.0.as_ref().to_owned(),
+                ctx.global_data().get_io_provider(),
+            ),
+            |(project_path, io)| async move { io.read_file_if_exists(project_path).await },
+        ))
     }
 
     fn equality(_: &Self::Value, _: &Self::Value) -> bool {

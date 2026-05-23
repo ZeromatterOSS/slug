@@ -72,16 +72,18 @@ impl FsHashCrawler {
     async fn update(
         &self,
         mut dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(slug_data::FileWatcherStats, DiceTransactionUpdater)> {
+    ) -> slug_error::Result<(slug_data::FileWatcherStats, DiceTransactionUpdater, bool)> {
         let root = self.root.dupe();
         let cells = self.cells.dupe();
         let new_snapshot =
             tokio::task::spawn_blocking(move || FsSnapshot::build(&root, &cells)).await??;
         let mut guard = self.snapshot.lock().unwrap();
         let old_snapshot = mem::replace(&mut *guard, new_snapshot);
-        let (stats, changes) = old_snapshot.get_updates_for_dice(&guard, &self.ignore_specs)?;
+        let (stats, changes) =
+            old_snapshot.get_updates_for_dice(&guard, &self.cells, &self.ignore_specs)?;
+        let requires_pre_config_commit = changes.requires_pre_config_commit();
         changes.write_to_dice(&mut dice)?;
-        Ok((stats, dice))
+        Ok((stats, dice, requires_pre_config_commit))
     }
 }
 
@@ -90,16 +92,17 @@ impl FileWatcher for FsHashCrawler {
     async fn sync(
         &self,
         dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase)> {
+    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase, bool)> {
         span_async(
             slug_data::FileWatcherStart {
                 provider: slug_data::FileWatcherProvider::FsHashCrawler as i32,
             },
             async {
                 let (stats, res) = match self.update(dice).await {
-                    Ok((stats, dice)) => {
+                    Ok((stats, dice, requires_pre_config_commit)) => {
                         let mergebase = Mergebase(Arc::new(stats.branched_from_revision.clone()));
-                        ((Some(stats)), Ok((dice, mergebase)))
+                        let has_changes = stats.fresh_instance || requires_pre_config_commit;
+                        ((Some(stats)), Ok((dice, mergebase, has_changes)))
                     }
                     Err(e) => (None, Err(e)),
                 };
@@ -204,6 +207,7 @@ impl FsSnapshot {
     fn get_updates_for_dice(
         &self,
         new_snapshot: &FsSnapshot,
+        cells: &CellResolver,
         ignore_specs: &HashMap<CellName, IgnoreSet>,
     ) -> slug_error::Result<(slug_data::FileWatcherStats, FileChangeTracker)> {
         let events = self.get_updates(new_snapshot)?;
@@ -226,6 +230,10 @@ impl FsSnapshot {
                     FileWatcherEventType::Create,
                     FileWatcherKind::File | FileWatcherKind::Symlink,
                 ) => {
+                    changed.project_file_added_or_removed(project_path_for_cell_path(
+                        cells,
+                        &event.cell_path,
+                    )?);
                     changed.file_added_or_removed(event.cell_path);
                 }
                 (FileWatcherEventType::Create, FileWatcherKind::Directory) => {
@@ -235,6 +243,10 @@ impl FsSnapshot {
                     FileWatcherEventType::Modify,
                     FileWatcherKind::File | FileWatcherKind::Symlink,
                 ) => {
+                    changed.project_file_contents_changed(project_path_for_cell_path(
+                        cells,
+                        &event.cell_path,
+                    )?);
                     changed.file_contents_changed(event.cell_path);
                 }
                 (FileWatcherEventType::Modify, FileWatcherKind::Directory) => {
@@ -245,6 +257,10 @@ impl FsSnapshot {
                     FileWatcherEventType::Delete,
                     FileWatcherKind::File | FileWatcherKind::Symlink,
                 ) => {
+                    changed.project_file_added_or_removed(project_path_for_cell_path(
+                        cells,
+                        &event.cell_path,
+                    )?);
                     changed.file_added_or_removed(event.cell_path);
                 }
                 (FileWatcherEventType::Delete, FileWatcherKind::Directory) => {
@@ -303,6 +319,17 @@ impl FsSnapshot {
         }
         Ok(())
     }
+}
+
+fn project_path_for_cell_path(
+    cells: &CellResolver,
+    cell_path: &CellPath,
+) -> slug_error::Result<slug_core::fs::project_rel_path::ProjectRelativePathBuf> {
+    Ok(cells
+        .get(cell_path.cell())?
+        .path()
+        .as_project_relative_path()
+        .join(cell_path.path()))
 }
 
 fn file_hash(path: &Path) -> slug_error::Result<Hash> {

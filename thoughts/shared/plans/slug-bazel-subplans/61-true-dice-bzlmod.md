@@ -274,14 +274,41 @@ Observed SDK result at the checkpoint:
   global registry is still process state, but the fast path is now keyed by the
   DICE-derived project root plus registered-toolchain list and clears/reloads
   when that signature changes.
+- Root and included `MODULE.bazel` reads now run through a `slug_common` DICE
+  key backed by `DiceFileComputations::read_project_file_if_exists` for the
+  root module and `DiceFileComputations::read_project_file` for included
+  segments. The parser keeps `RootModuleFileValue`,
+  `ParsedModuleFileWithInputs`, and input digest helpers in `slug_bzlmod`, but
+  include recursion is driven by `ModuleFileParseSession` so the caller owns
+  file reads. The old non-cacheable `slug_bzlmod::RootModuleFileKey`
+  direct-`std::fs` bridge was removed. Same-daemon root and included module
+  edit guardrails now assert a warm no-op first, then prove the edit bumps
+  module-file parse and bzlmod-resolution counters.
+- Extension evaluation no longer eagerly computes `ExtensionRepoExecutionKey`
+  for every generated spoke. It still registers generated spoke cells as
+  transitional lookup plumbing, but repository materialization dependencies now
+  stay on the repository execution path instead of being recorded as extension
+  evaluation inputs. This fixes the missing-lockfile same-daemon warm replay
+  guardrail: the extension executes once on the cold command and is reused on
+  the warm command.
+- Current slice validation passed with `cargo build -p slug`, `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
+  --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
+  -p slug_file_watcher -- --nocapture`, `cargo test -p
+  slug_interpreter_for_build module_extension_executor_impl -- --nocapture`,
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`, `cargo fmt
+  --check`, and `git diff --check`. The full Plan 61 Python guardrail passed
+  with 61 tests.
 
 ## Consolidated Learnings
 
 What worked:
 
-- Root `MODULE.bazel` and visible/hidden lockfile reads were moved behind DICE
-  keys as a bridge. Those keys are intentionally non-cacheable until file reads
-  are backed by tracked DICE filesystem inputs.
+- Root `MODULE.bazel` and included module segments are now read through tracked
+  DICE filesystem inputs in the persisted config path. Visible/hidden lockfile
+  reads are still bridge keys and remain a separate tracked-input migration
+  surface.
 - Extension evaluation and extension repository execution now run through DICE
   keys instead of immediate startup-side materialization.
 - Lockfile replay reads, facts validation, registry checksum policy,
@@ -442,12 +469,14 @@ using Rust DICE keys and values:
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.
 
-2. Make root, included, local override, registry, git, and archive module files
-   true DICE inputs.
-   - Replace direct `std::fs` validity hacks with tracked filesystem
+2. Finish module-file DICE inputs for local override, registry, git, and
+   archive sources.
+   - Root and included module segments now use tracked project-file DICE inputs;
+     keep extending that shape to every non-root module source.
+   - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes.
    - Include create/delete transitions, parse failures, include cycles, and
-     UTF-8 failures.
+     UTF-8 failures for every module source class.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.

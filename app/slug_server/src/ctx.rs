@@ -655,6 +655,22 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
         mut ctx: DiceTransactionUpdater,
         early_timings: &mut EarlyCommandTimingBuilder,
     ) -> slug_error::Result<(DiceTransactionUpdater, UserComputationData)> {
+        early_timings.start_span(FILE_WATCHER_WAIT.to_owned());
+        let (ctx_after_sync, mergebase, file_watcher_changed) = self
+            .cmd_ctx
+            .base_context
+            .daemon
+            .file_watcher
+            .sync(ctx)
+            .await?;
+        early_timings.end_known_span();
+
+        ctx = if file_watcher_changed {
+            ctx_after_sync.commit().await.into_updater()
+        } else {
+            ctx_after_sync
+        };
+
         let cells_and_configs = self.cmd_ctx.load_new_configs(&mut ctx).await?;
         let is_bzlmod = cells_and_configs.is_bzlmod;
         let cell_resolver = cells_and_configs.cell_resolver;
@@ -715,16 +731,6 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
             cells_and_configs.bzlmod_session_data,
         )?;
         ctx.set_is_bzlmod(is_bzlmod)?;
-
-        early_timings.start_span(FILE_WATCHER_WAIT.to_owned());
-        let (ctx, mergebase) = self
-            .cmd_ctx
-            .base_context
-            .daemon
-            .file_watcher
-            .sync(ctx)
-            .await?;
-        early_timings.end_known_span();
 
         let mut user_data = self.make_user_computation_data(&cells_and_configs.root_config)?;
         user_data.set_mergebase(mergebase);

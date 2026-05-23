@@ -30,6 +30,7 @@ use slug_core::cells::CellResolver;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::name::CellName;
 use slug_core::fs::project::ProjectRoot;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_data::FileWatcherEventType;
 use slug_data::FileWatcherKind;
 use slug_error::conversion::from_any_with_tag;
@@ -93,7 +94,7 @@ fn ignore_event_kind(event_kind: &EventKind) -> bool {
 struct NotifyFileData {
     ignored: u64,
     #[allocative(skip)]
-    events: OrderedSet<(CellPath, EventKind)>,
+    events: OrderedSet<(CellPath, ProjectRelativePathBuf, EventKind)>,
     /// Whether file system changes were missed
     missed_events: bool,
 }
@@ -130,6 +131,9 @@ impl NotifyFileData {
             if is_reserved_output_path(&path) {
                 continue;
             }
+            if path.as_ref().is_empty() && matches!(event.kind, EventKind::Modify(_)) {
+                continue;
+            }
 
             let cell_path = cells.get_cell_path(&path);
             let ignore = ignore_specs
@@ -150,7 +154,8 @@ impl NotifyFileData {
             if ignore || ignore_event_kind(&event.kind) {
                 self.ignored += 1;
             } else {
-                self.events.insert((cell_path, event.kind.clone()));
+                self.events
+                    .insert((cell_path, path.as_ref().to_buf(), event.kind.clone()));
             }
         }
         Ok(())
@@ -162,11 +167,12 @@ impl NotifyFileData {
         let mut stats = FileWatcherStats::new(Default::default(), self.events.len());
         stats.add_ignored(self.ignored);
 
-        for (cell_path, event_kind) in self.events {
+        for (cell_path, project_path, event_kind) in self.events {
             let cell_path_str = cell_path.to_string();
             match event_kind {
                 EventKind::Create(create_kind) => match create_kind {
                     CreateKind::File => {
+                        changed.project_file_added_or_removed(project_path);
                         changed.file_added_or_removed(cell_path);
                         stats.add(
                             cell_path_str,
@@ -183,6 +189,7 @@ impl NotifyFileData {
                         );
                     }
                     CreateKind::Any | CreateKind::Other => {
+                        changed.project_file_added_or_removed(project_path);
                         changed.file_added_or_removed(cell_path.clone());
                         stats.add(
                             cell_path_str.clone(),
@@ -199,6 +206,7 @@ impl NotifyFileData {
                 },
                 EventKind::Modify(modify_kind) => match modify_kind {
                     ModifyKind::Data(_) | ModifyKind::Metadata(_) => {
+                        changed.project_file_contents_changed(project_path);
                         changed.file_contents_changed(cell_path);
                         stats.add(
                             cell_path_str,
@@ -207,6 +215,7 @@ impl NotifyFileData {
                         );
                     }
                     ModifyKind::Name(_) | ModifyKind::Any | ModifyKind::Other => {
+                        changed.project_file_added_or_removed(project_path);
                         changed.file_added_or_removed(cell_path.clone());
                         stats.add(
                             cell_path_str.clone(),
@@ -233,6 +242,7 @@ impl NotifyFileData {
                 },
                 EventKind::Remove(remove_kind) => match remove_kind {
                     RemoveKind::File => {
+                        changed.project_file_added_or_removed(project_path);
                         changed.file_added_or_removed(cell_path);
                         stats.add(
                             cell_path_str,
@@ -249,6 +259,7 @@ impl NotifyFileData {
                         );
                     }
                     RemoveKind::Any | RemoveKind::Other => {
+                        changed.project_file_added_or_removed(project_path);
                         changed.file_added_or_removed(cell_path.clone());
                         stats.add(
                             cell_path_str.clone(),
@@ -424,17 +435,22 @@ impl NotifyFileWatcher {
     fn sync2(
         &self,
         mut dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(slug_data::FileWatcherStats, DiceTransactionUpdater)> {
+    ) -> slug_error::Result<(slug_data::FileWatcherStats, DiceTransactionUpdater, bool)> {
         let mut guard = self.data.lock().unwrap();
         let old = mem::replace(&mut *guard, Ok(NotifyFileData::new()));
         let (stats, changes) = old?.sync();
+        let requires_pre_config_commit = match changes.as_ref() {
+            Some(changes) => changes.requires_pre_config_commit(),
+            None => true,
+        };
+        let has_changes = stats.fresh_instance || requires_pre_config_commit;
         if let Some(changes) = changes {
             changes.write_to_dice(&mut dice)?;
         } else {
             // We missed some file system notifications, so we drop everything
             dice = dice.unstable_take();
         }
-        Ok((stats, dice))
+        Ok((stats, dice, has_changes))
     }
 }
 
@@ -443,16 +459,16 @@ impl FileWatcher for NotifyFileWatcher {
     async fn sync(
         &self,
         dice: DiceTransactionUpdater,
-    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase)> {
+    ) -> slug_error::Result<(DiceTransactionUpdater, Mergebase, bool)> {
         span_async(
             slug_data::FileWatcherStart {
                 provider: slug_data::FileWatcherProvider::RustNotify as i32,
             },
             async {
                 let (stats, res) = match self.sync2(dice) {
-                    Ok((stats, dice)) => {
+                    Ok((stats, dice, has_changes)) => {
                         let mergebase = Mergebase(Arc::new(stats.branched_from_revision.clone()));
-                        ((Some(stats)), Ok((dice, mergebase)))
+                        ((Some(stats)), Ok((dice, mergebase, has_changes)))
                     }
                     Err(e) => (None, Err(e)),
                 };
