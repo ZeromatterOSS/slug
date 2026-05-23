@@ -798,6 +798,30 @@ impl ExtensionSpokesByExtensionIdKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
+    "ExtensionIdByCanonicalRepoKey({}, {})",
+    workspace_id.stable_hash(),
+    canonical_name
+)]
+pub struct ExtensionIdByCanonicalRepoKey {
+    pub workspace_id: WorkspaceId,
+    pub canonical_name: Arc<str>,
+}
+
+impl ExtensionIdByCanonicalRepoKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId, canonical_name: &str) -> Self {
+        Self {
+            workspace_id,
+            canonical_name: Arc::from(canonical_name),
+        }
+    }
+
+    pub fn for_project_root(project_root: PathBuf, canonical_name: &str) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root), canonical_name)
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
     "ExtensionSpokesByCanonicalRepoKey({}, {})",
     workspace_id.stable_hash(),
     canonical_name

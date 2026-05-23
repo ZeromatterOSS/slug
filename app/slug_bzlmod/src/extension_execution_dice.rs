@@ -61,6 +61,7 @@ use crate::dice_graph::BzlmodExtensionReplayDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataValue;
 use crate::dice_graph::ExtensionBzlTransitiveDigestKey;
+use crate::dice_graph::ExtensionIdByCanonicalRepoKey;
 use crate::dice_graph::ExtensionSpoke;
 use crate::dice_graph::ExtensionSpokesByCanonicalRepoKey;
 use crate::dice_graph::ExtensionSpokesByExtensionIdKey;
@@ -474,6 +475,40 @@ impl Key for ExtensionSpokesByExtensionIdKey {
 }
 
 #[async_trait]
+impl Key for ExtensionIdByCanonicalRepoKey {
+    type Value = slug_error::Result<Option<Arc<str>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        ensure_extension_aggregations_workspace(
+            &self.workspace_id,
+            aggregations.as_ref(),
+            "ExtensionIdByCanonicalRepoKey",
+            &self.canonical_name,
+        )?;
+        Ok(
+            extension_id_for_canonical_repo(aggregations.as_ref(), &self.canonical_name)
+                .map(Arc::from),
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
+}
+
+#[async_trait]
 impl Key for ExtensionSpokesByCanonicalRepoKey {
     type Value = slug_error::Result<Option<Arc<ExtensionSpokesValue>>>;
 
@@ -482,15 +517,17 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        let extension_id = ctx
+            .compute(&ExtensionIdByCanonicalRepoKey {
+                workspace_id: self.workspace_id.clone(),
+                canonical_name: self.canonical_name.clone(),
+            })
+            .await??;
+        let Some(extension_id) = extension_id else {
+            return Ok(None);
+        };
         let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
         let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
-        ensure_extension_aggregations_workspace(
-            &self.workspace_id,
-            aggregations.as_ref(),
-            "ExtensionSpokesByCanonicalRepoKey",
-            &self.canonical_name,
-        )?;
         ensure_repo_mappings_workspace(
             &self.workspace_id,
             repo_mappings.as_ref(),
@@ -503,20 +540,15 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
             "ExtensionSpokesByCanonicalRepoKey",
             &self.canonical_name,
         )?;
-        let Some(extension_id) =
-            extension_id_for_canonical_repo(aggregations.as_ref(), &self.canonical_name)
-        else {
-            return Ok(None);
-        };
         let bzl_transitive_digest = ctx
             .compute(&ExtensionBzlTransitiveDigestKey {
                 workspace_id: self.workspace_id.clone(),
-                extension_id: Arc::from(extension_id),
+                extension_id: extension_id.clone(),
             })
             .await??;
         let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
             self.workspace_id.clone(),
-            extension_id,
+            extension_id.as_ref(),
             &bzl_transitive_digest,
         );
 
@@ -2205,6 +2237,10 @@ mod tests {
                 slug_error::ErrorTag::Tier0,
                 "aggregation failed"
             ));
+        let missing_canonical_owner: slug_error::Result<Option<Arc<str>>> = Ok(None);
+        let failed_canonical_owner: slug_error::Result<Option<Arc<str>>> = Err(
+            slug_error::slug_error!(slug_error::ErrorTag::Tier0, "canonical owner failed"),
+        );
         let first_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
         let same_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
         let changed_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("second"));
@@ -2214,6 +2250,12 @@ mod tests {
         ));
         assert!(!<BzlmodExtensionAggregationKey as Key>::validity(
             &failed_aggregation
+        ));
+        assert!(<ExtensionIdByCanonicalRepoKey as Key>::validity(
+            &missing_canonical_owner
+        ));
+        assert!(!<ExtensionIdByCanonicalRepoKey as Key>::validity(
+            &failed_canonical_owner
         ));
         assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &missing_extension
@@ -2305,6 +2347,73 @@ mod tests {
         let mut dice = updater.commit().await;
         let third = dice.compute(&key).await??.unwrap();
         assert_ne!(first, third);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn extension_id_by_canonical_repo_key_projects_owner_extension() -> slug_error::Result<()>
+    {
+        fn aggregations_value(
+            workspace_id: &crate::WorkspaceId,
+            target: AggregatedExtension,
+            other: AggregatedExtension,
+        ) -> Arc<BzlmodExtensionAggregationsDataValue> {
+            let mut extension_aggregations = std::collections::HashMap::new();
+            extension_aggregations.insert(target.extension_id.clone(), target);
+            extension_aggregations.insert(other.extension_id.clone(), other);
+            Arc::new(BzlmodExtensionAggregationsDataValue {
+                workspace_id: workspace_id.clone(),
+                extension_aggregations: Arc::new(extension_aggregations),
+                root_module_name: Arc::from("root"),
+            })
+        }
+
+        let workspace_id =
+            crate::WorkspaceId::for_project_root(PathBuf::from("/tmp/slug-plan61-canonical-key"));
+        let mut target = AggregatedExtension::new("@root//:ext.bzl", "ext");
+        target.extension_id = "@root//:ext.bzl%ext".to_owned();
+        let target_id = target.extension_id.clone();
+        let mut other = AggregatedExtension::new("@dep//:other.bzl", "other");
+        other.extension_id = "@dep//:other.bzl%other".to_owned();
+        let key =
+            ExtensionIdByCanonicalRepoKey::for_workspace_id(workspace_id.clone(), "_main+ext+tool");
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            aggregations_value(&workspace_id, target.clone(), other.clone()),
+        )])?;
+        let mut dice = updater.commit().await;
+        let first = dice.compute(&key).await??.unwrap();
+        assert_eq!(first.as_ref(), target_id);
+
+        let mut changed_other = other.clone();
+        changed_other.add_imported_repos(["changed_other_repo".to_owned()]);
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            aggregations_value(&workspace_id, target.clone(), changed_other),
+        )])?;
+        let mut dice = updater.commit().await;
+        let second = dice.compute(&key).await??.unwrap();
+        assert_eq!(first, second);
+
+        let mut changed_target = target.clone();
+        changed_target.extension_name = "renamed".to_owned();
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            aggregations_value(&workspace_id, changed_target, other),
+        )])?;
+        let mut dice = updater.commit().await;
+        let third = dice.compute(&key).await??;
+        assert!(third.is_none());
 
         Ok(())
     }
