@@ -828,6 +828,16 @@ Observed SDK result at the checkpoint:
   `cargo fmt --check`, and `git diff --check`. `BzlmodSessionData` no longer
   carries a separate `project_root`; the transitional session has one
   workspace identity source, `workspace_id`.
+- Dynamic generated-repo cell paths, setup payloads, unscoped aliases, and
+  scoped aliases now carry the dynamic project root captured at registration
+  time, and lookups require that root to match. This is still process-global
+  transitional plumbing, but stale entries from another root can no longer
+  satisfy generated repo lookup after the active root changes. Validation passed
+  with `cargo check -p slug_core`, `cargo test -p slug_core
+  dynamic_bzlmod_entries_are_scoped_to_current_project_root -- --nocapture`,
+  `cargo build -p slug`, the focused Plan 61 Python replay subset, the full
+  Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
+  `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -960,9 +970,9 @@ What did not work or remains risky:
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
 - Dynamic generated-repo state is still held in process-global maps. Clearing
-  the suffix cache and making suffix lookup deterministic close leaks in the
-  transitional reset/lookup path, but do not make the bzlmod cell graph a
-  DICE-owned value.
+  the suffix cache, making suffix lookup deterministic, and scoping registered
+  dynamic entries to the active project root close leaks in the transitional
+  reset/lookup path, but do not make the bzlmod cell graph a DICE-owned value.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
@@ -1113,6 +1123,8 @@ using Rust DICE keys and values:
    - Extension repo execution/materialization keys now preserve the workspace
      identity and output base, but generated repo cell graph ownership and
      final materialization state are still not fully DICE-owned.
+   - Dynamic generated-repo cell maps are now project-root scoped, but they
+     remain process-global maps rather than a DICE-owned `BzlmodCellGraphKey`.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
