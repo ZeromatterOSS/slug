@@ -125,6 +125,14 @@ Observed SDK result at the checkpoint:
   directive fails with "No repository visible as '@injected_helper' from
   repository '@@+ext+generated'"; Slug now has a same-daemon guardrail for the
   keyword alias and repo-mapping replay transition.
+- `use_extension(..., isolate = True)` has been Bazel-grounded as a larger
+  blocker, not a safe small patch. Bazel 9.0.1 rejects it unless
+  `--experimental_isolated_extension_usages` is set; with the flag, each
+  isolated usage evaluates separately, generated repo names include the
+  isolation key, and `module_ctx.is_isolated` is true. Slug currently lacks the
+  exported proxy variable name needed for Bazel's `IsolationKey`, aggregates by
+  extension id only, names generated repos without the isolation component, and
+  hard-codes `module_ctx.is_isolated` false.
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
@@ -298,9 +306,9 @@ What did not work or remains risky:
 - Dynamic generated-repo state is still held in process-global maps. Clearing
   the suffix cache closes one leak in the transitional reset path but does not
   make the bzlmod cell graph a DICE-owned value.
-- Some Bazel 9 semantics are parsed but not fully modeled, including
-  `bazel_dep(max_compatibility_level)`, registry selection on overrides, and
-  remaining command policy around non-root dev dependencies.
+- Some Bazel 9 semantics are parsed but not fully modeled, including registry
+  selection on overrides, isolated extension usages, and remaining command
+  policy around non-root dev dependencies.
 - Registry and repository cache behavior is still a blend of DICE identity,
   lockfile checksums, and filesystem markers. It is better than the old path,
   but it is not yet a complete `RepoSpecFunction` /
@@ -433,7 +441,8 @@ using Rust DICE keys and values:
    - Implement or explicitly Bazel-ground the behavior for
      remaining `dev_dependency` surfaces, `single_version_override(registry/patches)`,
      `multiple_version_override(registry)`, `archive_override`, `git_override`,
-     `override_repo`, `inject_repo`, and `isolate`.
+     `override_repo`, remaining `inject_repo` validation, and isolated
+     extension usages.
    - Preserve root `bazel_dep(dev_dependency=True)` default inclusion and
      `--ignore_dev_dependency` exclusion while moving command policy out of the
      transitional resolver.
