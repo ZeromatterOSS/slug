@@ -1037,6 +1037,7 @@ struct LegacyBzlmodResolutionDiceKey {
     visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
     local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
+    non_registry_override_inputs: Arc<NonRegistryOverrideModuleInputsValue>,
     registry_file_inputs: Arc<RegistryFileInputsValue>,
     extension_replay_summary_digest: Option<Arc<str>>,
 }
@@ -1127,6 +1128,7 @@ impl PartialEq for LegacyBzlmodResolutionDiceKey {
             && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
             && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
             && self.local_override_inputs.digest == other.local_override_inputs.digest
+            && self.non_registry_override_inputs.digest == other.non_registry_override_inputs.digest
             && self.registry_file_inputs.digest == other.registry_file_inputs.digest
             && self.extension_replay_summary_digest == other.extension_replay_summary_digest
     }
@@ -1144,6 +1146,7 @@ impl std::hash::Hash for LegacyBzlmodResolutionDiceKey {
         hash_lockfile_content_identity(&self.visible_lockfile, state);
         hash_lockfile_content_identity(&self.hidden_lockfile, state);
         self.local_override_inputs.digest.hash(state);
+        self.non_registry_override_inputs.digest.hash(state);
         self.registry_file_inputs.digest.hash(state);
         self.extension_replay_summary_digest.hash(state);
     }
@@ -1346,6 +1349,21 @@ struct LocalOverrideModuleInputsValue {
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("NonRegistryOverrideModuleInputsKey({})", project_root.display())]
+struct NonRegistryOverrideModuleInputsKey {
+    project_root: AbsNormPathBuf,
+    overrides: Vec<(String, PathBuf)>,
+    poll_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct NonRegistryOverrideModuleInputsValue {
+    digest: String,
+    has_inputs: bool,
+    has_untracked_inputs: bool,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("RegistryFileInputsKey")]
 struct RegistryFileInputsKey {
     project_root: AbsNormPathBuf,
@@ -1413,6 +1431,38 @@ fn active_root_overrides(
         })
         .cloned()
         .collect()
+}
+
+fn non_registry_override_module_dirs_from_root_module(
+    root_module_file: &slug_bzlmod::RootModuleFileValue,
+    ignore_dev_dependency: bool,
+) -> slug_error::Result<Vec<(String, PathBuf)>> {
+    let Some(parsed) = &root_module_file.parsed else {
+        return Ok(Vec::new());
+    };
+    let active_overrides = active_root_overrides(&parsed.module, ignore_dev_dependency);
+    if !active_overrides.iter().any(|override_| {
+        matches!(
+            override_,
+            slug_bzlmod::types::Override::Git(_) | slug_bzlmod::types::Override::Archive(_)
+        )
+    }) {
+        return Ok(Vec::new());
+    }
+    let cache = ModuleCache::new()?;
+    Ok(active_overrides
+        .iter()
+        .filter_map(|override_| match override_ {
+            slug_bzlmod::types::Override::Git(git) => {
+                Some((git.module_name.clone(), cache.git_override_dir(git)))
+            }
+            slug_bzlmod::types::Override::Archive(archive) => Some((
+                archive.module_name.clone(),
+                cache.archive_override_dir(archive),
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>())
 }
 
 async fn local_override_module_inputs_digest(
@@ -1609,6 +1659,128 @@ fn local_override_inputs_poll_digest(
     Ok(hex::encode(hasher.finalize()))
 }
 
+async fn non_registry_override_module_inputs_digest(
+    ctx: &mut DiceComputations<'_>,
+    project_root: &AbsNormPathBuf,
+    overrides: &[(String, PathBuf)],
+) -> slug_error::Result<NonRegistryOverrideModuleInputsValue> {
+    let project_fs = ProjectRoot::new_unchecked(project_root.clone());
+    let mut hasher = Sha256::new();
+    hasher.update(b"non-registry-override-module-inputs-v1");
+    hasher.update([0]);
+
+    for (module_name, module_dir) in overrides {
+        let normalized_module_dir = match module_dir.as_path().canonicalize() {
+            Ok(canonical) => AbsNormPathBuf::try_from(canonical)?,
+            Err(_) => AbsNormPathBuf::try_from(normalize_path_lexically(module_dir.clone()))?,
+        };
+        let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
+        hasher.update(module_name.as_bytes());
+        hasher.update([0]);
+        hasher.update(normalized_module_dir.to_string_lossy().as_bytes());
+        hasher.update([0]);
+
+        let (module_read, _tracking) =
+            read_bzlmod_file_for_module_inputs(ctx, &project_fs, &module_bazel_path).await?;
+        match module_read {
+            Some((content, _content_digest)) => {
+                hasher.update(b"present");
+                hasher.update([0]);
+                let parsed_with_inputs = parse_module_with_tracked_project_includes(
+                    ctx,
+                    &project_fs,
+                    &module_bazel_path,
+                    content,
+                )
+                .await
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to parse MODULE.bazel for non-registry override '{}' at {:?}",
+                        module_name, module_bazel_path
+                    )
+                })?;
+                for input in &parsed_with_inputs.inputs {
+                    hasher.update(input.path.to_string_lossy().as_bytes());
+                    hasher.update([0]);
+                    hasher.update(input.digest.as_bytes());
+                    hasher.update([0]);
+                }
+            }
+            None => {
+                hasher.update(b"missing");
+                hasher.update([0]);
+            }
+        }
+    }
+
+    Ok(NonRegistryOverrideModuleInputsValue {
+        digest: hex::encode(hasher.finalize()),
+        has_inputs: !overrides.is_empty(),
+        has_untracked_inputs: false,
+    })
+}
+
+fn non_registry_override_inputs_poll_digest(
+    project_fs: &ProjectRoot,
+    overrides: &[(String, PathBuf)],
+) -> slug_error::Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"non-registry-override-module-inputs-poll-v1");
+    hasher.update([0]);
+
+    for (module_name, module_dir) in overrides {
+        let normalized_module_dir = match module_dir.as_path().canonicalize() {
+            Ok(canonical) => AbsNormPathBuf::try_from(canonical)?,
+            Err(_) => AbsNormPathBuf::try_from(normalize_path_lexically(module_dir.clone()))?,
+        };
+        hasher.update(module_name.as_bytes());
+        hasher.update([0]);
+        hasher.update(normalized_module_dir.to_string_lossy().as_bytes());
+        hasher.update([0]);
+
+        if project_relative_path_for_abs_path(project_fs, normalized_module_dir.as_path()).is_some()
+        {
+            hasher.update(b"project-tracked");
+            hasher.update([0]);
+            continue;
+        }
+
+        let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
+        match read_absolute_text_file_input(&module_bazel_path)? {
+            (Some(content), Some(content_digest)) => {
+                hasher.update(b"present");
+                hasher.update([0]);
+                hasher.update(content_digest.as_bytes());
+                hasher.update([0]);
+                let parsed_with_inputs = parse_module_with_polled_includes(
+                    &module_bazel_path,
+                    content,
+                )
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to parse MODULE.bazel for non-registry override '{}' at {:?}",
+                        module_name, module_bazel_path
+                    )
+                })?;
+                for input in &parsed_with_inputs.inputs {
+                    hasher.update(input.path.to_string_lossy().as_bytes());
+                    hasher.update([0]);
+                    hasher.update(input.digest.as_bytes());
+                    hasher.update([0]);
+                }
+            }
+            (None, None) => {
+                hasher.update(b"missing");
+                hasher.update([0]);
+            }
+            _ => unreachable!("absolute text file reads return content and digest together"),
+        }
+        hasher.update([0]);
+    }
+
+    Ok(hex::encode(hasher.finalize()))
+}
+
 fn resolve_local_override_module_dir(
     base: &AbsNormPathBuf,
     path: &str,
@@ -1648,6 +1820,35 @@ impl Key for LocalOverrideModuleInputsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         local_override_module_inputs_digest(ctx, &self.project_root, &self.overrides)
+            .await
+            .map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_untracked_inputs,
+            Err(_) => false,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for NonRegistryOverrideModuleInputsKey {
+    type Value = slug_error::Result<Arc<NonRegistryOverrideModuleInputsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        non_registry_override_module_inputs_digest(ctx, &self.project_root, &self.overrides)
             .await
             .map(Arc::new)
     }
@@ -1985,6 +2186,22 @@ impl BuckConfigBasedCells {
             .buck_error_context(
                 "Computing local override MODULE.bazel inputs for bzlmod resolution",
             )?;
+        let non_registry_overrides = non_registry_override_module_dirs_from_root_module(
+            root_module_file.as_ref(),
+            options.ignore_dev_dependency,
+        )?;
+        let non_registry_override_poll_digest =
+            non_registry_override_inputs_poll_digest(project_fs, &non_registry_overrides)?;
+        let non_registry_override_inputs = dice_ctx
+            .compute(&NonRegistryOverrideModuleInputsKey {
+                project_root: project_root.clone(),
+                overrides: non_registry_overrides,
+                poll_digest: non_registry_override_poll_digest,
+            })
+            .await?
+            .buck_error_context(
+                "Computing non-registry override MODULE.bazel inputs for bzlmod resolution",
+            )?;
         let visible_lockfile = if root_module_file.parsed.is_some()
             && options.lockfile_mode != slug_bzlmod::LockfileMode::Off
         {
@@ -2074,6 +2291,7 @@ impl BuckConfigBasedCells {
             visible_lockfile,
             hidden_lockfile,
             local_override_inputs,
+            non_registry_override_inputs,
             registry_file_inputs,
             extension_replay_summary_digest: extension_replay_summary_digest.map(Arc::from),
         };
@@ -3415,6 +3633,11 @@ mod tests {
                 has_extension_usages: false,
                 has_repo_rule_invocations: false,
                 has_git_overrides: false,
+                has_untracked_inputs: false,
+            }),
+            non_registry_override_inputs: Arc::new(NonRegistryOverrideModuleInputsValue {
+                digest: "non-registry-overrides".to_owned(),
+                has_inputs: false,
                 has_untracked_inputs: false,
             }),
             registry_file_inputs: Arc::new(RegistryFileInputsValue {

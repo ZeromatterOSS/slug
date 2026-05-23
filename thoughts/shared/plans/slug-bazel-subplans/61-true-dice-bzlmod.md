@@ -328,6 +328,13 @@ Observed SDK result at the checkpoint:
   state instead of a stale path-only child value. Guardrails prove warm bzlmod
   reuse and same-daemon checksum failures after editing each cached registry
   file class, including an out-of-project `bazel_registry.json`.
+- Cached non-registry override module files now feed the transitional
+  resolution key through `NonRegistryOverrideModuleInputsKey`. The key shares
+  the override cache directory calculation with `ModuleCache`, reads
+  project-local files through tracked DICE file inputs, and polls out-of-project
+  cache contents into key identity. A same-daemon guardrail proves a cached
+  `git_override` `MODULE.bazel` warm no-op reuses bzlmod resolution, then an
+  edit to that cached module file forces resolution to recompute.
 - The unused non-cacheable `slug_bzlmod::LockfileContentKey` bridge was removed
   after visible and hidden lockfile reads moved to the tracked key in
   `slug_common`.
@@ -385,6 +392,12 @@ Observed SDK result at the checkpoint:
   61 Python guardrail
   `mapped_external_extension_bzl_load_edit_rejects_replay`, the full Plan 61
   Python guardrail with 64 tests, `cargo fmt --check`, and `git diff --check`.
+- Non-registry override module-input validation passed with `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python guardrail
+  `cached_git_override_module_edit_invalidates_bzlmod_resolution`, the full Plan
+  61 Python guardrail with 65 tests, `cargo fmt --check`, and `git diff
+  --check`.
 
 ## Consolidated Learnings
 
@@ -397,8 +410,8 @@ What worked:
 - Extension evaluation and extension repository execution now run through DICE
   keys instead of immediate startup-side materialization.
 - Lockfile replay reads, facts validation, registry checksum policy,
-  yanked-version policy, include invalidation, and local override module input
-  invalidation gained focused guardrails.
+  yanked-version policy, include invalidation, and local/non-registry override
+  module input invalidation gained focused guardrails.
 - Repository materialization no longer blindly trusts stale marker files. The
   marker path distinguishes known repo-spec/output-state cases and rejects old
   incomplete layouts.

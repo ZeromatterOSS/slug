@@ -786,13 +786,7 @@ impl MvsResolver {
             }
             Override::Git(g) => {
                 // Fetch the git repo to a cache directory and parse its MODULE.bazel
-                let cache_key = format!("git-{}", g.commit);
-                let dest_dir = self
-                    .cache
-                    .base_dir()
-                    .join("overrides")
-                    .join(&g.module_name)
-                    .join(&cache_key);
+                let dest_dir = self.cache.git_override_dir(g);
                 let complete_marker = dest_dir.join(".complete");
 
                 if !complete_marker.exists() {
@@ -867,21 +861,7 @@ impl MvsResolver {
             }
             Override::Archive(a) => {
                 // Fetch the archive to a cache directory and parse its MODULE.bazel
-                let cache_key = format!("archive-{:x}", {
-                    use std::collections::hash_map::DefaultHasher;
-                    use std::hash::Hash;
-                    use std::hash::Hasher;
-                    let mut h = DefaultHasher::new();
-                    a.urls.hash(&mut h);
-                    a.integrity.hash(&mut h);
-                    h.finish()
-                });
-                let dest_dir = self
-                    .cache
-                    .base_dir()
-                    .join("overrides")
-                    .join(&a.module_name)
-                    .join(&cache_key);
+                let dest_dir = self.cache.archive_override_dir(a);
                 let complete_marker = dest_dir.join(".complete");
 
                 if !complete_marker.exists() {

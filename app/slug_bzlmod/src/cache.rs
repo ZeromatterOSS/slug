@@ -133,6 +133,32 @@ impl ModuleCache {
         self.base_dir.join("downloads").join(safe_name)
     }
 
+    /// Get the cache directory for a git override.
+    pub fn git_override_dir(&self, git: &crate::types::GitOverride) -> PathBuf {
+        self.base_dir
+            .join("overrides")
+            .join(&git.module_name)
+            .join(format!("git-{}", git.commit))
+    }
+
+    /// Get the cache directory for an archive override.
+    pub fn archive_override_dir(&self, archive: &crate::types::ArchiveOverride) -> PathBuf {
+        let cache_key = {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::Hash;
+            use std::hash::Hasher;
+
+            let mut hasher = DefaultHasher::new();
+            archive.urls.hash(&mut hasher);
+            archive.integrity.hash(&mut hasher);
+            format!("archive-{:x}", hasher.finish())
+        };
+        self.base_dir
+            .join("overrides")
+            .join(&archive.module_name)
+            .join(cache_key)
+    }
+
     /// Check if a module is cached.
     pub fn has_module(&self, registry_url: &str, name: &str, version: &str) -> bool {
         self.module_bazel_path(registry_url, name, version).exists()
