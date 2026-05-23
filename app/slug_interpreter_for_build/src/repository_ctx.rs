@@ -39,6 +39,7 @@
 //!     ctx.file("BUILD", "filegroup(name='all', srcs=glob(['**/*']))")
 //! ```
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::io::ErrorKind;
@@ -626,6 +627,9 @@ pub struct RepositoryContext {
     /// filesystem dependencies for same-daemon invalidation.
     #[allocative(skip)]
     watch_inputs: Arc<Mutex<Vec<RepositoryWatchInput>>>,
+    /// Effective repository environment for this repository rule execution.
+    #[allocative(skip)]
+    repo_env: Arc<BTreeMap<String, String>>,
 }
 
 starlark_simple_value!(RepositoryContext);
@@ -660,6 +664,7 @@ impl RepositoryContext {
             workspace_root: Arc::new(workspace_root),
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
+            repo_env: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -680,6 +685,7 @@ impl RepositoryContext {
             workspace_root: Arc::new(workspace_root),
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
+            repo_env: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -698,7 +704,19 @@ impl RepositoryContext {
             ),
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
+            repo_env: Arc::new(BTreeMap::new()),
         }
+    }
+
+    /// Set the effective repository environment for repository_ctx APIs.
+    pub fn with_repo_env(mut self, repo_env: Arc<BTreeMap<String, String>>) -> Self {
+        self.repo_env = repo_env;
+        self
+    }
+
+    /// Effective repository environment for repository_ctx.getenv/os.environ.
+    pub fn repo_env(&self) -> &BTreeMap<String, String> {
+        &self.repo_env
     }
 
     /// Get the working directory.
@@ -2764,7 +2782,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(default = NoneOr::None)] default: NoneOr<&str>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        match slug_build_api::interpreter::rule_defs::build_config::get_repo_env_var(name) {
+        match this.repo_env().get(name) {
             Some(v) => Ok(heap.alloc(v)),
             None => match default.into_option() {
                 Some(d) => Ok(heap.alloc(d)),
@@ -2838,7 +2856,7 @@ impl<'v> StarlarkValue<'v> for RepositoryContext {
             "name" => Some(heap.alloc(&self.name as &str)),
             "original_name" => Some(heap.alloc(&self.original_name as &str)),
             "attr" => Some(heap.alloc(self.attr.clone())),
-            "os" => Some(heap.alloc(RepositoryOs::new())),
+            "os" => Some(heap.alloc(RepositoryOs::new_with_environ(self.repo_env.clone()))),
             "workspace_root" => Some(heap.alloc(RepositoryPath::with_base_dir(
                 self.workspace_root.to_string_lossy().to_string(),
                 self.workspace_root.clone(),
@@ -2917,6 +2935,16 @@ mod tests {
 
         assert_eq!(ctx.working_dir(), repo_dir.path());
         assert_eq!(ctx.workspace_root.as_ref().as_path(), workspace.path());
+    }
+
+    #[test]
+    fn test_repository_context_repo_env_is_context_owned() {
+        let mut repo_env = BTreeMap::new();
+        repo_env.insert("PLAN61_REPO_ENV".to_owned(), "from-context".to_owned());
+
+        let ctx = RepositoryContext::stub("test_repo").with_repo_env(Arc::new(repo_env.clone()));
+
+        assert_eq!(ctx.repo_env(), &repo_env);
     }
 
     #[test]

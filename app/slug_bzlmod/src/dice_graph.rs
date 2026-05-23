@@ -608,6 +608,7 @@ pub struct ExtensionSpokesValue {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
     pub project_root: Arc<PathBuf>,
+    pub repo_env: Arc<BTreeMap<String, String>>,
     pub spokes: BTreeMap<String, ExtensionSpoke>,
 }
 
@@ -662,8 +663,22 @@ impl RepoMaterializationManifestKey {
         canonical_repo: &str,
         repo_spec: Arc<RepoSpec>,
     ) -> Self {
-        let workspace_id = WorkspaceId::for_project_root(project_root);
         let repo_spec_digest = repo_spec.compute_hash();
+        Self::for_project_root_with_repo_spec_digest(
+            project_root,
+            canonical_repo,
+            repo_spec,
+            repo_spec_digest,
+        )
+    }
+
+    pub fn for_project_root_with_repo_spec_digest(
+        project_root: PathBuf,
+        canonical_repo: &str,
+        repo_spec: Arc<RepoSpec>,
+        repo_spec_digest: String,
+    ) -> Self {
+        let workspace_id = WorkspaceId::for_project_root(project_root);
         Self {
             output_base: workspace_id.output_base.clone(),
             workspace_id,

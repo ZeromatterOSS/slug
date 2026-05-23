@@ -170,6 +170,7 @@ pub use repository_execution::ExtensionRepoExecutionKey;
 pub use repository_execution::RepositoryRegistry;
 pub use repository_execution::RepositoryRuleExecutionKey;
 pub use repository_execution::RepositoryRuleResult;
+pub use repository_execution::repo_execution_spec_hash;
 pub use repository_execution::repo_spec_to_invocation;
 pub use repository_execution::repository_recorded_inputs_current;
 pub use repository_executor::execute_repository_rule;

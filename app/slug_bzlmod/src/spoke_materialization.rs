@@ -181,11 +181,12 @@ async fn spoke_execution_key(
         }
     };
     if let Some(spoke) = spokes.by_canonical_or_internal_name(canonical_name) {
-        return Ok(Some(ExtensionRepoExecutionKey::from_arcs(
+        return Ok(Some(ExtensionRepoExecutionKey::from_arcs_with_repo_env(
             spoke.canonical_name.clone(),
             spokes.extension_id.clone(),
             spoke.repo_spec.clone(),
             spokes.project_root.clone(),
+            spokes.repo_env.clone(),
         )));
     }
 

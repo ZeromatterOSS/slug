@@ -28,7 +28,9 @@
 //! The late binding pattern allows `ExtensionRepoExecutionKey::compute()` in
 //! `slug_bzlmod` to call into `slug_interpreter_for_build` without a direct dependency.
 
+use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
@@ -98,6 +100,7 @@ pub trait StarlarkRepoRuleExecutorImpl: Send + Sync + 'static {
         rule_bzl_path: &str,
         rule_name: &str,
         working_dir: &Path,
+        repo_env: Arc<BTreeMap<String, String>>,
     ) -> slug_error::Result<StarlarkRepoRuleExecution>;
 }
 

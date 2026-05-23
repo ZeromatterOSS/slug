@@ -32,22 +32,27 @@
 //!
 //! This follows the `GitFileOpsDelegateKey` pattern from `slug_external_cells/src/git.rs`.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use base64::Engine;
 use derive_more::Display;
 use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
+use sha2::Digest;
+use sha2::Sha256;
 
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::RepoMaterializationManifestKey;
 use crate::dice_graph::RepoMaterializationManifestValue;
 use crate::dice_graph::record_bzlmod_event;
+use crate::dice_graph::repo_env_policy_digest;
 use crate::lockfile::compute_sha256_hex;
 use crate::lockfile::validate_recorded_inputs_current;
 use crate::repo_spec::RepoSpec;
@@ -239,6 +244,9 @@ pub struct ExtensionRepoExecutionKey {
     /// fetch on marker contents and cheap layout checks, not a full tree walk
     /// of every external repo on access.
     pub materialization_manifest_key: Arc<RepoMaterializationManifestKey>,
+
+    /// Effective repository environment for Starlark repository rule execution.
+    pub repo_env: Arc<BTreeMap<String, String>>,
 }
 
 impl std::hash::Hash for ExtensionRepoExecutionKey {
@@ -249,6 +257,7 @@ impl std::hash::Hash for ExtensionRepoExecutionKey {
         self.spec_hash.hash(state);
         self.project_root.hash(state);
         self.materialization_manifest_key.hash(state);
+        self.repo_env.hash(state);
     }
 }
 
@@ -260,10 +269,33 @@ impl PartialEq for ExtensionRepoExecutionKey {
             && self.spec_hash == other.spec_hash
             && self.project_root == other.project_root
             && self.materialization_manifest_key == other.materialization_manifest_key
+            && self.repo_env == other.repo_env
     }
 }
 
 impl Eq for ExtensionRepoExecutionKey {}
+
+pub fn repo_execution_spec_hash(
+    repo_spec: &RepoSpec,
+    repo_env: &BTreeMap<String, String>,
+) -> String {
+    let repo_spec_hash = repo_spec.compute_hash();
+    if repo_env.is_empty() {
+        return repo_spec_hash;
+    }
+
+    let repo_env_digest = repo_env_policy_digest(repo_env);
+    let mut hasher = Sha256::new();
+    hasher.update(b"repo-execution-spec-v1");
+    hasher.update([0]);
+    hasher.update(repo_spec_hash.as_bytes());
+    hasher.update([0]);
+    hasher.update(repo_env_digest.as_bytes());
+    format!(
+        "sha256-{}",
+        base64::engine::general_purpose::STANDARD.encode(hasher.finalize())
+    )
+}
 
 impl ExtensionRepoExecutionKey {
     /// Create a new extension repo execution key.
@@ -273,13 +305,32 @@ impl ExtensionRepoExecutionKey {
         repo_spec: RepoSpec,
         project_root: PathBuf,
     ) -> Self {
-        let spec_hash = repo_spec.compute_hash();
+        Self::new_with_repo_env(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            project_root,
+            Arc::new(BTreeMap::new()),
+        )
+    }
+
+    /// Create a new extension repo execution key with command repo-env.
+    pub fn new_with_repo_env(
+        canonical_name: String,
+        extension_id: String,
+        repo_spec: RepoSpec,
+        project_root: PathBuf,
+        repo_env: Arc<BTreeMap<String, String>>,
+    ) -> Self {
+        let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
         let repo_spec = Arc::new(repo_spec);
-        let materialization_manifest_key = RepoMaterializationManifestKey::for_project_root(
-            project_root.clone(),
-            canonical_name.as_str(),
-            repo_spec.clone(),
-        );
+        let materialization_manifest_key =
+            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest(
+                project_root.clone(),
+                canonical_name.as_str(),
+                repo_spec.clone(),
+                spec_hash.clone(),
+            );
         Self {
             canonical_name: Arc::from(canonical_name.as_str()),
             extension_id: Arc::from(extension_id.as_str()),
@@ -287,6 +338,7 @@ impl ExtensionRepoExecutionKey {
             repo_spec,
             project_root: Arc::new(project_root),
             materialization_manifest_key: Arc::new(materialization_manifest_key),
+            repo_env,
         }
     }
 
@@ -297,12 +349,31 @@ impl ExtensionRepoExecutionKey {
         repo_spec: Arc<RepoSpec>,
         project_root: Arc<PathBuf>,
     ) -> Self {
-        let spec_hash = repo_spec.compute_hash();
-        let materialization_manifest_key = RepoMaterializationManifestKey::for_project_root(
-            project_root.as_ref().clone(),
-            canonical_name.as_ref(),
-            repo_spec.clone(),
-        );
+        Self::from_arcs_with_repo_env(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            project_root,
+            Arc::new(BTreeMap::new()),
+        )
+    }
+
+    /// Create from Arc references with command repo-env.
+    pub fn from_arcs_with_repo_env(
+        canonical_name: Arc<str>,
+        extension_id: Arc<str>,
+        repo_spec: Arc<RepoSpec>,
+        project_root: Arc<PathBuf>,
+        repo_env: Arc<BTreeMap<String, String>>,
+    ) -> Self {
+        let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
+        let materialization_manifest_key =
+            RepoMaterializationManifestKey::for_project_root_with_repo_spec_digest(
+                project_root.as_ref().clone(),
+                canonical_name.as_ref(),
+                repo_spec.clone(),
+                spec_hash.clone(),
+            );
         Self {
             canonical_name,
             extension_id,
@@ -310,6 +381,7 @@ impl ExtensionRepoExecutionKey {
             repo_spec,
             project_root,
             materialization_manifest_key: Arc::new(materialization_manifest_key),
+            repo_env,
         }
     }
 
@@ -616,6 +688,7 @@ impl Key for ExtensionRepoExecutionKey {
                                 rule_bzl_path,
                                 rule_fn_name,
                                 &working_dir,
+                                self.repo_env.clone(),
                             )
                             .await
                         {
@@ -1065,6 +1138,37 @@ mod tests {
         );
 
         assert_eq!(key1.spec_hash, key2.spec_hash);
+    }
+
+    #[test]
+    fn test_extension_repo_key_hash_includes_repo_env() {
+        let spec = RepoSpec::new("@@tools//repo:local.bzl%repository_rule".to_owned());
+        let mut first_env = BTreeMap::new();
+        first_env.insert("PLAN61_REPO_ENV".to_owned(), "first".to_owned());
+        let mut second_env = BTreeMap::new();
+        second_env.insert("PLAN61_REPO_ENV".to_owned(), "second".to_owned());
+
+        let key1 = ExtensionRepoExecutionKey::new_with_repo_env(
+            "_main+ext+repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            spec.clone(),
+            PathBuf::from("/project"),
+            Arc::new(first_env),
+        );
+        let key2 = ExtensionRepoExecutionKey::new_with_repo_env(
+            "_main+ext+repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            spec,
+            PathBuf::from("/project"),
+            Arc::new(second_env),
+        );
+
+        assert_ne!(key1.spec_hash, key2.spec_hash);
+        assert_ne!(
+            key1.materialization_manifest_key.repo_spec_digest,
+            key2.materialization_manifest_key.repo_spec_digest
+        );
+        assert_ne!(key1, key2);
     }
 
     #[test]

@@ -2619,6 +2619,66 @@ use_repo(env, "env_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_repo_env_uses_command_key_input(buck: Buck) -> None:
+    """Bazel anchors: RepositoryContext.getenv and RepositoryFunction."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+repo_env_ext+env_repo"
+    _write(
+        buck.cwd / "repo_env_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    value = repository_ctx.getenv("PLAN61_REPO_ENV")
+    if value == None:
+        fail("PLAN61_REPOSITORY_CTX_GETENV_NOT_FROM_COMMAND")
+    if repository_ctx.getenv("PLAN61_REPO_ENV_MISSING", "fallback") != "fallback":
+        fail("PLAN61_REPOSITORY_CTX_GETENV_DEFAULT_NOT_USED")
+    if repository_ctx.os.environ.get("PLAN61_REPO_ENV") != value:
+        fail("PLAN61_REPOSITORY_CTX_OS_ENVIRON_NOT_FROM_COMMAND")
+    repository_ctx.file("data.txt", value + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+env_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_env_ext_impl(module_ctx):
+    env_repo_rule(name = "env_repo")
+
+repo_env_ext = module_extension(
+    implementation = _repo_env_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repository_ctx_repo_env")
+
+env = use_extension("//:repo_env_ext.bzl", "repo_env_ext")
+use_repo(env, "env_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_env_repo",
+    srcs = ["@env_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_env_repo", "--repo_env=PLAN61_REPO_ENV=first")
+    first = await _bzlmod_counters(buck, "--repo_env=PLAN61_REPO_ENV=first")
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    await buck.build("//:uses_env_repo", "--repo_env=PLAN61_REPO_ENV=second")
+    second = await _bzlmod_counters(buck, "--repo_env=PLAN61_REPO_ENV=second")
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_label_taking_operations_materialize_or_fail_directly(
     buck: Buck,
 ) -> None:

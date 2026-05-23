@@ -362,6 +362,7 @@ impl Key for ExtensionSpokesKey {
             workspace_id: self.workspace_id.clone(),
             extension_id: self.extension_id.clone(),
             project_root: self.workspace_id.canonical_project_root.clone(),
+            repo_env: extension_key.repo_env.clone(),
             spokes,
         }))
     }

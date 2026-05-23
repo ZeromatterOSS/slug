@@ -190,16 +190,19 @@ Observed SDK result at the checkpoint:
   effective command repo environment computed from request flags and workspace
   root, then threads that value through config overrides as
   `bzlmod.repo_env_json`; bzlmod resolution/replay digests consume that
-  explicit option. Repository Starlark APIs still use the transitional
-  build-config repo-env adapter until that runtime surface moves to explicit
-  DICE/key inputs. Focused `slug_common` coverage verifies repo-env option
+  explicit option. Focused `slug_common` coverage verifies repo-env option
   parsing, and the full 50-test Plan 61 guardrail target passed after the
-  earlier config-key change.
+  earlier config-key change; later slices moved the module and repository
+  Starlark runtime APIs to explicit context/key inputs.
 - `module_ctx.getenv()` and `module_ctx.os.environ` now read the effective repo
   environment from `ModuleContext`, seeded by `ModuleExtensionExecutionKey`'s
   command repo-env value, instead of consulting the interpreter build-config
-  global at extension execution time. `repository_ctx.getenv()` remains the
-  next runtime repo-env migration surface.
+  global at extension execution time.
+- `repository_ctx.getenv()` and `repository_ctx.os.environ` now read the
+  effective command repo-env from `RepositoryContext`. Extension repo execution
+  keys carry that repo-env, and generated-repo completion markers use a
+  repo-env-aware execution identity so a changed `--repo_env` cannot reuse stale
+  materialized repository output by marker existence alone.
 - The seeded-extension process global was removed. Lazy spoke registration now
   relies on DICE replay/compute when the extension repo file-ops path needs
   sibling repos, instead of a cross-command seeded marker. Focused
@@ -445,6 +448,16 @@ Observed SDK result at the checkpoint:
   module_context_repo_env -- --nocapture`, `cargo build -p slug`, the focused
   Plan 61 Python guardrail `module_ctx_repo_env_uses_command_key_input`, and the
   full Plan 61 Python guardrail with 66 tests.
+- Repository-context repo-env validation passed with `cargo check -p
+  slug_bzlmod -p slug_external_cells -p slug_interpreter_for_build`, `cargo test
+  -p slug_bzlmod test_extension_repo_key_hash_includes_repo_env --
+  --nocapture`, `cargo test -p slug_interpreter_for_build
+  test_repository_context_repo_env_is_context_owned -- --nocapture`, `cargo
+  check -p slug_external_cells`, `cargo build -p slug`, and the focused Plan 61
+  Python guardrail `repository_ctx_repo_env_uses_command_key_input`. After the
+  stale marker fix, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p
+  slug_external_cells -- --nocapture`, `cargo test -p slug_common bzlmod --
+  --nocapture`, and the full Plan 61 Python guardrail passed with 67 tests.
 
 ## Consolidated Learnings
 
@@ -508,11 +521,11 @@ What did not work or remains risky:
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.
-- Module extension Starlark APIs now read their effective repo environment from
-  `ModuleContext`, which is seeded from the extension execution key. Repository
-  Starlark APIs still read repo env through the interpreter build-config adapter,
-  so the runtime environment surface is not yet a DICE-owned command value end
-  to end.
+- Module extension and repository rule Starlark APIs now read their effective
+  repo environment from explicit contexts seeded by command-key inputs. The
+  generated repo cell graph that exposes repository rule specs remains
+  transitional, but repo-env itself no longer comes from the interpreter
+  build-config adapter at runtime.
 - Registered toolchain facts now reach analysis through a DICE key and the
   eager-load fast path is keyed by the DICE-derived registration signature, but
   the final `DeclaredToolchainInfo` registry remains process-global output
@@ -697,10 +710,9 @@ using Rust DICE keys and values:
 
 9. Delete transitional APIs.
    - Remove `BzlmodSessionData` fields as the authority for graph semantics.
-   - The config-load command repo-env global readback and module extension
-     runtime repo-env adapter are removed; replace the remaining repository
-     runtime build-config adapter with explicit DICE/key inputs as the graph
-     migrates.
+   - The config-load command repo-env global readback and module/repository
+     runtime repo-env adapters are removed; keep repo-env wired through explicit
+     DICE/key inputs as the graph migrates.
    - Remove bridge cache fast paths whose correctness depends on hand-curated
      cacheability predicates.
    - Keep only compatibility shims that are demonstrably non-semantic or needed

@@ -30,8 +30,10 @@
 //!                                         └──────────────────────────────────┘
 //! ```
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
@@ -159,6 +161,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         rule_bzl_path: &str,
         rule_name: &str,
         working_dir: &Path,
+        repo_env: Arc<BTreeMap<String, String>>,
     ) -> slug_error::Result<StarlarkRepoRuleExecution> {
         tracing::debug!(
             "Executing Starlark repository rule '{}' from '{}' for repo '{}'",
@@ -232,7 +235,8 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             repo_attr,
             working_dir.to_path_buf(),
             workspace_root.root().to_path_buf(),
-        );
+        )
+        .with_repo_env(repo_env);
 
         tracing::debug!(
             "Invoking repository rule implementation for '{}'",

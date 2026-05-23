@@ -485,7 +485,7 @@ async fn ensure_extension_spokes_registered(
     extension_id: &str,
     project_root_path: &std::path::Path,
     requesting_canonical_name: &str,
-) -> slug_error::Result<()> {
+) -> slug_error::Result<Option<Arc<slug_bzlmod::ExtensionSpokesValue>>> {
     let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_project_root(
         project_root_path.to_path_buf(),
         extension_id,
@@ -517,7 +517,7 @@ async fn ensure_extension_spokes_registered(
     }) else {
         // Not a module extension — `use_repo_rule()` and similar produce a
         // single repo with no siblings, so there is nothing to seed.
-        return Ok(());
+        return Ok(None);
     };
 
     for spoke in spokes.iter() {
@@ -536,7 +536,7 @@ async fn ensure_extension_spokes_registered(
         }
     }
 
-    Ok(())
+    Ok(Some(spokes))
 }
 
 fn extension_repo_cell_setup_from_spoke(
@@ -580,6 +580,8 @@ pub(crate) async fn get_file_ops_delegate(
     let source_path = project_root_path
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
+    let bzlmod_session_data = ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await?;
+    let repo_env = Arc::new(bzlmod_session_data.repo_env.clone());
 
     // Make sure every sibling spoke of this extension is registered as a
     // dynamic cell. Idempotent across the daemon's lifetime — short-circuits
@@ -587,7 +589,7 @@ pub(crate) async fn get_file_ops_delegate(
     // it. Necessary on warm builds where `.slug_repo_complete` markers would
     // otherwise skip the materialization block below, leaving spoke lookups
     // unresolvable.
-    ensure_extension_spokes_registered(
+    let registered_spokes = ensure_extension_spokes_registered(
         ctx,
         &setup.extension_id,
         &project_root_path,
@@ -608,14 +610,32 @@ pub(crate) async fn get_file_ops_delegate(
         .exists()
         .then(|| std::fs::read_to_string(&marker_path).ok())
         .flatten();
+    let setup_marker_spec_hash = registered_spokes
+        .as_ref()
+        .and_then(|spokes| {
+            spokes
+                .by_internal_name(setup.internal_name.as_ref())
+                .or_else(|| spokes.by_canonical_name(setup.canonical_name.as_ref()))
+        })
+        .map(|spoke| slug_bzlmod::repo_execution_spec_hash(&spoke.repo_spec, repo_env.as_ref()))
+        .or_else(|| {
+            (!setup.repo_spec_json.is_empty()).then(|| {
+                serde_json::from_str::<RepoSpec>(&setup.repo_spec_json)
+                    .map(|repo_spec| {
+                        slug_bzlmod::repo_execution_spec_hash(&repo_spec, repo_env.as_ref())
+                    })
+                    .unwrap_or_else(|_| setup.spec_hash.to_string())
+            })
+        });
     let is_stale_non_complete_marker = marker_contents
         .as_deref()
         .is_some_and(|marker| !is_complete_marker(marker));
-    let is_stale_complete = !setup.repo_spec_json.is_empty()
-        && !setup.spec_hash.is_empty()
-        && marker_contents.as_deref().is_some_and(|s| {
-            is_complete_marker(s) && !complete_marker_matches(s, &setup.spec_hash)
-        });
+    let is_stale_complete = setup_marker_spec_hash.as_deref().is_some_and(|spec_hash| {
+        !spec_hash.is_empty()
+            && marker_contents
+                .as_deref()
+                .is_some_and(|s| is_complete_marker(s) && !complete_marker_matches(s, spec_hash))
+    });
     let is_stale_spec_unknown_complete = setup.repo_spec_json.is_empty()
         && marker_contents
             .as_deref()
@@ -627,7 +647,9 @@ pub(crate) async fn get_file_ops_delegate(
         && repair_invalid_empty_target_labels_from_repo_spec(
             &source_path,
             &setup.repo_spec_json,
-            &setup.spec_hash,
+            setup_marker_spec_hash
+                .as_deref()
+                .unwrap_or(setup.spec_hash.as_ref()),
         );
     let is_stale_missing_build = marker_path.exists()
         && !setup.repo_spec_json.is_empty()
@@ -719,11 +741,12 @@ pub(crate) async fn get_file_ops_delegate(
                     );
                     inv.rule_source = Some(setup.extension_id.to_string());
                     let repo_spec = slug_bzlmod::RepoSpec::new(setup.extension_id.to_string());
-                    let key = ExtensionRepoExecutionKey::new(
+                    let key = ExtensionRepoExecutionKey::new_with_repo_env(
                         setup.canonical_name.to_string(),
                         setup.extension_id.to_string(),
                         repo_spec,
                         project_root_path.clone(),
+                        repo_env.clone(),
                     );
                     match ctx.compute(&key).await {
                         Ok(Ok(repo_result)) => {
@@ -820,22 +843,24 @@ pub(crate) async fn get_file_ops_delegate(
         };
 
         // Create the execution key for lazy materialization of this specific repo
-        let key = ExtensionRepoExecutionKey::new(
+        let key = ExtensionRepoExecutionKey::new_with_repo_env(
             setup.canonical_name.to_string(),
             setup.extension_id.to_string(),
             repo_spec,
             project_root_path.clone(),
+            repo_env.clone(),
         );
+        let key_spec_hash = key.spec_hash.clone();
 
         // Execute via DICE to materialize the repository
         match ctx.compute(&key).await {
             Ok(Ok(repo_result)) => {
-                if !setup.spec_hash.is_empty() {
+                if !key_spec_hash.is_empty() {
                     match slug_bzlmod::repository_output_digest(&repo_result.repo_path) {
                         Ok(output_digest) => {
                             if let Err(e) = std::fs::write(
                                 repo_result.repo_path.join(".slug_repo_complete"),
-                                complete_marker(&setup.spec_hash, Some(&output_digest)),
+                                complete_marker(&key_spec_hash, Some(&output_digest)),
                             ) {
                                 tracing::warn!(
                                     "Failed to write spec-hashed completion marker for '{}': {}",
