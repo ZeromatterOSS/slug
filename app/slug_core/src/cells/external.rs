@@ -128,6 +128,9 @@ pub struct ExtensionRepoCellSetup {
     /// When the repo is first accessed, this is deserialized and used to
     /// create an ExtensionRepoExecutionKey for materialization.
     pub repo_spec_json: Arc<str>,
+    /// JSON-serialized repository environment captured when this generated
+    /// repository cell was registered.
+    pub repo_env_json: Arc<str>,
     /// Whether this repo has been materialized yet.
     /// When false, accessing the repo triggers lazy execution.
     pub materialized: bool,

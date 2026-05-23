@@ -496,6 +496,18 @@ Observed SDK result at the checkpoint:
   cell_resolver_dynamic_suffix_lookup_is_deterministic -- --nocapture`,
   `cargo build -p slug`, and the focused Plan 61 Python guardrail
   `two_workspaces_do_not_share_bzlmod_state`.
+- Generated repo materialization no longer recomputes
+  `BzlmodSessionDataKey` in the extension-repo file-ops path to find the
+  command repo environment. `ExtensionRepoCellSetup` carries serialized
+  repo-env for lockfile/use_repo_rule fallback paths, while normal module
+  extension materialization prefers the current `ExtensionSpokesValue`
+  repo-env from the DICE lookup so stale cell origins cannot pin the first
+  command's env. Validation passed with `cargo check -p slug_external_cells`,
+  `cargo build -p slug`, `cargo test -p slug_common bzlmod -- --nocapture`,
+  `cargo test -p slug_external_cells -- --nocapture`, focused Plan 61
+  guardrails for repository repo-env, recorded env replay, warm replay, and
+  mapped external load edit replay, and the full Plan 61 Python guardrail with
+  70 tests.
 
 ## Consolidated Learnings
 
@@ -556,10 +568,10 @@ What did not work or remains risky:
   changes, and the full interpreter load graph are not replay-complete.
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
-  materialization now goes through DICE lookup keys with workspace identity, but
-  generated repo cells and dynamic alias registration still flow through
-  transitional runtime cell-registration plumbing rather than a final
-  DICE-owned cell graph.
+  materialization now goes through DICE lookup keys with workspace identity and
+  uses DICE spoke repo-env where available, but generated repo cells and dynamic
+  alias registration still flow through transitional runtime cell-registration
+  plumbing rather than a final DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.
@@ -567,7 +579,8 @@ What did not work or remains risky:
   repo environment from explicit contexts seeded by command-key inputs. The
   generated repo cell graph that exposes repository rule specs remains
   transitional, but repo-env itself no longer comes from the interpreter
-  build-config adapter at runtime.
+  build-config adapter or a materialization-time injected-session lookup at
+  runtime.
 - Registered toolchain facts now reach analysis through a DICE key and the
   eager-load fast path is keyed by the DICE-derived registration signature, but
   the final `DeclaredToolchainInfo` registry remains process-global output

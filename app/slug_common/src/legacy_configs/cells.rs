@@ -83,7 +83,19 @@ const BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS: &[&str] = &[
     "@local_config_python//:host_launcher_maker_toolchain",
 ];
 
-fn register_lockfile_seeded_dynamic_cells(cells: &[BzlmodPendingRepoCell]) {
+fn repo_env_json(repo_env: &BTreeMap<String, String>) -> Arc<str> {
+    Arc::from(
+        serde_json::to_string(repo_env)
+            .unwrap_or_else(|_| "{}".to_owned())
+            .as_str(),
+    )
+}
+
+fn register_lockfile_seeded_dynamic_cells(
+    cells: &[BzlmodPendingRepoCell],
+    repo_env: &BTreeMap<String, String>,
+) {
+    let repo_env_json = repo_env_json(repo_env);
     for cell in cells {
         let setup = ExtensionRepoCellSetup {
             canonical_name: Arc::from(cell.canonical_name.as_str()),
@@ -91,6 +103,7 @@ fn register_lockfile_seeded_dynamic_cells(cells: &[BzlmodPendingRepoCell]) {
             internal_name: Arc::from(cell.internal_name.as_str()),
             spec_hash: Arc::from(cell.spec_hash.as_str()),
             repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
+            repo_env_json: repo_env_json.clone(),
             materialized: false,
         };
         slug_core::cells::register_dynamic_extension_cell_with_setup_lazy(
@@ -539,7 +552,10 @@ impl BzlmodResolutionResult {
         cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
         cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
 
-        register_lockfile_seeded_dynamic_cells(&self.lockfile_seeded_cells);
+        register_lockfile_seeded_dynamic_cells(
+            &self.lockfile_seeded_cells,
+            &self.session_data.repo_env,
+        );
 
         for (_name, path, setup) in &self.extension_cells {
             slug_core::cells::register_dynamic_extension_cell_with_setup(
@@ -3496,6 +3512,7 @@ impl BuckConfigBasedCells {
                 internal_name: Arc::from(cell.internal_name.as_str()),
                 spec_hash: Arc::from(cell.spec_hash.as_str()),
                 repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
+                repo_env_json: repo_env_json(&bzlmod_session_data.repo_env),
                 materialized: false,
             };
             ext_cells.push((cell_name, cell_path, setup));

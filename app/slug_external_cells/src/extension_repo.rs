@@ -521,7 +521,8 @@ async fn ensure_extension_spokes_registered(
     };
 
     for spoke in spokes.iter() {
-        let cell_setup = extension_repo_cell_setup_from_spoke(extension_id, spoke);
+        let cell_setup =
+            extension_repo_cell_setup_from_spoke(extension_id, spoke, &spokes.repo_env);
         slug_core::cells::register_dynamic_extension_cell_with_setup(
             spoke.canonical_name.to_string(),
             format!("bazel-external/{}", spoke.canonical_name),
@@ -542,6 +543,7 @@ async fn ensure_extension_spokes_registered(
 fn extension_repo_cell_setup_from_spoke(
     extension_id: &str,
     spoke: &slug_bzlmod::ExtensionSpoke,
+    repo_env: &std::collections::BTreeMap<String, String>,
 ) -> ExtensionRepoCellSetup {
     ExtensionRepoCellSetup {
         canonical_name: spoke.canonical_name.clone(),
@@ -549,8 +551,31 @@ fn extension_repo_cell_setup_from_spoke(
         internal_name: spoke.internal_name.clone(),
         spec_hash: spoke.spec_hash.clone(),
         repo_spec_json: spoke.repo_spec_json.clone(),
+        repo_env_json: std::sync::Arc::from(
+            serde_json::to_string(repo_env)
+                .unwrap_or_else(|_| "{}".to_owned())
+                .as_str(),
+        ),
         materialized: false,
     }
+}
+
+fn repo_env_from_setup(
+    setup: &ExtensionRepoCellSetup,
+) -> slug_error::Result<Arc<std::collections::BTreeMap<String, String>>> {
+    if setup.repo_env_json.is_empty() {
+        return Ok(Arc::new(std::collections::BTreeMap::new()));
+    }
+    serde_json::from_str::<std::collections::BTreeMap<String, String>>(&setup.repo_env_json)
+        .map(Arc::new)
+        .map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to parse repo_env for extension repo '{}': {}",
+                setup.canonical_name,
+                e
+            )
+        })
 }
 
 /// Get the file ops delegate for an extension-generated repository cell.
@@ -580,8 +605,6 @@ pub(crate) async fn get_file_ops_delegate(
     let source_path = project_root_path
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
-    let bzlmod_session_data = ctx.compute(&slug_bzlmod::BzlmodSessionDataKey).await?;
-    let repo_env = Arc::new(bzlmod_session_data.repo_env.clone());
 
     // Make sure every sibling spoke of this extension is registered as a
     // dynamic cell. Idempotent across the daemon's lifetime — short-circuits
@@ -596,6 +619,13 @@ pub(crate) async fn get_file_ops_delegate(
         setup.canonical_name.as_ref(),
     )
     .await?;
+    // A dynamic cell origin can outlive the command that created it. Prefer
+    // the current DICE spoke value when this is a module-extension repo.
+    let repo_env = match registered_spokes.as_ref() {
+        Some(spokes) => spokes.repo_env.clone(),
+        None if !setup.repo_env_json.is_empty() => repo_env_from_setup(&setup)?,
+        None => Arc::new(std::collections::BTreeMap::new()),
+    };
 
     // Check if the repository is fully materialized (marked complete).
     // We check for .slug_repo_complete rather than just directory existence because
