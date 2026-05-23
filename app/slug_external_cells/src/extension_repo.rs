@@ -719,6 +719,60 @@ pub(crate) async fn get_file_ops_delegate(
             );
         }
     }
+    if !setup.repo_spec_json.is_empty() {
+        let repo_spec = serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
+            ExtensionRepoError::DeserializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: e.to_string(),
+            }
+        })?;
+        let key = ExtensionRepoExecutionKey::new_with_repo_env(
+            setup.canonical_name.to_string(),
+            setup.extension_id.to_string(),
+            repo_spec,
+            project_root_path.clone(),
+            repo_env.clone(),
+        );
+        match ctx.compute(&key).await {
+            Ok(Ok(repo_result)) => {
+                tracing::debug!(
+                    "Validated extension repo '{}' at {:?}",
+                    setup.canonical_name,
+                    repo_result.repo_path
+                );
+            }
+            Ok(Err(e)) => {
+                return Err(ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!("Repo rule execution failed: {}", diagnostic_summary(&e)),
+                }
+                .into());
+            }
+            Err(e) => {
+                return Err(ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!(
+                        "DICE computation failed during repo rule execution: {}",
+                        diagnostic_summary(&e)
+                    ),
+                }
+                .into());
+            }
+        }
+        if !source_path.exists() {
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: "Repository not found after repo rule execution".to_owned(),
+            }
+            .into());
+        }
+        return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+            cell_name,
+            setup.canonical_name.to_string(),
+            source_path,
+            digest_config,
+        )));
+    }
     if !marker_path.exists() {
         tracing::warn!(
             "Extension repo '{}' not materialized, triggering lazy execution (ext_id='{}', repo_spec_json_empty={})",
@@ -727,19 +781,10 @@ pub(crate) async fn get_file_ops_delegate(
             setup.repo_spec_json.is_empty()
         );
 
-        // Get the RepoSpec: either from cached JSON or by executing the extension via DICE
-        let repo_spec = if !setup.repo_spec_json.is_empty() {
-            // Cached RepoSpec from lockfile (populated by previous builds)
-            serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
-                ExtensionRepoError::DeserializationFailed {
-                    canonical_name: setup.canonical_name.to_string(),
-                    reason: e.to_string(),
-                }
-            })?
-        } else {
-            // No cached RepoSpec - execute the extension via DICE to get it.
-            // This is the Bazel 9.0-compatible path: cells are pre-computed from
-            // use_repo() declarations, and extensions execute lazily on first access.
+        // No cached RepoSpec - execute the extension via DICE to get it.
+        // This is the Bazel 9.0-compatible path: cells are pre-computed from
+        // use_repo() declarations, and extensions execute lazily on first access.
+        let repo_spec = {
             tracing::info!(
                 "No cached RepoSpec for '{}', executing extension '{}' via DICE",
                 setup.canonical_name,

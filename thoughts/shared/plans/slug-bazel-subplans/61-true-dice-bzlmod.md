@@ -265,6 +265,12 @@ Observed SDK result at the checkpoint:
   path now owns both builtin and Starlark repo-rule invocations, so repository
   contents are materialized through the DICE repository execution path when the
   generated repo is accessed.
+- Extension repo file-ops access for known `RepoSpec` cells now validates
+  through `ExtensionRepoExecutionKey` and its
+  `RepoMaterializationManifestKey` dependency instead of short-circuiting on
+  duplicated marker checks in `slug_external_cells`. Unknown-spec extension
+  replay still uses the existing lazy extension-spoke lookup before it can form
+  a repository execution key.
 - The server no longer rewrites `BzlmodSessionData.repo_env` from process
   global build config after resolution. The injected session data now keeps the
   same explicit `bzlmod.repo_env_json` value that fed the transitional
@@ -563,6 +569,12 @@ Observed SDK result at the checkpoint:
   Plan 61 Python guardrails for missing-lockfile warm reuse, hidden-lockfile
   facts, and repo-env inputs, the full Plan 61 Python guardrail with 70 tests,
   and `git diff --check`.
+- Extension repo materialization routing validation passed with `cargo check
+  -p slug_external_cells -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  repository_execution -- --nocapture`, `cargo test -p slug_external_cells --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python guardrails
+  for marker, recorded-env, and watch/watch-tree behavior, the full Plan 61
+  Python guardrail with 70 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -635,6 +647,11 @@ What did not work or remains risky:
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.
+- Known-spec extension repo file-ops access now routes through the DICE
+  repository execution/materialization manifest key, but
+  `RepoMaterializationManifestKey` still directly polls marker/layout and
+  recorded-input files and remains non-cacheable until those reads are tracked
+  by lower-level DICE filesystem keys.
 - Module extension and repository rule Starlark APIs now read their effective
   repo environment from explicit contexts seeded by command-key inputs. The
   generated repo cell graph that exposes repository rule specs remains
