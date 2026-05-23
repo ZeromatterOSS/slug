@@ -737,6 +737,16 @@ Observed SDK result at the checkpoint:
   cell setup no longer polls `bazel-external` to log pending toolchain repos;
   semantic repo materialization remains owned by label resolution and
   external-cell delegates.
+- Transitional extension execution/spoke helper API cleanup validation passed
+  with `cargo check -p slug_bzlmod`, focused `slug_bzlmod` tests for canonical
+  repo owner projection and execution-key replay data, `cargo test -p
+  slug_bzlmod extension_spokes -- --nocapture`, full `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61
+  Python replay subset, the full Plan 61 Python guardrail with 72 tests,
+  `cargo fmt --check`, and `git diff --check`. The old public helpers that
+  formed extension execution/spoke keys directly from injected
+  session-shaped data were removed from the crate API; production lookup now
+  goes through the DICE keys.
 
 ## Consolidated Learnings
 
@@ -818,7 +828,10 @@ What did not work or remains risky:
   repo cells and dynamic alias registration now go through a typed runtime
   install snapshot and installer boundary in `slug_core::cells`, but the
   backing state is still process-global transitional cell-registration plumbing
-  rather than a final DICE-owned cell graph.
+  rather than a final DICE-owned cell graph. The direct public helpers for
+  forming extension execution and spoke keys from injected session-shaped
+  values were removed, reducing accidental bypass surfaces without changing
+  that remaining cell-graph ownership gap.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.

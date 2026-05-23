@@ -76,61 +76,6 @@ use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 use crate::module_extension_executor::ModuleExtensionMetadata;
 use crate::repo_spec::RepoSpec;
 
-const MAX_EXTENSION_IDS_IN_WARNING: usize = 25;
-
-fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) -> String {
-    let mut shown = Vec::new();
-    let mut total = 0;
-    for extension_id in extension_ids {
-        total += 1;
-        if shown.len() < MAX_EXTENSION_IDS_IN_WARNING {
-            shown.push(extension_id.as_str());
-        }
-    }
-
-    if total <= MAX_EXTENSION_IDS_IN_WARNING {
-        return format!("{shown:?} ({total} total)");
-    }
-
-    format!(
-        "{shown:?} (showing {} of {}; {} omitted)",
-        shown.len(),
-        total,
-        total - shown.len()
-    )
-}
-
-/// Look up the aggregated extension data and create a `ModuleExtensionExecutionKey`.
-///
-/// Returns `None` if the extension is not found in the current command's
-/// DICE-injected bzlmod extension aggregations.
-pub fn create_extension_execution_key(
-    aggregations: &BzlmodExtensionAggregationsDataValue,
-    replay_data: &BzlmodExtensionReplayDataValue,
-    repo_mappings: &BzlmodRepoMappingsDataValue,
-    extension_id: &str,
-) -> Option<ModuleExtensionExecutionKey> {
-    let aggregated = extension_aggregation(aggregations, extension_id)?;
-    Some(ModuleExtensionExecutionKey::new_with_tracked_lockfiles(
-        aggregated.clone(),
-        aggregations.root_module_name.to_string(),
-        aggregations
-            .workspace_id
-            .canonical_project_root
-            .as_ref()
-            .clone(),
-        replay_data.hidden_lockfile_path.clone(),
-        replay_data.visible_lockfile_digest.clone(),
-        replay_data.hidden_lockfile_digest.clone(),
-        replay_data.visible_lockfile.clone(),
-        replay_data.hidden_lockfile.clone(),
-        replay_data.lockfile_mode,
-        replay_data.repo_env.as_ref().clone(),
-        repo_mappings.repo_mappings.as_ref().clone(),
-        repo_mappings.repo_mapping_overrides.as_ref().clone(),
-    ))
-}
-
 fn create_extension_execution_key_from_aggregation(
     aggregation: &BzlmodExtensionAggregationValue,
     replay_data: &BzlmodExtensionReplayDataValue,
@@ -156,56 +101,6 @@ fn create_extension_execution_key_from_aggregation(
         repo_mappings.repo_mapping_overrides.as_ref().clone(),
         bzl_transitive_digest,
     )
-}
-
-fn extension_aggregation<'a>(
-    aggregations: &'a BzlmodExtensionAggregationsDataValue,
-    extension_id: &str,
-) -> Option<&'a AggregatedExtension> {
-    let aggregated = match aggregations.extension_aggregations.get(extension_id) {
-        Some(a) => a,
-        None => {
-            tracing::warn!(
-                "create_extension_execution_key: extension '{}' not found in aggregations. Available: {}",
-                extension_id,
-                extension_ids_summary(aggregations.extension_aggregations.keys())
-            );
-            return None;
-        }
-    };
-    Some(aggregated)
-}
-
-pub fn extension_spokes_key_for_extension_id(
-    aggregations: &BzlmodExtensionAggregationsDataValue,
-    repo_mappings: &BzlmodRepoMappingsDataValue,
-    extension_id: &str,
-) -> Option<ExtensionSpokesKey> {
-    aggregations
-        .extension_aggregations
-        .contains_key(extension_id)
-        .then(|| {
-            let bzl_transitive_digest =
-                compute_bzl_transitive_digest_for_project_with_repo_mappings(
-                    extension_id,
-                    aggregations.workspace_id.canonical_project_root.as_path(),
-                    Some(repo_mappings.repo_mappings.as_ref()),
-                );
-            ExtensionSpokesKey::for_workspace_id_with_digest(
-                aggregations.workspace_id.clone(),
-                extension_id,
-                &bzl_transitive_digest,
-            )
-        })
-}
-
-pub fn extension_spokes_key_for_canonical_repo(
-    aggregations: &BzlmodExtensionAggregationsDataValue,
-    repo_mappings: &BzlmodRepoMappingsDataValue,
-    canonical_name: &str,
-) -> Option<ExtensionSpokesKey> {
-    let extension_id = extension_id_for_canonical_repo(aggregations, canonical_name)?;
-    extension_spokes_key_for_extension_id(aggregations, repo_mappings, extension_id)
 }
 
 fn extension_id_for_canonical_repo<'a>(
@@ -2156,9 +2051,8 @@ mod tests {
     }
 
     #[test]
-    fn extension_spokes_key_for_canonical_repo_matches_owner_module() {
+    fn extension_id_for_canonical_repo_matches_owner_module() {
         use crate::BzlmodExtensionAggregationsDataValue;
-        use crate::BzlmodRepoMappingsDataValue;
         use crate::WorkspaceId;
         use crate::extensions::AggregatedExtension;
 
@@ -2168,11 +2062,6 @@ mod tests {
             workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(std::collections::HashMap::new()),
             root_module_name: Arc::from("root"),
-        };
-        let repo_mappings = BzlmodRepoMappingsDataValue {
-            workspace_id,
-            repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
-            repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
         };
         let mut root_ext = AggregatedExtension::new("@root//:ext.bzl", "ext");
         root_ext.extension_id = "@root//:ext.bzl%ext".to_owned();
@@ -2185,15 +2074,11 @@ mod tests {
             .unwrap()
             .insert(dep_ext.extension_id.clone(), dep_ext);
 
-        let dep_key =
-            extension_spokes_key_for_canonical_repo(&data, &repo_mappings, "dep++ext+tool")
-                .unwrap();
-        assert_eq!(dep_key.extension_id.as_ref(), "@dep//:ext.bzl%ext");
+        let dep_id = extension_id_for_canonical_repo(&data, "dep++ext+tool").unwrap();
+        assert_eq!(dep_id, "@dep//:ext.bzl%ext");
 
-        let root_key =
-            extension_spokes_key_for_canonical_repo(&data, &repo_mappings, "_main+ext+tool")
-                .unwrap();
-        assert_eq!(root_key.extension_id.as_ref(), "@root//:ext.bzl%ext");
+        let root_id = extension_id_for_canonical_repo(&data, "_main+ext+tool").unwrap();
+        assert_eq!(root_id, "@root//:ext.bzl%ext");
     }
 
     #[test]
@@ -2424,7 +2309,7 @@ mod tests {
     }
 
     #[test]
-    fn create_extension_execution_key_uses_replay_data() {
+    fn extension_execution_key_from_aggregation_uses_replay_data() {
         use crate::BzlmodExtensionAggregationsDataValue;
         use crate::BzlmodExtensionReplayDataValue;
         use crate::BzlmodRepoMappingsDataValue;
@@ -2463,9 +2348,18 @@ mod tests {
             repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
         };
 
-        let key =
-            create_extension_execution_key(&data, &replay_data, &repo_mappings, &extension_id)
-                .unwrap();
+        let aggregation = BzlmodExtensionAggregationValue {
+            workspace_id: data.workspace_id.clone(),
+            extension_id: Arc::from(extension_id.as_str()),
+            aggregated: Arc::new(data.extension_aggregations[&extension_id].clone()),
+            root_module_name: data.root_module_name.clone(),
+        };
+        let key = create_extension_execution_key_from_aggregation(
+            &aggregation,
+            &replay_data,
+            &repo_mappings,
+            Arc::from("digest-from-dice-key"),
+        );
 
         assert_eq!(
             key.hidden_lockfile_path.as_deref(),
@@ -2478,23 +2372,7 @@ mod tests {
         assert_eq!(key.hidden_lockfile_digest.as_deref(), Some("hidden-digest"));
         assert_eq!(key.lockfile_mode, LockfileMode::Error);
         assert_eq!(key.repo_env.as_ref(), &repo_env);
-
-        let aggregation = BzlmodExtensionAggregationValue {
-            workspace_id: data.workspace_id.clone(),
-            extension_id: Arc::from(extension_id.as_str()),
-            aggregated: Arc::new(data.extension_aggregations[&extension_id].clone()),
-            root_module_name: data.root_module_name.clone(),
-        };
-        let key_with_digest = create_extension_execution_key_from_aggregation(
-            &aggregation,
-            &replay_data,
-            &repo_mappings,
-            Arc::from("digest-from-dice-key"),
-        );
-        assert_eq!(
-            key_with_digest.bzl_transitive_digest.as_ref(),
-            "digest-from-dice-key"
-        );
+        assert_eq!(key.bzl_transitive_digest.as_ref(), "digest-from-dice-key");
     }
 
     #[test]

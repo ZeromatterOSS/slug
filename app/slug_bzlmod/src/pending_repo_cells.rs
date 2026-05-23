@@ -244,9 +244,8 @@ pub fn pre_compute_extension_repo_cells(
                 continue;
             }
             // Match the canonical form used by `aggregate_extensions_with_root`
-            // so the executor-side lookup (`create_extension_execution_key`)
-            // finds the aggregation for this setup. See
-            // `extensions::canonical_extension_id`.
+            // so DICE extension-spoke lookup finds the aggregation for this
+            // setup. See `extensions::canonical_extension_id`.
             let ext_id = crate::extensions::canonical_extension_id(
                 &usage.extension_bzl_file,
                 &usage.extension_name,
