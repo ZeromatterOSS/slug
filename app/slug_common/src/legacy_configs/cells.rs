@@ -91,12 +91,12 @@ fn repo_env_json(repo_env: &BTreeMap<String, String>) -> Arc<str> {
     )
 }
 
-fn runtime_extension_cells_from_lockfile_seeded_cells(
+fn append_lockfile_seeded_runtime_extension_cells(
+    snapshot: &mut slug_core::cells::BzlmodRuntimeCellInstallSnapshot,
     cells: &[BzlmodPendingRepoCell],
     repo_env: &BTreeMap<String, String>,
-) -> Vec<slug_core::cells::BzlmodRuntimeExtensionCell> {
+) {
     let repo_env_json = repo_env_json(repo_env);
-    let mut runtime_cells = Vec::with_capacity(cells.len());
     for cell in cells {
         let setup = ExtensionRepoCellSetup {
             canonical_name: Arc::from(cell.canonical_name.as_str()),
@@ -107,33 +107,35 @@ fn runtime_extension_cells_from_lockfile_seeded_cells(
             repo_env_json: repo_env_json.clone(),
             materialized: false,
         };
-        runtime_cells.push(slug_core::cells::BzlmodRuntimeExtensionCell {
-            canonical_name: cell.canonical_name.clone(),
-            internal_name: cell.internal_name.clone(),
-            path: cell.path.clone(),
-            setup,
-            registration: slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Lazy,
-        });
+        snapshot
+            .extension_cells
+            .push(slug_core::cells::BzlmodRuntimeExtensionCell {
+                canonical_name: cell.canonical_name.clone(),
+                internal_name: cell.internal_name.clone(),
+                path: cell.path.clone(),
+                setup,
+                registration: slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Lazy,
+            });
         validate_precomputed_repo_spec(&cell.canonical_name, &cell.repo_spec_json);
     }
-    runtime_cells
 }
 
-fn runtime_extension_cells_from_extension_cells(
+fn append_eager_runtime_extension_cells(
+    snapshot: &mut slug_core::cells::BzlmodRuntimeCellInstallSnapshot,
     cells: &[(CellName, CellRootPathBuf, ExtensionRepoCellSetup)],
-) -> Vec<slug_core::cells::BzlmodRuntimeExtensionCell> {
-    let mut runtime_cells = Vec::with_capacity(cells.len());
+) {
     for (_name, path, setup) in cells {
-        runtime_cells.push(slug_core::cells::BzlmodRuntimeExtensionCell {
-            canonical_name: setup.canonical_name.to_string(),
-            internal_name: setup.internal_name.to_string(),
-            path: path.as_str().to_owned(),
-            setup: setup.dupe(),
-            registration: slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Eager,
-        });
+        snapshot
+            .extension_cells
+            .push(slug_core::cells::BzlmodRuntimeExtensionCell {
+                canonical_name: setup.canonical_name.to_string(),
+                internal_name: setup.internal_name.to_string(),
+                path: path.as_str().to_owned(),
+                setup: setup.dupe(),
+                registration: slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Eager,
+            });
         validate_precomputed_repo_spec(&setup.canonical_name, &setup.repo_spec_json);
     }
-    runtime_cells
 }
 
 fn validate_precomputed_repo_spec(canonical_name: &str, repo_spec_json: &str) {
@@ -152,29 +154,44 @@ fn validate_precomputed_repo_spec(canonical_name: &str, repo_spec_json: &str) {
     }
 }
 
-fn scoped_runtime_aliases(
+fn append_scoped_runtime_aliases(
+    snapshot: &mut slug_core::cells::BzlmodRuntimeCellInstallSnapshot,
     aliases: &[BzlmodScopedRepoAlias],
-) -> Vec<slug_core::cells::BzlmodRuntimeScopedRepoAlias> {
-    aliases
-        .iter()
-        .map(|alias| slug_core::cells::BzlmodRuntimeScopedRepoAlias {
+) {
+    snapshot.scoped_aliases.extend(aliases.iter().map(|alias| {
+        slug_core::cells::BzlmodRuntimeScopedRepoAlias {
             owner_module: alias.owner_module.clone(),
             apparent_name: alias.apparent_name.clone(),
             target_name: alias.target_name.clone(),
-        })
-        .collect()
+        }
+    }))
 }
 
-fn dynamic_runtime_aliases(
+fn append_dynamic_runtime_aliases(
+    snapshot: &mut slug_core::cells::BzlmodRuntimeCellInstallSnapshot,
     aliases: &[BzlmodDynamicAlias],
-) -> Vec<slug_core::cells::BzlmodRuntimeDynamicAlias> {
-    aliases
-        .iter()
-        .map(|alias| slug_core::cells::BzlmodRuntimeDynamicAlias {
+) {
+    snapshot.dynamic_aliases.extend(aliases.iter().map(|alias| {
+        slug_core::cells::BzlmodRuntimeDynamicAlias {
             apparent_name: alias.apparent_name.clone(),
             canonical_name: alias.canonical_name.clone(),
-        })
-        .collect()
+        }
+    }))
+}
+
+fn runtime_cell_install_snapshot(
+    lockfile_seeded_cells: &[BzlmodPendingRepoCell],
+    extension_cells: &[(CellName, CellRootPathBuf, ExtensionRepoCellSetup)],
+    scoped_aliases: &[BzlmodScopedRepoAlias],
+    dynamic_aliases: &[BzlmodDynamicAlias],
+    repo_env: &BTreeMap<String, String>,
+) -> slug_core::cells::BzlmodRuntimeCellInstallSnapshot {
+    let mut snapshot = slug_core::cells::BzlmodRuntimeCellInstallSnapshot::default();
+    append_lockfile_seeded_runtime_extension_cells(&mut snapshot, lockfile_seeded_cells, repo_env);
+    append_eager_runtime_extension_cells(&mut snapshot, extension_cells);
+    append_scoped_runtime_aliases(&mut snapshot, scoped_aliases);
+    append_dynamic_runtime_aliases(&mut snapshot, dynamic_aliases);
+    snapshot
 }
 
 /// The module name used by the canonical rules_python Bazel module. Matched
@@ -595,18 +612,14 @@ impl BzlmodResolutionResult {
         cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
         cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
 
-        let mut runtime_extension_cells = runtime_extension_cells_from_lockfile_seeded_cells(
+        let runtime_cell_snapshot = runtime_cell_install_snapshot(
             &self.lockfile_seeded_cells,
+            &self.extension_cells,
+            &self.scoped_repo_aliases,
+            &self.dynamic_extension_aliases,
             &self.session_data.repo_env,
         );
-        runtime_extension_cells.extend(runtime_extension_cells_from_extension_cells(
-            &self.extension_cells,
-        ));
-        slug_core::cells::install_bzlmod_runtime_extension_cells(
-            &runtime_extension_cells,
-            &scoped_runtime_aliases(&self.scoped_repo_aliases),
-            &dynamic_runtime_aliases(&self.dynamic_extension_aliases),
-        );
+        slug_core::cells::install_bzlmod_runtime_cell_snapshot(&runtime_cell_snapshot);
 
         let cell_pairs: Vec<(String, String)> = self
             .cells

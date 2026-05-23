@@ -606,8 +606,8 @@ Observed SDK result at the checkpoint:
   test_project_bzl_digest -- --nocapture`, `cargo build -p slug`, focused
   Plan 61 Python guardrails for mapped external helper create/edit/delete
   replay transitions, and the full Plan 61 Python guardrail with 71 tests.
-- Runtime extension-cell installer validation passed with `cargo check -p
-  slug_core -p slug_common`, `cargo test -p slug_core
+- Runtime extension-cell snapshot/installer validation passed with `cargo
+  check -p slug_core -p slug_common`, `cargo test -p slug_core
   cells::bzlmod_apparent_alias_cache_tests -- --nocapture --test-threads=1`,
   `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
   focused Plan 61 Python guardrails for warm extension replay, two-workspace
@@ -685,10 +685,10 @@ What did not work or remains risky:
   materialization now goes through DICE lookup keys with workspace identity,
   reads narrower extension-aggregation, repo-mapping, and replay-input values,
   and uses DICE spoke repo-env where available. Generated repo cells and
-  dynamic alias registration now go through a typed runtime installer boundary
-  in `slug_core::cells`, but the backing state is still process-global
-  transitional cell-registration plumbing rather than a final DICE-owned cell
-  graph.
+  dynamic alias registration now go through a typed runtime install snapshot
+  and installer boundary in `slug_core::cells`, but the backing state is still
+  process-global transitional cell-registration plumbing rather than a final
+  DICE-owned cell graph.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser.

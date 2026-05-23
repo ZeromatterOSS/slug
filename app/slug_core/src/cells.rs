@@ -208,6 +208,13 @@ pub struct BzlmodRuntimeDynamicAlias {
     pub canonical_name: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct BzlmodRuntimeCellInstallSnapshot {
+    pub extension_cells: Vec<BzlmodRuntimeExtensionCell>,
+    pub scoped_aliases: Vec<BzlmodRuntimeScopedRepoAlias>,
+    pub dynamic_aliases: Vec<BzlmodRuntimeDynamicAlias>,
+}
+
 #[derive(Debug)]
 struct KnownCellAliasesForError {
     aliases: Vec<NonEmptyCellAlias>,
@@ -572,12 +579,8 @@ pub fn get_dynamic_extension_cell_setup(
         .and_then(|m| m.get(name).cloned())
 }
 
-pub fn install_bzlmod_runtime_extension_cells(
-    extension_cells: &[BzlmodRuntimeExtensionCell],
-    scoped_aliases: &[BzlmodRuntimeScopedRepoAlias],
-    dynamic_aliases: &[BzlmodRuntimeDynamicAlias],
-) {
-    for cell in extension_cells {
+pub fn install_bzlmod_runtime_cell_snapshot(snapshot: &BzlmodRuntimeCellInstallSnapshot) {
+    for cell in &snapshot.extension_cells {
         install_bzlmod_runtime_extension_cell_name(
             &cell.canonical_name,
             &cell.path,
@@ -594,7 +597,7 @@ pub fn install_bzlmod_runtime_extension_cells(
         }
     }
 
-    for alias in scoped_aliases {
+    for alias in &snapshot.scoped_aliases {
         register_scoped_bzlmod_repo_alias(
             alias.owner_module.clone(),
             alias.apparent_name.clone(),
@@ -602,7 +605,7 @@ pub fn install_bzlmod_runtime_extension_cells(
         );
     }
 
-    for alias in dynamic_aliases {
+    for alias in &snapshot.dynamic_aliases {
         register_dynamic_extension_cell_alias(
             alias.apparent_name.clone(),
             alias.canonical_name.clone(),
