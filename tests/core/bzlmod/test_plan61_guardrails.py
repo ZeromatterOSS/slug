@@ -317,6 +317,10 @@ def _label_bzl_location(
         external = _bzl_location_for_repo(repo, package, name, project_root)
         if external is not None:
             return external
+        if "+" in repo:
+            return _bzl_location_for_repo(
+                repo, package, name, project_root, include_missing=True
+            )
         return _project_bzl_location(project_root, package, name) if "+" not in repo else None
     elif label.startswith("@"):
         if "//" not in label:
@@ -335,6 +339,10 @@ def _label_bzl_location(
         external = _bzl_location_for_repo(repo, package, name, project_root)
         if external is not None:
             return external
+        if mapped or "+" in repo:
+            return _bzl_location_for_repo(
+                repo, package, name, project_root, include_missing=True
+            )
         return (
             _project_bzl_location(project_root, package, name)
             if not mapped and "+" not in repo
@@ -349,11 +357,29 @@ def _label_bzl_location(
         if target_parts is None:
             return None
         package, name = target_parts
-        return _bzl_location_for_repo(repo, package, name, project_root)
+        external = _bzl_location_for_repo(repo, package, name, project_root)
+        if external is not None:
+            return external
+        if repo and repo != "_main":
+            return _bzl_location_for_repo(
+                repo, package, name, project_root, include_missing=True
+            )
+        return None
     elif label.startswith(":"):
         if current is None:
             return None
-        return _bzl_location_for_repo(current[1], current[2], label[1:], project_root)
+        external = _bzl_location_for_repo(current[1], current[2], label[1:], project_root)
+        if external is not None:
+            return external
+        if current[1] and current[1] != "_main":
+            return _bzl_location_for_repo(
+                current[1],
+                current[2],
+                label[1:],
+                project_root,
+                include_missing=True,
+            )
+        return None
     elif "//" in label:
         repo, target = label.split("//", 1)
         target_parts = _split_bzl_label_target(target)
@@ -369,6 +395,10 @@ def _label_bzl_location(
         external = _bzl_location_for_repo(repo, package, name, project_root)
         if external is not None:
             return external
+        if mapped or "+" in repo:
+            return _bzl_location_for_repo(
+                repo, package, name, project_root, include_missing=True
+            )
         return (
             _project_bzl_location(project_root, package, name)
             if not mapped and "+" not in repo
@@ -392,9 +422,12 @@ def _bzl_location_for_repo(
     package: str,
     name: str,
     project_root: Path,
+    *,
+    include_missing: bool = False,
 ) -> tuple[Path, str, str] | None:
     if not repo or repo == "_main":
         return _project_bzl_location(project_root, package, name)
+    first_missing: tuple[Path, str, str] | None = None
     for candidate in _external_repo_candidates(repo):
         path = project_root / "bazel-external" / candidate
         if package:
@@ -402,6 +435,10 @@ def _bzl_location_for_repo(
         path = path / name
         if path.is_file():
             return path, candidate, package
+        if first_missing is None:
+            first_missing = (path, candidate, package)
+    if include_missing:
+        return first_missing
     return None
 
 
@@ -2590,6 +2627,97 @@ use_repo(replay, "replayed_repo")
     second = await _bzlmod_counters(buck)
 
     assert "mapped helper edit should make replay stale: edited mapped helper" in str(exc.value)
+    assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_missing_mapped_external_extension_bzl_load_creation_rejects_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction loaded .bzl digest includes creates."""
+    owner_module = "plan61_rules_owner_missing"
+    helper_module = "plan61_real_helper_missing"
+    helper_alias = "plan61_helper_alias_missing"
+    root_module = "plan61_mapped_load_missing_replay"
+    extension_id = f"@{owner_module}//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    owner_dir = buck.cwd.parent / f"{buck.cwd.name}_rules_owner_missing"
+    helper_dir = buck.cwd.parent / f"{buck.cwd.name}_real_helper_missing"
+    external_dir = buck.cwd / "bazel-external"
+
+    replayed_repo.mkdir(exist_ok=True)
+    owner_dir.mkdir(parents=True, exist_ok=True)
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    external_dir.mkdir(exist_ok=True)
+
+    _write(replayed_repo / "BUILD.bazel", "filegroup(name = \"data\")\n")
+    _write(
+        owner_dir / "MODULE.bazel",
+        f"""module(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", repo_name = "{helper_alias}")
+""",
+    )
+    _write(
+        owner_dir / "replay_ext.bzl",
+        f"""load("@{helper_alias}//:helper.bzl", "HELPER_SENTINEL")
+
+def _replay_ext_impl(module_ctx):
+    fail("missing mapped helper creation should make replay stale: %s" % HELPER_SENTINEL)
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(helper_dir / "MODULE.bazel", f'module(name = "{helper_module}", version = "1.0")\n')
+
+    (external_dir / f"{owner_module}+").symlink_to(owner_dir, target_is_directory=True)
+    (external_dir / f"{helper_module}+").symlink_to(helper_dir, target_is_directory=True)
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{root_module}")
+bazel_dep(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", version = "1.0")
+local_path_override(module_name = "{owner_module}", path = "{owner_dir.as_posix()}")
+local_path_override(module_name = "{helper_module}", path = "{helper_dir.as_posix()}")
+
+replay = use_extension("@{owner_module}//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=root_module,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+        repo_mappings={owner_module: {helper_alias: helper_module}},
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_replayed_repo")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    _write(helper_dir / "helper.bzl", 'HELPER_SENTINEL = "created mapped helper"\n')
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_replayed_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert "missing mapped helper creation should make replay stale" in str(exc.value)
+    assert "created mapped helper" in str(exc.value)
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
 

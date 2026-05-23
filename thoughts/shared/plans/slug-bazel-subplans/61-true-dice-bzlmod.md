@@ -601,6 +601,11 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, focused Plan 61 Python guardrails for visible/hidden
   lockfiles, repo env, missing-lockfile warm reuse, mapped external loads, and
   recorded repo mappings, and the full Plan 61 Python guardrail with 70 tests.
+- Missing mapped external `.bzl` load-state validation passed with `cargo
+  fmt --check`, `git diff --check`, `cargo test -p slug_bzlmod
+  test_project_bzl_digest -- --nocapture`, `cargo build -p slug`, focused
+  Plan 61 Python guardrails for mapped external helper create/edit/delete
+  replay transitions, and the full Plan 61 Python guardrail with 71 tests.
 
 ## Consolidated Learnings
 
@@ -658,12 +663,13 @@ What did not work or remains risky:
   replay-input value rather than final lockfile/replay-input producer keys.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads, missing project-local load paths, and existing external files
-  under `bazel-external/<repo>` are hashed, and repo mappings are applied where
+  under `bazel-external/<repo>` are hashed, missing mapped external load paths
+  are included in the transitional digest, and repo mappings are applied where
   the caller has a `RepoMappingSnapshot`. Same-daemon generated-repo access now
-  rejects replay after a mapped external helper edit and after a missing
-  project-local helper is created, with explicit coverage for mapped external
-  helper deletion. Other external load failures, audit-cell-only external load
-  changes, and the full interpreter load graph are not replay-complete.
+  rejects replay after mapped external helper create/edit/delete transitions
+  and after a missing project-local helper is created. Other external load
+  failures, audit-cell-only external load changes, and the full interpreter
+  load graph are not replay-complete.
 - Extension spoke materialization no longer uses a bzlmod process-global
   registry or extension-name-only scans for sibling lookup. Generated repo
   materialization now goes through DICE lookup keys with workspace identity,

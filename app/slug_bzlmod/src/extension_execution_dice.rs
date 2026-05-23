@@ -1535,6 +1535,9 @@ fn label_bzl_location_under_project(
         if let Some(location) = bzl_location_for_repo(repo, pkg, name, project_root) {
             return Some(location);
         }
+        if repo.contains('+') {
+            return missing_bzl_location_for_repo(repo, pkg, name, project_root);
+        }
         if !repo.contains('+') {
             return Some(project_bzl_location(project_root, pkg, name));
         }
@@ -1560,6 +1563,9 @@ fn label_bzl_location_under_project(
         if let Some(location) = bzl_location_for_repo(&repo, pkg, name, project_root) {
             return Some(location);
         }
+        if mapped || repo.contains('+') {
+            return missing_bzl_location_for_repo(&repo, pkg, name, project_root);
+        }
         if !mapped && !repo.contains('+') {
             return Some(project_bzl_location(project_root, pkg, name));
         }
@@ -1567,10 +1573,25 @@ fn label_bzl_location_under_project(
     } else if let Some(rest) = label.strip_prefix("//") {
         let current_repo = current.map(|location| location.repo.as_str()).unwrap_or("");
         let (pkg, name) = split_bzl_label_target(rest)?;
-        bzl_location_for_repo(current_repo, pkg, name, project_root)
+        bzl_location_for_repo(current_repo, pkg, name, project_root).or_else(|| {
+            (!current_repo.is_empty() && current_repo != "_main")
+                .then(|| missing_bzl_location_for_repo(current_repo, pkg, name, project_root))
+                .flatten()
+        })
     } else if let Some(name) = label.strip_prefix(':') {
         let current = current?;
-        bzl_location_for_repo(&current.repo, &current.package, name, project_root)
+        bzl_location_for_repo(&current.repo, &current.package, name, project_root).or_else(|| {
+            (!current.repo.is_empty() && current.repo != "_main")
+                .then(|| {
+                    missing_bzl_location_for_repo(
+                        &current.repo,
+                        &current.package,
+                        name,
+                        project_root,
+                    )
+                })
+                .flatten()
+        })
     } else if label.contains("//") {
         let (repo, target) = label.split_once("//")?;
         let (pkg, name) = split_bzl_label_target(target)?;
@@ -1591,6 +1612,9 @@ fn label_bzl_location_under_project(
         };
         if let Some(location) = bzl_location_for_repo(&repo, pkg, name, project_root) {
             return Some(location);
+        }
+        if mapped || repo.contains('+') {
+            return missing_bzl_location_for_repo(&repo, pkg, name, project_root);
         }
         if !mapped && !repo.contains('+') {
             return Some(project_bzl_location(project_root, pkg, name));
@@ -1614,10 +1638,30 @@ fn bzl_location_for_repo(
     name: &str,
     project_root: &Path,
 ) -> Option<BzlLoadLocation> {
+    bzl_location_for_repo_impl(repo, package, name, project_root, false)
+}
+
+fn missing_bzl_location_for_repo(
+    repo: &str,
+    package: &str,
+    name: &str,
+    project_root: &Path,
+) -> Option<BzlLoadLocation> {
+    bzl_location_for_repo_impl(repo, package, name, project_root, true)
+}
+
+fn bzl_location_for_repo_impl(
+    repo: &str,
+    package: &str,
+    name: &str,
+    project_root: &Path,
+    include_missing: bool,
+) -> Option<BzlLoadLocation> {
     if repo.is_empty() || repo == "_main" {
         return Some(project_bzl_location(project_root, package, name));
     }
 
+    let mut first_missing = None;
     for candidate in external_repo_candidates(repo) {
         let mut path = project_root.join("bazel-external").join(&candidate);
         if !package.is_empty() {
@@ -1631,8 +1675,13 @@ fn bzl_location_for_repo(
                 package: package.to_owned(),
             });
         }
+        first_missing.get_or_insert_with(|| BzlLoadLocation {
+            path,
+            repo: candidate,
+            package: package.to_owned(),
+        });
     }
-    None
+    include_missing.then_some(first_missing).flatten()
 }
 
 fn project_bzl_location(project_root: &Path, package: &str, name: &str) -> BzlLoadLocation {
@@ -2518,6 +2567,42 @@ mod tests {
         );
 
         assert_ne!(first, after_real_edit);
+    }
+
+    #[test]
+    fn test_project_bzl_digest_includes_missing_mapped_external_load_state() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let owner_dir = temp_dir.path().join("bazel-external/rules_owner+");
+        std::fs::create_dir_all(&owner_dir).unwrap();
+        std::fs::write(
+            owner_dir.join("ext.bzl"),
+            "load(\"@apparent_helper//:helper.bzl\", \"HELPER\")\n",
+        )
+        .unwrap();
+
+        let real_dir = temp_dir.path().join("bazel-external/real_helper+");
+        std::fs::create_dir_all(&real_dir).unwrap();
+        let real_helper = real_dir.join("helper.bzl");
+
+        let mut source_mapping = BTreeMap::new();
+        source_mapping.insert("apparent_helper".to_owned(), "real_helper".to_owned());
+        let mut repo_mappings = crate::RepoMappingSnapshot::new();
+        repo_mappings.insert("rules_owner+".to_owned(), source_mapping);
+
+        let missing = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            "@@rules_owner+//:ext.bzl%ext",
+            temp_dir.path(),
+            Some(&repo_mappings),
+        );
+
+        std::fs::write(&real_helper, "HELPER = \"created\"\n").unwrap();
+        let created = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            "@@rules_owner+//:ext.bzl%ext",
+            temp_dir.path(),
+            Some(&repo_mappings),
+        );
+
+        assert_ne!(missing, created);
     }
 
     #[test]
