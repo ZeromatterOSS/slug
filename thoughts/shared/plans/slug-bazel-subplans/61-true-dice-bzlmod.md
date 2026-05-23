@@ -791,6 +791,16 @@ Observed SDK result at the checkpoint:
   extension executor now requires a concrete `WorkspaceId`; execution keys
   without one fail before Starlark evaluation instead of letting the
   interpreter implementation re-derive workspace identity from project root.
+- Transitional session workspace-id injection validation passed with `cargo
+  check -p slug_bzlmod -p slug_common`, `cargo test -p slug_bzlmod
+  set_bzlmod_session_data_uses_session_workspace_id -- --nocapture`, full
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
+  replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo
+  fmt --check`, and `git diff --check`. `BzlmodSessionData` now carries the
+  current `WorkspaceId` explicitly, and the DICE injection step fans that
+  exact root/output-base identity into the narrower bzlmod data values instead
+  of reconstructing it from `project_root`.
 
 ## Consolidated Learnings
 
@@ -837,7 +847,9 @@ What did not work or remains risky:
   conservative session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
-  injected DICE key.
+  injected DICE key. The session payload now carries exact workspace identity
+  for the narrower injected values, but the values are still populated from the
+  legacy resolver output.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.

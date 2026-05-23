@@ -3136,13 +3136,14 @@ impl BuckConfigBasedCells {
         let dynamic_extension_aliases = Vec::new();
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
-        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::default();
+        let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
+        let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(workspace_root.to_path_buf());
+        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
         bzlmod_session_data.repo_env = options.repo_env.clone();
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
             options.allow_yanked_versions_env.as_deref(),
             &options.allow_yanked_versions_flags,
         )?;
-        let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let visible_lockfile_value = visible_lockfile;
         let hidden_lockfile_value = hidden_lockfile;
         let visible_lockfile_digest = visible_lockfile_value

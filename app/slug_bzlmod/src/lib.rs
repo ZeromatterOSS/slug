@@ -244,8 +244,9 @@ pub struct RegisteredToolchain {
 /// Bzlmod facts produced by startup resolution and injected into DICE for the
 /// current command. This is the transitional Plan 61 boundary between legacy
 /// cell parsing and DICE-owned bzlmod values.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Allocative)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodSessionData {
+    pub workspace_id: WorkspaceId,
     pub module_versions: HashMap<String, String>,
     pub registered_toolchains: Vec<RegisteredToolchain>,
     pub registered_execution_platforms: Vec<String>,
@@ -265,13 +266,44 @@ pub struct BzlmodSessionData {
     pub repo_mapping_overrides: RepoMappingOverrides,
 }
 
+impl BzlmodSessionData {
+    pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
+        Self {
+            project_root: workspace_id.canonical_project_root.as_ref().clone(),
+            workspace_id,
+            module_versions: HashMap::new(),
+            registered_toolchains: Vec::new(),
+            registered_execution_platforms: Vec::new(),
+            extension_aggregations: HashMap::new(),
+            root_module_name: String::new(),
+            hidden_lockfile_path: None,
+            visible_lockfile_digest: None,
+            hidden_lockfile_digest: None,
+            visible_lockfile: None,
+            hidden_lockfile: None,
+            lockfile_mode: LockfileMode::Update,
+            repo_env: BTreeMap::new(),
+            registry_file_hashes: indexmap::IndexMap::new(),
+            selected_yanked_versions: indexmap::IndexMap::new(),
+            repo_mappings: RepoMappingSnapshot::new(),
+            repo_mapping_overrides: RepoMappingOverrides::new(),
+        }
+    }
+}
+
+impl Default for BzlmodSessionData {
+    fn default() -> Self {
+        Self::for_workspace(WorkspaceId::for_project_root(PathBuf::new()))
+    }
+}
+
 pub trait SetBzlmodSessionData {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()>;
 }
 
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
-        let workspace_id = WorkspaceId::for_project_root(data.project_root.clone());
+        let workspace_id = data.workspace_id.clone();
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
@@ -333,6 +365,34 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
         )])?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn set_bzlmod_session_data_uses_session_workspace_id() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-session-workspace"),
+            PathBuf::from("/tmp/slug-plan61-custom-output-base"),
+        );
+        let data = BzlmodSessionData::for_workspace(workspace_id.clone());
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_bzlmod_session_data(data)?;
+        let mut dice = updater.commit().await;
+
+        let repo_mappings = dice.compute(&BzlmodRepoMappingsDataKey).await?;
+        assert_eq!(repo_mappings.workspace_id, workspace_id);
+
         Ok(())
     }
 }
