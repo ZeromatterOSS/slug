@@ -87,7 +87,10 @@ impl BuildSettingLabel {
             && let Some((repo, package_and_target)) = rest.split_once("//")
             && let Some(canonical) = cells::resolve_dynamic_extension_cell_alias(repo)
         {
-            canon = format!("{prefix}{canonical}//{package_and_target}");
+            // Bazel's `@@` marks a canonical repo in label syntax; Slug's
+            // internal cell name is the repo name without that sigil.
+            let slug_prefix = if prefix == "@@" { "@" } else { prefix };
+            canon = format!("{slug_prefix}{canonical}//{package_and_target}");
         }
 
         let target = TargetLabel::testing_parse(&canon);

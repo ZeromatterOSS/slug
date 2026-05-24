@@ -1288,6 +1288,13 @@ Observed SDK result at the checkpoint:
   test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
   focused Plan 61 generated repo alias guardrail subset, `cargo fmt --check`,
   and `git diff --check`.
+- Build-setting label canonicalization now normalizes Bazel's `@@` canonical
+  repo sigil away when a dynamic generated-repo alias maps to a Slug cell name,
+  instead of carrying `@@` into the internal `TargetLabel` cell. Validation
+  passed with focused `cargo test -p slug_core
+  build_setting_labels_resolve_dynamic_extension_aliases -- --nocapture`,
+  `cargo check -p slug_core`, `cargo build -p slug`, `cargo fmt --check`, and
+  `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1451,7 +1458,9 @@ What did not work or remains risky:
   now uses canonical generated repo names from that snapshot for direct cell
   existence and for same-extension sibling fallback before consulting
   process-global dynamic maps, so internal generated repo names are not made
-  root-visible merely by snapshot membership. The graph is still
+  root-visible merely by snapshot membership. Build-setting labels that arrive
+  in Bazel canonical `@@repo//...` form now normalize to Slug's internal cell
+  name after dynamic alias resolution. The graph is still
   legacy-produced, and alias compatibility plus runtime registration remain
   process-global transitional plumbing, so this does not yet make the runtime
   bzlmod cell graph DICE-owned.
