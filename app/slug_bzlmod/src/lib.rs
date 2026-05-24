@@ -288,7 +288,10 @@ impl BzlmodSessionData {
                 Arc::new(HashMap::new()),
             ),
             lockfile_inputs: BzlmodLockfileInputsValue::default(),
-            repo_env: BzlmodRepoEnvDataValue::default(),
+            repo_env: BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            ),
             resolution_facts: BzlmodResolutionFactsValue::default(),
             repo_mappings: BzlmodRepoMappingsDataValue::for_workspace(
                 workspace_id.clone(),
@@ -313,9 +316,10 @@ pub trait SetBzlmodSessionData {
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
-        let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue {
-            lockfile_inputs: lockfile_inputs.clone(),
-        });
+        let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+            data.cell_graph.workspace_id.clone(),
+            lockfile_inputs.clone(),
+        ));
         let repo_env_data = Arc::new(data.repo_env.clone());
         let module_versions = Arc::new(data.module_versions.clone());
         let resolution_facts = Arc::new(data.resolution_facts.clone());
@@ -464,12 +468,13 @@ mod tests {
             Some(hidden_lockfile),
             LockfileMode::Update,
         );
-        data.repo_env = BzlmodRepoEnvDataValue {
-            repo_env: Arc::new(BTreeMap::from([(
+        data.repo_env = BzlmodRepoEnvDataValue::for_workspace(
+            workspace_id.clone(),
+            Arc::new(BTreeMap::from([(
                 "TOKEN".to_owned(),
                 "from-session".to_owned(),
             )])),
-        };
+        );
         data.resolution_facts.registry_file_hashes.insert(
             "registry/modules/dep/1.0/MODULE.bazel".to_owned(),
             "sha256-registry".to_owned(),
@@ -606,15 +611,17 @@ mod tests {
         )])?;
         updater.changed_to(vec![(
             BzlmodLockfileInputsDataKey,
-            Arc::new(BzlmodLockfileInputsDataValue {
-                lockfile_inputs: Arc::new(BzlmodLockfileInputsValue::default()),
-            }),
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            )),
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoEnvDataKey,
-            Arc::new(BzlmodRepoEnvDataValue {
-                repo_env: Arc::new(BTreeMap::new()),
-            }),
+            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            )),
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoMappingsDataKey,
@@ -663,13 +670,37 @@ mod tests {
                 workspace_id.clone(),
             ))
             .await??;
+        let lockfile_inputs = dice
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        let repo_env = dice
+            .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
+            .await??;
         assert_eq!(module_versions.workspace_id, workspace_id);
         assert_eq!(registered_toolchains.workspace_id, workspace_id);
         assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
         assert_eq!(repo_mappings.workspace_id.as_ref(), Some(&workspace_id));
+        assert_eq!(lockfile_inputs.lockfile_mode, LockfileMode::Update);
+        assert!(repo_env.is_empty());
 
         assert!(
             dice.compute(&ModuleVersionsKey::for_workspace_id(
+                other_workspace_id.clone(),
+            ))
+            .await?
+            .is_err()
+        );
+        assert!(
+            dice.compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                other_workspace_id.clone(),
+            ))
+            .await?
+            .is_err()
+        );
+        assert!(
+            dice.compute(&BzlmodRepoEnvKey::for_workspace_id(
                 other_workspace_id.clone(),
             ))
             .await?
@@ -713,6 +744,78 @@ mod tests {
             .unwrap_err();
         assert!(
             err.to_string().contains("repo mapping data root"),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn replay_input_data_rejects_wrong_workspace() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-replay-input-workspace"),
+            PathBuf::from("/tmp/slug-plan61-replay-input-output-base"),
+        );
+        let other_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-replay-input-other"),
+            PathBuf::from("/tmp/slug-plan61-replay-input-other-output"),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodCellGraphDataKey,
+            Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+                workspace_id.clone(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoEnvDataKey,
+            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
+                other_workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+        let err = dice
+            .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
+            .await?
+            .unwrap_err();
+        assert!(err.to_string().contains("repo env data root"), "{err:?}");
+
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodRepoEnvDataKey,
+            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+                other_workspace_id,
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+        let err = dice
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(workspace_id))
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("lockfile input data root"),
             "{err:?}"
         );
 

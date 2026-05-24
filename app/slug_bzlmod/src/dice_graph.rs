@@ -532,7 +532,20 @@ impl BzlmodLockfileInputsKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodLockfileInputsDataValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
+}
+
+impl BzlmodLockfileInputsDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            lockfile_inputs,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -561,7 +574,20 @@ impl BzlmodRepoEnvKey {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoEnvDataValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub repo_env: Arc<BTreeMap<String, String>>,
+}
+
+impl BzlmodRepoEnvDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        repo_env: Arc<BTreeMap<String, String>>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            repo_env,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -821,6 +847,17 @@ impl Key for BzlmodLockfileInputsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodLockfileInputsDataKey).await?;
+        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
+            if data_workspace_id != &self.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodLockfileInputsKey was computed with project root '{}', \
+                     but current bzlmod lockfile input data root is '{}'",
+                    self.workspace_id.canonical_project_root.display(),
+                    data_workspace_id.canonical_project_root.display()
+                ));
+            }
+        }
         ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
             self.workspace_id.clone(),
         ))
@@ -846,6 +883,17 @@ impl Key for BzlmodRepoEnvKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodRepoEnvDataKey).await?;
+        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
+            if data_workspace_id != &self.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodRepoEnvKey was computed with project root '{}', \
+                     but current bzlmod repo env data root is '{}'",
+                    self.workspace_id.canonical_project_root.display(),
+                    data_workspace_id.canonical_project_root.display()
+                ));
+            }
+        }
         ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
             self.workspace_id.clone(),
         ))

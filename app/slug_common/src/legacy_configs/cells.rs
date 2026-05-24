@@ -3088,9 +3088,10 @@ impl BuckConfigBasedCells {
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(workspace_root.to_path_buf());
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
-        bzlmod_session_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue {
-            repo_env: Arc::new(options.repo_env.clone()),
-        };
+        bzlmod_session_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
+            bzlmod_session_data.cell_graph.workspace_id.clone(),
+            Arc::new(options.repo_env.clone()),
+        );
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
             options.allow_yanked_versions_env.as_deref(),
             &options.allow_yanked_versions_flags,
