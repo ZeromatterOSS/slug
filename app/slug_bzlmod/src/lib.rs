@@ -314,11 +314,9 @@ impl BzlmodSessionData {
             cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
         }
     }
-}
 
-impl Default for BzlmodSessionData {
-    fn default() -> Self {
-        Self::for_workspace(WorkspaceId::for_project_root(PathBuf::new()))
+    pub fn empty_for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace(WorkspaceId::for_project_root(project_root))
     }
 }
 

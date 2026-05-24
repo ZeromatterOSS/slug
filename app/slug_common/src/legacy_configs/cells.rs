@@ -2813,7 +2813,14 @@ impl BuckConfigBasedCells {
         let mut bzlmod_extension_cells: Vec<(CellName, ExtensionRepoCellSetup)> = Vec::new();
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
         let mut has_module_bazel = false;
-        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::default();
+        // Non-bzlmod parsing still injects empty bzlmod projections for legacy
+        // consumers. Use the real project root when one exists, and keep the
+        // no-project testing sentinel explicit.
+        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::empty_for_project_root(
+            project_fs
+                .map(|project_fs| project_fs.root().to_path_buf())
+                .unwrap_or_default(),
+        );
         let mut bzlmod_runtime_cell_snapshot = None;
 
         // ===== Bzlmod Integration =====

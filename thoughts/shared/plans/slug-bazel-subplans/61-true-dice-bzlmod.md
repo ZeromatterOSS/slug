@@ -1277,6 +1277,17 @@ Observed SDK result at the checkpoint:
   pre-existing isolated failures in
   `build_setting_labels_resolve_dynamic_extension_aliases` and
   `pattern::pattern::tests::test_relaxed`.
+- `BzlmodSessionData` no longer implements `Default`; empty session projection
+  data must name an explicit project root, with the no-project sentinel
+  confined to test/basic setup call sites. This does not remove the session
+  bridge, but it demotes one accidental authority surface where code could
+  synthesize a fake empty bzlmod workspace without acknowledging the workspace
+  identity. Validation passed with focused `cargo test -p slug_bzlmod
+  set_bzlmod_session_data_uses_session_workspace_id -- --nocapture`, `cargo
+  check -p slug_bzlmod -p slug_common -p slug_interpreter_for_build`, `cargo
+  test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
+  focused Plan 61 generated repo alias guardrail subset, `cargo fmt --check`,
+  and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1646,6 +1657,9 @@ using Rust DICE keys and values:
 
 9. Delete transitional APIs.
    - Remove `BzlmodSessionData` fields as the authority for graph semantics.
+   - `BzlmodSessionData::default()` is removed; remaining empty session
+     construction must explicitly name the project-root sentinel while the
+     session bridge is still being unwound.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key inputs as the graph migrates.
