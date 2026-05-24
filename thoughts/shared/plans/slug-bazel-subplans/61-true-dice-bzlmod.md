@@ -1767,6 +1767,16 @@ What did not work or remains risky:
   slug_analysis -p slug_server`, `cargo build -p slug`, and the full Plan 61
   Python guardrail with `75 passed in 40.35s`. The slugd processes left by the
   full guardrail were cleaned up afterward.
+- `config_setting(flag_values = ...)` build-setting lookup now normalizes bzlmod
+  repo spellings through the active config-setting cell's declared/runtime alias
+  resolver before falling back to the process-global dynamic alias helper. This
+  lets resolver-owned runtime aliases explain transitioned build-setting labels
+  without requiring a compatibility global. Validation passed with `cargo test
+  -p slug_analysis build_setting_lookup_ -- --nocapture` (`2 passed`), `cargo
+  test -p slug_analysis -- --nocapture` (`32 passed`), `cargo check -p
+  slug_analysis -p slug_server`, `cargo build -p slug`, and the full Plan 61
+  Python guardrail with `75 passed in 40.25s`. The slugd processes left by the
+  full guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -1990,6 +2000,10 @@ using Rust DICE keys and values:
   runtime aliases/cells from the active cell alias resolver before consulting
   process-global dynamic aliases, but remaining canonicalization helpers still
   have process-global fallback behavior.
+- `config_setting(flag_values = ...)` build-setting lookup now also uses the
+  active cell alias resolver for bzlmod repo-spelling normalization before
+  consulting process-global dynamic aliases, but other metadata/action-path
+  canonicalization helpers still retain process-global fallbacks.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
   cells, but the final cell graph is still injected from legacy-produced data.

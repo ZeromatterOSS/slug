@@ -37,6 +37,7 @@ use slug_build_signals::env::WaitingData;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::legacy_configs::dice::HasLegacyConfigs;
 use slug_common::legacy_configs::key::BuckconfigKeyRef;
+use slug_core::cells::CellAliasResolver;
 use slug_core::configuration::build_setting::BuildSettingLabel;
 use slug_core::configuration::build_setting::BuildSettingValue;
 use slug_core::configuration::compatibility::MaybeCompatible;
@@ -862,6 +863,7 @@ async fn check_config_setting_flag_values(
             configured_node,
             &flag_target_label,
             &flag_label_str,
+            &cell_alias_resolver,
         )
         .await?;
 
@@ -952,6 +954,7 @@ async fn get_configured_build_setting_value(
     configured_node: ConfiguredTargetNodeRef<'_>,
     flag_target_label: &TargetLabel,
     flag_label_str: &str,
+    cell_alias_resolver: &CellAliasResolver,
 ) -> slug_error::Result<Option<BuildSettingValue>> {
     let cfg = configured_node.label().cfg();
     let canonical_label = BuildSettingLabel::new(flag_target_label.dupe());
@@ -974,7 +977,10 @@ async fn get_configured_build_setting_value(
     // those repo spellings so target_settings filters observe the transition.
     let wanted_pkg = flag_target_label.pkg().cell_relative_path().as_str();
     let wanted_name = flag_target_label.name().as_str();
-    let wanted_cell = normalized_bzlmod_repo_name(flag_target_label.pkg().cell_name().as_str());
+    let wanted_cell = normalized_bzlmod_repo_name_with_alias_resolver(
+        flag_target_label.pkg().cell_name().as_str(),
+        Some(cell_alias_resolver),
+    );
     for (label, value) in &cfg.data()?.build_settings {
         let target = label.target();
         if target.name().as_str() != wanted_name {
@@ -984,7 +990,11 @@ async fn get_configured_build_setting_value(
         if pkg.cell_relative_path().as_str() != wanted_pkg {
             continue;
         }
-        if normalized_bzlmod_repo_name(pkg.cell_name().as_str()) == wanted_cell {
+        if normalized_bzlmod_repo_name_with_alias_resolver(
+            pkg.cell_name().as_str(),
+            Some(cell_alias_resolver),
+        ) == wanted_cell
+        {
             return Ok(Some(value.clone()));
         }
     }
@@ -1000,8 +1010,17 @@ fn normalize_bazel_bool_flag_value(value: &str) -> Option<bool> {
     }
 }
 
-fn normalized_bzlmod_repo_name(repo: &str) -> String {
-    let repo = slug_core::cells::resolve_dynamic_extension_cell_alias(repo)
+fn normalized_bzlmod_repo_name_with_alias_resolver(
+    repo: &str,
+    cell_alias_resolver: Option<&CellAliasResolver>,
+) -> String {
+    let repo = cell_alias_resolver
+        .and_then(|resolver| {
+            resolver
+                .resolve_declared_or_runtime_alias(repo)
+                .map(|cell| cell.as_str().to_owned())
+        })
+        .or_else(|| slug_core::cells::resolve_dynamic_extension_cell_alias(repo))
         .unwrap_or_else(|| repo.to_owned());
     let repo = if let Some((_, rest)) = repo.split_once("++") {
         rest.rsplit_once('+')
@@ -1667,8 +1686,15 @@ pub struct AnalysisWithExtraData {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::name::CellName;
+
     use super::config_setting_flag_value_matches;
-    use super::normalized_bzlmod_repo_name;
+    use super::normalized_bzlmod_repo_name_with_alias_resolver;
 
     #[test]
     fn config_setting_flag_values_accept_bazel_bool_spellings() {
@@ -1688,10 +1714,54 @@ mod tests {
         );
 
         assert_eq!(
-            normalized_bzlmod_repo_name("rules_rs++rules_rust+rules_rust"),
+            normalized_bzlmod_repo_name_with_alias_resolver(
+                "rules_rs++rules_rust+rules_rust",
+                None
+            ),
             "rules_rust"
         );
-        assert_eq!(normalized_bzlmod_repo_name("rules_rust+"), "rules_rust");
-        assert_eq!(normalized_bzlmod_repo_name("rules_rust"), "rules_rust");
+        assert_eq!(
+            normalized_bzlmod_repo_name_with_alias_resolver("rules_rust+", None),
+            "rules_rust"
+        );
+        assert_eq!(
+            normalized_bzlmod_repo_name_with_alias_resolver("rules_rust", None),
+            "rules_rust"
+        );
+    }
+
+    #[test]
+    fn build_setting_lookup_normalization_prefers_runtime_aliases_before_globals()
+    -> slug_error::Result<()> {
+        let apparent = "plan61_build_setting_alias";
+        let canonical = "plan61_owner++settings+generated";
+        let wrong_global = "plan61_wrong_owner++settings+wrong_generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        assert_eq!(
+            normalized_bzlmod_repo_name_with_alias_resolver(apparent, Some(&resolver)),
+            "generated"
+        );
+        Ok(())
     }
 }
