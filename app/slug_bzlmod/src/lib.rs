@@ -424,6 +424,7 @@ mod tests {
                 name: "root_mod".to_owned(),
                 path: String::new(),
                 module_setup: None,
+                bundled: false,
             }]),
             extension_cells: Arc::new(Vec::new()),
             root_aliases: Arc::new(vec![BzlmodCellGraphAlias {

@@ -301,6 +301,7 @@ pub struct BzlmodCellGraphCell {
     pub name: String,
     pub path: String,
     pub module_setup: Option<BzlmodCellGraphModuleSetup>,
+    pub bundled: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]

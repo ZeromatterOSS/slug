@@ -84,6 +84,13 @@ const BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS: &[&str] = &[
     "@local_config_python//:host_launcher_maker_toolchain",
 ];
 
+const BZLMOD_ALWAYS_BUNDLED_CELLS: &[&str] = &[
+    "bazel_tools",
+    "local_config_platform",
+    "slug_builtins",
+    "local_config_python",
+];
+
 fn repo_env_json(repo_env: &BTreeMap<String, String>) -> Arc<str> {
     Arc::from(
         serde_json::to_string(repo_env)
@@ -2845,6 +2852,8 @@ impl BuckConfigBasedCells {
 
                     if let Some(setup) = module_setup_from_cell_graph(cell) {
                         bzlmod_external_cells.push((name, setup));
+                    } else if cell.bundled {
+                        bzlmod_bundled_cells.push(name);
                     }
                 }
             }
@@ -2867,56 +2876,6 @@ impl BuckConfigBasedCells {
                 ));
             }
             bzlmod_session_data = session_data;
-
-            // Auto-register @bazel_tools for bzlmod projects
-            let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
-            if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
-                let bazel_tools_path =
-                    CellRootPathBuf::new(ProjectRelativePath::new("bazel_tools")?.to_owned());
-                cell_definitions.push((bazel_tools_name, bazel_tools_path));
-                bzlmod_bundled_cells.push(bazel_tools_name);
-                tracing::info!("Auto-registered bundled cell: bazel_tools");
-            }
-
-            // Auto-register @local_config_platform for bzlmod projects
-            let lcp_name = CellName::unchecked_new("local_config_platform")?;
-            if !cell_definitions.iter().any(|(n, _)| *n == lcp_name) {
-                let lcp_path = CellRootPathBuf::new(
-                    ProjectRelativePath::new("local_config_platform")?.to_owned(),
-                );
-                cell_definitions.push((lcp_name, lcp_path));
-                bzlmod_bundled_cells.push(lcp_name);
-                tracing::info!("Auto-registered bundled cell: local_config_platform");
-            }
-
-            // Plan 28: auto-register @slug_builtins for bzlmod projects.
-            // The cell ships exports.bzl whose public symbols are
-            // injected into every BUILD/.bzl by `bazel_builtins_autoload`.
-            let kb_name = CellName::unchecked_new("slug_builtins")?;
-            if !cell_definitions.iter().any(|(n, _)| *n == kb_name) {
-                let kb_path =
-                    CellRootPathBuf::new(ProjectRelativePath::new("slug_builtins")?.to_owned());
-                cell_definitions.push((kb_name, kb_path));
-                bzlmod_bundled_cells.push(kb_name);
-                tracing::info!("Auto-registered bundled cell: slug_builtins");
-            }
-
-            // Auto-register @local_config_python for bzlmod projects that
-            // depend on rules_python. The bundled cell provides a host
-            // py_runtime + py_runtime_pair + toolchain() target so
-            // rules_python's py_library/py_binary analysis finds a
-            // py3_runtime when the user's MODULE.bazel hasn't registered
-            // its own Python toolchain (common for projects that use
-            // small py_binary helpers, e.g. @llvm-project//clang:clang).
-            let lcpy_name = CellName::unchecked_new("local_config_python")?;
-            if !cell_definitions.iter().any(|(n, _)| *n == lcpy_name) {
-                let lcpy_path = CellRootPathBuf::new(
-                    ProjectRelativePath::new("local_config_python")?.to_owned(),
-                );
-                cell_definitions.push((lcpy_name, lcpy_path));
-                bzlmod_bundled_cells.push(lcpy_name);
-                tracing::info!("Auto-registered bundled cell: local_config_python");
-            }
         }
 
         // Legacy .buckconfig cell definitions - only used when MODULE.bazel is NOT present
@@ -3859,7 +3818,16 @@ impl BuckConfigBasedCells {
                                 source_path: setup.source_path.to_string(),
                             }
                         }),
+                        bundled: false,
                     })
+                    .chain(BZLMOD_ALWAYS_BUNDLED_CELLS.iter().map(|name| {
+                        slug_bzlmod::BzlmodCellGraphCell {
+                            name: (*name).to_owned(),
+                            path: (*name).to_owned(),
+                            module_setup: None,
+                            bundled: true,
+                        }
+                    }))
                     .collect(),
             ),
             extension_cells: Arc::new(
@@ -4325,6 +4293,7 @@ mod tests {
                 registry_url: "https://bcr.bazel.build".to_owned(),
                 source_path: "/tmp/dep-src".to_owned(),
             }),
+            bundled: false,
         };
 
         let setup = module_setup_from_cell_graph(&cell).unwrap();
@@ -4333,6 +4302,48 @@ mod tests {
         assert_eq!(setup.version.as_ref(), "1.2.3");
         assert_eq!(setup.registry_url.as_ref(), "https://bcr.bazel.build");
         assert_eq!(setup.source_path.as_ref(), "/tmp/dep-src");
+    }
+
+    #[tokio::test]
+    async fn bzlmod_cell_resolver_uses_bundled_cells_from_cell_graph() -> slug_error::Result<()> {
+        let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(PathBuf::from(
+            "/tmp/slug-plan61-bundled-cell-graph-test",
+        ));
+        let mut session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
+        session_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
+            workspace_id: session_data.workspace_id.clone(),
+            root_module_name: "root".to_owned(),
+            cells: Arc::new(vec![slug_bzlmod::BzlmodCellGraphCell {
+                name: "bazel_tools".to_owned(),
+                path: "bazel_tools".to_owned(),
+                module_setup: None,
+                bundled: true,
+            }]),
+            extension_cells: Arc::new(Vec::new()),
+            root_aliases: Arc::new(Vec::new()),
+            module_symlinks: Arc::new(Vec::new()),
+            scoped_aliases: Arc::new(Vec::new()),
+            dynamic_aliases: Arc::new(Vec::new()),
+        };
+
+        let configs = BuckConfigBasedCells::parse_with_file_ops_and_options_inner(
+            &[],
+            None,
+            None,
+            None,
+            Some(Arc::new(Some(BzlmodResolutionResult { session_data }))),
+        )
+        .await?;
+        let bazel_tools = CellName::unchecked_new("bazel_tools")?;
+        let cell = configs.cell_resolver.get(bazel_tools)?;
+
+        match cell.external() {
+            Some(ExternalCellOrigin::Bundled(name)) => {
+                assert_eq!(name.as_str(), "bazel_tools");
+            }
+            other => panic!("expected bazel_tools to be a bundled cell, got {other:?}"),
+        }
+        Ok(())
     }
 
     #[tokio::test]
