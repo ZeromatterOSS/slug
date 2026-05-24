@@ -1100,6 +1100,17 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
   subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
   --check`, and `git diff --check`.
+- `BzlmodSessionData` no longer carries a sibling workspace-id field beside
+  the named cell graph. The legacy resolver boundary still returns a
+  transitional session payload, but config-load replay and DICE injection now
+  read workspace identity through `BzlmodCellGraphValue` only. Validation
+  passed with `cargo check -p slug_bzlmod -p slug_common`, focused
+  `slug_bzlmod` and `slug_common` session/cell-graph tests, full `cargo test
+  -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
+  --nocapture`, full `cargo test -p slug_external_cells -- --nocapture`,
+  `cargo build -p slug`, the focused Plan 61 Python replay subset, the full
+  Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
+  `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1149,10 +1160,9 @@ What did not work or remains risky:
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
   injected DICE key and no longer sits behind a separate
-  `BzlmodResolutionResult` wrapper. The session payload still carries exact
-  workspace identity so the legacy bridge can seed the named cell graph, but
-  the narrower injected values are still populated from the legacy resolver
-  output.
+  `BzlmodResolutionResult` wrapper. The session payload now carries workspace
+  identity only inside its named cell graph, and the narrower injected values
+  are still populated from the legacy resolver output.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.
@@ -1342,9 +1352,10 @@ using Rust DICE keys and values:
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
-   - Module-version/toolchain/platform consumers and current-workspace helpers
-     now derive workspace identity from the named cell graph, but their data
-     payloads are still injected from the legacy resolver.
+   - Module-version/toolchain/platform consumers, current-workspace helpers,
+     and the remaining session bridge now derive workspace identity from the
+     named cell graph, but their data payloads are still injected from the
+     legacy resolver.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.

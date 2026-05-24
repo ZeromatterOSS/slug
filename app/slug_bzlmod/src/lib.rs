@@ -266,7 +266,6 @@ pub struct RegisteredToolchain {
 /// cell parsing and DICE-owned bzlmod values.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodSessionData {
-    pub workspace_id: WorkspaceId,
     pub module_versions: HashMap<String, String>,
     pub registered_toolchains: Vec<RegisteredToolchain>,
     pub registered_execution_platforms: Vec<String>,
@@ -283,7 +282,6 @@ pub struct BzlmodSessionData {
 impl BzlmodSessionData {
     pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
         Self {
-            workspace_id: workspace_id.clone(),
             module_versions: HashMap::new(),
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),

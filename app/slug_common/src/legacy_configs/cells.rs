@@ -3785,7 +3785,7 @@ impl BuckConfigBasedCells {
         };
         let lockfile_repo_env_json = repo_env_json(&bzlmod_session_data.repo_env);
         let cell_graph = slug_bzlmod::BzlmodCellGraphValue {
-            workspace_id: bzlmod_session_data.workspace_id.clone(),
+            workspace_id: bzlmod_session_data.cell_graph.workspace_id.clone(),
             root_module_name: root_module_name.clone(),
             cells: Arc::new(
                 cells
@@ -4290,9 +4290,9 @@ mod tests {
         let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(PathBuf::from(
             "/tmp/slug-plan61-bundled-cell-graph-test",
         ));
-        let mut session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
+        let mut session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id.clone());
         session_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
-            workspace_id: session_data.workspace_id.clone(),
+            workspace_id,
             root_module_name: "root".to_owned(),
             cells: Arc::new(vec![slug_bzlmod::BzlmodCellGraphCell {
                 name: "bazel_tools".to_owned(),
