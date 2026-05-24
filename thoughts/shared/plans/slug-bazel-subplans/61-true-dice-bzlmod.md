@@ -564,6 +564,13 @@ Observed SDK result at the checkpoint:
   recompute bzlmod resolution instead of reusing the warm value. Validation
   passed with the two new guardrails (`2 passed, 81 deselected`) and the cached
   git/archive override module-input subset (`6 passed, 77 deselected`).
+  Mirror guardrails now cover cached `archive_override` parse failures and
+  cached `git_override` UTF-8 failures, and cached git/archive include-cycle
+  guardrails prove cyclic included module segments reject stale warm reuse and
+  repair recomputes resolution. Validation passed with the override failure
+  subset selected by `-k 'override_module_parse_failure or
+  override_module_utf8_failure or override_module_include_cycle'` (`6 passed,
+  86 deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
@@ -2081,14 +2088,17 @@ using Rust DICE keys and values:
      watched-input graph is still pending.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
      have same-daemon warm-reuse, edit-invalidation, and create/delete
-     transition guardrails.
+     transition guardrails. Both cached override source classes also have
+     parse-error, UTF-8-error, and include-cycle guardrails.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes. Repository materialization
      marker/layout/recorded-input reads are now child DICE nodes, but those
      children still poll until the tracked filesystem API is available below
      `slug_common`.
    - Include create/delete transitions, parse failures, include cycles, and
-     UTF-8 failures for every module source class.
+     UTF-8 failures for every module source class. Cached git/archive override
+     coverage now includes create/delete, parse/UTF-8 failures, and include
+     cycles; remaining source classes still need full matrix coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
