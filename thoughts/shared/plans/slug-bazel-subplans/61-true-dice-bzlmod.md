@@ -1610,6 +1610,13 @@ What did not work or remains risky:
   `cargo check -p slug_core -p slug_external_cells -p slug_server`,
   `cargo build -p slug`, and focused Plan 61 Python guardrail
   `lockfile_replay_recorded_repo_mapping_from_extension_repo_source`.
+- Extension execution now registers captured generated repos on the active
+  `CellResolver` with a full `ExtensionRepoCellSetup` instead of publishing
+  only canonical names into the process-global dynamic registry. Validation
+  passed with `cargo check -p slug_interpreter_for_build -p slug_core -p
+  slug_server`, `cargo build -p slug`, and focused Plan 61 Python guardrails
+  `missing_lockfile_extension_executes_once_then_reuses_dice_state` plus
+  `lockfile_replay_recorded_repo_mapping_from_extension_repo_source`.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
@@ -1838,9 +1845,10 @@ using Rust DICE keys and values:
    - Runtime file-ops spoke lookup now uses the injected bzlmod workspace
      identity instead of deriving one from the project root, and sibling spokes
      discovered from the current DICE spoke value are registered on the active
-     resolver instead of the process-global dynamic registry. Startup and
-     alias compatibility registration still use process-global transitional
-     plumbing.
+     resolver instead of the process-global dynamic registry. Extension
+     execution also registers captured generated repos on the active resolver.
+     Startup and alias compatibility registration still use process-global
+     transitional plumbing.
    - Extension repo execution/materialization keys now preserve the workspace
   identity and output base, but generated repo cell graph ownership and
   final materialization state are still not fully DICE-owned.

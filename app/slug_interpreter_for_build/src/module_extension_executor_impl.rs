@@ -401,7 +401,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
             .with_temp_working_dir(working_dir.clone())
             .with_label_resolution(project_root.clone(), cell_paths)
             .with_facts(prior_facts)
-            .with_repo_env(repo_env);
+            .with_repo_env(repo_env.clone());
 
         tracing::debug!(
             "Built module_ctx with {} module(s), working_dir: {:?}",
@@ -462,13 +462,31 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
             // what `pending_repo_cells.rs` registers for the same repo.
             let owning_module =
                 slug_bzlmod::extract_owning_module(&aggregated.extension_id, root_module_name);
+            let repo_env_json =
+                serde_json::to_string(repo_env.as_ref()).unwrap_or_else(|_| "{}".to_owned());
 
-            for internal_name in specs.keys() {
+            for (internal_name, spec) in &specs {
                 let canonical = format!("{}+{}+{}", owning_module, ext_name, internal_name);
-                slug_core::cells::register_dynamic_extension_cell(
-                    canonical.clone(),
-                    format!("bazel-external/{}", canonical),
-                );
+                let repo_spec_json = serde_json::to_string(spec).buck_error_context(format!(
+                    "Serializing repo spec for generated repo '{}'",
+                    canonical
+                ))?;
+                let setup = slug_core::cells::external::ExtensionRepoCellSetup {
+                    canonical_name: Arc::from(canonical.as_str()),
+                    extension_id: Arc::from(aggregated.extension_id.as_str()),
+                    internal_name: Arc::from(internal_name.as_str()),
+                    spec_hash: Arc::from(
+                        slug_bzlmod::repo_execution_spec_hash(spec, repo_env.as_ref()).as_str(),
+                    ),
+                    repo_spec_json: Arc::from(repo_spec_json.as_str()),
+                    repo_env_json: Arc::from(repo_env_json.as_str()),
+                    materialized: false,
+                };
+                cell_resolver.register_bzlmod_runtime_extension_cell(
+                    &canonical,
+                    &format!("bazel-external/{}", canonical),
+                    setup,
+                )?;
             }
         }
 
