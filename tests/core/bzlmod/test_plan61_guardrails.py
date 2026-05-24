@@ -1565,6 +1565,61 @@ single_version_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_archive_override_patches_fail_until_supported(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: archive_override patches affect final RepoSpec materialization."""
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_archive_patches_unsupported")
+bazel_dep(name = "dep", version = "1.0.0")
+archive_override(
+    module_name = "dep",
+    urls = ["file:///does/not/matter.tar.gz"],
+    patches = ["//:fix.patch"],
+)
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    _write(buck.cwd / "fix.patch", "")
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "archive_override(patches = ...)" in str(exc.value)
+    assert "MODULE.bazel discovery" in str(exc.value)
+    assert "repository materialization" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_git_override_patches_fail_until_supported(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: git_override patches affect final RepoSpec materialization."""
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_git_patches_unsupported")
+bazel_dep(name = "dep", version = "1.0.0")
+git_override(
+    module_name = "dep",
+    remote = "file:///does/not/matter.git",
+    commit = "0000000000000000000000000000000000000000",
+    patches = ["//:fix.patch"],
+)
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    _write(buck.cwd / "fix.patch", "")
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "git_override(patches = ...)" in str(exc.value)
+    assert "MODULE.bazel discovery" in str(exc.value)
+    assert "repository materialization" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_two_workspaces_do_not_share_bzlmod_state(
     buck: Buck,
 ) -> None:

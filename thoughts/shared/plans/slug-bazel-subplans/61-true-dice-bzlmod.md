@@ -269,9 +269,10 @@ Observed SDK result at the checkpoint:
   and appends the same patches to the final repo spec; non-registry
   `archive_override`/`git_override` patches also affect repository
   materialization. Slug now fails loudly when override `patches = [...]` are
-  present instead of silently ignoring part of Bazel's behavior. Full support
-  still needs DICE-tracked patch-file inputs plus repository materialization
-  patch identity.
+  present instead of silently ignoring part of Bazel's behavior. Focused Plan
+  61 guardrails cover `single_version_override`, `archive_override`, and
+  `git_override` patch rejection. Full support still needs DICE-tracked
+  patch-file inputs plus repository materialization patch identity.
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
