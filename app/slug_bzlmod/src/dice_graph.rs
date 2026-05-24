@@ -599,7 +599,7 @@ pub struct BzlmodModuleVersionsInvalidation {
     pub repo_mapping_overrides: crate::RepoMappingOverrides,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodResolutionFactsValue {
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,

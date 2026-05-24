@@ -3192,9 +3192,10 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
-            bzlmod_session_data.registry_file_hashes = resolved_graph.registry_file_hashes.clone();
-            bzlmod_session_data.selected_yanked_versions =
-                resolved_graph.selected_yanked_versions.clone();
+            bzlmod_session_data.resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue {
+                registry_file_hashes: resolved_graph.registry_file_hashes.clone(),
+                selected_yanked_versions: resolved_graph.selected_yanked_versions.clone(),
+            };
 
             // Build a set of local override names to skip
             let local_override_names: std::collections::HashSet<_> = active_overrides

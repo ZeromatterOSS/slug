@@ -272,8 +272,7 @@ pub struct BzlmodSessionData {
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
     pub lockfile_inputs: BzlmodLockfileInputsValue,
     pub repo_env: BTreeMap<String, String>,
-    pub registry_file_hashes: indexmap::IndexMap<String, String>,
-    pub selected_yanked_versions: indexmap::IndexMap<String, String>,
+    pub resolution_facts: BzlmodResolutionFactsValue,
     pub repo_mappings: RepoMappingSnapshot,
     pub repo_mapping_overrides: RepoMappingOverrides,
     pub cell_graph: BzlmodCellGraphValue,
@@ -288,8 +287,7 @@ impl BzlmodSessionData {
             extension_aggregations: HashMap::new(),
             lockfile_inputs: BzlmodLockfileInputsValue::default(),
             repo_env: BTreeMap::new(),
-            registry_file_hashes: indexmap::IndexMap::new(),
-            selected_yanked_versions: indexmap::IndexMap::new(),
+            resolution_facts: BzlmodResolutionFactsValue::default(),
             repo_mappings: RepoMappingSnapshot::new(),
             repo_mapping_overrides: RepoMappingOverrides::new(),
             cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
@@ -320,10 +318,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             module_versions: Arc::new(data.module_versions.clone()),
         });
-        let resolution_facts = Arc::new(BzlmodResolutionFactsValue {
-            registry_file_hashes: data.registry_file_hashes.clone(),
-            selected_yanked_versions: data.selected_yanked_versions.clone(),
-        });
+        let resolution_facts = Arc::new(data.resolution_facts.clone());
         let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
             repo_mappings: Arc::new(data.repo_mappings.clone()),
             repo_mapping_overrides: Arc::new(data.repo_mapping_overrides.clone()),
@@ -478,11 +473,12 @@ mod tests {
         );
         data.repo_env
             .insert("TOKEN".to_owned(), "from-session".to_owned());
-        data.registry_file_hashes.insert(
+        data.resolution_facts.registry_file_hashes.insert(
             "registry/modules/dep/1.0/MODULE.bazel".to_owned(),
             "sha256-registry".to_owned(),
         );
-        data.selected_yanked_versions
+        data.resolution_facts
+            .selected_yanked_versions
             .insert("dep@1.0".to_owned(), "allowed by flag".to_owned());
 
         let dice = dice::testing::DiceBuilder::new()
