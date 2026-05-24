@@ -239,6 +239,16 @@ pub struct LockfileContentValue {
     pub lockfile: Option<Arc<Lockfile>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodLockfileInputsValue {
+    pub hidden_lockfile_path: Option<PathBuf>,
+    pub visible_lockfile_digest: Option<String>,
+    pub hidden_lockfile_digest: Option<String>,
+    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
+    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
+    pub lockfile_mode: crate::LockfileMode,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 pub struct LockfileExtensionEntryKey {
     pub workspace_id: WorkspaceId,
@@ -471,12 +481,7 @@ pub struct ModuleVersionsValue {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsInvalidation {
     pub root_module_name: String,
-    pub hidden_lockfile_path: Option<PathBuf>,
-    pub visible_lockfile_digest: Option<String>,
-    pub hidden_lockfile_digest: Option<String>,
-    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
-    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
-    pub lockfile_mode: crate::LockfileMode,
+    pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
     pub repo_env: BTreeMap<String, String>,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
@@ -516,12 +521,7 @@ pub struct BzlmodExtensionAggregationValue {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionReplayDataValue {
     pub workspace_id: WorkspaceId,
-    pub hidden_lockfile_path: Option<PathBuf>,
-    pub visible_lockfile_digest: Option<String>,
-    pub hidden_lockfile_digest: Option<String>,
-    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
-    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
-    pub lockfile_mode: crate::LockfileMode,
+    pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
     pub repo_env: Arc<BTreeMap<String, String>>,
 }
 
@@ -1398,12 +1398,14 @@ mod tests {
     ) -> Arc<BzlmodModuleVersionsInvalidation> {
         Arc::new(BzlmodModuleVersionsInvalidation {
             root_module_name: "root".to_owned(),
-            hidden_lockfile_path: None,
-            visible_lockfile_digest: None,
-            hidden_lockfile_digest: hidden_lockfile_digest.map(str::to_owned),
-            visible_lockfile: None,
-            hidden_lockfile: None,
-            lockfile_mode: crate::LockfileMode::Update,
+            lockfile_inputs: Arc::new(BzlmodLockfileInputsValue {
+                hidden_lockfile_path: None,
+                visible_lockfile_digest: None,
+                hidden_lockfile_digest: hidden_lockfile_digest.map(str::to_owned),
+                visible_lockfile: None,
+                hidden_lockfile: None,
+                lockfile_mode: crate::LockfileMode::Update,
+            }),
             repo_env: BTreeMap::new(),
             registry_file_hashes: indexmap::IndexMap::new(),
             selected_yanked_versions: indexmap::IndexMap::new(),

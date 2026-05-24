@@ -82,6 +82,7 @@ fn create_extension_execution_key_from_aggregation(
     repo_mappings: &BzlmodRepoMappingsDataValue,
     bzl_transitive_digest: Arc<str>,
 ) -> ModuleExtensionExecutionKey {
+    let lockfile_inputs = replay_data.lockfile_inputs.as_ref();
     ModuleExtensionExecutionKey::new_with_tracked_lockfiles_and_bzl_digest(
         aggregation.aggregated.as_ref().clone(),
         aggregation.root_module_name.to_string(),
@@ -90,12 +91,12 @@ fn create_extension_execution_key_from_aggregation(
             .canonical_project_root
             .as_ref()
             .clone(),
-        replay_data.hidden_lockfile_path.clone(),
-        replay_data.visible_lockfile_digest.clone(),
-        replay_data.hidden_lockfile_digest.clone(),
-        replay_data.visible_lockfile.clone(),
-        replay_data.hidden_lockfile.clone(),
-        replay_data.lockfile_mode,
+        lockfile_inputs.hidden_lockfile_path.clone(),
+        lockfile_inputs.visible_lockfile_digest.clone(),
+        lockfile_inputs.hidden_lockfile_digest.clone(),
+        lockfile_inputs.visible_lockfile.clone(),
+        lockfile_inputs.hidden_lockfile.clone(),
+        lockfile_inputs.lockfile_mode,
         replay_data.repo_env.as_ref().clone(),
         repo_mappings.repo_mappings.as_ref().clone(),
         repo_mappings.repo_mapping_overrides.as_ref().clone(),
@@ -2317,6 +2318,7 @@ mod tests {
     fn extension_execution_key_from_aggregation_uses_replay_data() {
         use crate::BzlmodExtensionAggregationsDataValue;
         use crate::BzlmodExtensionReplayDataValue;
+        use crate::BzlmodLockfileInputsValue;
         use crate::BzlmodRepoMappingsDataValue;
         use crate::WorkspaceId;
         use crate::extensions::AggregatedExtension;
@@ -2339,12 +2341,14 @@ mod tests {
             .insert(extension_id.clone(), aggregated);
         let replay_data = BzlmodExtensionReplayDataValue {
             workspace_id: workspace_id.clone(),
-            hidden_lockfile_path: Some(hidden_lockfile_path.clone()),
-            visible_lockfile_digest: Some("visible-digest".to_owned()),
-            hidden_lockfile_digest: Some("hidden-digest".to_owned()),
-            visible_lockfile: None,
-            hidden_lockfile: None,
-            lockfile_mode: LockfileMode::Error,
+            lockfile_inputs: Arc::new(BzlmodLockfileInputsValue {
+                hidden_lockfile_path: Some(hidden_lockfile_path.clone()),
+                visible_lockfile_digest: Some("visible-digest".to_owned()),
+                hidden_lockfile_digest: Some("hidden-digest".to_owned()),
+                visible_lockfile: None,
+                hidden_lockfile: None,
+                lockfile_mode: LockfileMode::Error,
+            }),
             repo_env: Arc::new(repo_env.clone()),
         };
         let repo_mappings = BzlmodRepoMappingsDataValue {

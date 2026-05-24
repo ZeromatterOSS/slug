@@ -79,6 +79,7 @@ pub use dice_graph::BzlmodExtensionAggregationsDataKey;
 pub use dice_graph::BzlmodExtensionAggregationsDataValue;
 pub use dice_graph::BzlmodExtensionReplayDataKey;
 pub use dice_graph::BzlmodExtensionReplayDataValue;
+pub use dice_graph::BzlmodLockfileInputsValue;
 pub use dice_graph::BzlmodModuleVersionsDataKey;
 pub use dice_graph::BzlmodModuleVersionsDataValue;
 pub use dice_graph::BzlmodModuleVersionsInvalidation;
@@ -308,19 +309,20 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let workspace_id = data.workspace_id.clone();
         let root_module_name = data.cell_graph.root_module_name.clone();
-        let visible_lockfile_digest = lockfile_content_digest(&data.visible_lockfile);
-        let hidden_lockfile_digest = lockfile_content_digest(&data.hidden_lockfile);
+        let lockfile_inputs = Arc::new(BzlmodLockfileInputsValue {
+            hidden_lockfile_path: data.hidden_lockfile_path.clone(),
+            visible_lockfile_digest: lockfile_content_digest(&data.visible_lockfile),
+            hidden_lockfile_digest: lockfile_content_digest(&data.hidden_lockfile),
+            visible_lockfile: data.visible_lockfile.clone(),
+            hidden_lockfile: data.hidden_lockfile.clone(),
+            lockfile_mode: data.lockfile_mode,
+        });
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
             invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
                 root_module_name: root_module_name.clone(),
-                hidden_lockfile_path: data.hidden_lockfile_path.clone(),
-                visible_lockfile_digest: visible_lockfile_digest.clone(),
-                hidden_lockfile_digest: hidden_lockfile_digest.clone(),
-                visible_lockfile: data.visible_lockfile.clone(),
-                hidden_lockfile: data.hidden_lockfile.clone(),
-                lockfile_mode: data.lockfile_mode,
+                lockfile_inputs: lockfile_inputs.clone(),
                 repo_env: data.repo_env.clone(),
                 registry_file_hashes: data.registry_file_hashes.clone(),
                 selected_yanked_versions: data.selected_yanked_versions.clone(),
@@ -335,12 +337,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         });
         let extension_replay_data = Arc::new(BzlmodExtensionReplayDataValue {
             workspace_id: workspace_id.clone(),
-            hidden_lockfile_path: data.hidden_lockfile_path.clone(),
-            visible_lockfile_digest,
-            hidden_lockfile_digest,
-            visible_lockfile: data.visible_lockfile.clone(),
-            hidden_lockfile: data.hidden_lockfile.clone(),
-            lockfile_mode: data.lockfile_mode,
+            lockfile_inputs,
             repo_env: Arc::new(data.repo_env.clone()),
         });
         let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
@@ -498,11 +495,17 @@ mod tests {
 
         let replay_data = dice.compute(&BzlmodExtensionReplayDataKey).await?;
         assert_eq!(
-            replay_data.visible_lockfile_digest.as_deref(),
+            replay_data
+                .lockfile_inputs
+                .visible_lockfile_digest
+                .as_deref(),
             Some("visible-digest")
         );
         assert_eq!(
-            replay_data.hidden_lockfile_digest.as_deref(),
+            replay_data
+                .lockfile_inputs
+                .hidden_lockfile_digest
+                .as_deref(),
             Some("hidden-digest")
         );
 
@@ -510,6 +513,7 @@ mod tests {
         assert_eq!(
             module_versions
                 .invalidation
+                .lockfile_inputs
                 .visible_lockfile_digest
                 .as_deref(),
             Some("visible-digest")
@@ -517,6 +521,7 @@ mod tests {
         assert_eq!(
             module_versions
                 .invalidation
+                .lockfile_inputs
                 .hidden_lockfile_digest
                 .as_deref(),
             Some("hidden-digest")

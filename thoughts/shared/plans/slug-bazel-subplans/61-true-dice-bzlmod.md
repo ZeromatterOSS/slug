@@ -958,6 +958,18 @@ Observed SDK result at the checkpoint:
   -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
   subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
   --check`, and `git diff --check`.
+- Lockfile replay identity now has a named `BzlmodLockfileInputsValue` shared
+  by extension replay data and module-version invalidation instead of
+  repeating the visible/hidden lockfile path, digest, parsed value, and mode
+  fields in both projections. `ModuleExtensionExecutionKey` still keeps its
+  explicit hashed lockfile identity, but that identity is now formed from the
+  shared lockfile-input bundle. Validation passed with `cargo check -p
+  slug_bzlmod -p slug_common`, focused `slug_bzlmod` tests for session
+  injection, extension execution-key construction, and module-version equality,
+  full `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
+  replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
+  --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
