@@ -237,19 +237,6 @@ fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
     (String::new(), String::new())
 }
 
-fn canonical_repo_name_for_label_context(
-    eval: &Evaluator<'_, '_, '_>,
-    apparent_repo_name: &str,
-) -> String {
-    let alias_resolver = BuildContext::from_context(eval)
-        .ok()
-        .map(|build_ctx| build_ctx.cell_info().cell_alias_resolver().dupe());
-    canonical_repo_name_for_label_context_with_alias_resolver(
-        apparent_repo_name,
-        alias_resolver.as_ref(),
-    )
-}
-
 fn canonical_repo_name_for_label_context_with_alias_resolver(
     apparent_repo_name: &str,
     alias_resolver: Option<&slug_core::cells::CellAliasResolver>,
@@ -301,6 +288,44 @@ fn scoped_canonical_repo_name_for_label_context(
     file_cell: &str,
     apparent_repo_name: &str,
 ) -> String {
+    let alias_resolver = BuildContext::from_context(eval)
+        .ok()
+        .map(|build_ctx| build_ctx.cell_info().cell_alias_resolver().dupe());
+    scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+        file_cell,
+        apparent_repo_name,
+        alias_resolver.as_ref(),
+    )
+}
+
+fn scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+    file_cell: &str,
+    apparent_repo_name: &str,
+    alias_resolver: Option<&slug_core::cells::CellAliasResolver>,
+) -> String {
+    if let Some(alias_resolver) = alias_resolver {
+        if let Ok(file_cell_name) = slug_core::cells::name::CellName::unchecked_new(file_cell)
+            && let Ok(owner_aliases) = slug_core::cells::CellAliasResolver::new_for_non_root_cell(
+                file_cell_name,
+                alias_resolver,
+                std::iter::empty::<(
+                    slug_core::cells::alias::NonEmptyCellAlias,
+                    slug_core::cells::alias::NonEmptyCellAlias,
+                )>(),
+            )
+            && let Some(canonical_name) =
+                owner_aliases.resolve_declared_or_runtime_alias(apparent_repo_name)
+        {
+            return canonical_name.as_str().to_owned();
+        }
+        if alias_resolver.has_bzlmod_runtime_alias_snapshot() {
+            return canonical_repo_name_for_label_context_with_alias_resolver(
+                apparent_repo_name,
+                Some(alias_resolver),
+            );
+        }
+    }
+
     if let Some(canonical_name) =
         slug_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
             file_cell,
@@ -310,7 +335,7 @@ fn scoped_canonical_repo_name_for_label_context(
         return canonical_name;
     }
 
-    canonical_repo_name_for_label_context(eval, apparent_repo_name)
+    canonical_repo_name_for_label_context_with_alias_resolver(apparent_repo_name, alias_resolver)
 }
 
 /// Register Bazel-specific module-level globals.
@@ -1031,12 +1056,14 @@ mod tests {
 
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::BzlmodRuntimeScopedRepoAlias;
     use slug_core::cells::CellAliasResolver;
     use slug_core::cells::name::CellName;
 
     use super::canonical_repo_name_for_label_context_with_alias_resolver;
     use super::extract_cell_and_package_from_filename;
     use super::lexical_current_repo_name_for_label_context;
+    use super::scoped_canonical_repo_name_for_label_context_with_alias_resolver;
 
     #[test]
     fn label_context_for_bzlmod_module_strips_version_suffix() {
@@ -1139,6 +1166,84 @@ mod tests {
         );
         assert_eq!(
             canonical_repo_name_for_label_context_with_alias_resolver(apparent, None),
+            wrong_global
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn label_context_scoped_repo_prefers_runtime_aliases_before_globals() -> slug_error::Result<()>
+    {
+        let apparent = "label_ctx_scoped_alias";
+        let file_cell = "label_ctx_owner++ext+caller";
+        let canonical = "label_ctx_owner++ext+generated";
+        let wrong_global = "label_ctx_wrong_owner++ext+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
+                owner_module: "label_ctx_owner+".to_owned(),
+                apparent_name: apparent.to_owned(),
+                target_name: canonical.to_owned(),
+            }],
+            dynamic_aliases: Vec::new(),
+        };
+        slug_core::cells::register_scoped_bzlmod_repo_alias(
+            "label_ctx_owner+".to_owned(),
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(
+            scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+                file_cell,
+                apparent,
+                Some(&resolver)
+            ),
+            canonical
+        );
+        assert_eq!(
+            scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+                file_cell, apparent, None
+            ),
+            wrong_global
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn label_context_scoped_repo_runtime_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let apparent = "label_ctx_scoped_runtime_miss";
+        let file_cell = "label_ctx_owner++ext+caller_miss";
+        let wrong_global = "label_ctx_wrong_owner++ext+scoped_miss";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        slug_core::cells::register_scoped_bzlmod_repo_alias(
+            "label_ctx_owner+".to_owned(),
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(
+            scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+                file_cell,
+                apparent,
+                Some(&resolver)
+            ),
+            apparent
+        );
+        assert_eq!(
+            scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+                file_cell, apparent, None
+            ),
             wrong_global
         );
         Ok(())
