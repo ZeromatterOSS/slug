@@ -1784,6 +1784,8 @@ fn resolve_impl_label_repo_name(
     repo_name: &str,
     cell_resolver: Option<&slug_core::cells::CellResolver>,
 ) -> String {
+    let resolver_has_runtime_snapshot =
+        cell_resolver.is_some_and(cell_resolver_has_runtime_alias_snapshot);
     if let Some(cell_resolver) = cell_resolver {
         if let Some(resolved_cell) = cell_resolver
             .root_cell_cell_alias_resolver()
@@ -1795,7 +1797,9 @@ fn resolve_impl_label_repo_name(
                 .unwrap_or_else(|_| resolved_cell.as_str().to_owned());
         }
     }
-    slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name)
+    (!resolver_has_runtime_snapshot)
+        .then(|| slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name))
+        .flatten()
         .unwrap_or_else(|| repo_name.to_owned())
 }
 
@@ -2300,6 +2304,9 @@ impl<'a> MetadataLabelContext<'a> {
     }
 
     fn canonical_dynamic_extension_cell_name(&self, cell_name: &str) -> Option<String> {
+        let resolver_has_runtime_snapshot = self
+            .cell_resolver
+            .is_some_and(|cell_resolver| cell_resolver_has_runtime_alias_snapshot(cell_resolver));
         self.cell_resolver
             .and_then(|cell_resolver| {
                 cell_resolver
@@ -2312,14 +2319,35 @@ impl<'a> MetadataLabelContext<'a> {
                             .unwrap_or_else(|_| resolved.as_str().to_owned())
                     })
             })
-            .or_else(|| slug_core::cells::canonical_dynamic_extension_cell_name(cell_name))
+            .or_else(|| {
+                (!resolver_has_runtime_snapshot)
+                    .then(|| slug_core::cells::canonical_dynamic_extension_cell_name(cell_name))
+                    .flatten()
+            })
     }
 
     fn external_cell_name(&self, cell_name: &str) -> String {
         self.canonical_dynamic_extension_cell_name(cell_name)
-            .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
+            .or_else(|| {
+                (!self.has_runtime_alias_snapshot())
+                    .then(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
+                    .flatten()
+            })
             .unwrap_or_else(|| cell_name.to_owned())
     }
+
+    fn has_runtime_alias_snapshot(&self) -> bool {
+        self.cell_resolver
+            .is_some_and(|cell_resolver| cell_resolver_has_runtime_alias_snapshot(cell_resolver))
+    }
+}
+
+fn cell_resolver_has_runtime_alias_snapshot(
+    cell_resolver: &slug_core::cells::CellResolver,
+) -> bool {
+    cell_resolver
+        .root_cell_cell_alias_resolver()
+        .has_bzlmod_runtime_alias_snapshot()
 }
 
 fn metadata_canonicalize_target_label(
@@ -5323,6 +5351,29 @@ mod tests {
         .unwrap()
     }
 
+    fn test_bzlmod_cell_resolver(
+        snapshot: BzlmodRuntimeCellInstallSnapshot,
+    ) -> slug_error::Result<CellResolver> {
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )
+    }
+
     #[test]
     fn metadata_select_matches_llvm_runtime_stage_build_setting() {
         let cfg =
@@ -5636,6 +5687,35 @@ mod tests {
     }
 
     #[test]
+    fn metadata_paths_runtime_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let apparent = "plan61_metadata_unowned_alias";
+        let wrong_global = "plan61_wrong_owner++metadata+unowned";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+        let resolver = test_bzlmod_cell_resolver(BzlmodRuntimeCellInstallSnapshot::default())?;
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let label = TargetLabel::testing_parse(&format!("@{apparent}//pkg:lib"));
+        let path =
+            metadata_path_for_label(&label, &cfg, MetadataLabelContext::new(Some(&resolver)));
+        assert!(path.contains(&format!("external/{apparent}/pkg/lib")));
+
+        let legacy_path = metadata_path_for_label(&label, &cfg, MetadataLabelContext::empty());
+        assert!(legacy_path.contains(&format!("external/{wrong_global}/pkg/lib")));
+        Ok(())
+    }
+
+    #[test]
     fn metadata_expands_rules_cc_link_action_set_labels() {
         let actions =
             metadata_expand_rules_cc_action_name("@rules_cc//cc/toolchains/actions:link_actions")
@@ -5891,6 +5971,43 @@ mod tests {
         )
         .unwrap();
         assert_eq!(label.pkg().cell_name(), CellName::testing_new(canonical));
+        assert_eq!(label.pkg().cell_relative_path().as_str(), "pkg");
+        assert_eq!(label.name().as_str(), "impl");
+
+        let legacy_label =
+            parse_impl_label_to_target_label(&format!("@{apparent}//pkg:impl")).unwrap();
+        assert_eq!(
+            legacy_label.pkg().cell_name(),
+            CellName::testing_new(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_impl_label_to_target_label_runtime_miss_ignores_global_alias() -> slug_error::Result<()>
+    {
+        let apparent = "plan61_impl_unowned_alias";
+        let wrong_global = "plan61_wrong_owner++impls+unowned";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+        let resolver = test_bzlmod_cell_resolver(BzlmodRuntimeCellInstallSnapshot::default())?;
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+
+        let label = parse_impl_label_to_target_label_with_cell_resolver(
+            &format!("@{apparent}//pkg:impl"),
+            Some(&resolver),
+        )
+        .unwrap();
+        assert_eq!(label.pkg().cell_name(), CellName::testing_new(apparent));
         assert_eq!(label.pkg().cell_relative_path().as_str(), "pkg");
         assert_eq!(label.name().as_str(), "impl");
 

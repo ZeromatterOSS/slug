@@ -1950,6 +1950,14 @@ What did not work or remains risky:
   --nocapture` (`3 passed` after the config-setting normalization guardrail),
   `cargo check -p slug_core -p slug_analysis -p slug_configured`, `cargo build
   -p slug`, `cargo fmt --check`, and `git diff --check`.
+- Metadata path canonicalization and toolchain implementation label parsing now
+  also treat a resolver with a bzlmod runtime snapshot as authoritative on
+  misses, so stale process-global dynamic aliases cannot fill an unowned repo
+  spelling once the analysis caller has passed a runtime snapshot. Validation
+  passed with `cargo test -p slug_analysis metadata_paths_ -- --nocapture` (`2
+  passed`) and `cargo test -p slug_analysis parse_impl_label_to_target_label --
+  --nocapture` (`3 passed`), `cargo check -p slug_analysis`, `cargo fmt
+  --check`, and `git diff --check`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
