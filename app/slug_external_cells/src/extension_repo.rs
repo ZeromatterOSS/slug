@@ -730,13 +730,6 @@ pub(crate) async fn get_file_ops_delegate(
         );
     let is_stale_foreign_symlink = marker_contents.as_deref().is_some_and(is_complete_marker)
         && repo_has_foreign_top_level_symlink(&source_path, &project_root_path);
-    let is_stale_invalid_layout = !setup.repo_spec_json.is_empty()
-        && marker_contents.as_deref().is_some_and(is_complete_marker)
-        && repo_spec_layout_is_invalid(
-            &setup.repo_spec_json,
-            setup.canonical_name.as_ref(),
-            &source_path,
-        );
     let is_stale_recorded_inputs = should_precheck_recorded_inputs(
         &setup.repo_spec_json,
         marker_contents.as_deref(),
@@ -749,7 +742,6 @@ pub(crate) async fn get_file_ops_delegate(
         || is_stale_spec_unknown_complete
         || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
         || is_stale_foreign_symlink
-        || is_stale_invalid_layout
         || is_stale_recorded_inputs
     {
         tracing::info!(
@@ -1053,20 +1045,6 @@ pub(crate) async fn get_file_ops_delegate(
         source_path,
         digest_config,
     )))
-}
-
-fn repo_spec_layout_is_invalid(
-    repo_spec_json: &str,
-    canonical_name: &str,
-    source_path: &Path,
-) -> bool {
-    let Ok(repo_spec) = serde_json::from_str::<RepoSpec>(repo_spec_json) else {
-        return false;
-    };
-    let Ok(invocation) = slug_bzlmod::repo_spec_to_invocation(canonical_name, &repo_spec) else {
-        return false;
-    };
-    !slug_bzlmod::repo_layout_is_valid_for_invocation(&invocation, source_path)
 }
 
 fn should_precheck_recorded_inputs(

@@ -135,6 +135,17 @@ Observed SDK result at the checkpoint:
   known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
   `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
   `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
+- Known repo-spec extension file-ops no longer performs its own
+  `repo_spec_layout_is_invalid` probe before repository execution; the
+  existing `RepoMaterializationManifestKey` layout child is now the single
+  owner for those layout-validity misses. Validation passed with focused
+  `cargo test -p slug_external_cells
+  known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  materialization_manifest_layout_rejects_missing_declared_build_file
+  -- --nocapture`, `cargo check -p slug_bzlmod -p slug_external_cells -p
+  slug_server`, `cargo build -p slug`, `cargo fmt --check`, and
+  `git diff --check`.
 - Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
   extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
   when the hidden facts are created with the expected value, fails after an
@@ -1409,8 +1420,8 @@ What worked:
   current materialized tree before the DICE repository execution path or the
   external-cell marker gate accepts them. Known repo-spec extension file-ops
   now lets the repository execution manifest own recorded-input staleness
-  and missing declared BUILD-file checks instead of deleting from a pre-DICE
-  check.
+  and layout validity, including missing declared BUILD-file checks, instead of
+  deleting from a pre-DICE check.
 - The process-global legacy bzlmod resolution bridge cache was removed from
   the persisted config load path. Warm no-op reuse now has to come from the
   DICE key path rather than `LEGACY_BZLMOD_RESOLUTION_CACHE`; focused warm
@@ -1770,8 +1781,9 @@ using Rust DICE keys and values:
      value has DICE child state for marker/layout/recorded-input checks, but
      does not yet own the full repository output-tree identity. Known repo-spec
      extension file-ops now delegates recorded-input staleness and missing
-     declared BUILD-file checks to this manifest path, but the no-spec fallback
-     and other legacy stale-layout checks still contain direct file-ops reads.
+     declared BUILD-file checks to this manifest path, and no longer performs a
+     duplicate direct layout-validity probe. The no-spec fallback and other
+     legacy stale-layout checks still contain direct file-ops reads.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 
