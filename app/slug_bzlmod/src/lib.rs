@@ -65,6 +65,7 @@ pub use dice_graph::BzlmodCellGraphDataKey;
 pub use dice_graph::BzlmodCellGraphDynamicAlias;
 pub use dice_graph::BzlmodCellGraphExtensionCell;
 pub use dice_graph::BzlmodCellGraphKey;
+pub use dice_graph::BzlmodCellGraphModuleSetup;
 pub use dice_graph::BzlmodCellGraphModuleSymlink;
 pub use dice_graph::BzlmodCellGraphScopedAlias;
 pub use dice_graph::BzlmodCellGraphValue;
@@ -422,6 +423,7 @@ mod tests {
             cells: Arc::new(vec![BzlmodCellGraphCell {
                 name: "root_mod".to_owned(),
                 path: String::new(),
+                module_setup: None,
             }]),
             extension_cells: Arc::new(Vec::new()),
             root_aliases: Arc::new(vec![BzlmodCellGraphAlias {

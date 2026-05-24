@@ -122,6 +122,23 @@ fn runtime_extension_setup_from_cell_graph(
     }
 }
 
+fn module_setup_from_cell_graph(
+    cell: &slug_bzlmod::BzlmodCellGraphCell,
+) -> Option<BzlmodCellSetup> {
+    cell.module_setup.as_ref().map(|setup| BzlmodCellSetup {
+        module_name: Arc::from(setup.module_name.as_str()),
+        version: Arc::from(setup.version.as_str()),
+        registry_url: Arc::from(setup.registry_url.as_str()),
+        source_path: Arc::from(setup.source_path.as_str()),
+    })
+}
+
+fn cell_root_path_from_cell_graph(path: &str) -> slug_error::Result<CellRootPathBuf> {
+    Ok(CellRootPathBuf::new(
+        ProjectRelativePath::new(path)?.to_owned(),
+    ))
+}
+
 fn runtime_cell_install_snapshot(
     cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
 ) -> slug_core::cells::BzlmodRuntimeCellInstallSnapshot {
@@ -442,18 +459,6 @@ pub struct BuckConfigBasedCells {
 /// Result of bzlmod dependency resolution.
 #[derive(Clone, PartialEq, Eq, Allocative)]
 struct BzlmodResolutionResult {
-    /// Root module name from MODULE.bazel `module(name = "...")`.
-    /// Used as the root cell name (falls back to `_main` if empty).
-    root_module_name: String,
-    /// Cells to register: (name, path, optional setup for remote modules)
-    cells: Vec<(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)>,
-    /// Extension-generated cells: (name, path, setup for extension repos)
-    /// These are created by module extensions (e.g., pip.parse(), go_deps)
-    /// and are populated from lockfile cache during resolution.
-    extension_cells: Vec<(CellName, CellRootPathBuf, ExtensionRepoCellSetup)>,
-    /// Cell aliases to register: (alias_name, target_cell_name)
-    /// These come from repo_name parameters in bazel_dep()
-    aliases: Vec<(NonEmptyCellAlias, CellName)>,
     /// DICE-injected bzlmod facts derived from this resolution.
     session_data: slug_bzlmod::BzlmodSessionData,
 }
@@ -2820,36 +2825,48 @@ impl BuckConfigBasedCells {
                 bzlmod_result.replay_runtime_state(project_fs);
             }
             has_module_bazel = true;
-            bzlmod_session_data = bzlmod_result.session_data;
+            let session_data = bzlmod_result.session_data;
+            let cell_graph = &session_data.cell_graph;
 
             // Root cell comes from MODULE.bazel module(name = "...")
-            let root_cell_name = CellName::unchecked_new(&bzlmod_result.root_module_name)?;
+            let root_cell_name = CellName::unchecked_new(&cell_graph.root_module_name)?;
             cell_definitions.push((root_cell_name, root_path.clone()));
             tracing::info!(
                 "Root cell '{}' defined from MODULE.bazel",
-                bzlmod_result.root_module_name
+                cell_graph.root_module_name
             );
 
-            for (name, path, maybe_setup) in bzlmod_result.cells {
+            for cell in cell_graph.cells.iter() {
+                let name = CellName::unchecked_new(&cell.name)?;
+                let path = cell_root_path_from_cell_graph(&cell.path)?;
                 if !cell_definitions.iter().any(|(n, _)| *n == name) {
                     cell_definitions.push((name, path));
                     tracing::info!("Added bzlmod cell: {}", name);
 
-                    if let Some(setup) = maybe_setup {
+                    if let Some(setup) = module_setup_from_cell_graph(cell) {
                         bzlmod_external_cells.push((name, setup));
                     }
                 }
             }
 
-            for (name, path, setup) in bzlmod_result.extension_cells {
+            for cell in cell_graph.extension_cells.iter().filter(|cell| !cell.lazy) {
+                let name = CellName::unchecked_new(&cell.canonical_name)?;
+                let path = cell_root_path_from_cell_graph(&cell.path)?;
                 if !cell_definitions.iter().any(|(n, _)| *n == name) {
+                    let setup = runtime_extension_setup_from_cell_graph(cell);
                     cell_definitions.push((name, path));
                     tracing::info!("Added extension repo cell: {}", name);
                     bzlmod_extension_cells.push((name, setup));
                 }
             }
 
-            bzlmod_aliases = bzlmod_result.aliases;
+            for alias in cell_graph.root_aliases.iter() {
+                bzlmod_aliases.push((
+                    NonEmptyCellAlias::new(alias.apparent_name.clone())?,
+                    CellName::unchecked_new(&alias.target_name)?,
+                ));
+            }
+            bzlmod_session_data = session_data;
 
             // Auto-register @bazel_tools for bzlmod projects
             let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
@@ -3831,9 +3848,17 @@ impl BuckConfigBasedCells {
             cells: Arc::new(
                 cells
                     .iter()
-                    .map(|(name, path, _)| slug_bzlmod::BzlmodCellGraphCell {
+                    .map(|(name, path, setup)| slug_bzlmod::BzlmodCellGraphCell {
                         name: name.as_str().to_owned(),
                         path: path.as_str().to_owned(),
+                        module_setup: setup.as_ref().map(|setup| {
+                            slug_bzlmod::BzlmodCellGraphModuleSetup {
+                                module_name: setup.module_name.to_string(),
+                                version: setup.version.to_string(),
+                                registry_url: setup.registry_url.to_string(),
+                                source_path: setup.source_path.to_string(),
+                            }
+                        }),
                     })
                     .collect(),
             ),
@@ -3909,10 +3934,6 @@ impl BuckConfigBasedCells {
         bzlmod_session_data.cell_graph = cell_graph;
 
         Ok(Some(BzlmodResolutionResult {
-            root_module_name,
-            cells,
-            extension_cells: ext_cells,
-            aliases,
             session_data: bzlmod_session_data,
         }))
     }
@@ -4291,6 +4312,27 @@ mod tests {
         assert!(!snapshot.extension_cells[1].setup.materialized);
         assert_eq!(snapshot.scoped_aliases[0].apparent_name, "tool");
         assert_eq!(snapshot.dynamic_aliases[0].canonical_name, "root+ext+eager");
+    }
+
+    #[test]
+    fn module_setup_derives_from_cell_graph() {
+        let cell = slug_bzlmod::BzlmodCellGraphCell {
+            name: "dep+".to_owned(),
+            path: "bazel-external/dep+".to_owned(),
+            module_setup: Some(slug_bzlmod::BzlmodCellGraphModuleSetup {
+                module_name: "dep".to_owned(),
+                version: "1.2.3".to_owned(),
+                registry_url: "https://bcr.bazel.build".to_owned(),
+                source_path: "/tmp/dep-src".to_owned(),
+            }),
+        };
+
+        let setup = module_setup_from_cell_graph(&cell).unwrap();
+
+        assert_eq!(setup.module_name.as_ref(), "dep");
+        assert_eq!(setup.version.as_ref(), "1.2.3");
+        assert_eq!(setup.registry_url.as_ref(), "https://bcr.bazel.build");
+        assert_eq!(setup.source_path.as_ref(), "/tmp/dep-src");
     }
 
     #[tokio::test]

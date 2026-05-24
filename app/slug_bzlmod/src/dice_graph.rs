@@ -289,9 +289,18 @@ impl BzlmodCellGraphKey {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphModuleSetup {
+    pub module_name: String,
+    pub version: String,
+    pub registry_url: String,
+    pub source_path: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodCellGraphCell {
     pub name: String,
     pub path: String,
+    pub module_setup: Option<BzlmodCellGraphModuleSetup>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
