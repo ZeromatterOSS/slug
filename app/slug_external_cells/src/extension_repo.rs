@@ -150,6 +150,7 @@ fn complete_marker_expected_output<'a>(marker: &'a str, spec_hash: &str) -> Opti
     marker.strip_prefix(&format!("complete:{spec_hash}:output:"))
 }
 
+#[cfg(test)]
 fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
     let marker = marker.trim();
     if spec_hash.is_empty() {
@@ -580,7 +581,39 @@ pub(crate) async fn get_file_ops_delegate(
     // authority; discard it and re-materialize from the current repo spec.
     let marker_path = source_path.join(".slug_repo_complete");
     let has_known_repo_spec = !setup.repo_spec_json.is_empty();
-    let marker_contents = (!has_known_repo_spec)
+    let repo_spec_for_execution = if has_known_repo_spec {
+        Some(
+            serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
+                ExtensionRepoError::DeserializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: e.to_string(),
+                }
+            })?,
+        )
+    } else if let Some(spokes) = registered_spokes.as_ref() {
+        match spokes
+            .by_internal_name(setup.internal_name.as_ref())
+            .or_else(|| spokes.by_canonical_name(setup.canonical_name.as_ref()))
+        {
+            Some(spoke) => Some(spoke.repo_spec.as_ref().clone()),
+            None => {
+                return Err(ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!(
+                        "Extension '{}' did not generate repo '{}' (available: {})",
+                        setup.extension_id,
+                        setup.internal_name,
+                        repo_names_summary(spokes.spokes.keys().map(|name| name.as_str()))
+                    ),
+                }
+                .into());
+            }
+        }
+    } else {
+        None
+    };
+    let marker_contents = repo_spec_for_execution
+        .is_none()
         .then(|| {
             marker_path
                 .exists()
@@ -588,39 +621,13 @@ pub(crate) async fn get_file_ops_delegate(
                 .flatten()
         })
         .flatten();
-    let setup_marker_spec_hash = registered_spokes
-        .as_ref()
-        .and_then(|spokes| {
-            spokes
-                .by_internal_name(setup.internal_name.as_ref())
-                .or_else(|| spokes.by_canonical_name(setup.canonical_name.as_ref()))
-        })
-        .map(|spoke| slug_bzlmod::repo_execution_spec_hash(&spoke.repo_spec, repo_env.as_ref()))
-        .or_else(|| {
-            (!setup.repo_spec_json.is_empty()).then(|| {
-                serde_json::from_str::<RepoSpec>(&setup.repo_spec_json)
-                    .map(|repo_spec| {
-                        slug_bzlmod::repo_execution_spec_hash(&repo_spec, repo_env.as_ref())
-                    })
-                    .unwrap_or_else(|_| setup.spec_hash.to_string())
-            })
-        });
     let is_stale_non_complete_marker = !has_known_repo_spec
         && marker_contents
             .as_deref()
             .is_some_and(|marker| !is_complete_marker(marker));
-    let is_stale_complete = !has_known_repo_spec
-        && setup_marker_spec_hash.as_deref().is_some_and(|spec_hash| {
-            !spec_hash.is_empty()
-                && marker_contents.as_deref().is_some_and(|s| {
-                    is_complete_marker(s) && !complete_marker_matches(s, spec_hash)
-                })
-        });
-    let output_marker_spec_hash = setup_marker_spec_hash.as_deref().unwrap_or("");
     let is_stale_output_state = !has_known_repo_spec
         && marker_contents.as_deref().is_some_and(|s| {
-            is_complete_marker(s)
-                && complete_marker_output_state_is_stale(&source_path, s, output_marker_spec_hash)
+            is_complete_marker(s) && complete_marker_output_state_is_stale(&source_path, s, "")
         });
     let is_stale_spec_unknown_complete = !has_known_repo_spec
         && marker_contents
@@ -636,7 +643,6 @@ pub(crate) async fn get_file_ops_delegate(
         repo_env.as_ref(),
     );
     if is_stale_non_complete_marker
-        || is_stale_complete
         || is_stale_output_state
         || is_stale_spec_unknown_complete
         || is_stale_foreign_symlink
@@ -655,13 +661,7 @@ pub(crate) async fn get_file_ops_delegate(
             );
         }
     }
-    if !setup.repo_spec_json.is_empty() {
-        let repo_spec = serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
-            ExtensionRepoError::DeserializationFailed {
-                canonical_name: setup.canonical_name.to_string(),
-                reason: e.to_string(),
-            }
-        })?;
+    if let Some(repo_spec) = repo_spec_for_execution {
         let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
             setup.canonical_name.to_string(),
             setup.extension_id.to_string(),
@@ -717,9 +717,8 @@ pub(crate) async fn get_file_ops_delegate(
             setup.repo_spec_json.is_empty()
         );
 
-        // No cached RepoSpec - execute the extension via DICE to get it.
-        // This is the Bazel 9.0-compatible path: cells are pre-computed from
-        // use_repo() declarations, and extensions execute lazily on first access.
+        // No current RepoSpec was available from setup or extension spokes.
+        // This fallback is expected only for direct use_repo_rule-style cells.
         let repo_spec = {
             tracing::info!(
                 "No cached RepoSpec for '{}', executing extension '{}' via DICE",

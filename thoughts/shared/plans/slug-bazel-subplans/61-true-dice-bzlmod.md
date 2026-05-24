@@ -177,6 +177,17 @@ Observed SDK result at the checkpoint:
   known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
   `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
   `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
+- Precomputed extension repo setups that lack embedded `repo_spec_json` now
+  validate through the current `ExtensionSpokesKey` repo spec when that spoke
+  value exists, instead of trusting the legacy marker prechecks. The direct
+  marker scan remains only for the no-spoke fallback used by direct
+  use-repo-rule cells. Validation passed with focused `cargo test -p
+  slug_external_cells known_repo_spec_defers_recorded_input_staleness_to_manifest
+  -- --nocapture`, `cargo check -p slug_external_cells`, `cargo build -p
+  slug`, and focused Plan 61 Python guardrails
+  `missing_lockfile_extension_executes_once_then_reuses_dice_state` plus
+  `valid_lockfile_replay_materializes_generated_repo_without_extension_eval`;
+  `cargo fmt --check` and `git diff --check` also passed.
 - Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
   extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
   when the hidden facts are created with the expected value, fails after an
@@ -1816,8 +1827,9 @@ using Rust DICE keys and values:
      recorded-input staleness, missing declared BUILD-file checks, and
      layout-validity probes, including foreign top-level symlink checks, to
      this manifest path. Legacy invalid empty target-label checks also belong
-     to manifest layout state now. The no-spec fallback still contains direct
-     file-ops reads.
+     to manifest layout state now. No-spec extension cells with a current spoke
+     value validate through that spoke's repo spec; only the no-spoke fallback
+     still contains direct file-ops reads.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 
