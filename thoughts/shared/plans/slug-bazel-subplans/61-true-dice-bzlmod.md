@@ -612,12 +612,13 @@ Observed SDK result at the checkpoint:
   have present-to-missing deletion guardrails. Validation passed with the
   focused subset selected by `-k 'project_local_override_module_deletion or
   out_of_project_local_override_module_deletion'` (`2 passed, 107 deselected`).
-- Locked registry `source.json` metadata now has a focused parse-failure
-  guardrail: after a warm same-daemon registry module resolution, invalid
-  cached source metadata with a matching lockfile hash fails the next
-  `audit cell` instead of reusing the warm value, and repairing the metadata
-  succeeds again. Validation passed with
-  `test_locked_registry_source_json_parse_failure_invalidates_bzlmod_resolution`.
+- Locked registry `source.json` metadata now has focused parse-error and
+  invalid UTF-8 failure-transition guardrails: after a warm same-daemon
+  registry module resolution, corrupt cached source metadata with matching
+  lockfile hashes fails the next `audit cell`, then repair introduces a new
+  registry dependency instead of reusing the warm value. Validation passed with
+  the focused subset selected by `-k 'locked_registry_source_json_parse_failure
+  or locked_registry_source_json_utf8_failure'` (`2 passed, 108 deselected`).
 - Locked registry `MODULE.bazel` files now have focused parse-error and
   invalid UTF-8 failure-transition guardrails: after a warm same-daemon
   registry module resolution, corrupt cached module metadata with matching

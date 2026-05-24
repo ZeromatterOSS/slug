@@ -2203,6 +2203,7 @@ async def test_locked_registry_source_json_parse_failure_invalidates_bzlmod_reso
     """Bazel anchor: RepoSpec source.json parse failures are resolution inputs."""
     module_name = "remote_source_parse_failure"
     module_version = "1.0.0"
+    repaired_module_name = "remote_source_parse_repaired_dep"
     cache_home = buck.cwd / "cache_home"
     registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
     module_cache = registry_cache / "modules" / module_name / module_version
@@ -2217,6 +2218,13 @@ async def test_locked_registry_source_json_parse_failure_invalidates_bzlmod_reso
     _write(source_json, "{}\n")
     _write(source_dir / ".complete", "")
     _write(source_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    repaired_module_cache = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        repaired_module_name,
+        module_version,
+        f'module(name = "{repaired_module_name}", version = "{module_version}")\n',
+    )
     _write(
         buck.cwd / "MODULE.bazel",
         f"""module(name = "plan61_registry_source_parse_failure")
@@ -2232,6 +2240,12 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     source_url = (
         f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
     )
+    repaired_module_url = (
+        f"https://bcr.bazel.build/modules/{repaired_module_name}/{module_version}/MODULE.bazel"
+    )
+    repaired_source_url = (
+        f"https://bcr.bazel.build/modules/{repaired_module_name}/{module_version}/source.json"
+    )
 
     def write_lockfile() -> None:
         _write(
@@ -2243,6 +2257,12 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
                         registry_url: _sha256(registry_cache / "bazel_registry.json"),
                         module_url: _sha256(module_cache / "MODULE.bazel"),
                         source_url: _sha256(source_json),
+                        repaired_module_url: _sha256(
+                            repaired_module_cache / "MODULE.bazel"
+                        ),
+                        repaired_source_url: _sha256(
+                            repaired_module_cache / "source.json"
+                        ),
                     },
                     "selectedYankedVersions": {},
                     "moduleExtensions": {},
@@ -2272,9 +2292,122 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     assert module_name in failure_stderr
 
     _write(source_json, "{}\n")
+    _write(
+        module_cache / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "{module_version}")
+bazel_dep(name = "{repaired_module_name}", version = "{module_version}")
+""",
+    )
     write_lockfile()
     output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
+    assert repaired_module_name in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_locked_registry_source_json_utf8_failure_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: RepoSpec source.json UTF-8 failures are resolution inputs."""
+    module_name = "remote_source_utf8_failure"
+    module_version = "1.0.0"
+    repaired_module_name = "remote_source_utf8_repaired_dep"
+    cache_home = buck.cwd / "cache_home"
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    module_cache = registry_cache / "modules" / module_name / module_version
+    source_dir = module_cache / "source"
+    source_dir.mkdir(parents=True)
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+    module_file = module_cache / "MODULE.bazel"
+    _write(module_file, f'module(name = "{module_name}", version = "{module_version}")\n')
+    source_json = module_cache / "source.json"
+    _write(source_json, "{}\n")
+    _write(source_dir / ".complete", "")
+    _write(source_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    repaired_module_cache = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        repaired_module_name,
+        module_version,
+        f'module(name = "{repaired_module_name}", version = "{module_version}")\n',
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_registry_source_utf8_failure")
+
+bazel_dep(name = "{module_name}", version = "{module_version}")
+""",
+    )
+
+    registry_url = "https://bcr.bazel.build/bazel_registry.json"
+    module_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel"
+    )
+    source_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
+    )
+    repaired_module_url = (
+        f"https://bcr.bazel.build/modules/{repaired_module_name}/{module_version}/MODULE.bazel"
+    )
+    repaired_source_url = (
+        f"https://bcr.bazel.build/modules/{repaired_module_name}/{module_version}/source.json"
+    )
+
+    def write_lockfile() -> None:
+        _write(
+            buck.cwd / "MODULE.bazel.lock",
+            json.dumps(
+                {
+                    "lockFileVersion": 26,
+                    "registryFileHashes": {
+                        registry_url: _sha256(registry_cache / "bazel_registry.json"),
+                        module_url: _sha256(module_file),
+                        source_url: _sha256(source_json),
+                        repaired_module_url: _sha256(
+                            repaired_module_cache / "MODULE.bazel"
+                        ),
+                        repaired_source_url: _sha256(
+                            repaired_module_cache / "source.json"
+                        ),
+                    },
+                    "selectedYankedVersions": {},
+                    "moduleExtensions": {},
+                    "facts": {},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+        )
+
+    write_lockfile()
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write_bytes(source_json, b"\xff\xfeinvalid source metadata\n")
+    write_lockfile()
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "source.json" in failure_stderr
+    assert "UTF-8" in failure_stderr or "utf-8" in failure_stderr
+
+    _write(source_json, "{}\n")
+    _write(
+        module_file,
+        f"""module(name = "{module_name}", version = "{module_version}")
+bazel_dep(name = "{repaired_module_name}", version = "{module_version}")
+""",
+    )
+    write_lockfile()
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert repaired_module_name in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
