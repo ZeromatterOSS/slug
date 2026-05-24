@@ -1225,46 +1225,14 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         };
 
         // Resolve cell name (triggers ExtensionRepoCellSetup → lazy materialization)
-        let cell_name = match CellName::unchecked_new(&repo_name) {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::debug!("Invalid cell name '{}': {}", repo_name, e);
-                continue;
-            }
-        };
-
-        let cell_instance = match cell_resolver.get(cell_name) {
-            Ok(c) => c,
-            Err(_) => {
-                tracing::debug!(
-                    "Cell '{}' not found in resolver for toolchain '{}', skipping",
-                    repo_name,
-                    tc_label_str
-                );
-                skipped_count += 1;
-                continue;
-            }
-        };
-
-        // Extension repos (paths containing '+' or '~') are loaded the same
-        // way as other cells: via `dice.get_interpreter_results`. If the
-        // repo's content is not yet on disk, the file-ops layer triggers
-        // `ExtensionRepoExecutionKey::compute` and materialises it on demand.
-        // Root-module registrations must take this path even when they point
-        // at extension-generated repos; Bazel gives root registrations higher
-        // priority than transitive registrations, so deferring them can let a
-        // lower-priority toolchain win before the root toolchain is visible.
-        let _ = cell_instance;
-
-        let cell_rel_path = CellRelativePath::unchecked_new(&pkg_path);
         let package_label =
-            match PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)) {
-                Ok(p) => p,
-                Err(e) => {
+            match registered_toolchain_package_label(&cell_resolver, &repo_name, &pkg_path) {
+                Some(p) => p,
+                None => {
                     tracing::debug!(
-                        "Failed to create package label for '{}': {}",
-                        tc_label_str,
-                        e
+                        "Cell '{}' not found in resolver for toolchain '{}', skipping",
+                        repo_name,
+                        tc_label_str
                     );
                     skipped_count += 1;
                     continue;
@@ -1469,19 +1437,11 @@ async fn prepare_toolchain_load_list(
             Some(v) => v,
             None => continue,
         };
-        let cell_name = match CellName::unchecked_new(&repo_name) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        if cell_resolver.get(cell_name).is_err() {
+        let Some(package_label) =
+            registered_toolchain_package_label(&cell_resolver, &repo_name, &pkg_path)
+        else {
             continue;
-        }
-        let cell_rel_path = CellRelativePath::unchecked_new(&pkg_path);
-        let package_label =
-            match PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
+        };
         out.push((tc_label_str.clone(), package_label));
     }
     out
@@ -1620,8 +1580,6 @@ fn parse_registered_toolchain_label(label: &str) -> Option<(String, String)> {
     if repo_name.is_empty() {
         return None;
     }
-    let repo_name = slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name)
-        .unwrap_or_else(|| repo_name.to_owned());
     let after_slashes = &stripped[slash_pos + 2..];
     // Extract package path (before the colon, if any)
     let pkg_path = if let Some(colon_pos) = after_slashes.find(':') {
@@ -1630,6 +1588,24 @@ fn parse_registered_toolchain_label(label: &str) -> Option<(String, String)> {
         after_slashes
     };
     Some((repo_name.to_owned(), pkg_path.to_owned()))
+}
+
+fn registered_toolchain_package_label(
+    cell_resolver: &slug_core::cells::CellResolver,
+    repo_name: &str,
+    pkg_path: &str,
+) -> Option<PackageLabel> {
+    // Registered toolchain labels are parsed syntactically. Repository identity
+    // belongs to the active cell resolver: ask its declared/runtime alias
+    // snapshot first, then let `CellResolver::get` handle legacy fallbacks.
+    let parsed_cell = CellName::unchecked_new(repo_name).ok()?;
+    let resolved_cell = cell_resolver
+        .root_cell_cell_alias_resolver()
+        .resolve_declared_or_runtime_alias(repo_name)
+        .unwrap_or(parsed_cell);
+    let cell_instance = cell_resolver.get(resolved_cell).ok()?;
+    let cell_rel_path = CellRelativePath::unchecked_new(pkg_path);
+    PackageLabel::from_cell_path(CellPathRef::new(cell_instance.name(), cell_rel_path)).ok()
 }
 
 /// Plan 24 Phase 2: read the configured target's `exec_properties`
@@ -5036,6 +5012,16 @@ mod tests {
     use std::collections::BTreeMap;
     use std::collections::HashMap;
 
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::BzlmodRuntimeExtensionCell;
+    use slug_core::cells::BzlmodRuntimeExtensionCellRegistration;
+    use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::CellResolver;
+    use slug_core::cells::cell_root_path::CellRootPathBuf;
+    use slug_core::cells::external::ExtensionRepoCellSetup;
+    use slug_core::cells::instance::CellInstance;
+    use slug_core::cells::nested::NestedCells;
     use slug_core::configuration::build_setting::BuildSettingLabel;
     use slug_core::configuration::build_setting::BuildSettingValue;
     use slug_core::configuration::pair::ConfigurationNoExec;
@@ -5410,6 +5396,76 @@ mod tests {
 
         // Invalid: no //
         assert_eq!(parse_registered_toolchain_label("@repo"), None);
+    }
+
+    #[test]
+    fn registered_toolchain_package_label_prefers_runtime_aliases_before_globals()
+    -> slug_error::Result<()> {
+        let apparent = "plan61_toolchain_runtime_alias";
+        let canonical = "plan61_owner++toolchains+generated";
+        let wrong_global = "plan61_wrong_owner++toolchains+generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@plan61_owner//:toolchains.bzl%toolchains"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-plan61-toolchain-runtime-alias"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                setup,
+                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        assert!(resolver.get(CellName::testing_new(wrong_global)).is_ok());
+
+        let package_label =
+            registered_toolchain_package_label(&resolver, apparent, "toolchains").unwrap();
+
+        assert_eq!(package_label.cell_name(), CellName::testing_new(canonical));
+        assert_eq!(package_label.cell_relative_path().as_str(), "toolchains");
+        Ok(())
     }
 
     #[test]
