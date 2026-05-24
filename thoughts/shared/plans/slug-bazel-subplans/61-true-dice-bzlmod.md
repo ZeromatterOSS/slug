@@ -191,8 +191,9 @@ Observed SDK result at the checkpoint:
 - Extension repository execution now calls a fresh native repository-rule
   executor path after `RepoMaterializationManifestKey` has classified reuse,
   so the manifest-owned extension path no longer falls through the native
-  executor's marker shortcut. Direct repository-rule execution still keeps the
-  legacy marker reuse path until direct repo rules get their own manifest key.
+  executor's marker shortcut. The legacy marker-reuse executor entrypoint is
+  now test-only and is no longer exported from `slug_bzlmod`; production native
+  repository execution uses the fresh path after manifest classification.
   Validation passed with focused `cargo test -p slug_bzlmod
   fresh_repository_execution_bypasses_marker_shortcut -- --nocapture`,
   `cargo test -p slug_bzlmod
@@ -1012,6 +1013,11 @@ Observed SDK result at the checkpoint:
   slug_external_cells -p slug_server`, `cargo build -p slug`, and focused Plan
   61 Python guardrail
   `valid_lockfile_replay_materializes_generated_repo_without_extension_eval`.
+- After the override-patch guardrails, repository-manifest fresh native
+  execution path, and lazy repo path-classification slices, the full Plan 61
+  Python guardrail file passed with `74 passed in 72.84s` using
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug`; stale `slugd`
+  processes from the guardrail run were cleaned afterward.
 - Bzlmod cell-resolver assembly now also consumes `BzlmodCellGraphValue`.
   Graph module cells carry optional remote-module setup metadata, and the
   config-load path derives module cells, eager extension cells, and root aliases
@@ -1858,8 +1864,8 @@ using Rust DICE keys and values:
      value validate through that spoke's repo spec; only the no-spoke fallback
      still contains direct file-ops reads. Extension repo execution enters the
      native repository-rule executor through a fresh path after the manifest
-     decision, so the native marker shortcut is not an additional reuse
-     authority for known extension repo specs.
+     decision, so the native marker shortcut is test-only rather than an
+     additional production reuse authority for known extension repo specs.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 

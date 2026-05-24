@@ -54,8 +54,9 @@ impl StarlarkRepoRuleExecution {
 
 /// Names of built-in repository rules implemented natively (not via Starlark execution).
 ///
-/// These rules are handled by `execute_repository_rule()` in `repository_executor.rs`
-/// and do NOT need Starlark implementation lookup.
+/// These rules are handled by the fresh native repository executor after a
+/// DICE-owned materialization manifest decides reuse is invalid, so they do NOT
+/// need Starlark implementation lookup.
 pub const BUILTIN_REPO_RULES: &[&str] = &[
     "http_archive",
     "http_file",

@@ -44,9 +44,13 @@ use crate::repository_execution::RepositoryExecutionError;
 use crate::repository_execution::RepositoryRuleResult;
 use crate::repository_invocations::RepositoryInvocation;
 
-/// Execute a repository rule invocation.
+/// Execute a repository rule invocation using legacy marker reuse.
 ///
-/// This function dispatches to the appropriate handler based on the rule name.
+/// Production extension repository execution should call
+/// `execute_repository_rule_fresh` after its DICE-owned manifest has decided
+/// reuse is invalid. This shortcut remains only to prove that fresh execution
+/// does not trust a stale marker.
+#[cfg(test)]
 pub fn execute_repository_rule(
     invocation: &RepositoryInvocation,
     project_root: &Path,

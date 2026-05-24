@@ -209,7 +209,6 @@ pub use repository_execution::repo_execution_spec_hash;
 pub use repository_execution::repo_has_foreign_top_level_symlink;
 pub use repository_execution::repo_spec_to_invocation;
 pub use repository_execution::repository_recorded_inputs_current;
-pub use repository_executor::execute_repository_rule;
 pub use repository_executor::repo_layout_is_valid_for_invocation;
 pub use repository_executor::repository_output_digest;
 pub use repository_invocations::AttrValue as RepoAttrValue;
