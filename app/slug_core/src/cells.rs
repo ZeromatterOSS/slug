@@ -268,7 +268,7 @@ impl BzlmodRuntimeAliasResolver {
         let extension_cell_names = snapshot
             .extension_cells
             .iter()
-            .flat_map(|cell| [cell.canonical_name.clone(), cell.internal_name.clone()])
+            .map(|cell| cell.canonical_name.clone())
             .collect();
         Arc::new(Self {
             scoped_aliases,
@@ -1623,6 +1623,11 @@ impl CellAliasResolver {
             if let Some(name) = self.lookup_alias(&candidate) {
                 return Ok(name);
             }
+            if self.has_bzlmod_runtime_extension_cell(&candidate) {
+                if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                    return Ok(cell_name);
+                }
+            }
             // Check the global dynamic registry
             if get_dynamic_extension_cell(&candidate).is_some() {
                 if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
@@ -2687,6 +2692,7 @@ mod tests {
             NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
         )?;
         let canonical = "owner++ext+generated";
+        let sibling = "owner++ext+sibling";
         let setup = crate::cells::external::ExtensionRepoCellSetup {
             canonical_name: Arc::from(canonical),
             extension_id: Arc::from("@owner//:ext.bzl%ext"),
@@ -2696,14 +2702,32 @@ mod tests {
             repo_env_json: Arc::from("{}"),
             materialized: false,
         };
+        let sibling_setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(sibling),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("sibling"),
+            spec_hash: Arc::from("sha256-sibling"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
-            extension_cells: vec![BzlmodRuntimeExtensionCell {
-                canonical_name: canonical.to_owned(),
-                internal_name: "generated".to_owned(),
-                path: format!("bazel-external/{canonical}"),
-                setup: setup.clone(),
-                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
-            }],
+            extension_cells: vec![
+                BzlmodRuntimeExtensionCell {
+                    canonical_name: canonical.to_owned(),
+                    internal_name: "generated".to_owned(),
+                    path: format!("bazel-external/{canonical}"),
+                    setup: setup.clone(),
+                    registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+                },
+                BzlmodRuntimeExtensionCell {
+                    canonical_name: sibling.to_owned(),
+                    internal_name: "sibling".to_owned(),
+                    path: format!("bazel-external/{sibling}"),
+                    setup: sibling_setup,
+                    registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+                },
+            ],
             scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
                 owner_module: "owner+".to_owned(),
                 apparent_name: "helper".to_owned(),
@@ -2738,10 +2762,22 @@ mod tests {
             root_aliases.resolve("generated_alias")?,
             CellName::testing_new(canonical)
         );
+        assert!(root_aliases.resolve("generated").is_err());
+        assert!(root_aliases.resolve("sibling").is_err());
         assert_eq!(
             owner_aliases.resolve("helper")?,
             CellName::testing_new("dep+1.0")
         );
+        let generated_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new(canonical),
+            HashMap::new(),
+            &snapshot,
+        )?;
+        assert_eq!(
+            generated_aliases.resolve("sibling")?,
+            CellName::testing_new(sibling)
+        );
+        assert_eq!(get_dynamic_extension_cell(sibling), None);
 
         let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
             vec![root_instance],
@@ -3181,7 +3217,10 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_alias_overrides_existing_generated_extension_cell() -> slug_error::Result<()> {
+    fn dynamic_alias_does_not_override_exact_generated_extension_cell() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         let generated = "override_owner++ext+generated_repo";
         let selected = "selected_repo+1.0.0";
         register_dynamic_extension_cell(
@@ -3189,14 +3228,20 @@ mod tests {
             format!("bazel-external/{generated}"),
         );
         register_dynamic_extension_cell_alias(generated.to_owned(), selected.to_owned());
+        register_dynamic_extension_cell_alias("repo_alias".to_owned(), selected.to_owned());
 
         let aliases = HashMap::new();
         let resolver = CellAliasResolver::new(CellName::testing_new("root"), aliases)?;
 
         assert_eq!(
-            CellName::testing_new(selected),
+            CellName::testing_new(generated),
             resolver.resolve(generated)?
         );
+        assert_eq!(
+            CellName::testing_new(selected),
+            resolver.resolve("repo_alias")?
+        );
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().join("after"));
         Ok(())
     }
 

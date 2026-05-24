@@ -1262,6 +1262,21 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, the focused Plan 61 Python repo-env/lockfile replay
   subset, the full Plan 61 Python guardrail with 72 tests, `cargo
   fmt --check`, and `git diff --check`.
+- Resolver-local runtime snapshots no longer make generated repo internal names
+  root-visible aliases just because the generated repo cell exists in the
+  snapshot. Alias resolution now treats the snapshot's extension-cell existence
+  set as canonical-name-only, and same-extension sibling fallback checks that
+  resolver-local snapshot before consulting transitional process-global dynamic
+  maps. Validation passed with focused `slug_core` runtime-snapshot and exact
+  generated-repo alias tests, serial `cargo test -p slug_core cells::tests --
+  --nocapture --test-threads=1`, `cargo check -p slug_core -p slug_common -p
+  slug_external_cells`, `cargo build -p slug`, the focused Plan 61 generated
+  repo alias guardrail subset, the full Plan 61 Python guardrail with 72 tests,
+  `cargo fmt --check`, and `git diff --check`. A broader serial
+  `cargo test -p slug_core -- --test-threads=1` still has two unrelated
+  pre-existing isolated failures in
+  `build_setting_labels_resolve_dynamic_extension_aliases` and
+  `pattern::pattern::tests::test_relaxed`.
 
 ## Consolidated Learnings
 
@@ -1421,7 +1436,11 @@ What did not work or remains risky:
   `override_repo()` generated-repo aliases are projected into that snapshot as
   dynamic aliases.
   Resolver-local cells promoted from that snapshot are now graph-owned instead
-  of root-scoped process-global cache entries. The graph is still
+  of root-scoped process-global cache entries. Resolver-local alias resolution
+  now uses canonical generated repo names from that snapshot for direct cell
+  existence and for same-extension sibling fallback before consulting
+  process-global dynamic maps, so internal generated repo names are not made
+  root-visible merely by snapshot membership. The graph is still
   legacy-produced, and alias compatibility plus runtime registration remain
   process-global transitional plumbing, so this does not yet make the runtime
   bzlmod cell graph DICE-owned.
