@@ -607,6 +607,13 @@ Observed SDK result at the checkpoint:
   `audit cell` instead of reusing the warm value, and repairing the metadata
   succeeds again. Validation passed with
   `test_locked_registry_source_json_parse_failure_invalidates_bzlmod_resolution`.
+- Locked registry `MODULE.bazel` files now have focused parse-error and
+  invalid UTF-8 failure-transition guardrails: after a warm same-daemon
+  registry module resolution, corrupt cached module metadata with matching
+  lockfile hashes fails the next `audit cell`, then repair introduces a new
+  registry dependency instead of reusing the warm value. Validation passed with
+  the focused subset selected by `-k 'locked_registry_module_parse_failure or
+  locked_registry_module_utf8_failure'` (`2 passed, 101 deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
@@ -2122,7 +2129,9 @@ using Rust DICE keys and values:
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are polled into key identity while the final
      watched-input graph is still pending. Locked registry `source.json`
-     checksum and parse-failure transitions now have same-daemon guardrails.
+     checksum and parse-failure transitions now have same-daemon guardrails,
+     and locked registry `MODULE.bazel` parse/UTF-8 failure transitions have
+     same-daemon guardrails.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
      have same-daemon warm-reuse, edit-invalidation, and create/delete
      transition guardrails. Both cached override source classes also have
@@ -2138,8 +2147,8 @@ using Rust DICE keys and values:
      cycles, and out-of-project local override coverage now includes
      parse/UTF-8 failures and include cycles. Root included segments now have
      parse/UTF-8 failure and include-cycle coverage, and root `MODULE.bazel`
-     now has parse/UTF-8 failure coverage; remaining source classes still need
-     full matrix coverage.
+     and registry `MODULE.bazel` now have parse/UTF-8 failure coverage;
+     remaining source classes still need full matrix coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
