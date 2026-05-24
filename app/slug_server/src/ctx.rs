@@ -578,6 +578,12 @@ impl ServerCommandContext<'_> {
                 &self.base_context.project_root,
                 &config_overrides,
                 dice_ctx,
+                Some(
+                    self.base_context
+                        .project_root
+                        .resolve(&self.buck_out_dir)
+                        .to_path_buf(),
+                ),
             )
             .await?;
 

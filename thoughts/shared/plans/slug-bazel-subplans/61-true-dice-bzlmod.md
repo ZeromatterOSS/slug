@@ -1302,6 +1302,16 @@ Observed SDK result at the checkpoint:
   repository materialization keys. Validation passed with `cargo check -p
   slug_bzlmod`, focused `cargo test -p slug_bzlmod repository_execution --
   --nocapture`, `cargo fmt --check`, and `git diff --check`.
+- The persisted bzlmod config-load resolution key now threads the daemon
+  output base from `ServerCommandContext` into `WorkspaceId` instead of
+  hard-coding `<project>/buck-out/v2`, and the legacy resolver session is
+  seeded from that keyed workspace identity. This keeps isolated output-base
+  identity attached to the transitional DICE key while the resolver graph is
+  still legacy-produced. Validation passed with focused `cargo test -p
+  slug_common bzlmod_resolution_key_uses_explicit_output_base --
+  --nocapture`, `cargo check -p slug_common -p slug_server`, `cargo build -p
+  slug`, the focused Plan 61 generated-repo alias guardrail subset, `cargo
+  fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1359,7 +1369,9 @@ What did not work or remains risky:
   that graph. It carries resolution facts, module versions, repo env, repo
   mappings, extension aggregations, and registrations as the same values
   injected into DICE, but the narrower injected values are still populated from
-  the legacy resolver output.
+  the legacy resolver output. The persisted config-load key now receives the
+  server output base instead of synthesizing the default output base for
+  workspace identity, but that key still wraps the legacy resolver.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.
@@ -1566,8 +1578,9 @@ using Rust DICE keys and values:
      isolation.
    - Module-version/toolchain/platform consumers, current-workspace helpers,
      and the remaining session bridge now derive workspace identity from the
-     named cell graph, but their data payloads are still injected from the
-     legacy resolver.
+     named cell graph, and the persisted config-load key carries the daemon
+     output base, but their data payloads are still injected from the legacy
+     resolver.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.

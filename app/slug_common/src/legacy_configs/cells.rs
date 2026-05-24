@@ -2583,7 +2583,8 @@ impl BuckConfigBasedCells {
         config_args: &[slug_cli_proto::ConfigOverride],
         dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<Self> {
-        let key = Self::build_dice_bzlmod_resolution_key(project_fs, config_args, dice_ctx).await?;
+        let key =
+            Self::build_dice_bzlmod_resolution_key(project_fs, config_args, dice_ctx, None).await?;
         let bzlmod_resolution = dice_ctx
             .compute(&key)
             .await?
@@ -2604,10 +2605,16 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
         updater: &mut DiceTransactionUpdater,
+        output_base: Option<PathBuf>,
     ) -> slug_error::Result<Self> {
         let mut dice_ctx = updater.existing_state().await;
-        let key =
-            Self::build_dice_bzlmod_resolution_key(project_fs, config_args, &mut dice_ctx).await?;
+        let key = Self::build_dice_bzlmod_resolution_key(
+            project_fs,
+            config_args,
+            &mut dice_ctx,
+            output_base,
+        )
+        .await?;
         let bzlmod_resolution = dice_ctx
             .compute(&key)
             .await?
@@ -2628,13 +2635,14 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
         dice_ctx: &mut DiceComputations<'_>,
+        output_base: Option<PathBuf>,
     ) -> slug_error::Result<LegacyBzlmodResolutionDiceKey> {
         let root_config = LegacyBuckConfig::from_overrides_only(config_args)?;
         let options = BzlmodResolutionOptions::from_config(&root_config)?;
         let project_root_path = project_fs.root().to_path_buf();
         let workspace_id = slug_bzlmod::WorkspaceId::new(
             project_root_path.clone(),
-            project_root_path.join("buck-out/v2"),
+            output_base.unwrap_or_else(|| project_root_path.join("buck-out/v2")),
         );
         let command_policy = dice_ctx
             .compute(&options.command_policy_key(workspace_id.clone()))
@@ -2835,6 +2843,7 @@ impl BuckConfigBasedCells {
             Self::resolve_bzlmod_dependencies_with_options(
                 project_fs,
                 &options,
+                None,
                 root_module_file.as_deref(),
                 visible_lockfile.clone(),
                 None,
@@ -3018,6 +3027,7 @@ impl BuckConfigBasedCells {
         Self::resolve_bzlmod_dependencies_with_options(
             &project_root,
             &key.options,
+            Some(key.resolution_key.workspace_id.clone()),
             Some(root_module_file.as_ref()),
             key.visible_lockfile.clone(),
             key.hidden_lockfile.clone(),
@@ -3040,6 +3050,7 @@ impl BuckConfigBasedCells {
     async fn resolve_bzlmod_dependencies_with_options(
         project_root: &ProjectRoot,
         options: &BzlmodResolutionOptions,
+        workspace_id: Option<slug_bzlmod::WorkspaceId>,
         root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
@@ -3093,7 +3104,9 @@ impl BuckConfigBasedCells {
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
-        let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(workspace_root.to_path_buf());
+        let workspace_id = workspace_id.unwrap_or_else(|| {
+            slug_bzlmod::WorkspaceId::for_project_root(workspace_root.to_path_buf())
+        });
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
         bzlmod_session_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             bzlmod_session_data.cell_graph.workspace_id.clone(),
@@ -4249,6 +4262,41 @@ mod tests {
         assert_eq!(
             options.repo_env_digest,
             slug_bzlmod::repo_env_policy_digest(&repo_env)
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_resolution_key_uses_explicit_output_base() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
+        let output_base = fs
+            .path()
+            .resolve(ProjectRelativePath::new("buck-out/custom-isolation")?);
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let key = BuckConfigBasedCells::build_dice_bzlmod_resolution_key(
+            fs.path(),
+            &[],
+            &mut dice,
+            Some(output_base.to_path_buf()),
+        )
+        .await?;
+
+        assert_eq!(
+            key.resolution_key
+                .workspace_id
+                .output_base
+                .as_ref()
+                .as_path(),
+            output_base.as_path()
         );
         Ok(())
     }
