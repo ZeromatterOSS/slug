@@ -2015,6 +2015,16 @@ What did not work or remains risky:
   `No such file or directory (os error 2)` state already expected by the
   guardrails, while `ExtensionBzlTransitiveDigestKey` and non-DICE callers
   remain on the transitional direct scanner.
+- Out-of-project bzlmod text reads used by module-file inputs, includes,
+  registry-cache files, and hidden lockfiles now flow through a named
+  `AbsoluteTextFileInputKey` child when the parent DICE computation reads the
+  file. The key is still `validity=false` and the higher-level poll-digest
+  construction still performs transitional direct reads, but parent bzlmod
+  computations now have an auditable DICE dependency for those text-file
+  contents. Validation passed with focused `cargo test -p slug_common
+  absolute_text_file_input_key_tracks_polled_transitions -- --nocapture` and
+  `cargo test -p slug_common
+  out_of_project_module_include_reads_use_polled_text_key -- --nocapture`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
@@ -2273,10 +2283,10 @@ using Rust DICE keys and values:
    override/registry-cache sources.
    - Root, included, and project-local local override module segments now use
      tracked project-file DICE inputs; out-of-project local override module
-     files are polled into key identity. The DICE-backed resolver now rejects
-     missing tracked root module input instead of direct-parsing the root module
-     in the DICE path. Keep extending that shape to every non-root module
-     source.
+     files are read through named DICE poll keys and still polled into
+     higher-level key identity. The DICE-backed resolver now rejects missing
+     tracked root module input instead of direct-parsing the root module in the
+     DICE path. Keep extending that shape to every non-root module source.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are polled into key identity while the final

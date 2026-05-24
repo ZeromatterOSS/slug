@@ -1040,6 +1040,47 @@ enum BzlmodFileInputTracking {
     Polled,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct AbsoluteTextFileInputValue {
+    content: Option<String>,
+    digest: Option<String>,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("AbsoluteTextFileInputKey({})", path.display())]
+struct AbsoluteTextFileInputKey {
+    path: Arc<PathBuf>,
+    poll_digest: String,
+}
+
+#[async_trait]
+impl Key for AbsoluteTextFileInputKey {
+    type Value = slug_error::Result<Arc<AbsoluteTextFileInputValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let (content, digest) = read_absolute_text_file_input(&self.path)?;
+        Ok(Arc::new(AbsoluteTextFileInputValue { content, digest }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.content == y.content && x.digest == y.digest,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // Out-of-project bzlmod inputs are still polled rather than watched.
+        // Recompute this child each transaction so parent bzlmod keys can cut
+        // off only after this named read has refreshed and compared equal.
+        false
+    }
+}
+
 async fn read_bzlmod_file_for_module_inputs(
     ctx: &mut DiceComputations<'_>,
     project_fs: &ProjectRoot,
@@ -1055,10 +1096,12 @@ async fn read_bzlmod_file_for_module_inputs(
         return Ok((Some((content, digest)), BzlmodFileInputTracking::Project));
     }
 
-    let (content, digest) = read_absolute_text_file_input(path)?;
+    let input = read_absolute_text_file_input_via_dice(ctx, path).await?;
     Ok((
-        content
-            .zip(digest)
+        input
+            .content
+            .clone()
+            .zip(input.digest.clone())
             .map(|(content, digest)| (content, digest)),
         BzlmodFileInputTracking::Polled,
     ))
@@ -1084,8 +1127,38 @@ async fn read_text_file_for_project_input(
         ));
     }
 
-    let (content, _digest) = read_absolute_text_file_input(path)?;
-    Ok((content, BzlmodFileInputTracking::Polled))
+    let input = read_absolute_text_file_input_via_dice(ctx, path).await?;
+    Ok((input.content.clone(), BzlmodFileInputTracking::Polled))
+}
+
+async fn read_absolute_text_file_input_via_dice(
+    ctx: &mut DiceComputations<'_>,
+    path: &Path,
+) -> slug_error::Result<Arc<AbsoluteTextFileInputValue>> {
+    let poll_digest = absolute_text_file_input_poll_digest(path)?;
+    ctx.compute(&AbsoluteTextFileInputKey {
+        path: Arc::new(path.to_path_buf()),
+        poll_digest,
+    })
+    .await?
+}
+
+fn absolute_text_file_input_poll_digest(path: &Path) -> slug_error::Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"absolute-text-file-input-poll-v1");
+    hasher.update([0]);
+    hasher.update(path.to_string_lossy().as_bytes());
+    hasher.update([0]);
+    match absolute_text_file_digest(path)? {
+        Some(digest) => {
+            hasher.update(b"present");
+            hasher.update([0]);
+            hasher.update(digest.as_bytes());
+        }
+        None => hasher.update(b"missing"),
+    }
+    hasher.update([0]);
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn read_absolute_text_file_input(
@@ -4517,6 +4590,117 @@ mod tests {
                 .as_path(),
             output_base.as_path()
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn absolute_text_file_input_key_tracks_polled_transitions() -> slug_error::Result<()> {
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-absolute-text-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let path = external.path().join("MODULE.bazel");
+        let mut dice = DiceBuilder::new()
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let missing = read_absolute_text_file_input_via_dice(&mut dice, &path).await?;
+        assert!(missing.content.is_none());
+        assert!(missing.digest.is_none());
+
+        std::fs::write(&path, "module(name = \"created\")\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let created = read_absolute_text_file_input_via_dice(&mut dice, &path).await?;
+        assert_eq!(
+            created.content.as_deref(),
+            Some("module(name = \"created\")\n")
+        );
+        assert_ne!(missing.as_ref(), created.as_ref());
+
+        std::fs::write(&path, "module(name = \"edited\")\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let edited = read_absolute_text_file_input_via_dice(&mut dice, &path).await?;
+        assert_eq!(
+            edited.content.as_deref(),
+            Some("module(name = \"edited\")\n")
+        );
+        assert_ne!(created.as_ref(), edited.as_ref());
+
+        std::fs::remove_file(&path).unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let deleted = read_absolute_text_file_input_via_dice(&mut dice, &path).await?;
+        assert!(deleted.content.is_none());
+        assert!(deleted.digest.is_none());
+        assert_eq!(missing.as_ref(), deleted.as_ref());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn out_of_project_module_include_reads_use_polled_text_key() -> slug_error::Result<()> {
+        let project = tempfile::Builder::new()
+            .prefix("slug-plan61-project-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let project_root = ProjectRoot::new(AbsNormPathBuf::try_from(
+            project.path().canonicalize().unwrap(),
+        )?)?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-module-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        let include_path = external.path().join("deps.MODULE.bazel");
+        std::fs::write(
+            &module_path,
+            "module(name = \"external_root\")\ninclude(\"//:deps.MODULE.bazel\")\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &include_path,
+            "bazel_dep(name = \"dep\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let mut dice = DiceBuilder::new()
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let (module_read, tracking) =
+            read_bzlmod_file_for_module_inputs(&mut dice, &project_root, &module_path).await?;
+        assert_eq!(tracking, BzlmodFileInputTracking::Polled);
+        let (module_content, _) = module_read.expect("external MODULE should exist");
+        let parsed = parse_module_with_tracked_project_includes(
+            &mut dice,
+            &project_root,
+            &module_path,
+            module_content,
+        )
+        .await?;
+        let first_digest = slug_bzlmod::module_file_inputs_digest(&parsed.inputs);
+
+        std::fs::write(
+            &include_path,
+            "bazel_dep(name = \"dep\", version = \"2.0\")\n",
+        )
+        .unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let (module_read, tracking) =
+            read_bzlmod_file_for_module_inputs(&mut dice, &project_root, &module_path).await?;
+        assert_eq!(tracking, BzlmodFileInputTracking::Polled);
+        let (module_content, _) = module_read.expect("external MODULE should exist");
+        let parsed = parse_module_with_tracked_project_includes(
+            &mut dice,
+            &project_root,
+            &module_path,
+            module_content,
+        )
+        .await?;
+        let second_digest = slug_bzlmod::module_file_inputs_digest(&parsed.inputs);
+
+        assert_ne!(first_digest, second_digest);
         Ok(())
     }
 
