@@ -89,6 +89,7 @@ pub mod paths;
 pub(crate) mod sequence_trie_allocative;
 pub mod unchecked_cell_rel_path;
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::hash_map;
@@ -2498,6 +2499,43 @@ impl CellResolver {
             .map(|(name, instance)| (*name, instance))
     }
 
+    /// Project-relative repo paths that bzlmod label resolution can learn from
+    /// this resolver's graph snapshot without consulting process-global dynamic
+    /// cell maps.
+    pub fn bzlmod_label_cell_paths(&self) -> Vec<(String, String)> {
+        let mut paths = BTreeMap::new();
+        if let Some(snapshot) = self.0.bzlmod_runtime_cell_snapshot.as_ref() {
+            for runtime_cell in snapshot.extension_cells.iter() {
+                paths
+                    .entry(runtime_cell.canonical_name.clone())
+                    .or_insert_with(|| runtime_cell.path.clone());
+            }
+            for alias in snapshot.dynamic_aliases.iter() {
+                if let Some(path) = self.bzlmod_label_path_for_cell(&alias.canonical_name) {
+                    paths.entry(alias.apparent_name.clone()).or_insert(path);
+                }
+            }
+        }
+        for (alias, target) in self.0.root_cell_alias_resolver.mappings() {
+            if let Some(path) = self.bzlmod_label_path_for_cell(target.as_str()) {
+                paths.entry(alias.as_str().to_owned()).or_insert(path);
+            }
+        }
+        paths.into_iter().collect()
+    }
+
+    fn bzlmod_label_path_for_cell(&self, cell_name: &str) -> Option<String> {
+        let cell = CellName::unchecked_new(cell_name).ok()?;
+        self.0
+            .cells
+            .get(&cell)
+            .map(|instance| instance.path().as_str().to_owned())
+            .or_else(|| {
+                self.bzlmod_runtime_extension_cell_for_name(cell_name)
+                    .map(|cell| cell.path)
+            })
+    }
+
     /// Resolves a given 'Package' to the 'ProjectRelativePath' that points to
     /// the 'Package'
     ///
@@ -2899,6 +2937,87 @@ mod tests {
             )
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_label_cell_paths_project_runtime_snapshot_without_globals() -> slug_error::Result<()>
+    {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let dep = CellName::testing_new("dep");
+        let root_path = CellRootPathBuf::testing_new("");
+        let dep_path = CellRootPathBuf::testing_new("bazel-external/dep+1.0");
+        let cell_roots = [(root, root_path.as_path()), (dep, dep_path.as_path())];
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &root_path),
+        )?;
+        let dep_instance = CellInstance::new(
+            dep,
+            dep_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &dep_path),
+        )?;
+        let canonical = "owner++ext+generated";
+        let runtime_path = format!("bazel-external/{canonical}");
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-test"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: runtime_path.clone(),
+                setup,
+                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: "runtime_alias".to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            NonEmptyCellAlias::new("root_generated".to_owned())?,
+            CellName::testing_new(canonical),
+        );
+        aliases.insert(NonEmptyCellAlias::new("dep_alias".to_owned())?, dep);
+        let root_aliases =
+            CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(root, aliases, &snapshot)?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance, dep_instance],
+            root_aliases,
+            snapshot,
+        )?;
+
+        let paths: BTreeMap<_, _> = resolver.bzlmod_label_cell_paths().into_iter().collect();
+
+        assert_eq!(paths.get(canonical), Some(&runtime_path));
+        assert_eq!(paths.get("runtime_alias"), Some(&runtime_path));
+        assert_eq!(paths.get("root_generated"), Some(&runtime_path));
+        assert_eq!(
+            paths.get("dep_alias").map(String::as_str),
+            Some("bazel-external/dep+1.0")
+        );
+        assert!(!paths.contains_key("generated"));
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
+
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().join("after"));
+        assert_eq!(paths.get(canonical), Some(&runtime_path));
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
         Ok(())
     }
 

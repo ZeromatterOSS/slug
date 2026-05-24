@@ -1624,6 +1624,20 @@ What did not work or remains risky:
   tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`:
   `74 passed in 72.08s`. The four slugd processes left by the test harness
   were cleaned up afterward.
+- Module extension label path resolution now projects generated repo cells,
+  dynamic aliases, and root aliases from the active `CellResolver` bzlmod
+  runtime snapshot before falling back to process-global dynamic maps. This
+  lets `module_ctx.path(Label(...))` resolve common generated-repo labels from
+  resolver-local graph state during extension evaluation. Validation passed with
+  `cargo test -p slug_core
+  bzlmod_label_cell_paths_project_runtime_snapshot_without_globals --
+  --nocapture`, `cargo check -p slug_core -p slug_interpreter_for_build -p
+  slug_external_cells -p slug_server`, `cargo build -p slug`, focused Plan 61
+  Python guardrails for generated-repo materialization, injected/override repo
+  labels, and recorded repo mappings (`6 passed, 68 deselected`), the full Plan
+  61 Python guardrail with `74 passed in 83.33s`, `cargo fmt --check`, and
+  `git diff --check`. The four slugd processes left by the full guardrail were
+  cleaned up afterward.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
@@ -1865,6 +1879,11 @@ using Rust DICE keys and values:
   extension-spoke values are graph-owned, but directory-scan caches and
   alias-compatibility maps are still process-local lookup accelerators rather
   than DICE inputs.
+- Module extension label path resolution now receives generated repo cells and
+  root/dynamic aliases from the resolver-local runtime snapshot, reducing one
+  more `module_ctx.path(Label(...))` dependency on the process-global dynamic
+  maps. Repository-context label path resolution and remaining compatibility
+  adapters still use process-global dynamic lookups.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.

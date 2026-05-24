@@ -395,6 +395,11 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                 project_root.join(rel_path.as_str()),
             );
         }
+        for (cell_name, rel_path) in cell_resolver.bzlmod_label_cell_paths() {
+            cell_paths
+                .entry(cell_name)
+                .or_insert_with(|| project_root.join(rel_path));
+        }
 
         // Build the module_ctx from aggregated extension data
         let module_ctx = build_module_context(aggregated, root_module_name)
