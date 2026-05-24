@@ -1484,6 +1484,26 @@ async fn tracked_extension_bzl_digest_for_project(
     ))
 }
 
+async fn tracked_extension_bzl_digests_for_lockfile_preseed(
+    ctx: &mut DiceComputations<'_>,
+    project_root: &AbsNormPathBuf,
+    aggregated: &HashMap<String, slug_bzlmod::extensions::AggregatedExtension>,
+    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
+) -> slug_error::Result<HashMap<String, String>> {
+    let repo_mappings = Arc::new(repo_mappings.clone());
+    let mut digests = HashMap::new();
+    for extension_id in aggregated.keys() {
+        let key = TrackedExtensionBzlDigestKey {
+            project_root: project_root.clone(),
+            extension_id: Arc::from(extension_id.as_str()),
+            repo_mappings: repo_mappings.clone(),
+        };
+        let digest = ctx.compute(&key).await??;
+        digests.insert(extension_id.clone(), digest.to_string());
+    }
+    Ok(digests)
+}
+
 async fn read_bzl_digest_file_input(
     ctx: &mut DiceComputations<'_>,
     project_fs: &ProjectRoot,
@@ -3733,7 +3753,6 @@ impl BuckConfigBasedCells {
             root_module_name,
             &repo_mapping_overrides,
         );
-
         // Augment with extension-internal spokes recorded in MODULE.bazel.lock.
         // The use_repo()-driven pass above only registers repos the project
         // explicitly imports (e.g. the `crates` hub), not the spokes the hub's
@@ -3743,6 +3762,19 @@ impl BuckConfigBasedCells {
         // post-extension-eval loop) is gated on the hub's `.slug_repo_complete`
         // marker.
         if let Some(lockfile) = visible_lockfile.as_ref() {
+            let tracked_bzl_transitive_digests = if let Some(ctx) = dice_ctx.as_deref_mut() {
+                Some(
+                    tracked_extension_bzl_digests_for_lockfile_preseed(
+                        ctx,
+                        &project_root_abs,
+                        &aggregated,
+                        &repo_mappings,
+                    )
+                    .await?,
+                )
+            } else {
+                None
+            };
             let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                 lockfile,
                 &aggregated,
@@ -3750,6 +3782,7 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
                 Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
+                tracked_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
             );
@@ -3764,6 +3797,19 @@ impl BuckConfigBasedCells {
         }
         let hidden_lockfile_path = options.hidden_lockfile_path.clone();
         if let Some(lockfile) = hidden_lockfile.as_ref() {
+            let tracked_bzl_transitive_digests = if let Some(ctx) = dice_ctx.as_deref_mut() {
+                Some(
+                    tracked_extension_bzl_digests_for_lockfile_preseed(
+                        ctx,
+                        &project_root_abs,
+                        &aggregated,
+                        &repo_mappings,
+                    )
+                    .await?,
+                )
+            } else {
+                None
+            };
             let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                 lockfile,
                 &aggregated,
@@ -3771,6 +3817,7 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
                 Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
+                tracked_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
             );

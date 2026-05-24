@@ -1999,6 +1999,14 @@ What did not work or remains risky:
   -p slug_external_cells no_spec_complete_marker_does_not_skip_dice_execution
   -- --nocapture`, `cargo test -p slug_external_cells extension_repo::tests --
   --nocapture`, and `cargo check -p slug_external_cells -p slug_bzlmod`.
+- Lockfile spoke pre-seeding now consumes the `TrackedExtensionBzlDigestKey`
+  digest when bzlmod resolution is running with DICE inputs, so the pre-seed
+  path no longer performs its own direct `.bzl` digest scan in that mode.
+  Non-DICE bootstrap callers keep the old direct scanner until the remaining
+  bridge is removed. Validation passed with `cargo test -p slug_bzlmod
+  lockfile_preseed_uses_tracked_bzl_digest_when_provided -- --nocapture`,
+  `cargo test -p slug_bzlmod lockfile_preseed_skips_stale_extension_cache --
+  --nocapture`, and `cargo check -p slug_common -p slug_bzlmod`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
@@ -2315,6 +2323,10 @@ using Rust DICE keys and values:
    - Keep the current external `bazel-external/<repo>` and mapped literal-load
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.
+   - Lockfile spoke pre-seeding uses the tracked project-file digest producer
+     when DICE inputs are available; `ExtensionBzlTransitiveDigestKey` and
+     non-DICE bootstrap/preseed callers still use the transitional direct
+     literal-load scanner.
    - Reject replay when any loaded implementation file changes, not only
      literal loads that the transitional scanner can find.
 
