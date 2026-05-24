@@ -1651,6 +1651,18 @@ What did not work or remains risky:
   (`6 passed, 68 deselected`), the full Plan 61 Python guardrail with
   `74 passed in 79.03s`, `cargo fmt --check`, and `git diff --check`. The four
   slugd processes left by the full guardrail were cleaned up afterward.
+- `repository_ctx.path(Label(...))` lazy materialization now also derives the
+  canonical extension-generated repository name from the resolver-owned cell
+  path map before falling back to the legacy process-global dynamic maps. This
+  closes the follow-up gap where a resolver-only generated-repo alias could
+  return the correct filesystem path but not fetch-trigger through the same
+  resolver-owned state. Validation passed with `cargo test -p
+  slug_interpreter_for_build repository_context_ -- --nocapture` (`4 passed`),
+  `cargo check -p slug_interpreter_for_build -p slug_server`, `cargo build -p
+  slug`, focused Plan 61 label/repo-mapping guardrails (`6 passed, 68
+  deselected`), the full Plan 61 Python guardrail with `74 passed in 80.20s`,
+  `cargo fmt --check`, and `git diff --check`. The four slugd processes left
+  by the full guardrail were cleaned up afterward.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
@@ -1900,8 +1912,10 @@ using Rust DICE keys and values:
 - Repository-context label path resolution now also receives the resolver-owned
   cell path map from the Starlark repo-rule executor, reducing reliance on
   process-global generated-repo lookups for repository rule path APIs. The
-  fallback resolver and compatibility adapters still consult process-global
-  dynamic maps when no resolver-owned path is available.
+  `repository_ctx.path(Label(...))` lazy materialization trigger also uses that
+  map before falling back to legacy dynamic maps. The fallback resolver and
+  compatibility adapters still consult process-global dynamic maps when no
+  resolver-owned path is available.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.

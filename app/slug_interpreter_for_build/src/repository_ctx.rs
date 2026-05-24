@@ -766,6 +766,22 @@ impl RepositoryContext {
         }
     }
 
+    fn canonical_repo_for_label_materialization(&self, repo: &str) -> String {
+        if let Some(canonical) = self.cell_paths.get(repo).and_then(|path| {
+            let name = path.file_name()?.to_str()?;
+            slug_bzlmod::parse_canonical_name(name).map(|_| name.to_owned())
+        }) {
+            return canonical;
+        }
+        let resolved_repo = slug_core::cells::resolve_dynamic_extension_cell_alias(repo)
+            .unwrap_or_else(|| repo.to_owned());
+        if let Some(cell_path) = slug_core::cells::get_dynamic_extension_cell(&resolved_repo) {
+            cell_path.rsplit('/').next().unwrap_or(repo).to_owned()
+        } else {
+            resolved_repo
+        }
+    }
+
     /// Return recorded inputs collected during repository rule execution.
     pub fn recorded_inputs(&self) -> slug_error::Result<Vec<String>> {
         self.recorded_inputs
@@ -1902,15 +1918,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             if repo.is_empty() {
                 return;
             }
-            let resolved_repo = slug_core::cells::resolve_dynamic_extension_cell_alias(repo)
-                .unwrap_or_else(|| repo.to_owned());
-            let canonical = if let Some(cell_path) =
-                slug_core::cells::get_dynamic_extension_cell(&resolved_repo)
-            {
-                cell_path.rsplit('/').next().unwrap_or(repo).to_owned()
-            } else {
-                resolved_repo
-            };
+            let canonical = this.canonical_repo_for_label_materialization(repo);
             if let Err(e) = slug_bzlmod::materialize_spoke_sync(&canonical) {
                 tracing::debug!(
                     "rctx.path: lazy materialization of '{}' failed (continuing): {}",
@@ -3223,6 +3231,36 @@ mod tests {
                 .join(canonical)
                 .join("pkg")
                 .join("file.txt")
+        );
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
+            None
+        );
+    }
+
+    #[test]
+    fn repository_context_materialization_uses_resolver_owned_generated_repo_path_before_globals() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let working_dir = workspace_root.join("repo_work");
+        let canonical = "repo_ctx_materialize_owner++ext+generated";
+        let apparent = "repo_ctx_materialize_alias";
+        let mut cell_paths = HashMap::new();
+        cell_paths.insert(
+            apparent.to_owned(),
+            workspace_root.join("bazel-external").join(canonical),
+        );
+        let ctx = RepositoryContext::new_with_workspace_root(
+            "ctx".to_owned(),
+            RepositoryAttr::empty(),
+            working_dir,
+            workspace_root.to_path_buf(),
+        )
+        .with_label_resolution(cell_paths);
+
+        assert_eq!(
+            ctx.canonical_repo_for_label_materialization(apparent),
+            canonical
         );
         assert_eq!(
             slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
