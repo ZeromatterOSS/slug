@@ -107,6 +107,7 @@ use itertools::Itertools;
 use sequence_trie::SequenceTrie;
 use slug_fs::paths::abs_path::AbsPath;
 use slug_fs::paths::file_name::FileNameBuf;
+use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
 use crate::cells::alias::CellAlias;
 use crate::cells::alias::NonEmptyCellAlias;
@@ -2393,6 +2394,9 @@ impl CellResolver {
                 return cell_path;
             }
         }
+        if let Some(cell_path) = self.get_bzlmod_runtime_cell_path(path) {
+            return cell_path;
+        }
         let cell = self.find(path);
         // Both of these unwraps are ok by construction of the `CellResolver`
         let instance = self.get(cell).unwrap();
@@ -2408,6 +2412,32 @@ impl CellResolver {
         fs: &ProjectRoot,
     ) -> slug_error::Result<CellPath> {
         Ok(self.get_cell_path(&fs.relativize_any(path)?))
+    }
+
+    fn get_bzlmod_runtime_cell_path(&self, path: &ProjectRelativePath) -> Option<CellPath> {
+        let snapshot = self.0.bzlmod_runtime_cell_snapshot.as_ref()?;
+        let mut best_runtime: Option<(usize, CellName, ForwardRelativePathBuf)> = None;
+        for runtime_cell in snapshot.extension_cells.iter() {
+            let Ok(cell_root) = ProjectRelativePath::new(&runtime_cell.path) else {
+                continue;
+            };
+            let Some(relative) = path.strip_prefix_opt(cell_root) else {
+                continue;
+            };
+            let Ok(cell) = CellName::unchecked_new(&runtime_cell.canonical_name) else {
+                continue;
+            };
+            let depth = cell_root.iter().count();
+            if best_runtime
+                .as_ref()
+                .is_none_or(|(best_depth, _, _)| depth > *best_depth)
+            {
+                best_runtime = Some((depth, cell, relative.to_owned()));
+            }
+        }
+        let (_, cell, relative) = best_runtime?;
+        self.get(cell).ok()?;
+        Some(CellPath::new(cell, relative.into()))
     }
 
     pub fn cells(&self) -> impl Iterator<Item = (CellName, &CellInstance)> {
@@ -2785,6 +2815,16 @@ mod tests {
             snapshot,
         )?;
         let cell_name = CellName::testing_new(canonical);
+        assert_eq!(
+            resolver.get_cell_path(ProjectRelativePath::new(&format!(
+                "bazel-external/{canonical}/defs.bzl"
+            ))?),
+            CellPath::new(
+                cell_name,
+                ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
+            )
+        );
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
         let cell = resolver.get(cell_name)?;
 
         assert_eq!(cell.name(), cell_name);

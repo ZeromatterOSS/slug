@@ -1002,6 +1002,16 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
   the focused Plan 61 Python replay subset, the full Plan 61 Python guardrail
   with 72 tests, `cargo fmt --check`, and `git diff --check`.
+- Cell path classification for lazy extension repositories now consults the
+  resolver's `BzlmodCellGraphValue` runtime snapshot before falling back to
+  process-global dynamic-cell discovery. A path under a graph-owned lazy
+  generated repo can now be classified from the injected cell graph before any
+  global registry promotion. Validation passed with focused `cargo test -p
+  slug_core bzlmod_resolver_uses_runtime_snapshot_for_lazy_extension_cell
+  -- --nocapture`, `cargo check -p slug_core -p slug_common -p
+  slug_external_cells -p slug_server`, `cargo build -p slug`, and focused Plan
+  61 Python guardrail
+  `valid_lockfile_replay_materializes_generated_repo_without_extension_eval`.
 - Bzlmod cell-resolver assembly now also consumes `BzlmodCellGraphValue`.
   Graph module cells carry optional remote-module setup metadata, and the
   config-load path derives module cells, eager extension cells, and root aliases
@@ -1622,8 +1632,9 @@ What did not work or remains risky:
   legacy resolver now publishes the assembled cell graph as
   `BzlmodCellGraphDataKey`, including bundled bzlmod cells. Runtime
   installation and cell-resolver assembly consume that published value, and
-  exact lazy generated-repo lookup plus dynamic/scoped alias resolution can now
-  use the resolver-local runtime snapshot before using process globals.
+  exact lazy generated-repo lookup, dynamic/scoped alias resolution, and lazy
+  generated-repo path classification can now use the resolver-local runtime
+  snapshot before using process globals.
   `override_repo()` generated-repo aliases are projected into that snapshot as
   dynamic aliases.
   Resolver-local cells promoted from that snapshot are now graph-owned instead
@@ -1795,17 +1806,20 @@ using Rust DICE keys and values:
      identity instead of deriving one from the project root, but generated repo
      cell registration itself remains process-global transitional plumbing.
    - Extension repo execution/materialization keys now preserve the workspace
-     identity and output base, but generated repo cell graph ownership and
-     final materialization state are still not fully DICE-owned.
-   - Dynamic generated-repo cell maps are now project-root scoped, but they
-     remain process-global maps rather than a DICE-owned `BzlmodCellGraphKey`.
-     Resolver-local promoted dynamic cells also carry project-root identity, but
-     remain a cache over that transitional global graph. Directory-scan caches
-     are also root-scoped, including negative entries, but still process-local
-     lookup accelerators rather than DICE inputs.
-   - Temporary root-cell and non-root cell-name adapters are project-root scoped,
-     but remain process-global compatibility adapters.
-   - `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
+  identity and output base, but generated repo cell graph ownership and
+  final materialization state are still not fully DICE-owned.
+- Dynamic generated-repo cell maps are now project-root scoped, but they
+  remain process-global maps rather than a DICE-owned `BzlmodCellGraphKey`.
+  Resolver-local promoted dynamic cells also carry project-root identity, but
+  remain a cache over that transitional global graph. Directory-scan caches
+  are also root-scoped, including negative entries, but still process-local
+  lookup accelerators rather than DICE inputs.
+- Lazy extension repository path classification now reads the resolver's
+  runtime cell graph snapshot before process-global dynamic discovery, but the
+  graph is still injected from legacy-produced data.
+- Temporary root-cell and non-root cell-name adapters are project-root scoped,
+  but remain process-global compatibility adapters.
+- `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
      including bundled bzlmod cells, and resolver assembly, runtime
      installation, module-version projection, extension-aggregation projection,
      and registered toolchain/platform projection consume that value. Remaining
