@@ -531,10 +531,11 @@ Observed SDK result at the checkpoint:
   lockfiles use the same value type and now feed a polled content digest into
   the lockfile key when read outside the project root, so warm same-daemon
   commands reuse the hidden-lockfile value while create/edit/delete transitions
-  still change key identity. The visible-lockfile guardrail proves a
-  same-daemon warm no-op does not reread the lockfile before an invalid edit is
-  observed and rejected under `--lockfile_mode=error`, and hidden-lockfile
-  guardrails cover warm reuse plus replay/facts create-edit-delete transitions.
+  still change key identity. The visible-lockfile guardrails prove a
+  same-daemon warm no-op does not reread the lockfile before create, edit, and
+  delete transitions are observed under `--lockfile_mode=error`, and
+  hidden-lockfile guardrails cover warm reuse plus replay/facts
+  create-edit-delete transitions.
 - Locked registry cache files now use tracked project-file DICE reads when the
   configured `XDG_CACHE_HOME` is under the project root, covering cached
   registry `MODULE.bazel`, `source.json`, and `bazel_registry.json` checksum
@@ -652,6 +653,14 @@ Observed SDK result at the checkpoint:
   content is accepted, and restoring the hash succeeds again. Validation passed
   with the focused guardrail selected by `-k 'missing_registry_checksum'`
   (`1 passed, 111 deselected`).
+- Visible lockfile missing-to-present creation and present-to-missing deletion
+  now have same-daemon error-mode coverage: creating an invalid
+  `MODULE.bazel.lock` makes the next `audit cell` fail instead of reusing the
+  warm no-lockfile value, and deleting a valid lockfile forces the next
+  `audit cell` to recompute instead of reusing the warm lockfile value.
+  Validation passed with the focused selector `-k 'visible_lockfile_creation
+  or visible_lockfile_deletion or visible_lockfile_edit'` (`3 passed, 113
+  deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while

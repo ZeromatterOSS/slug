@@ -4472,6 +4472,55 @@ async def test_visible_lockfile_edit_is_observed_in_same_daemon(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_visible_lockfile_creation_is_observed_in_same_daemon(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelLockFileValue.KEY observes missing-to-present changes."""
+    lockfile = buck.cwd / "MODULE.bazel.lock"
+    assert not lockfile.exists()
+
+    before = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    await buck.audit("cell", "--lockfile_mode=error")
+    first = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    await buck.audit("cell", "--lockfile_mode=error")
+    warm = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(lockfile, "{ this is not json }\n")
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", "--lockfile_mode=error")
+    assert "MODULE.bazel.lock" in exc.value.stderr
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_visible_lockfile_deletion_is_observed_in_same_daemon(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelLockFileValue.KEY observes present-to-missing changes."""
+    lockfile = buck.cwd / "MODULE.bazel.lock"
+    _write_minimal_lockfile(lockfile)
+
+    before = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    output = (await buck.audit("cell", "--lockfile_mode=error")).stdout
+    first = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    assert "plan61_guardrails" in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output = (await buck.audit("cell", "--lockfile_mode=error")).stdout
+    warm = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    assert "plan61_guardrails" in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    lockfile.unlink()
+    output = (await buck.audit("cell", "--lockfile_mode=error")).stdout
+    deleted = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    assert "plan61_guardrails" in output
+    assert deleted["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_lockfile_mode_error_rejects_changed_extension_facts(
     buck: Buck,
 ) -> None:
