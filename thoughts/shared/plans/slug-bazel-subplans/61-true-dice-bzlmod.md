@@ -1329,6 +1329,15 @@ Observed SDK result at the checkpoint:
   persisted_empty_bzlmod_session_preserves_explicit_output_base --
   --nocapture`, `cargo check -p slug_common -p slug_server`, `cargo build -p
   slug`, `cargo fmt --check`, and `git diff --check`.
+- `BzlmodSessionData::empty_for_project_root` is now test-only. The remaining
+  basic interpreter setup without a `ProjectRoot` uses a named no-project
+  sentinel constructor, while production project paths initialize empty session
+  projections through explicit `WorkspaceId` values. Validation passed with
+  focused `cargo test -p slug_bzlmod
+  set_bzlmod_session_data_uses_session_workspace_id -- --nocapture`, `cargo
+  check -p slug_bzlmod -p slug_common -p slug_interpreter_for_build -p
+  slug_build_api_tests`, `cargo build -p slug`, `cargo fmt --check`, and `git
+  diff --check`.
 
 ## Consolidated Learnings
 
@@ -1501,7 +1510,9 @@ What did not work or remains risky:
   constructors, bzlmod projection-key constructors, and materialization-manifest
   helper constructors that derive workspace identity from project root are
   test-only, so production execution/materialization code has to pass the
-  explicit workspace identity. The graph is still
+  explicit workspace identity. Generic empty-session construction from only a
+  project root is also test-only; no-project interpreter setup uses a named
+  sentinel. The graph is still
   legacy-produced, and alias compatibility plus runtime registration remain
   process-global transitional plumbing, so this does not yet make the runtime
   bzlmod cell graph DICE-owned.
@@ -1710,7 +1721,8 @@ using Rust DICE keys and values:
    - Remove `BzlmodSessionData` fields as the authority for graph semantics.
    - `BzlmodSessionData::default()` is removed; remaining empty session
      construction must explicitly name the project-root sentinel while the
-     session bridge is still being unwound.
+     session bridge is still being unwound. The generic project-root empty
+     session helper is test-only, and the no-project sentinel is named.
    - Extension repository execution constructors that derive workspace identity
      from project root are test-only; production code must pass explicit
      workspace identity and repo-env. Bzlmod projection-key and

@@ -315,6 +315,11 @@ impl BzlmodSessionData {
         }
     }
 
+    pub fn empty_no_project_sentinel() -> Self {
+        Self::for_workspace(WorkspaceId::for_project_root(PathBuf::new()))
+    }
+
+    #[cfg(test)]
     pub fn empty_for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace(WorkspaceId::for_project_root(project_root))
     }

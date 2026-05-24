@@ -59,7 +59,7 @@ pub fn setup_interpreter_basic(
     // sentinel explicit instead of relying on a semantic-looking Default.
     slug_bzlmod::SetBzlmodSessionData::set_bzlmod_session_data(
         dice,
-        slug_bzlmod::BzlmodSessionData::empty_for_project_root(std::path::PathBuf::new()),
+        slug_bzlmod::BzlmodSessionData::empty_no_project_sentinel(),
     )?;
     Ok(())
 }
