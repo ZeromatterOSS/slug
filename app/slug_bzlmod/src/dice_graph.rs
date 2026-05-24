@@ -559,7 +559,7 @@ impl BzlmodRepoEnvKey {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoEnvDataValue {
     pub repo_env: Arc<BTreeMap<String, String>>,
 }
@@ -640,7 +640,7 @@ pub struct BzlmodRepoMappingsDataValue {
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionAggregationsDataValue {
     pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
 }
@@ -971,7 +971,7 @@ pub struct RegisteredToolchainsValue {
     pub registered_toolchains: Vec<crate::RegisteredToolchain>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct RegisteredToolchainsDataValue {
     pub registered_toolchains: Vec<crate::RegisteredToolchain>,
 }
@@ -1056,7 +1056,7 @@ pub struct RegisteredExecutionPlatformsValue {
     pub registered_execution_platforms: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct RegisteredExecutionPlatformsDataValue {
     pub registered_execution_platforms: Vec<String>,
 }

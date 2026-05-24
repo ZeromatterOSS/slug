@@ -3067,7 +3067,9 @@ impl BuckConfigBasedCells {
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(workspace_root.to_path_buf());
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
-        bzlmod_session_data.repo_env = options.repo_env.clone();
+        bzlmod_session_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue {
+            repo_env: Arc::new(options.repo_env.clone()),
+        };
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
             options.allow_yanked_versions_env.as_deref(),
             &options.allow_yanked_versions_flags,
@@ -3525,7 +3527,7 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
-                Some(&bzlmod_session_data.repo_env),
+                Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
                 Some(&bzlmod_session_data.repo_mappings),
                 Some(&bzlmod_session_data.repo_mapping_overrides),
             );
@@ -3546,7 +3548,7 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
-                Some(&bzlmod_session_data.repo_env),
+                Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
                 Some(&bzlmod_session_data.repo_mappings),
                 Some(&bzlmod_session_data.repo_mapping_overrides),
             );
@@ -3575,7 +3577,10 @@ impl BuckConfigBasedCells {
         // Aggregate extension usages from all modules and carry them into the
         // DICE-injected bzlmod session state. This data is needed when
         // extension repos are lazily executed inside DICE.
-        bzlmod_session_data.extension_aggregations = aggregated;
+        bzlmod_session_data.extension_aggregations =
+            slug_bzlmod::BzlmodExtensionAggregationsDataValue {
+                extension_aggregations: Arc::new(aggregated),
+            };
         bzlmod_session_data.lockfile_inputs = slug_bzlmod::BzlmodLockfileInputsValue::from_values(
             hidden_lockfile_path,
             visible_lockfile_value,
@@ -3630,8 +3635,14 @@ impl BuckConfigBasedCells {
                 all_toolchains.len(),
                 all_exec_platforms.len()
             );
-            bzlmod_session_data.registered_toolchains = all_toolchains.clone();
-            bzlmod_session_data.registered_execution_platforms = all_exec_platforms;
+            bzlmod_session_data.registered_toolchains =
+                slug_bzlmod::RegisteredToolchainsDataValue {
+                    registered_toolchains: all_toolchains,
+                };
+            bzlmod_session_data.registered_execution_platforms =
+                slug_bzlmod::RegisteredExecutionPlatformsDataValue {
+                    registered_execution_platforms: all_exec_platforms,
+                };
 
             // Toolchain repo materialization is intentionally lazy. Label
             // resolution and the external-cell delegates own the semantic
@@ -3652,7 +3663,7 @@ impl BuckConfigBasedCells {
                 internal_name: Arc::from(cell.internal_name.as_str()),
                 spec_hash: Arc::from(cell.spec_hash.as_str()),
                 repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
-                repo_env_json: repo_env_json(&bzlmod_session_data.repo_env),
+                repo_env_json: repo_env_json(bzlmod_session_data.repo_env.repo_env.as_ref()),
                 materialized: false,
             };
             ext_cells.push((cell_name, cell_path, setup));
@@ -3786,7 +3797,7 @@ impl BuckConfigBasedCells {
         } else {
             parsed.module.name.clone()
         };
-        let lockfile_repo_env_json = repo_env_json(&bzlmod_session_data.repo_env);
+        let lockfile_repo_env_json = repo_env_json(bzlmod_session_data.repo_env.repo_env.as_ref());
         let cell_graph = slug_bzlmod::BzlmodCellGraphValue {
             workspace_id: bzlmod_session_data.cell_graph.workspace_id.clone(),
             root_module_name: root_module_name.clone(),

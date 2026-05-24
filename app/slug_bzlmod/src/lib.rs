@@ -53,7 +53,6 @@ pub mod version;
 // Module version registry
 // ============================================================================
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -267,11 +266,11 @@ pub struct RegisteredToolchain {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodSessionData {
     pub module_versions: BzlmodModuleVersionsDataValue,
-    pub registered_toolchains: Vec<RegisteredToolchain>,
-    pub registered_execution_platforms: Vec<String>,
-    pub extension_aggregations: HashMap<String, AggregatedExtension>,
+    pub registered_toolchains: RegisteredToolchainsDataValue,
+    pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+    pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
     pub lockfile_inputs: BzlmodLockfileInputsValue,
-    pub repo_env: BTreeMap<String, String>,
+    pub repo_env: BzlmodRepoEnvDataValue,
     pub resolution_facts: BzlmodResolutionFactsValue,
     pub repo_mappings: RepoMappingSnapshot,
     pub repo_mapping_overrides: RepoMappingOverrides,
@@ -282,11 +281,11 @@ impl BzlmodSessionData {
     pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
         Self {
             module_versions: BzlmodModuleVersionsDataValue::default(),
-            registered_toolchains: Vec::new(),
-            registered_execution_platforms: Vec::new(),
-            extension_aggregations: HashMap::new(),
+            registered_toolchains: RegisteredToolchainsDataValue::default(),
+            registered_execution_platforms: RegisteredExecutionPlatformsDataValue::default(),
+            extension_aggregations: BzlmodExtensionAggregationsDataValue::default(),
             lockfile_inputs: BzlmodLockfileInputsValue::default(),
-            repo_env: BTreeMap::new(),
+            repo_env: BzlmodRepoEnvDataValue::default(),
             resolution_facts: BzlmodResolutionFactsValue::default(),
             repo_mappings: RepoMappingSnapshot::new(),
             repo_mapping_overrides: RepoMappingOverrides::new(),
@@ -311,26 +310,17 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue {
             lockfile_inputs: lockfile_inputs.clone(),
         });
-        let repo_env = Arc::new(data.repo_env.clone());
-        let repo_env_data = Arc::new(BzlmodRepoEnvDataValue {
-            repo_env: repo_env.clone(),
-        });
+        let repo_env_data = Arc::new(data.repo_env.clone());
         let module_versions = Arc::new(data.module_versions.clone());
         let resolution_facts = Arc::new(data.resolution_facts.clone());
         let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
             repo_mappings: Arc::new(data.repo_mappings.clone()),
             repo_mapping_overrides: Arc::new(data.repo_mapping_overrides.clone()),
         });
-        let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
-            extension_aggregations: Arc::new(data.extension_aggregations.clone()),
-        });
+        let extension_aggregations = Arc::new(data.extension_aggregations.clone());
         let cell_graph = Arc::new(data.cell_graph.clone());
-        let registered_toolchains = Arc::new(RegisteredToolchainsDataValue {
-            registered_toolchains: data.registered_toolchains.clone(),
-        });
-        let registered_execution_platforms = Arc::new(RegisteredExecutionPlatformsDataValue {
-            registered_execution_platforms: data.registered_execution_platforms.clone(),
-        });
+        let registered_toolchains = Arc::new(data.registered_toolchains.clone());
+        let registered_execution_platforms = Arc::new(data.registered_execution_platforms.clone());
         self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
         self.changed_to(vec![(
             BzlmodRegisteredToolchainsDataKey,
@@ -379,6 +369,8 @@ pub async fn registered_execution_platforms_for_current_workspace(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[tokio::test]
@@ -469,8 +461,12 @@ mod tests {
             Some(hidden_lockfile),
             LockfileMode::Update,
         );
-        data.repo_env
-            .insert("TOKEN".to_owned(), "from-session".to_owned());
+        data.repo_env = BzlmodRepoEnvDataValue {
+            repo_env: Arc::new(BTreeMap::from([(
+                "TOKEN".to_owned(),
+                "from-session".to_owned(),
+            )])),
+        };
         data.resolution_facts.registry_file_hashes.insert(
             "registry/modules/dep/1.0/MODULE.bazel".to_owned(),
             "sha256-registry".to_owned(),
