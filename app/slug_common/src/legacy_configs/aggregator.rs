@@ -168,7 +168,14 @@ impl CellsAggregator {
             })
             .collect::<slug_error::Result<Vec<_>>>()?;
 
-        let root_cell_alias_resolver = CellAliasResolver::new(self.root_cell, self.root_aliases)?;
+        let root_cell_alias_resolver = match &bzlmod_runtime_cell_snapshot {
+            Some(snapshot) => CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+                self.root_cell,
+                self.root_aliases,
+                snapshot,
+            )?,
+            None => CellAliasResolver::new(self.root_cell, self.root_aliases)?,
+        };
         slug_util::memory_checkpoint::checkpoint(
             "legacy_cells_aggregator_make_cell_resolver",
             [

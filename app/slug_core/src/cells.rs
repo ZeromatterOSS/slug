@@ -90,6 +90,7 @@ pub(crate) mod sequence_trie_allocative;
 pub mod unchecked_cell_rel_path;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::hash_map;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -240,6 +241,51 @@ pub struct BzlmodRuntimeCellInstallSnapshot {
     pub dynamic_aliases: Vec<BzlmodRuntimeDynamicAlias>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct BzlmodRuntimeAliasResolver {
+    scoped_aliases: HashMap<(String, String), String>,
+    dynamic_aliases: HashMap<String, String>,
+    extension_cell_names: HashSet<String>,
+}
+
+impl BzlmodRuntimeAliasResolver {
+    fn from_snapshot(snapshot: &BzlmodRuntimeCellInstallSnapshot) -> Arc<Self> {
+        let scoped_aliases = snapshot
+            .scoped_aliases
+            .iter()
+            .map(|alias| {
+                (
+                    (alias.owner_module.clone(), alias.apparent_name.clone()),
+                    alias.target_name.clone(),
+                )
+            })
+            .collect();
+        let dynamic_aliases = snapshot
+            .dynamic_aliases
+            .iter()
+            .map(|alias| (alias.apparent_name.clone(), alias.canonical_name.clone()))
+            .collect();
+        let extension_cell_names = snapshot
+            .extension_cells
+            .iter()
+            .flat_map(|cell| [cell.canonical_name.clone(), cell.internal_name.clone()])
+            .collect();
+        Arc::new(Self {
+            scoped_aliases,
+            dynamic_aliases,
+            extension_cell_names,
+        })
+    }
+
+    fn resolve_dynamic_alias(&self, apparent_name: &str) -> Option<String> {
+        self.dynamic_aliases.get(apparent_name).cloned()
+    }
+
+    fn has_extension_cell(&self, name: &str) -> bool {
+        self.extension_cell_names.contains(name)
+    }
+}
+
 #[derive(Debug)]
 struct KnownCellAliasesForError {
     aliases: Vec<NonEmptyCellAlias>,
@@ -369,20 +415,36 @@ pub fn resolve_scoped_bzlmod_repo_alias_for_current_cell(
         return None;
     }
 
-    let canonical_current_cell =
-        canonical_dynamic_extension_cell_name(current_cell).filter(|cell| cell != current_cell);
     let aliases = SCOPED_BZLMOD_REPO_ALIASES.lock().ok()?;
+    resolve_scoped_bzlmod_repo_alias_for_current_cell_with_lookup(
+        current_cell,
+        apparent_name,
+        &|cell| canonical_dynamic_extension_cell_name(cell),
+        &|owner_module| {
+            aliases
+                .get(&(owner_module.to_owned(), apparent_name.to_owned()))
+                .and_then(dynamic_bzlmod_value_for_current_root)
+        },
+        &|apparent_name| resolve_dynamic_extension_cell_alias(apparent_name),
+    )
+}
 
-    lookup_scoped_bzlmod_repo_alias_for_cell(&aliases, current_cell, apparent_name)
+fn resolve_scoped_bzlmod_repo_alias_for_current_cell_with_lookup(
+    current_cell: &str,
+    apparent_name: &str,
+    canonicalize_cell: &impl Fn(&str) -> Option<String>,
+    lookup: &impl Fn(&str) -> Option<String>,
+    resolve_dynamic_alias: &impl Fn(&str) -> Option<String>,
+) -> Option<String> {
+    let canonical_current_cell =
+        canonicalize_cell(current_cell).filter(|cell| cell != current_cell);
+
+    lookup_scoped_bzlmod_repo_alias_for_cell(current_cell, lookup)
         .or_else(|| {
             canonical_current_cell
                 .as_deref()
                 .and_then(|canonical_cell| {
-                    lookup_scoped_bzlmod_repo_alias_for_cell(
-                        &aliases,
-                        canonical_cell,
-                        apparent_name,
-                    )
+                    lookup_scoped_bzlmod_repo_alias_for_cell(canonical_cell, lookup)
                 })
         })
         .or_else(|| {
@@ -391,7 +453,7 @@ pub fn resolve_scoped_bzlmod_repo_alias_for_current_cell(
                 .or(Some(current_cell))
                 .and_then(|cell| {
                     let prefix = bzlmod_extension_repo_prefix(cell)?;
-                    resolve_dynamic_extension_cell_alias(apparent_name)
+                    resolve_dynamic_alias(apparent_name)
                         .filter(|canonical| canonical.starts_with(&prefix))
                 })
         })
@@ -404,16 +466,9 @@ fn bzlmod_extension_repo_prefix(cell: &str) -> Option<String> {
 }
 
 fn lookup_scoped_bzlmod_repo_alias_for_cell(
-    aliases: &HashMap<(String, String), DynamicBzlmodEntry<String>>,
     current_cell: &str,
-    apparent_name: &str,
+    lookup: &impl Fn(&str) -> Option<String>,
 ) -> Option<String> {
-    let lookup = |owner_module: &str| {
-        aliases
-            .get(&(owner_module.to_owned(), apparent_name.to_owned()))
-            .and_then(dynamic_bzlmod_value_for_current_root)
-    };
-
     if let Some(canonical) = lookup(current_cell).or_else(|| lookup(&format!("{current_cell}+"))) {
         return Some(canonical);
     }
@@ -1386,6 +1441,7 @@ pub struct CellAliasResolver {
     /// Current cell name.
     current: CellName,
     aliases: Arc<HashMap<NonEmptyCellAlias, CellName>>,
+    bzlmod_runtime_aliases: Option<Arc<BzlmodRuntimeAliasResolver>>,
 }
 
 impl CellAliasResolver {
@@ -1401,6 +1457,7 @@ impl CellAliasResolver {
     fn new_with_shared_aliases(
         current: CellName,
         aliases: Arc<HashMap<NonEmptyCellAlias, CellName>>,
+        bzlmod_runtime_aliases: Option<Arc<BzlmodRuntimeAliasResolver>>,
     ) -> slug_error::Result<CellAliasResolver> {
         let current_as_alias = Self::current_as_alias(current)?;
         if let Some(alias_target) = aliases.get(&current_as_alias) {
@@ -1414,14 +1471,40 @@ impl CellAliasResolver {
             [("aliases", aliases.len())],
         );
 
-        Ok(CellAliasResolver { current, aliases })
+        Ok(CellAliasResolver {
+            current,
+            aliases,
+            bzlmod_runtime_aliases,
+        })
     }
 
     /// Create an instance of `CellAliasResolver`. The special alias `""` must be present, or
     /// this will fail
     pub fn new(
         current: CellName,
+        aliases: HashMap<NonEmptyCellAlias, CellName>,
+    ) -> slug_error::Result<CellAliasResolver> {
+        Self::new_with_bzlmod_runtime_aliases(current, aliases, None)
+    }
+
+    pub fn new_bzlmod_with_runtime_cell_snapshot(
+        current: CellName,
+        aliases: HashMap<NonEmptyCellAlias, CellName>,
+        runtime_cell_snapshot: &BzlmodRuntimeCellInstallSnapshot,
+    ) -> slug_error::Result<CellAliasResolver> {
+        Self::new_with_bzlmod_runtime_aliases(
+            current,
+            aliases,
+            Some(BzlmodRuntimeAliasResolver::from_snapshot(
+                runtime_cell_snapshot,
+            )),
+        )
+    }
+
+    fn new_with_bzlmod_runtime_aliases(
+        current: CellName,
         mut aliases: HashMap<NonEmptyCellAlias, CellName>,
+        bzlmod_runtime_aliases: Option<Arc<BzlmodRuntimeAliasResolver>>,
     ) -> slug_error::Result<CellAliasResolver> {
         let input_aliases = aliases.len();
         let current_as_alias = Self::current_as_alias(current)?;
@@ -1438,7 +1521,11 @@ impl CellAliasResolver {
             [("input_aliases", input_aliases), ("aliases", aliases.len())],
         );
 
-        Ok(CellAliasResolver { current, aliases })
+        Ok(CellAliasResolver {
+            current,
+            aliases,
+            bzlmod_runtime_aliases,
+        })
     }
 
     pub fn new_for_non_root_cell(
@@ -1451,6 +1538,7 @@ impl CellAliasResolver {
             return CellAliasResolver::new_with_shared_aliases(
                 current,
                 root_aliases.aliases.dupe(),
+                root_aliases.bzlmod_runtime_aliases.clone(),
             );
         };
 
@@ -1465,7 +1553,11 @@ impl CellAliasResolver {
             };
             aliases.insert(alias, *name);
         }
-        CellAliasResolver::new(current, aliases)
+        CellAliasResolver::new_with_bzlmod_runtime_aliases(
+            current,
+            aliases,
+            root_aliases.bzlmod_runtime_aliases.clone(),
+        )
     }
 
     /// resolves a 'CellAlias' into its corresponding 'CellName'
@@ -1476,8 +1568,11 @@ impl CellAliasResolver {
         if alias == self.current.as_str() {
             return Ok(self.current);
         }
-        if let Some(canonical_name) =
-            resolve_scoped_bzlmod_repo_alias_for_current_cell(self.current.as_str(), alias)
+        if let Some(canonical_name) = self
+            .resolve_scoped_bzlmod_repo_alias_from_runtime(alias)
+            .or_else(|| {
+                resolve_scoped_bzlmod_repo_alias_for_current_cell(self.current.as_str(), alias)
+            })
         {
             if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
                 return Ok(cell_name);
@@ -1487,13 +1582,18 @@ impl CellAliasResolver {
             return Ok(name);
         }
 
-        if let Some(canonical_name) = resolve_dynamic_extension_cell_alias(alias) {
+        if let Some(canonical_name) = self
+            .resolve_dynamic_extension_cell_alias_from_runtime(alias)
+            .or_else(|| resolve_dynamic_extension_cell_alias(alias))
+        {
             if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
                 return Ok(cell_name);
             }
         }
 
-        if get_dynamic_extension_cell(alias).is_some() {
+        if self.has_bzlmod_runtime_extension_cell(alias)
+            || get_dynamic_extension_cell(alias).is_some()
+        {
             if let Ok(cell_name) = CellName::unchecked_new(alias) {
                 return Ok(cell_name);
             }
@@ -1549,6 +1649,39 @@ impl CellAliasResolver {
             self.current,
             KnownCellAliasesForError::new(&self.aliases),
         )))
+    }
+
+    fn resolve_scoped_bzlmod_repo_alias_from_runtime(&self, alias: &str) -> Option<String> {
+        let runtime_aliases = self.bzlmod_runtime_aliases.as_ref()?;
+        resolve_scoped_bzlmod_repo_alias_for_current_cell_with_lookup(
+            self.current.as_str(),
+            alias,
+            &|cell| {
+                runtime_aliases
+                    .has_extension_cell(cell)
+                    .then(|| cell.to_owned())
+                    .or_else(|| runtime_aliases.resolve_dynamic_alias(cell))
+            },
+            &|owner_module| {
+                runtime_aliases
+                    .scoped_aliases
+                    .get(&(owner_module.to_owned(), alias.to_owned()))
+                    .cloned()
+            },
+            &|apparent_name| runtime_aliases.resolve_dynamic_alias(apparent_name),
+        )
+    }
+
+    fn resolve_dynamic_extension_cell_alias_from_runtime(&self, alias: &str) -> Option<String> {
+        self.bzlmod_runtime_aliases
+            .as_ref()
+            .and_then(|runtime_aliases| runtime_aliases.resolve_dynamic_alias(alias))
+    }
+
+    fn has_bzlmod_runtime_extension_cell(&self, name: &str) -> bool {
+        self.bzlmod_runtime_aliases
+            .as_ref()
+            .is_some_and(|runtime_aliases| runtime_aliases.has_extension_cell(name))
     }
 
     /// finds the 'CellName' for the current cell (with the alias `""`. See module docs)
@@ -2526,7 +2659,6 @@ mod tests {
             None,
             NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
         )?;
-        let root_aliases = CellAliasResolver::new(root, HashMap::new())?;
         let canonical = "owner++ext+generated";
         let setup = crate::cells::external::ExtensionRepoCellSetup {
             canonical_name: Arc::from(canonical),
@@ -2545,10 +2677,44 @@ mod tests {
                 setup: setup.clone(),
                 registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
             }],
-            scoped_aliases: Vec::new(),
-            dynamic_aliases: Vec::new(),
+            scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
+                owner_module: "owner+".to_owned(),
+                apparent_name: "helper".to_owned(),
+                target_name: "dep+1.0".to_owned(),
+            }],
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: "generated_alias".to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
         };
         assert_eq!(get_dynamic_extension_cell(canonical), None);
+        assert_eq!(
+            resolve_dynamic_extension_cell_alias("generated_alias"),
+            None
+        );
+        assert_eq!(
+            resolve_scoped_bzlmod_repo_alias_for_current_cell("owner+", "helper"),
+            None
+        );
+
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let owner_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("owner+"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+        assert_eq!(
+            root_aliases.resolve("generated_alias")?,
+            CellName::testing_new(canonical)
+        );
+        assert_eq!(
+            owner_aliases.resolve("helper")?,
+            CellName::testing_new("dep+1.0")
+        );
 
         let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
             vec![root_instance],
