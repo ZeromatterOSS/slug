@@ -1617,6 +1617,13 @@ What did not work or remains risky:
   slug_server`, `cargo build -p slug`, and focused Plan 61 Python guardrails
   `missing_lockfile_extension_executes_once_then_reuses_dice_state` plus
   `lockfile_replay_recorded_repo_mapping_from_extension_repo_source`.
+- After the tracked root input and resolver-owned generated-repo registration
+  slices, the full Plan 61 Python guardrail file passed with
+  `env TMPDIR=/var/mnt/dev/slug-test-tmp
+  TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`:
+  `74 passed in 72.08s`. The four slugd processes left by the test harness
+  were cleaned up afterward.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
