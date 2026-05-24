@@ -1562,6 +1562,52 @@ impl CellAliasResolver {
         )
     }
 
+    /// Resolve an alias using only aliases carried by this resolver: explicit
+    /// alias mappings and bzlmod runtime snapshot aliases/cells. This omits
+    /// transitional process-global dynamic maps and directory scans.
+    pub fn resolve_declared_or_runtime_alias(&self, alias: &str) -> Option<CellName> {
+        if alias.is_empty() || alias == self.current.as_str() {
+            return Some(self.current);
+        }
+        if let Some(canonical_name) = self.resolve_scoped_bzlmod_repo_alias_from_runtime(alias) {
+            if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
+                return Some(cell_name);
+            }
+        }
+        if let Some(name) = self.lookup_alias(alias) {
+            return Some(name);
+        }
+
+        if let Some(canonical_name) = self.resolve_dynamic_extension_cell_alias_from_runtime(alias)
+        {
+            if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
+                return Some(cell_name);
+            }
+        }
+
+        if self.has_bzlmod_runtime_extension_cell(alias) {
+            if let Ok(cell_name) = CellName::unchecked_new(alias) {
+                return Some(cell_name);
+            }
+        }
+
+        let current_str = self.current.as_str();
+        if let Some(prefix_end) = current_str.rfind('+') {
+            let prefix = &current_str[..=prefix_end];
+            let candidate = format!("{prefix}{alias}");
+            if let Some(name) = self.lookup_alias(&candidate) {
+                return Some(name);
+            }
+            if self.has_bzlmod_runtime_extension_cell(&candidate) {
+                if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                    return Some(cell_name);
+                }
+            }
+        }
+
+        None
+    }
+
     /// resolves a 'CellAlias' into its corresponding 'CellName'
     pub fn resolve(&self, alias: &str) -> slug_error::Result<CellName> {
         if alias.is_empty() {

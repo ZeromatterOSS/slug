@@ -24,6 +24,7 @@ use slug_common::package_listing::listing::PackageListing;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::bxl::BxlFilePath;
 use slug_core::bzl::ImportPath;
+use slug_core::cells::CellAliasResolver;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
@@ -243,7 +244,11 @@ impl LoadResolver for InterpreterLoadResolver {
             .cell_resolver
             .get_cell_path(&project_path);
         if reformed_path.cell() != path.cell() {
-            if are_bzlmod_alias_equivalent(reformed_path.cell().as_str(), path.cell().as_str()) {
+            if are_bzlmod_alias_equivalent(
+                self.config.cell_info.cell_alias_resolver(),
+                reformed_path.cell().as_str(),
+                path.cell().as_str(),
+            ) {
                 path = reformed_path;
             } else {
                 // We actually call resolve_load twice for each loadable - once with all load's up front,
@@ -294,10 +299,20 @@ fn canonicalize_bzlmod_load_path(path: CellPath) -> slug_error::Result<CellPath>
     }
 }
 
-fn are_bzlmod_alias_equivalent(apparent: &str, canonical: &str) -> bool {
+fn are_bzlmod_alias_equivalent(
+    alias_resolver: &CellAliasResolver,
+    apparent: &str,
+    canonical: &str,
+) -> bool {
     apparent == canonical
         || canonical.strip_suffix('+') == Some(apparent)
         || apparent.strip_suffix('+') == Some(canonical)
+        || alias_resolver
+            .resolve_declared_or_runtime_alias(apparent)
+            .is_some_and(|cell| cell.as_str() == canonical)
+        || alias_resolver
+            .resolve_declared_or_runtime_alias(canonical)
+            .is_some_and(|cell| cell.as_str() == apparent)
         || slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref()
             == Some(canonical)
         || slug_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
@@ -314,10 +329,20 @@ fn extension_repo_internal_name(canonical: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+
     use super::*;
+
+    fn test_alias_resolver() -> CellAliasResolver {
+        CellAliasResolver::new(CellName::testing_new("root"), HashMap::new()).unwrap()
+    }
 
     #[test]
     fn load_cell_equivalence_accepts_registered_dynamic_alias() {
+        let resolver = test_alias_resolver();
         let apparent = "interpreter_load_alias_test";
         let canonical = "owner+ext+interpreter_load_alias_test";
         slug_core::cells::register_dynamic_extension_cell_alias(
@@ -325,14 +350,55 @@ mod tests {
             canonical.to_owned(),
         );
 
-        assert!(are_bzlmod_alias_equivalent(apparent, canonical));
-        assert!(are_bzlmod_alias_equivalent(canonical, apparent));
+        assert!(are_bzlmod_alias_equivalent(&resolver, apparent, canonical));
+        assert!(are_bzlmod_alias_equivalent(&resolver, canonical, apparent));
+    }
+
+    #[test]
+    fn load_cell_equivalence_uses_runtime_aliases_before_globals() -> slug_error::Result<()> {
+        let apparent = "runtime_load_alias";
+        let canonical = "owner++ext+generated";
+        let wrong_global = "wrong_owner++ext+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert!(are_bzlmod_alias_equivalent(&resolver, apparent, canonical));
+        assert!(are_bzlmod_alias_equivalent(&resolver, canonical, apparent));
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
+            Some(wrong_global.to_owned())
+        );
+        Ok(())
     }
 
     #[test]
     fn load_cell_equivalence_accepts_empty_version_module_suffix() {
-        assert!(are_bzlmod_alias_equivalent("rules_rust", "rules_rust+"));
-        assert!(are_bzlmod_alias_equivalent("rules_rust+", "rules_rust"));
+        let resolver = test_alias_resolver();
+        assert!(are_bzlmod_alias_equivalent(
+            &resolver,
+            "rules_rust",
+            "rules_rust+"
+        ));
+        assert!(are_bzlmod_alias_equivalent(
+            &resolver,
+            "rules_rust+",
+            "rules_rust"
+        ));
     }
 
     #[test]
@@ -356,11 +422,14 @@ mod tests {
 
     #[test]
     fn load_cell_equivalence_accepts_same_extension_internal_repo_name() {
+        let resolver = test_alias_resolver();
         assert!(are_bzlmod_alias_equivalent(
+            &resolver,
             "rules_rs+crate+crates__ts-rs-12.0.1",
             "crates__ts-rs-12.0.1"
         ));
         assert!(are_bzlmod_alias_equivalent(
+            &resolver,
             "crates__ts-rs-12.0.1",
             "rules_rs+crate+crates__ts-rs-12.0.1"
         ));
@@ -368,11 +437,14 @@ mod tests {
 
     #[test]
     fn load_cell_equivalence_accepts_bazel9_double_plus_internal_repo_name() {
+        let resolver = test_alias_resolver();
         assert!(are_bzlmod_alias_equivalent(
+            &resolver,
             "rules_rs++crate+crates",
             "crates"
         ));
         assert!(are_bzlmod_alias_equivalent(
+            &resolver,
             "crates",
             "rules_rs++crate+crates"
         ));

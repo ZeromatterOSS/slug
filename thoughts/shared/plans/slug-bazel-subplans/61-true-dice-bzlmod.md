@@ -1663,6 +1663,19 @@ What did not work or remains risky:
   deselected`), the full Plan 61 Python guardrail with `74 passed in 80.20s`,
   `cargo fmt --check`, and `git diff --check`. The four slugd processes left
   by the full guardrail were cleaned up afterward.
+- Bzlmod load-path alias equivalence now asks a declared/runtime-only
+  `CellAliasResolver` helper before falling back to process-global dynamic
+  alias maps when deciding whether a reformed canonical load path is equivalent
+  to the originally parsed path. This lets resolver-owned runtime aliases
+  explain load-path equivalence without requiring a compatibility global, and
+  the focused regression installs a conflicting process-global alias to prove
+  ordering. Validation passed with `cargo test -p slug_interpreter_for_build
+  load_cell_equivalence_ -- --nocapture` (`5 passed`), `cargo check -p
+  slug_core -p slug_interpreter_for_build -p slug_server`, `cargo build -p
+  slug`, focused Plan 61 scoped-alias/mapped-load guardrails (`4 passed, 70
+  deselected`), the full Plan 61 Python guardrail with `74 passed in 80.85s`,
+  `cargo fmt --check`, and `git diff --check`. The four slugd processes left
+  by the full guardrail were cleaned up afterward.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
@@ -1916,6 +1929,10 @@ using Rust DICE keys and values:
   map before falling back to legacy dynamic maps. The fallback resolver and
   compatibility adapters still consult process-global dynamic maps when no
   resolver-owned path is available.
+- Bzlmod load-path wrong-cell equivalence can now use declared aliases and
+  runtime aliases/cells from the active cell alias resolver before consulting
+  process-global dynamic aliases, but remaining canonicalization helpers still
+  have process-global fallback behavior.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.
