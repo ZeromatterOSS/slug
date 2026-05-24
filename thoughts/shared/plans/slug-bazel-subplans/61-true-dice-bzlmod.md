@@ -943,6 +943,23 @@ Observed SDK result at the checkpoint:
   build -p slug`, the focused Plan 61 Python replay/root-isolation/alias subset,
   the full Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
   `git diff --check`.
+- Resolver-local promoted generated-repo cells now distinguish graph-owned cells
+  from transitional root-scoped discoveries. Cells created from the
+  graph-derived runtime snapshot remain available through that resolver even
+  after the process-global root adapter resets, while cells discovered from
+  process-global maps or directory scans remain scoped to the root that
+  published them. Validation passed with `cargo test -p slug_core
+  bzlmod_resolver_uses_runtime_snapshot_for_lazy_extension_cell --
+  --nocapture`, `cargo test -p slug_core
+  dynamic_bzlmod_entries_are_scoped_to_current_project_root -- --nocapture`,
+  `cargo test -p slug_core cells::bzlmod_apparent_alias_cache_tests --
+  --nocapture --test-threads=1`, `cargo check -p slug_core`, `cargo check -p
+  slug_core -p slug_common -p slug_external_cells`, `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
+  --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo
+  build -p slug`, the focused Plan 61 Python replay/root-isolation/alias subset,
+  the full Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
+  `git diff --check`.
 - Bundled bzlmod cells are now part of `BzlmodCellGraphValue` instead of
   separate config-load auto-registration. The graph records bundled cells with
   an explicit `bundled` bit, and resolver assembly marks those graph cells with
@@ -1338,10 +1355,12 @@ What did not work or remains risky:
   `BzlmodCellGraphDataKey`, including bundled bzlmod cells. Runtime
   installation and cell-resolver assembly consume that published value, and
   exact lazy generated-repo lookup plus dynamic/scoped alias resolution can now
-  use the resolver-local runtime snapshot before using process globals. The
-  graph is still legacy-produced, and alias compatibility plus runtime
-  registration remain process-global transitional plumbing, so this does not
-  yet make the runtime bzlmod cell graph DICE-owned.
+  use the resolver-local runtime snapshot before using process globals.
+  Resolver-local cells promoted from that snapshot are now graph-owned instead
+  of root-scoped process-global cache entries. The graph is still
+  legacy-produced, and alias compatibility plus runtime registration remain
+  process-global transitional plumbing, so this does not yet make the runtime
+  bzlmod cell graph DICE-owned.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
