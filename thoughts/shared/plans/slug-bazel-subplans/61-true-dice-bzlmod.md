@@ -1159,7 +1159,9 @@ Observed SDK result at the checkpoint:
   Startup replay still refreshes module/external symlinks from that graph, but
   no longer installs eager/lazy extension cells, scoped aliases, or dynamic
   aliases into process-global maps; those runtime cells and aliases are carried
-  by the resolver-owned snapshot. Validation passed with `cargo test -p
+  by the resolver-owned snapshot. The runtime snapshot also no longer carries
+  the now-dead eager/lazy process-global registration flag. Validation passed
+  with `cargo test -p
   slug_core bzlmod_resolver_ -- --nocapture`, `cargo test -p slug_common
   runtime_cell_install_snapshot_derives_from_cell_graph -- --nocapture`,
   `cargo test -p slug_common

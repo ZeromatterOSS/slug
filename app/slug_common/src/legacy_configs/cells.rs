@@ -266,11 +266,6 @@ fn runtime_cell_install_snapshot(
                 internal_name: cell.internal_name.clone(),
                 path: cell.path.clone(),
                 setup: runtime_extension_setup_from_cell_graph(cell),
-                registration: if cell.lazy {
-                    slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Lazy
-                } else {
-                    slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Eager
-                },
             }
         }));
     snapshot
@@ -4700,15 +4695,7 @@ mod tests {
         let snapshot = runtime_cell_install_snapshot(&cell_graph);
 
         assert_eq!(snapshot.extension_cells.len(), 2);
-        assert_eq!(
-            snapshot.extension_cells[0].registration,
-            slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Eager
-        );
         assert!(snapshot.extension_cells[0].setup.materialized);
-        assert_eq!(
-            snapshot.extension_cells[1].registration,
-            slug_core::cells::BzlmodRuntimeExtensionCellRegistration::Lazy
-        );
         assert_eq!(
             snapshot.extension_cells[1].setup.repo_env_json.as_ref(),
             r#"{"K":"V"}"#

@@ -209,18 +209,11 @@ static DYNAMIC_PROJECT_ROOT: std::sync::LazyLock<std::sync::RwLock<Option<std::p
 const MAX_UNKNOWN_CELL_ALIAS_SUGGESTIONS: usize = 50;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BzlmodRuntimeExtensionCellRegistration {
-    Eager,
-    Lazy,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BzlmodRuntimeExtensionCell {
     pub canonical_name: String,
     pub internal_name: String,
     pub path: String,
     pub setup: crate::cells::external::ExtensionRepoCellSetup,
-    pub registration: BzlmodRuntimeExtensionCellRegistration,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2911,14 +2904,12 @@ mod tests {
                     internal_name: "generated".to_owned(),
                     path: format!("bazel-external/{canonical}"),
                     setup: setup.clone(),
-                    registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
                 },
                 BzlmodRuntimeExtensionCell {
                     canonical_name: sibling.to_owned(),
                     internal_name: "sibling".to_owned(),
                     path: format!("bazel-external/{sibling}"),
                     setup: sibling_setup,
-                    registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
                 },
             ],
             scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
@@ -3047,7 +3038,6 @@ mod tests {
                 internal_name: "generated".to_owned(),
                 path: runtime_path.clone(),
                 setup,
-                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
             }],
             scoped_aliases: Vec::new(),
             dynamic_aliases: Vec::new(),
@@ -3224,7 +3214,6 @@ mod tests {
                 internal_name: "generated".to_owned(),
                 path: runtime_path.clone(),
                 setup,
-                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
             }],
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
