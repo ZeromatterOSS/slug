@@ -4467,8 +4467,9 @@ async fn resolve_toolchain_types(
     // sees the same list as default-group resolution does. Check
     // `target_compatible_with` against the configured target platform, whose
     // constraints may include user/toolchain constraints beyond OS and CPU.
+    let declared_toolchains = get_declared_toolchains();
     let mut target = PlatformConstraints::from_configuration_data(node.label().cfg());
-    add_matching_toolchain_target_settings(dice, node, &mut target).await?;
+    add_matching_toolchain_target_settings(dice, node, &mut target, &declared_toolchains).await?;
     let candidates: Vec<PlatformConstraints> = if candidate_platforms.is_empty() {
         vec![target.clone()]
     } else {
@@ -4497,7 +4498,6 @@ async fn resolve_toolchain_types(
             ("candidate_count", candidates.len()),
         ],
     );
-    let declared_toolchains = get_declared_toolchains();
     let first =
         resolve_toolchains_multi_group(&requests, &target, &candidates, &declared_toolchains);
     let (
@@ -4575,10 +4575,23 @@ async fn resolve_toolchain_types(
             ],
         );
         let retry_declared_toolchains = get_declared_toolchains();
+        let mut retry_target = PlatformConstraints::from_configuration_data(node.label().cfg());
+        add_matching_toolchain_target_settings(
+            dice,
+            node,
+            &mut retry_target,
+            &retry_declared_toolchains,
+        )
+        .await?;
+        let retry_candidates: Vec<PlatformConstraints> = if candidate_platforms.is_empty() {
+            vec![retry_target.clone()]
+        } else {
+            candidate_platforms.to_vec()
+        };
         let retry = resolve_toolchains_multi_group(
             &requests,
-            &target,
-            &candidates,
+            &retry_target,
+            &retry_candidates,
             &retry_declared_toolchains,
         );
         let (
@@ -4676,11 +4689,9 @@ async fn add_matching_toolchain_target_settings(
     dice: &mut DiceComputations<'_>,
     node: ConfiguredTargetNodeRef<'_>,
     target: &mut crate::analysis::toolchain_resolution::PlatformConstraints,
+    declared: &[(String, DeclaredToolchainInfo)],
 ) -> slug_error::Result<()> {
-    let settings: HashSet<String> = get_declared_toolchains()
-        .into_iter()
-        .flat_map(|(_, info)| info.target_settings)
-        .collect();
+    let settings = declared_toolchain_target_settings(declared);
     if settings.is_empty() {
         return Ok(());
     }
@@ -4714,6 +4725,15 @@ async fn add_matching_toolchain_target_settings(
     }
 
     Ok(())
+}
+
+fn declared_toolchain_target_settings(
+    declared: &[(String, DeclaredToolchainInfo)],
+) -> HashSet<String> {
+    declared
+        .iter()
+        .flat_map(|(_, info)| info.target_settings.iter().cloned())
+        .collect()
 }
 
 fn summarize_toolchain_resolution_result(
@@ -5056,6 +5076,21 @@ mod tests {
             cc_toolchain_config: None,
             cc_toolchain_module_map: None,
             toolchain_type: label.to_owned(),
+        }
+    }
+
+    fn declared_toolchain_with_target_settings(
+        toolchain_type: &str,
+        target_settings: Vec<&str>,
+    ) -> DeclaredToolchainInfo {
+        DeclaredToolchainInfo {
+            toolchain_type: toolchain_type.to_owned(),
+            toolchain_impl: format!("{toolchain_type}_impl"),
+            cc_toolchain_config: None,
+            cc_toolchain_module_map: None,
+            exec_compatible_with: Vec::new(),
+            target_compatible_with: Vec::new(),
+            target_settings: target_settings.into_iter().map(str::to_owned).collect(),
         }
     }
 
@@ -5528,5 +5563,32 @@ mod tests {
             &Ok(MultiGroupResolutionResult { groups }),
             &requests
         ));
+    }
+
+    #[test]
+    fn test_declared_toolchain_target_settings_use_explicit_snapshot() {
+        let declared = vec![
+            (
+                "@first//:toolchain".to_owned(),
+                declared_toolchain_with_target_settings(
+                    "@rules//:toolchain_type",
+                    vec!["@settings//:linux", "@settings//:dbg"],
+                ),
+            ),
+            (
+                "@second//:toolchain".to_owned(),
+                declared_toolchain_with_target_settings(
+                    "@rules//:other_toolchain_type",
+                    vec!["@settings//:linux"],
+                ),
+            ),
+        ];
+
+        let settings = declared_toolchain_target_settings(&declared);
+
+        assert_eq!(settings.len(), 2);
+        assert!(settings.contains("@settings//:linux"));
+        assert!(settings.contains("@settings//:dbg"));
+        assert!(declared_toolchain_target_settings(&[]).is_empty());
     }
 }

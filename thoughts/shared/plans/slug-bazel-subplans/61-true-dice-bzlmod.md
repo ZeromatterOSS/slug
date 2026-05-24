@@ -1737,6 +1737,17 @@ What did not work or remains risky:
   passed`), `cargo check -p slug_analysis -p slug_server`, `cargo build -p
   slug`, and the full Plan 61 Python guardrail with `74 passed in 39.83s`.
   The slugd processes left by the full guardrail were cleaned up afterward.
+- Toolchain `target_settings` enrichment now consumes the same explicit
+  declared-toolchain snapshot as the resolver instead of reopening the
+  process-global registry inside the helper, and the deferred-load retry
+  refreshes both the declared-toolchain snapshot and derived target platform
+  constraints before resolving again. The snapshot producer is still the
+  transitional registry. Validation passed with `cargo test -p slug_analysis
+  test_declared_toolchain_target_settings_use_explicit_snapshot --
+  --nocapture`, `cargo test -p slug_analysis toolchain -- --nocapture` (`12
+  passed`), `cargo check -p slug_analysis -p slug_server`, `cargo build -p
+  slug`, and the full Plan 61 Python guardrail with `74 passed in 40.17s`.
+  The slugd processes left by the full guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -1973,13 +1984,14 @@ using Rust DICE keys and values:
      installation, module-version projection, extension-aggregation projection,
      and registered toolchain/platform projection consume that value. Remaining
      installed lookup state still needs to depend on it instead of
-     process-global maps. Toolchain resolution receives an explicit declared
-     toolchain snapshot from the caller, but the snapshot producer is still a
-     process-global transitional registry rather than a DICE-owned value.
-     Runtime module-symlink replay now writes under that graph's workspace
-     output base, and extension-repo symlink replay uses the same graph output
-     base, but the graph itself is still legacy-produced and runtime
-     registration remains process-global transitional plumbing.
+     process-global maps. Toolchain resolution and target-setting
+     pre-processing receive an explicit declared toolchain snapshot from the
+     caller, but the snapshot producer is still a process-global transitional
+     registry rather than a DICE-owned value. Runtime module-symlink replay now
+     writes under that graph's workspace output base, and extension-repo
+     symlink replay uses the same graph output base, but the graph itself is
+     still legacy-produced and runtime registration remains process-global
+     transitional plumbing.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
