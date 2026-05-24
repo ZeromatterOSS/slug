@@ -2340,6 +2340,57 @@ impl CellResolver {
         self.get_or_create_dynamic_cell(cell)
     }
 
+    /// Register a bzlmod extension repo cell on this resolver only.
+    ///
+    /// This is used for sibling spokes discovered from the current DICE
+    /// extension-spoke value. Unlike the transitional process-global dynamic
+    /// registry, the promoted cell is owned by this resolver and survives
+    /// process-global root changes without leaking into other resolvers.
+    pub fn register_bzlmod_runtime_extension_cell(
+        &self,
+        name: &str,
+        path: &str,
+        setup: crate::cells::external::ExtensionRepoCellSetup,
+    ) -> slug_error::Result<()> {
+        let cell = CellName::unchecked_new(name)?;
+        if self.0.cells.contains_key(&cell) {
+            return Ok(());
+        }
+        if self
+            .0
+            .dynamic_cells
+            .read()
+            .ok()
+            .and_then(|dynamic| {
+                dynamic
+                    .get(&cell)
+                    .and_then(DynamicCellInstance::instance_for_current_context)
+                    .map(|_| ())
+            })
+            .is_some()
+        {
+            return Ok(());
+        }
+
+        let rel_path = ProjectRelativePath::new(path)?;
+        let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+        let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+        let external = Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(
+            setup,
+        ));
+        let instance = CellInstance::new(cell, cell_path, external, nested)?;
+        ensure_external_symlink(cell.as_str(), path);
+        let mut dynamic = self.0.dynamic_cells.write().map_err(|_| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "failed to register bzlmod runtime extension cell '{}': dynamic cell lock poisoned",
+                cell.as_str()
+            )
+        })?;
+        dynamic.insert(cell, DynamicCellInstance::graph_owned(instance));
+        Ok(())
+    }
+
     pub fn is_root_cell(&self, name: CellName) -> bool {
         name == self.0.root_cell
     }
@@ -2846,6 +2897,54 @@ mod tests {
                 cell_name,
                 ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
             )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_resolver_registers_runtime_spoke_without_global_registry() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let resolver = CellResolver::testing_with_names_and_paths(&[(
+            CellName::testing_new("root"),
+            CellRootPathBuf::testing_new(""),
+        )]);
+        let canonical = "owner++ext+sibling";
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("sibling"),
+            spec_hash: Arc::from("sha256-sibling"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+
+        resolver.register_bzlmod_runtime_extension_cell(
+            canonical,
+            &format!("bazel-external/{canonical}"),
+            setup.clone(),
+        )?;
+
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
+        let cell = resolver.get(CellName::testing_new(canonical))?;
+        assert_eq!(cell.path().as_str(), format!("bazel-external/{canonical}"));
+        assert!(matches!(
+            cell.external(),
+            Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(origin))
+                if origin == &setup
+        ));
+
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().join("after"));
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
+        assert_eq!(
+            resolver
+                .get(CellName::testing_new(canonical))?
+                .name()
+                .as_str(),
+            canonical
         );
 
         Ok(())

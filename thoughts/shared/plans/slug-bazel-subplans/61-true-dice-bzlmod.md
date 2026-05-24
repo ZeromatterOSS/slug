@@ -1600,6 +1600,16 @@ What did not work or remains risky:
   for forming extension execution and spoke keys from injected session-shaped
   values were removed, reducing accidental bypass surfaces without changing
   that remaining cell-graph ownership gap.
+- Runtime extension file-ops now registers sibling spokes from the current
+  `ExtensionSpokesValue` on the active `CellResolver` as graph-owned dynamic
+  cells instead of publishing those siblings through the process-global dynamic
+  registry. Validation passed with focused `cargo test -p slug_core
+  bzlmod_resolver_registers_runtime_spoke_without_global_registry
+  -- --nocapture`, `cargo test -p slug_external_cells
+  known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
+  `cargo check -p slug_core -p slug_external_cells -p slug_server`,
+  `cargo build -p slug`, and focused Plan 61 Python guardrail
+  `lockfile_replay_recorded_repo_mapping_from_extension_repo_source`.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
@@ -1826,17 +1836,20 @@ using Rust DICE keys and values:
      state. Continue moving generated repo cell registration and materialized
      output state into DICE-owned values.
    - Runtime file-ops spoke lookup now uses the injected bzlmod workspace
-     identity instead of deriving one from the project root, but generated repo
-     cell registration itself remains process-global transitional plumbing.
+     identity instead of deriving one from the project root, and sibling spokes
+     discovered from the current DICE spoke value are registered on the active
+     resolver instead of the process-global dynamic registry. Startup and
+     alias compatibility registration still use process-global transitional
+     plumbing.
    - Extension repo execution/materialization keys now preserve the workspace
   identity and output base, but generated repo cell graph ownership and
   final materialization state are still not fully DICE-owned.
 - Dynamic generated-repo cell maps are now project-root scoped, but they
   remain process-global maps rather than a DICE-owned `BzlmodCellGraphKey`.
-  Resolver-local promoted dynamic cells also carry project-root identity, but
-  remain a cache over that transitional global graph. Directory-scan caches
-  are also root-scoped, including negative entries, but still process-local
-  lookup accelerators rather than DICE inputs.
+  Resolver-local promoted dynamic cells from graph snapshots and current
+  extension-spoke values are graph-owned, but directory-scan caches and
+  alias-compatibility maps are still process-local lookup accelerators rather
+  than DICE inputs.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.

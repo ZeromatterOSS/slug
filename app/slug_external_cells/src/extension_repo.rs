@@ -31,6 +31,7 @@ use compact_str::CompactString;
 use dice::DiceComputations;
 use slug_bzlmod::ExtensionRepoExecutionKey;
 use slug_bzlmod::RepoSpec;
+use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::external_symlink::ExternalSymlink;
 use slug_common::file_ops::delegate::FileOpsDelegate;
@@ -397,12 +398,9 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
     }
 }
 
-/// Idempotently register every sibling spoke of `extension_id` as a dynamic
-/// cell. Returns silently if this is not a module extension (e.g. a
+/// Idempotently register every sibling spoke of `extension_id` on the current
+/// resolver. Returns silently if this is not a module extension (e.g. a
 /// `use_repo_rule()` invocation, which has no siblings).
-///
-/// Failure to register is logged at debug and otherwise ignored: the caller
-/// will still error out cleanly downstream if a needed cell is missing.
 async fn ensure_extension_spokes_registered(
     ctx: &mut DiceComputations<'_>,
     workspace_id: &slug_bzlmod::WorkspaceId,
@@ -443,20 +441,22 @@ async fn ensure_extension_spokes_registered(
         return Ok(None);
     };
 
+    let cell_resolver = ctx.get_cell_resolver().await?;
     for spoke in spokes.iter() {
         let cell_setup =
             extension_repo_cell_setup_from_spoke(extension_id, spoke, &spokes.repo_env);
-        slug_core::cells::register_dynamic_extension_cell_with_setup(
-            spoke.canonical_name.to_string(),
-            format!("bazel-external/{}", spoke.canonical_name),
+        let path = format!("bazel-external/{}", spoke.canonical_name);
+        cell_resolver.register_bzlmod_runtime_extension_cell(
+            spoke.canonical_name.as_ref(),
+            &path,
             cell_setup.clone(),
-        );
+        )?;
         if spoke.internal_name != spoke.canonical_name {
-            slug_core::cells::register_dynamic_extension_cell_with_setup(
-                spoke.internal_name.to_string(),
-                format!("bazel-external/{}", spoke.canonical_name),
+            cell_resolver.register_bzlmod_runtime_extension_cell(
+                spoke.internal_name.as_ref(),
+                &path,
                 cell_setup,
-            );
+            )?;
         }
     }
 
@@ -548,12 +548,10 @@ pub(crate) async fn get_file_ops_delegate(
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
 
-    // Make sure every sibling spoke of this extension is registered as a
-    // dynamic cell. Idempotent across the daemon's lifetime — short-circuits
-    // when the lockfile pre-seed (in `slug_common::cells`) has already done
-    // it. Necessary on warm builds where `.slug_repo_complete` markers would
-    // otherwise skip the materialization block below, leaving spoke lookups
-    // unresolvable.
+    // Make sure every sibling spoke of this extension is registered on the
+    // current resolver. Necessary on warm builds where `.slug_repo_complete`
+    // markers would otherwise skip the materialization block below, leaving
+    // spoke lookups unresolvable.
     let extension_lookup_workspace_id =
         workspace_id_for_extension_spoke_lookup(ctx, setup.canonical_name.as_ref()).await?;
     let registered_spokes = ensure_extension_spokes_registered(
