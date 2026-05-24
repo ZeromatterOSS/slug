@@ -1676,6 +1676,23 @@ What did not work or remains risky:
   deselected`), the full Plan 61 Python guardrail with `74 passed in 80.85s`,
   `cargo fmt --check`, and `git diff --check`. The four slugd processes left
   by the full guardrail were cleaned up afterward.
+- `CellResolver::get_cell_path()` now prefers graph-owned dynamic cells and
+  resolver-owned bzlmod runtime snapshot cells before falling back to
+  root-scoped process-global dynamic cells. This keeps legacy compatibility
+  while preventing stale root-scoped dynamic mappings from explaining a path
+  ahead of the active resolver's own runtime graph. Validation passed with
+  focused `cargo test -p slug_core
+  get_cell_path_prefers_runtime_snapshot_over_root_scoped_dynamic_cell --
+  --nocapture`, `cargo test -p slug_core
+  bzlmod_resolver_uses_runtime_snapshot_for_lazy_extension_cell --
+  --nocapture`, `cargo test -p slug_core
+  bzlmod_label_cell_paths_project_runtime_snapshot_without_globals --
+  --nocapture`, `cargo check -p slug_core -p slug_interpreter_for_build -p
+  slug_server`, `cargo build -p slug`, focused Plan 61 label/repo-mapping
+  guardrails (`6 passed, 68 deselected`), the full Plan 61 Python guardrail
+  with `74 passed in 73.49s`, `cargo fmt --check`, and `git diff --check`.
+  The four slugd processes left by the full guardrail were cleaned up
+  afterward.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
@@ -1933,6 +1950,9 @@ using Rust DICE keys and values:
   runtime aliases/cells from the active cell alias resolver before consulting
   process-global dynamic aliases, but remaining canonicalization helpers still
   have process-global fallback behavior.
+- Path-to-cell projection now checks graph-owned dynamic cells and the
+  resolver-owned runtime snapshot before root-scoped process-global dynamic
+  cells, but the final cell graph is still injected from legacy-produced data.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.

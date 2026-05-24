@@ -2097,6 +2097,12 @@ enum DynamicCellInstance {
     GraphOwned(&'static CellInstance),
 }
 
+#[derive(Clone, Copy)]
+enum DynamicCellPathKind {
+    GraphOwned,
+    RootScoped,
+}
+
 impl DynamicCellInstance {
     fn root_scoped(instance: CellInstance) -> Self {
         Self::RootScoped(dynamic_bzlmod_entry(Box::leak(Box::new(instance))))
@@ -2106,11 +2112,23 @@ impl DynamicCellInstance {
         Self::GraphOwned(Box::leak(Box::new(instance)))
     }
 
-    fn instance_for_current_context(&self) -> Option<&'static CellInstance> {
+    fn graph_owned_instance(&self) -> Option<&'static CellInstance> {
+        match self {
+            Self::GraphOwned(instance) => Some(*instance),
+            Self::RootScoped(_) => None,
+        }
+    }
+
+    fn root_scoped_instance_for_current_context(&self) -> Option<&'static CellInstance> {
         match self {
             Self::RootScoped(entry) => dynamic_bzlmod_value_for_current_root(entry),
-            Self::GraphOwned(instance) => Some(*instance),
+            Self::GraphOwned(_) => None,
         }
+    }
+
+    fn instance_for_current_context(&self) -> Option<&'static CellInstance> {
+        self.graph_owned_instance()
+            .or_else(|| self.root_scoped_instance_for_current_context())
     }
 }
 
@@ -2469,30 +2487,15 @@ impl CellResolver {
 
     pub fn get_cell_path<P: AsRef<ProjectRelativePath> + ?Sized>(&self, path: &P) -> CellPath {
         let path = path.as_ref();
-        if let Ok(dynamic_cells) = self.0.dynamic_cells.read() {
-            let mut best_dynamic: Option<(usize, CellPath)> = None;
-            for (cell, instance) in dynamic_cells.iter().filter_map(|(cell, entry)| {
-                entry
-                    .instance_for_current_context()
-                    .map(|instance| (cell, instance))
-            }) {
-                let cell_root = instance.path().as_project_relative_path();
-                let Some(relative) = path.strip_prefix_opt(cell_root) else {
-                    continue;
-                };
-                let depth = cell_root.iter().count();
-                if best_dynamic
-                    .as_ref()
-                    .is_none_or(|(best_depth, _)| depth > *best_depth)
-                {
-                    best_dynamic = Some((depth, CellPath::new(*cell, relative.to_owned().into())));
-                }
-            }
-            if let Some((_, cell_path)) = best_dynamic {
-                return cell_path;
-            }
+        if let Some(cell_path) = self.best_dynamic_cell_path(path, DynamicCellPathKind::GraphOwned)
+        {
+            return cell_path;
         }
         if let Some(cell_path) = self.get_bzlmod_runtime_cell_path(path) {
+            return cell_path;
+        }
+        if let Some(cell_path) = self.best_dynamic_cell_path(path, DynamicCellPathKind::RootScoped)
+        {
             return cell_path;
         }
         let cell = self.find(path);
@@ -2502,6 +2505,35 @@ impl CellResolver {
             .strip_prefix(instance.path().as_project_relative_path())
             .unwrap();
         CellPath::new(cell, relative.to_owned().into())
+    }
+
+    fn best_dynamic_cell_path(
+        &self,
+        path: &ProjectRelativePath,
+        kind: DynamicCellPathKind,
+    ) -> Option<CellPath> {
+        let dynamic_cells = self.0.dynamic_cells.read().ok()?;
+        let mut best_dynamic: Option<(usize, CellPath)> = None;
+        for (cell, instance) in dynamic_cells.iter().filter_map(|(cell, entry)| {
+            let instance = match kind {
+                DynamicCellPathKind::GraphOwned => entry.graph_owned_instance(),
+                DynamicCellPathKind::RootScoped => entry.root_scoped_instance_for_current_context(),
+            }?;
+            Some((cell, instance))
+        }) {
+            let cell_root = instance.path().as_project_relative_path();
+            let Some(relative) = path.strip_prefix_opt(cell_root) else {
+                continue;
+            };
+            let depth = cell_root.iter().count();
+            if best_dynamic
+                .as_ref()
+                .is_none_or(|(best_depth, _)| depth > *best_depth)
+            {
+                best_dynamic = Some((depth, CellPath::new(*cell, relative.to_owned().into())));
+            }
+        }
+        best_dynamic.map(|(_, cell_path)| cell_path)
     }
 
     pub fn get_cell_path_from_abs_path(
@@ -2979,6 +3011,73 @@ mod tests {
             ))?),
             CellPath::new(
                 cell_name,
+                ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
+            )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_cell_path_prefers_runtime_snapshot_over_root_scoped_dynamic_cell()
+    -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let canonical = "runtime_owner++ext+generated";
+        let stale_global = "stale_owner++ext+generated";
+        let runtime_path = format!("bazel-external/{canonical}");
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@runtime_owner//:ext.bzl%ext"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-test"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: runtime_path.clone(),
+                setup,
+                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: Vec::new(),
+        };
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+
+        register_dynamic_extension_cell(stale_global.to_owned(), runtime_path.clone());
+        let stale_cell = CellName::testing_new(stale_global);
+        assert_eq!(resolver.get(stale_cell)?.name(), stale_cell);
+
+        let runtime_cell = CellName::testing_new(canonical);
+        assert_eq!(
+            resolver.get_cell_path(ProjectRelativePath::new(&format!(
+                "{runtime_path}/defs.bzl"
+            ))?),
+            CellPath::new(
+                runtime_cell,
                 ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
             )
         );
