@@ -178,11 +178,12 @@ Observed SDK result at the checkpoint:
   `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
   `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - DICE-backed bzlmod resolution now fails if it reaches the legacy resolver
-  without the tracked visible lockfile value, and similarly refuses to direct
-  read a configured hidden lockfile when the tracked hidden value was not
-  supplied. This keeps direct lockfile fallback limited to non-DICE bootstrap
-  paths. Validation passed with focused `cargo test -p slug_common
-  dice_bzlmod_resolution_requires_tracked_visible_lockfile -- --nocapture`,
+  without the tracked root `MODULE.bazel` parse result or tracked visible
+  lockfile value, and similarly refuses to direct read a configured hidden
+  lockfile when the tracked hidden value was not supplied. This keeps direct
+  root module and lockfile fallback limited to non-DICE bootstrap paths.
+  Validation passed with focused `cargo test -p slug_common
+  'dice_bzlmod_resolution_requires_tracked' -- --nocapture`,
   `cargo check -p slug_common -p slug_server`, `cargo build -p slug`, and
   focused Plan 61 Python guardrails
   `visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only` plus
@@ -1775,8 +1776,10 @@ using Rust DICE keys and values:
    override/registry-cache sources.
    - Root, included, and project-local local override module segments now use
      tracked project-file DICE inputs; out-of-project local override module
-     files are polled into key identity. Keep extending that shape to every
-     non-root module source.
+     files are polled into key identity. The DICE-backed resolver now rejects
+     missing tracked root module input instead of direct-parsing the root module
+     in the DICE path. Keep extending that shape to every non-root module
+     source.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are polled into key identity while the final
