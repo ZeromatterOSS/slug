@@ -2942,6 +2942,33 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_module_deletion_invalidates_bzlmod_graph(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root MODULE.bazel presence is a module-resolution input."""
+    _write(buck.cwd / ".buckconfig", "[repositories]\nroot = .\n")
+    root_module = buck.cwd / "MODULE.bazel"
+    _write(
+        root_module,
+        """module(name = "plan61_root_module_deletion")
+""",
+    )
+
+    output, first = await _audit_cells_and_counters(buck)
+    assert "plan61_root_module_deletion" in output
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_root_module_deletion" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    root_module.unlink()
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    assert "No cell name for the root path" in exc.value.stderr
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_non_root_included_module_segment_edit_invalidates_extension_graph(
     buck: Buck,
 ) -> None:
@@ -3063,9 +3090,16 @@ local_path_override(
     assert created["module_file_parse"] > 0
     assert created["bzlmod_resolution_compute"] > 0
 
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "created_include_lib" in output
+    assert warm["module_file_parse"] == created["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
+
     (buck.cwd / "deps.MODULE.bazel").unlink()
-    with pytest.raises(BuckException):
+    with pytest.raises(BuckException) as exc:
         await buck.audit("cell")
+    assert "Failed to read included MODULE.bazel segment" in exc.value.stderr
+    assert "deps.MODULE.bazel" in exc.value.stderr
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

@@ -601,6 +601,14 @@ Observed SDK result at the checkpoint:
   newly introduced local module instead of reusing the warm value. Validation
   passed with the focused subset selected by `-k 'root_module_parse_failure or
   root_module_utf8_failure'` (`2 passed, 99 deselected`).
+- Root `MODULE.bazel` deletion is now covered as an observable same-daemon
+  transition: a warm root module graph is established, deleting the root module
+  file makes the next `audit cell` fail during cell resolver creation instead
+  of reusing the stale bzlmod cell graph. The included-segment create/delete
+  guardrail was tightened to assert a warm no-op before deleting the included
+  segment and checking the missing-include failure. Validation passed with the
+  focused subset selected by `-k 'root_module_deletion or
+  included_module_segment_create_delete'` (`2 passed, 109 deselected`).
 - Project-local `local_path_override` module files now have same-daemon
   parse-error, invalid UTF-8, and included-segment cycle guardrails matching the
   out-of-project local override cases. Validation passed with the focused
@@ -2163,9 +2171,10 @@ using Rust DICE keys and values:
      coverage now includes create/delete, parse/UTF-8 failures, and include
      cycles; project-local and out-of-project local override coverage now
      includes deletion, parse/UTF-8 failures, and include cycles. Root included
-     segments now have parse/UTF-8 failure and include-cycle coverage, and root
-     `MODULE.bazel` and registry `MODULE.bazel` now have parse/UTF-8 failure
-     coverage; remaining source classes still need full matrix coverage.
+     segments now have parse/UTF-8 failure, include-cycle, and create/delete
+     coverage. Root `MODULE.bazel` has parse/UTF-8 failure and deletion
+     coverage, while registry `MODULE.bazel` has parse/UTF-8 failure coverage;
+     remaining source classes still need full matrix coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
