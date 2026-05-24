@@ -544,7 +544,11 @@ Observed SDK result at the checkpoint:
   project-local files through tracked DICE file inputs, and polls out-of-project
   cache contents into key identity. A same-daemon guardrail proves a cached
   `git_override` `MODULE.bazel` warm no-op reuses bzlmod resolution, then an
-  edit to that cached module file forces resolution to recompute.
+  edit to that cached module file forces resolution to recompute. The matching
+  `archive_override` cache guardrail now proves the same warm reuse and
+  same-daemon edit invalidation (`1 passed, 78 deselected`), and the focused
+  local/git/archive/registry module-input subset passed (`6 passed, 73
+  deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
@@ -2043,6 +2047,8 @@ using Rust DICE keys and values:
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are polled into key identity while the final
      watched-input graph is still pending.
+   - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
+     have same-daemon warm-reuse and edit-invalidation guardrails.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes. Repository materialization
      marker/layout/recorded-input reads are now child DICE nodes, but those

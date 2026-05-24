@@ -142,6 +142,23 @@ def _git_override_cache_dir(
     return cache_home / "slug" / "overrides" / module_name / f"git-{commit}-{source_identity}"
 
 
+def _archive_override_cache_dir(
+    cache_home: Path,
+    module_name: str,
+    urls: list[str],
+    integrity: str | None = None,
+    strip_prefix: str | None = None,
+) -> Path:
+    hasher = hashlib.sha256()
+    hasher.update(b"slug-archive-override-cache-v1")
+    for url in urls:
+        _update_digest_str(hasher, url)
+    _update_digest_optional_str(hasher, integrity)
+    _update_digest_optional_str(hasher, strip_prefix)
+    source_identity = hasher.hexdigest()[:16]
+    return cache_home / "slug" / "overrides" / module_name / f"archive-{source_identity}"
+
+
 def _update_digest_str(hasher: _HashLike, value: str) -> None:
     hasher.update(b"\0")
     hasher.update(value.encode())
@@ -726,6 +743,48 @@ git_override(
     module_name = "{module_name}",
     remote = "{remote}",
     commit = "{commit}",
+)
+""",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    before = await _bzlmod_counters(buck, env=env)
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
+
+    output, second = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_cached_archive_override_module_edit_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: archive_override extracted MODULE.bazel is a module-resolution input."""
+    module_name = "archive_override_lib"
+    urls = [f"https://example.invalid/{module_name}.tar.gz"]
+    cache_home = buck.cwd.parent / f"{buck.cwd.name}_archive_override_cache_home"
+    override_dir = _archive_override_cache_dir(cache_home, module_name, urls)
+    override_dir.mkdir(parents=True)
+    _write(override_dir / ".complete", "")
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_archive_override_input")
+
+bazel_dep(name = "{module_name}")
+archive_override(
+    module_name = "{module_name}",
+    urls = {urls!r},
 )
 """,
     )
