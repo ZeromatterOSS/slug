@@ -561,24 +561,40 @@ Observed SDK result at the checkpoint:
   transitions now also have focused same-daemon guardrails: a cached
   `git_override` `MODULE.bazel` parse error and a cached `archive_override`
   invalid-UTF-8 `MODULE.bazel` both fail the next `audit cell`, then repair and
-  recompute bzlmod resolution instead of reusing the warm value. Validation
-  passed with the two new guardrails (`2 passed, 81 deselected`) and the cached
-  git/archive override module-input subset (`6 passed, 77 deselected`).
+  produce a graph containing a newly introduced generated repo instead of
+  reusing the warm value. Validation passed with the two new guardrails (`2
+  passed, 81 deselected`) and the cached git/archive override module-input
+  subset (`6 passed, 77 deselected`).
   Mirror guardrails now cover cached `archive_override` parse failures and
   cached `git_override` UTF-8 failures, and cached git/archive include-cycle
-  guardrails prove cyclic included module segments reject stale warm reuse and
-  repair recomputes resolution. Validation passed with the override failure
-  subset selected by `-k 'override_module_parse_failure or
-  override_module_utf8_failure or override_module_include_cycle'` (`6 passed,
-  86 deselected`).
+  guardrails start from a valid included module segment, then edit only that
+  segment into a cycle before repairing it to introduce a generated repo.
+  Validation passed with the override failure subset selected by `-k
+  'override_module_parse_failure or override_module_utf8_failure or
+  override_module_include_cycle'` (`6 passed, 86 deselected`), and the corrected
+  failure-input matrix below passed as part of a 12-test subset.
 - Out-of-project `local_path_override` module files now have focused
   same-daemon failure-transition guardrails: parse errors, invalid UTF-8, and
-  cyclic included module segments fail the next `audit cell`, then repair and
-  recompute bzlmod resolution instead of reusing the warm value. Validation
-  passed with the focused subset selected by `-k
-  'out_of_project_local_override_parse_failure or
+  cyclic included module segments fail the next `audit cell`, then repair to a
+  graph containing a newly introduced generated repo instead of reusing the
+  warm value. The include-cycle guardrail edits only the included segment after
+  warming a valid include. Validation passed with the focused subset selected
+  by `-k 'out_of_project_local_override_parse_failure or
   out_of_project_local_override_utf8_failure or
-  out_of_project_local_override_include_cycle'` (`3 passed, 92 deselected`).
+  out_of_project_local_override_include_cycle'` (`3 passed, 92 deselected`),
+  and with the corrected 12-test failure-input subset.
+- Root included module segments now have same-daemon parse-error, invalid
+  UTF-8, and include-cycle failure-transition guardrails. Each starts from a
+  valid included segment, fails after editing only that segment, then repairs
+  to a graph containing a newly introduced module instead of reusing the warm
+  value. Validation passed with the corrected failure-input subset selected by
+  `-k 'override_module_parse_failure or override_module_utf8_failure or
+  override_module_include_cycle or out_of_project_local_override_parse_failure
+  or out_of_project_local_override_utf8_failure or
+  out_of_project_local_override_include_cycle or
+  included_module_segment_parse_failure or
+  included_module_segment_utf8_failure or
+  included_module_segment_include_cycle'` (`12 passed, 87 deselected`).
 - Locked registry `source.json` metadata now has a focused parse-failure
   guardrail: after a warm same-daemon registry module resolution, invalid
   cached source metadata with a matching lockfile hash fails the next
@@ -2114,8 +2130,9 @@ using Rust DICE keys and values:
      UTF-8 failures for every module source class. Cached git/archive override
      coverage now includes create/delete, parse/UTF-8 failures, and include
      cycles, and out-of-project local override coverage now includes
-     parse/UTF-8 failures and include cycles; remaining source classes still
-     need full matrix coverage.
+     parse/UTF-8 failures and include cycles. Root included segments now have
+     parse/UTF-8 failure and include-cycle coverage; remaining source classes
+     still need full matrix coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.

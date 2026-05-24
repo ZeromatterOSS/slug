@@ -734,6 +734,16 @@ async def test_out_of_project_local_override_parse_failure_invalidates_bzlmod_re
     local_lib.mkdir(parents=True, exist_ok=True)
     _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
     _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
+    _write(
         buck.cwd / "MODULE.bazel",
         f"""module(name = "plan61_external_local_parse_failure")
 
@@ -761,10 +771,16 @@ local_path_override(
     assert "Failed to parse MODULE.bazel for local module" in failure_stderr
     assert module_name in failure_stderr
 
-    _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
-    output, recovered = await _audit_cells_and_counters(buck)
+    _write(
+        local_lib / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -776,6 +792,16 @@ async def test_out_of_project_local_override_utf8_failure_invalidates_bzlmod_res
     local_lib = buck.cwd.parent / f"{buck.cwd.name}_{module_name}"
     local_lib.mkdir(parents=True, exist_ok=True)
     _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(
         buck.cwd / "MODULE.bazel",
         f"""module(name = "plan61_external_local_utf8_failure")
@@ -805,10 +831,16 @@ local_path_override(
     assert "valid UTF-8" in failure_stderr
     assert str(local_lib / "MODULE.bazel") in failure_stderr
 
-    _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
-    output, recovered = await _audit_cells_and_counters(buck)
+    _write(
+        local_lib / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -819,7 +851,23 @@ async def test_out_of_project_local_override_include_cycle_invalidates_bzlmod_re
     module_name = "external_local_include_cycle"
     local_lib = buck.cwd.parent / f"{buck.cwd.name}_{module_name}"
     local_lib.mkdir(parents=True, exist_ok=True)
-    _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        local_lib / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "1.0")
+include("//:cycle.MODULE.bazel")
+""",
+    )
+    _write(local_lib / "cycle.MODULE.bazel", "# initially valid included segment\n")
+    _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(
         buck.cwd / "MODULE.bazel",
         f"""module(name = "plan61_external_local_include_cycle")
@@ -841,12 +889,6 @@ local_path_override(
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
-    _write(
-        local_lib / "MODULE.bazel",
-        f"""module(name = "{module_name}", version = "2.0")
-include("//:cycle.MODULE.bazel")
-""",
-    )
     _write(local_lib / "cycle.MODULE.bazel", 'include("//:cycle.MODULE.bazel")\n')
     with pytest.raises(BuckException) as exc:
         await buck.audit("cell")
@@ -854,10 +896,15 @@ include("//:cycle.MODULE.bazel")
     assert "Failed to parse MODULE.bazel for local module" in failure_stderr
     assert "cyclic include" in failure_stderr
 
-    _write(local_lib / "cycle.MODULE.bazel", "# cycle repaired\n")
-    output, recovered = await _audit_cells_and_counters(buck)
+    _write(
+        local_lib / "cycle.MODULE.bazel",
+        """dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -872,7 +919,23 @@ async def test_cached_git_override_module_edit_invalidates_bzlmod_resolution(
     override_dir = _git_override_cache_dir(cache_home, module_name, remote, commit)
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "1.0")
+include("//:cycle.MODULE.bazel")
+""",
+    )
+    _write(override_dir / "cycle.MODULE.bazel", "# initially valid included segment\n")
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -916,6 +979,16 @@ async def test_cached_archive_override_module_edit_invalidates_bzlmod_resolution
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
     _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -1044,7 +1117,23 @@ async def test_cached_git_override_module_parse_failure_invalidates_bzlmod_resol
     override_dir = _git_override_cache_dir(cache_home, module_name, remote, commit)
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "1.0")
+include("//:cycle.MODULE.bazel")
+""",
+    )
+    _write(override_dir / "cycle.MODULE.bazel", "# initially valid included segment\n")
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -1076,10 +1165,16 @@ git_override(
     assert "Failed to parse MODULE.bazel for git override" in failure_stderr
     assert module_name in failure_stderr
 
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
-    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -1094,6 +1189,16 @@ async def test_cached_archive_override_module_utf8_failure_invalidates_bzlmod_re
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
     _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -1125,10 +1230,16 @@ archive_override(
     assert "valid UTF-8" in failure_stderr
     assert str(override_dir / "MODULE.bazel") in failure_stderr
 
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
-    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -1143,6 +1254,16 @@ async def test_cached_archive_override_module_parse_failure_invalidates_bzlmod_r
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
     _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -1173,10 +1294,16 @@ archive_override(
     assert "Failed to parse MODULE.bazel for archive override" in failure_stderr
     assert module_name in failure_stderr
 
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
-    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -1192,6 +1319,16 @@ async def test_cached_git_override_module_utf8_failure_invalidates_bzlmod_resolu
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
     _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -1224,10 +1361,16 @@ git_override(
     assert "valid UTF-8" in failure_stderr
     assert str(override_dir / "MODULE.bazel") in failure_stderr
 
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
-    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -1242,7 +1385,23 @@ async def test_cached_git_override_module_include_cycle_invalidates_bzlmod_resol
     override_dir = _git_override_cache_dir(cache_home, module_name, remote, commit)
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "1.0")
+include("//:cycle.MODULE.bazel")
+""",
+    )
+    _write(override_dir / "cycle.MODULE.bazel", "# initially valid included segment\n")
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -1267,12 +1426,6 @@ git_override(
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
-    _write(
-        override_dir / "MODULE.bazel",
-        f"""module(name = "{module_name}", version = "2.0")
-include("//:cycle.MODULE.bazel")
-""",
-    )
     _write(override_dir / "cycle.MODULE.bazel", 'include("//:cycle.MODULE.bazel")\n')
     with pytest.raises(BuckException) as exc:
         await buck.audit("cell", env=env)
@@ -1280,10 +1433,15 @@ include("//:cycle.MODULE.bazel")
     assert "Failed to parse MODULE.bazel for git override" in failure_stderr
     assert "cyclic include" in failure_stderr
 
-    _write(override_dir / "cycle.MODULE.bazel", "# cycle repaired\n")
-    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    _write(
+        override_dir / "cycle.MODULE.bazel",
+        """dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -1297,7 +1455,23 @@ async def test_cached_archive_override_module_include_cycle_invalidates_bzlmod_r
     override_dir = _archive_override_cache_dir(cache_home, module_name, urls)
     override_dir.mkdir(parents=True)
     _write(override_dir / ".complete", "")
-    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        override_dir / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "1.0")
+include("//:cycle.MODULE.bazel")
+""",
+    )
+    _write(override_dir / "cycle.MODULE.bazel", "# initially valid included segment\n")
+    _write(
+        override_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
     _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
     _write(
         buck.cwd / "MODULE.bazel",
@@ -1321,12 +1495,6 @@ archive_override(
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
-    _write(
-        override_dir / "MODULE.bazel",
-        f"""module(name = "{module_name}", version = "2.0")
-include("//:cycle.MODULE.bazel")
-""",
-    )
     _write(override_dir / "cycle.MODULE.bazel", 'include("//:cycle.MODULE.bazel")\n')
     with pytest.raises(BuckException) as exc:
         await buck.audit("cell", env=env)
@@ -1334,10 +1502,15 @@ include("//:cycle.MODULE.bazel")
     assert "Failed to parse MODULE.bazel for archive override" in failure_stderr
     assert "cyclic include" in failure_stderr
 
-    _write(override_dir / "cycle.MODULE.bazel", "# cycle repaired\n")
-    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    _write(
+        override_dir / "cycle.MODULE.bazel",
+        """dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
-    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+    assert "repaired_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -2134,6 +2307,153 @@ local_path_override(
     (buck.cwd / "deps.MODULE.bazel").unlink()
     with pytest.raises(BuckException):
         await buck.audit("cell")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_included_module_segment_parse_failure_invalidates_bzlmod_graph(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: included MODULE.bazel segment parse errors are inputs."""
+    _write(buck.cwd / "deps.MODULE.bazel", "# initially empty included segment\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_include_parse_failure")
+include("//:deps.MODULE.bazel")
+""",
+    )
+
+    output, first = await _audit_cells_and_counters(buck)
+    assert "plan61_include_parse_failure" in output
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_include_parse_failure" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(buck.cwd / "deps.MODULE.bazel", "bazel_dep(name = )\n")
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    failure_stderr = exc.value.stderr
+    assert "deps.MODULE.bazel" in failure_stderr
+
+    repaired_lib = buck.cwd / "libs/repaired_include_parse_lib"
+    repaired_lib.mkdir(parents=True)
+    _write(
+        repaired_lib / "MODULE.bazel",
+        'module(name = "repaired_include_parse_lib", version = "1.0")\n',
+    )
+    _write(repaired_lib / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "deps.MODULE.bazel",
+        """bazel_dep(name = "repaired_include_parse_lib")
+local_path_override(
+    module_name = "repaired_include_parse_lib",
+    path = "libs/repaired_include_parse_lib",
+)
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert "plan61_include_parse_failure" in output
+    assert "repaired_include_parse_lib" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_included_module_segment_utf8_failure_invalidates_bzlmod_graph(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: included MODULE.bazel segment UTF-8 errors are inputs."""
+    included = buck.cwd / "deps.MODULE.bazel"
+    _write(included, "# initially empty included segment\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_include_utf8_failure")
+include("//:deps.MODULE.bazel")
+""",
+    )
+
+    output, first = await _audit_cells_and_counters(buck)
+    assert "plan61_include_utf8_failure" in output
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_include_utf8_failure" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write_bytes(included, b"\xff\xfeinvalid included segment\n")
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    failure_stderr = exc.value.stderr
+    assert "deps.MODULE.bazel" in failure_stderr
+    assert "not UTF-8" in failure_stderr
+
+    repaired_lib = buck.cwd / "libs/repaired_include_utf8_lib"
+    repaired_lib.mkdir(parents=True)
+    _write(
+        repaired_lib / "MODULE.bazel",
+        'module(name = "repaired_include_utf8_lib", version = "1.0")\n',
+    )
+    _write(repaired_lib / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        included,
+        """bazel_dep(name = "repaired_include_utf8_lib")
+local_path_override(
+    module_name = "repaired_include_utf8_lib",
+    path = "libs/repaired_include_utf8_lib",
+)
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert "plan61_include_utf8_failure" in output
+    assert "repaired_include_utf8_lib" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_included_module_segment_include_cycle_invalidates_bzlmod_graph(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: included MODULE.bazel segment include cycles are inputs."""
+    included = buck.cwd / "deps.MODULE.bazel"
+    _write(included, "# initially empty included segment\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_include_cycle_failure")
+include("//:deps.MODULE.bazel")
+""",
+    )
+
+    output, first = await _audit_cells_and_counters(buck)
+    assert "plan61_include_cycle_failure" in output
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_include_cycle_failure" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(included, 'include("//:deps.MODULE.bazel")\n')
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    failure_stderr = exc.value.stderr
+    assert "cyclic include" in failure_stderr
+
+    repaired_lib = buck.cwd / "libs/repaired_include_cycle_lib"
+    repaired_lib.mkdir(parents=True)
+    _write(
+        repaired_lib / "MODULE.bazel",
+        'module(name = "repaired_include_cycle_lib", version = "1.0")\n',
+    )
+    _write(repaired_lib / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        included,
+        """bazel_dep(name = "repaired_include_cycle_lib")
+local_path_override(
+    module_name = "repaired_include_cycle_lib",
+    path = "libs/repaired_include_cycle_lib",
+)
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert "plan61_include_cycle_failure" in output
+    assert "repaired_include_cycle_lib" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
