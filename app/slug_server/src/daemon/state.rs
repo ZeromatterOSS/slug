@@ -310,8 +310,12 @@ impl DaemonState {
                 config_override: "bzlmod.lockfile_mode=off".to_owned(),
                 config_type: ConfigType::Value as i32,
             }];
-            let legacy_cells =
-                BuckConfigBasedCells::parse_with_config_args(&fs, &bootstrap_config).await?;
+            let legacy_cells = BuckConfigBasedCells::parse_with_config_args_and_output_base(
+                &fs,
+                &bootstrap_config,
+                paths.buck_out_path().as_path().to_path_buf(),
+            )
+            .await?;
 
             tracing::info!("Starting...");
 

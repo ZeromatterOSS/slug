@@ -1338,6 +1338,15 @@ Observed SDK result at the checkpoint:
   check -p slug_bzlmod -p slug_common -p slug_interpreter_for_build -p
   slug_build_api_tests`, `cargo build -p slug`, `cargo fmt --check`, and `git
   diff --check`.
+- The direct config parser now has an explicit-output-base entry point, and
+  daemon startup uses `InvocationPaths::buck_out_path()` when bootstrapping
+  legacy cells with bzlmod lockfile mode disabled. Direct non-DICE bzlmod
+  resolution now seeds the transitional session from that workspace identity
+  instead of re-deriving `<project>/buck-out/v2`. Validation passed with
+  focused `cargo test -p slug_common explicit_output_base -- --nocapture`,
+  `cargo check -p slug_common -p slug_server -p slug_cmd_completion_client -p
+  slug_client_ctx`, `cargo build -p slug`, `cargo fmt --check`, and `git diff
+  --check`.
 
 ## Consolidated Learnings
 
@@ -1398,7 +1407,9 @@ What did not work or remains risky:
   the legacy resolver output. The persisted config-load key now receives the
   server output base instead of synthesizing the default output base for
   workspace identity, and the no-`MODULE.bazel` empty-session projection now
-  preserves that keyed output base. The key still wraps the legacy resolver.
+  preserves that keyed output base. The daemon bootstrap direct parser now also
+  accepts an explicit output base. These paths still wrap or call the legacy
+  resolver.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.
@@ -1610,7 +1621,9 @@ using Rust DICE keys and values:
      and the remaining session bridge now derive workspace identity from the
      named cell graph, and the persisted config-load key carries the daemon
      output base, including no-`MODULE.bazel` empty-session projections, but
-     their data payloads are still injected from the legacy resolver.
+     their data payloads are still injected from the legacy resolver. Daemon
+     bootstrap direct parsing now passes its isolated buck-out path into the
+     transitional workspace identity too.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.

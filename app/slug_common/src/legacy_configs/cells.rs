@@ -2554,6 +2554,25 @@ impl BuckConfigBasedCells {
         .buck_error_context("Parsing cells")
     }
 
+    pub async fn parse_with_config_args_and_output_base(
+        project_fs: &ProjectRoot,
+        config_args: &[slug_cli_proto::ConfigOverride],
+        output_base: PathBuf,
+    ) -> slug_error::Result<Self> {
+        let workspace_id =
+            slug_bzlmod::WorkspaceId::new(project_fs.root().to_path_buf(), output_base);
+        Self::parse_with_file_ops_and_options_inner(
+            config_args,
+            Some(project_fs),
+            None,
+            None,
+            None,
+            Some(workspace_id),
+        )
+        .await
+        .buck_error_context("Parsing cells")
+    }
+
     pub async fn parse_with_config_args_and_root_module(
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
@@ -2843,7 +2862,7 @@ impl BuckConfigBasedCells {
                 .unwrap_or_else(|| slug_bzlmod::WorkspaceId::for_project_root(PathBuf::new()))
         });
         let mut bzlmod_session_data =
-            slug_bzlmod::BzlmodSessionData::for_workspace(empty_workspace_id);
+            slug_bzlmod::BzlmodSessionData::for_workspace(empty_workspace_id.clone());
         let mut bzlmod_runtime_cell_snapshot = None;
 
         // ===== Bzlmod Integration =====
@@ -2858,7 +2877,7 @@ impl BuckConfigBasedCells {
             Self::resolve_bzlmod_dependencies_with_options(
                 project_fs,
                 &options,
-                None,
+                Some(empty_workspace_id.clone()),
                 root_module_file.as_deref(),
                 visible_lockfile.clone(),
                 None,
@@ -4344,6 +4363,35 @@ mod tests {
             .await?;
 
         assert!(!configs.is_bzlmod);
+        assert_eq!(
+            configs
+                .bzlmod_session_data
+                .cell_graph
+                .workspace_id
+                .output_base
+                .as_ref()
+                .as_path(),
+            output_base.as_path()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn direct_bzlmod_parse_preserves_explicit_output_base() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
+        let output_base = fs
+            .path()
+            .resolve(ProjectRelativePath::new("buck-out/custom-direct")?);
+
+        let configs = BuckConfigBasedCells::parse_with_config_args_and_output_base(
+            fs.path(),
+            &[],
+            output_base.to_path_buf(),
+        )
+        .await?;
+
+        assert!(configs.is_bzlmod);
         assert_eq!(
             configs
                 .bzlmod_session_data
