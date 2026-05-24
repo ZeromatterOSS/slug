@@ -146,6 +146,16 @@ Observed SDK result at the checkpoint:
   -- --nocapture`, `cargo check -p slug_bzlmod -p slug_external_cells -p
   slug_server`, `cargo build -p slug`, `cargo fmt --check`, and
   `git diff --check`.
+- Known repo-spec extension file-ops now also leaves non-complete markers,
+  marker/spec mismatches, and output-state marker mismatches to
+  `RepoMaterializationManifestKey`; those pre-DICE stale checks now run only
+  for the no-spec fallback that lacks a manifest key. Validation passed with
+  focused `cargo test -p slug_external_cells
+  known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  materialization_manifest_key_observes_marker_state_dependency -- --nocapture`,
+  `cargo check -p slug_external_cells -p slug_bzlmod -p slug_server`,
+  `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
   extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
   when the hidden facts are created with the expected value, fails after an
@@ -1419,9 +1429,9 @@ What worked:
   incomplete layouts. Slug output-state markers are now verified against the
   current materialized tree before the DICE repository execution path or the
   external-cell marker gate accepts them. Known repo-spec extension file-ops
-  now lets the repository execution manifest own recorded-input staleness
-  and layout validity, including missing declared BUILD-file checks, instead of
-  deleting from a pre-DICE check.
+  now lets the repository execution manifest own marker/content/output-state
+  staleness, recorded-input staleness, and layout validity, including missing
+  declared BUILD-file checks, instead of deleting from a pre-DICE check.
 - The process-global legacy bzlmod resolution bridge cache was removed from
   the persisted config load path. Warm no-op reuse now has to come from the
   DICE key path rather than `LEGACY_BZLMOD_RESOLUTION_CACHE`; focused warm
@@ -1780,10 +1790,11 @@ using Rust DICE keys and values:
      repo spec and observed output tree are compatible. The current manifest
      value has DICE child state for marker/layout/recorded-input checks, but
      does not yet own the full repository output-tree identity. Known repo-spec
-     extension file-ops now delegates recorded-input staleness and missing
-     declared BUILD-file checks to this manifest path, and no longer performs a
-     duplicate direct layout-validity probe. The no-spec fallback and other
-     legacy stale-layout checks still contain direct file-ops reads.
+     extension file-ops now delegates marker/content/output-state staleness,
+     recorded-input staleness, missing declared BUILD-file checks, and
+     layout-validity probes to this manifest path. The no-spec fallback,
+     invalid-empty-target-label repair, and foreign-symlink checks still
+     contain direct file-ops reads.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 

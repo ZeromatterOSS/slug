@@ -699,25 +699,29 @@ pub(crate) async fn get_file_ops_delegate(
                     .unwrap_or_else(|_| setup.spec_hash.to_string())
             })
         });
-    let is_stale_non_complete_marker = marker_contents
-        .as_deref()
-        .is_some_and(|marker| !is_complete_marker(marker));
-    let is_stale_complete = setup_marker_spec_hash.as_deref().is_some_and(|spec_hash| {
-        !spec_hash.is_empty()
-            && marker_contents
-                .as_deref()
-                .is_some_and(|s| is_complete_marker(s) && !complete_marker_matches(s, spec_hash))
-    });
+    let has_known_repo_spec = !setup.repo_spec_json.is_empty();
+    let is_stale_non_complete_marker = !has_known_repo_spec
+        && marker_contents
+            .as_deref()
+            .is_some_and(|marker| !is_complete_marker(marker));
+    let is_stale_complete = !has_known_repo_spec
+        && setup_marker_spec_hash.as_deref().is_some_and(|spec_hash| {
+            !spec_hash.is_empty()
+                && marker_contents.as_deref().is_some_and(|s| {
+                    is_complete_marker(s) && !complete_marker_matches(s, spec_hash)
+                })
+        });
     let output_marker_spec_hash = setup_marker_spec_hash.as_deref().unwrap_or("");
-    let is_stale_output_state = marker_contents.as_deref().is_some_and(|s| {
-        is_complete_marker(s)
-            && complete_marker_output_state_is_stale(&source_path, s, output_marker_spec_hash)
-    });
-    let is_stale_spec_unknown_complete = setup.repo_spec_json.is_empty()
+    let is_stale_output_state = !has_known_repo_spec
+        && marker_contents.as_deref().is_some_and(|s| {
+            is_complete_marker(s)
+                && complete_marker_output_state_is_stale(&source_path, s, output_marker_spec_hash)
+        });
+    let is_stale_spec_unknown_complete = !has_known_repo_spec
         && marker_contents
             .as_deref()
             .is_some_and(|s| is_complete_marker(s) && !is_output_state_marker(s));
-    let is_stale_invalid_empty_target_label = !setup.repo_spec_json.is_empty()
+    let is_stale_invalid_empty_target_label = has_known_repo_spec
         && marker_contents.as_deref().is_some_and(is_complete_marker)
         && build_file_has_invalid_empty_target_label(&source_path);
     let repaired_invalid_empty_target_label = is_stale_invalid_empty_target_label
