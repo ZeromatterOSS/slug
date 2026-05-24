@@ -1006,6 +1006,11 @@ pub struct RegisteredToolchainsValue {
     pub registered_toolchains: Vec<crate::RegisteredToolchain>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct RegisteredToolchainsDataValue {
+    pub registered_toolchains: Vec<crate::RegisteredToolchain>,
+}
+
 #[derive(
     derive_more::Display,
     Debug,
@@ -1020,7 +1025,7 @@ pub struct RegisteredToolchainsValue {
 pub struct BzlmodRegisteredToolchainsDataKey;
 
 impl dice::InjectedKey for BzlmodRegisteredToolchainsDataKey {
-    type Value = Arc<RegisteredToolchainsValue>;
+    type Value = Arc<RegisteredToolchainsDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -1036,17 +1041,16 @@ impl Key for RegisteredToolchainsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let value = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
-        if value.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "RegisteredToolchainsKey was computed with project root '{}', \
-                 but current bzlmod registered-toolchain root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                value.workspace_id.canonical_project_root.display()
-            ));
-        }
-        Ok(value)
+        let data = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
+        let cell_graph = ctx
+            .compute(&BzlmodCellGraphKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        Ok(Arc::new(RegisteredToolchainsValue {
+            workspace_id: cell_graph.workspace_id.clone(),
+            registered_toolchains: data.registered_toolchains.clone(),
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1087,6 +1091,11 @@ pub struct RegisteredExecutionPlatformsValue {
     pub registered_execution_platforms: Vec<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct RegisteredExecutionPlatformsDataValue {
+    pub registered_execution_platforms: Vec<String>,
+}
+
 #[derive(
     derive_more::Display,
     Debug,
@@ -1101,7 +1110,7 @@ pub struct RegisteredExecutionPlatformsValue {
 pub struct BzlmodRegisteredExecutionPlatformsDataKey;
 
 impl dice::InjectedKey for BzlmodRegisteredExecutionPlatformsDataKey {
-    type Value = Arc<RegisteredExecutionPlatformsValue>;
+    type Value = Arc<RegisteredExecutionPlatformsDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -1117,19 +1126,18 @@ impl Key for RegisteredExecutionPlatformsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let value = ctx
+        let data = ctx
             .compute(&BzlmodRegisteredExecutionPlatformsDataKey)
             .await?;
-        if value.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "RegisteredExecutionPlatformsKey was computed with project root '{}', \
-                 but current bzlmod execution-platform root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                value.workspace_id.canonical_project_root.display()
-            ));
-        }
-        Ok(value)
+        let cell_graph = ctx
+            .compute(&BzlmodCellGraphKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        Ok(Arc::new(RegisteredExecutionPlatformsValue {
+            workspace_id: cell_graph.workspace_id.clone(),
+            registered_execution_platforms: data.registered_execution_platforms.clone(),
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

@@ -1060,6 +1060,18 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
   focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
   72 tests, `cargo fmt --check`, and `git diff --check`.
+- Registered toolchain and execution-platform data now inject only the
+  registration lists; `RegisteredToolchainsKey` and
+  `RegisteredExecutionPlatformsKey` derive workspace identity through
+  `BzlmodCellGraphKey`. The current-workspace helpers now use the named cell
+  graph projection instead of reading workspace identity from the registered
+  data payloads. Validation passed with `cargo check -p slug_bzlmod -p
+  slug_common`, focused `slug_bzlmod` coverage for cell-graph workspace
+  projection and current-workspace helpers, full `cargo test -p slug_bzlmod --
+  --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, full `cargo
+  test -p slug_external_cells -- --nocapture`, `cargo build -p slug`, the
+  focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
+  72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1102,7 +1114,9 @@ What did not work or remains risky:
   cell setup, then injected as transitional command data. Registered
   toolchain/platform consumers, extension aggregation consumers, extension
   replay-input consumers, repo-mapping consumers, and module-version consumers
-  now read narrower injected DICE values. The module-version value still carries a
+  now read narrower injected DICE values. Registered toolchain/platform
+  projections now get workspace identity from the named cell graph rather than
+  from the registration payloads. The module-version value still carries a
   conservative session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
@@ -1370,9 +1384,10 @@ using Rust DICE keys and values:
      but remain process-global compatibility adapters.
    - `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
      including bundled bzlmod cells, and resolver assembly, runtime
-     installation, module-version projection, and extension-aggregation
-     projection consume that value. Remaining installed lookup state still
-     needs to depend on it instead of process-global maps.
+     installation, module-version projection, extension-aggregation projection,
+     and registered toolchain/platform projection consume that value. Remaining
+     installed lookup state still needs to depend on it instead of
+     process-global maps.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 

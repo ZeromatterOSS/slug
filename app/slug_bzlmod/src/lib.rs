@@ -120,8 +120,10 @@ pub use dice_graph::ModuleFileKey;
 pub use dice_graph::ModuleSourceKey;
 pub use dice_graph::ModuleVersionsKey;
 pub use dice_graph::ModuleVersionsValue;
+pub use dice_graph::RegisteredExecutionPlatformsDataValue;
 pub use dice_graph::RegisteredExecutionPlatformsKey;
 pub use dice_graph::RegisteredExecutionPlatformsValue;
+pub use dice_graph::RegisteredToolchainsDataValue;
 pub use dice_graph::RegisteredToolchainsKey;
 pub use dice_graph::RegisteredToolchainsValue;
 pub use dice_graph::RepoMappingKey;
@@ -339,12 +341,10 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             extension_aggregations: Arc::new(data.extension_aggregations.clone()),
         });
         let cell_graph = Arc::new(data.cell_graph.clone());
-        let registered_toolchains = Arc::new(RegisteredToolchainsValue {
-            workspace_id: workspace_id.clone(),
+        let registered_toolchains = Arc::new(RegisteredToolchainsDataValue {
             registered_toolchains: data.registered_toolchains.clone(),
         });
-        let registered_execution_platforms = Arc::new(RegisteredExecutionPlatformsValue {
-            workspace_id,
+        let registered_execution_platforms = Arc::new(RegisteredExecutionPlatformsDataValue {
             registered_execution_platforms: data.registered_execution_platforms.clone(),
         });
         self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
@@ -380,18 +380,16 @@ pub async fn module_versions_for_current_workspace(
 pub async fn registered_toolchains_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<RegisteredToolchainsValue>> {
-    let data = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
-    let key = RegisteredToolchainsKey::for_workspace_id(data.workspace_id.clone());
+    let cell_graph = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    let key = RegisteredToolchainsKey::for_workspace_id(cell_graph.workspace_id.clone());
     ctx.compute(&key).await?
 }
 
 pub async fn registered_execution_platforms_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<RegisteredExecutionPlatformsValue>> {
-    let data = ctx
-        .compute(&BzlmodRegisteredExecutionPlatformsDataKey)
-        .await?;
-    let key = RegisteredExecutionPlatformsKey::for_workspace_id(data.workspace_id.clone());
+    let cell_graph = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    let key = RegisteredExecutionPlatformsKey::for_workspace_id(cell_graph.workspace_id.clone());
     ctx.compute(&key).await?
 }
 
@@ -588,6 +586,75 @@ mod tests {
                 .get("dep@1.0")
                 .map(String::as_str),
             Some("allowed by flag")
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn registered_toolchain_platform_keys_use_cell_graph_workspace() -> slug_error::Result<()>
+    {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-registered-cell-graph-workspace"),
+            PathBuf::from("/tmp/slug-plan61-registered-cell-graph-output-base"),
+        );
+        let other_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-registered-cell-graph-other"),
+            PathBuf::from("/tmp/slug-plan61-registered-cell-graph-other-output"),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodCellGraphDataKey,
+            Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+                workspace_id.clone(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRegisteredToolchainsDataKey,
+            Arc::new(RegisteredToolchainsDataValue {
+                registered_toolchains: Vec::new(),
+            }),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRegisteredExecutionPlatformsDataKey,
+            Arc::new(RegisteredExecutionPlatformsDataValue {
+                registered_execution_platforms: Vec::new(),
+            }),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let registered_toolchains = dice
+            .compute(&RegisteredToolchainsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        let registered_execution_platforms = dice
+            .compute(&RegisteredExecutionPlatformsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(registered_toolchains.workspace_id, workspace_id);
+        assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
+
+        assert!(
+            dice.compute(&RegisteredToolchainsKey::for_workspace_id(
+                other_workspace_id.clone(),
+            ))
+            .await?
+            .is_err()
+        );
+        assert!(
+            dice.compute(&RegisteredExecutionPlatformsKey::for_workspace_id(
+                other_workspace_id,
+            ))
+            .await?
+            .is_err()
         );
 
         Ok(())
