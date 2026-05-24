@@ -725,6 +725,188 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_project_local_override_parse_failure_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: project-local local_path_override parse errors are inputs."""
+    module_name = "project_local_parse_failure"
+    local_lib = buck.cwd / "libs" / module_name
+    local_lib.mkdir(parents=True, exist_ok=True)
+    _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_project_local_parse_failure")
+
+bazel_dep(name = "{module_name}")
+local_path_override(
+    module_name = "{module_name}",
+    path = "libs/{module_name}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = )\n')
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    failure_stderr = exc.value.stderr
+    assert "Failed to parse MODULE.bazel for local module" in failure_stderr
+    assert module_name in failure_stderr
+
+    _write(
+        local_lib / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "repaired_repo" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_project_local_override_utf8_failure_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: project-local local_path_override UTF-8 errors are inputs."""
+    module_name = "project_local_utf8_failure"
+    local_lib = buck.cwd / "libs" / module_name
+    local_lib.mkdir(parents=True, exist_ok=True)
+    _write(local_lib / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_project_local_utf8_failure")
+
+bazel_dep(name = "{module_name}")
+local_path_override(
+    module_name = "{module_name}",
+    path = "libs/{module_name}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write_bytes(local_lib / "MODULE.bazel", b"\xff\xfeinvalid module file\n")
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    failure_stderr = exc.value.stderr
+    assert "Failed to parse MODULE.bazel for local module" in failure_stderr
+    assert "valid UTF-8" in failure_stderr
+
+    _write(
+        local_lib / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "2.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "repaired_repo" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_project_local_override_include_cycle_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: project-local local_path_override include cycles are inputs."""
+    module_name = "project_local_include_cycle"
+    local_lib = buck.cwd / "libs" / module_name
+    local_lib.mkdir(parents=True, exist_ok=True)
+    _write(
+        local_lib / "MODULE.bazel",
+        f"""module(name = "{module_name}", version = "1.0")
+include("//:cycle.MODULE.bazel")
+""",
+    )
+    _write(local_lib / "cycle.MODULE.bazel", "# initially valid included segment\n")
+    _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_project_local_include_cycle")
+
+bazel_dep(name = "{module_name}")
+local_path_override(
+    module_name = "{module_name}",
+    path = "libs/{module_name}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(local_lib / "cycle.MODULE.bazel", 'include("//:cycle.MODULE.bazel")\n')
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    failure_stderr = exc.value.stderr
+    assert "Failed to parse MODULE.bazel for local module" in failure_stderr
+    assert "cyclic include" in failure_stderr
+
+    _write(
+        local_lib / "cycle.MODULE.bazel",
+        """dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "repaired_repo")
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "repaired_repo" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_out_of_project_local_override_parse_failure_invalidates_bzlmod_resolution(
     buck: Buck,
 ) -> None:

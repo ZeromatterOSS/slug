@@ -601,6 +601,13 @@ Observed SDK result at the checkpoint:
   newly introduced local module instead of reusing the warm value. Validation
   passed with the focused subset selected by `-k 'root_module_parse_failure or
   root_module_utf8_failure'` (`2 passed, 99 deselected`).
+- Project-local `local_path_override` module files now have same-daemon
+  parse-error, invalid UTF-8, and included-segment cycle guardrails matching the
+  out-of-project local override cases. Validation passed with the focused
+  local-override failure subset selected by `-k
+  'project_local_override_parse_failure or project_local_override_utf8_failure
+  or project_local_override_include_cycle'` (`6 passed, 101 deselected`,
+  including the out-of-project mirror tests selected by the same pattern).
 - Locked registry `source.json` metadata now has a focused parse-failure
   guardrail: after a warm same-daemon registry module resolution, invalid
   cached source metadata with a matching lockfile hash fails the next
@@ -613,7 +620,7 @@ Observed SDK result at the checkpoint:
   lockfile hashes fails the next `audit cell`, then repair introduces a new
   registry dependency instead of reusing the warm value. Validation passed with
   the focused subset selected by `-k 'locked_registry_module_parse_failure or
-  locked_registry_module_utf8_failure'` (`2 passed, 101 deselected`).
+  locked_registry_module_utf8_failure'` (`2 passed, 102 deselected`).
 - Visible lockfile `selectedYankedVersions` now has same-daemon edit coverage:
   a locked registry module warms as not-yanked, editing only the lockfile
   selected-yanked entry for that selected version fails the next `audit cell`,
@@ -2150,10 +2157,12 @@ using Rust DICE keys and values:
      UTF-8 failures for every module source class. Cached git/archive override
      coverage now includes create/delete, parse/UTF-8 failures, and include
      cycles, and out-of-project local override coverage now includes
-     parse/UTF-8 failures and include cycles. Root included segments now have
-     parse/UTF-8 failure and include-cycle coverage, and root `MODULE.bazel`
-     and registry `MODULE.bazel` now have parse/UTF-8 failure coverage;
-     remaining source classes still need full matrix coverage.
+     parse/UTF-8 failures and include cycles. Project-local local override
+     coverage now also includes parse/UTF-8 failures and include cycles. Root
+     included segments now have parse/UTF-8 failure and include-cycle coverage,
+     and root `MODULE.bazel` and registry `MODULE.bazel` now have parse/UTF-8
+     failure coverage; remaining source classes still need full matrix
+     coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
