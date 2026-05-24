@@ -107,6 +107,9 @@ pub struct RepositoryRuleResult {
 
     /// Whether execution succeeded.
     pub success: bool,
+
+    /// Whether DICE may reuse this result across transactions.
+    pub cacheable: bool,
 }
 
 impl RepositoryRuleResult {
@@ -117,12 +120,19 @@ impl RepositoryRuleResult {
             content_hash: None,
             repo_name,
             success: true,
+            cacheable: true,
         }
     }
 
     /// Create a result with a content hash.
     pub fn with_content_hash(mut self, hash: String) -> Self {
         self.content_hash = Some(hash);
+        self
+    }
+
+    /// Mark this result as unsuitable for DICE reuse across transactions.
+    pub fn non_cacheable(mut self) -> Self {
+        self.cacheable = false;
         self
     }
 }
@@ -190,7 +200,7 @@ impl Key for RepositoryRuleExecutionKey {
 
     fn validity(x: &Self::Value) -> bool {
         // Don't cache errors - retry on next request
-        x.is_ok()
+        x.as_ref().is_ok_and(|result| result.cacheable)
     }
 }
 
@@ -1045,10 +1055,14 @@ impl Key for ExtensionRepoExecutionKey {
                                     working_dir.join(".slug_repo_complete"),
                                     complete_marker(&self.spec_hash, &output_digest),
                                 );
-                                return Ok(Arc::new(RepositoryRuleResult::success(
+                                let mut result = RepositoryRuleResult::success(
                                     self.canonical_name.to_string(),
                                     working_dir,
-                                )));
+                                );
+                                if self.repo_spec.local {
+                                    result = result.non_cacheable();
+                                }
+                                return Ok(Arc::new(result));
                             }
                             Err(e) => {
                                 return Err(RepositoryExecutionError::ExecutionFailed {
@@ -1078,12 +1092,15 @@ impl Key for ExtensionRepoExecutionKey {
                 &self.project_root,
                 &cell_graph,
             );
-        let result =
+        let mut result =
             crate::repository_executor::execute_repository_rule_fresh_with_label_resolution(
                 &invocation,
                 &self.project_root,
                 &label_resolution,
             )?;
+        if self.repo_spec.local {
+            result = result.non_cacheable();
+        }
         let output_digest =
             crate::repository_executor::repository_output_digest(&result.repo_path)?;
 
@@ -1119,7 +1136,7 @@ impl Key for ExtensionRepoExecutionKey {
         // guarded by `RepoMaterializationManifestKey`, so marker/layout
         // corruption dirties the DICE dependency while same-transaction
         // materialization stays deduped.
-        x.is_ok()
+        x.as_ref().is_ok_and(|result| result.cacheable)
     }
 }
 
@@ -1364,6 +1381,7 @@ mod tests {
         assert_eq!(result.repo_path, PathBuf::from("bazel-external/test"));
         assert_eq!(result.content_hash, Some("sha256-abc123".to_owned()));
         assert!(result.success);
+        assert!(result.cacheable);
     }
 
     // Tests for ExtensionRepoExecutionKey
@@ -1576,6 +1594,26 @@ mod tests {
         );
 
         assert_ne!(key1, key2);
+    }
+
+    #[test]
+    fn extension_repo_execution_validity_rejects_non_cacheable_results() {
+        let cacheable = Ok(Arc::new(RepositoryRuleResult::success(
+            "_main+ext+repo".to_owned(),
+            PathBuf::from("/project/bazel-external/_main+ext+repo"),
+        )));
+        assert!(<ExtensionRepoExecutionKey as Key>::validity(&cacheable));
+
+        let non_cacheable = Ok(Arc::new(
+            RepositoryRuleResult::success(
+                "_main+ext+repo".to_owned(),
+                PathBuf::from("/project/bazel-external/_main+ext+repo"),
+            )
+            .non_cacheable(),
+        ));
+        assert!(!<ExtensionRepoExecutionKey as Key>::validity(
+            &non_cacheable
+        ));
     }
 
     #[test]

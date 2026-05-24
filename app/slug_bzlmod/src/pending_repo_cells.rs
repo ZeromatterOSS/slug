@@ -414,6 +414,7 @@ pub fn pre_compute_extension_repo_cells(
                 let rule_source =
                     canonicalize_repo_rule_source(&invocation.rule_source, module_name, is_root);
                 let mut spec = RepoSpec::new(rule_source.clone());
+                spec.local = repo_rule_source_is_builtin_local(&rule_source);
                 for (k, v) in &invocation.attrs {
                     spec.attributes
                         .insert(k.clone(), tag_value_to_attr_value(v));
@@ -492,6 +493,21 @@ fn canonicalize_repo_rule_source(rule_source: &str, module_name: &str, is_root: 
     };
 
     format!("{resolved}%{rule_name}")
+}
+
+fn repo_rule_source_is_builtin_local(rule_source: &str) -> bool {
+    let Some((bzl_file, rule_name)) = rule_source.rsplit_once('%') else {
+        return false;
+    };
+    if !matches!(rule_name, "local_repository" | "new_local_repository") {
+        return false;
+    }
+
+    let normalized_bzl_file = bzl_file
+        .strip_prefix("@@")
+        .or_else(|| bzl_file.strip_prefix('@'))
+        .unwrap_or(bzl_file);
+    normalized_bzl_file == "bazel_tools//tools/build_defs/repo:local.bzl"
 }
 
 /// Augment a pre-computed `PendingRepoCell` set with every spoke repo recorded
@@ -1266,6 +1282,55 @@ mod tests {
             aliases[0].canonical_name,
             "ape++toolchain_local_select+launcher"
         );
+    }
+
+    #[test]
+    fn test_precompute_use_repo_rule_marks_builtin_local_repos_local() {
+        let mut module = parsed_module("ape");
+        for rule_name in ["local_repository", "new_local_repository"] {
+            let mut attrs = indexmap::IndexMap::new();
+            attrs.insert(
+                "path".to_owned(),
+                crate::types::TagValue::String("repo_src".to_owned()),
+            );
+            if rule_name == "new_local_repository" {
+                attrs.insert(
+                    "build_file_content".to_owned(),
+                    crate::types::TagValue::String("exports_files([\"data.txt\"])\n".to_owned()),
+                );
+            }
+            module.repo_rule_invocations.push(RepoRuleInvocation {
+                name: format!("{rule_name}_repo"),
+                rule_source: format!("@bazel_tools//tools/build_defs/repo:local.bzl%{rule_name}"),
+                dev_dependency: false,
+                attrs,
+            });
+        }
+        module.repo_rule_invocations.push(RepoRuleInvocation {
+            name: "archive_repo".to_owned(),
+            rule_source: "@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned(),
+            dev_dependency: false,
+            attrs: indexmap::IndexMap::new(),
+        });
+
+        let (cells, _) =
+            pre_compute_extension_repo_cells(&[("ape+1.0.1".to_owned(), module)], "ape", false)
+                .unwrap();
+
+        let local_specs: Vec<_> = cells
+            .iter()
+            .filter(|cell| cell.internal_name.ends_with("_repository_repo"))
+            .map(|cell| serde_json::from_str::<RepoSpec>(&cell.repo_spec_json).unwrap())
+            .collect();
+        assert_eq!(local_specs.len(), 2);
+        assert!(local_specs.iter().all(|spec| spec.local));
+
+        let archive = cells
+            .iter()
+            .find(|cell| cell.internal_name == "archive_repo")
+            .unwrap();
+        let archive_spec: RepoSpec = serde_json::from_str(&archive.repo_spec_json).unwrap();
+        assert!(!archive_spec.local);
     }
 
     #[test]
