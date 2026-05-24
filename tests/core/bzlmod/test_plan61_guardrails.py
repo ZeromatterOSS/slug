@@ -1791,6 +1791,86 @@ bazel_dep(name = "{module_name}", version = "{module_version}", dev_dependency =
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_deferred_toolchain_retry_recomputes_target_settings(
+    buck: Buck,
+) -> None:
+    """Regression: deferred toolchain retry must recompute target_settings."""
+    dep = buck.cwd / "deferred_toolchain_dep"
+    dep.mkdir()
+    _write(
+        dep / "MODULE.bazel",
+        """module(name = "deferred_toolchain_dep", version = "1.0")
+register_toolchains("@deferred_toolchain_dep//:tc")
+""",
+    )
+    _write(
+        dep / "defs.bzl",
+        """def _tc_impl(ctx):
+    return [platform_common.ToolchainInfo(message = "retry-target-settings-ok")]
+
+tc_impl = rule(implementation = _tc_impl)
+""",
+    )
+    _write(
+        dep / "BUILD.bazel",
+        """load(":defs.bzl", "tc_impl")
+
+toolchain_type(name = "type")
+
+config_setting(
+    name = "setting",
+    values = {"compilation_mode": "fastbuild"},
+)
+
+tc_impl(name = "impl")
+
+toolchain(
+    name = "tc",
+    toolchain_type = ":type",
+    toolchain = ":impl",
+    target_settings = [":setting"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_toolchain_retry")
+
+bazel_dep(name = "deferred_toolchain_dep", version = "1.0")
+local_path_override(
+    module_name = "deferred_toolchain_dep",
+    path = "deferred_toolchain_dep",
+)
+""",
+    )
+    _write(
+        buck.cwd / "defs.bzl",
+        """def _consumer_impl(ctx):
+    toolchain = ctx.toolchains["@deferred_toolchain_dep//:type"]
+    out = ctx.actions.declare_file("retry_target_settings.txt")
+    ctx.actions.write(out, toolchain.message + "\\n")
+    return [DefaultInfo(files = depset([out]))]
+
+consumer = rule(
+    implementation = _consumer_impl,
+    toolchains = ["@deferred_toolchain_dep//:type"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """load(":defs.bzl", "consumer")
+
+consumer(name = "uses_deferred_toolchain")
+""",
+    )
+
+    result = await buck.build("//:uses_deferred_toolchain")
+    output = result.get_build_report().output_for_target("//:uses_deferred_toolchain")
+    assert output.read_text().strip() == "retry-target-settings-ok"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_use_repo_rule_dev_dependency_follows_ignore_policy(
     buck: Buck,
 ) -> None:

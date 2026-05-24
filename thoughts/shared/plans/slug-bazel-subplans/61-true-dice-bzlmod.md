@@ -1745,9 +1745,13 @@ What did not work or remains risky:
   transitional registry. Validation passed with `cargo test -p slug_analysis
   test_declared_toolchain_target_settings_use_explicit_snapshot --
   --nocapture`, `cargo test -p slug_analysis toolchain -- --nocapture` (`12
-  passed`), `cargo check -p slug_analysis -p slug_server`, `cargo build -p
-  slug`, and the full Plan 61 Python guardrail with `74 passed in 40.17s`.
-  The slugd processes left by the full guardrail were cleaned up afterward.
+  passed`), the focused production guardrail
+  `test_deferred_toolchain_retry_recomputes_target_settings` using Bazel-valid
+  `config_setting(values = {"compilation_mode": "fastbuild"})` and
+  `DefaultInfo(files = depset([out]))`, `cargo check -p slug_analysis -p
+  slug_server`, `cargo build -p slug`, and the full Plan 61 Python guardrail
+  with `75 passed in 39.94s`. The slugd processes left by the full guardrail
+  were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
