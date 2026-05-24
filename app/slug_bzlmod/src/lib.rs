@@ -261,10 +261,7 @@ pub struct BzlmodSessionData {
     pub registered_toolchains: Vec<RegisteredToolchain>,
     pub registered_execution_platforms: Vec<String>,
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
-    pub hidden_lockfile_path: Option<PathBuf>,
-    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
-    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
-    pub lockfile_mode: LockfileMode,
+    pub lockfile_inputs: BzlmodLockfileInputsValue,
     pub repo_env: BTreeMap<String, String>,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
@@ -281,10 +278,7 @@ impl BzlmodSessionData {
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
             extension_aggregations: HashMap::new(),
-            hidden_lockfile_path: None,
-            visible_lockfile: None,
-            hidden_lockfile: None,
-            lockfile_mode: LockfileMode::Update,
+            lockfile_inputs: BzlmodLockfileInputsValue::default(),
             repo_env: BTreeMap::new(),
             registry_file_hashes: indexmap::IndexMap::new(),
             selected_yanked_versions: indexmap::IndexMap::new(),
@@ -309,14 +303,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let workspace_id = data.workspace_id.clone();
         let root_module_name = data.cell_graph.root_module_name.clone();
-        let lockfile_inputs = Arc::new(BzlmodLockfileInputsValue {
-            hidden_lockfile_path: data.hidden_lockfile_path.clone(),
-            visible_lockfile_digest: lockfile_content_digest(&data.visible_lockfile),
-            hidden_lockfile_digest: lockfile_content_digest(&data.hidden_lockfile),
-            visible_lockfile: data.visible_lockfile.clone(),
-            hidden_lockfile: data.hidden_lockfile.clone(),
-            lockfile_mode: data.lockfile_mode,
-        });
+        let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
@@ -372,10 +359,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph)])?;
         Ok(())
     }
-}
-
-fn lockfile_content_digest(value: &Option<Arc<LockfileContentValue>>) -> Option<String> {
-    value.as_ref().and_then(|value| value.digest.clone())
 }
 
 pub async fn module_versions_for_current_workspace(
@@ -464,25 +447,30 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-session-lockfile-output-base"),
         );
         let mut data = BzlmodSessionData::for_workspace(workspace_id);
-        data.hidden_lockfile_path = Some(PathBuf::from(
-            "/tmp/slug-plan61-session-lockfile-output-base/MODULE.bazel.lock",
-        ));
-        data.visible_lockfile = Some(Arc::new(LockfileContentValue {
+        let visible_lockfile = Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from(
                 "/tmp/slug-plan61-session-lockfile-digest/MODULE.bazel.lock",
             )),
             digest: Some("visible-digest".to_owned()),
             tracked_by_dice: true,
             lockfile: None,
-        }));
-        data.hidden_lockfile = Some(Arc::new(LockfileContentValue {
+        });
+        let hidden_lockfile = Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from(
                 "/tmp/slug-plan61-session-lockfile-output-base/MODULE.bazel.lock",
             )),
             digest: Some("hidden-digest".to_owned()),
             tracked_by_dice: true,
             lockfile: None,
-        }));
+        });
+        data.lockfile_inputs = BzlmodLockfileInputsValue::from_values(
+            Some(PathBuf::from(
+                "/tmp/slug-plan61-session-lockfile-output-base/MODULE.bazel.lock",
+            )),
+            Some(visible_lockfile),
+            Some(hidden_lockfile),
+            LockfileMode::Update,
+        );
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())

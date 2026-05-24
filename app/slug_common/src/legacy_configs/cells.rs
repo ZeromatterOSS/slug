@@ -3573,10 +3573,12 @@ impl BuckConfigBasedCells {
         // DICE-injected bzlmod session state. This data is needed when
         // extension repos are lazily executed inside DICE.
         bzlmod_session_data.extension_aggregations = aggregated;
-        bzlmod_session_data.hidden_lockfile_path = hidden_lockfile_path;
-        bzlmod_session_data.visible_lockfile = visible_lockfile_value;
-        bzlmod_session_data.hidden_lockfile = hidden_lockfile_value;
-        bzlmod_session_data.lockfile_mode = options.lockfile_mode;
+        bzlmod_session_data.lockfile_inputs = slug_bzlmod::BzlmodLockfileInputsValue::from_values(
+            hidden_lockfile_path,
+            visible_lockfile_value,
+            hidden_lockfile_value,
+            options.lockfile_mode,
+        );
 
         // Collect toolchain and execution platform registrations from all modules.
         // Priority order: root module first, then BFS order of dep graph.

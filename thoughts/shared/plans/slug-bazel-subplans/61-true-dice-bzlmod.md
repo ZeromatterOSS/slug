@@ -970,6 +970,17 @@ Observed SDK result at the checkpoint:
   bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
   replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
   --check`, and `git diff --check`.
+- `BzlmodSessionData` now carries the same `BzlmodLockfileInputsValue` at the
+  transitional legacy resolver boundary, instead of separate lockfile path,
+  value, and mode fields. The resolver constructs the bundle from the tracked
+  lockfile values, and DICE injection fans out that same bundle to replay and
+  module-version invalidation projections. Validation passed with `cargo check
+  -p slug_bzlmod -p slug_common`, focused `slug_bzlmod` tests for session
+  injection, extension execution-key construction, and module-version equality,
+  full `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
+  replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
+  --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 

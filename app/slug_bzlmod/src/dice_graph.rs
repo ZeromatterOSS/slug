@@ -249,6 +249,34 @@ pub struct BzlmodLockfileInputsValue {
     pub lockfile_mode: crate::LockfileMode,
 }
 
+impl BzlmodLockfileInputsValue {
+    pub fn from_values(
+        hidden_lockfile_path: Option<PathBuf>,
+        visible_lockfile: Option<Arc<LockfileContentValue>>,
+        hidden_lockfile: Option<Arc<LockfileContentValue>>,
+        lockfile_mode: crate::LockfileMode,
+    ) -> Self {
+        Self {
+            hidden_lockfile_path,
+            visible_lockfile_digest: lockfile_content_digest(&visible_lockfile),
+            hidden_lockfile_digest: lockfile_content_digest(&hidden_lockfile),
+            visible_lockfile,
+            hidden_lockfile,
+            lockfile_mode,
+        }
+    }
+}
+
+impl Default for BzlmodLockfileInputsValue {
+    fn default() -> Self {
+        Self::from_values(None, None, None, crate::LockfileMode::Update)
+    }
+}
+
+fn lockfile_content_digest(value: &Option<Arc<LockfileContentValue>>) -> Option<String> {
+    value.as_ref().and_then(|value| value.digest.clone())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 pub struct LockfileExtensionEntryKey {
     pub workspace_id: WorkspaceId,
