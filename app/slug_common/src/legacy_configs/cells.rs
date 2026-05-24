@@ -3404,7 +3404,9 @@ impl BuckConfigBasedCells {
             for (name, info) in &resolved_graph.modules {
                 version_map.insert(name.clone(), info.version.clone());
             }
-            bzlmod_session_data.module_versions = version_map;
+            bzlmod_session_data.module_versions = slug_bzlmod::BzlmodModuleVersionsDataValue {
+                module_versions: Arc::new(version_map),
+            };
         }
 
         // Build parsed_modules list for extension resolution

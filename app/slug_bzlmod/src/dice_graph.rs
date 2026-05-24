@@ -629,7 +629,7 @@ impl BzlmodResolutionFactsKey {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsDataValue {
     pub module_versions: Arc<HashMap<String, String>>,
 }

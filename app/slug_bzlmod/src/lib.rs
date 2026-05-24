@@ -266,7 +266,7 @@ pub struct RegisteredToolchain {
 /// cell parsing and DICE-owned bzlmod values.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodSessionData {
-    pub module_versions: HashMap<String, String>,
+    pub module_versions: BzlmodModuleVersionsDataValue,
     pub registered_toolchains: Vec<RegisteredToolchain>,
     pub registered_execution_platforms: Vec<String>,
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
@@ -281,7 +281,7 @@ pub struct BzlmodSessionData {
 impl BzlmodSessionData {
     pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
         Self {
-            module_versions: HashMap::new(),
+            module_versions: BzlmodModuleVersionsDataValue::default(),
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
             extension_aggregations: HashMap::new(),
@@ -315,9 +315,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let repo_env_data = Arc::new(BzlmodRepoEnvDataValue {
             repo_env: repo_env.clone(),
         });
-        let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
-            module_versions: Arc::new(data.module_versions.clone()),
-        });
+        let module_versions = Arc::new(data.module_versions.clone());
         let resolution_facts = Arc::new(data.resolution_facts.clone());
         let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
             repo_mappings: Arc::new(data.repo_mappings.clone()),
