@@ -299,6 +299,7 @@ pub fn repo_execution_spec_hash(
 
 impl ExtensionRepoExecutionKey {
     /// Create a new extension repo execution key.
+    #[cfg(test)]
     pub fn new(
         canonical_name: String,
         extension_id: String,
@@ -315,6 +316,7 @@ impl ExtensionRepoExecutionKey {
     }
 
     /// Create a new extension repo execution key with command repo-env.
+    #[cfg(test)]
     pub fn new_with_repo_env(
         canonical_name: String,
         extension_id: String,
@@ -379,6 +381,7 @@ impl ExtensionRepoExecutionKey {
     }
 
     /// Create from Arc references (avoids cloning for repeated use).
+    #[cfg(test)]
     pub fn from_arcs(
         canonical_name: Arc<str>,
         extension_id: Arc<str>,
@@ -395,6 +398,7 @@ impl ExtensionRepoExecutionKey {
     }
 
     /// Create from Arc references with command repo-env.
+    #[cfg(test)]
     pub fn from_arcs_with_repo_env(
         canonical_name: Arc<str>,
         extension_id: Arc<str>,
@@ -442,6 +446,7 @@ impl ExtensionRepoExecutionKey {
 
     /// Create with default project root (current directory).
     /// Primarily for testing.
+    #[cfg(test)]
     pub fn new_with_cwd(canonical_name: String, extension_id: String, repo_spec: RepoSpec) -> Self {
         Self::new(
             canonical_name,

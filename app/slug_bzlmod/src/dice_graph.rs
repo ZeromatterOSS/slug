@@ -1385,6 +1385,7 @@ impl BzlmodExtensionAggregationKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root), extension_id)
     }
@@ -1420,6 +1421,7 @@ impl ExtensionSpokesKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root), extension_id)
     }
@@ -1444,6 +1446,7 @@ impl ExtensionSpokesByExtensionIdKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf, extension_id: &str) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root), extension_id)
     }
@@ -1468,6 +1471,7 @@ impl ExtensionIdByCanonicalRepoKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf, canonical_name: &str) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root), canonical_name)
     }

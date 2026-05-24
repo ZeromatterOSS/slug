@@ -1295,6 +1295,13 @@ Observed SDK result at the checkpoint:
   build_setting_labels_resolve_dynamic_extension_aliases -- --nocapture`,
   `cargo check -p slug_core`, `cargo build -p slug`, `cargo fmt --check`, and
   `git diff --check`.
+- Extension repository execution constructors that synthesize workspace
+  identity from only a project root are now compiled only for tests. Production
+  callers must use constructors that take explicit `WorkspaceId`/repo-env
+  inputs, reducing another accidental bypass around output-base-sensitive
+  repository materialization keys. Validation passed with `cargo check -p
+  slug_bzlmod`, focused `cargo test -p slug_bzlmod repository_execution --
+  --nocapture`, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1460,7 +1467,10 @@ What did not work or remains risky:
   process-global dynamic maps, so internal generated repo names are not made
   root-visible merely by snapshot membership. Build-setting labels that arrive
   in Bazel canonical `@@repo//...` form now normalize to Slug's internal cell
-  name after dynamic alias resolution. The graph is still
+  name after dynamic alias resolution. Extension repository execution
+  constructors that derive workspace identity from project root are test-only,
+  so production execution/materialization code has to pass the explicit
+  workspace identity. The graph is still
   legacy-produced, and alias compatibility plus runtime registration remain
   process-global transitional plumbing, so this does not yet make the runtime
   bzlmod cell graph DICE-owned.
@@ -1669,6 +1679,9 @@ using Rust DICE keys and values:
    - `BzlmodSessionData::default()` is removed; remaining empty session
      construction must explicitly name the project-root sentinel while the
      session bridge is still being unwound.
+   - Extension repository execution constructors that derive workspace identity
+     from project root are test-only; production code must pass explicit
+     workspace identity and repo-env.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key inputs as the graph migrates.
