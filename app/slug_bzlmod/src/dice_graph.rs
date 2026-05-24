@@ -602,28 +602,33 @@ pub struct BzlmodModuleVersionsInvalidation {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-pub struct BzlmodModuleVersionsInvalidationData {
+pub struct BzlmodResolutionFactsValue {
+    pub workspace_id: WorkspaceId,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
 }
 
-impl BzlmodModuleVersionsInvalidationData {
-    fn with_keyed_inputs(
-        &self,
-        root_module_name: String,
-        lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
-        repo_env: Arc<BTreeMap<String, String>>,
-        repo_mappings: Arc<BzlmodRepoMappingsDataValue>,
-    ) -> BzlmodModuleVersionsInvalidation {
-        BzlmodModuleVersionsInvalidation {
-            root_module_name,
-            lockfile_inputs,
-            repo_env: repo_env.as_ref().clone(),
-            registry_file_hashes: self.registry_file_hashes.clone(),
-            selected_yanked_versions: self.selected_yanked_versions.clone(),
-            repo_mappings: repo_mappings.repo_mappings.as_ref().clone(),
-            repo_mapping_overrides: repo_mappings.repo_mapping_overrides.as_ref().clone(),
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodResolutionFactsKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
+pub struct BzlmodResolutionFactsKey {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+}
+
+impl BzlmodResolutionFactsKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest: Arc::from("injected-bzlmod-session"),
         }
+    }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
 }
 
@@ -631,7 +636,6 @@ impl BzlmodModuleVersionsInvalidationData {
 pub struct BzlmodModuleVersionsDataValue {
     pub workspace_id: WorkspaceId,
     pub module_versions: Arc<HashMap<String, String>>,
-    pub invalidation: Arc<BzlmodModuleVersionsInvalidationData>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -734,6 +738,27 @@ pub struct BzlmodRepoMappingsDataKey;
 
 impl dice::InjectedKey for BzlmodRepoMappingsDataKey {
     type Value = Arc<BzlmodRepoMappingsDataValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodResolutionFactsDataKey")]
+pub struct BzlmodResolutionFactsDataKey;
+
+impl dice::InjectedKey for BzlmodResolutionFactsDataKey {
+    type Value = Arc<BzlmodResolutionFactsValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -856,6 +881,36 @@ impl Key for BzlmodRepoMappingsKey {
 }
 
 #[async_trait]
+impl Key for BzlmodResolutionFactsKey {
+    type Value = slug_error::Result<Arc<BzlmodResolutionFactsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodResolutionFactsDataKey).await?;
+        if data.workspace_id != self.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodResolutionFactsKey was computed with project root '{}', \
+                 but current bzlmod resolution-facts root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        Ok(data)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[async_trait]
 impl Key for ModuleVersionsKey {
     type Value = slug_error::Result<Arc<ModuleVersionsValue>>;
 
@@ -894,15 +949,23 @@ impl Key for ModuleVersionsKey {
                 self.workspace_id.clone(),
             ))
             .await??;
+        let resolution_facts = ctx
+            .compute(&BzlmodResolutionFactsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         Ok(Arc::new(ModuleVersionsValue {
             workspace_id: data.workspace_id.clone(),
             module_versions: data.module_versions.clone(),
-            invalidation: Arc::new(data.invalidation.with_keyed_inputs(
-                cell_graph.root_module_name.clone(),
+            invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
+                root_module_name: cell_graph.root_module_name.clone(),
                 lockfile_inputs,
-                repo_env,
-                repo_mappings,
-            )),
+                repo_env: repo_env.as_ref().clone(),
+                registry_file_hashes: resolution_facts.registry_file_hashes.clone(),
+                selected_yanked_versions: resolution_facts.selected_yanked_versions.clone(),
+                repo_mappings: repo_mappings.repo_mappings.as_ref().clone(),
+                repo_mapping_overrides: repo_mappings.repo_mapping_overrides.as_ref().clone(),
+            }),
         }))
     }
 

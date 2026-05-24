@@ -84,7 +84,6 @@ pub use dice_graph::BzlmodLockfileInputsValue;
 pub use dice_graph::BzlmodModuleVersionsDataKey;
 pub use dice_graph::BzlmodModuleVersionsDataValue;
 pub use dice_graph::BzlmodModuleVersionsInvalidation;
-pub use dice_graph::BzlmodModuleVersionsInvalidationData;
 pub use dice_graph::BzlmodRegisteredExecutionPlatformsDataKey;
 pub use dice_graph::BzlmodRegisteredToolchainsDataKey;
 pub use dice_graph::BzlmodRepoEnvDataKey;
@@ -93,6 +92,9 @@ pub use dice_graph::BzlmodRepoEnvKey;
 pub use dice_graph::BzlmodRepoMappingsDataKey;
 pub use dice_graph::BzlmodRepoMappingsDataValue;
 pub use dice_graph::BzlmodRepoMappingsKey;
+pub use dice_graph::BzlmodResolutionFactsDataKey;
+pub use dice_graph::BzlmodResolutionFactsKey;
+pub use dice_graph::BzlmodResolutionFactsValue;
 pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionBzlTransitiveDigestKey;
@@ -322,10 +324,11 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
-            invalidation: Arc::new(BzlmodModuleVersionsInvalidationData {
-                registry_file_hashes: data.registry_file_hashes.clone(),
-                selected_yanked_versions: data.selected_yanked_versions.clone(),
-            }),
+        });
+        let resolution_facts = Arc::new(BzlmodResolutionFactsValue {
+            workspace_id: workspace_id.clone(),
+            registry_file_hashes: data.registry_file_hashes.clone(),
+            selected_yanked_versions: data.selected_yanked_versions.clone(),
         });
         let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
             workspace_id: workspace_id.clone(),
@@ -358,6 +361,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         self.changed_to(vec![(BzlmodRepoMappingsDataKey, repo_mappings)])?;
         self.changed_to(vec![(BzlmodLockfileInputsDataKey, lockfile_inputs_data)])?;
         self.changed_to(vec![(BzlmodRepoEnvDataKey, repo_env_data)])?;
+        self.changed_to(vec![(BzlmodResolutionFactsDataKey, resolution_facts)])?;
         self.changed_to(vec![(
             BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
@@ -487,6 +491,12 @@ mod tests {
         );
         data.repo_env
             .insert("TOKEN".to_owned(), "from-session".to_owned());
+        data.registry_file_hashes.insert(
+            "registry/modules/dep/1.0/MODULE.bazel".to_owned(),
+            "sha256-registry".to_owned(),
+        );
+        data.selected_yanked_versions
+            .insert("dep@1.0".to_owned(), "allowed by flag".to_owned());
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -518,6 +528,25 @@ mod tests {
             repo_env.get("TOKEN").map(String::as_str),
             Some("from-session")
         );
+        let resolution_facts = dice
+            .compute(&BzlmodResolutionFactsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(
+            resolution_facts
+                .registry_file_hashes
+                .get("registry/modules/dep/1.0/MODULE.bazel")
+                .map(String::as_str),
+            Some("sha256-registry")
+        );
+        assert_eq!(
+            resolution_facts
+                .selected_yanked_versions
+                .get("dep@1.0")
+                .map(String::as_str),
+            Some("allowed by flag")
+        );
 
         let module_versions = dice
             .compute(&ModuleVersionsKey::for_workspace_id(workspace_id.clone()))
@@ -545,6 +574,22 @@ mod tests {
                 .hidden_lockfile_digest
                 .as_deref(),
             Some("hidden-digest")
+        );
+        assert_eq!(
+            module_versions
+                .invalidation
+                .registry_file_hashes
+                .get("registry/modules/dep/1.0/MODULE.bazel")
+                .map(String::as_str),
+            Some("sha256-registry")
+        );
+        assert_eq!(
+            module_versions
+                .invalidation
+                .selected_yanked_versions
+                .get("dep@1.0")
+                .map(String::as_str),
+            Some("allowed by flag")
         );
 
         Ok(())

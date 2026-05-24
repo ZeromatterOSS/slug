@@ -677,9 +677,8 @@ Observed SDK result at the checkpoint:
   full `cargo test -p slug_bzlmod -- --nocapture`, and the full Plan 61 Python
   guardrail with 72 tests. A version-map-only equality attempt regressed the
   hidden-lockfile facts restore transition, so `ModuleVersionsValue` now carries
-  the same conservative invalidation identity as the injected
-  `BzlmodModuleVersionsDataValue` until the remaining interpreter inputs are
-  explicit DICE dependencies.
+  a conservative invalidation identity composed from named bzlmod projections
+  until the remaining interpreter inputs are explicit DICE dependencies.
 - Extension-spoke lookup digest validation passed with `cargo fmt --check`,
   `cargo test -p slug_bzlmod
   extension_spokes_lookup_keys_cache_after_digest_dependency -- --nocapture`,
@@ -1037,6 +1036,19 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
   subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
   --check`, and `git diff --check`.
+- Registry-file hashes and selected yanked-version facts now flow through a
+  workspace-checked `BzlmodResolutionFactsKey`, leaving
+  `BzlmodModuleVersionsDataValue` as the injected module-version map rather
+  than a carrier for unrelated conservative invalidation facts.
+  `ModuleVersionsKey` composes its invalidation identity from the named cell
+  graph, lockfile, repo-env, repo-mapping, and resolution-facts projections.
+  This remains transitional because the facts are still produced by the legacy
+  resolver. Validation passed with `cargo check -p slug_bzlmod -p
+  slug_common`, focused `slug_bzlmod` coverage for lockfile/repo-env/facts
+  session injection, full `cargo test -p slug_bzlmod -- --nocapture`, `cargo
+  test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
+  focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
+  72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
