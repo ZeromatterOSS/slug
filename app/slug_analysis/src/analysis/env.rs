@@ -2336,6 +2336,45 @@ impl<'a> MetadataLabelContext<'a> {
             .unwrap_or_else(|| cell_name.to_owned())
     }
 
+    fn scoped_dynamic_extension_cell_name(
+        &self,
+        owner_cell: &str,
+        apparent_cell: &str,
+    ) -> Option<String> {
+        if let Some(cell_resolver) = self.cell_resolver {
+            if let Ok(owner_cell_name) = CellName::unchecked_new(owner_cell)
+                && let Ok(owner_aliases) =
+                    slug_core::cells::CellAliasResolver::new_for_non_root_cell(
+                        owner_cell_name,
+                        cell_resolver.root_cell_cell_alias_resolver(),
+                        std::iter::empty::<(
+                            slug_core::cells::alias::NonEmptyCellAlias,
+                            slug_core::cells::alias::NonEmptyCellAlias,
+                        )>(),
+                    )
+                && let Some(resolved) =
+                    owner_aliases.resolve_declared_or_runtime_alias(apparent_cell)
+            {
+                return Some(resolved.as_str().to_owned());
+            }
+            if cell_resolver_has_runtime_alias_snapshot(cell_resolver) {
+                return None;
+            }
+        }
+
+        slug_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
+            owner_cell,
+            apparent_cell,
+        )
+        .or_else(|| {
+            metadata_owner_scoped_repo_candidates(owner_cell)
+                .into_iter()
+                .find_map(|owner_module| {
+                    slug_core::cells::resolve_scoped_bzlmod_repo_alias(&owner_module, apparent_cell)
+                })
+        })
+    }
+
     fn has_runtime_alias_snapshot(&self) -> bool {
         self.cell_resolver
             .is_some_and(|cell_resolver| cell_resolver_has_runtime_alias_snapshot(cell_resolver))
@@ -2430,17 +2469,7 @@ fn metadata_canonicalize_label_for_owner(
 
     let owner_cell = owner.pkg().cell_name().as_str();
     if let Some(canonical_cell) =
-        slug_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
-            owner_cell,
-            apparent_cell,
-        )
-        .or_else(|| {
-            metadata_owner_scoped_repo_candidates(owner_cell)
-                .into_iter()
-                .find_map(|owner_module| {
-                    slug_core::cells::resolve_scoped_bzlmod_repo_alias(&owner_module, apparent_cell)
-                })
-        })
+        metadata_ctx.scoped_dynamic_extension_cell_name(owner_cell, apparent_cell)
     {
         return metadata_relabel_with_cell(&label, &canonical_cell).unwrap_or(label);
     }
@@ -5265,6 +5294,7 @@ mod tests {
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
     use slug_core::cells::BzlmodRuntimeExtensionCell;
+    use slug_core::cells::BzlmodRuntimeScopedRepoAlias;
     use slug_core::cells::CellAliasResolver;
     use slug_core::cells::CellResolver;
     use slug_core::cells::cell_root_path::CellRootPathBuf;
@@ -5712,6 +5742,85 @@ mod tests {
 
         let legacy_path = metadata_path_for_label(&label, &cfg, MetadataLabelContext::empty());
         assert!(legacy_path.contains(&format!("external/{wrong_global}/pkg/lib")));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_owner_scoped_alias_prefers_runtime_snapshot_before_globals()
+    -> slug_error::Result<()> {
+        let apparent = "plan61_metadata_scoped_alias";
+        let owner = "plan61_owner++metadata+owner";
+        let canonical = "plan61_owner++metadata+scoped";
+        let wrong_global = "plan61_wrong_owner++metadata+scoped";
+        slug_core::cells::register_scoped_bzlmod_repo_alias(
+            "plan61_owner+".to_owned(),
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
+                owner_module: "plan61_owner+".to_owned(),
+                apparent_name: apparent.to_owned(),
+                target_name: canonical.to_owned(),
+            }],
+            dynamic_aliases: Vec::new(),
+        };
+        let resolver = test_bzlmod_cell_resolver(snapshot)?;
+
+        let owner_label = TargetLabel::testing_parse(&format!("@{owner}//pkg:owner"));
+        let label = TargetLabel::testing_parse(&format!("@{apparent}//pkg:lib"));
+        let resolved = metadata_canonicalize_label_for_owner(
+            &owner_label,
+            label.dupe(),
+            MetadataLabelContext::new(Some(&resolver)),
+        );
+
+        assert_eq!(resolved.pkg().cell_name(), CellName::testing_new(canonical));
+        assert_eq!(
+            metadata_canonicalize_label_for_owner(
+                &owner_label,
+                label,
+                MetadataLabelContext::empty()
+            )
+            .pkg()
+            .cell_name(),
+            CellName::testing_new(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_owner_scoped_alias_runtime_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let apparent = "plan61_metadata_scoped_miss";
+        let owner = "plan61_owner++metadata+owner_miss";
+        let wrong_global = "plan61_wrong_owner++metadata+scoped_miss";
+        slug_core::cells::register_scoped_bzlmod_repo_alias(
+            "plan61_owner+".to_owned(),
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = test_bzlmod_cell_resolver(BzlmodRuntimeCellInstallSnapshot::default())?;
+
+        let owner_label = TargetLabel::testing_parse(&format!("@{owner}//pkg:owner"));
+        let label = TargetLabel::testing_parse(&format!("@{apparent}//pkg:lib"));
+        let resolved = metadata_canonicalize_label_for_owner(
+            &owner_label,
+            label.dupe(),
+            MetadataLabelContext::new(Some(&resolver)),
+        );
+
+        assert_eq!(resolved.pkg().cell_name(), CellName::testing_new(apparent));
+        assert_eq!(
+            metadata_canonicalize_label_for_owner(
+                &owner_label,
+                label,
+                MetadataLabelContext::empty()
+            )
+            .pkg()
+            .cell_name(),
+            CellName::testing_new(wrong_global)
+        );
         Ok(())
     }
 

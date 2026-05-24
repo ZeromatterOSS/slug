@@ -1953,11 +1953,14 @@ What did not work or remains risky:
 - Metadata path canonicalization and toolchain implementation label parsing now
   also treat a resolver with a bzlmod runtime snapshot as authoritative on
   misses, so stale process-global dynamic aliases cannot fill an unowned repo
-  spelling once the analysis caller has passed a runtime snapshot. Validation
+  spelling once the analysis caller has passed a runtime snapshot. Owner-scoped
+  metadata alias canonicalization now uses a resolver-owned alias view for the
+  owner cell and gates legacy scoped-alias globals the same way. Validation
   passed with `cargo test -p slug_analysis metadata_paths_ -- --nocapture` (`2
-  passed`) and `cargo test -p slug_analysis parse_impl_label_to_target_label --
-  --nocapture` (`3 passed`), `cargo check -p slug_analysis`, `cargo fmt
-  --check`, and `git diff --check`.
+  passed`), `cargo test -p slug_analysis metadata_owner_scoped_alias --
+  --nocapture` (`2 passed`), and `cargo test -p slug_analysis
+  parse_impl_label_to_target_label -- --nocapture` (`3 passed`), `cargo check
+  -p slug_analysis`, `cargo fmt --check`, and `git diff --check`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
