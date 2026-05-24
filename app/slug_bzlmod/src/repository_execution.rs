@@ -646,6 +646,12 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
     {
         return "layout-missing-build-file".to_owned();
     }
+    if repo_has_foreign_top_level_symlink(
+        &repo_dir,
+        key.workspace_id.canonical_project_root.as_ref(),
+    ) {
+        return "layout-foreign-top-level-symlink".to_owned();
+    }
     match repo_spec_to_invocation(canonical_name, repo_spec) {
         Ok(invocation) => {
             if crate::repository_executor::repo_layout_is_valid_for_invocation(
@@ -659,6 +665,25 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
         }
         Err(e) => format!("layout-unclassifiable:{e}"),
     }
+}
+
+pub fn repo_has_foreign_top_level_symlink(repo_path: &Path, project_root: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(repo_path) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        let path = entry.path();
+        let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+            return false;
+        };
+        if !metadata.file_type().is_symlink() {
+            return false;
+        }
+        let Ok(target) = std::fs::read_link(path) else {
+            return false;
+        };
+        target.is_absolute() && !target.starts_with(project_root)
+    })
 }
 
 fn repo_spec_requires_build_file(repo_spec: &RepoSpec) -> bool {
@@ -1832,6 +1857,41 @@ mod tests {
         let present = repo_materialization_manifest_for_key(&key);
         assert_eq!(present.layout_state.as_ref(), "layout-valid");
         assert_ne!(missing.digest, present.digest);
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn materialization_manifest_layout_rejects_foreign_top_level_symlink() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().join("project");
+        let canonical_name = "_main+ext+foreign_link_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        let foreign_dir = temp.path().join("foreign/src");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::create_dir_all(&foreign_dir).unwrap();
+        std::fs::write(repo_dir.join("BUILD.bazel"), "exports_files([\"src\"])\n").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&foreign_dir, repo_dir.join("src")).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&foreign_dir, repo_dir.join("src")).unwrap();
+
+        let repo_spec = RepoSpec::new("@@example//:repo.bzl%custom_repository".to_owned());
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec.clone()),
+        );
+        let foreign = repo_materialization_manifest_for_key(&key);
+        assert_eq!(
+            foreign.layout_state.as_ref(),
+            "layout-foreign-top-level-symlink"
+        );
+
+        std::fs::remove_file(repo_dir.join("src")).unwrap();
+        std::fs::write(repo_dir.join("src"), "payload").unwrap();
+        let valid = repo_materialization_manifest_for_key(&key);
+        assert_eq!(valid.layout_state.as_ref(), "layout-valid");
+        assert_ne!(foreign.digest, valid.digest);
     }
 
     #[tokio::test]
