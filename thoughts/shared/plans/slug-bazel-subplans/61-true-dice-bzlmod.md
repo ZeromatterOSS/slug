@@ -662,6 +662,12 @@ Observed SDK result at the checkpoint:
   Validation passed with the focused selector `-k 'visible_lockfile_creation
   or visible_lockfile_deletion or visible_lockfile_edit'` (`3 passed, 113
   deselected`).
+- Extension tag values now have a behavioral stale-replay guardrail: a build
+  first replays generated repo specs from a lockfile whose `usagesDigest`
+  matches the initial tag value, then editing only that tag value makes the
+  consuming build evaluate the extension and fail instead of reusing stale
+  replay output. Validation passed with the focused guardrail selected by `-k
+  'extension_tag_attr_edit'` (`1 passed, 115 deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while

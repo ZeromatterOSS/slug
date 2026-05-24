@@ -6770,6 +6770,14 @@ async def test_extension_tag_attr_edit_invalidates_or_rejects_replay(
     replayed_repo.mkdir(exist_ok=True)
     _write(replayed_repo / "BUILD.bazel", "filegroup(name = \"data\")\n")
     _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+    _write(
         buck.cwd / "replay_ext.bzl",
         """def _generated_repo_impl(rctx):
     pass
@@ -6779,6 +6787,10 @@ generated_repo = repository_rule(
 )
 
 def _replay_ext_impl(module_ctx):
+    for mod in module_ctx.modules:
+        for config in mod.tags.config:
+            if config.name == "edited":
+                fail("edited tag value should make replay stale")
     generated_repo(name = "replayed_repo")
 
 replay_ext = module_extension(
@@ -6845,7 +6857,7 @@ use_repo(replay, "replayed_repo")
     )
 
     before = await _bzlmod_counters(buck)
-    await buck.audit("cell")
+    await buck.build("//:uses_replayed_repo")
     first = await _bzlmod_counters(buck)
     assert first["extension_replay_hit"] > before["extension_replay_hit"]
     assert first["extension_eval"] == before["extension_eval"]
@@ -6860,11 +6872,14 @@ use_repo(replay, "replayed_repo")
 """,
     )
 
-    await buck.audit("cell")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_replayed_repo")
     second = await _bzlmod_counters(buck)
 
+    assert "edited tag value should make replay stale" in exc.value.stderr
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    assert second["extension_eval"] > first["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
