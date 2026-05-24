@@ -547,6 +547,23 @@ struct BzlmodDynamicAlias {
     canonical_name: String,
 }
 
+fn dynamic_alias_for_generated_override(
+    alias: &slug_bzlmod::RepoAlias,
+    target_name: &str,
+) -> Option<BzlmodDynamicAlias> {
+    if alias.declaring_module.is_none()
+        && alias.apparent_name != target_name
+        && slug_bzlmod::parse_canonical_name(&alias.apparent_name).is_some()
+    {
+        Some(BzlmodDynamicAlias {
+            apparent_name: alias.apparent_name.clone(),
+            canonical_name: target_name.to_owned(),
+        })
+    } else {
+        None
+    }
+}
+
 fn replay_bzlmod_runtime_state(
     cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
     project_root: &ProjectRoot,
@@ -3065,7 +3082,7 @@ impl BuckConfigBasedCells {
         let mut module_symlinks = Vec::new();
         let mut lockfile_seeded_cells = Vec::new();
         let mut scoped_repo_aliases = Vec::new();
-        let dynamic_extension_aliases: Vec<BzlmodDynamicAlias> = Vec::new();
+        let mut dynamic_extension_aliases: Vec<BzlmodDynamicAlias> = Vec::new();
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
@@ -3715,6 +3732,11 @@ impl BuckConfigBasedCells {
                 // that exact generated name as its own cell pointing at the
                 // selected cell's path, and discard any stale extension/lockfile
                 // registration for the generated repo.
+                if let Some(dynamic_alias) =
+                    dynamic_alias_for_generated_override(&alias, &target_name)
+                {
+                    dynamic_extension_aliases.push(dynamic_alias);
+                }
                 if !existing_cell_names.contains(&alias.apparent_name) {
                     if let Some((_, selected_path, selected_setup)) = cells
                         .iter()
@@ -4344,6 +4366,28 @@ mod tests {
             other => panic!("expected bazel_tools to be a bundled cell, got {other:?}"),
         }
         Ok(())
+    }
+
+    #[test]
+    fn generated_override_aliases_project_to_dynamic_runtime_aliases() {
+        let alias = slug_bzlmod::RepoAlias {
+            apparent_name: "root++ext+generated".to_owned(),
+            canonical_name: "generated".to_owned(),
+            declaring_module: None,
+        };
+        let scoped_alias = slug_bzlmod::RepoAlias {
+            apparent_name: "generated".to_owned(),
+            canonical_name: "actual_dep".to_owned(),
+            declaring_module: Some("root+".to_owned()),
+        };
+
+        let dynamic_alias = dynamic_alias_for_generated_override(&alias, "generated")
+            .expect("generated override alias should project to runtime dynamic alias");
+
+        assert_eq!(dynamic_alias.apparent_name, "root++ext+generated");
+        assert_eq!(dynamic_alias.canonical_name, "generated");
+        assert!(dynamic_alias_for_generated_override(&scoped_alias, "actual_dep").is_none());
+        assert!(dynamic_alias_for_generated_override(&alias, "root++ext+generated").is_none());
     }
 
     #[tokio::test]

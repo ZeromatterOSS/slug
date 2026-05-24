@@ -943,6 +943,17 @@ Observed SDK result at the checkpoint:
   build -p slug`, the focused Plan 61 Python replay/root-isolation/alias subset,
   the full Plan 61 Python guardrail with 72 tests, `cargo fmt --check`, and
   `git diff --check`.
+- Generated-repo aliases created by `override_repo()` now project into
+  `BzlmodCellGraphValue.dynamic_aliases`, so the runtime snapshot carries the
+  exact generated-repo-to-selected-module mapping instead of relying on ad hoc
+  process-global alias registration. Validation passed with `cargo test -p
+  slug_common generated_override_aliases_project_to_dynamic_runtime_aliases --
+  --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, `cargo check
+  -p slug_core -p slug_common -p slug_external_cells`, `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo test -p slug_external_cells --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python override/replay
+  subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt --check`,
+  and `git diff --check`.
 - Resolver-local promoted generated-repo cells now distinguish graph-owned cells
   from transitional root-scoped discoveries. Cells created from the
   graph-derived runtime snapshot remain available through that resolver even
@@ -1356,6 +1367,8 @@ What did not work or remains risky:
   installation and cell-resolver assembly consume that published value, and
   exact lazy generated-repo lookup plus dynamic/scoped alias resolution can now
   use the resolver-local runtime snapshot before using process globals.
+  `override_repo()` generated-repo aliases are projected into that snapshot as
+  dynamic aliases.
   Resolver-local cells promoted from that snapshot are now graph-owned instead
   of root-scoped process-global cache entries. The graph is still
   legacy-produced, and alias compatibility plus runtime registration remain
