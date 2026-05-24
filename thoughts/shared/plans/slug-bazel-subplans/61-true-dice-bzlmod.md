@@ -571,6 +571,14 @@ Observed SDK result at the checkpoint:
   subset selected by `-k 'override_module_parse_failure or
   override_module_utf8_failure or override_module_include_cycle'` (`6 passed,
   86 deselected`).
+- Out-of-project `local_path_override` module files now have focused
+  same-daemon failure-transition guardrails: parse errors, invalid UTF-8, and
+  cyclic included module segments fail the next `audit cell`, then repair and
+  recompute bzlmod resolution instead of reusing the warm value. Validation
+  passed with the focused subset selected by `-k
+  'out_of_project_local_override_parse_failure or
+  out_of_project_local_override_utf8_failure or
+  out_of_project_local_override_include_cycle'` (`3 passed, 92 deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
@@ -2098,7 +2106,9 @@ using Rust DICE keys and values:
    - Include create/delete transitions, parse failures, include cycles, and
      UTF-8 failures for every module source class. Cached git/archive override
      coverage now includes create/delete, parse/UTF-8 failures, and include
-     cycles; remaining source classes still need full matrix coverage.
+     cycles, and out-of-project local override coverage now includes
+     parse/UTF-8 failures and include cycles; remaining source classes still
+     need full matrix coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
