@@ -3812,10 +3812,11 @@ impl BuckConfigBasedCells {
             &cells,
             resolved_graph_for_aliases.as_ref(),
         );
-        bzlmod_session_data.repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue {
-            repo_mappings: Arc::new(repo_mappings),
-            repo_mapping_overrides: Arc::new(repo_mapping_overrides),
-        };
+        bzlmod_session_data.repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+            bzlmod_session_data.cell_graph.workspace_id.clone(),
+            Arc::new(repo_mappings),
+            Arc::new(repo_mapping_overrides),
+        );
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);

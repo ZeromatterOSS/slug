@@ -2370,10 +2370,11 @@ mod tests {
             hidden_lockfile: None,
             lockfile_mode: LockfileMode::Error,
         };
-        let repo_mappings = BzlmodRepoMappingsDataValue {
-            repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
-            repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
-        };
+        let repo_mappings = BzlmodRepoMappingsDataValue::for_workspace(
+            workspace_id.clone(),
+            Arc::new(crate::RepoMappingSnapshot::new()),
+            Arc::new(crate::RepoMappingOverrides::new()),
+        );
 
         let aggregation = BzlmodExtensionAggregationValue {
             workspace_id: workspace_id.clone(),

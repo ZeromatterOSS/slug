@@ -636,8 +636,23 @@ pub struct BzlmodModuleVersionsDataValue {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoMappingsDataValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+}
+
+impl BzlmodRepoMappingsDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        repo_mappings: Arc<crate::RepoMappingSnapshot>,
+        repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            repo_mappings,
+            repo_mapping_overrides,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
@@ -856,6 +871,17 @@ impl Key for BzlmodRepoMappingsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
+        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
+            if data_workspace_id != &self.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodRepoMappingsKey was computed with project root '{}', \
+                     but current bzlmod repo mapping data root is '{}'",
+                    self.workspace_id.canonical_project_root.display(),
+                    data_workspace_id.canonical_project_root.display()
+                ));
+            }
+        }
         ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
             self.workspace_id.clone(),
         ))

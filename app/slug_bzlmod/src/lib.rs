@@ -290,7 +290,11 @@ impl BzlmodSessionData {
             lockfile_inputs: BzlmodLockfileInputsValue::default(),
             repo_env: BzlmodRepoEnvDataValue::default(),
             resolution_facts: BzlmodResolutionFactsValue::default(),
-            repo_mappings: BzlmodRepoMappingsDataValue::default(),
+            repo_mappings: BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingOverrides::new()),
+            ),
             cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
         }
     }
@@ -614,10 +618,11 @@ mod tests {
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoMappingsDataKey,
-            Arc::new(BzlmodRepoMappingsDataValue {
-                repo_mappings: Arc::new(RepoMappingSnapshot::new()),
-                repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
-            }),
+            Arc::new(BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingOverrides::new()),
+            )),
         )])?;
         updater.changed_to(vec![(
             BzlmodResolutionFactsDataKey,
@@ -653,12 +658,25 @@ mod tests {
                 workspace_id.clone(),
             ))
             .await??;
+        let repo_mappings = dice
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
         assert_eq!(module_versions.workspace_id, workspace_id);
         assert_eq!(registered_toolchains.workspace_id, workspace_id);
         assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
+        assert_eq!(repo_mappings.workspace_id.as_ref(), Some(&workspace_id));
 
         assert!(
             dice.compute(&ModuleVersionsKey::for_workspace_id(
+                other_workspace_id.clone(),
+            ))
+            .await?
+            .is_err()
+        );
+        assert!(
+            dice.compute(&BzlmodRepoMappingsKey::for_workspace_id(
                 other_workspace_id.clone(),
             ))
             .await?
@@ -673,10 +691,29 @@ mod tests {
         );
         assert!(
             dice.compute(&RegisteredExecutionPlatformsKey::for_workspace_id(
-                other_workspace_id,
+                other_workspace_id.clone(),
             ))
             .await?
             .is_err()
+        );
+
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodRepoMappingsDataKey,
+            Arc::new(BzlmodRepoMappingsDataValue::for_workspace(
+                other_workspace_id,
+                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingOverrides::new()),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+        let err = dice
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(workspace_id))
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("repo mapping data root"),
+            "{err:?}"
         );
 
         Ok(())
