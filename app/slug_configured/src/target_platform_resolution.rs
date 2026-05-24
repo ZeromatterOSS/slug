@@ -173,7 +173,10 @@ fn apply_cli_build_settings_with(
 
     for (raw_label, raw_values) in starlark_flags {
         let canonical_label = canonicalize_cell_alias(raw_label, aliases);
-        let label = match BuildSettingLabel::from_bazel_label(&canonical_label) {
+        let label = match BuildSettingLabel::from_bazel_label_with_alias_resolver(
+            &canonical_label,
+            aliases,
+        ) {
             Ok(l) => l,
             Err(e) => {
                 tracing::warn!("skipping CLI flag `{raw_label}`: {e}");
@@ -403,7 +406,8 @@ mod tests {
             "@rules_rust//cargo/settings:experimental_symlink_execroot",
             Some(&resolver),
         );
-        let stored_label = BuildSettingLabel::from_bazel_label(&stored)?;
+        let stored_label =
+            BuildSettingLabel::from_bazel_label_with_alias_resolver(&stored, Some(&resolver))?;
         assert_eq!(
             cfg.get_build_setting(&stored_label)?,
             Some(&BuildSettingValue::String("true".to_owned()))

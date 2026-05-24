@@ -1937,6 +1937,18 @@ What did not work or remains risky:
   slug_analysis -p slug_server`, `cargo build -p slug`, and the full Plan 61
   Python guardrail with `75 passed in 40.25s`. The slugd processes left by the
   full guardrail were cleaned up afterward.
+- Build-setting label parsing now has a resolver-aware entry point used by
+  config-setting lookup and CLI build-setting folding when those callers already
+  carry an active `CellAliasResolver`. A resolver with a bzlmod runtime snapshot
+  is authoritative, so stale process-global dynamic aliases cannot rewrite
+  `@`/`@@` build-setting repo spellings ahead of the resolver-owned alias map.
+  Validation passed with focused `cargo test -p slug_core build_setting_labels
+  -- --nocapture`, `cargo test -p slug_configured
+  target_platform_resolution::tests::cell_alias_is_canonicalized_at_storage_time
+  -- --nocapture`, `cargo test -p slug_analysis build_setting_lookup_ --
+  --nocapture`, `cargo check -p slug_core -p slug_analysis -p
+  slug_configured`, `cargo build -p slug`, `cargo fmt --check`, and `git diff
+  --check`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before

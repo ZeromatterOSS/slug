@@ -5237,7 +5237,6 @@ mod tests {
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
     use slug_core::cells::BzlmodRuntimeExtensionCell;
-    use slug_core::cells::BzlmodRuntimeExtensionCellRegistration;
     use slug_core::cells::CellAliasResolver;
     use slug_core::cells::CellResolver;
     use slug_core::cells::cell_root_path::CellRootPathBuf;
@@ -5603,7 +5602,6 @@ mod tests {
                 internal_name: "generated".to_owned(),
                 path: format!("bazel-external/{canonical}"),
                 setup,
-                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
             }],
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -5745,7 +5743,6 @@ mod tests {
                 internal_name: "generated".to_owned(),
                 path: format!("bazel-external/{canonical}"),
                 setup,
-                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
             }],
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -5865,7 +5862,6 @@ mod tests {
                 internal_name: "generated".to_owned(),
                 path: format!("bazel-external/{canonical}"),
                 setup,
-                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
             }],
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {

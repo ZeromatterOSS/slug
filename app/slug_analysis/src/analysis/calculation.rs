@@ -962,9 +962,12 @@ async fn get_configured_build_setting_value(
         return Ok(Some(value.clone()));
     }
 
-    if let Some(value) = BuildSettingLabel::from_bazel_label(flag_label_str)
-        .ok()
-        .and_then(|label| cfg.get_build_setting(&label).ok().flatten().cloned())
+    if let Some(value) = BuildSettingLabel::from_bazel_label_with_alias_resolver(
+        flag_label_str,
+        Some(cell_alias_resolver),
+    )
+    .ok()
+    .and_then(|label| cfg.get_build_setting(&label).ok().flatten().cloned())
     {
         return Ok(Some(value));
     }

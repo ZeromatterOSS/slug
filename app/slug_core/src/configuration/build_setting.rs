@@ -66,6 +66,13 @@ impl BuildSettingLabel {
     /// or analysed as a real target. Cell-aware parsing is a follow-up;
     /// see Plan 19.4.
     pub fn from_bazel_label(raw: &str) -> slug_error::Result<Self> {
+        Self::from_bazel_label_with_alias_resolver(raw, None)
+    }
+
+    pub fn from_bazel_label_with_alias_resolver(
+        raw: &str,
+        cell_alias_resolver: Option<&cells::CellAliasResolver>,
+    ) -> slug_error::Result<Self> {
         const SYNTHETIC_CELL: &str = "@slug_settings";
 
         let mut canon = if raw.starts_with('@') {
@@ -85,7 +92,7 @@ impl BuildSettingLabel {
             .map(|rest| ("@@", rest))
             .or_else(|| canon.strip_prefix('@').map(|rest| ("@", rest)))
             && let Some((repo, package_and_target)) = rest.split_once("//")
-            && let Some(canonical) = cells::resolve_dynamic_extension_cell_alias(repo)
+            && let Some(canonical) = resolve_bzlmod_build_setting_repo(repo, cell_alias_resolver)
         {
             // Bazel's `@@` marks a canonical repo in label syntax; Slug's
             // internal cell name is the repo name without that sigil.
@@ -98,9 +105,34 @@ impl BuildSettingLabel {
     }
 }
 
+fn resolve_bzlmod_build_setting_repo(
+    repo: &str,
+    cell_alias_resolver: Option<&cells::CellAliasResolver>,
+) -> Option<String> {
+    let resolver_has_runtime_snapshot =
+        cell_alias_resolver.is_some_and(|resolver| resolver.has_bzlmod_runtime_alias_snapshot());
+    cell_alias_resolver
+        .and_then(|resolver| {
+            resolver
+                .resolve_declared_or_runtime_alias(repo)
+                .map(|cell| cell.as_str().to_owned())
+        })
+        .or_else(|| {
+            (!resolver_has_runtime_snapshot)
+                .then(|| cells::resolve_dynamic_extension_cell_alias(repo))
+                .flatten()
+        })
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::BuildSettingLabel;
+    use crate::cells::BzlmodRuntimeCellInstallSnapshot;
+    use crate::cells::BzlmodRuntimeDynamicAlias;
+    use crate::cells::CellAliasResolver;
+    use crate::cells::name::CellName;
 
     #[test]
     fn build_setting_labels_resolve_dynamic_extension_aliases() {
@@ -116,6 +148,42 @@ mod tests {
 
         assert_eq!(label.target().pkg().cell_name().as_str(), "rules_rust+");
         assert_eq!(label.target().name().as_str(), "bootstrap_setting");
+    }
+
+    #[test]
+    fn build_setting_labels_prefer_runtime_aliases_before_globals() -> slug_error::Result<()> {
+        let apparent = "plan61_build_setting_runtime_alias";
+        let canonical = "plan61_owner++settings+generated";
+        let wrong_global = "plan61_wrong_owner++settings+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        crate::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        let label = BuildSettingLabel::from_bazel_label_with_alias_resolver(
+            &format!("@@{apparent}//pkg:flag"),
+            Some(&resolver),
+        )?;
+
+        assert_eq!(label.target().pkg().cell_name().as_str(), canonical);
+        assert_eq!(
+            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
     }
 }
 
