@@ -93,6 +93,14 @@ Observed SDK result at the checkpoint:
   first replays from the daemon hidden lockfile, then editing that hidden
   lockfile removes the cached extension entry and forces the extension to run
   and fail instead of reusing stale replay state.
+- Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
+  `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
+  `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
+  the symlink and the default path is untouched. Validation passed with focused
+  `cargo test -p slug_common
+  bzlmod_runtime_state_uses_workspace_output_base_for_external_cell_symlinks
+  -- --nocapture`, `cargo check -p slug_common -p slug_server`,
+  `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
   extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
   when the hidden facts are created with the expected value, fails after an
@@ -1408,7 +1416,9 @@ What did not work or remains risky:
   server output base instead of synthesizing the default output base for
   workspace identity, and the no-`MODULE.bazel` empty-session projection now
   preserves that keyed output base. The daemon bootstrap direct parser now also
-  accepts an explicit output base. These paths still wrap or call the legacy
+  accepts an explicit output base. Runtime module-symlink replay now uses the
+  named cell graph's workspace output base for `external_cells/bzlmod` instead
+  of hard-coding the project default. These paths still wrap or call the legacy
   resolver.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
@@ -1694,7 +1704,9 @@ using Rust DICE keys and values:
      installation, module-version projection, extension-aggregation projection,
      and registered toolchain/platform projection consume that value. Remaining
      installed lookup state still needs to depend on it instead of
-     process-global maps.
+     process-global maps. Runtime module-symlink replay now writes under that
+     graph's workspace output base, but the graph itself is still legacy-produced
+     and runtime registration remains process-global transitional plumbing.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 

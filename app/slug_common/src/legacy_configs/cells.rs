@@ -573,10 +573,11 @@ fn replay_bzlmod_runtime_state(
     );
 
     let external_base_dir = project_root.root().as_path().join("bazel-external");
-    let buck_out_external_cells_dir = project_root
-        .root()
-        .as_path()
-        .join("buck-out/v2/external_cells/bzlmod");
+    let buck_out_external_cells_dir = cell_graph
+        .workspace_id
+        .output_base
+        .as_ref()
+        .join("external_cells/bzlmod");
     let mut valid_symlink_names = std::collections::HashSet::new();
     for symlink in cell_graph.module_symlinks.iter() {
         valid_symlink_names.insert(symlink.entry_name.clone());
@@ -4470,6 +4471,47 @@ mod tests {
         assert!(!snapshot.extension_cells[1].setup.materialized);
         assert_eq!(snapshot.scoped_aliases[0].apparent_name, "tool");
         assert_eq!(snapshot.dynamic_aliases[0].canonical_name, "root+ext+eager");
+    }
+
+    #[test]
+    fn bzlmod_runtime_state_uses_workspace_output_base_for_external_cell_symlinks()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("dep_src/BUILD.bazel", "");
+        let source_path = fs
+            .path()
+            .resolve(ProjectRelativePath::new("dep_src")?)
+            .to_path_buf();
+        let output_base = fs
+            .path()
+            .resolve(ProjectRelativePath::new("buck-out/custom-runtime")?);
+        let workspace_id = slug_bzlmod::WorkspaceId::new(
+            fs.path().root().to_path_buf(),
+            output_base.to_path_buf(),
+        );
+        let cell_graph = slug_bzlmod::BzlmodCellGraphValue {
+            workspace_id,
+            root_module_name: "root".to_owned(),
+            cells: Arc::new(Vec::new()),
+            extension_cells: Arc::new(Vec::new()),
+            root_aliases: Arc::new(Vec::new()),
+            module_symlinks: Arc::new(vec![slug_bzlmod::BzlmodCellGraphModuleSymlink {
+                entry_name: "dep".to_owned(),
+                source_path: Arc::new(source_path.clone()),
+            }]),
+            scoped_aliases: Arc::new(Vec::new()),
+            dynamic_aliases: Arc::new(Vec::new()),
+        };
+
+        replay_bzlmod_runtime_state(&cell_graph, fs.path());
+
+        let explicit_link = output_base.as_path().join("external_cells/bzlmod/dep");
+        assert_eq!(std::fs::read_link(explicit_link)?, source_path);
+        let default_link = fs.path().resolve(ProjectRelativePath::new(
+            "buck-out/v2/external_cells/bzlmod/dep",
+        )?);
+        assert!(!default_link.exists());
+        Ok(())
     }
 
     #[test]
