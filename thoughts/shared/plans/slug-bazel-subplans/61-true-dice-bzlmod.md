@@ -1798,6 +1798,20 @@ What did not work or remains risky:
   Plan 61 Python guardrail with `75 passed in 39.17s`, `cargo fmt --check`, and
   `git diff --check`. The slugd processes left by the full guardrail were
   cleaned up afterward.
+- `module_ctx` and `repository_ctx` label filesystem resolution now treat an
+  explicit resolver-owned cell path map as authoritative: missing repos no longer
+  fall through to process-global dynamic aliases, process-global project-root
+  state, or `bazel-external` directory scans. Legacy callers that do not provide
+  a resolver-owned map keep the old compatibility fallbacks. Validation passed
+  with focused `slug_interpreter_for_build` tests for missing resolver-owned
+  label paths and conflicting globals, `cargo test -p slug_interpreter_for_build
+  label_filesystem -- --nocapture` (`4 passed`), `cargo test -p
+  slug_interpreter_for_build repository_context_ -- --nocapture` (`5 passed`),
+  `cargo test -p slug_interpreter_for_build -- --nocapture` (`90 passed`),
+  `cargo check -p slug_interpreter_for_build -p slug_server`, `cargo build -p
+  slug`, the full Plan 61 Python guardrail with `75 passed in 39.97s`, `cargo
+  fmt --check`, and `git diff --check`. The slugd processes left by the full
+  guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -2005,18 +2019,14 @@ using Rust DICE keys and values:
   extension-spoke values are graph-owned, but directory-scan caches and
   alias-compatibility maps are still process-local lookup accelerators rather
   than DICE inputs.
-- Module extension label path resolution now receives generated repo cells and
-  root/dynamic aliases from the resolver-local runtime snapshot, reducing one
-  more `module_ctx.path(Label(...))` dependency on the process-global dynamic
-  maps. Repository-context label path resolution and remaining compatibility
-  adapters still use process-global dynamic lookups.
-- Repository-context label path resolution now also receives the resolver-owned
-  cell path map from the Starlark repo-rule executor, reducing reliance on
-  process-global generated-repo lookups for repository rule path APIs. The
-  `repository_ctx.path(Label(...))` lazy materialization trigger also uses that
-  map before falling back to legacy dynamic maps. The fallback resolver and
-  compatibility adapters still consult process-global dynamic maps when no
-  resolver-owned path is available.
+- Module extension and repository-context label path resolution now receive
+  resolver-owned cell path maps from the active cell resolver, and those maps are
+  authoritative when present. `module_ctx.path(Label(...))`,
+  `repository_ctx.path(Label(...))`, repository path-like APIs, and the
+  `repository_ctx.path(Label(...))` lazy materialization trigger no longer fill a
+  resolver-owned miss from process-global dynamic aliases or directory scans.
+  Fallback helpers and callers that do not receive a resolver-owned path map
+  still use legacy process-global compatibility lookups.
 - Bzlmod load-path wrong-cell equivalence, toolchain implementation/metadata
   label parsing, and C++ toolchain metadata/action-path formatting can now use
   declared aliases and runtime aliases/cells from the active cell alias resolver

@@ -31,6 +31,7 @@ pub(crate) struct LabelFilesystemResolver<'a> {
     project_root: Option<&'a Path>,
     cell_paths: Option<&'a HashMap<String, PathBuf>>,
     root_label_resolution: RootLabelResolution,
+    allow_legacy_fallbacks: bool,
 }
 
 impl<'a> LabelFilesystemResolver<'a> {
@@ -40,6 +41,7 @@ impl<'a> LabelFilesystemResolver<'a> {
             project_root: None,
             cell_paths: None,
             root_label_resolution: RootLabelResolution::Relative,
+            allow_legacy_fallbacks: true,
         }
     }
 
@@ -55,6 +57,11 @@ impl<'a> LabelFilesystemResolver<'a> {
 
     pub(crate) fn with_root_label_resolution(mut self, mode: RootLabelResolution) -> Self {
         self.root_label_resolution = mode;
+        self
+    }
+
+    pub(crate) fn without_legacy_fallbacks(mut self) -> Self {
+        self.allow_legacy_fallbacks = false;
         self
     }
 
@@ -79,6 +86,10 @@ impl<'a> LabelFilesystemResolver<'a> {
 
         if let Some(repo_path) = self.cell_path_for_repo(repo) {
             return join_label_fragment(repo_path, label.package(), label.target());
+        }
+
+        if !self.allow_legacy_fallbacks {
+            return join_label_fragment(PathBuf::from(repo), label.package(), label.target());
         }
 
         if let Some(cell_path) = slug_core::cells::get_dynamic_extension_cell(repo) {
@@ -140,9 +151,11 @@ impl<'a> LabelFilesystemResolver<'a> {
     }
 
     fn project_root_path(&self) -> Option<PathBuf> {
-        self.project_root
-            .map(Path::to_path_buf)
-            .or_else(slug_core::cells::get_dynamic_project_root)
+        self.project_root.map(Path::to_path_buf).or_else(|| {
+            self.allow_legacy_fallbacks
+                .then(slug_core::cells::get_dynamic_project_root)
+                .flatten()
+        })
     }
 
     fn cell_path_for_repo(&self, repo: &str) -> Option<PathBuf> {
@@ -349,5 +362,31 @@ mod tests {
                 .join("label_fs_owner+")
                 .join("data")
         );
+    }
+
+    #[test]
+    fn resolver_owned_cell_paths_do_not_use_legacy_fallbacks_for_missing_repo() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path();
+        let apparent = "label_fs_resolver_missing_alias";
+        let wrong_global = "label_fs_wrong_owner++ext+generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+
+        let cell_paths = HashMap::new();
+        let resolved = LabelFilesystemResolver::new(project_root)
+            .with_project_root(Some(project_root))
+            .with_cell_paths(&cell_paths)
+            .without_legacy_fallbacks()
+            .resolve_label_string(&format!("@{apparent}//pkg:tool"))
+            .unwrap();
+
+        assert_eq!(resolved, PathBuf::from(apparent).join("pkg").join("tool"));
     }
 }
