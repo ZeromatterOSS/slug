@@ -595,6 +595,12 @@ Observed SDK result at the checkpoint:
   included_module_segment_parse_failure or
   included_module_segment_utf8_failure or
   included_module_segment_include_cycle'` (`12 passed, 87 deselected`).
+- Root `MODULE.bazel` now has same-daemon parse-error and invalid UTF-8
+  failure-transition guardrails. Each starts from a valid root module, fails
+  after corrupting only `MODULE.bazel`, then repairs to a graph containing a
+  newly introduced local module instead of reusing the warm value. Validation
+  passed with the focused subset selected by `-k 'root_module_parse_failure or
+  root_module_utf8_failure'` (`2 passed, 99 deselected`).
 - Locked registry `source.json` metadata now has a focused parse-failure
   guardrail: after a warm same-daemon registry module resolution, invalid
   cached source metadata with a matching lockfile hash fails the next
@@ -2131,8 +2137,9 @@ using Rust DICE keys and values:
      coverage now includes create/delete, parse/UTF-8 failures, and include
      cycles, and out-of-project local override coverage now includes
      parse/UTF-8 failures and include cycles. Root included segments now have
-     parse/UTF-8 failure and include-cycle coverage; remaining source classes
-     still need full matrix coverage.
+     parse/UTF-8 failure and include-cycle coverage, and root `MODULE.bazel`
+     now has parse/UTF-8 failure coverage; remaining source classes still need
+     full matrix coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.

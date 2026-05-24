@@ -2183,6 +2183,100 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_module_parse_failure_invalidates_bzlmod_graph(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root MODULE.bazel parse errors are module-resolution inputs."""
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_root_parse_failure")
+""",
+    )
+
+    output, first = await _audit_cells_and_counters(buck)
+    assert "plan61_root_parse_failure" in output
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_root_parse_failure" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(buck.cwd / "MODULE.bazel", 'module(name = "plan61_root_parse_failure", version = )\n')
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    assert "Failed to parse root MODULE.bazel" in exc.value.stderr
+
+    repaired_lib = buck.cwd / "libs/repaired_root_parse_lib"
+    repaired_lib.mkdir(parents=True)
+    _write(
+        repaired_lib / "MODULE.bazel",
+        'module(name = "repaired_root_parse_lib", version = "1.0")\n',
+    )
+    _write(repaired_lib / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_root_parse_failure")
+bazel_dep(name = "repaired_root_parse_lib")
+local_path_override(
+    module_name = "repaired_root_parse_lib",
+    path = "libs/repaired_root_parse_lib",
+)
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert "plan61_root_parse_failure" in output
+    assert "repaired_root_parse_lib" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_module_utf8_failure_invalidates_bzlmod_graph(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root MODULE.bazel UTF-8 errors are module-resolution inputs."""
+    module_file = buck.cwd / "MODULE.bazel"
+    _write(
+        module_file,
+        """module(name = "plan61_root_utf8_failure")
+""",
+    )
+
+    output, first = await _audit_cells_and_counters(buck)
+    assert "plan61_root_utf8_failure" in output
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_root_utf8_failure" in output
+    assert warm["module_file_parse"] == first["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write_bytes(module_file, b"\xff\xfeinvalid root module\n")
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    assert "Failed to parse root MODULE.bazel" in exc.value.stderr
+    assert "valid UTF-8" in exc.value.stderr
+
+    repaired_lib = buck.cwd / "libs/repaired_root_utf8_lib"
+    repaired_lib.mkdir(parents=True)
+    _write(
+        repaired_lib / "MODULE.bazel",
+        'module(name = "repaired_root_utf8_lib", version = "1.0")\n',
+    )
+    _write(repaired_lib / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        module_file,
+        """module(name = "plan61_root_utf8_failure")
+bazel_dep(name = "repaired_root_utf8_lib")
+local_path_override(
+    module_name = "repaired_root_utf8_lib",
+    path = "libs/repaired_root_utf8_lib",
+)
+""",
+    )
+    output, _recovered = await _audit_cells_and_counters(buck)
+    assert "plan61_root_utf8_failure" in output
+    assert "repaired_root_utf8_lib" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_non_root_included_module_segment_edit_invalidates_extension_graph(
     buck: Buck,
 ) -> None:
