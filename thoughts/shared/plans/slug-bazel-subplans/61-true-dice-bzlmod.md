@@ -949,6 +949,15 @@ Observed SDK result at the checkpoint:
   fmt --check`, and `git diff --check`. The first full `slug_bzlmod` test run
   hit an environmental doctest linker `SIGBUS` because `/tmp` was full; reruns
   with `TMPDIR=/var/mnt/dev/slug-test-tmp` passed.
+- Runtime bzlmod state replay now accepts the published
+  `BzlmodCellGraphValue` directly instead of the whole transitional
+  `BzlmodSessionData` payload. The installed lookup state is still
+  process-global transitional plumbing, but the replay helper can no longer
+  accidentally depend on session-shaped data outside the graph. Validation
+  passed with `cargo check -p slug_common`, `cargo test -p slug_common bzlmod
+  -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
+  subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
+  --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 

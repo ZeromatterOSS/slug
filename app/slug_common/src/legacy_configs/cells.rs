@@ -548,13 +548,12 @@ struct BzlmodDynamicAlias {
 }
 
 fn replay_bzlmod_runtime_state(
-    session_data: &slug_bzlmod::BzlmodSessionData,
+    cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
     project_root: &ProjectRoot,
 ) {
     slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(
         project_root.root().to_path_buf(),
     );
-    let cell_graph = &session_data.cell_graph;
 
     let external_base_dir = project_root.root().as_path().join("bazel-external");
     let buck_out_external_cells_dir = project_root
@@ -587,8 +586,7 @@ fn replay_bzlmod_runtime_state(
     let runtime_cell_snapshot = runtime_cell_install_snapshot(cell_graph);
     slug_core::cells::install_bzlmod_runtime_cell_snapshot(&runtime_cell_snapshot);
 
-    let cell_pairs: Vec<(String, String)> = session_data
-        .cell_graph
+    let cell_pairs: Vec<(String, String)> = cell_graph
         .cells
         .iter()
         .map(|cell| (cell.name.clone(), cell.path.clone()))
@@ -2822,7 +2820,7 @@ impl BuckConfigBasedCells {
             None
         } {
             if let Some(project_fs) = project_fs {
-                replay_bzlmod_runtime_state(&session_data, project_fs);
+                replay_bzlmod_runtime_state(&session_data.cell_graph, project_fs);
             }
             has_module_bazel = true;
             let cell_graph = &session_data.cell_graph;
