@@ -177,6 +177,16 @@ Observed SDK result at the checkpoint:
   known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
   `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
   `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
+- DICE-backed bzlmod resolution now fails if it reaches the legacy resolver
+  without the tracked visible lockfile value, and similarly refuses to direct
+  read a configured hidden lockfile when the tracked hidden value was not
+  supplied. This keeps direct lockfile fallback limited to non-DICE bootstrap
+  paths. Validation passed with focused `cargo test -p slug_common
+  dice_bzlmod_resolution_requires_tracked_visible_lockfile -- --nocapture`,
+  `cargo check -p slug_common -p slug_server`, `cargo build -p slug`, and
+  focused Plan 61 Python guardrails
+  `visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only` plus
+  `hidden_lockfile_read_is_observable_before_extension_replay`.
 - Precomputed extension repo setups that lack embedded `repo_spec_json` now
   validate through the current `ExtensionSpokesKey` repo spec when that spoke
   value exists, instead of trusting the legacy marker prechecks. The direct
@@ -1784,6 +1794,10 @@ using Rust DICE keys and values:
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
      hidden/output-base lockfile bytes are polled into lockfile key identity
      while the final watched-input graph is still pending.
+   - DICE-backed bzlmod resolution now requires the tracked visible and hidden
+     lockfile values when lockfile mode/path policy says those inputs are
+     active, instead of silently falling back to a direct lockfile read inside
+     the DICE compute path.
    - Preserve Bazel's hidden-lockfile fail-open behavior without hiding
      invalidation.
    - Preserve same-daemon hidden-lockfile create/edit/delete/facts coverage

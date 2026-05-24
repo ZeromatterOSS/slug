@@ -3142,6 +3142,7 @@ impl BuckConfigBasedCells {
         let workspace_id = workspace_id.unwrap_or_else(|| {
             slug_bzlmod::WorkspaceId::for_project_root(workspace_root.to_path_buf())
         });
+        let using_dice_inputs = dice_ctx.is_some();
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
         bzlmod_session_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             bzlmod_session_data.cell_graph.workspace_id.clone(),
@@ -3157,6 +3158,11 @@ impl BuckConfigBasedCells {
             None
         } else if let Some(visible_lockfile) = visible_lockfile_value.as_ref() {
             visible_lockfile.lockfile.clone()
+        } else if using_dice_inputs {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "DICE bzlmod resolution requires tracked visible lockfile input"
+            ));
         } else {
             slug_bzlmod::read_lockfile_with_mode(
                 project_root.root().as_path(),
@@ -3167,6 +3173,11 @@ impl BuckConfigBasedCells {
             None
         } else if let Some(hidden_lockfile) = hidden_lockfile_value.as_ref() {
             hidden_lockfile.lockfile.clone()
+        } else if using_dice_inputs && options.hidden_lockfile_path.is_some() {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "DICE bzlmod resolution requires tracked hidden lockfile input"
+            ));
         } else if let Some(hidden_lockfile_path) = options.hidden_lockfile_path.as_ref() {
             slug_bzlmod::read_hidden_lockfile_path(hidden_lockfile_path)?
         } else {
@@ -4332,6 +4343,59 @@ mod tests {
                 .as_ref()
                 .as_path(),
             output_base.as_path()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn dice_bzlmod_resolution_requires_tracked_visible_lockfile() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let project_root = fs.path().root().to_path_buf();
+        let module_path = project_root.join("MODULE.bazel");
+        let parsed = slug_bzlmod::parse_module_bazel(&module_path)?;
+        let root_module_file = slug_bzlmod::RootModuleFileValue {
+            path: Arc::new(module_path),
+            input_digest: Some("root-module".to_owned()),
+            input_count: 1,
+            parsed: Some(parsed),
+        };
+        let options = BzlmodResolutionOptions {
+            lockfile_mode: slug_bzlmod::LockfileMode::Update,
+            ignore_dev_dependency: false,
+            allow_yanked_versions_env: None,
+            allow_yanked_versions_flags: Vec::new(),
+            hidden_lockfile_path: Some(project_root.join("buck-out/v2/MODULE.bazel.lock")),
+            repo_env: BTreeMap::new(),
+            repo_env_digest: slug_bzlmod::repo_env_policy_digest(&BTreeMap::new()),
+        };
+
+        let err = BuckConfigBasedCells::resolve_bzlmod_dependencies_with_options(
+            fs.path(),
+            &options,
+            Some(slug_bzlmod::WorkspaceId::new(
+                project_root.clone(),
+                project_root.join("buck-out/v2"),
+            )),
+            Some(&root_module_file),
+            None,
+            None,
+            Some(&mut dice),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            err.to_string()
+                .contains("DICE bzlmod resolution requires tracked visible lockfile input")
         );
         Ok(())
     }
