@@ -566,6 +566,30 @@ pub struct BzlmodRepoEnvDataValue {
     pub repo_env: Arc<BTreeMap<String, String>>,
 }
 
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodRepoMappingsKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
+pub struct BzlmodRepoMappingsKey {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+}
+
+impl BzlmodRepoMappingsKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest: Arc::from("injected-bzlmod-session"),
+        }
+    }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsInvalidation {
     pub root_module_name: String,
@@ -582,8 +606,6 @@ pub struct BzlmodModuleVersionsInvalidationData {
     pub root_module_name: String,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
-    pub repo_mappings: crate::RepoMappingSnapshot,
-    pub repo_mapping_overrides: crate::RepoMappingOverrides,
 }
 
 impl BzlmodModuleVersionsInvalidationData {
@@ -591,6 +613,7 @@ impl BzlmodModuleVersionsInvalidationData {
         &self,
         lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
         repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<BzlmodRepoMappingsDataValue>,
     ) -> BzlmodModuleVersionsInvalidation {
         BzlmodModuleVersionsInvalidation {
             root_module_name: self.root_module_name.clone(),
@@ -598,8 +621,8 @@ impl BzlmodModuleVersionsInvalidationData {
             repo_env: repo_env.as_ref().clone(),
             registry_file_hashes: self.registry_file_hashes.clone(),
             selected_yanked_versions: self.selected_yanked_versions.clone(),
-            repo_mappings: self.repo_mappings.clone(),
-            repo_mapping_overrides: self.repo_mapping_overrides.clone(),
+            repo_mappings: repo_mappings.repo_mappings.as_ref().clone(),
+            repo_mapping_overrides: repo_mappings.repo_mapping_overrides.as_ref().clone(),
         }
     }
 }
@@ -803,6 +826,36 @@ impl Key for BzlmodRepoEnvKey {
 }
 
 #[async_trait]
+impl Key for BzlmodRepoMappingsKey {
+    type Value = slug_error::Result<Arc<BzlmodRepoMappingsDataValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
+        if data.workspace_id != self.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodRepoMappingsKey was computed with project root '{}', \
+                 but current bzlmod repo-mapping root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        Ok(data)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[async_trait]
 impl Key for ModuleVersionsKey {
     type Value = slug_error::Result<Arc<ModuleVersionsValue>>;
 
@@ -831,13 +884,19 @@ impl Key for ModuleVersionsKey {
                 self.workspace_id.clone(),
             ))
             .await??;
+        let repo_mappings = ctx
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         Ok(Arc::new(ModuleVersionsValue {
             workspace_id: data.workspace_id.clone(),
             module_versions: data.module_versions.clone(),
-            invalidation: Arc::new(
-                data.invalidation
-                    .with_keyed_inputs(lockfile_inputs, repo_env),
-            ),
+            invalidation: Arc::new(data.invalidation.with_keyed_inputs(
+                lockfile_inputs,
+                repo_env,
+                repo_mappings,
+            )),
         }))
     }
 

@@ -92,6 +92,7 @@ pub use dice_graph::BzlmodRepoEnvDataValue;
 pub use dice_graph::BzlmodRepoEnvKey;
 pub use dice_graph::BzlmodRepoMappingsDataKey;
 pub use dice_graph::BzlmodRepoMappingsDataValue;
+pub use dice_graph::BzlmodRepoMappingsKey;
 pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionBzlTransitiveDigestKey;
@@ -325,8 +326,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
                 root_module_name: root_module_name.clone(),
                 registry_file_hashes: data.registry_file_hashes.clone(),
                 selected_yanked_versions: data.selected_yanked_versions.clone(),
-                repo_mappings: data.repo_mappings.clone(),
-                repo_mapping_overrides: data.repo_mapping_overrides.clone(),
             }),
         });
         let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
@@ -434,7 +433,11 @@ mod tests {
         updater.set_bzlmod_session_data(data)?;
         let mut dice = updater.commit().await;
 
-        let repo_mappings = dice.compute(&BzlmodRepoMappingsDataKey).await?;
+        let repo_mappings = dice
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
         assert_eq!(repo_mappings.workspace_id, workspace_id);
         let cell_graph = dice
             .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))

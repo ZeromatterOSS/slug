@@ -59,8 +59,8 @@ use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
 use crate::dice_graph::BzlmodLockfileInputsKey;
 use crate::dice_graph::BzlmodLockfileInputsValue;
 use crate::dice_graph::BzlmodRepoEnvKey;
-use crate::dice_graph::BzlmodRepoMappingsDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataValue;
+use crate::dice_graph::BzlmodRepoMappingsKey;
 use crate::dice_graph::ExtensionBzlTransitiveDigestKey;
 use crate::dice_graph::ExtensionIdByCanonicalRepoKey;
 use crate::dice_graph::ExtensionSpoke;
@@ -139,26 +139,6 @@ fn owning_module_matches(canonical_owner: &str, extension_owner: &str) -> bool {
         || (!canonical_owner.ends_with('+') && extension_owner == format!("{canonical_owner}+"))
         || (canonical_owner.ends_with('+')
             && extension_owner.strip_suffix('+') == Some(canonical_owner.trim_end_matches('+')))
-}
-
-fn ensure_repo_mappings_workspace(
-    workspace_id: &crate::WorkspaceId,
-    repo_mappings: &BzlmodRepoMappingsDataValue,
-    key_name: &str,
-    subject: &str,
-) -> slug_error::Result<()> {
-    if &repo_mappings.workspace_id != workspace_id {
-        return Err(slug_error::slug_error!(
-            slug_error::ErrorTag::Tier0,
-            "{} for '{}' was computed with project root '{}', \
-             but current bzlmod repo-mapping root is '{}'",
-            key_name,
-            subject,
-            workspace_id.canonical_project_root.display(),
-            repo_mappings.workspace_id.canonical_project_root.display()
-        ));
-    }
-    Ok(())
 }
 
 fn ensure_extension_aggregations_workspace(
@@ -252,13 +232,11 @@ impl Key for ExtensionBzlTransitiveDigestKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
-        ensure_repo_mappings_workspace(
-            &self.workspace_id,
-            repo_mappings.as_ref(),
-            "ExtensionBzlTransitiveDigestKey",
-            &self.extension_id,
-        )?;
+        let repo_mappings = ctx
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         Ok(Arc::from(
             compute_bzl_transitive_digest_for_project_with_repo_mappings(
                 &self.extension_id,
@@ -448,7 +426,11 @@ impl Key for ExtensionSpokesKey {
                 self.extension_id
             ));
         };
-        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
+        let repo_mappings = ctx
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         let repo_env = ctx
             .compute(&BzlmodRepoEnvKey::for_workspace_id(
                 self.workspace_id.clone(),
@@ -462,12 +444,6 @@ impl Key for ExtensionSpokesKey {
         ensure_extension_aggregation_workspace(
             &self.workspace_id,
             aggregation.as_ref(),
-            "ExtensionSpokesKey",
-            &self.extension_id,
-        )?;
-        ensure_repo_mappings_workspace(
-            &self.workspace_id,
-            repo_mappings.as_ref(),
             "ExtensionSpokesKey",
             &self.extension_id,
         )?;

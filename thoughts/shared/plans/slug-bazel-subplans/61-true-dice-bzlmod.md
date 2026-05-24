@@ -263,9 +263,11 @@ Observed SDK result at the checkpoint:
   depend on unrelated registered toolchain/platform, module-version,
   repo-mapping, or replay-input session fields.
 - Extension repo mappings and root override rows now read through
-  `BzlmodRepoMappingsDataKey`. Extension replay and generated-repo spoke lookup
-  still use a transitional injected value produced by the legacy resolver, but
-  repo mapping state is no longer bundled with extension aggregation state.
+  workspace-checked `BzlmodRepoMappingsKey`. The underlying repo-mapping data
+  is still injected from the legacy resolver, but extension replay,
+  generated-repo spoke lookup, and module-version invalidation now depend on
+  the named repo-mapping projection rather than bundling repo mapping state
+  with extension aggregation state.
 - Extension replay inputs were split out of extension aggregation state, and
   the temporary replay-data wrapper was later replaced by named
   `BzlmodLockfileInputsKey` and `BzlmodRepoEnvKey` projections. Lockfile paths,
@@ -1010,6 +1012,19 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
   the focused Plan 61 Python replay subset, the full Plan 61 Python guardrail
   with 72 tests, `cargo fmt --check`, and `git diff --check`.
+- Repo mappings now have a workspace-checked `BzlmodRepoMappingsKey` in front
+  of the injected repo-mapping data. Extension `.bzl` digesting,
+  extension-spoke execution-key construction, and `ModuleVersionsKey`
+  invalidation now consume this key, so stale workspace identity is rejected at
+  the projection boundary instead of by ad hoc caller checks. This remains
+  transitional because the repo-mapping snapshot is still produced by the
+  legacy resolver. Validation passed with `cargo check -p slug_bzlmod -p
+  slug_common`, focused `slug_bzlmod` tests for session workspace identity,
+  mapped external load digesting, extension execution-key construction, and
+  absent-spoke dependency avoidance, full `cargo test -p slug_bzlmod --
+  --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, `cargo
+  build -p slug`, the focused Plan 61 Python replay subset, the full Plan 61
+  Python guardrail with 72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
