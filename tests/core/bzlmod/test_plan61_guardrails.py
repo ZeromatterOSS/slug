@@ -807,6 +807,92 @@ archive_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_cached_git_override_module_creation_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: git_override missing-to-present MODULE.bazel transitions are inputs."""
+    module_name = "git_override_created_module"
+    commit = "abcdef1234567890"
+    remote = f"https://example.invalid/{module_name}.git"
+    cache_home = buck.cwd.parent / f"{buck.cwd.name}_git_override_create_cache_home"
+    override_dir = _git_override_cache_dir(cache_home, module_name, remote, commit)
+    override_dir.mkdir(parents=True)
+    _write(override_dir / ".complete", "")
+    _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_git_override_create_input")
+
+bazel_dep(name = "{module_name}")
+git_override(
+    module_name = "{module_name}",
+    remote = "{remote}",
+    commit = "{commit}",
+)
+""",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    before = await _bzlmod_counters(buck, env=env)
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+
+    output, second = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_cached_archive_override_module_deletion_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: archive_override present-to-missing MODULE.bazel transitions are inputs."""
+    module_name = "archive_override_deleted_module"
+    urls = [f"https://example.invalid/{module_name}.tar.gz"]
+    cache_home = buck.cwd.parent / f"{buck.cwd.name}_archive_override_delete_cache_home"
+    override_dir = _archive_override_cache_dir(cache_home, module_name, urls)
+    override_dir.mkdir(parents=True)
+    _write(override_dir / ".complete", "")
+    module_file = override_dir / "MODULE.bazel"
+    _write(module_file, f'module(name = "{module_name}", version = "1.0")\n')
+    _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_archive_override_delete_input")
+
+bazel_dep(name = "{module_name}")
+archive_override(
+    module_name = "{module_name}",
+    urls = {urls!r},
+)
+""",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    before = await _bzlmod_counters(buck, env=env)
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    module_file.unlink()
+
+    output, second = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_warm_noop_locked_registry_dep_reuses_bzlmod_resolution(
     buck: Buck,
 ) -> None:

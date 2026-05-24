@@ -548,7 +548,10 @@ Observed SDK result at the checkpoint:
   `archive_override` cache guardrail now proves the same warm reuse and
   same-daemon edit invalidation (`1 passed, 78 deselected`), and the focused
   local/git/archive/registry module-input subset passed (`6 passed, 73
-  deselected`).
+  deselected`). Additional create/delete transition guardrails prove a cached
+  `git_override` missing-to-present `MODULE.bazel` transition and a cached
+  `archive_override` present-to-missing transition both recompute bzlmod
+  resolution (`4 passed, 77 deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
@@ -2048,7 +2051,8 @@ using Rust DICE keys and values:
      out-of-root cache paths are polled into key identity while the final
      watched-input graph is still pending.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
-     have same-daemon warm-reuse and edit-invalidation guardrails.
+     have same-daemon warm-reuse, edit-invalidation, and create/delete
+     transition guardrails.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes. Repository materialization
      marker/layout/recorded-input reads are now child DICE nodes, but those
