@@ -531,11 +531,12 @@ Observed SDK result at the checkpoint:
   lockfiles use the same value type and now feed a polled content digest into
   the lockfile key when read outside the project root, so warm same-daemon
   commands reuse the hidden-lockfile value while create/edit/delete transitions
-  still change key identity. The visible-lockfile guardrails prove a
-  same-daemon warm no-op does not reread the lockfile before create, edit, and
-  delete transitions are observed under `--lockfile_mode=error`, and
-  hidden-lockfile guardrails cover warm reuse plus replay/facts
-  create-edit-delete transitions.
+  still change key identity. The visible-lockfile edit guardrail proves a
+  same-daemon warm no-op does not reread the lockfile before an invalid edit is
+  observed under `--lockfile_mode=error`; the create/delete guardrails prove
+  warm resolution reuse followed by same-daemon transition observation. Hidden
+  lockfile guardrails cover warm reuse plus replay/facts create-edit-delete
+  transitions.
 - Locked registry cache files now use tracked project-file DICE reads when the
   configured `XDG_CACHE_HOME` is under the project root, covering cached
   registry `MODULE.bazel`, `source.json`, and `bazel_registry.json` checksum
