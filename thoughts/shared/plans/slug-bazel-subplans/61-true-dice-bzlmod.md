@@ -1049,6 +1049,17 @@ Observed SDK result at the checkpoint:
   test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
   focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
   72 tests, `cargo fmt --check`, and `git diff --check`.
+- Extension aggregation root-module identity now comes from
+  `BzlmodCellGraphKey` instead of a duplicate field in the injected aggregation
+  map. `BzlmodExtensionAggregationKey` and canonical-repo owner lookup read the
+  named cell graph only when a matching aggregation exists; absent-spoke lookup
+  still avoids adding replay or cell-graph dependencies. Validation passed with
+  `cargo check -p slug_bzlmod -p slug_common`, focused `slug_bzlmod` coverage
+  for extension aggregation projection, canonical repo owner lookup, and absent
+  spoke dependency avoidance, full `cargo test -p slug_bzlmod -- --nocapture`,
+  `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
+  focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
+  72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1137,6 +1148,9 @@ What did not work or remains risky:
   the exact `WorkspaceId` into extension execution and the sync
   materialization bridge instead of re-deriving workspace identity from project
   root; the late-bound executor API now rejects missing workspace identity.
+  Extension aggregation projections now read root-module identity from the
+  named cell-graph key instead of duplicating it in aggregation data, but the
+  aggregation map is still produced by the legacy resolver.
   Generated repo cells and dynamic alias registration now go through a
   typed runtime install snapshot and installer boundary in `slug_core::cells`,
   but the backing state is still process-global transitional cell-registration
@@ -1355,9 +1369,10 @@ using Rust DICE keys and values:
    - Temporary root-cell and non-root cell-name adapters are project-root scoped,
      but remain process-global compatibility adapters.
    - `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
-     including bundled bzlmod cells, and resolver assembly plus runtime
-     installation consume that value. Remaining consumers and installed lookup
-     state still need to depend on it instead of process-global maps.
+     including bundled bzlmod cells, and resolver assembly, runtime
+     installation, module-version projection, and extension-aggregation
+     projection consume that value. Remaining installed lookup state still
+     needs to depend on it instead of process-global maps.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 

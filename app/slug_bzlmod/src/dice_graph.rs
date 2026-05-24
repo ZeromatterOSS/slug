@@ -649,7 +649,6 @@ pub struct BzlmodRepoMappingsDataValue {
 pub struct BzlmodExtensionAggregationsDataValue {
     pub workspace_id: WorkspaceId,
     pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
-    pub root_module_name: Arc<str>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]

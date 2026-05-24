@@ -53,6 +53,7 @@ use crate::BzlmodExtensionAggregationValue;
 use crate::BzlmodExtensionAggregationsDataValue;
 use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
+use crate::dice_graph::BzlmodCellGraphKey;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::BzlmodExtensionAggregationKey;
 use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
@@ -108,6 +109,7 @@ fn create_extension_execution_key_from_aggregation(
 
 fn extension_id_for_canonical_repo<'a>(
     aggregations: &'a BzlmodExtensionAggregationsDataValue,
+    root_module_name: &str,
     canonical_name: &str,
 ) -> Option<&'a str> {
     let (owner_module, extension_name, _) = crate::parse_canonical_name(canonical_name)?;
@@ -118,7 +120,7 @@ fn extension_id_for_canonical_repo<'a>(
             if aggregation.extension_name != extension_name {
                 return None;
             }
-            let owner = extract_owning_module(extension_id, aggregations.root_module_name.as_ref());
+            let owner = extract_owning_module(extension_id, root_module_name);
             owning_module_matches(owner_module, &owner).then_some(extension_id.as_str())
         })
         .collect::<Vec<_>>();
@@ -203,11 +205,16 @@ impl Key for BzlmodExtensionAggregationKey {
         else {
             return Ok(None);
         };
+        let cell_graph = ctx
+            .compute(&BzlmodCellGraphKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         Ok(Some(Arc::new(BzlmodExtensionAggregationValue {
             workspace_id: self.workspace_id.clone(),
             extension_id: self.extension_id.clone(),
             aggregated: Arc::new(aggregated.clone()),
-            root_module_name: aggregations.root_module_name.clone(),
+            root_module_name: Arc::from(cell_graph.root_module_name.as_str()),
         })))
     }
 
@@ -332,10 +339,20 @@ impl Key for ExtensionIdByCanonicalRepoKey {
             "ExtensionIdByCanonicalRepoKey",
             &self.canonical_name,
         )?;
-        Ok(
-            extension_id_for_canonical_repo(aggregations.as_ref(), &self.canonical_name)
-                .map(Arc::from),
+        if aggregations.extension_aggregations.is_empty() {
+            return Ok(None);
+        }
+        let cell_graph = ctx
+            .compute(&BzlmodCellGraphKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        Ok(extension_id_for_canonical_repo(
+            aggregations.as_ref(),
+            &cell_graph.root_module_name,
+            &self.canonical_name,
         )
+        .map(Arc::from))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1902,6 +1919,12 @@ mod tests {
     use super::*;
     use crate::repository_invocations::AttrValue;
 
+    fn cell_graph_with_root(workspace_id: crate::WorkspaceId) -> Arc<crate::BzlmodCellGraphValue> {
+        let mut value = crate::BzlmodCellGraphValue::empty_for_workspace(workspace_id);
+        value.root_module_name = "root".to_owned();
+        Arc::new(value)
+    }
+
     #[test]
     fn test_module_extension_result_creation() {
         let mut specs = FxHashMap::default();
@@ -2028,7 +2051,6 @@ mod tests {
         let mut data = BzlmodExtensionAggregationsDataValue {
             workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(std::collections::HashMap::new()),
-            root_module_name: Arc::from("root"),
         };
         let mut root_ext = AggregatedExtension::new("@root//:ext.bzl", "ext");
         root_ext.extension_id = "@root//:ext.bzl%ext".to_owned();
@@ -2041,10 +2063,10 @@ mod tests {
             .unwrap()
             .insert(dep_ext.extension_id.clone(), dep_ext);
 
-        let dep_id = extension_id_for_canonical_repo(&data, "dep++ext+tool").unwrap();
+        let dep_id = extension_id_for_canonical_repo(&data, "root", "dep++ext+tool").unwrap();
         assert_eq!(dep_id, "@dep//:ext.bzl%ext");
 
-        let root_id = extension_id_for_canonical_repo(&data, "_main+ext+tool").unwrap();
+        let root_id = extension_id_for_canonical_repo(&data, "root", "_main+ext+tool").unwrap();
         assert_eq!(root_id, "@root//:ext.bzl%ext");
     }
 
@@ -2115,7 +2137,6 @@ mod tests {
         let aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
             workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(std::collections::HashMap::new()),
-            root_module_name: Arc::from("root"),
         });
 
         let dice = dice::testing::DiceBuilder::new()
@@ -2153,7 +2174,6 @@ mod tests {
             Arc::new(BzlmodExtensionAggregationsDataValue {
                 workspace_id: workspace_id.clone(),
                 extension_aggregations: Arc::new(extension_aggregations),
-                root_module_name: Arc::from("root"),
             })
         }
 
@@ -2179,6 +2199,10 @@ mod tests {
         updater.changed_to(vec![(
             BzlmodExtensionAggregationsDataKey,
             aggregations_value(&workspace_id, target.clone(), other.clone()),
+        )])?;
+        updater.changed_to(vec![(
+            crate::BzlmodCellGraphDataKey,
+            cell_graph_with_root(workspace_id.clone()),
         )])?;
         let mut dice = updater.commit().await;
         let first = dice.compute(&key).await??.unwrap();
@@ -2222,7 +2246,6 @@ mod tests {
             Arc::new(BzlmodExtensionAggregationsDataValue {
                 workspace_id: workspace_id.clone(),
                 extension_aggregations: Arc::new(extension_aggregations),
-                root_module_name: Arc::from("root"),
             })
         }
 
@@ -2245,6 +2268,10 @@ mod tests {
         updater.changed_to(vec![(
             BzlmodExtensionAggregationsDataKey,
             aggregations_value(&workspace_id, target.clone(), other.clone()),
+        )])?;
+        updater.changed_to(vec![(
+            crate::BzlmodCellGraphDataKey,
+            cell_graph_with_root(workspace_id.clone()),
         )])?;
         let mut dice = updater.commit().await;
         let first = dice.compute(&key).await??.unwrap();
@@ -2291,7 +2318,6 @@ mod tests {
         let mut data = BzlmodExtensionAggregationsDataValue {
             workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(std::collections::HashMap::new()),
-            root_module_name: Arc::from("root"),
         };
         let mut aggregated = AggregatedExtension::new("@root//:ext.bzl", "ext");
         aggregated.extension_id = "@root//:ext.bzl%ext".to_owned();
@@ -2317,7 +2343,7 @@ mod tests {
             workspace_id: data.workspace_id.clone(),
             extension_id: Arc::from(extension_id.as_str()),
             aggregated: Arc::new(data.extension_aggregations[&extension_id].clone()),
-            root_module_name: data.root_module_name.clone(),
+            root_module_name: Arc::from("root"),
         };
         let key = create_extension_execution_key_from_aggregation(
             &aggregation,

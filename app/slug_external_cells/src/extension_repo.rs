@@ -1194,7 +1194,6 @@ mod tests {
         let injected = Arc::new(slug_bzlmod::BzlmodExtensionAggregationsDataValue {
             workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(std::collections::HashMap::new()),
-            root_module_name: Arc::from("root"),
         });
 
         let dice = dice::testing::DiceBuilder::new()

@@ -310,7 +310,6 @@ pub trait SetBzlmodSessionData {
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let workspace_id = data.workspace_id.clone();
-        let root_module_name = data.cell_graph.root_module_name.clone();
         let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
         let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue {
             workspace_id: workspace_id.clone(),
@@ -338,7 +337,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
             workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(data.extension_aggregations.clone()),
-            root_module_name: Arc::from(root_module_name.as_str()),
         });
         let cell_graph = Arc::new(data.cell_graph.clone());
         let registered_toolchains = Arc::new(RegisteredToolchainsValue {
