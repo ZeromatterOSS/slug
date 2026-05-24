@@ -907,6 +907,43 @@ use_repo(dep, "repaired_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_project_local_override_module_deletion_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: project-local local_path_override deletion is an input."""
+    module_name = "project_local_deleted_module"
+    local_lib = buck.cwd / "libs" / module_name
+    local_lib.mkdir(parents=True, exist_ok=True)
+    module_file = local_lib / "MODULE.bazel"
+    _write(module_file, f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_project_local_delete")
+
+bazel_dep(name = "{module_name}")
+local_path_override(
+    module_name = "{module_name}",
+    path = "libs/{module_name}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    module_file.unlink()
+    output, deleted = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert deleted["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_out_of_project_local_override_parse_failure_invalidates_bzlmod_resolution(
     buck: Buck,
 ) -> None:
@@ -1087,6 +1124,43 @@ use_repo(dep, "repaired_repo")
     output, _recovered = await _audit_cells_and_counters(buck)
     assert module_name in output
     assert "repaired_repo" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_out_of_project_local_override_module_deletion_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: out-of-project local_path_override deletion is an input."""
+    module_name = "external_local_deleted_module"
+    local_lib = buck.cwd.parent / f"{buck.cwd.name}_{module_name}"
+    local_lib.mkdir(parents=True, exist_ok=True)
+    module_file = local_lib / "MODULE.bazel"
+    _write(module_file, f'module(name = "{module_name}", version = "1.0")\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_external_local_delete")
+
+bazel_dep(name = "{module_name}")
+local_path_override(
+    module_name = "{module_name}",
+    path = "{local_lib.as_posix()}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    module_file.unlink()
+    output, deleted = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert deleted["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

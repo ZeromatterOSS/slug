@@ -608,6 +608,10 @@ Observed SDK result at the checkpoint:
   'project_local_override_parse_failure or project_local_override_utf8_failure
   or project_local_override_include_cycle'` (`6 passed, 101 deselected`,
   including the out-of-project mirror tests selected by the same pattern).
+- Project-local and out-of-project `local_path_override` module files now also
+  have present-to-missing deletion guardrails. Validation passed with the
+  focused subset selected by `-k 'project_local_override_module_deletion or
+  out_of_project_local_override_module_deletion'` (`2 passed, 107 deselected`).
 - Locked registry `source.json` metadata now has a focused parse-failure
   guardrail: after a warm same-daemon registry module resolution, invalid
   cached source metadata with a matching lockfile hash fails the next
@@ -2156,13 +2160,11 @@ using Rust DICE keys and values:
    - Include create/delete transitions, parse failures, include cycles, and
      UTF-8 failures for every module source class. Cached git/archive override
      coverage now includes create/delete, parse/UTF-8 failures, and include
-     cycles, and out-of-project local override coverage now includes
-     parse/UTF-8 failures and include cycles. Project-local local override
-     coverage now also includes parse/UTF-8 failures and include cycles. Root
-     included segments now have parse/UTF-8 failure and include-cycle coverage,
-     and root `MODULE.bazel` and registry `MODULE.bazel` now have parse/UTF-8
-     failure coverage; remaining source classes still need full matrix
-     coverage.
+     cycles; project-local and out-of-project local override coverage now
+     includes deletion, parse/UTF-8 failures, and include cycles. Root included
+     segments now have parse/UTF-8 failure and include-cycle coverage, and root
+     `MODULE.bazel` and registry `MODULE.bazel` now have parse/UTF-8 failure
+     coverage; remaining source classes still need full matrix coverage.
    - Model registry selection and source metadata for overrides.
 
 3. Make lockfile replay complete.
