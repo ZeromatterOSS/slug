@@ -981,6 +981,20 @@ Observed SDK result at the checkpoint:
   bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
   replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
   --check`, and `git diff --check`.
+- Lockfile replay inputs now have their own injected data key and
+  workspace-checked `BzlmodLockfileInputsKey`. Extension execution-key
+  construction reads lockfile identity through that key instead of bundling it
+  inside extension replay data, and `ModuleVersionsKey` composes its
+  conservative invalidation identity from the same keyed lockfile value. This
+  is still transitional because the lockfile bundle is populated from the
+  legacy resolver payload, but replay and module-version consumers now depend
+  on a named lockfile-input projection. Validation passed with `cargo check -p
+  slug_bzlmod -p slug_common`, focused `slug_bzlmod` tests for lockfile
+  session injection, extension execution-key construction, and absent-spoke
+  dependency avoidance, full `cargo test -p slug_bzlmod -- --nocapture`,
+  `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
+  the focused Plan 61 Python replay subset, the full Plan 61 Python guardrail
+  with 72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1040,8 +1054,9 @@ What did not work or remains risky:
   and hashing path, and hidden replay has same-daemon edit coverage. Extension
   replay no longer reopens those lockfiles after the tracked values are computed.
   Broader hidden lockfile replay/fail-open behavior now has stronger guardrails,
-  but the lockfile values still flow through an injected transitional
-  replay-input value rather than final lockfile/replay-input producer keys.
+  and replay/module-version consumers now depend on a named lockfile-input key,
+  but that key is still populated from injected transitional resolver output
+  rather than final lockfile/replay-input producer keys.
 - Extension `.bzl` transitive digests are still best-effort. Project-local
   literal loads, missing project-local load paths, and existing external files
   under `bazel-external/<repo>` are hashed, missing mapped external load paths

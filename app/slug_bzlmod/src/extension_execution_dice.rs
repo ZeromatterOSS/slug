@@ -58,6 +58,8 @@ use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::BzlmodExtensionAggregationKey;
 use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
 use crate::dice_graph::BzlmodExtensionReplayDataKey;
+use crate::dice_graph::BzlmodLockfileInputsKey;
+use crate::dice_graph::BzlmodLockfileInputsValue;
 use crate::dice_graph::BzlmodRepoMappingsDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataValue;
 use crate::dice_graph::ExtensionBzlTransitiveDigestKey;
@@ -79,10 +81,10 @@ use crate::repo_spec::RepoSpec;
 fn create_extension_execution_key_from_aggregation(
     aggregation: &BzlmodExtensionAggregationValue,
     replay_data: &BzlmodExtensionReplayDataValue,
+    lockfile_inputs: &BzlmodLockfileInputsValue,
     repo_mappings: &BzlmodRepoMappingsDataValue,
     bzl_transitive_digest: Arc<str>,
 ) -> ModuleExtensionExecutionKey {
-    let lockfile_inputs = replay_data.lockfile_inputs.as_ref();
     ModuleExtensionExecutionKey::new_with_tracked_lockfiles_and_bzl_digest(
         aggregation.aggregated.as_ref().clone(),
         aggregation.root_module_name.to_string(),
@@ -460,8 +462,6 @@ impl Key for ExtensionSpokesKey {
                 extension_id: self.extension_id.clone(),
             })
             .await??;
-        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
-        let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
         let Some(aggregation) = aggregation else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -469,6 +469,13 @@ impl Key for ExtensionSpokesKey {
                 self.extension_id
             ));
         };
+        let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
+        let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
+        let lockfile_inputs = ctx
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         ensure_extension_aggregation_workspace(
             &self.workspace_id,
             aggregation.as_ref(),
@@ -490,6 +497,7 @@ impl Key for ExtensionSpokesKey {
         let extension_key = create_extension_execution_key_from_aggregation(
             aggregation.as_ref(),
             replay_data.as_ref(),
+            lockfile_inputs.as_ref(),
             repo_mappings.as_ref(),
             self.bzl_transitive_digest.clone(),
         );
@@ -2315,7 +2323,7 @@ mod tests {
     }
 
     #[test]
-    fn extension_execution_key_from_aggregation_uses_replay_data() {
+    fn extension_execution_key_from_aggregation_uses_replay_and_lockfile_data() {
         use crate::BzlmodExtensionAggregationsDataValue;
         use crate::BzlmodExtensionReplayDataValue;
         use crate::BzlmodLockfileInputsValue;
@@ -2341,15 +2349,15 @@ mod tests {
             .insert(extension_id.clone(), aggregated);
         let replay_data = BzlmodExtensionReplayDataValue {
             workspace_id: workspace_id.clone(),
-            lockfile_inputs: Arc::new(BzlmodLockfileInputsValue {
-                hidden_lockfile_path: Some(hidden_lockfile_path.clone()),
-                visible_lockfile_digest: Some("visible-digest".to_owned()),
-                hidden_lockfile_digest: Some("hidden-digest".to_owned()),
-                visible_lockfile: None,
-                hidden_lockfile: None,
-                lockfile_mode: LockfileMode::Error,
-            }),
             repo_env: Arc::new(repo_env.clone()),
+        };
+        let lockfile_inputs = BzlmodLockfileInputsValue {
+            hidden_lockfile_path: Some(hidden_lockfile_path.clone()),
+            visible_lockfile_digest: Some("visible-digest".to_owned()),
+            hidden_lockfile_digest: Some("hidden-digest".to_owned()),
+            visible_lockfile: None,
+            hidden_lockfile: None,
+            lockfile_mode: LockfileMode::Error,
         };
         let repo_mappings = BzlmodRepoMappingsDataValue {
             workspace_id,
@@ -2366,6 +2374,7 @@ mod tests {
         let key = create_extension_execution_key_from_aggregation(
             &aggregation,
             &replay_data,
+            &lockfile_inputs,
             &repo_mappings,
             Arc::from("digest-from-dice-key"),
         );

@@ -79,10 +79,14 @@ pub use dice_graph::BzlmodExtensionAggregationsDataKey;
 pub use dice_graph::BzlmodExtensionAggregationsDataValue;
 pub use dice_graph::BzlmodExtensionReplayDataKey;
 pub use dice_graph::BzlmodExtensionReplayDataValue;
+pub use dice_graph::BzlmodLockfileInputsDataKey;
+pub use dice_graph::BzlmodLockfileInputsDataValue;
+pub use dice_graph::BzlmodLockfileInputsKey;
 pub use dice_graph::BzlmodLockfileInputsValue;
 pub use dice_graph::BzlmodModuleVersionsDataKey;
 pub use dice_graph::BzlmodModuleVersionsDataValue;
 pub use dice_graph::BzlmodModuleVersionsInvalidation;
+pub use dice_graph::BzlmodModuleVersionsInvalidationData;
 pub use dice_graph::BzlmodRegisteredExecutionPlatformsDataKey;
 pub use dice_graph::BzlmodRegisteredToolchainsDataKey;
 pub use dice_graph::BzlmodRepoMappingsDataKey;
@@ -304,12 +308,15 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let workspace_id = data.workspace_id.clone();
         let root_module_name = data.cell_graph.root_module_name.clone();
         let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
+        let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue {
+            workspace_id: workspace_id.clone(),
+            lockfile_inputs: lockfile_inputs.clone(),
+        });
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
-            invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
+            invalidation: Arc::new(BzlmodModuleVersionsInvalidationData {
                 root_module_name: root_module_name.clone(),
-                lockfile_inputs: lockfile_inputs.clone(),
                 repo_env: data.repo_env.clone(),
                 registry_file_hashes: data.registry_file_hashes.clone(),
                 selected_yanked_versions: data.selected_yanked_versions.clone(),
@@ -324,7 +331,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         });
         let extension_replay_data = Arc::new(BzlmodExtensionReplayDataValue {
             workspace_id: workspace_id.clone(),
-            lockfile_inputs,
             repo_env: Arc::new(data.repo_env.clone()),
         });
         let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
@@ -351,6 +357,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             registered_execution_platforms,
         )])?;
         self.changed_to(vec![(BzlmodRepoMappingsDataKey, repo_mappings)])?;
+        self.changed_to(vec![(BzlmodLockfileInputsDataKey, lockfile_inputs_data)])?;
         self.changed_to(vec![(BzlmodExtensionReplayDataKey, extension_replay_data)])?;
         self.changed_to(vec![(
             BzlmodExtensionAggregationsDataKey,
@@ -446,7 +453,7 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-session-lockfile-digest"),
             PathBuf::from("/tmp/slug-plan61-session-lockfile-output-base"),
         );
-        let mut data = BzlmodSessionData::for_workspace(workspace_id);
+        let mut data = BzlmodSessionData::for_workspace(workspace_id.clone());
         let visible_lockfile = Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from(
                 "/tmp/slug-plan61-session-lockfile-digest/MODULE.bazel.lock",
@@ -481,23 +488,26 @@ mod tests {
         updater.set_bzlmod_session_data(data)?;
         let mut dice = updater.commit().await;
 
-        let replay_data = dice.compute(&BzlmodExtensionReplayDataKey).await?;
+        let lockfile_inputs = dice
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
         assert_eq!(
-            replay_data
-                .lockfile_inputs
-                .visible_lockfile_digest
-                .as_deref(),
+            lockfile_inputs.visible_lockfile_digest.as_deref(),
             Some("visible-digest")
         );
         assert_eq!(
-            replay_data
-                .lockfile_inputs
-                .hidden_lockfile_digest
-                .as_deref(),
+            lockfile_inputs.hidden_lockfile_digest.as_deref(),
             Some("hidden-digest")
         );
 
-        let module_versions = dice.compute(&BzlmodModuleVersionsDataKey).await?;
+        let replay_data = dice.compute(&BzlmodExtensionReplayDataKey).await?;
+        assert_eq!(replay_data.workspace_id, workspace_id);
+
+        let module_versions = dice
+            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id.clone()))
+            .await??;
         assert_eq!(
             module_versions
                 .invalidation
