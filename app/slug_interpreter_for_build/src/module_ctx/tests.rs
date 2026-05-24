@@ -248,7 +248,7 @@ fn test_bazel_module_with_tags() {
 
 #[test]
 fn test_repository_os() {
-    let os = RepositoryOs::new();
+    let os = RepositoryOs::new_with_environ(Default::default());
 
     // Just verify it creates something - actual values depend on platform
     assert!(!os.name.is_empty());

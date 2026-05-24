@@ -51,13 +51,6 @@ pub struct RepositoryOs {
 starlark_simple_value!(RepositoryOs);
 
 impl RepositoryOs {
-    pub fn new() -> Self {
-        let environ = slug_build_api::interpreter::rule_defs::build_config::get_repo_env()
-            .into_iter()
-            .collect();
-        Self::new_with_environ(Arc::new(environ))
-    }
-
     pub fn new_with_environ(environ: Arc<BTreeMap<String, String>>) -> Self {
         let name = if cfg!(target_os = "linux") {
             "linux"

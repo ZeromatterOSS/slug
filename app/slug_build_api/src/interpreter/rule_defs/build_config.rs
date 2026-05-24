@@ -189,24 +189,6 @@ pub fn set_repo_env(env_values: &[String], workspace_root: &str) {
     }
 }
 
-/// Get the effective repository environment for repository rules and module extensions.
-pub fn get_repo_env() -> HashMap<String, String> {
-    BUILD_CONFIG
-        .read()
-        .ok()
-        .and_then(|c| c.repo_env.clone())
-        .unwrap_or_else(|| std::env::vars().collect())
-}
-
-/// Get one value from the effective repository environment.
-pub fn get_repo_env_var(name: &str) -> Option<String> {
-    BUILD_CONFIG
-        .read()
-        .ok()
-        .and_then(|c| c.repo_env.as_ref().and_then(|env| env.get(name).cloned()))
-        .or_else(|| std::env::var(name).ok())
-}
-
 /// Set --copt values for the current build.
 pub fn set_copts(values: &[String]) {
     if let Ok(mut config) = BUILD_CONFIG.write() {

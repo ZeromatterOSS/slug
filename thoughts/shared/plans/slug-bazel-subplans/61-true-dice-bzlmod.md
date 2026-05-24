@@ -345,6 +345,11 @@ Observed SDK result at the checkpoint:
   keys carry that repo-env, and generated-repo completion markers use a
   repo-env-aware execution identity so a changed `--repo_env` cannot reuse stale
   materialized repository output by marker existence alone.
+- The leftover `RepositoryOs::new()` adapter and public build-config repo-env
+  readback helpers are removed, so module/repository runtime `os.environ`
+  construction must use explicit context-owned repo-env snapshots. Focused
+  validation passed with `cargo test -p slug_interpreter_for_build
+  repository_os -- --nocapture`.
 - The seeded-extension process global was removed. Lazy spoke registration now
   relies on DICE replay/compute when the extension repo file-ops path needs
   sibling repos, instead of a cross-command seeded marker. Focused
@@ -2384,7 +2389,7 @@ using Rust DICE keys and values:
      project root are also test-only.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
-     DICE/key inputs as the graph migrates.
+     DICE/key/context inputs as the graph migrates.
    - Remove bridge cache fast paths whose correctness depends on hand-curated
      cacheability predicates.
    - Keep only compatibility shims that are demonstrably non-semantic or needed
