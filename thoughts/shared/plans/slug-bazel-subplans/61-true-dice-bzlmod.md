@@ -1812,6 +1812,23 @@ What did not work or remains risky:
   `cargo build -p slug`, the full Plan 61 Python guardrail with `75 passed in
   41.29s`, `cargo fmt --check`, and `git diff --check`. The slugd processes left
   by the full guardrail were cleaned up afterward.
+- Native repository-rule `build_file` and `patches` label resolution can now use
+  resolver-owned bzlmod cell paths from the DICE cell graph during extension
+  repository execution. That path prefers graph-owned aliases and cells over
+  stale normal directories, and a resolver-owned miss no longer scans
+  `bazel-external`; legacy native-executor callers without resolver-owned label
+  paths keep the old scan fallback. Scoped aliases are intentionally not
+  flattened because the native executor does not yet carry the declaring-module
+  owner context. Validation passed with focused `cargo test -p slug_bzlmod
+  resolve_build_file_label -- --nocapture` (`6 passed`), `cargo test -p
+  slug_bzlmod http_archive_build_file_uses_resolver_owned_label_path --
+  --nocapture` (`1 passed`), `cargo test -p slug_bzlmod -- --nocapture` (`319
+  passed`), `cargo test -p slug_common bzlmod -- --nocapture` (`10 passed`),
+  `cargo test -p slug_external_cells -- --nocapture` (`8 passed`), `cargo check
+  -p slug_bzlmod -p slug_server`, `cargo build -p slug`, the full Plan 61 Python
+  guardrail with `75 passed in 346.43s`, `cargo fmt --check`, and `git diff
+  --check`. The slugd processes left by the full guardrail were cleaned up
+  afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final

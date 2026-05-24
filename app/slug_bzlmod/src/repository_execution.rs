@@ -48,6 +48,7 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 
+use crate::dice_graph::BzlmodCellGraphKey;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::RepoMaterializationManifestKey;
 use crate::dice_graph::RepoMaterializationManifestValue;
@@ -1067,10 +1068,22 @@ impl Key for ExtensionRepoExecutionKey {
 
         // Execute the repository rule using the native repository executor
         // This handles http_archive, git_repository, local_repository, etc.
-        let result = crate::repository_executor::execute_repository_rule_fresh(
-            &invocation,
-            &self.project_root,
-        )?;
+        let cell_graph = ctx
+            .compute(&BzlmodCellGraphKey::for_workspace_id(
+                self.materialization_manifest_key.workspace_id.clone(),
+            ))
+            .await??;
+        let label_resolution =
+            crate::repository_executor::RepositoryLabelResolution::from_cell_graph(
+                &self.project_root,
+                &cell_graph,
+            );
+        let result =
+            crate::repository_executor::execute_repository_rule_fresh_with_label_resolution(
+                &invocation,
+                &self.project_root,
+                &label_resolution,
+            )?;
         let output_digest =
             crate::repository_executor::repository_output_digest(&result.repo_path)?;
 
