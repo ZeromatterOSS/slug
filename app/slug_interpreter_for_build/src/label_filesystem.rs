@@ -72,8 +72,7 @@ impl<'a> LabelFilesystemResolver<'a> {
 
     pub(crate) fn resolve_canonical_label(&self, label: &CanonicalLabel) -> PathBuf {
         let repo = label.repo().as_str();
-        let is_root = repo.is_empty() || slug_core::cells::is_root_cell_name(repo);
-        if is_root {
+        if repo.is_empty() {
             let fragment = label_path_fragment(label.package(), label.target());
             return match self.root_label_resolution {
                 RootLabelResolution::Relative => fragment,
@@ -90,6 +89,17 @@ impl<'a> LabelFilesystemResolver<'a> {
 
         if !self.allow_legacy_fallbacks {
             return join_label_fragment(PathBuf::from(repo), label.package(), label.target());
+        }
+
+        if slug_core::cells::is_root_cell_name(repo) {
+            let fragment = label_path_fragment(label.package(), label.target());
+            return match self.root_label_resolution {
+                RootLabelResolution::Relative => fragment,
+                RootLabelResolution::ProjectAbsolute => self
+                    .project_root_path()
+                    .map(|root| root.join(&fragment))
+                    .unwrap_or(fragment),
+            };
         }
 
         if let Some(cell_path) = slug_core::cells::get_dynamic_extension_cell(repo) {
@@ -388,5 +398,28 @@ mod tests {
             .unwrap();
 
         assert_eq!(resolved, PathBuf::from(apparent).join("pkg").join("tool"));
+    }
+
+    #[test]
+    fn resolver_owned_cell_paths_do_not_use_legacy_root_cell_name_for_missing_repo() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path();
+        let repo = "root";
+
+        let legacy_resolved = LabelFilesystemResolver::new(project_root)
+            .with_project_root(Some(project_root))
+            .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
+            .resolve_label_string(&format!("@{repo}//pkg:tool"))
+            .unwrap();
+        assert_eq!(legacy_resolved, project_root.join("pkg").join("tool"));
+
+        let cell_paths = HashMap::new();
+        let resolver_owned = LabelFilesystemResolver::new(project_root)
+            .with_project_root(Some(project_root))
+            .with_cell_paths(&cell_paths)
+            .without_legacy_fallbacks()
+            .resolve_label_string(&format!("@{repo}//pkg:tool"))
+            .unwrap();
+        assert_eq!(resolver_owned, PathBuf::from(repo).join("pkg").join("tool"));
     }
 }

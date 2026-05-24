@@ -1805,13 +1805,13 @@ What did not work or remains risky:
   a resolver-owned map keep the old compatibility fallbacks. Validation passed
   with focused `slug_interpreter_for_build` tests for missing resolver-owned
   label paths and conflicting globals, `cargo test -p slug_interpreter_for_build
-  label_filesystem -- --nocapture` (`4 passed`), `cargo test -p
+  label_filesystem -- --nocapture` (`5 passed`), `cargo test -p
   slug_interpreter_for_build repository_context_ -- --nocapture` (`5 passed`),
-  `cargo test -p slug_interpreter_for_build -- --nocapture` (`90 passed`),
-  `cargo check -p slug_interpreter_for_build -p slug_server`, `cargo build -p
-  slug`, the full Plan 61 Python guardrail with `75 passed in 39.97s`, `cargo
-  fmt --check`, and `git diff --check`. The slugd processes left by the full
-  guardrail were cleaned up afterward.
+  `cargo test -p slug_interpreter_for_build -- --nocapture --test-threads=1`
+  (`91 passed`), `cargo check -p slug_interpreter_for_build -p slug_server`,
+  `cargo build -p slug`, the full Plan 61 Python guardrail with `75 passed in
+  41.29s`, `cargo fmt --check`, and `git diff --check`. The slugd processes left
+  by the full guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
