@@ -1889,7 +1889,10 @@ What did not work or remains risky:
   `cargo build -p slug`, focused `test_custom_use_repo_rule_local_probe_failure_does_not_block_execution`
   (`1 passed, 76 deselected`), the focused local-repository marker subset (`5
   passed, 72 deselected`), `cargo fmt --check`, and `git diff --check`. No slugd
-  processes remained after cleanup.
+  processes remained after cleanup. The external-module guardrail
+  `test_external_use_repo_rule_local_definition_reexecutes_after_input_edit`
+  then proved the same execution-time local sidecar for an
+  `@repo_rule_owner//:repo.bzl` custom repo rule (`1 passed, 77 deselected`).
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -2185,10 +2188,10 @@ using Rust DICE keys and values:
      installed, and
      `test_custom_use_repo_rule_local_probe_failure_does_not_block_execution`
      proves rematerialization after an unwatched input edit for that class.
-     Remaining custom `use_repo_rule()` local semantics for external/cross-repo
-     `.bzl` files still need the real loaded-module graph available after the
-     bzlmod cell graph is established rather than the root-local precompute
-     fallback.
+     External/cross-repo `.bzl` files also rely on that execution-time loaded
+     rule bit after the bzlmod cell graph is established, and
+     `test_external_use_repo_rule_local_definition_reexecutes_after_input_edit`
+     proves rematerialization after an unwatched input edit for that class.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

@@ -2056,6 +2056,50 @@ repo(name = "custom_local")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_external_use_repo_rule_local_definition_reexecutes_after_input_edit(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: external use_repo_rule() local bits load after cell graph install."""
+    owner = buck.cwd / "owner"
+    owner.mkdir()
+    _write(owner / "MODULE.bazel", 'module(name = "repo_rule_owner", version = "1.0")\n')
+    _write(
+        owner / "repo.bzl",
+        """def _external_local_impl(repository_ctx):
+    payload = repository_ctx.read(Label("@@//:source.txt"), watch = "no")
+    repository_ctx.file("payload.txt", payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"payload.txt\\"])\\nfilegroup(name = \\"payload\\", srcs = [\\"payload.txt\\"])\\n")
+
+external_local_repository = repository_rule(
+    implementation = _external_local_impl,
+    local = True,
+)
+""",
+    )
+    repo_dir = buck.cwd / "bazel-external" / "+external_local_repository+external_local"
+    payload = repo_dir / "payload.txt"
+    _write(buck.cwd / "source.txt", "first\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_external_use_repo_rule_local")
+
+bazel_dep(name = "repo_rule_owner", version = "1.0")
+local_path_override(module_name = "repo_rule_owner", path = "owner")
+
+repo = use_repo_rule("@repo_rule_owner//:repo.bzl", "external_local_repository")
+repo(name = "external_local")
+""",
+    )
+
+    await buck.build("@external_local//:payload")
+    assert payload.read_text() == "first\n"
+
+    _write(buck.cwd / "source.txt", "second\n")
+    await buck.build("@external_local//:payload")
+    assert payload.read_text() == "second\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_use_extension_dev_dependency_follows_ignore_policy(
     buck: Buck,
 ) -> None:
