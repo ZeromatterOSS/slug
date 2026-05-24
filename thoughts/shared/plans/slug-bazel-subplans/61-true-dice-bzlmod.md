@@ -1025,6 +1025,18 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, `cargo
   build -p slug`, the focused Plan 61 Python replay subset, the full Plan 61
   Python guardrail with 72 tests, `cargo fmt --check`, and `git diff --check`.
+- `ModuleVersionsKey` now reads the root module name from
+  `BzlmodCellGraphKey` when composing its conservative invalidation identity,
+  instead of carrying a duplicate root-name copy in the injected
+  module-version data. The cell graph is still legacy-produced, but the
+  module-version consumer now depends on the named cell-graph projection for
+  root module identity. Validation passed with `cargo check -p slug_bzlmod -p
+  slug_common`, focused `slug_bzlmod` coverage proving the session cell graph
+  root name feeds module-version invalidation, full `cargo test -p
+  slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
+  subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
+  --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 

@@ -323,7 +323,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
             invalidation: Arc::new(BzlmodModuleVersionsInvalidationData {
-                root_module_name: root_module_name.clone(),
                 registry_file_hashes: data.registry_file_hashes.clone(),
                 selected_yanked_versions: data.selected_yanked_versions.clone(),
             }),
@@ -446,6 +445,10 @@ mod tests {
         assert_eq!(cell_graph.root_module_name, "root_mod");
         assert_eq!(cell_graph.cells[0].name, "root_mod");
         assert_eq!(cell_graph.root_aliases[0].apparent_name, "dep");
+        let module_versions = dice
+            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id))
+            .await??;
+        assert_eq!(module_versions.invalidation.root_module_name, "root_mod");
 
         Ok(())
     }

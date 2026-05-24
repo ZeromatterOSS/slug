@@ -603,7 +603,6 @@ pub struct BzlmodModuleVersionsInvalidation {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsInvalidationData {
-    pub root_module_name: String,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
 }
@@ -611,12 +610,13 @@ pub struct BzlmodModuleVersionsInvalidationData {
 impl BzlmodModuleVersionsInvalidationData {
     fn with_keyed_inputs(
         &self,
+        root_module_name: String,
         lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
         repo_env: Arc<BTreeMap<String, String>>,
         repo_mappings: Arc<BzlmodRepoMappingsDataValue>,
     ) -> BzlmodModuleVersionsInvalidation {
         BzlmodModuleVersionsInvalidation {
-            root_module_name: self.root_module_name.clone(),
+            root_module_name,
             lockfile_inputs,
             repo_env: repo_env.as_ref().clone(),
             registry_file_hashes: self.registry_file_hashes.clone(),
@@ -889,10 +889,16 @@ impl Key for ModuleVersionsKey {
                 self.workspace_id.clone(),
             ))
             .await??;
+        let cell_graph = ctx
+            .compute(&BzlmodCellGraphKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         Ok(Arc::new(ModuleVersionsValue {
             workspace_id: data.workspace_id.clone(),
             module_versions: data.module_versions.clone(),
             invalidation: Arc::new(data.invalidation.with_keyed_inputs(
+                cell_graph.root_module_name.clone(),
                 lockfile_inputs,
                 repo_env,
                 repo_mappings,
