@@ -2015,7 +2015,7 @@ async def test_custom_use_repo_rule_local_probe_failure_does_not_block_execution
     """Bazel anchor: custom repository_rule modules load through the normal bzl loader."""
     repo_dir = buck.cwd / "bazel-external" / "+custom_local_repository+custom_local"
     payload = repo_dir / "payload.txt"
-    _write(buck.cwd / "source.txt", "payload\n")
+    _write(buck.cwd / "source.txt", "first\n")
     _write(
         buck.cwd / "repo.bzl",
         """def _unused_rule_impl(ctx):
@@ -2048,7 +2048,11 @@ repo(name = "custom_local")
     _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "tool")\n')
 
     await buck.build("@custom_local//:payload")
-    assert payload.read_text() == "payload\n"
+    assert payload.read_text() == "first\n"
+
+    _write(buck.cwd / "source.txt", "second\n")
+    await buck.build("@custom_local//:payload")
+    assert payload.read_text() == "second\n"
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

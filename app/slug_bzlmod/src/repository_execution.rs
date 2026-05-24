@@ -61,6 +61,7 @@ use crate::repository_invocations::AttrValue;
 use crate::repository_invocations::RepositoryInvocation;
 
 pub(crate) const REPO_RECORDED_INPUTS_FILE: &str = ".slug_repo_recorded_inputs";
+const REPO_RULE_LOCAL_FILE: &str = ".slug_repo_rule_local";
 
 /// Errors that can occur during repository rule execution.
 #[derive(Debug, slug_error::Error)]
@@ -590,6 +591,33 @@ fn write_repository_recorded_inputs(repo_dir: &Path, inputs: &[String]) -> slug_
     Ok(())
 }
 
+fn write_repository_rule_local_state(repo_dir: &Path, local: bool) -> slug_error::Result<()> {
+    let marker_path = repo_dir.join(REPO_RULE_LOCAL_FILE);
+    if local {
+        std::fs::write(&marker_path, "local\n").map_err(|e| {
+            RepositoryExecutionError::WorkingDirFailed {
+                reason: format!(
+                    "Failed to write repository local marker '{}': {}",
+                    marker_path.display(),
+                    e
+                ),
+            }
+        })?;
+    } else if let Err(e) = std::fs::remove_file(&marker_path)
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        return Err(RepositoryExecutionError::WorkingDirFailed {
+            reason: format!(
+                "Failed to remove repository local marker '{}': {}",
+                marker_path.display(),
+                e
+            ),
+        }
+        .into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 pub fn repo_materialization_manifest(
     canonical_name: &str,
@@ -632,7 +660,7 @@ fn repo_materialization_marker_state_for_key(key: &RepoMaterializationManifestKe
     let spec_hash = key.repo_spec_digest.as_ref();
     let repo_dir = repo_dir_for_materialization_manifest_key(key);
     let marker_path = repo_dir.join(".slug_repo_complete");
-    if repo_spec.local {
+    if repo_spec.local || repo_dir.join(REPO_RULE_LOCAL_FILE).exists() {
         "local-rule".to_owned()
     } else if marker_path.exists() {
         match std::fs::read_to_string(&marker_path) {
@@ -1047,6 +1075,8 @@ impl Key for ExtensionRepoExecutionKey {
                                     &working_dir,
                                     &execution.recorded_inputs,
                                 )?;
+                                let effective_local = self.repo_spec.local || execution.local;
+                                write_repository_rule_local_state(&working_dir, effective_local)?;
                                 let output_digest =
                                     crate::repository_executor::repository_output_digest(
                                         &working_dir,
@@ -1059,7 +1089,7 @@ impl Key for ExtensionRepoExecutionKey {
                                     self.canonical_name.to_string(),
                                     working_dir,
                                 );
-                                if self.repo_spec.local {
+                                if effective_local {
                                     result = result.non_cacheable();
                                 }
                                 return Ok(Arc::new(result));
@@ -1101,6 +1131,7 @@ impl Key for ExtensionRepoExecutionKey {
         if self.repo_spec.local {
             result = result.non_cacheable();
         }
+        write_repository_rule_local_state(&result.repo_path, self.repo_spec.local)?;
         let output_digest =
             crate::repository_executor::repository_output_digest(&result.repo_path)?;
 
@@ -1516,6 +1547,21 @@ mod tests {
             "complete:sha256-abc123",
             "sha256-abc123"
         ));
+    }
+
+    #[test]
+    fn materialization_manifest_treats_recorded_local_rule_as_non_cacheable() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let repo_dir = project_root.join("bazel-external").join("_main+ext+repo");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(repo_dir.join(".slug_repo_complete"), "complete").unwrap();
+        write_repository_rule_local_state(&repo_dir, true).unwrap();
+
+        let spec = RepoSpec::new("//:repo.bzl%custom_repository".to_owned());
+        let manifest = repo_materialization_manifest("_main+ext+repo", &spec, &project_root);
+
+        assert_eq!(manifest.marker_state.as_ref(), "local-rule");
     }
 
     #[test]

@@ -509,7 +509,10 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
                 let recorded_inputs = repo_ctx.recorded_inputs()?;
                 track_repository_watch_inputs(ctx, &cell_resolver, workspace_root, &watch_inputs)
                     .await?;
-                Ok(StarlarkRepoRuleExecution::new(recorded_inputs))
+                Ok(StarlarkRepoRuleExecution::new(
+                    recorded_inputs,
+                    frozen_rule.is_local(),
+                ))
             }
             Err(summary) => {
                 tracing::debug!(

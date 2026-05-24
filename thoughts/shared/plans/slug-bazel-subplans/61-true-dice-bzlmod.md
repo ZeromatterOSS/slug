@@ -1878,7 +1878,18 @@ What did not work or remains risky:
   `test_custom_use_repo_rule_local_probe_failure_does_not_block_execution`
   covers a root-local repo-rule module with an ordinary build `rule(...)`
   declaration that requires the normal `.bzl` loader context (`5 passed, 72
-  deselected`). No slugd processes remained after cleanup.
+  deselected`). The normal repository-rule execution path now records the
+  loaded rule's `local` bit in the repository materialization sidecar, so a
+  valid root-local custom repo rule that the pre-cell-resolver probe cannot
+  inspect is still treated as non-cacheable after the real loader runs; the same
+  guardrail edits an unwatched input and proves rematerialization. Validation
+  for that execution-time refresh passed with `cargo test -p slug_bzlmod
+  materialization_manifest_treats_recorded_local_rule_as_non_cacheable --
+  --nocapture`, `cargo check -p slug_bzlmod -p slug_interpreter_for_build`,
+  `cargo build -p slug`, focused `test_custom_use_repo_rule_local_probe_failure_does_not_block_execution`
+  (`1 passed, 76 deselected`), the focused local-repository marker subset (`5
+  passed, 72 deselected`), `cargo fmt --check`, and `git diff --check`. No slugd
+  processes remained after cleanup.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -2168,11 +2179,16 @@ using Rust DICE keys and values:
      including root-local `.bzl` loads, before serializing the `RepoSpec`, and
      the focused guardrail
      `test_custom_use_repo_rule_local_definition_reexecutes_after_input_edit`
-     proves rematerialization after an unwatched input edit. Remaining custom
-     `use_repo_rule()` local semantics for root-local `.bzl` modules that need
-     the normal loader context, plus external/cross-repo `.bzl` files, need the
-     real loaded-module graph available after the bzlmod cell graph is
-     established rather than the root-local precompute fallback.
+     proves rematerialization after an unwatched input edit. Root-local `.bzl`
+     modules that need the normal loader context now refresh the local bit at
+     repository execution time after the cell graph and Starlark loader are
+     installed, and
+     `test_custom_use_repo_rule_local_probe_failure_does_not_block_execution`
+     proves rematerialization after an unwatched input edit for that class.
+     Remaining custom `use_repo_rule()` local semantics for external/cross-repo
+     `.bzl` files still need the real loaded-module graph available after the
+     bzlmod cell graph is established rather than the root-local precompute
+     fallback.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

@@ -44,11 +44,16 @@ use crate::repository_invocations::RepositoryInvocation;
 pub struct StarlarkRepoRuleExecution {
     /// Bazel-style recorded inputs collected from repository_ctx.watch APIs.
     pub recorded_inputs: Vec<String>,
+    /// Whether the loaded repository_rule was declared `local = True`.
+    pub local: bool,
 }
 
 impl StarlarkRepoRuleExecution {
-    pub fn new(recorded_inputs: Vec<String>) -> Self {
-        Self { recorded_inputs }
+    pub fn new(recorded_inputs: Vec<String>, local: bool) -> Self {
+        Self {
+            recorded_inputs,
+            local,
+        }
     }
 }
 
