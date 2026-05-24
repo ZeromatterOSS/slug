@@ -77,8 +77,6 @@ pub use dice_graph::BzlmodExtensionAggregationKey;
 pub use dice_graph::BzlmodExtensionAggregationValue;
 pub use dice_graph::BzlmodExtensionAggregationsDataKey;
 pub use dice_graph::BzlmodExtensionAggregationsDataValue;
-pub use dice_graph::BzlmodExtensionReplayDataKey;
-pub use dice_graph::BzlmodExtensionReplayDataValue;
 pub use dice_graph::BzlmodLockfileInputsDataKey;
 pub use dice_graph::BzlmodLockfileInputsDataValue;
 pub use dice_graph::BzlmodLockfileInputsKey;
@@ -89,6 +87,9 @@ pub use dice_graph::BzlmodModuleVersionsInvalidation;
 pub use dice_graph::BzlmodModuleVersionsInvalidationData;
 pub use dice_graph::BzlmodRegisteredExecutionPlatformsDataKey;
 pub use dice_graph::BzlmodRegisteredToolchainsDataKey;
+pub use dice_graph::BzlmodRepoEnvDataKey;
+pub use dice_graph::BzlmodRepoEnvDataValue;
+pub use dice_graph::BzlmodRepoEnvKey;
 pub use dice_graph::BzlmodRepoMappingsDataKey;
 pub use dice_graph::BzlmodRepoMappingsDataValue;
 pub use dice_graph::BzlmodResolutionKey;
@@ -312,12 +313,16 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             workspace_id: workspace_id.clone(),
             lockfile_inputs: lockfile_inputs.clone(),
         });
+        let repo_env = Arc::new(data.repo_env.clone());
+        let repo_env_data = Arc::new(BzlmodRepoEnvDataValue {
+            workspace_id: workspace_id.clone(),
+            repo_env: repo_env.clone(),
+        });
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
             invalidation: Arc::new(BzlmodModuleVersionsInvalidationData {
                 root_module_name: root_module_name.clone(),
-                repo_env: data.repo_env.clone(),
                 registry_file_hashes: data.registry_file_hashes.clone(),
                 selected_yanked_versions: data.selected_yanked_versions.clone(),
                 repo_mappings: data.repo_mappings.clone(),
@@ -328,10 +333,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             workspace_id: workspace_id.clone(),
             repo_mappings: Arc::new(data.repo_mappings.clone()),
             repo_mapping_overrides: Arc::new(data.repo_mapping_overrides.clone()),
-        });
-        let extension_replay_data = Arc::new(BzlmodExtensionReplayDataValue {
-            workspace_id: workspace_id.clone(),
-            repo_env: Arc::new(data.repo_env.clone()),
         });
         let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
             workspace_id: workspace_id.clone(),
@@ -358,7 +359,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         )])?;
         self.changed_to(vec![(BzlmodRepoMappingsDataKey, repo_mappings)])?;
         self.changed_to(vec![(BzlmodLockfileInputsDataKey, lockfile_inputs_data)])?;
-        self.changed_to(vec![(BzlmodExtensionReplayDataKey, extension_replay_data)])?;
+        self.changed_to(vec![(BzlmodRepoEnvDataKey, repo_env_data)])?;
         self.changed_to(vec![(
             BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
@@ -478,6 +479,8 @@ mod tests {
             Some(hidden_lockfile),
             LockfileMode::Update,
         );
+        data.repo_env
+            .insert("TOKEN".to_owned(), "from-session".to_owned());
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -502,12 +505,25 @@ mod tests {
             Some("hidden-digest")
         );
 
-        let replay_data = dice.compute(&BzlmodExtensionReplayDataKey).await?;
-        assert_eq!(replay_data.workspace_id, workspace_id);
+        let repo_env = dice
+            .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
+            .await??;
+        assert_eq!(
+            repo_env.get("TOKEN").map(String::as_str),
+            Some("from-session")
+        );
 
         let module_versions = dice
             .compute(&ModuleVersionsKey::for_workspace_id(workspace_id.clone()))
             .await??;
+        assert_eq!(
+            module_versions
+                .invalidation
+                .repo_env
+                .get("TOKEN")
+                .map(String::as_str),
+            Some("from-session")
+        );
         assert_eq!(
             module_versions
                 .invalidation

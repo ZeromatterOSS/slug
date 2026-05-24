@@ -266,10 +266,11 @@ Observed SDK result at the checkpoint:
   `BzlmodRepoMappingsDataKey`. Extension replay and generated-repo spoke lookup
   still use a transitional injected value produced by the legacy resolver, but
   repo mapping state is no longer bundled with extension aggregation state.
-- Extension replay inputs now read through `BzlmodExtensionReplayDataKey`.
-  Lockfile paths, tracked visible/hidden lockfile contents and digests,
-  lockfile mode, and command repo env are no longer bundled with extension
-  aggregation state.
+- Extension replay inputs were split out of extension aggregation state, and
+  the temporary replay-data wrapper was later replaced by named
+  `BzlmodLockfileInputsKey` and `BzlmodRepoEnvKey` projections. Lockfile paths,
+  tracked visible/hidden lockfile contents and digests, lockfile mode, and
+  command repo env are no longer bundled with extension aggregation state.
 - Interpreter module-version lookup now reads `ModuleVersionsKey` instead of
   directly reading injected `BzlmodSessionData`. This is still a transitional
   producer over the injected session graph, but the Starlark interpreter adapter
@@ -995,6 +996,20 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
   the focused Plan 61 Python replay subset, the full Plan 61 Python guardrail
   with 72 tests, `cargo fmt --check`, and `git diff --check`.
+- Command repo-env now has its own injected data key and workspace-checked
+  `BzlmodRepoEnvKey`. The old extension replay-data wrapper was removed:
+  extension execution-key construction reads repo env through the repo-env key,
+  lockfile identity through `BzlmodLockfileInputsKey`, and repo mappings
+  through `BzlmodRepoMappingsDataKey`; `ModuleVersionsKey` composes its
+  conservative invalidation identity from the same keyed repo-env and lockfile
+  values. This remains transitional because repo env is still injected from the
+  legacy resolver payload. Validation passed with `cargo check -p slug_bzlmod
+  -p slug_common`, focused `slug_bzlmod` tests for repo-env/lockfile execution
+  key construction, lockfile/repo-env session injection, and absent-spoke
+  dependency avoidance, full `cargo test -p slug_bzlmod -- --nocapture`,
+  `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
+  the focused Plan 61 Python replay subset, the full Plan 61 Python guardrail
+  with 72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1109,11 +1124,13 @@ What did not work or remains risky:
   still avoid asking the repository materialization key until a higher-level
   invalidation path reaches it.
 - Module extension and repository rule Starlark APIs now read their effective
-  repo environment from explicit contexts seeded by command-key inputs. The
-  generated repo cell graph that exposes repository rule specs remains
-  transitional, but repo-env itself no longer comes from the interpreter
-  build-config adapter or a materialization-time injected-session lookup at
-  runtime.
+  repo environment from explicit contexts seeded by command-key inputs.
+  Extension execution and module-version invalidation now consume that command
+  repo env through `BzlmodRepoEnvKey`. The generated repo cell graph that
+  exposes repository rule specs remains transitional, and the repo-env key is
+  still populated from injected resolver output, but repo-env itself no longer
+  comes from the interpreter build-config adapter or a materialization-time
+  injected-session lookup at runtime.
 - Registered toolchain and execution-platform facts now reach analysis through
   narrower DICE values, and the eager-load fast path is keyed by the
   DICE-derived registration signature, but the final `DeclaredToolchainInfo`

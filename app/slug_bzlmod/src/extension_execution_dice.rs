@@ -51,15 +51,14 @@ use starlark_syntax::syntax::ast::StmtP;
 
 use crate::BzlmodExtensionAggregationValue;
 use crate::BzlmodExtensionAggregationsDataValue;
-use crate::BzlmodExtensionReplayDataValue;
 use crate::RepoMappingOverrides;
 use crate::RepoMappingSnapshot;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::BzlmodExtensionAggregationKey;
 use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
-use crate::dice_graph::BzlmodExtensionReplayDataKey;
 use crate::dice_graph::BzlmodLockfileInputsKey;
 use crate::dice_graph::BzlmodLockfileInputsValue;
+use crate::dice_graph::BzlmodRepoEnvKey;
 use crate::dice_graph::BzlmodRepoMappingsDataKey;
 use crate::dice_graph::BzlmodRepoMappingsDataValue;
 use crate::dice_graph::ExtensionBzlTransitiveDigestKey;
@@ -80,7 +79,7 @@ use crate::repo_spec::RepoSpec;
 
 fn create_extension_execution_key_from_aggregation(
     aggregation: &BzlmodExtensionAggregationValue,
-    replay_data: &BzlmodExtensionReplayDataValue,
+    repo_env: &BTreeMap<String, String>,
     lockfile_inputs: &BzlmodLockfileInputsValue,
     repo_mappings: &BzlmodRepoMappingsDataValue,
     bzl_transitive_digest: Arc<str>,
@@ -99,7 +98,7 @@ fn create_extension_execution_key_from_aggregation(
         lockfile_inputs.visible_lockfile.clone(),
         lockfile_inputs.hidden_lockfile.clone(),
         lockfile_inputs.lockfile_mode,
-        replay_data.repo_env.as_ref().clone(),
+        repo_env.clone(),
         repo_mappings.repo_mappings.as_ref().clone(),
         repo_mappings.repo_mapping_overrides.as_ref().clone(),
         bzl_transitive_digest,
@@ -197,26 +196,6 @@ fn ensure_extension_aggregation_workspace(
             subject,
             workspace_id.canonical_project_root.display(),
             aggregation.workspace_id.canonical_project_root.display()
-        ));
-    }
-    Ok(())
-}
-
-fn ensure_replay_data_workspace(
-    workspace_id: &crate::WorkspaceId,
-    replay_data: &BzlmodExtensionReplayDataValue,
-    key_name: &str,
-    subject: &str,
-) -> slug_error::Result<()> {
-    if &replay_data.workspace_id != workspace_id {
-        return Err(slug_error::slug_error!(
-            slug_error::ErrorTag::Tier0,
-            "{} for '{}' was computed with project root '{}', \
-             but current bzlmod extension replay root is '{}'",
-            key_name,
-            subject,
-            workspace_id.canonical_project_root.display(),
-            replay_data.workspace_id.canonical_project_root.display()
         ));
     }
     Ok(())
@@ -470,7 +449,11 @@ impl Key for ExtensionSpokesKey {
             ));
         };
         let repo_mappings = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
-        let replay_data = ctx.compute(&BzlmodExtensionReplayDataKey).await?;
+        let repo_env = ctx
+            .compute(&BzlmodRepoEnvKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         let lockfile_inputs = ctx
             .compute(&BzlmodLockfileInputsKey::for_workspace_id(
                 self.workspace_id.clone(),
@@ -488,15 +471,9 @@ impl Key for ExtensionSpokesKey {
             "ExtensionSpokesKey",
             &self.extension_id,
         )?;
-        ensure_replay_data_workspace(
-            &self.workspace_id,
-            replay_data.as_ref(),
-            "ExtensionSpokesKey",
-            &self.extension_id,
-        )?;
         let extension_key = create_extension_execution_key_from_aggregation(
             aggregation.as_ref(),
-            replay_data.as_ref(),
+            repo_env.as_ref(),
             lockfile_inputs.as_ref(),
             repo_mappings.as_ref(),
             self.bzl_transitive_digest.clone(),
@@ -542,7 +519,7 @@ impl Key for ExtensionSpokesKey {
             workspace_id: self.workspace_id.clone(),
             extension_id: self.extension_id.clone(),
             project_root: self.workspace_id.canonical_project_root.clone(),
-            repo_env: replay_data.repo_env.clone(),
+            repo_env: repo_env.clone(),
             spokes,
         }))
     }
@@ -2323,9 +2300,8 @@ mod tests {
     }
 
     #[test]
-    fn extension_execution_key_from_aggregation_uses_replay_and_lockfile_data() {
+    fn extension_execution_key_from_aggregation_uses_repo_env_and_lockfile_data() {
         use crate::BzlmodExtensionAggregationsDataValue;
-        use crate::BzlmodExtensionReplayDataValue;
         use crate::BzlmodLockfileInputsValue;
         use crate::BzlmodRepoMappingsDataValue;
         use crate::WorkspaceId;
@@ -2347,10 +2323,6 @@ mod tests {
         Arc::get_mut(&mut data.extension_aggregations)
             .unwrap()
             .insert(extension_id.clone(), aggregated);
-        let replay_data = BzlmodExtensionReplayDataValue {
-            workspace_id: workspace_id.clone(),
-            repo_env: Arc::new(repo_env.clone()),
-        };
         let lockfile_inputs = BzlmodLockfileInputsValue {
             hidden_lockfile_path: Some(hidden_lockfile_path.clone()),
             visible_lockfile_digest: Some("visible-digest".to_owned()),
@@ -2373,7 +2345,7 @@ mod tests {
         };
         let key = create_extension_execution_key_from_aggregation(
             &aggregation,
-            &replay_data,
+            &repo_env,
             &lockfile_inputs,
             &repo_mappings,
             Arc::from("digest-from-dice-key"),

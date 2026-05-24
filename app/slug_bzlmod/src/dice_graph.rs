@@ -536,6 +536,36 @@ pub struct BzlmodLockfileInputsDataValue {
     pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
 }
 
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodRepoEnvKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
+pub struct BzlmodRepoEnvKey {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+}
+
+impl BzlmodRepoEnvKey {
+    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest: Arc::from("injected-bzlmod-session"),
+        }
+    }
+
+    pub fn for_project_root(project_root: PathBuf) -> Self {
+        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodRepoEnvDataValue {
+    pub workspace_id: WorkspaceId,
+    pub repo_env: Arc<BTreeMap<String, String>>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsInvalidation {
     pub root_module_name: String,
@@ -550,7 +580,6 @@ pub struct BzlmodModuleVersionsInvalidation {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsInvalidationData {
     pub root_module_name: String,
-    pub repo_env: BTreeMap<String, String>,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
     pub repo_mappings: crate::RepoMappingSnapshot,
@@ -558,14 +587,15 @@ pub struct BzlmodModuleVersionsInvalidationData {
 }
 
 impl BzlmodModuleVersionsInvalidationData {
-    fn with_lockfile_inputs(
+    fn with_keyed_inputs(
         &self,
         lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
+        repo_env: Arc<BTreeMap<String, String>>,
     ) -> BzlmodModuleVersionsInvalidation {
         BzlmodModuleVersionsInvalidation {
             root_module_name: self.root_module_name.clone(),
             lockfile_inputs,
-            repo_env: self.repo_env.clone(),
+            repo_env: repo_env.as_ref().clone(),
             registry_file_hashes: self.registry_file_hashes.clone(),
             selected_yanked_versions: self.selected_yanked_versions.clone(),
             repo_mappings: self.repo_mappings.clone(),
@@ -603,12 +633,6 @@ pub struct BzlmodExtensionAggregationValue {
     pub root_module_name: Arc<str>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-pub struct BzlmodExtensionReplayDataValue {
-    pub workspace_id: WorkspaceId,
-    pub repo_env: Arc<BTreeMap<String, String>>,
-}
-
 #[derive(
     derive_more::Display,
     Debug,
@@ -619,11 +643,11 @@ pub struct BzlmodExtensionReplayDataValue {
     PartialEq,
     Allocative
 )]
-#[display("BzlmodExtensionReplayDataKey")]
-pub struct BzlmodExtensionReplayDataKey;
+#[display("BzlmodLockfileInputsDataKey")]
+pub struct BzlmodLockfileInputsDataKey;
 
-impl dice::InjectedKey for BzlmodExtensionReplayDataKey {
-    type Value = Arc<BzlmodExtensionReplayDataValue>;
+impl dice::InjectedKey for BzlmodLockfileInputsDataKey {
+    type Value = Arc<BzlmodLockfileInputsDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -640,11 +664,11 @@ impl dice::InjectedKey for BzlmodExtensionReplayDataKey {
     PartialEq,
     Allocative
 )]
-#[display("BzlmodLockfileInputsDataKey")]
-pub struct BzlmodLockfileInputsDataKey;
+#[display("BzlmodRepoEnvDataKey")]
+pub struct BzlmodRepoEnvDataKey;
 
-impl dice::InjectedKey for BzlmodLockfileInputsDataKey {
-    type Value = Arc<BzlmodLockfileInputsDataValue>;
+impl dice::InjectedKey for BzlmodRepoEnvDataKey {
+    type Value = Arc<BzlmodRepoEnvDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -749,6 +773,36 @@ impl Key for BzlmodLockfileInputsKey {
 }
 
 #[async_trait]
+impl Key for BzlmodRepoEnvKey {
+    type Value = slug_error::Result<Arc<BTreeMap<String, String>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodRepoEnvDataKey).await?;
+        if data.workspace_id != self.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodRepoEnvKey was computed with project root '{}', \
+                 but current bzlmod repo-env root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        Ok(data.repo_env.clone())
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[async_trait]
 impl Key for ModuleVersionsKey {
     type Value = slug_error::Result<Arc<ModuleVersionsValue>>;
 
@@ -772,10 +826,18 @@ impl Key for ModuleVersionsKey {
                 self.workspace_id.clone(),
             ))
             .await??;
+        let repo_env = ctx
+            .compute(&BzlmodRepoEnvKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         Ok(Arc::new(ModuleVersionsValue {
             workspace_id: data.workspace_id.clone(),
             module_versions: data.module_versions.clone(),
-            invalidation: Arc::new(data.invalidation.with_lockfile_inputs(lockfile_inputs)),
+            invalidation: Arc::new(
+                data.invalidation
+                    .with_keyed_inputs(lockfile_inputs, repo_env),
+            ),
         }))
     }
 
