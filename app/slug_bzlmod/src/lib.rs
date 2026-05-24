@@ -260,7 +260,6 @@ pub struct BzlmodSessionData {
     pub registered_toolchains: Vec<RegisteredToolchain>,
     pub registered_execution_platforms: Vec<String>,
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
-    pub root_module_name: String,
     pub hidden_lockfile_path: Option<PathBuf>,
     pub visible_lockfile_digest: Option<String>,
     pub hidden_lockfile_digest: Option<String>,
@@ -283,7 +282,6 @@ impl BzlmodSessionData {
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
             extension_aggregations: HashMap::new(),
-            root_module_name: String::new(),
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
@@ -313,11 +311,12 @@ pub trait SetBzlmodSessionData {
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let workspace_id = data.workspace_id.clone();
+        let root_module_name = data.cell_graph.root_module_name.clone();
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
             invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
-                root_module_name: data.root_module_name.clone(),
+                root_module_name: root_module_name.clone(),
                 hidden_lockfile_path: data.hidden_lockfile_path.clone(),
                 visible_lockfile_digest: data.visible_lockfile_digest.clone(),
                 hidden_lockfile_digest: data.hidden_lockfile_digest.clone(),
@@ -349,7 +348,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
             workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(data.extension_aggregations.clone()),
-            root_module_name: Arc::from(data.root_module_name.as_str()),
+            root_module_name: Arc::from(root_module_name.as_str()),
         });
         let cell_graph = Arc::new(data.cell_graph.clone());
         let registered_toolchains = Arc::new(RegisteredToolchainsValue {
