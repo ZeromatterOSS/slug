@@ -1768,6 +1768,87 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_locked_registry_source_json_parse_failure_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: RepoSpec source.json parse failures are resolution inputs."""
+    module_name = "remote_source_parse_failure"
+    module_version = "1.0.0"
+    cache_home = buck.cwd / "cache_home"
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    module_cache = registry_cache / "modules" / module_name / module_version
+    source_dir = module_cache / "source"
+    source_dir.mkdir(parents=True)
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+    _write(
+        module_cache / "MODULE.bazel",
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    source_json = module_cache / "source.json"
+    _write(source_json, "{}\n")
+    _write(source_dir / ".complete", "")
+    _write(source_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_registry_source_parse_failure")
+
+bazel_dep(name = "{module_name}", version = "{module_version}")
+""",
+    )
+
+    registry_url = "https://bcr.bazel.build/bazel_registry.json"
+    module_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel"
+    )
+    source_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
+    )
+
+    def write_lockfile() -> None:
+        _write(
+            buck.cwd / "MODULE.bazel.lock",
+            json.dumps(
+                {
+                    "lockFileVersion": 26,
+                    "registryFileHashes": {
+                        registry_url: _sha256(registry_cache / "bazel_registry.json"),
+                        module_url: _sha256(module_cache / "MODULE.bazel"),
+                        source_url: _sha256(source_json),
+                    },
+                    "selectedYankedVersions": {},
+                    "moduleExtensions": {},
+                    "facts": {},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+        )
+
+    write_lockfile()
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(source_json, "{not json}\n")
+    write_lockfile()
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "Failed to parse source.json" in failure_stderr
+    assert module_name in failure_stderr
+
+    _write(source_json, "{}\n")
+    write_lockfile()
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_warm_noop_extension_replay_audit_cell_reuses_bzlmod_resolution(
     buck: Buck,
 ) -> None:

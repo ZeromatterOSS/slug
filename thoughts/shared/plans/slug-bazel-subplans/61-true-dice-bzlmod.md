@@ -579,6 +579,12 @@ Observed SDK result at the checkpoint:
   'out_of_project_local_override_parse_failure or
   out_of_project_local_override_utf8_failure or
   out_of_project_local_override_include_cycle'` (`3 passed, 92 deselected`).
+- Locked registry `source.json` metadata now has a focused parse-failure
+  guardrail: after a warm same-daemon registry module resolution, invalid
+  cached source metadata with a matching lockfile hash fails the next
+  `audit cell` instead of reusing the warm value, and repairing the metadata
+  succeeds again. Validation passed with
+  `test_locked_registry_source_json_parse_failure_invalidates_bzlmod_resolution`.
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
@@ -2093,7 +2099,8 @@ using Rust DICE keys and values:
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are polled into key identity while the final
-     watched-input graph is still pending.
+     watched-input graph is still pending. Locked registry `source.json`
+     checksum and parse-failure transitions now have same-daemon guardrails.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
      have same-daemon warm-reuse, edit-invalidation, and create/delete
      transition guardrails. Both cached override source classes also have
