@@ -1989,8 +1989,10 @@ What did not work or remains risky:
   -- --nocapture` and `cargo test -p slug_analysis
   test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback
   -- --nocapture`; the error-path regression now exercises the production
-  `ensure_registered_toolchains_loaded` branch and checks the loaded signature,
-  declared registry, deferred pool, and deferred loaded markers are cleared.
+  `ensure_registered_toolchains_loaded` branch and checks the old signature is
+  cleared, no requested/stale/project-root fallback signature is cached, and the
+  declared registry, deferred pool, per-key deferred markers, and load-all
+  deferred marker are cleared.
 - Extension repo file-ops no longer accepts a no-spec/no-spoke
   `.slug_repo_complete` marker as semantic authority. If setup and registered
   DICE spokes do not provide a current `RepoSpec`, the path now always enters

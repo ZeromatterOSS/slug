@@ -6276,6 +6276,7 @@ mod tests {
                 "@first//:all".to_owned(),
                 declared_toolchain_with_target_settings("@first//:type", Vec::new()),
             );
+            mark_deferred_all_loaded();
 
             let dice = dice::testing::DiceBuilder::new()
                 .build(dice::UserComputationData::new())
@@ -6283,19 +6284,20 @@ mod tests {
                 .commit()
                 .await;
             let mut updater = dice.into_updater();
+            let project_root = PathBuf::from("/tmp/plan61-toolchains");
             let requested_workspace = slug_bzlmod::WorkspaceId::new(
-                PathBuf::from("/tmp/plan61-toolchains"),
+                project_root.clone(),
                 PathBuf::from("/tmp/plan61-toolchains/buck-out/requested"),
             );
             let stale_workspace = slug_bzlmod::WorkspaceId::new(
-                PathBuf::from("/tmp/plan61-toolchains"),
+                project_root.clone(),
                 PathBuf::from("/tmp/plan61-toolchains/buck-out/stale"),
             );
             updater
                 .changed_to(vec![(
                     slug_bzlmod::BzlmodCellGraphDataKey,
                     Arc::new(slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-                        requested_workspace,
+                        requested_workspace.clone(),
                     )),
                 )])
                 .unwrap();
@@ -6303,7 +6305,7 @@ mod tests {
                 .changed_to(vec![(
                     slug_bzlmod::BzlmodRegisteredToolchainsDataKey,
                     Arc::new(slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-                        stale_workspace,
+                        stale_workspace.clone(),
                         Vec::new(),
                     )),
                 )])
@@ -6313,9 +6315,28 @@ mod tests {
             ensure_registered_toolchains_loaded(&mut dice).await;
 
             assert!(!toolchains_loaded_for_signature(&loaded));
+            assert!(!toolchains_loaded_for_signature(
+                &ToolchainLoadingSignature {
+                    workspace_id: requested_workspace,
+                    registered_toolchains: Vec::new(),
+                }
+            ));
+            assert!(!toolchains_loaded_for_signature(
+                &ToolchainLoadingSignature {
+                    workspace_id: stale_workspace,
+                    registered_toolchains: Vec::new(),
+                }
+            ));
+            assert!(!toolchains_loaded_for_signature(
+                &ToolchainLoadingSignature {
+                    workspace_id: slug_bzlmod::WorkspaceId::for_project_root(project_root),
+                    registered_toolchains: Vec::new(),
+                }
+            ));
             assert!(get_declared_toolchains().is_empty());
             assert!(get_deferred_toolchains().is_empty());
             assert!(!deferred_key_already_loaded("rules_rust"));
+            assert!(!deferred_all_loaded());
 
             reset_toolchain_loading();
         })
