@@ -321,6 +321,7 @@ impl BzlmodCellGraphKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -492,6 +493,7 @@ impl ModuleVersionsKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -525,6 +527,7 @@ impl BzlmodLockfileInputsKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -567,6 +570,7 @@ impl BzlmodRepoEnvKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -609,6 +613,7 @@ impl BzlmodRepoMappingsKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -665,6 +670,7 @@ impl BzlmodResolutionFactsKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -1097,6 +1103,7 @@ impl RegisteredToolchainsKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -1206,6 +1213,7 @@ impl RegisteredExecutionPlatformsKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
     }
@@ -1576,6 +1584,7 @@ impl RepoMaterializationManifestKey {
         )
     }
 
+    #[cfg(test)]
     pub fn for_project_root(
         project_root: PathBuf,
         canonical_repo: &str,
@@ -1603,6 +1612,7 @@ impl RepoMaterializationManifestKey {
         )
     }
 
+    #[cfg(test)]
     pub fn for_project_root_with_repo_spec_digest(
         project_root: PathBuf,
         canonical_repo: &str,
@@ -1634,6 +1644,7 @@ impl RepoMaterializationManifestKey {
         }
     }
 
+    #[cfg(test)]
     pub fn for_project_root_with_repo_spec_digest_and_repo_env(
         project_root: PathBuf,
         canonical_repo: &str,

@@ -1312,6 +1312,15 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo check -p slug_common -p slug_server`, `cargo build -p
   slug`, the focused Plan 61 generated-repo alias guardrail subset, `cargo
   fmt --check`, and `git diff --check`.
+- Project-root convenience constructors for bzlmod projection keys and
+  materialization-manifest helper paths are now compiled only for tests.
+  Production callers must form those DICE keys from explicit `WorkspaceId`
+  values instead of silently accepting the default output base. Validation
+  passed with focused `cargo test -p slug_bzlmod dice_graph::tests --
+  --nocapture`, focused `cargo test -p slug_bzlmod
+  repository_execution::tests -- --nocapture`, `cargo check -p slug_bzlmod -p
+  slug_common -p slug_external_cells -p slug_server`, `cargo build -p slug`,
+  `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1480,9 +1489,10 @@ What did not work or remains risky:
   root-visible merely by snapshot membership. Build-setting labels that arrive
   in Bazel canonical `@@repo//...` form now normalize to Slug's internal cell
   name after dynamic alias resolution. Extension repository execution
-  constructors that derive workspace identity from project root are test-only,
-  so production execution/materialization code has to pass the explicit
-  workspace identity. The graph is still
+  constructors, bzlmod projection-key constructors, and materialization-manifest
+  helper constructors that derive workspace identity from project root are
+  test-only, so production execution/materialization code has to pass the
+  explicit workspace identity. The graph is still
   legacy-produced, and alias compatibility plus runtime registration remain
   process-global transitional plumbing, so this does not yet make the runtime
   bzlmod cell graph DICE-owned.
@@ -1694,7 +1704,9 @@ using Rust DICE keys and values:
      session bridge is still being unwound.
    - Extension repository execution constructors that derive workspace identity
      from project root are test-only; production code must pass explicit
-     workspace identity and repo-env.
+     workspace identity and repo-env. Bzlmod projection-key and
+     materialization-manifest helpers that derive workspace identity from only a
+     project root are also test-only.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key inputs as the graph migrates.

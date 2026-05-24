@@ -578,6 +578,7 @@ fn write_repository_recorded_inputs(repo_dir: &Path, inputs: &[String]) -> slug_
     Ok(())
 }
 
+#[cfg(test)]
 pub fn repo_materialization_manifest(
     canonical_name: &str,
     repo_spec: &RepoSpec,
@@ -591,6 +592,7 @@ pub fn repo_materialization_manifest(
     repo_materialization_manifest_for_key(&key)
 }
 
+#[cfg(test)]
 fn repo_materialization_manifest_for_key(
     key: &RepoMaterializationManifestKey,
 ) -> RepoMaterializationManifestValue {
