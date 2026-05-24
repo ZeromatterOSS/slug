@@ -1983,10 +1983,14 @@ What did not work or remains risky:
   loaded signature uncached instead of synthesizing a project-root-only
   workspace identity. Validation passed with
   `cargo test -p slug_analysis
+  test_registered_toolchain_loading_records_dice_workspace_id -- --nocapture`,
+  `cargo test -p slug_analysis
   test_toolchain_loading_signature_includes_workspace_id_and_registered_toolchains
   -- --nocapture` and `cargo test -p slug_analysis
   test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback
-  -- --nocapture`.
+  -- --nocapture`; the error-path regression now exercises the production
+  `ensure_registered_toolchains_loaded` branch and checks the loaded signature,
+  declared registry, deferred pool, and deferred loaded markers are cleared.
 - Extension repo file-ops no longer accepts a no-spec/no-spoke
   `.slug_repo_complete` marker as semantic authority. If setup and registered
   DICE spokes do not provide a current `RepoSpec`, the path now always enters
