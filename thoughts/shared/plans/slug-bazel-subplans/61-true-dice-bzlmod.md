@@ -1961,6 +1961,12 @@ What did not work or remains risky:
   --nocapture` (`2 passed`), and `cargo test -p slug_analysis
   parse_impl_label_to_target_label -- --nocapture` (`3 passed`), `cargo check
   -p slug_analysis`, `cargo fmt --check`, and `git diff --check`.
+- Starlark `Label("@repo//...")` explicit-repo canonicalization now carries the
+  active `BuildContext` alias resolver into a focused helper, and a resolver
+  with a bzlmod runtime snapshot is authoritative on misses before the
+  transitional process-global dynamic alias map. Validation passed with `cargo
+  test -p slug_interpreter_for_build label_context_explicit_repo --
+  --nocapture` (`2 passed`).
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
