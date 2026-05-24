@@ -2687,6 +2687,85 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_lockfile_missing_registry_checksum_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: registry file hashes are BazelLockFileValue inputs."""
+    module_name = "remote_missing_checksum"
+    module_version = "1.0.0"
+    cache_home = buck.cwd / "cache_home"
+    module_cache = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        module_name,
+        module_version,
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_missing_registry_checksum")
+
+bazel_dep(name = "{module_name}", version = "{module_version}")
+""",
+    )
+
+    registry_url = "https://bcr.bazel.build/bazel_registry.json"
+    module_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel"
+    )
+    source_url = (
+        f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
+    )
+
+    def write_lockfile(include_module_hash: bool) -> None:
+        registry_file_hashes = {
+            registry_url: _sha256(registry_cache / "bazel_registry.json"),
+            source_url: _sha256(module_cache / "source.json"),
+        }
+        if include_module_hash:
+            registry_file_hashes[module_url] = _sha256(module_cache / "MODULE.bazel")
+        _write(
+            buck.cwd / "MODULE.bazel.lock",
+            json.dumps(
+                {
+                    "lockFileVersion": 26,
+                    "registryFileHashes": registry_file_hashes,
+                    "selectedYankedVersions": {},
+                    "moduleExtensions": {},
+                    "facts": {},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+        )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    write_lockfile(include_module_hash=True)
+    result = await buck.audit("cell", "--lockfile_mode=error", env=env)
+    assert module_name in result.stdout
+    first = await _bzlmod_counters(buck, "--lockfile_mode=error", env=env)
+
+    result = await buck.audit("cell", "--lockfile_mode=error", env=env)
+    assert module_name in result.stdout
+    warm = await _bzlmod_counters(buck, "--lockfile_mode=error", env=env)
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    write_lockfile(include_module_hash=False)
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", "--lockfile_mode=error", env=env)
+    failure_stderr = exc.value.stderr
+    assert "Missing checksum for registry file" in failure_stderr
+    assert module_url in failure_stderr
+
+    write_lockfile(include_module_hash=True)
+    result = await buck.audit("cell", "--lockfile_mode=error", env=env)
+    assert module_name in result.stdout
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_warm_noop_extension_replay_audit_cell_reuses_bzlmod_resolution(
     buck: Buck,
 ) -> None:

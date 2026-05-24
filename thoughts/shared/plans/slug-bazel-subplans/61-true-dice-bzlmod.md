@@ -639,6 +639,13 @@ Observed SDK result at the checkpoint:
   selected-yanked entry for that selected version fails the next `audit cell`,
   and removing the entry succeeds again. Validation passed with
   `test_lockfile_selected_yanked_version_edit_invalidates_bzlmod_resolution`.
+- Visible lockfile registry hash policy now has same-daemon missing-checksum
+  coverage under `--lockfile_mode=error`: a locked registry module warms with
+  all registry file hashes present, removing only the selected
+  `MODULE.bazel` registry hash from the lockfile fails before mutable registry
+  content is accepted, and restoring the hash succeeds again. Validation passed
+  with the focused guardrail selected by `-k 'missing_registry_checksum'`
+  (`1 passed, 111 deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
