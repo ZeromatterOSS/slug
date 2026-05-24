@@ -532,7 +532,6 @@ impl BzlmodLockfileInputsKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodLockfileInputsDataValue {
-    pub workspace_id: WorkspaceId,
     pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
 }
 
@@ -562,7 +561,6 @@ impl BzlmodRepoEnvKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoEnvDataValue {
-    pub workspace_id: WorkspaceId,
     pub repo_env: Arc<BTreeMap<String, String>>,
 }
 
@@ -603,7 +601,6 @@ pub struct BzlmodModuleVersionsInvalidation {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodResolutionFactsValue {
-    pub workspace_id: WorkspaceId,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
 }
@@ -639,14 +636,12 @@ pub struct BzlmodModuleVersionsDataValue {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoMappingsDataValue {
-    pub workspace_id: WorkspaceId,
     pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionAggregationsDataValue {
-    pub workspace_id: WorkspaceId,
     pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
 }
 
@@ -798,15 +793,10 @@ impl Key for BzlmodLockfileInputsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodLockfileInputsDataKey).await?;
-        if data.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodLockfileInputsKey was computed with project root '{}', \
-                 but current bzlmod lockfile-input root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                data.workspace_id.canonical_project_root.display()
-            ));
-        }
+        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
+            self.workspace_id.clone(),
+        ))
+        .await??;
         Ok(data.lockfile_inputs.clone())
     }
 
@@ -828,15 +818,10 @@ impl Key for BzlmodRepoEnvKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodRepoEnvDataKey).await?;
-        if data.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodRepoEnvKey was computed with project root '{}', \
-                 but current bzlmod repo-env root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                data.workspace_id.canonical_project_root.display()
-            ));
-        }
+        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
+            self.workspace_id.clone(),
+        ))
+        .await??;
         Ok(data.repo_env.clone())
     }
 
@@ -858,15 +843,10 @@ impl Key for BzlmodRepoMappingsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodRepoMappingsDataKey).await?;
-        if data.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodRepoMappingsKey was computed with project root '{}', \
-                 but current bzlmod repo-mapping root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                data.workspace_id.canonical_project_root.display()
-            ));
-        }
+        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
+            self.workspace_id.clone(),
+        ))
+        .await??;
         Ok(data)
     }
 
@@ -888,15 +868,10 @@ impl Key for BzlmodResolutionFactsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodResolutionFactsDataKey).await?;
-        if data.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodResolutionFactsKey was computed with project root '{}', \
-                 but current bzlmod resolution-facts root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                data.workspace_id.canonical_project_root.display()
-            ));
-        }
+        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
+            self.workspace_id.clone(),
+        ))
+        .await??;
         Ok(data)
     }
 

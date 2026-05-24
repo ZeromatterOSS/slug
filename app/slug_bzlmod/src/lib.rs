@@ -311,32 +311,26 @@ pub trait SetBzlmodSessionData {
 
 impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
-        let workspace_id = data.workspace_id.clone();
         let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
         let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue {
-            workspace_id: workspace_id.clone(),
             lockfile_inputs: lockfile_inputs.clone(),
         });
         let repo_env = Arc::new(data.repo_env.clone());
         let repo_env_data = Arc::new(BzlmodRepoEnvDataValue {
-            workspace_id: workspace_id.clone(),
             repo_env: repo_env.clone(),
         });
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             module_versions: Arc::new(data.module_versions.clone()),
         });
         let resolution_facts = Arc::new(BzlmodResolutionFactsValue {
-            workspace_id: workspace_id.clone(),
             registry_file_hashes: data.registry_file_hashes.clone(),
             selected_yanked_versions: data.selected_yanked_versions.clone(),
         });
         let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
-            workspace_id: workspace_id.clone(),
             repo_mappings: Arc::new(data.repo_mappings.clone()),
             repo_mapping_overrides: Arc::new(data.repo_mapping_overrides.clone()),
         });
         let extension_aggregations = Arc::new(BzlmodExtensionAggregationsDataValue {
-            workspace_id: workspace_id.clone(),
             extension_aggregations: Arc::new(data.extension_aggregations.clone()),
         });
         let cell_graph = Arc::new(data.cell_graph.clone());
@@ -436,7 +430,7 @@ mod tests {
                 workspace_id.clone(),
             ))
             .await??;
-        assert_eq!(repo_mappings.workspace_id, workspace_id);
+        assert!(repo_mappings.repo_mappings.is_empty());
         let cell_graph = dice
             .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
             .await??;
@@ -622,21 +616,18 @@ mod tests {
         updater.changed_to(vec![(
             BzlmodLockfileInputsDataKey,
             Arc::new(BzlmodLockfileInputsDataValue {
-                workspace_id: workspace_id.clone(),
                 lockfile_inputs: Arc::new(BzlmodLockfileInputsValue::default()),
             }),
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoEnvDataKey,
             Arc::new(BzlmodRepoEnvDataValue {
-                workspace_id: workspace_id.clone(),
                 repo_env: Arc::new(BTreeMap::new()),
             }),
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoMappingsDataKey,
             Arc::new(BzlmodRepoMappingsDataValue {
-                workspace_id: workspace_id.clone(),
                 repo_mappings: Arc::new(RepoMappingSnapshot::new()),
                 repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
             }),
@@ -644,7 +635,6 @@ mod tests {
         updater.changed_to(vec![(
             BzlmodResolutionFactsDataKey,
             Arc::new(BzlmodResolutionFactsValue {
-                workspace_id: workspace_id.clone(),
                 registry_file_hashes: indexmap::IndexMap::new(),
                 selected_yanked_versions: indexmap::IndexMap::new(),
             }),

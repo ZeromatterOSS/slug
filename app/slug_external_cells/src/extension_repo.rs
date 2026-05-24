@@ -565,7 +565,7 @@ async fn workspace_id_for_extension_spoke_lookup(
     ctx: &mut DiceComputations<'_>,
     requesting_canonical_name: &str,
 ) -> slug_error::Result<slug_bzlmod::WorkspaceId> {
-    ctx.compute(&slug_bzlmod::BzlmodExtensionAggregationsDataKey)
+    ctx.compute(&slug_bzlmod::BzlmodCellGraphDataKey)
         .await
         .map(|data| data.workspace_id.clone())
         .map_err(|e| {
@@ -1191,10 +1191,9 @@ mod tests {
         let output_base =
             std::env::temp_dir().join(format!("slug-spoke-lookup-output-{}", std::process::id()));
         let workspace_id = slug_bzlmod::WorkspaceId::new(project_root.clone(), output_base);
-        let injected = Arc::new(slug_bzlmod::BzlmodExtensionAggregationsDataValue {
-            workspace_id: workspace_id.clone(),
-            extension_aggregations: Arc::new(std::collections::HashMap::new()),
-        });
+        let injected = Arc::new(slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
+            workspace_id.clone(),
+        ));
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -1202,10 +1201,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.changed_to(vec![(
-            slug_bzlmod::BzlmodExtensionAggregationsDataKey,
-            injected,
-        )])?;
+        updater.changed_to(vec![(slug_bzlmod::BzlmodCellGraphDataKey, injected)])?;
         let mut dice = updater.commit().await;
 
         let actual = workspace_id_for_extension_spoke_lookup(&mut dice, "_main+ext+tool").await?;

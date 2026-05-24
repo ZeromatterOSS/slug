@@ -1084,6 +1084,22 @@ Observed SDK result at the checkpoint:
   test -p slug_external_cells -- --nocapture`, `cargo build -p slug`, the
   focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
   72 tests, `cargo fmt --check`, and `git diff --check`.
+- `BzlmodCellGraphKey` is now the single narrow DICE projection that owns
+  injected bzlmod workspace identity. Lockfile inputs, repo env, repo mappings,
+  resolution facts, extension aggregations, module versions, registered
+  toolchains, and registered execution platforms no longer carry duplicate
+  workspace ids in their injected payloads; their keys validate or derive
+  identity through the named cell graph. The external-cell spoke lookup also
+  reads the cell graph rather than extension-aggregation data for workspace
+  identity. Validation passed with `cargo check -p slug_bzlmod -p
+  slug_common`, focused `slug_bzlmod` coverage for semantic projections,
+  extension aggregation projection, and absent-spoke dependency avoidance,
+  focused `slug_external_cells` coverage for spoke workspace lookup, full
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, full `cargo test -p slug_external_cells --
+  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
+  subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
+  --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1126,17 +1142,17 @@ What did not work or remains risky:
   cell setup, then injected as transitional command data. Registered
   toolchain/platform consumers, extension aggregation consumers, extension
   replay-input consumers, repo-mapping consumers, and module-version consumers
-  now read narrower injected DICE values. Registered toolchain/platform and
-  module-version projections now get workspace identity from the named cell
-  graph rather than from the injected payloads. The module-version value still
-  carries a conservative session invalidation identity until the remaining
+  now read narrower injected DICE values. The named cell graph now owns
+  workspace identity for those projections rather than duplicating it in each
+  injected payload. The module-version value still carries a conservative
+  session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
   injected DICE key and no longer sits behind a separate
-  `BzlmodResolutionResult` wrapper. The session payload now carries exact
-  workspace identity, without parallel `project_root` or `root_module_name`
-  fields, for the narrower injected values, but the values are still populated
-  from the legacy resolver output.
+  `BzlmodResolutionResult` wrapper. The session payload still carries exact
+  workspace identity so the legacy bridge can seed the named cell graph, but
+  the narrower injected values are still populated from the legacy resolver
+  output.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.
@@ -1326,9 +1342,9 @@ using Rust DICE keys and values:
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
-   - Module-version/toolchain/platform consumers no longer rebuild workspace
-     identity from project root, but their current-workspace helpers still read
-     transitional values injected from the legacy resolver.
+   - Module-version/toolchain/platform consumers and current-workspace helpers
+     now derive workspace identity from the named cell graph, but their data
+     payloads are still injected from the legacy resolver.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.
