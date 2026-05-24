@@ -53,6 +53,7 @@ pub mod version;
 // Module version registry
 // ============================================================================
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -282,7 +283,10 @@ impl BzlmodSessionData {
             module_versions: BzlmodModuleVersionsDataValue::default(),
             registered_toolchains: RegisteredToolchainsDataValue::default(),
             registered_execution_platforms: RegisteredExecutionPlatformsDataValue::default(),
-            extension_aggregations: BzlmodExtensionAggregationsDataValue::default(),
+            extension_aggregations: BzlmodExtensionAggregationsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(HashMap::new()),
+            ),
             lockfile_inputs: BzlmodLockfileInputsValue::default(),
             repo_env: BzlmodRepoEnvDataValue::default(),
             resolution_facts: BzlmodResolutionFactsValue::default(),

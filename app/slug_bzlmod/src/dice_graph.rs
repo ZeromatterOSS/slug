@@ -642,7 +642,20 @@ pub struct BzlmodRepoMappingsDataValue {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionAggregationsDataValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
+}
+
+impl BzlmodExtensionAggregationsDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            extension_aggregations,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]

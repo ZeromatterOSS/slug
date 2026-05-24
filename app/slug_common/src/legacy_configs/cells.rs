@@ -3596,9 +3596,10 @@ impl BuckConfigBasedCells {
         // DICE-injected bzlmod session state. This data is needed when
         // extension repos are lazily executed inside DICE.
         bzlmod_session_data.extension_aggregations =
-            slug_bzlmod::BzlmodExtensionAggregationsDataValue {
-                extension_aggregations: Arc::new(aggregated),
-            };
+            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
+                bzlmod_session_data.cell_graph.workspace_id.clone(),
+                Arc::new(aggregated),
+            );
         bzlmod_session_data.lockfile_inputs = slug_bzlmod::BzlmodLockfileInputsValue::from_values(
             hidden_lockfile_path,
             visible_lockfile_value,
