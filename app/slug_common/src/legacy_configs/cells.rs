@@ -2542,9 +2542,16 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs), None, None, None)
-            .await
-            .buck_error_context("Parsing cells")
+        Self::parse_with_file_ops_and_options_inner(
+            config_args,
+            Some(project_fs),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .buck_error_context("Parsing cells")
     }
 
     pub async fn parse_with_config_args_and_root_module(
@@ -2573,6 +2580,7 @@ impl BuckConfigBasedCells {
             Some(root_module_file),
             visible_lockfile,
             None,
+            None,
         )
         .await
         .buck_error_context("Parsing cells")
@@ -2596,6 +2604,7 @@ impl BuckConfigBasedCells {
             None,
             None,
             Some(bzlmod_resolution),
+            Some(key.resolution_key.workspace_id.clone()),
         )
         .await
         .buck_error_context("Parsing cells")
@@ -2626,6 +2635,7 @@ impl BuckConfigBasedCells {
             None,
             None,
             Some(bzlmod_resolution),
+            Some(key.resolution_key.workspace_id.clone()),
         )
         .await
         .buck_error_context("Parsing cells")
@@ -2796,7 +2806,7 @@ impl BuckConfigBasedCells {
     pub async fn testing_parse(
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, None, None, None, None)
+        Self::parse_with_file_ops_and_options_inner(config_args, None, None, None, None, None)
             .await
             .buck_error_context("Parsing cells")
     }
@@ -2807,6 +2817,7 @@ impl BuckConfigBasedCells {
         root_module_file: Option<Arc<slug_bzlmod::RootModuleFileValue>>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         dice_bzlmod_resolution: Option<Arc<Option<slug_bzlmod::BzlmodSessionData>>>,
+        empty_workspace_id: Option<slug_bzlmod::WorkspaceId>,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
         let processed_config_args = resolve_config_args(config_args).await?;
@@ -2822,13 +2833,17 @@ impl BuckConfigBasedCells {
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
         let mut has_module_bazel = false;
         // Non-bzlmod parsing still injects empty bzlmod projections for legacy
-        // consumers. Use the real project root when one exists, and keep the
-        // no-project testing sentinel explicit.
-        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::empty_for_project_root(
+        // consumers. Use the DICE workspace identity when available, otherwise
+        // derive one from the real project root or the no-project test sentinel.
+        let empty_workspace_id = empty_workspace_id.unwrap_or_else(|| {
             project_fs
-                .map(|project_fs| project_fs.root().to_path_buf())
-                .unwrap_or_default(),
-        );
+                .map(|project_fs| {
+                    slug_bzlmod::WorkspaceId::for_project_root(project_fs.root().to_path_buf())
+                })
+                .unwrap_or_else(|| slug_bzlmod::WorkspaceId::for_project_root(PathBuf::new()))
+        });
+        let mut bzlmod_session_data =
+            slug_bzlmod::BzlmodSessionData::for_workspace(empty_workspace_id);
         let mut bzlmod_runtime_cell_snapshot = None;
 
         // ===== Bzlmod Integration =====
@@ -4301,6 +4316,47 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn persisted_empty_bzlmod_session_preserves_explicit_output_base()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let output_base = fs
+            .path()
+            .resolve(ProjectRelativePath::new("buck-out/custom-isolation")?);
+        let dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let config_args = [slug_cli_proto::ConfigOverride::flag_no_cell("cells.root=.")];
+
+        let configs =
+            BuckConfigBasedCells::parse_with_config_args_and_persisted_dice_bzlmod_resolution(
+                fs.path(),
+                &config_args,
+                &mut updater,
+                Some(output_base.to_path_buf()),
+            )
+            .await?;
+
+        assert!(!configs.is_bzlmod);
+        assert_eq!(
+            configs
+                .bzlmod_session_data
+                .cell_graph
+                .workspace_id
+                .output_base
+                .as_ref()
+                .as_path(),
+            output_base.as_path()
+        );
+        Ok(())
+    }
+
     #[test]
     fn runtime_cell_install_snapshot_derives_from_cell_graph() {
         let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(PathBuf::from(
@@ -4418,6 +4474,7 @@ mod tests {
             None,
             None,
             Some(Arc::new(Some(session_data))),
+            None,
         )
         .await?;
         let bazel_tools = CellName::unchecked_new("bazel_tools")?;
