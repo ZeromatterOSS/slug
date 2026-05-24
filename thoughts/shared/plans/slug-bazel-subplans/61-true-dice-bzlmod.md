@@ -881,6 +881,17 @@ Observed SDK result at the checkpoint:
   bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
   replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo
   fmt --check`, and `git diff --check`.
+- Bzlmod runtime cell installation now consumes the published
+  `BzlmodCellGraphValue` instead of assembling a separate install snapshot from
+  parallel `BzlmodResolutionResult` fields. The replay path uses that graph for
+  module symlinks, eager extension-cell symlinks, root aliases, scoped aliases,
+  dynamic aliases, and eager/lazy extension-cell registration. Cell resolver
+  assembly and the backing runtime maps are still transitional. Validation
+  passed with `cargo check -p slug_common`, `cargo test -p slug_common
+  runtime_cell_install_snapshot_derives_from_cell_graph -- --nocapture`,
+  `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
+  the focused Plan 61 Python replay subset, the full Plan 61 Python guardrail
+  with 72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1018,10 +1029,9 @@ What did not work or remains risky:
   the active project root close leaks in the transitional reset/lookup path.
   Root-cell and non-root cell-name adapters are also root-scoped now, and the
   legacy resolver now publishes the assembled cell graph as
-  `BzlmodCellGraphDataKey`. Runtime installation and lookup still use
-  process-global transitional adapters, so the published value names the
-  migration surface but does not yet make the runtime bzlmod cell graph
-  DICE-owned.
+  `BzlmodCellGraphDataKey`. Runtime installation consumes that published value,
+  but the installed lookup state remains process-global transitional plumbing,
+  so this does not yet make the runtime bzlmod cell graph DICE-owned.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
@@ -1181,8 +1191,8 @@ using Rust DICE keys and values:
    - Temporary root-cell and non-root cell-name adapters are project-root scoped,
      but remain process-global compatibility adapters.
    - `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
-     but consumers and runtime installation still need to depend on that value
-     instead of process-global maps.
+     and runtime installation consumes that value, but consumers and installed
+     lookup state still need to depend on it instead of process-global maps.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
@@ -1212,8 +1222,8 @@ using Rust DICE keys and values:
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
      external symlinks, and bundled repos from DICE values.
    - `BzlmodCellGraphDataKey` currently exposes the legacy-produced graph, but
-     the graph is not yet derived from DICE producers and is not the runtime
-     installation authority.
+     the graph is not yet derived from DICE producers and is not the complete
+     cell resolver authority.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
