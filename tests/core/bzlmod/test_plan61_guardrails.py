@@ -55,6 +55,10 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content)
 
 
+def _write_bytes(path: Path, content: bytes) -> None:
+    path.write_bytes(content)
+
+
 def _write_minimal_lockfile(path: Path) -> None:
     _write(
         path,
@@ -890,6 +894,105 @@ archive_override(
     output, second = await _audit_cells_and_counters(buck, env=env)
     assert module_name in output
     assert second["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_cached_git_override_module_parse_failure_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: git_override fetched MODULE.bazel parse errors are resolution inputs."""
+    module_name = "git_override_parse_failure"
+    commit = "abcdef1234567890"
+    remote = f"https://example.invalid/{module_name}.git"
+    cache_home = buck.cwd.parent / f"{buck.cwd.name}_git_override_parse_failure_cache_home"
+    override_dir = _git_override_cache_dir(cache_home, module_name, remote, commit)
+    override_dir.mkdir(parents=True)
+    _write(override_dir / ".complete", "")
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_git_override_parse_failure")
+
+bazel_dep(name = "{module_name}")
+git_override(
+    module_name = "{module_name}",
+    remote = "{remote}",
+    commit = "{commit}",
+)
+""",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    before = await _bzlmod_counters(buck, env=env)
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = )\n')
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "Failed to parse MODULE.bazel for git override" in failure_stderr
+    assert module_name in failure_stderr
+
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
+    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_cached_archive_override_module_utf8_failure_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: archive_override extracted MODULE.bazel UTF-8 errors are inputs."""
+    module_name = "archive_override_utf8_failure"
+    urls = [f"https://example.invalid/{module_name}.tar.gz"]
+    cache_home = buck.cwd.parent / f"{buck.cwd.name}_archive_override_utf8_failure_cache_home"
+    override_dir = _archive_override_cache_dir(cache_home, module_name, urls)
+    override_dir.mkdir(parents=True)
+    _write(override_dir / ".complete", "")
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
+    _write(override_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_archive_override_utf8_failure")
+
+bazel_dep(name = "{module_name}")
+archive_override(
+    module_name = "{module_name}",
+    urls = {urls!r},
+)
+""",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    before = await _bzlmod_counters(buck, env=env)
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write_bytes(override_dir / "MODULE.bazel", b"\xff\xfeinvalid module file\n")
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "Failed to parse MODULE.bazel for archive override" in failure_stderr
+    assert "valid UTF-8" in failure_stderr
+    assert str(override_dir / "MODULE.bazel") in failure_stderr
+
+    _write(override_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "2.0")\n')
+    output, recovered = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert recovered["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

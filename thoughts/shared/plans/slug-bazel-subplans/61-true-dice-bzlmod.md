@@ -551,7 +551,13 @@ Observed SDK result at the checkpoint:
   deselected`). Additional create/delete transition guardrails prove a cached
   `git_override` missing-to-present `MODULE.bazel` transition and a cached
   `archive_override` present-to-missing transition both recompute bzlmod
-  resolution (`4 passed, 77 deselected`).
+  resolution (`4 passed, 77 deselected`). Cached non-registry override failure
+  transitions now also have focused same-daemon guardrails: a cached
+  `git_override` `MODULE.bazel` parse error and a cached `archive_override`
+  invalid-UTF-8 `MODULE.bazel` both fail the next `audit cell`, then repair and
+  recompute bzlmod resolution instead of reusing the warm value. Validation
+  passed with the two new guardrails (`2 passed, 81 deselected`) and the cached
+  git/archive override module-input subset (`6 passed, 77 deselected`).
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
