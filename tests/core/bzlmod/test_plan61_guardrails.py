@@ -2009,6 +2009,49 @@ repo(name = "custom_local")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_custom_use_repo_rule_local_probe_failure_does_not_block_execution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: custom repository_rule modules load through the normal bzl loader."""
+    repo_dir = buck.cwd / "bazel-external" / "+custom_local_repository+custom_local"
+    payload = repo_dir / "payload.txt"
+    _write(buck.cwd / "source.txt", "payload\n")
+    _write(
+        buck.cwd / "repo.bzl",
+        """def _unused_rule_impl(ctx):
+    return []
+
+unused_rule = rule(
+    implementation = _unused_rule_impl,
+    attrs = {"tool": attr.label(default = "//:tool")},
+)
+
+def _custom_local_impl(repository_ctx):
+    payload = repository_ctx.read(Label("//:source.txt"), watch = "no")
+    repository_ctx.file("payload.txt", payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"payload.txt\\"])\\nfilegroup(name = \\"payload\\", srcs = [\\"payload.txt\\"])\\n")
+
+custom_local_repository = repository_rule(
+    implementation = _custom_local_impl,
+    local = True,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_custom_use_repo_rule_probe_failure")
+
+repo = use_repo_rule("//:repo.bzl", "custom_local_repository")
+repo(name = "custom_local")
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "tool")\n')
+
+    await buck.build("@custom_local//:payload")
+    assert payload.read_text() == "payload\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_use_extension_dev_dependency_follows_ignore_policy(
     buck: Buck,
 ) -> None:

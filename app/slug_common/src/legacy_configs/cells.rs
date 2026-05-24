@@ -167,16 +167,20 @@ async fn resolve_use_repo_rule_local_bits(
         if !declaring_cells.contains_key(&repo_spec.repo_rule_id) {
             continue;
         }
-        if executor
-            .rule_is_local(ctx, rule_bzl_path, rule_name)
-            .await
-            .with_buck_error_context(|| {
-                format!(
-                    "Failed to inspect repository rule '{}' for '{}'",
-                    repo_spec.repo_rule_id, cell.canonical_name
-                )
-            })?
-        {
+        let is_local = match executor.rule_is_local(ctx, rule_bzl_path, rule_name).await {
+            Ok(is_local) => is_local,
+            Err(e) => {
+                tracing::debug!(
+                    "Failed to precompute repository rule local bit for '{}' on '{}': {}; \
+                     deferring to normal repository rule execution",
+                    repo_spec.repo_rule_id,
+                    cell.canonical_name,
+                    e
+                );
+                false
+            }
+        };
+        if is_local {
             repo_spec.local = true;
             cell.spec_hash = repo_spec.compute_hash();
             cell.repo_spec_json =

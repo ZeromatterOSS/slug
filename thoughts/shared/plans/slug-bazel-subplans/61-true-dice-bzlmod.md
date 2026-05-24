@@ -1860,7 +1860,10 @@ What did not work or remains risky:
   resolution before serializing precomputed `RepoSpec`s. The pre-cell-resolver
   path uses DICE-tracked project-file reads for root-local `.bzl` files and
   their root-local loads, then marks local repo specs non-cacheable through the
-  existing repository-rule execution path. Bazel anchors:
+  existing repository-rule execution path. If that early probe cannot evaluate
+  a valid `.bzl` module that needs the normal loader context, it no longer fails
+  resolution; normal repository-rule execution still owns the eventual rule
+  load. Bazel anchors:
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepoRule.java:54-63`,
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryModule.java:58-72`,
   and
@@ -1870,8 +1873,12 @@ What did not work or remains risky:
   focused Plan 61 guardrail
   `test_custom_use_repo_rule_local_definition_reexecutes_after_input_edit` (`1
   passed, 75 deselected`), then the focused local-repository marker subset
-  including that guardrail (`4 passed, 72 deselected`). No slugd processes
-  remained after cleanup.
+  including that guardrail (`4 passed, 72 deselected`). The follow-up focused
+  subset including
+  `test_custom_use_repo_rule_local_probe_failure_does_not_block_execution`
+  covers a root-local repo-rule module with an ordinary build `rule(...)`
+  declaration that requires the normal `.bzl` loader context (`5 passed, 72
+  deselected`). No slugd processes remained after cleanup.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -2162,8 +2169,9 @@ using Rust DICE keys and values:
      the focused guardrail
      `test_custom_use_repo_rule_local_definition_reexecutes_after_input_edit`
      proves rematerialization after an unwatched input edit. Remaining custom
-     `use_repo_rule()` local semantics for external/cross-repo `.bzl` files
-     need the real loaded-module graph available after the bzlmod cell graph is
+     `use_repo_rule()` local semantics for root-local `.bzl` modules that need
+     the normal loader context, plus external/cross-repo `.bzl` files, need the
+     real loaded-module graph available after the bzlmod cell graph is
      established rather than the root-local precompute fallback.
 
 8. Make the bzlmod cell graph a DICE value.
