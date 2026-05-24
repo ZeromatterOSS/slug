@@ -634,7 +634,6 @@ impl BzlmodResolutionFactsKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsDataValue {
-    pub workspace_id: WorkspaceId,
     pub module_versions: Arc<HashMap<String, String>>,
 }
 
@@ -919,15 +918,6 @@ impl Key for ModuleVersionsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodModuleVersionsDataKey).await?;
-        if data.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "ModuleVersionsKey was computed with project root '{}', \
-                 but current bzlmod module-version root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                data.workspace_id.canonical_project_root.display()
-            ));
-        }
         let lockfile_inputs = ctx
             .compute(&BzlmodLockfileInputsKey::for_workspace_id(
                 self.workspace_id.clone(),
@@ -954,7 +944,7 @@ impl Key for ModuleVersionsKey {
             ))
             .await??;
         Ok(Arc::new(ModuleVersionsValue {
-            workspace_id: data.workspace_id.clone(),
+            workspace_id: cell_graph.workspace_id.clone(),
             module_versions: data.module_versions.clone(),
             invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
                 root_module_name: cell_graph.root_module_name.clone(),

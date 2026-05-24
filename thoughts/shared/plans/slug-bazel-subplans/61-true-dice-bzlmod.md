@@ -1072,6 +1072,18 @@ Observed SDK result at the checkpoint:
   test -p slug_external_cells -- --nocapture`, `cargo build -p slug`, the
   focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
   72 tests, `cargo fmt --check`, and `git diff --check`.
+- Module-version data now injects only the selected module-version map;
+  `ModuleVersionsKey` derives workspace identity through `BzlmodCellGraphKey`
+  while continuing to compose lockfile, repo-env, repo-mapping, and
+  resolution-fact invalidation through their named keys. The current-workspace
+  helper now uses the named cell graph projection instead of reading workspace
+  identity from the module-version payload. Validation passed with `cargo
+  check -p slug_bzlmod -p slug_common`, focused `slug_bzlmod` coverage for
+  cell-graph workspace projection, full `cargo test -p slug_bzlmod --
+  --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, full `cargo
+  test -p slug_external_cells -- --nocapture`, `cargo build -p slug`, the
+  focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
+  72 tests, `cargo fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -1114,10 +1126,10 @@ What did not work or remains risky:
   cell setup, then injected as transitional command data. Registered
   toolchain/platform consumers, extension aggregation consumers, extension
   replay-input consumers, repo-mapping consumers, and module-version consumers
-  now read narrower injected DICE values. Registered toolchain/platform
-  projections now get workspace identity from the named cell graph rather than
-  from the registration payloads. The module-version value still carries a
-  conservative session invalidation identity until the remaining
+  now read narrower injected DICE values. Registered toolchain/platform and
+  module-version projections now get workspace identity from the named cell
+  graph rather than from the injected payloads. The module-version value still
+  carries a conservative session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
   injected DICE key and no longer sits behind a separate

@@ -323,7 +323,6 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
             repo_env: repo_env.clone(),
         });
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
-            workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
         });
         let resolution_facts = Arc::new(BzlmodResolutionFactsValue {
@@ -372,8 +371,8 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
 pub async fn module_versions_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<ModuleVersionsValue>> {
-    let data = ctx.compute(&BzlmodModuleVersionsDataKey).await?;
-    let key = ModuleVersionsKey::for_workspace_id(data.workspace_id.clone());
+    let cell_graph = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    let key = ModuleVersionsKey::for_workspace_id(cell_graph.workspace_id.clone());
     ctx.compute(&key).await?
 }
 
@@ -592,8 +591,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn registered_toolchain_platform_keys_use_cell_graph_workspace() -> slug_error::Result<()>
-    {
+    async fn semantic_projection_keys_use_cell_graph_workspace() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-registered-cell-graph-workspace"),
             PathBuf::from("/tmp/slug-plan61-registered-cell-graph-output-base"),
@@ -616,6 +614,42 @@ mod tests {
             )),
         )])?;
         updater.changed_to(vec![(
+            BzlmodModuleVersionsDataKey,
+            Arc::new(BzlmodModuleVersionsDataValue {
+                module_versions: Arc::new(HashMap::new()),
+            }),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue {
+                workspace_id: workspace_id.clone(),
+                lockfile_inputs: Arc::new(BzlmodLockfileInputsValue::default()),
+            }),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoEnvDataKey,
+            Arc::new(BzlmodRepoEnvDataValue {
+                workspace_id: workspace_id.clone(),
+                repo_env: Arc::new(BTreeMap::new()),
+            }),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoMappingsDataKey,
+            Arc::new(BzlmodRepoMappingsDataValue {
+                workspace_id: workspace_id.clone(),
+                repo_mappings: Arc::new(RepoMappingSnapshot::new()),
+                repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
+            }),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodResolutionFactsDataKey,
+            Arc::new(BzlmodResolutionFactsValue {
+                workspace_id: workspace_id.clone(),
+                registry_file_hashes: indexmap::IndexMap::new(),
+                selected_yanked_versions: indexmap::IndexMap::new(),
+            }),
+        )])?;
+        updater.changed_to(vec![(
             BzlmodRegisteredToolchainsDataKey,
             Arc::new(RegisteredToolchainsDataValue {
                 registered_toolchains: Vec::new(),
@@ -629,6 +663,9 @@ mod tests {
         )])?;
         let mut dice = updater.commit().await;
 
+        let module_versions = dice
+            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id.clone()))
+            .await??;
         let registered_toolchains = dice
             .compute(&RegisteredToolchainsKey::for_workspace_id(
                 workspace_id.clone(),
@@ -639,9 +676,17 @@ mod tests {
                 workspace_id.clone(),
             ))
             .await??;
+        assert_eq!(module_versions.workspace_id, workspace_id);
         assert_eq!(registered_toolchains.workspace_id, workspace_id);
         assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
 
+        assert!(
+            dice.compute(&ModuleVersionsKey::for_workspace_id(
+                other_workspace_id.clone(),
+            ))
+            .await?
+            .is_err()
+        );
         assert!(
             dice.compute(&RegisteredToolchainsKey::for_workspace_id(
                 other_workspace_id.clone(),
