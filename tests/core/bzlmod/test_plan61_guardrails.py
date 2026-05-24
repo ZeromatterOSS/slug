@@ -3050,6 +3050,156 @@ use_repo(replay, "replayed_repo")
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
 
 
+def _write_mapped_external_extension_audit_cell_workspace(
+    buck: Buck,
+    *,
+    suffix: str,
+    helper_content: str | None,
+) -> Path:
+    owner_module = f"plan61_rules_owner_audit_{suffix}"
+    helper_module = f"plan61_real_helper_audit_{suffix}"
+    helper_alias = f"plan61_helper_alias_audit_{suffix}"
+    root_module = f"plan61_mapped_load_audit_{suffix}"
+    extension_id = f"@{owner_module}//:replay_ext.bzl%replay_ext"
+    replayed_repo = buck.cwd / "replayed_repo"
+    owner_dir = buck.cwd.parent / f"{buck.cwd.name}_rules_owner_audit_{suffix}"
+    helper_dir = buck.cwd.parent / f"{buck.cwd.name}_real_helper_audit_{suffix}"
+    external_dir = buck.cwd / "bazel-external"
+    helper_path = helper_dir / "helper.bzl"
+
+    replayed_repo.mkdir(exist_ok=True)
+    owner_dir.mkdir(parents=True, exist_ok=True)
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    external_dir.mkdir(exist_ok=True)
+
+    _write(replayed_repo / "BUILD.bazel", "filegroup(name = \"data\")\n")
+    _write(
+        owner_dir / "MODULE.bazel",
+        f"""module(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", repo_name = "{helper_alias}")
+""",
+    )
+    _write(
+        owner_dir / "replay_ext.bzl",
+        f"""load("@{helper_alias}//:helper.bzl", "HELPER_SENTINEL")
+
+def _replay_ext_impl(module_ctx):
+    fail("audit cell mapped helper change should make replay stale: %s" % HELPER_SENTINEL)
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(helper_dir / "MODULE.bazel", f'module(name = "{helper_module}", version = "1.0")\n')
+    if helper_content is not None:
+        _write(helper_path, helper_content)
+
+    (external_dir / f"{owner_module}+").symlink_to(owner_dir, target_is_directory=True)
+    (external_dir / f"{helper_module}+").symlink_to(helper_dir, target_is_directory=True)
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{root_module}")
+bazel_dep(name = "{owner_module}", version = "1.0")
+bazel_dep(name = "{helper_module}", version = "1.0")
+local_path_override(module_name = "{owner_module}", path = "{owner_dir.as_posix()}")
+local_path_override(module_name = "{helper_module}", path = "{helper_dir.as_posix()}")
+
+replay = use_extension("@{owner_module}//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=root_module,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+        repo_mappings={owner_module: {helper_alias: helper_module}},
+    )
+
+    return helper_path
+
+
+async def _assert_mapped_external_audit_cell_replay_misses_after_change(
+    buck: Buck,
+    first: BzlmodCounters,
+) -> BzlmodCounters:
+    await buck.audit("cell")
+    second = await _bzlmod_counters(buck)
+
+    assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
+    assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    return second
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_mapped_external_extension_bzl_load_edit_rejects_audit_cell_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction loaded .bzl digest includes edits."""
+    helper_path = _write_mapped_external_extension_audit_cell_workspace(
+        buck,
+        suffix="edit",
+        helper_content='HELPER_SENTINEL = "initial mapped helper"\n',
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.audit("cell")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    _write(helper_path, 'HELPER_SENTINEL = "edited mapped helper"\n')
+
+    await _assert_mapped_external_audit_cell_replay_misses_after_change(buck, first)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_missing_mapped_external_extension_bzl_load_creation_rejects_audit_cell_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction loaded .bzl digest includes creates."""
+    helper_path = _write_mapped_external_extension_audit_cell_workspace(
+        buck,
+        suffix="create",
+        helper_content=None,
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.audit("cell")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    _write(helper_path, 'HELPER_SENTINEL = "created mapped helper"\n')
+
+    await _assert_mapped_external_audit_cell_replay_misses_after_change(buck, first)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_mapped_external_extension_bzl_load_deletion_rejects_audit_cell_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction loaded .bzl digest includes deletes."""
+    helper_path = _write_mapped_external_extension_audit_cell_workspace(
+        buck,
+        suffix="delete",
+        helper_content='HELPER_SENTINEL = "initial mapped helper"\n',
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.audit("cell")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+    assert first["extension_eval"] == before["extension_eval"]
+
+    helper_path.unlink()
+
+    await _assert_mapped_external_audit_cell_replay_misses_after_change(buck, first)
+
+
 @buck_test(data_dir="test_plan61_guardrails_data")
 async def test_mapped_external_extension_bzl_load_edit_rejects_replay(
     buck: Buck,

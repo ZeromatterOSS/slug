@@ -850,6 +850,16 @@ Observed SDK result at the checkpoint:
   -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo fmt --check`, `git diff --check`, and the full Plan 61
   Python guardrail with 72 tests.
+- The legacy resolution bridge's extension replay-summary digest now also
+  covers root extension usages whose implementation lives in a local override
+  module with source-repo mappings. Local override `MODULE.bazel` parsing
+  carries the parsed module data it already computed into the summary path, so
+  mapped external helper `.bzl` create/edit/delete transitions change the
+  bridge key before `audit cell` can reuse stale extension replay state.
+  Validation passed with `cargo check -p slug_common`, `cargo build -p slug`,
+  focused audit-cell-only Plan 61 Python guardrails for mapped external
+  `.bzl` edit/create/delete transitions, and the existing build-based mapped
+  external `.bzl` edit/create/delete replay subset.
 - Extension-spoke aggregation projection validation passed with `cargo check
   -p slug_bzlmod`, `cargo test -p slug_bzlmod
   extension_aggregation_key_projects_single_extension -- --nocapture`, `cargo
@@ -1583,8 +1593,10 @@ What did not work or remains risky:
   are included in the transitional digest, and repo mappings are applied where
   the caller has a `RepoMappingSnapshot`. Same-daemon generated-repo access now
   rejects replay after mapped external helper create/edit/delete transitions
-  and after a missing project-local helper is created. Other external load
-  failures, audit-cell-only external load changes, and the full interpreter
+  and after a missing project-local helper is created. Audit-cell-only mapped
+  external helper create/edit/delete transitions are now covered when the
+  extension owner comes from a local override module and the root usage has a
+  lockfile replay entry. Other external load failures and the full interpreter
   load graph are not replay-complete. The digest now has explicit DICE keys for
   spoke lookup invalidation and for the legacy root replay-summary bridge. The
   root bridge key reads project-local implementation files through

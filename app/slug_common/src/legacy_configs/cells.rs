@@ -1564,17 +1564,14 @@ fn hash_extension_bzl_digest_inputs(
 async fn root_extension_replay_summary_digest(
     ctx: &mut DiceComputations<'_>,
     parsed: &ParsedModuleFile,
+    local_override_modules: &[(String, ParsedModuleFile)],
     project_fs: &ProjectRoot,
     visible_lockfile: Option<&slug_bzlmod::Lockfile>,
     hidden_lockfile: Option<&slug_bzlmod::Lockfile>,
     repo_env: &BTreeMap<String, String>,
     ignore_dev_dependency: bool,
 ) -> slug_error::Result<Option<String>> {
-    if parsed.extension_usages.is_empty()
-        || !parsed.module.bazel_deps.is_empty()
-        || !parsed.module.overrides.is_empty()
-        || !parsed.repo_rule_invocations.is_empty()
-    {
+    if parsed.extension_usages.is_empty() || !parsed.repo_rule_invocations.is_empty() {
         return Ok(None);
     }
 
@@ -1583,9 +1580,12 @@ async fn root_extension_replay_summary_digest(
     } else {
         &parsed.module.name
     };
-    let parsed_modules = vec![(root_module_name.to_owned(), parsed.clone())];
+    let mut parsed_modules = vec![(root_module_name.to_owned(), parsed.clone())];
+    parsed_modules.extend(local_override_modules.iter().cloned());
     let mut module_extensions = HashMap::new();
-    module_extensions.insert(root_module_name.to_owned(), parsed.extension_usages.clone());
+    for (module_name, parsed_module) in &parsed_modules {
+        module_extensions.insert(module_name.clone(), parsed_module.extension_usages.clone());
+    }
     let aggregated = slug_bzlmod::aggregate_extensions_with_policy(
         &module_extensions,
         Some(root_module_name),
@@ -1700,6 +1700,7 @@ struct LocalOverrideModuleInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct LocalOverrideModuleInputsValue {
     digest: String,
+    parsed_modules: Vec<(String, ParsedModuleFile)>,
     has_bazel_deps: bool,
     has_extension_usages: bool,
     has_repo_rule_invocations: bool,
@@ -1865,6 +1866,7 @@ async fn local_override_module_inputs_digest(
     let mut has_repo_rule_invocations = false;
     let mut has_git_overrides = false;
     let has_untracked_inputs = false;
+    let mut parsed_modules = Vec::new();
 
     while let Some((module_name, base, path)) = queue.pop_front() {
         let module_dir = resolve_local_override_module_dir(&base, &path)?;
@@ -1933,6 +1935,7 @@ async fn local_override_module_inputs_digest(
                         ));
                     }
                 }
+                parsed_modules.push((module_name.clone(), parsed));
             }
             None => {
                 hasher.update(b"missing");
@@ -1943,6 +1946,7 @@ async fn local_override_module_inputs_digest(
 
     Ok(LocalOverrideModuleInputsValue {
         digest: hex::encode(hasher.finalize()),
+        parsed_modules,
         has_bazel_deps,
         has_extension_usages,
         has_repo_rule_invocations,
@@ -2900,6 +2904,7 @@ impl BuckConfigBasedCells {
                 root_extension_replay_summary_digest(
                     dice_ctx,
                     parsed,
+                    &local_override_inputs.parsed_modules,
                     project_fs,
                     visible_lockfile
                         .as_ref()
@@ -4334,6 +4339,7 @@ mod tests {
             hidden_lockfile: Some(hidden_lockfile),
             local_override_inputs: Arc::new(LocalOverrideModuleInputsValue {
                 digest: "local-overrides".to_owned(),
+                parsed_modules: Vec::new(),
                 has_bazel_deps: false,
                 has_extension_usages: false,
                 has_repo_rule_invocations: false,
