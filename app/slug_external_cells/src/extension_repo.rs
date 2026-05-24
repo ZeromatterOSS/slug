@@ -1036,12 +1036,18 @@ pub(crate) async fn get_file_ops_delegate(
         .into());
     }
 
-    // Create a buck-out/v2/external_cells/extension_repo/{canonical_name} symlink
+    // Create an external_cells/extension_repo/{canonical_name} symlink under the
+    // workspace output base
     // pointing to bazel-external/{canonical_name}. `resolve_external_cell_source`
     // in buck_out_path.rs builds action command lines that reference source files
-    // at the buck-out path (mirroring how bzlmod cells get a parallel symlink in
-    // legacy_configs/cells.rs). Without this, gcc/clang can't find the actual files.
-    ensure_buck_out_extension_repo_symlink(&project_root_path, &setup.canonical_name);
+    // at the output-base path (mirroring how bzlmod cells get a parallel symlink
+    // in legacy_configs/cells.rs). Without this, gcc/clang can't find the actual
+    // files.
+    ensure_output_base_extension_repo_symlink(
+        &project_root_path,
+        extension_lookup_workspace_id.output_base.as_ref(),
+        &setup.canonical_name,
+    );
 
     Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
         cell_name,
@@ -1089,17 +1095,22 @@ fn repo_spec_layout_is_invalid(
     !slug_bzlmod::repo_layout_is_valid_for_invocation(&invocation, source_path)
 }
 
-/// Create `buck-out/v2/external_cells/extension_repo/{canonical_name}` as a symlink
-/// to `bazel-external/{canonical_name}` (the materialized repo content).
+/// Create `external_cells/extension_repo/{canonical_name}` under the workspace
+/// output base as a symlink to `bazel-external/{canonical_name}` (the
+/// materialized repo content).
 ///
 /// Action command lines reference sources via the buck-out path computed in
 /// `BuckOutPathResolver::resolve_external_cell_source`. Materialization writes
 /// content under `bazel-external/`, so a symlink bridges the two locations.
 /// Failures are logged but non-fatal; downstream action execution will surface
 /// the missing-file error with the full command context.
-fn ensure_buck_out_extension_repo_symlink(project_root: &std::path::Path, canonical_name: &str) {
+fn ensure_output_base_extension_repo_symlink(
+    project_root: &std::path::Path,
+    output_base: &std::path::Path,
+    canonical_name: &str,
+) {
     let source = project_root.join("bazel-external").join(canonical_name);
-    let link_parent = project_root.join("buck-out/v2/external_cells/extension_repo");
+    let link_parent = output_base.join("external_cells/extension_repo");
     let link = link_parent.join(canonical_name);
 
     if let Ok(existing) = std::fs::read_link(&link) {
@@ -1116,8 +1127,9 @@ fn ensure_buck_out_extension_repo_symlink(project_root: &std::path::Path, canoni
         }
     } else if link.exists() {
         tracing::warn!(
-            "buck-out/v2/external_cells/extension_repo/{} exists and is not a symlink — skipping",
-            canonical_name
+            "external_cells/extension_repo/{} exists and is not a symlink under {:?} — skipping",
+            canonical_name,
+            link_parent
         );
         return;
     }
@@ -1213,6 +1225,28 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn extension_repo_symlink_uses_workspace_output_base() {
+        let base = std::env::temp_dir().join(format!("slug-extension-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let project_root = base.join("project");
+        let output_base = base.join("custom-output");
+        let source = project_root.join("bazel-external/_main+ext+repo");
+        std::fs::create_dir_all(&source).unwrap();
+
+        ensure_output_base_extension_repo_symlink(&project_root, &output_base, "_main+ext+repo");
+
+        let explicit_link = output_base.join("external_cells/extension_repo/_main+ext+repo");
+        assert_eq!(std::fs::read_link(explicit_link).unwrap(), source);
+        assert!(
+            !project_root
+                .join("buck-out/v2/external_cells/extension_repo/_main+ext+repo")
+                .exists()
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
