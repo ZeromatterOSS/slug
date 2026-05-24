@@ -614,6 +614,11 @@ Observed SDK result at the checkpoint:
   registry dependency instead of reusing the warm value. Validation passed with
   the focused subset selected by `-k 'locked_registry_module_parse_failure or
   locked_registry_module_utf8_failure'` (`2 passed, 101 deselected`).
+- Visible lockfile `selectedYankedVersions` now has same-daemon edit coverage:
+  a locked registry module warms as not-yanked, editing only the lockfile
+  selected-yanked entry for that selected version fails the next `audit cell`,
+  and removing the entry succeeds again. Validation passed with
+  `test_lockfile_selected_yanked_version_edit_invalidates_bzlmod_resolution`.
 - Non-registry override fetch cache directories now include the Bazel-relevant
   source/extraction identity instead of only commit or archive URL/integrity:
   `git_override` includes remote, commit, and shallow-since, while
@@ -2164,7 +2169,8 @@ using Rust DICE keys and values:
    - Preserve same-daemon hidden-lockfile create/edit/delete/facts coverage
      while moving the implementation out of the transitional graph.
    - Model facts, selected yanked versions, registry file hashes, recorded
-     inputs, and lockfile mode as explicit dependencies.
+     inputs, and lockfile mode as explicit dependencies. Visible lockfile
+     selected-yanked-version edits now have same-daemon guardrail coverage.
    - Keep ordinary build/query paths read-only; count write attempts as test
      failures unless the command is explicitly a lockfile update command.
 
