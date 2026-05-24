@@ -634,7 +634,7 @@ pub struct BzlmodModuleVersionsDataValue {
     pub module_versions: Arc<HashMap<String, String>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoMappingsDataValue {
     pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,

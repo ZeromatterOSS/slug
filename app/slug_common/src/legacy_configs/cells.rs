@@ -3491,9 +3491,9 @@ impl BuckConfigBasedCells {
             Some(root_module_name),
             options.ignore_dev_dependency,
         );
-        bzlmod_session_data.repo_mappings =
+        let mut repo_mappings =
             repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
-        bzlmod_session_data.repo_mapping_overrides = repo_mapping_overrides_for_root(
+        let repo_mapping_overrides = repo_mapping_overrides_for_root(
             &parsed_modules,
             root_module_name,
             options.ignore_dev_dependency,
@@ -3506,10 +3506,10 @@ impl BuckConfigBasedCells {
             )?;
         let mut extension_mapping_cells = pre_computed_cells.clone();
         add_extension_repo_mapping_rows_from_cells(
-            &mut bzlmod_session_data.repo_mappings,
+            &mut repo_mappings,
             &extension_mapping_cells,
             root_module_name,
-            &bzlmod_session_data.repo_mapping_overrides,
+            &repo_mapping_overrides,
         );
 
         // Augment with extension-internal spokes recorded in MODULE.bazel.lock.
@@ -3528,16 +3528,16 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
                 Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
-                Some(&bzlmod_session_data.repo_mappings),
-                Some(&bzlmod_session_data.repo_mapping_overrides),
+                Some(&repo_mappings),
+                Some(&repo_mapping_overrides),
             );
             lockfile_seeded_cells.extend(extra.iter().map(BzlmodPendingRepoCell::from_pending));
             extension_mapping_cells.extend(extra);
             add_extension_repo_mapping_rows_from_cells(
-                &mut bzlmod_session_data.repo_mappings,
+                &mut repo_mappings,
                 &extension_mapping_cells,
                 root_module_name,
-                &bzlmod_session_data.repo_mapping_overrides,
+                &repo_mapping_overrides,
             );
         }
         let hidden_lockfile_path = options.hidden_lockfile_path.clone();
@@ -3549,22 +3549,19 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
                 Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
-                Some(&bzlmod_session_data.repo_mappings),
-                Some(&bzlmod_session_data.repo_mapping_overrides),
+                Some(&repo_mappings),
+                Some(&repo_mapping_overrides),
             );
             lockfile_seeded_cells.extend(extra.iter().map(BzlmodPendingRepoCell::from_pending));
             extension_mapping_cells.extend(extra);
             add_extension_repo_mapping_rows_from_cells(
-                &mut bzlmod_session_data.repo_mappings,
+                &mut repo_mappings,
                 &extension_mapping_cells,
                 root_module_name,
-                &bzlmod_session_data.repo_mapping_overrides,
+                &repo_mapping_overrides,
             );
         }
-        add_scoped_repo_aliases_from_mapping_snapshot(
-            &mut scoped_repo_aliases,
-            &bzlmod_session_data.repo_mappings,
-        );
+        add_scoped_repo_aliases_from_mapping_snapshot(&mut scoped_repo_aliases, &repo_mappings);
         slug_util::memory_checkpoint::checkpoint(
             "legacy_cells_bzlmod_precomputed_repos",
             [
@@ -3783,11 +3780,15 @@ impl BuckConfigBasedCells {
         }
         add_scoped_repo_aliases_from_root_overrides(
             &mut scoped_repo_aliases,
-            &bzlmod_session_data.repo_mapping_overrides,
+            &repo_mapping_overrides,
             root_module_name,
             &cells,
             resolved_graph_for_aliases.as_ref(),
         );
+        bzlmod_session_data.repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue {
+            repo_mappings: Arc::new(repo_mappings),
+            repo_mapping_overrides: Arc::new(repo_mapping_overrides),
+        };
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);

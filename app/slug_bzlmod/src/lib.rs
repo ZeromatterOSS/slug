@@ -272,8 +272,7 @@ pub struct BzlmodSessionData {
     pub lockfile_inputs: BzlmodLockfileInputsValue,
     pub repo_env: BzlmodRepoEnvDataValue,
     pub resolution_facts: BzlmodResolutionFactsValue,
-    pub repo_mappings: RepoMappingSnapshot,
-    pub repo_mapping_overrides: RepoMappingOverrides,
+    pub repo_mappings: BzlmodRepoMappingsDataValue,
     pub cell_graph: BzlmodCellGraphValue,
 }
 
@@ -287,8 +286,7 @@ impl BzlmodSessionData {
             lockfile_inputs: BzlmodLockfileInputsValue::default(),
             repo_env: BzlmodRepoEnvDataValue::default(),
             resolution_facts: BzlmodResolutionFactsValue::default(),
-            repo_mappings: RepoMappingSnapshot::new(),
-            repo_mapping_overrides: RepoMappingOverrides::new(),
+            repo_mappings: BzlmodRepoMappingsDataValue::default(),
             cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
         }
     }
@@ -313,10 +311,7 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let repo_env_data = Arc::new(data.repo_env.clone());
         let module_versions = Arc::new(data.module_versions.clone());
         let resolution_facts = Arc::new(data.resolution_facts.clone());
-        let repo_mappings = Arc::new(BzlmodRepoMappingsDataValue {
-            repo_mappings: Arc::new(data.repo_mappings.clone()),
-            repo_mapping_overrides: Arc::new(data.repo_mapping_overrides.clone()),
-        });
+        let repo_mappings = Arc::new(data.repo_mappings.clone());
         let extension_aggregations = Arc::new(data.extension_aggregations.clone());
         let cell_graph = Arc::new(data.cell_graph.clone());
         let registered_toolchains = Arc::new(data.registered_toolchains.clone());
