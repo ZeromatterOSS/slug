@@ -110,6 +110,21 @@ Observed SDK result at the checkpoint:
   extension_repo_symlink_uses_workspace_output_base -- --nocapture`,
   `cargo check -p slug_external_cells -p slug_server`, `cargo build -p slug`,
   `cargo fmt --check`, and `git diff --check`.
+- Extension repo file-ops now leaves recorded-input staleness for known
+  repo-spec materializations to `ExtensionRepoExecutionKey` and its
+  `RepoMaterializationManifestKey` child state, instead of deleting the repo
+  from a pre-DICE file-ops check first. The no-spec fallback keeps the legacy
+  precheck because it has no manifest key yet, and repository-execution miss
+  classification now uses the computed manifest marker state rather than a
+  redundant marker `exists()` read. Validation passed with focused
+  `cargo test -p slug_external_cells
+  known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  materialization_manifest_key_observes_marker_state_dependency -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  extension_repo_execution_consumes_materialization_manifest_key -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
+  `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
   extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
   when the hidden facts are created with the expected value, fails after an
@@ -1382,7 +1397,9 @@ What worked:
   marker path distinguishes known repo-spec/output-state cases and rejects old
   incomplete layouts. Slug output-state markers are now verified against the
   current materialized tree before the DICE repository execution path or the
-  external-cell marker gate accepts them.
+  external-cell marker gate accepts them. Known repo-spec extension file-ops
+  now lets the repository execution manifest own recorded-input staleness
+  instead of deleting from a pre-DICE check.
 - The process-global legacy bzlmod resolution bridge cache was removed from
   the persisted config load path. Warm no-op reuse now has to come from the
   DICE key path rather than `LEGACY_BZLMOD_RESOLUTION_CACHE`; focused warm
@@ -1740,7 +1757,10 @@ using Rust DICE keys and values:
    - Replace marker-file trust with a manifest value that proves the current
      repo spec and observed output tree are compatible. The current manifest
      value has DICE child state for marker/layout/recorded-input checks, but
-     does not yet own the full repository output-tree identity.
+     does not yet own the full repository output-tree identity. Known repo-spec
+     extension file-ops now delegates recorded-input staleness to this manifest
+     path, but the no-spec fallback and other legacy stale-layout checks still
+     contain direct file-ops reads.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 

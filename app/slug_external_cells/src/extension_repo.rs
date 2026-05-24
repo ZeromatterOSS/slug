@@ -742,8 +742,12 @@ pub(crate) async fn get_file_ops_delegate(
             setup.canonical_name.as_ref(),
             &source_path,
         );
-    let is_stale_recorded_inputs = marker_contents.as_deref().is_some_and(is_complete_marker)
-        && !slug_bzlmod::repository_recorded_inputs_current(&source_path, Some(repo_env.as_ref()));
+    let is_stale_recorded_inputs = should_precheck_recorded_inputs(
+        &setup.repo_spec_json,
+        marker_contents.as_deref(),
+        &source_path,
+        repo_env.as_ref(),
+    );
     if is_stale_non_complete_marker
         || is_stale_complete
         || is_stale_output_state
@@ -1095,6 +1099,17 @@ fn repo_spec_layout_is_invalid(
     !slug_bzlmod::repo_layout_is_valid_for_invocation(&invocation, source_path)
 }
 
+fn should_precheck_recorded_inputs(
+    repo_spec_json: &str,
+    marker_contents: Option<&str>,
+    source_path: &Path,
+    repo_env: &std::collections::BTreeMap<String, String>,
+) -> bool {
+    repo_spec_json.is_empty()
+        && marker_contents.is_some_and(is_complete_marker)
+        && !slug_bzlmod::repository_recorded_inputs_current(source_path, Some(repo_env))
+}
+
 /// Create `external_cells/extension_repo/{canonical_name}` under the workspace
 /// output base as a symlink to `bazel-external/{canonical_name}` (the
 /// materialized repo content).
@@ -1245,6 +1260,39 @@ mod tests {
                 .join("buck-out/v2/external_cells/extension_repo/_main+ext+repo")
                 .exists()
         );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn known_repo_spec_defers_recorded_input_staleness_to_manifest() {
+        let base = std::env::temp_dir().join(format!(
+            "slug-recorded-input-precheck-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        let repo = base.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::write(
+            repo.join(".slug_repo_recorded_inputs"),
+            "ENV:PLAN61_REPO_ENV first\n",
+        )
+        .unwrap();
+        let mut repo_env = std::collections::BTreeMap::new();
+        repo_env.insert("PLAN61_REPO_ENV".to_owned(), "second".to_owned());
+
+        assert!(!should_precheck_recorded_inputs(
+            "{\"repoRuleId\":\"@@//:repo.bzl%repo\"}",
+            Some("complete"),
+            &repo,
+            &repo_env
+        ));
+        assert!(should_precheck_recorded_inputs(
+            "",
+            Some("complete"),
+            &repo,
+            &repo_env
+        ));
 
         let _ = std::fs::remove_dir_all(&base);
     }

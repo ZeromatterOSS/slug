@@ -858,7 +858,6 @@ impl Key for ExtensionRepoExecutionKey {
         let manifest = ctx
             .compute(self.materialization_manifest_key.as_ref())
             .await??;
-        let marker_path = working_dir.join(".slug_repo_complete");
         let marker_matches =
             !self.repo_spec.local && manifest.marker_state.starts_with("marker:complete:");
         let layout_valid = manifest.layout_state.as_ref() == "layout-valid";
@@ -891,7 +890,7 @@ impl Key for ExtensionRepoExecutionKey {
             .starts_with("marker-output-unreadable:")
         {
             "marker_output_unreadable"
-        } else if manifest.marker_state.starts_with("marker-unreadable:") || marker_path.exists() {
+        } else if manifest.marker_state.starts_with("marker-unreadable:") {
             "marker_unreadable"
         } else {
             "marker_absent"
