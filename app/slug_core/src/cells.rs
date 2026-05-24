@@ -1501,6 +1501,18 @@ impl CellAliasResolver {
         )
     }
 
+    pub fn new_bzlmod_for_non_root_cell(
+        current: CellName,
+        root_aliases: &CellAliasResolver,
+        aliases: HashMap<NonEmptyCellAlias, CellName>,
+    ) -> slug_error::Result<CellAliasResolver> {
+        CellAliasResolver::new_with_bzlmod_runtime_aliases(
+            current,
+            aliases,
+            root_aliases.bzlmod_runtime_aliases.clone(),
+        )
+    }
+
     /// Resolve an alias using only aliases carried by this resolver: explicit
     /// alias mappings and bzlmod runtime snapshot aliases/cells. This omits
     /// transitional process-global dynamic maps and directory scans.

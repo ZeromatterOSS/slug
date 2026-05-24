@@ -157,7 +157,12 @@ impl Key for CellAliasResolverKey {
                 .mappings()
                 .filter(|(alias, name)| alias.as_str() == name.as_str())
                 .collect();
-            return CellAliasResolver::new(self.0, canonical_aliases).map_err(Into::into);
+            return CellAliasResolver::new_bzlmod_for_non_root_cell(
+                self.0,
+                root_aliases,
+                canonical_aliases,
+            )
+            .map_err(Into::into);
         }
 
         let config = ctx.get_legacy_config_for_cell(self.0).await?;
@@ -198,5 +203,112 @@ impl SetCellResolver for DiceTransactionUpdater {
 
     fn set_is_bzlmod(&mut self, is_bzlmod: bool) -> slug_error::Result<()> {
         Ok(self.changed_to(vec![(IsBzlmodKey, is_bzlmod)])?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use dice::UserComputationData;
+    use dice::testing::DiceBuilder;
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::BzlmodRuntimeExtensionCell;
+    use slug_core::cells::alias::NonEmptyCellAlias;
+    use slug_core::cells::cell_root_path::CellRootPathBuf;
+    use slug_core::cells::external::ExtensionRepoCellSetup;
+    use slug_core::cells::instance::CellInstance;
+    use slug_core::cells::name::CellName;
+    use slug_core::cells::nested::NestedCells;
+    use slug_core::cells::register_dynamic_extension_cell_alias;
+    use slug_core::cells::reset_dynamic_bzlmod_state_for_project_root;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn bzlmod_non_root_alias_resolver_preserves_runtime_snapshot() -> slug_error::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let dep = CellName::testing_new("dep+1.0");
+        let root_path = CellRootPathBuf::testing_new("");
+        let dep_path = CellRootPathBuf::testing_new("bazel-external/dep+1.0");
+        let cell_roots = [(root, root_path.as_path()), (dep, dep_path.as_path())];
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &root_path),
+        )?;
+        let dep_instance = CellInstance::new(
+            dep,
+            dep_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &dep_path),
+        )?;
+
+        let canonical = "owner++ext+generated";
+        let stale_global = "stale_owner++ext+generated";
+        register_dynamic_extension_cell_alias("stale_alias".to_owned(), stale_global.to_owned());
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-test"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                setup,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: "runtime_alias".to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let mut root_aliases = HashMap::new();
+        root_aliases.insert(NonEmptyCellAlias::new("root_dep".to_owned())?, dep);
+        root_aliases.insert(NonEmptyCellAlias::new(dep.as_str().to_owned())?, dep);
+        let root_alias_resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            root_aliases,
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance, dep_instance],
+            root_alias_resolver,
+            snapshot,
+        )?;
+
+        let dice = DiceBuilder::new()
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_cell_resolver(resolver)?;
+        updater.set_is_bzlmod(true)?;
+        let mut dice = updater.commit().await;
+
+        let aliases = dice.get_cell_alias_resolver(dep).await?;
+
+        assert!(aliases.has_bzlmod_runtime_alias_snapshot());
+        assert_eq!(
+            aliases.resolve("runtime_alias")?,
+            CellName::testing_new(canonical)
+        );
+        assert!(aliases.resolve("stale_alias").is_err());
+        assert!(aliases.resolve("root_dep").is_err());
+        assert_eq!(aliases.resolve(dep.as_str())?, dep);
+        Ok(())
     }
 }

@@ -1969,6 +1969,12 @@ What did not work or remains risky:
   label_context_explicit_repo -- --nocapture` (`2 passed`) and `cargo test -p
   slug_interpreter_for_build label_context_scoped_repo -- --nocapture` (`2
   passed`).
+- Bzlmod non-root `CellAliasResolverKey` now preserves the root resolver's
+  runtime alias snapshot while still narrowing static aliases to canonical
+  names, so non-root module resolvers can resolve DICE-owned generated-repo
+  aliases without leaking root apparent names or consulting stale process-global
+  aliases on runtime misses. Validation passed with `cargo test -p slug_common
+  bzlmod_non_root_alias_resolver_preserves_runtime_snapshot -- --nocapture`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
