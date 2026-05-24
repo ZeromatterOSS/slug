@@ -708,9 +708,6 @@ fn replay_bzlmod_runtime_state(
     cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
     cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
 
-    let runtime_cell_snapshot = runtime_cell_install_snapshot(cell_graph);
-    slug_core::cells::install_bzlmod_runtime_cell_snapshot(&runtime_cell_snapshot);
-
     let cell_pairs: Vec<(String, String)> = cell_graph
         .cells
         .iter()
@@ -4741,14 +4738,31 @@ mod tests {
             workspace_id,
             root_module_name: "root".to_owned(),
             cells: Arc::new(Vec::new()),
-            extension_cells: Arc::new(Vec::new()),
+            extension_cells: Arc::new(vec![slug_bzlmod::BzlmodCellGraphExtensionCell {
+                canonical_name: "root+ext+repo".to_owned(),
+                internal_name: "repo".to_owned(),
+                path: "bazel-external/root+ext+repo".to_owned(),
+                extension_id: "@@root//:ext.bzl%ext".to_owned(),
+                spec_hash: "repo-hash".to_owned(),
+                repo_spec_json: "{}".to_owned(),
+                repo_env_json: "{}".to_owned(),
+                materialized: false,
+                lazy: true,
+            }]),
             root_aliases: Arc::new(Vec::new()),
             module_symlinks: Arc::new(vec![slug_bzlmod::BzlmodCellGraphModuleSymlink {
                 entry_name: "dep".to_owned(),
                 source_path: Arc::new(source_path.clone()),
             }]),
-            scoped_aliases: Arc::new(Vec::new()),
-            dynamic_aliases: Arc::new(Vec::new()),
+            scoped_aliases: Arc::new(vec![slug_bzlmod::BzlmodCellGraphScopedAlias {
+                owner_module: "root".to_owned(),
+                apparent_name: "repo".to_owned(),
+                target_name: "root+ext+repo".to_owned(),
+            }]),
+            dynamic_aliases: Arc::new(vec![slug_bzlmod::BzlmodCellGraphDynamicAlias {
+                apparent_name: "repo".to_owned(),
+                canonical_name: "root+ext+repo".to_owned(),
+            }]),
         };
 
         replay_bzlmod_runtime_state(&cell_graph, fs.path());
@@ -4759,6 +4773,9 @@ mod tests {
             "buck-out/v2/external_cells/bzlmod/dep",
         )?);
         assert!(!default_link.exists());
+        assert!(slug_core::cells::get_dynamic_extension_cell("root+ext+repo").is_none());
+        assert!(slug_core::cells::get_dynamic_extension_cell_setup("root+ext+repo").is_none());
+        assert!(slug_core::cells::resolve_dynamic_extension_cell_alias("repo").is_none());
         Ok(())
     }
 

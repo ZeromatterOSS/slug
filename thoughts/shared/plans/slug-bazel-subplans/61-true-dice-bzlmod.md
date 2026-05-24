@@ -1146,26 +1146,29 @@ Observed SDK result at the checkpoint:
   `BzlmodCellGraphKey` projects it by explicit `WorkspaceId`. The value records
   root module name, module cells, extension/generated cells, root aliases,
   module symlinks, scoped aliases, and dynamic aliases as DICE-visible data.
-  Runtime installation still uses the transitional process-global
-  `slug_core::cells` adapter, so this is a named migration surface rather than
-  final cell-graph ownership. Validation passed with `cargo check -p
+  This is a named migration surface rather than final cell-graph ownership.
+  Validation passed with `cargo check -p
   slug_bzlmod -p slug_common`, `cargo test -p slug_bzlmod
   set_bzlmod_session_data_uses_session_workspace_id -- --nocapture`, full
   `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
   bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
   replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo
   fmt --check`, and `git diff --check`.
-- Bzlmod runtime cell installation now consumes the published
-  `BzlmodCellGraphValue` instead of assembling a separate install snapshot from
-  parallel `BzlmodResolutionResult` fields. The replay path uses that graph for
-  module symlinks, eager extension-cell symlinks, root aliases, scoped aliases,
-  dynamic aliases, and eager/lazy extension-cell registration. Cell resolver
-  assembly and the backing runtime maps are still transitional. Validation
-  passed with `cargo check -p slug_common`, `cargo test -p slug_common
+- Bzlmod runtime cell snapshots are derived from the published
+  `BzlmodCellGraphValue` instead of parallel `BzlmodResolutionResult` fields.
+  Startup replay still refreshes module/external symlinks from that graph, but
+  no longer installs eager/lazy extension cells, scoped aliases, or dynamic
+  aliases into process-global maps; those runtime cells and aliases are carried
+  by the resolver-owned snapshot. Validation passed with `cargo test -p
+  slug_core bzlmod_resolver_ -- --nocapture`, `cargo test -p slug_common
   runtime_cell_install_snapshot_derives_from_cell_graph -- --nocapture`,
-  `cargo test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`,
-  the focused Plan 61 Python replay subset, the full Plan 61 Python guardrail
-  with 72 tests, `cargo fmt --check`, and `git diff --check`.
+  `cargo test -p slug_common
+  bzlmod_runtime_state_uses_workspace_output_base_for_external_cell_symlinks
+  -- --nocapture`, `cargo build -p slug`, and focused Plan 61 Python replay
+  coverage selected by `-k 'two_workspace or
+  valid_lockfile_replay_materializes_generated_repo_without_extension_eval or
+  lockfile_replay_recorded_repo_mapping_from_extension_repo_source'` (`3
+  passed, 115 deselected`).
 - Cell path classification for lazy extension repositories now consults the
   resolver's `BzlmodCellGraphValue` runtime snapshot before falling back to
   process-global dynamic-cell discovery. A path under a graph-owned lazy
@@ -1748,13 +1751,13 @@ What did not work or remains risky:
   Extension aggregation projections now read root-module identity from the
   named cell-graph key instead of duplicating it in aggregation data, but the
   aggregation map is still produced by the legacy resolver.
-  Generated repo cells and dynamic alias registration now go through a
-  typed runtime install snapshot and installer boundary in `slug_core::cells`,
-  but the backing state is still process-global transitional cell-registration
-  plumbing rather than a final DICE-owned cell graph. The direct public helpers
-  for forming extension execution and spoke keys from injected session-shaped
-  values were removed, reducing accidental bypass surfaces without changing
-  that remaining cell-graph ownership gap.
+  Startup generated repo cells and dynamic aliases now go through the
+  resolver-owned runtime snapshot instead of a process-global installer.
+  Generated repos captured after extension execution still use transitional
+  resolver-local/runtime plumbing rather than a final DICE-owned cell graph.
+  The direct public helpers for forming extension execution and spoke keys from
+  injected session-shaped values were removed, reducing accidental bypass
+  surfaces without changing that remaining cell-graph ownership gap.
 - Runtime extension file-ops now registers sibling spokes from the current
   `ExtensionSpokesValue` on the active `CellResolver` as graph-owned dynamic
   cells instead of publishing those siblings through the process-global dynamic
@@ -2261,9 +2264,10 @@ using Rust DICE keys and values:
      identity instead of deriving one from the project root, and sibling spokes
      discovered from the current DICE spoke value are registered on the active
      resolver instead of the process-global dynamic registry. Extension
-     execution also registers captured generated repos on the active resolver.
-     Startup and alias compatibility registration still use process-global
-     transitional plumbing.
+     execution also registers captured generated repos on the active resolver,
+     and startup runtime extension cells now come from the resolver snapshot
+     instead of process-global dynamic maps. Alias compatibility fallback still
+     uses process-global transitional plumbing.
    - Extension repo execution/materialization keys now preserve the workspace
   identity and output base, but generated repo cell graph ownership and
   final materialization state are still not fully DICE-owned.

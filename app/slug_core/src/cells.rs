@@ -677,60 +677,6 @@ pub fn get_dynamic_extension_cell_setup(
         .and_then(|m| m.get(name).and_then(dynamic_bzlmod_value_for_current_root))
 }
 
-pub fn install_bzlmod_runtime_cell_snapshot(snapshot: &BzlmodRuntimeCellInstallSnapshot) {
-    for cell in &snapshot.extension_cells {
-        install_bzlmod_runtime_extension_cell_name(
-            &cell.canonical_name,
-            &cell.path,
-            cell.setup.dupe(),
-            &cell.registration,
-        );
-        if cell.internal_name != cell.canonical_name {
-            install_bzlmod_runtime_extension_cell_name(
-                &cell.internal_name,
-                &cell.path,
-                cell.setup.dupe(),
-                &cell.registration,
-            );
-        }
-    }
-
-    for alias in &snapshot.scoped_aliases {
-        register_scoped_bzlmod_repo_alias(
-            alias.owner_module.clone(),
-            alias.apparent_name.clone(),
-            alias.target_name.clone(),
-        );
-    }
-
-    for alias in &snapshot.dynamic_aliases {
-        register_dynamic_extension_cell_alias(
-            alias.apparent_name.clone(),
-            alias.canonical_name.clone(),
-        );
-    }
-}
-
-fn install_bzlmod_runtime_extension_cell_name(
-    name: &str,
-    path: &str,
-    setup: crate::cells::external::ExtensionRepoCellSetup,
-    registration: &BzlmodRuntimeExtensionCellRegistration,
-) {
-    match registration {
-        BzlmodRuntimeExtensionCellRegistration::Eager => {
-            register_dynamic_extension_cell_with_setup(name.to_owned(), path.to_owned(), setup);
-        }
-        BzlmodRuntimeExtensionCellRegistration::Lazy => {
-            register_dynamic_extension_cell_with_setup_lazy(
-                name.to_owned(),
-                path.to_owned(),
-                setup,
-            );
-        }
-    }
-}
-
 fn dynamic_project_root() -> Option<std::path::PathBuf> {
     DYNAMIC_PROJECT_ROOT
         .read()
