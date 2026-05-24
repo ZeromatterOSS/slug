@@ -3216,10 +3216,12 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
-            bzlmod_session_data.resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue {
-                registry_file_hashes: resolved_graph.registry_file_hashes.clone(),
-                selected_yanked_versions: resolved_graph.selected_yanked_versions.clone(),
-            };
+            bzlmod_session_data.resolution_facts =
+                slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
+                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    resolved_graph.registry_file_hashes.clone(),
+                    resolved_graph.selected_yanked_versions.clone(),
+                );
 
             // Build a set of local override names to skip
             let local_override_names: std::collections::HashSet<_> = active_overrides
@@ -3428,9 +3430,11 @@ impl BuckConfigBasedCells {
             for (name, info) in &resolved_graph.modules {
                 version_map.insert(name.clone(), info.version.clone());
             }
-            bzlmod_session_data.module_versions = slug_bzlmod::BzlmodModuleVersionsDataValue {
-                module_versions: Arc::new(version_map),
-            };
+            bzlmod_session_data.module_versions =
+                slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
+                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    Arc::new(version_map),
+                );
         }
 
         // Build parsed_modules list for extension resolution
@@ -3656,13 +3660,15 @@ impl BuckConfigBasedCells {
                 all_exec_platforms.len()
             );
             bzlmod_session_data.registered_toolchains =
-                slug_bzlmod::RegisteredToolchainsDataValue {
-                    registered_toolchains: all_toolchains,
-                };
+                slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
+                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    all_toolchains,
+                );
             bzlmod_session_data.registered_execution_platforms =
-                slug_bzlmod::RegisteredExecutionPlatformsDataValue {
-                    registered_execution_platforms: all_exec_platforms,
-                };
+                slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
+                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    all_exec_platforms,
+                );
 
             // Toolchain repo materialization is intentionally lazy. Label
             // resolution and the external-cell delegates own the semantic

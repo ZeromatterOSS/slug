@@ -627,8 +627,23 @@ pub struct BzlmodModuleVersionsInvalidation {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodResolutionFactsValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
+}
+
+impl BzlmodResolutionFactsValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        registry_file_hashes: indexmap::IndexMap<String, String>,
+        selected_yanked_versions: indexmap::IndexMap<String, String>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            registry_file_hashes,
+            selected_yanked_versions,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -657,7 +672,20 @@ impl BzlmodResolutionFactsKey {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsDataValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub module_versions: Arc<HashMap<String, String>>,
+}
+
+impl BzlmodModuleVersionsDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        module_versions: Arc<HashMap<String, String>>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            module_versions,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
@@ -955,6 +983,17 @@ impl Key for BzlmodResolutionFactsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodResolutionFactsDataKey).await?;
+        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
+            if data_workspace_id != &self.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodResolutionFactsKey was computed with project root '{}', \
+                     but current bzlmod resolution facts data root is '{}'",
+                    self.workspace_id.canonical_project_root.display(),
+                    data_workspace_id.canonical_project_root.display()
+                ));
+            }
+        }
         ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
             self.workspace_id.clone(),
         ))
@@ -980,6 +1019,17 @@ impl Key for ModuleVersionsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodModuleVersionsDataKey).await?;
+        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
+            if data_workspace_id != &self.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "ModuleVersionsKey was computed with project root '{}', \
+                     but current bzlmod module versions data root is '{}'",
+                    self.workspace_id.canonical_project_root.display(),
+                    data_workspace_id.canonical_project_root.display()
+                ));
+            }
+        }
         let lockfile_inputs = ctx
             .compute(&BzlmodLockfileInputsKey::for_workspace_id(
                 self.workspace_id.clone(),
@@ -1060,7 +1110,20 @@ pub struct RegisteredToolchainsValue {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct RegisteredToolchainsDataValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub registered_toolchains: Vec<crate::RegisteredToolchain>,
+}
+
+impl RegisteredToolchainsDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        registered_toolchains: Vec<crate::RegisteredToolchain>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            registered_toolchains,
+        }
+    }
 }
 
 #[derive(
@@ -1094,6 +1157,17 @@ impl Key for RegisteredToolchainsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
+        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
+            if data_workspace_id != &self.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "RegisteredToolchainsKey was computed with project root '{}', \
+                     but current bzlmod registered toolchain data root is '{}'",
+                    self.workspace_id.canonical_project_root.display(),
+                    data_workspace_id.canonical_project_root.display()
+                ));
+            }
+        }
         let cell_graph = ctx
             .compute(&BzlmodCellGraphKey::for_workspace_id(
                 self.workspace_id.clone(),
@@ -1145,7 +1219,20 @@ pub struct RegisteredExecutionPlatformsValue {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub struct RegisteredExecutionPlatformsDataValue {
+    pub workspace_id: Option<WorkspaceId>,
     pub registered_execution_platforms: Vec<String>,
+}
+
+impl RegisteredExecutionPlatformsDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        registered_execution_platforms: Vec<String>,
+    ) -> Self {
+        Self {
+            workspace_id: Some(workspace_id),
+            registered_execution_platforms,
+        }
+    }
 }
 
 #[derive(
@@ -1181,6 +1268,17 @@ impl Key for RegisteredExecutionPlatformsKey {
         let data = ctx
             .compute(&BzlmodRegisteredExecutionPlatformsDataKey)
             .await?;
+        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
+            if data_workspace_id != &self.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "RegisteredExecutionPlatformsKey was computed with project root '{}', \
+                     but current bzlmod registered execution platform data root is '{}'",
+                    self.workspace_id.canonical_project_root.display(),
+                    data_workspace_id.canonical_project_root.display()
+                ));
+            }
+        }
         let cell_graph = ctx
             .compute(&BzlmodCellGraphKey::for_workspace_id(
                 self.workspace_id.clone(),
