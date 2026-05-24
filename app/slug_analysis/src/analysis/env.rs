@@ -958,6 +958,7 @@ pub(crate) async fn get_resolved_toolchain_dep_analysis(
     .await?;
 
     let target_cfg = node.label().cfg().dupe();
+    let cell_resolver = optional_cell_resolver(dice).await?;
     let mut configured_toolchains = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let groups = default_result
@@ -971,8 +972,10 @@ pub(crate) async fn get_resolved_toolchain_dep_analysis(
             let Some(resolved) = resolved else {
                 continue;
             };
-            let Some(target_label) = parse_impl_label_to_target_label(&resolved.toolchain_impl)
-            else {
+            let Some(target_label) = parse_impl_label_to_target_label_with_cell_resolver(
+                &resolved.toolchain_impl,
+                cell_resolver.as_ref(),
+            ) else {
                 continue;
             };
             let configured =
@@ -1608,6 +1611,16 @@ fn registered_toolchain_package_label(
     PackageLabel::from_cell_path(CellPathRef::new(cell_instance.name(), cell_rel_path)).ok()
 }
 
+async fn optional_cell_resolver(
+    dice: &mut DiceComputations<'_>,
+) -> slug_error::Result<Option<slug_core::cells::CellResolver>> {
+    if dice.is_cell_resolver_key_set().await? {
+        dice.get_cell_resolver().await.map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
 /// Plan 24 Phase 2: read the configured target's `exec_properties`
 /// attribute and return it as a sorted `BTreeMap` for the actions
 /// registry. Empty when the attribute was unset (the default) or when
@@ -1727,7 +1740,15 @@ fn extract_label_list_from_coerced_attr(attr: &CoercedAttr) -> Vec<String> {
 ///
 /// Accepts formats: `@repo//pkg:target`, `@@repo//pkg:target`, `repo//pkg:target`
 /// Returns `None` if the label cannot be parsed (missing components, etc.).
+#[cfg(test)]
 fn parse_impl_label_to_target_label(label: &str) -> Option<TargetLabel> {
+    parse_impl_label_to_target_label_with_cell_resolver(label, None)
+}
+
+fn parse_impl_label_to_target_label_with_cell_resolver(
+    label: &str,
+    cell_resolver: Option<&slug_core::cells::CellResolver>,
+) -> Option<TargetLabel> {
     // Strip any leading @ characters
     let stripped = label.trim_start_matches('@');
     let slash_pos = stripped.find("//")?;
@@ -1735,8 +1756,7 @@ fn parse_impl_label_to_target_label(label: &str) -> Option<TargetLabel> {
     if repo_name.is_empty() {
         return None;
     }
-    let repo_name = slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name)
-        .unwrap_or_else(|| repo_name.to_owned());
+    let repo_name = resolve_impl_label_repo_name(repo_name, cell_resolver);
     let after_slashes = &stripped[slash_pos + 2..];
 
     // Split into package path and target name
@@ -1758,6 +1778,25 @@ fn parse_impl_label_to_target_label(label: &str) -> Option<TargetLabel> {
         PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)).ok()?;
     let target_name_ref = TargetNameRef::new(target_name).ok()?;
     Some(TargetLabel::new(package_label, target_name_ref))
+}
+
+fn resolve_impl_label_repo_name(
+    repo_name: &str,
+    cell_resolver: Option<&slug_core::cells::CellResolver>,
+) -> String {
+    if let Some(cell_resolver) = cell_resolver {
+        if let Some(resolved_cell) = cell_resolver
+            .root_cell_cell_alias_resolver()
+            .resolve_declared_or_runtime_alias(repo_name)
+        {
+            return cell_resolver
+                .get(resolved_cell)
+                .map(|cell_instance| cell_instance.name().as_str().to_owned())
+                .unwrap_or_else(|_| resolved_cell.as_str().to_owned());
+        }
+    }
+    slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name)
+        .unwrap_or_else(|| repo_name.to_owned())
 }
 
 /// Canonicalize a label in an extension-generated repository that points at a
@@ -1817,12 +1856,16 @@ async fn canonicalize_toolchain_type_label(
         return canonical.clone();
     }
 
+    let cell_resolver = optional_cell_resolver(ctx).await.ok().flatten();
     let mut current = label_str.to_owned();
     let mut visited: Vec<String> = vec![current.clone()];
     const MAX_DEPTH: usize = 8;
 
     for _ in 0..MAX_DEPTH {
-        let target_label = match parse_impl_label_to_target_label(&current) {
+        let target_label = match parse_impl_label_to_target_label_with_cell_resolver(
+            &current,
+            cell_resolver.as_ref(),
+        ) {
             Some(t) => t,
             None => break,
         };
@@ -1880,7 +1923,11 @@ async fn extract_cc_toolchain_features_metadata(
     toolchain_config_label: &str,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
 ) -> Option<CcToolchainFeaturesMetadata> {
-    let config_target = parse_impl_label_to_target_label(toolchain_config_label)?;
+    let cell_resolver = optional_cell_resolver(ctx).await.ok().flatten();
+    let config_target = parse_impl_label_to_target_label_with_cell_resolver(
+        toolchain_config_label,
+        cell_resolver.as_ref(),
+    )?;
     let config_node = target_node_for_metadata(ctx, &config_target).await?;
 
     let mut feature_names = Vec::new();
@@ -3693,6 +3740,7 @@ async fn run_analysis_with_env_underlying(
             let any_resolved = result.resolved_toolchains.values().any(|v| v.is_some());
             if any_resolved {
                 let target_cfg = node.label().cfg().dupe();
+                let cell_resolver = optional_cell_resolver(dice).await?;
                 let mut toolchain_providers = std::collections::HashMap::<
                     String,
                     Option<FrozenProviderCollectionValue>,
@@ -3719,7 +3767,10 @@ async fn run_analysis_with_env_underlying(
                         // user sees the real failure rather than a cryptic
                         // "NoneType has no attribute X" at the call site.
                         let provider_value: Option<FrozenProviderCollectionValue> =
-                            match parse_impl_label_to_target_label(&tc.toolchain_impl) {
+                            match parse_impl_label_to_target_label_with_cell_resolver(
+                                &tc.toolchain_impl,
+                                cell_resolver.as_ref(),
+                            ) {
                                 Some(target_label) => {
                                     let use_cpp_native_shim =
                                         is_cpp_toolchain_type_label(type_label);
@@ -3786,7 +3837,12 @@ async fn run_analysis_with_env_underlying(
                                         let module_map_path = tc
                                             .cc_toolchain_module_map
                                             .as_deref()
-                                            .and_then(parse_impl_label_to_target_label)
+                                            .and_then(|label| {
+                                                parse_impl_label_to_target_label_with_cell_resolver(
+                                                    label,
+                                                    cell_resolver.as_ref(),
+                                                )
+                                            })
                                             .map(|label| metadata_path_for_label(&label, &target_cfg));
                                         // Bazel's rules_cc asks for C++ runtime libraries from
                                         // rule semantics at the link point. The executable link
@@ -4673,8 +4729,11 @@ async fn add_matching_toolchain_target_settings(
     }
 
     let target_cfg = node.label().cfg().dupe();
+    let cell_resolver = optional_cell_resolver(dice).await?;
     for setting in settings {
-        let Some(setting_target) = parse_impl_label_to_target_label(&setting) else {
+        let Some(setting_target) =
+            parse_impl_label_to_target_label_with_cell_resolver(&setting, cell_resolver.as_ref())
+        else {
             continue;
         };
         let configured = setting_target.configure(target_cfg.dupe());
@@ -5516,6 +5575,86 @@ mod tests {
 
         // Invalid: empty target
         assert!(parse_impl_label_to_target_label("@repo//:").is_none());
+    }
+
+    #[test]
+    fn parse_impl_label_to_target_label_prefers_runtime_aliases_before_globals()
+    -> slug_error::Result<()> {
+        let apparent = "plan61_impl_runtime_alias";
+        let canonical = "plan61_owner++impls+generated";
+        let wrong_global = "plan61_wrong_owner++impls+generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@plan61_owner//:impls.bzl%impls"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-plan61-impl-runtime-alias"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                setup,
+                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        assert!(resolver.get(CellName::testing_new(wrong_global)).is_ok());
+
+        let label = parse_impl_label_to_target_label_with_cell_resolver(
+            &format!("@{apparent}//pkg:impl"),
+            Some(&resolver),
+        )
+        .unwrap();
+        assert_eq!(label.pkg().cell_name(), CellName::testing_new(canonical));
+        assert_eq!(label.pkg().cell_relative_path().as_str(), "pkg");
+        assert_eq!(label.name().as_str(), "impl");
+
+        let legacy_label =
+            parse_impl_label_to_target_label(&format!("@{apparent}//pkg:impl")).unwrap();
+        assert_eq!(
+            legacy_label.pkg().cell_name(),
+            CellName::testing_new(wrong_global)
+        );
+        Ok(())
     }
 
     #[test]

@@ -1777,6 +1777,16 @@ What did not work or remains risky:
   slug_analysis -p slug_server`, `cargo build -p slug`, and the full Plan 61
   Python guardrail with `75 passed in 40.25s`. The slugd processes left by the
   full guardrail were cleaned up afterward.
+- Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
+  metadata labels, module-map metadata labels, and target-setting labels now
+  parse through the active cell resolver's declared/runtime alias snapshot before
+  falling back to process-global dynamic aliases. Validation passed with `cargo
+  test -p slug_analysis parse_impl_label_to_target_label -- --nocapture` (`2
+  passed`), `cargo test -p slug_analysis toolchain -- --nocapture` (`13
+  passed`), `cargo test -p slug_analysis -- --nocapture` (`33 passed`), `cargo
+  check -p slug_analysis -p slug_server`, `cargo build -p slug`, and the full
+  Plan 61 Python guardrail with `75 passed in 47.69s`. The slugd processes left
+  by the full guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -1996,13 +2006,14 @@ using Rust DICE keys and values:
   map before falling back to legacy dynamic maps. The fallback resolver and
   compatibility adapters still consult process-global dynamic maps when no
   resolver-owned path is available.
-- Bzlmod load-path wrong-cell equivalence can now use declared aliases and
-  runtime aliases/cells from the active cell alias resolver before consulting
-  process-global dynamic aliases, but remaining canonicalization helpers still
-  have process-global fallback behavior.
+- Bzlmod load-path wrong-cell equivalence and toolchain implementation/metadata
+  label parsing can now use declared aliases and runtime aliases/cells from the
+  active cell alias resolver before consulting process-global dynamic aliases,
+  but remaining canonicalization helpers still have process-global fallback
+  behavior.
 - `config_setting(flag_values = ...)` build-setting lookup now also uses the
   active cell alias resolver for bzlmod repo-spelling normalization before
-  consulting process-global dynamic aliases, but other metadata/action-path
+  consulting process-global dynamic aliases, but other action-path
   canonicalization helpers still retain process-global fallbacks.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
