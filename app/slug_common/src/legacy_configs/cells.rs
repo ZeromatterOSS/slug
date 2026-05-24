@@ -1622,6 +1622,7 @@ async fn root_extension_replay_summary_digest(
 
     let mut extension_ids = aggregated.keys().cloned().collect::<Vec<_>>();
     extension_ids.sort();
+    let mut has_cached_extension = false;
     for extension_id in extension_ids {
         let Some(extension) = aggregated.get(&extension_id) else {
             return Ok(None);
@@ -1646,8 +1647,8 @@ async fn root_extension_replay_summary_digest(
                 Some(&repo_mapping_overrides),
             )
         });
-        let (source, cached_specs) = if let Some(cached_specs) = visible_specs {
-            ("visible", cached_specs)
+        let cached_specs = if let Some(cached_specs) = visible_specs {
+            Some(("visible", cached_specs))
         } else if let Some(cached_specs) = hidden_lockfile.and_then(|lockfile| {
             lockfile.get_extension_cache_for_workspace(
                 &extension_id,
@@ -1660,9 +1661,9 @@ async fn root_extension_replay_summary_digest(
                 Some(&repo_mapping_overrides),
             )
         }) {
-            ("hidden", cached_specs)
+            Some(("hidden", cached_specs))
         } else {
-            return Ok(None);
+            None
         };
 
         hasher.update(extension_id.as_bytes());
@@ -1671,22 +1672,32 @@ async fn root_extension_replay_summary_digest(
         hasher.update([0]);
         hasher.update(usages_digest.as_bytes());
         hasher.update([0]);
-        hasher.update(source.as_bytes());
-        hasher.update([0]);
-        let mut repo_names = cached_specs.keys().cloned().collect::<Vec<_>>();
-        repo_names.sort();
-        for repo_name in repo_names {
-            let Some(spec) = cached_specs.get(&repo_name) else {
-                return Ok(None);
-            };
-            hasher.update(repo_name.as_bytes());
+        if let Some((source, cached_specs)) = cached_specs {
+            has_cached_extension = true;
+            hasher.update(source.as_bytes());
             hasher.update([0]);
-            hasher.update(spec.compute_hash().as_bytes());
+            let mut repo_names = cached_specs.keys().cloned().collect::<Vec<_>>();
+            repo_names.sort();
+            for repo_name in repo_names {
+                let Some(spec) = cached_specs.get(&repo_name) else {
+                    return Ok(None);
+                };
+                hasher.update(repo_name.as_bytes());
+                hasher.update([0]);
+                hasher.update(spec.compute_hash().as_bytes());
+                hasher.update([0]);
+            }
+        } else {
+            hasher.update(b"uncached");
             hasher.update([0]);
         }
     }
 
-    Ok(Some(hex::encode(hasher.finalize())))
+    if has_cached_extension {
+        Ok(Some(hex::encode(hasher.finalize())))
+    } else {
+        Ok(None)
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]

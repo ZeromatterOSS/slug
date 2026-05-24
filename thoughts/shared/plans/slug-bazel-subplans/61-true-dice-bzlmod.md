@@ -217,6 +217,12 @@ Observed SDK result at the checkpoint:
   when the hidden facts are created with the expected value, fails after an
   edit to stale facts, succeeds after restoration, and fails again after the
   hidden lockfile is deleted.
+- Unsupported extension replay recorded inputs now have same-daemon coverage:
+  a lockfile entry with matching digests/specs but an unsupported recorded
+  `FILE` path form is rejected as an extension replay miss and does not count
+  as a replay hit. Validation passed with focused Plan 61 guardrail
+  `test_lockfile_replay_unsupported_recorded_input_rejects_cache` and the
+  recorded-input replay subset selected by `-k 'lockfile_replay_recorded'`.
 - Best-effort extension `.bzl` digests now include existing external
   repository load files materialized under `bazel-external/<repo>` in addition
   to project-local literal loads, and resolve apparent external loads through
@@ -856,10 +862,14 @@ Observed SDK result at the checkpoint:
   carries the parsed module data it already computed into the summary path, so
   mapped external helper `.bzl` create/edit/delete transitions change the
   bridge key before `audit cell` can reuse stale extension replay state.
+  Uncached sibling extensions now contribute explicit `uncached` digest entries
+  instead of collapsing the whole replay-summary digest to absent, so one
+  uncached extension cannot hide a cached extension's mapped helper changes.
   Validation passed with `cargo check -p slug_common`, `cargo build -p slug`,
   focused audit-cell-only Plan 61 Python guardrails for mapped external
-  `.bzl` edit/create/delete transitions, and the existing build-based mapped
-  external `.bzl` edit/create/delete replay subset.
+  `.bzl` edit/create/delete transitions including a mixed cached/uncached root
+  extension case, and the existing build-based mapped external `.bzl`
+  edit/create/delete replay subset.
 - Extension-spoke aggregation projection validation passed with `cargo check
   -p slug_bzlmod`, `cargo test -p slug_bzlmod
   extension_aggregation_key_projects_single_extension -- --nocapture`, `cargo
@@ -1596,8 +1606,9 @@ What did not work or remains risky:
   and after a missing project-local helper is created. Audit-cell-only mapped
   external helper create/edit/delete transitions are now covered when the
   extension owner comes from a local override module and the root usage has a
-  lockfile replay entry. Other external load failures and the full interpreter
-  load graph are not replay-complete. The digest now has explicit DICE keys for
+  lockfile replay entry, including a mixed cached/uncached root-extension graph.
+  Other external load failures and the full interpreter load graph are not
+  replay-complete. The digest now has explicit DICE keys for
   spoke lookup invalidation and for the legacy root replay-summary bridge. The
   root bridge key reads project-local implementation files through
   `DiceFileComputations`, but both digest producers intentionally mark

@@ -3055,6 +3055,7 @@ def _write_mapped_external_extension_audit_cell_workspace(
     *,
     suffix: str,
     helper_content: str | None,
+    include_uncached_extension: bool = False,
 ) -> Path:
     owner_module = f"plan61_rules_owner_audit_{suffix}"
     helper_module = f"plan61_real_helper_audit_{suffix}"
@@ -3094,13 +3095,22 @@ replay_ext = module_extension(
     _write(helper_dir / "MODULE.bazel", f'module(name = "{helper_module}", version = "1.0")\n')
     if helper_content is not None:
         _write(helper_path, helper_content)
+    if include_uncached_extension:
+        _write(
+            buck.cwd / "uncached_ext.bzl",
+            """def _uncached_ext_impl(module_ctx):
+    pass
+
+uncached_ext = module_extension(
+    implementation = _uncached_ext_impl,
+)
+""",
+        )
 
     (external_dir / f"{owner_module}+").symlink_to(owner_dir, target_is_directory=True)
     (external_dir / f"{helper_module}+").symlink_to(helper_dir, target_is_directory=True)
 
-    _write(
-        buck.cwd / "MODULE.bazel",
-        f"""module(name = "{root_module}")
+    root_module_file = f"""module(name = "{root_module}")
 bazel_dep(name = "{owner_module}", version = "1.0")
 bazel_dep(name = "{helper_module}", version = "1.0")
 local_path_override(module_name = "{owner_module}", path = "{owner_dir.as_posix()}")
@@ -3108,8 +3118,10 @@ local_path_override(module_name = "{helper_module}", path = "{helper_dir.as_posi
 
 replay = use_extension("@{owner_module}//:replay_ext.bzl", "replay_ext")
 use_repo(replay, "replayed_repo")
-""",
-    )
+"""
+    if include_uncached_extension:
+        root_module_file += 'uncached = use_extension("//:uncached_ext.bzl", "uncached_ext")\n'
+    _write(buck.cwd / "MODULE.bazel", root_module_file)
     _write_replay_lockfile(
         buck.cwd / "MODULE.bazel.lock",
         extension_id=extension_id,
@@ -3152,6 +3164,28 @@ async def test_mapped_external_extension_bzl_load_edit_rejects_audit_cell_replay
     assert first["extension_eval"] == before["extension_eval"]
 
     _write(helper_path, 'HELPER_SENTINEL = "edited mapped helper"\n')
+
+    await _assert_mapped_external_audit_cell_replay_misses_after_change(buck, first)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_mapped_external_extension_bzl_load_edit_with_uncached_extension_rejects_audit_cell_replay(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: uncached extensions do not hide loaded .bzl digest inputs."""
+    helper_path = _write_mapped_external_extension_audit_cell_workspace(
+        buck,
+        suffix="mixed",
+        helper_content='HELPER_SENTINEL = "initial mapped helper"\n',
+        include_uncached_extension=True,
+    )
+
+    before = await _bzlmod_counters(buck)
+    await buck.audit("cell")
+    first = await _bzlmod_counters(buck)
+    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+
+    _write(helper_path, 'HELPER_SENTINEL = "edited mapped helper with uncached extension"\n')
 
     await _assert_mapped_external_audit_cell_replay_misses_after_change(buck, first)
 
@@ -4006,6 +4040,73 @@ use_repo(wasm, "wasm_repo")
 
     assert "load_wasm" in failure_stderr
     assert not (repo_dir / ".slug_repo_complete").exists()
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_lockfile_replay_unsupported_recorded_input_rejects_cache(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: unsupported RepoRecordedInput data is not replayable."""
+    module_name = "plan61_unsupported_recorded_input"
+    extension_id = "@plan61_unsupported_recorded_input//:replay_ext.bzl%replay_ext"
+    watched = buck.cwd / "watched.txt"
+    _write(watched, "unchanged\n")
+    replayed_repo = buck.cwd / "replayed_repo"
+    replayed_repo.mkdir(exist_ok=True)
+    _write(replayed_repo / "data.txt", "replayed repo payload\n")
+    _write(
+        replayed_repo / "BUILD.bazel",
+        """exports_files(["data.txt"])
+filegroup(name = "data", srcs = ["data.txt"])
+""",
+    )
+    _write(
+        buck.cwd / "replay_ext.bzl",
+        """def _replay_ext_impl(module_ctx):
+    fail("unsupported recorded input replay rejected")
+
+replay_ext = module_extension(
+    implementation = _replay_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+replay = use_extension("//:replay_ext.bzl", "replay_ext")
+use_repo(replay, "replayed_repo")
+""",
+    )
+    _write_replay_lockfile(
+        buck.cwd / "MODULE.bazel.lock",
+        extension_id=extension_id,
+        module_name=module_name,
+        project_root=buck.cwd,
+        repo_path=replayed_repo,
+        recorded_inputs=[f"FILE:watched.txt {_sha256(watched)}"],
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_replayed_repo",
+    srcs = ["@replayed_repo//:data"],
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    failure_stderr: str | None = None
+    try:
+        await buck.audit("cell")
+    except BuckException as e:
+        failure_stderr = e.stderr
+    after = await _bzlmod_counters(buck)
+
+    if failure_stderr is not None:
+        assert "unsupported recorded input replay rejected" in failure_stderr
+    assert after["extension_replay_miss_reason"] > before["extension_replay_miss_reason"]
+    assert after["extension_replay_hit"] == before["extension_replay_hit"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
