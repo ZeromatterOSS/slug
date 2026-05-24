@@ -51,6 +51,23 @@ pub fn execute_repository_rule(
     invocation: &RepositoryInvocation,
     project_root: &Path,
 ) -> slug_error::Result<RepositoryRuleResult> {
+    execute_repository_rule_impl(invocation, project_root, true)
+}
+
+/// Execute a repository rule after the caller has already classified
+/// materialization reuse through its own manifest/input state.
+pub fn execute_repository_rule_fresh(
+    invocation: &RepositoryInvocation,
+    project_root: &Path,
+) -> slug_error::Result<RepositoryRuleResult> {
+    execute_repository_rule_impl(invocation, project_root, false)
+}
+
+fn execute_repository_rule_impl(
+    invocation: &RepositoryInvocation,
+    project_root: &Path,
+    allow_marker_reuse: bool,
+) -> slug_error::Result<RepositoryRuleResult> {
     let attrs = InvocationAttrs::new(invocation);
     let working_dir = project_root.join("bazel-external").join(&invocation.name);
 
@@ -63,28 +80,30 @@ pub fn execute_repository_rule(
 
     // Check if already materialized. A marker is not sufficient for repository
     // rules whose outputs have layout invariants consumed by downstream rules.
-    if is_repo_complete(&working_dir)
-        && repo_layout_is_valid_for_invocation(invocation, &working_dir)
-    {
+    if allow_marker_reuse {
+        if is_repo_complete(&working_dir)
+            && repo_layout_is_valid_for_invocation(invocation, &working_dir)
+        {
+            record_bzlmod_event(
+                BzlmodEventKind::RepoMaterializationHit,
+                invocation.name.as_str(),
+            );
+            tracing::debug!("Repository '{}' already materialized", invocation.name);
+            return Ok(RepositoryRuleResult::success(
+                invocation.name.clone(),
+                working_dir,
+            ));
+        }
+        let miss_reason = if is_repo_complete(&working_dir) {
+            "marker_layout_invalid"
+        } else {
+            "marker_absent"
+        };
         record_bzlmod_event(
-            BzlmodEventKind::RepoMaterializationHit,
-            invocation.name.as_str(),
+            BzlmodEventKind::RepoMaterializationMissReason,
+            format!("{}:{miss_reason}", invocation.name),
         );
-        tracing::debug!("Repository '{}' already materialized", invocation.name);
-        return Ok(RepositoryRuleResult::success(
-            invocation.name.clone(),
-            working_dir,
-        ));
     }
-    let miss_reason = if is_repo_complete(&working_dir) {
-        "marker_layout_invalid"
-    } else {
-        "marker_absent"
-    };
-    record_bzlmod_event(
-        BzlmodEventKind::RepoMaterializationMissReason,
-        format!("{}:{miss_reason}", invocation.name),
-    );
 
     // Clean and create working directory
     prepare_working_dir(&working_dir)?;
@@ -1831,6 +1850,26 @@ mod tests {
 
         mark_repo_complete(&working_dir).unwrap();
         assert!(is_repo_complete(&working_dir));
+    }
+
+    #[test]
+    fn fresh_repository_execution_bypasses_marker_shortcut() {
+        let temp = TempDir::new().unwrap();
+        let working_dir = temp.path().join("bazel-external/stale_repo");
+        std::fs::create_dir_all(&working_dir).unwrap();
+        mark_repo_complete(&working_dir).unwrap();
+
+        let invocation =
+            RepositoryInvocation::new("stale_repo".to_owned(), "unimplemented_rule".to_owned());
+        let reused = execute_repository_rule(&invocation, temp.path()).unwrap();
+        assert!(reused.success);
+
+        let err = execute_repository_rule_fresh(&invocation, temp.path()).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("Repository rule 'unimplemented_rule' has no implementation")
+        );
+        assert!(!working_dir.exists());
     }
 
     #[test]

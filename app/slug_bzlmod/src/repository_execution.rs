@@ -1067,8 +1067,10 @@ impl Key for ExtensionRepoExecutionKey {
 
         // Execute the repository rule using the native repository executor
         // This handles http_archive, git_repository, local_repository, etc.
-        let result =
-            crate::repository_executor::execute_repository_rule(&invocation, &self.project_root)?;
+        let result = crate::repository_executor::execute_repository_rule_fresh(
+            &invocation,
+            &self.project_root,
+        )?;
         let output_digest =
             crate::repository_executor::repository_output_digest(&result.repo_path)?;
 

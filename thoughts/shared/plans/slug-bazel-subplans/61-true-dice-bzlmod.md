@@ -188,6 +188,18 @@ Observed SDK result at the checkpoint:
   `missing_lockfile_extension_executes_once_then_reuses_dice_state` plus
   `valid_lockfile_replay_materializes_generated_repo_without_extension_eval`;
   `cargo fmt --check` and `git diff --check` also passed.
+- Extension repository execution now calls a fresh native repository-rule
+  executor path after `RepoMaterializationManifestKey` has classified reuse,
+  so the manifest-owned extension path no longer falls through the native
+  executor's marker shortcut. Direct repository-rule execution still keeps the
+  legacy marker reuse path until direct repo rules get their own manifest key.
+  Validation passed with focused `cargo test -p slug_bzlmod
+  fresh_repository_execution_bypasses_marker_shortcut -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  extension_repo_execution_consumes_materialization_manifest_key -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
+  `cargo build -p slug`, and focused Plan 61 Python guardrail
+  `materialized_repo_marker_revalidates_corrupted_output_digest`.
 - Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
   extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
   when the hidden facts are created with the expected value, fails after an
@@ -1830,7 +1842,10 @@ using Rust DICE keys and values:
      this manifest path. Legacy invalid empty target-label checks also belong
      to manifest layout state now. No-spec extension cells with a current spoke
      value validate through that spoke's repo spec; only the no-spoke fallback
-     still contains direct file-ops reads.
+     still contains direct file-ops reads. Extension repo execution enters the
+     native repository-rule executor through a fresh path after the manifest
+     decision, so the native marker shortcut is not an additional reuse
+     authority for known extension repo specs.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 
