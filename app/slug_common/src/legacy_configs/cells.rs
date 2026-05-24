@@ -3076,12 +3076,6 @@ impl BuckConfigBasedCells {
         )?;
         let visible_lockfile_value = visible_lockfile;
         let hidden_lockfile_value = hidden_lockfile;
-        let visible_lockfile_digest = visible_lockfile_value
-            .as_ref()
-            .and_then(|value| value.digest.clone());
-        let hidden_lockfile_digest = hidden_lockfile_value
-            .as_ref()
-            .and_then(|value| value.digest.clone());
         let visible_lockfile = if options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
             None
         } else if let Some(visible_lockfile) = visible_lockfile_value.as_ref() {
@@ -3582,8 +3576,6 @@ impl BuckConfigBasedCells {
         // extension repos are lazily executed inside DICE.
         bzlmod_session_data.extension_aggregations = aggregated;
         bzlmod_session_data.hidden_lockfile_path = hidden_lockfile_path;
-        bzlmod_session_data.visible_lockfile_digest = visible_lockfile_digest;
-        bzlmod_session_data.hidden_lockfile_digest = hidden_lockfile_digest;
         bzlmod_session_data.visible_lockfile = visible_lockfile_value;
         bzlmod_session_data.hidden_lockfile = hidden_lockfile_value;
         bzlmod_session_data.lockfile_mode = options.lockfile_mode;

@@ -261,8 +261,6 @@ pub struct BzlmodSessionData {
     pub registered_execution_platforms: Vec<String>,
     pub extension_aggregations: HashMap<String, AggregatedExtension>,
     pub hidden_lockfile_path: Option<PathBuf>,
-    pub visible_lockfile_digest: Option<String>,
-    pub hidden_lockfile_digest: Option<String>,
     pub visible_lockfile: Option<Arc<LockfileContentValue>>,
     pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
     pub lockfile_mode: LockfileMode,
@@ -283,8 +281,6 @@ impl BzlmodSessionData {
             registered_execution_platforms: Vec::new(),
             extension_aggregations: HashMap::new(),
             hidden_lockfile_path: None,
-            visible_lockfile_digest: None,
-            hidden_lockfile_digest: None,
             visible_lockfile: None,
             hidden_lockfile: None,
             lockfile_mode: LockfileMode::Update,
@@ -312,14 +308,16 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
         let workspace_id = data.workspace_id.clone();
         let root_module_name = data.cell_graph.root_module_name.clone();
+        let visible_lockfile_digest = lockfile_content_digest(&data.visible_lockfile);
+        let hidden_lockfile_digest = lockfile_content_digest(&data.hidden_lockfile);
         let module_versions = Arc::new(BzlmodModuleVersionsDataValue {
             workspace_id: workspace_id.clone(),
             module_versions: Arc::new(data.module_versions.clone()),
             invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
                 root_module_name: root_module_name.clone(),
                 hidden_lockfile_path: data.hidden_lockfile_path.clone(),
-                visible_lockfile_digest: data.visible_lockfile_digest.clone(),
-                hidden_lockfile_digest: data.hidden_lockfile_digest.clone(),
+                visible_lockfile_digest: visible_lockfile_digest.clone(),
+                hidden_lockfile_digest: hidden_lockfile_digest.clone(),
                 visible_lockfile: data.visible_lockfile.clone(),
                 hidden_lockfile: data.hidden_lockfile.clone(),
                 lockfile_mode: data.lockfile_mode,
@@ -338,8 +336,8 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         let extension_replay_data = Arc::new(BzlmodExtensionReplayDataValue {
             workspace_id: workspace_id.clone(),
             hidden_lockfile_path: data.hidden_lockfile_path.clone(),
-            visible_lockfile_digest: data.visible_lockfile_digest.clone(),
-            hidden_lockfile_digest: data.hidden_lockfile_digest.clone(),
+            visible_lockfile_digest,
+            hidden_lockfile_digest,
             visible_lockfile: data.visible_lockfile.clone(),
             hidden_lockfile: data.hidden_lockfile.clone(),
             lockfile_mode: data.lockfile_mode,
@@ -377,6 +375,10 @@ impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
         self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph)])?;
         Ok(())
     }
+}
+
+fn lockfile_content_digest(value: &Option<Arc<LockfileContentValue>>) -> Option<String> {
+    value.as_ref().and_then(|value| value.digest.clone())
 }
 
 pub async fn module_versions_for_current_workspace(
@@ -453,6 +455,72 @@ mod tests {
         assert_eq!(cell_graph.root_module_name, "root_mod");
         assert_eq!(cell_graph.cells[0].name, "root_mod");
         assert_eq!(cell_graph.root_aliases[0].apparent_name, "dep");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_bzlmod_session_data_derives_lockfile_digests_from_values() -> slug_error::Result<()>
+    {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-session-lockfile-digest"),
+            PathBuf::from("/tmp/slug-plan61-session-lockfile-output-base"),
+        );
+        let mut data = BzlmodSessionData::for_workspace(workspace_id);
+        data.hidden_lockfile_path = Some(PathBuf::from(
+            "/tmp/slug-plan61-session-lockfile-output-base/MODULE.bazel.lock",
+        ));
+        data.visible_lockfile = Some(Arc::new(LockfileContentValue {
+            path: Arc::new(PathBuf::from(
+                "/tmp/slug-plan61-session-lockfile-digest/MODULE.bazel.lock",
+            )),
+            digest: Some("visible-digest".to_owned()),
+            tracked_by_dice: true,
+            lockfile: None,
+        }));
+        data.hidden_lockfile = Some(Arc::new(LockfileContentValue {
+            path: Arc::new(PathBuf::from(
+                "/tmp/slug-plan61-session-lockfile-output-base/MODULE.bazel.lock",
+            )),
+            digest: Some("hidden-digest".to_owned()),
+            tracked_by_dice: true,
+            lockfile: None,
+        }));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_bzlmod_session_data(data)?;
+        let mut dice = updater.commit().await;
+
+        let replay_data = dice.compute(&BzlmodExtensionReplayDataKey).await?;
+        assert_eq!(
+            replay_data.visible_lockfile_digest.as_deref(),
+            Some("visible-digest")
+        );
+        assert_eq!(
+            replay_data.hidden_lockfile_digest.as_deref(),
+            Some("hidden-digest")
+        );
+
+        let module_versions = dice.compute(&BzlmodModuleVersionsDataKey).await?;
+        assert_eq!(
+            module_versions
+                .invalidation
+                .visible_lockfile_digest
+                .as_deref(),
+            Some("visible-digest")
+        );
+        assert_eq!(
+            module_versions
+                .invalidation
+                .hidden_lockfile_digest
+                .as_deref(),
+            Some("hidden-digest")
+        );
 
         Ok(())
     }

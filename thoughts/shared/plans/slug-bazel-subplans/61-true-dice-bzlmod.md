@@ -935,6 +935,20 @@ Observed SDK result at the checkpoint:
   bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
   replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo
   fmt --check`, and `git diff --check`.
+- `BzlmodSessionData` no longer carries duplicate visible/hidden lockfile
+  digest fields. The injection fan-out derives replay and module-version
+  invalidation digests from the tracked `LockfileContentValue`s, so the
+  transitional session payload has one lockfile content identity source while
+  the narrower replay keys still keep explicit digest identity. Validation
+  passed with `cargo check -p slug_bzlmod -p slug_common`, `cargo test -p
+  slug_bzlmod
+  set_bzlmod_session_data_derives_lockfile_digests_from_values -- --nocapture`,
+  `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
+  replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo
+  fmt --check`, and `git diff --check`. The first full `slug_bzlmod` test run
+  hit an environmental doctest linker `SIGBUS` because `/tmp` was full; reruns
+  with `TMPDIR=/var/mnt/dev/slug-test-tmp` passed.
 
 ## Consolidated Learnings
 
