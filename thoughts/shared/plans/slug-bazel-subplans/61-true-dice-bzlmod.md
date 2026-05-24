@@ -166,6 +166,17 @@ Observed SDK result at the checkpoint:
   known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
   `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
   `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
+- Legacy invalid empty target-label detection for known repo-spec
+  materializations now belongs to `RepoMaterializationManifestKey` layout state
+  as `layout-invalid-empty-target-label`; extension file-ops no longer performs
+  the in-place BUILD-file repair side effect and no longer reads the completion
+  marker for known repo specs before forming `ExtensionRepoExecutionKey`.
+  Validation passed with focused `cargo test -p slug_bzlmod
+  materialization_manifest_layout_rejects_invalid_empty_target_label
+  -- --nocapture`, `cargo test -p slug_external_cells
+  known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
+  `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - Hidden-lockfile facts now have same-daemon create/edit/delete coverage: an
   extension reads `module_ctx.facts` from the daemon hidden lockfile, succeeds
   when the hidden facts are created with the expected value, fails after an
@@ -1441,8 +1452,8 @@ What worked:
   external-cell marker gate accepts them. Known repo-spec extension file-ops
   now lets the repository execution manifest own marker/content/output-state
   staleness, recorded-input staleness, and layout validity, including missing
-  declared BUILD-file and foreign top-level symlink checks, instead of
-  deleting from a pre-DICE check.
+  declared BUILD-file, foreign top-level symlink, and invalid empty
+  target-label checks, instead of deleting or repairing from a pre-DICE check.
 - The process-global legacy bzlmod resolution bridge cache was removed from
   the persisted config load path. Warm no-op reuse now has to come from the
   DICE key path rather than `LEGACY_BZLMOD_RESOLUTION_CACHE`; focused warm
@@ -1804,8 +1815,9 @@ using Rust DICE keys and values:
      extension file-ops now delegates marker/content/output-state staleness,
      recorded-input staleness, missing declared BUILD-file checks, and
      layout-validity probes, including foreign top-level symlink checks, to
-     this manifest path. The no-spec fallback and invalid-empty-target-label
-     repair still contain direct file-ops reads.
+     this manifest path. Legacy invalid empty target-label checks also belong
+     to manifest layout state now. The no-spec fallback still contains direct
+     file-ops reads.
    - Ensure local repository rules are non-cacheable where Bazel does not reuse
      cached local repository contents.
 

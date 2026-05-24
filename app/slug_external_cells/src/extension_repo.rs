@@ -30,7 +30,6 @@ use cmp_any::PartialEqAny;
 use compact_str::CompactString;
 use dice::DiceComputations;
 use slug_bzlmod::ExtensionRepoExecutionKey;
-use slug_bzlmod::RepoAttrValue;
 use slug_bzlmod::RepoSpec;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::external_symlink::ExternalSymlink;
@@ -172,82 +171,6 @@ fn complete_marker_output_state_is_stale(
     slug_bzlmod::repository_output_digest(repo_path)
         .map(|current_output_digest| current_output_digest != expected_output_digest)
         .unwrap_or(true)
-}
-
-fn build_file_has_invalid_empty_target_label(repo_path: &std::path::Path) -> bool {
-    ["BUILD.bazel", "BUILD"].into_iter().any(|name| {
-        std::fs::read_to_string(repo_path.join(name))
-            .ok()
-            .is_some_and(|content| content.contains("//:\"") || content.contains("//:'"))
-    })
-}
-
-fn collect_label_repairs(value: &RepoAttrValue, repairs: &mut Vec<(String, String)>) {
-    match value {
-        RepoAttrValue::Label(label) | RepoAttrValue::String(label) => {
-            if let Some(colon) = label.rfind(':') {
-                if colon + 1 < label.len() && (label.starts_with('@') || label.starts_with("//")) {
-                    repairs.push((label[..=colon].to_owned(), label.clone()));
-                }
-            }
-        }
-        RepoAttrValue::StringList(items) => {
-            for item in items {
-                collect_label_repairs(&RepoAttrValue::String(item.clone()), repairs);
-            }
-        }
-        RepoAttrValue::Dict(entries) => {
-            for value in entries.values() {
-                collect_label_repairs(value, repairs);
-            }
-        }
-        RepoAttrValue::Int(_) | RepoAttrValue::Bool(_) | RepoAttrValue::None => {}
-    }
-}
-
-fn repair_invalid_empty_target_labels_from_repo_spec(
-    repo_path: &std::path::Path,
-    repo_spec_json: &str,
-    spec_hash: &str,
-) -> bool {
-    let Ok(repo_spec) = serde_json::from_str::<RepoSpec>(repo_spec_json) else {
-        return false;
-    };
-    let mut repairs = Vec::new();
-    for value in repo_spec.attributes.values() {
-        collect_label_repairs(value, &mut repairs);
-    }
-    repairs.sort();
-    repairs.dedup();
-    if repairs.is_empty() {
-        return false;
-    }
-
-    let mut repaired_any = false;
-    for name in ["BUILD.bazel", "BUILD"] {
-        let path = repo_path.join(name);
-        let Ok(mut content) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        let original = content.clone();
-        for (empty_label, full_label) in &repairs {
-            content = content.replace(&format!("\"{empty_label}\""), &format!("\"{full_label}\""));
-            content = content.replace(&format!("'{empty_label}'"), &format!("'{full_label}'"));
-        }
-        if content != original && std::fs::write(&path, content).is_ok() {
-            repaired_any = true;
-        }
-    }
-
-    if repaired_any {
-        if let Ok(output_digest) = slug_bzlmod::repository_output_digest(repo_path) {
-            let _ = std::fs::write(
-                repo_path.join(".slug_repo_complete"),
-                complete_marker(spec_hash, Some(&output_digest)),
-            );
-        }
-    }
-    repaired_any
 }
 
 /// File operations delegate for extension-generated repositories.
@@ -656,9 +579,14 @@ pub(crate) async fn get_file_ops_delegate(
     // corrupted materialization. Non-complete marker content is never semantic
     // authority; discard it and re-materialize from the current repo spec.
     let marker_path = source_path.join(".slug_repo_complete");
-    let marker_contents = marker_path
-        .exists()
-        .then(|| std::fs::read_to_string(&marker_path).ok())
+    let has_known_repo_spec = !setup.repo_spec_json.is_empty();
+    let marker_contents = (!has_known_repo_spec)
+        .then(|| {
+            marker_path
+                .exists()
+                .then(|| std::fs::read_to_string(&marker_path).ok())
+                .flatten()
+        })
         .flatten();
     let setup_marker_spec_hash = registered_spokes
         .as_ref()
@@ -677,7 +605,6 @@ pub(crate) async fn get_file_ops_delegate(
                     .unwrap_or_else(|_| setup.spec_hash.to_string())
             })
         });
-    let has_known_repo_spec = !setup.repo_spec_json.is_empty();
     let is_stale_non_complete_marker = !has_known_repo_spec
         && marker_contents
             .as_deref()
@@ -699,17 +626,6 @@ pub(crate) async fn get_file_ops_delegate(
         && marker_contents
             .as_deref()
             .is_some_and(|s| is_complete_marker(s) && !is_output_state_marker(s));
-    let is_stale_invalid_empty_target_label = has_known_repo_spec
-        && marker_contents.as_deref().is_some_and(is_complete_marker)
-        && build_file_has_invalid_empty_target_label(&source_path);
-    let repaired_invalid_empty_target_label = is_stale_invalid_empty_target_label
-        && repair_invalid_empty_target_labels_from_repo_spec(
-            &source_path,
-            &setup.repo_spec_json,
-            setup_marker_spec_hash
-                .as_deref()
-                .unwrap_or(setup.spec_hash.as_ref()),
-        );
     let is_stale_foreign_symlink = !has_known_repo_spec
         && marker_contents.as_deref().is_some_and(is_complete_marker)
         && slug_bzlmod::repo_has_foreign_top_level_symlink(&source_path, &project_root_path);
@@ -723,7 +639,6 @@ pub(crate) async fn get_file_ops_delegate(
         || is_stale_complete
         || is_stale_output_state
         || is_stale_spec_unknown_complete
-        || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
         || is_stale_foreign_symlink
         || is_stale_recorded_inputs
     {
@@ -1277,41 +1192,5 @@ mod tests {
         ));
         assert!(!is_complete_marker("stub:sha256-old"));
         let _ = std::fs::remove_dir_all(&base);
-    }
-
-    #[test]
-    fn repairs_legacy_empty_target_labels_from_current_repo_spec() {
-        let dir =
-            std::env::temp_dir().join(format!("slug-empty-label-repair-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(
-            dir.join("BUILD.bazel"),
-            "rust_crate(name = \"x\", deps = [\"@@zstd//:\", \"@@zstd//:zstd\"])\n",
-        )
-        .unwrap();
-
-        let spec = RepoSpec::new("@@rules_rs//rs:crate.bzl%crate_repository".to_owned()).with_attr(
-            "deps".to_owned(),
-            RepoAttrValue::StringList(vec!["@@zstd//:zstd".to_owned()]),
-        );
-        let spec_json = serde_json::to_string(&spec).unwrap();
-
-        assert!(repair_invalid_empty_target_labels_from_repo_spec(
-            &dir,
-            &spec_json,
-            "sha256-new"
-        ));
-        assert_eq!(
-            std::fs::read_to_string(dir.join("BUILD.bazel")).unwrap(),
-            "rust_crate(name = \"x\", deps = [\"@@zstd//:zstd\", \"@@zstd//:zstd\"])\n"
-        );
-        let output_digest = slug_bzlmod::repository_output_digest(&dir).unwrap();
-        assert_eq!(
-            std::fs::read_to_string(dir.join(".slug_repo_complete")).unwrap(),
-            complete_marker("sha256-new", Some(&output_digest))
-        );
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

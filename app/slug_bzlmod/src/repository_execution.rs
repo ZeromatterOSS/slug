@@ -646,6 +646,9 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
     {
         return "layout-missing-build-file".to_owned();
     }
+    if repo_has_invalid_empty_target_label(&repo_dir) {
+        return "layout-invalid-empty-target-label".to_owned();
+    }
     if repo_has_foreign_top_level_symlink(
         &repo_dir,
         key.workspace_id.canonical_project_root.as_ref(),
@@ -665,6 +668,14 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
         }
         Err(e) => format!("layout-unclassifiable:{e}"),
     }
+}
+
+fn repo_has_invalid_empty_target_label(repo_path: &Path) -> bool {
+    ["BUILD.bazel", "BUILD"].into_iter().any(|name| {
+        std::fs::read_to_string(repo_path.join(name))
+            .ok()
+            .is_some_and(|content| content.contains("//:\"") || content.contains("//:'"))
+    })
 }
 
 pub fn repo_has_foreign_top_level_symlink(repo_path: &Path, project_root: &Path) -> bool {
@@ -1857,6 +1868,41 @@ mod tests {
         let present = repo_materialization_manifest_for_key(&key);
         assert_eq!(present.layout_state.as_ref(), "layout-valid");
         assert_ne!(missing.digest, present.digest);
+    }
+
+    #[test]
+    fn materialization_manifest_layout_rejects_invalid_empty_target_label() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+invalid_empty_target_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "rust_crate(name = \"x\", deps = [\"@@zstd//:\"])\n",
+        )
+        .unwrap();
+
+        let repo_spec = RepoSpec::new("@@rules_rs//rs:crate.bzl%crate_repository".to_owned());
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec.clone()),
+        );
+        let invalid = repo_materialization_manifest_for_key(&key);
+        assert_eq!(
+            invalid.layout_state.as_ref(),
+            "layout-invalid-empty-target-label"
+        );
+
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "rust_crate(name = \"x\", deps = [\"@@zstd//:zstd\"])\n",
+        )
+        .unwrap();
+        let valid = repo_materialization_manifest_for_key(&key);
+        assert_eq!(valid.layout_state.as_ref(), "layout-valid");
+        assert_ne!(invalid.digest, valid.digest);
     }
 
     #[cfg(any(unix, windows))]
