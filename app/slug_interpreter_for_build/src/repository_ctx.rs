@@ -630,6 +630,10 @@ pub struct RepositoryContext {
     /// Effective repository environment for this repository rule execution.
     #[allocative(skip)]
     repo_env: Arc<BTreeMap<String, String>>,
+    /// Resolver-owned project paths for labels visible during repository rule
+    /// execution.
+    #[allocative(skip)]
+    cell_paths: Arc<HashMap<String, PathBuf>>,
 }
 
 starlark_simple_value!(RepositoryContext);
@@ -665,6 +669,7 @@ impl RepositoryContext {
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
+            cell_paths: Arc::new(HashMap::new()),
         }
     }
 
@@ -686,6 +691,7 @@ impl RepositoryContext {
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
+            cell_paths: Arc::new(HashMap::new()),
         }
     }
 
@@ -705,7 +711,14 @@ impl RepositoryContext {
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
+            cell_paths: Arc::new(HashMap::new()),
         }
+    }
+
+    /// Set resolver-owned label paths for repository_ctx path-like APIs.
+    pub fn with_label_resolution(mut self, cell_paths: HashMap<String, PathBuf>) -> Self {
+        self.cell_paths = Arc::new(cell_paths);
+        self
     }
 
     /// Set the effective repository environment for repository_ctx APIs.
@@ -730,6 +743,26 @@ impl RepositoryContext {
             PathBuf::from(path)
         } else {
             self.working_dir.join(path)
+        }
+    }
+
+    fn resolve_label_to_filesystem_path(&self, label_str: &str) -> PathBuf {
+        let workspace_root = self.workspace_root.as_ref().as_path();
+        let resolver = LabelFilesystemResolver::new(workspace_root)
+            .with_project_root(Some(workspace_root))
+            .with_root_label_resolution(RootLabelResolution::ProjectAbsolute);
+        let path = if self.cell_paths.is_empty() {
+            resolver.resolve_label_string(label_str)
+        } else {
+            resolver
+                .with_cell_paths(&self.cell_paths)
+                .resolve_label_string(label_str)
+        }
+        .unwrap_or_else(|| PathBuf::from(label_str));
+        if path.is_absolute() {
+            path
+        } else {
+            workspace_root.join(path)
         }
     }
 
@@ -862,6 +895,7 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
         .unwrap_or_else(|| label_str.to_owned())
 }
 
+#[cfg(test)]
 fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> PathBuf {
     let path = LabelFilesystemResolver::new(workspace_root)
         .with_project_root(Some(workspace_root))
@@ -1892,7 +1926,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // `@repo` shorthand for `@repo//:repo`.
             if is_bazel_label_string(s) {
                 trigger_materialization(s);
-                resolve_label_to_filesystem_path(s, &this.workspace_root)
+                this.resolve_label_to_filesystem_path(s)
                     .to_string_lossy()
                     .to_string()
             } else {
@@ -1904,7 +1938,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // Handle Label objects: resolve to the project-root filesystem path.
             let label_str = format!("{}", path_arg);
             trigger_materialization(&label_str);
-            resolve_label_to_filesystem_path(&label_str, &this.workspace_root)
+            this.resolve_label_to_filesystem_path(&label_str)
                 .to_string_lossy()
                 .to_string()
         } else {
@@ -2158,7 +2192,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                 } else if v.get_type() == "Label" {
                     // Label: resolve to filesystem path via cell paths
                     let label_str = v.to_str();
-                    let path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
+                    let path = this.resolve_label_to_filesystem_path(&label_str);
                     ensure_label_path_materialized(&path);
                     path.to_string_lossy().to_string()
                 } else {
@@ -2250,7 +2284,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // string form (which would stringify as
             // `@@cell//templates:foo.bzl` and be a dangling link).
             let label_str = format!("{target}");
-            let path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
+            let path = this.resolve_label_to_filesystem_path(&label_str);
             ensure_label_path_materialized(&path);
             path.to_string_lossy().to_string()
         } else {
@@ -2399,7 +2433,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // form ("@@cell//templates:foo.tpl") as if it were the
             // template body, corrupting every generated file.
             let label_str = format!("{template}");
-            let template_path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
+            let template_path = this.resolve_label_to_filesystem_path(&label_str);
             ensure_label_path_materialized(&template_path);
             std::fs::read_to_string(&template_path).map_err(|e| {
                 starlark::Error::from(slug_error::slug_error!(
@@ -2484,7 +2518,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let _ = watch;
         let file_path = if let Some(s) = path.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = resolve_label_to_filesystem_path(s, &this.workspace_root);
+                let path = this.resolve_label_to_filesystem_path(s);
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2494,7 +2528,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             repo_path.absolute_path()
         } else if path.get_type() == "Label" {
             let label_str = path.to_str();
-            let path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
+            let path = this.resolve_label_to_filesystem_path(&label_str);
             ensure_label_path_materialized(&path);
             path
         } else {
@@ -2572,13 +2606,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let patch_path = if let Some(repo_path) = patch_file.downcast_ref::<RepositoryPath>() {
             repo_path.absolute_path().to_path_buf()
         } else if patch_file.get_type() == "Label" {
-            let path =
-                resolve_label_to_filesystem_path(&format!("{patch_file}"), &this.workspace_root);
+            let path = this.resolve_label_to_filesystem_path(&format!("{patch_file}"));
             ensure_label_path_materialized(&path);
             path
         } else if let Some(s) = patch_file.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = resolve_label_to_filesystem_path(s, &this.workspace_root);
+                let path = this.resolve_label_to_filesystem_path(s);
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2587,7 +2620,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             let repr = patch_file.to_repr();
             if is_bazel_label_string(&repr) {
-                let path = resolve_label_to_filesystem_path(&repr, &this.workspace_root);
+                let path = this.resolve_label_to_filesystem_path(&repr);
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2837,7 +2870,7 @@ fn repository_ctx_resolve_watch_path(
 ) -> starlark::Result<PathBuf> {
     if let Some(s) = path.unpack_str() {
         if is_bazel_label_string(s) {
-            return Ok(resolve_label_to_filesystem_path(s, &this.workspace_root));
+            return Ok(this.resolve_label_to_filesystem_path(s));
         }
         return Ok(this.resolve_path(s));
     }
@@ -2845,10 +2878,7 @@ fn repository_ctx_resolve_watch_path(
         return Ok(repo_path.absolute_path());
     }
     if path.get_type() == "Label" {
-        return Ok(resolve_label_to_filesystem_path(
-            &format!("{}", path),
-            &this.workspace_root,
-        ));
+        return Ok(this.resolve_label_to_filesystem_path(&format!("{}", path)));
     }
     Err(slug_error::slug_error!(
         slug_error::ErrorTag::Input,
@@ -3163,6 +3193,40 @@ mod tests {
         assert_eq!(
             resolve_label_to_filesystem_path("@llvm-raw//:WORKSPACE", workspace_root),
             raw_repo.join("WORKSPACE")
+        );
+    }
+
+    #[test]
+    fn repository_context_label_paths_use_resolver_owned_cell_paths_before_globals() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let working_dir = workspace_root.join("repo_work");
+        let canonical = "repo_ctx_label_owner++ext+generated";
+        let apparent = "repo_ctx_generated_alias";
+        let mut cell_paths = HashMap::new();
+        cell_paths.insert(
+            apparent.to_owned(),
+            workspace_root.join("bazel-external").join(canonical),
+        );
+        let ctx = RepositoryContext::new_with_workspace_root(
+            "ctx".to_owned(),
+            RepositoryAttr::empty(),
+            working_dir,
+            workspace_root.to_path_buf(),
+        )
+        .with_label_resolution(cell_paths);
+
+        assert_eq!(
+            ctx.resolve_label_to_filesystem_path(&format!("@{apparent}//pkg:file.txt")),
+            workspace_root
+                .join("bazel-external")
+                .join(canonical)
+                .join("pkg")
+                .join("file.txt")
+        );
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
+            None
         );
     }
 

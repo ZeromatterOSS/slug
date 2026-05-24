@@ -1638,6 +1638,19 @@ What did not work or remains risky:
   61 Python guardrail with `74 passed in 83.33s`, `cargo fmt --check`, and
   `git diff --check`. The four slugd processes left by the full guardrail were
   cleaned up afterward.
+- Repository rule label path resolution now receives the same resolver-owned
+  cell path map, including bzlmod runtime snapshot aliases, when
+  `RepositoryContext` is created by the Starlark repo-rule executor. This
+  reduces `repository_ctx.path/read/symlink/template/patch/watch` label
+  resolution reliance on process-global generated-repo maps for labels visible
+  in the active resolver. Validation passed with `cargo test -p
+  slug_interpreter_for_build
+  repository_context_label_paths_use_resolver_owned_cell_paths_before_globals
+  -- --nocapture`, `cargo check -p slug_interpreter_for_build -p slug_server`,
+  `cargo build -p slug`, focused Plan 61 label/repo-mapping guardrails
+  (`6 passed, 68 deselected`), the full Plan 61 Python guardrail with
+  `74 passed in 79.03s`, `cargo fmt --check`, and `git diff --check`. The four
+  slugd processes left by the full guardrail were cleaned up afterward.
 - `use_repo_rule()` no longer has a duplicate eager execution/replay path, but
   the generated repo cell graph that exposes those `RepoSpec`s is still
   assembled by the transitional legacy cell parser. Extension repo-spec
@@ -1884,6 +1897,11 @@ using Rust DICE keys and values:
   more `module_ctx.path(Label(...))` dependency on the process-global dynamic
   maps. Repository-context label path resolution and remaining compatibility
   adapters still use process-global dynamic lookups.
+- Repository-context label path resolution now also receives the resolver-owned
+  cell path map from the Starlark repo-rule executor, reducing reliance on
+  process-global generated-repo lookups for repository rule path APIs. The
+  fallback resolver and compatibility adapters still consult process-global
+  dynamic maps when no resolver-owned path is available.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.

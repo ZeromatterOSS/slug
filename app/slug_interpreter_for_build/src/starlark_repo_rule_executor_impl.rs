@@ -232,12 +232,27 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         // 7. Create the RepositoryContext
         let io = ctx.global_data().get_io_provider();
         let workspace_root = io.project_root();
+        let workspace_root_path = workspace_root.root().to_path_buf();
+        let mut cell_paths = HashMap::new();
+        for (cell_name, cell_instance) in cell_resolver.cells() {
+            let rel_path = cell_instance.path().as_project_relative_path();
+            cell_paths.insert(
+                cell_name.as_str().to_owned(),
+                workspace_root_path.join(rel_path.as_str()),
+            );
+        }
+        for (cell_name, rel_path) in cell_resolver.bzlmod_label_cell_paths() {
+            cell_paths
+                .entry(cell_name)
+                .or_insert_with(|| workspace_root_path.join(rel_path));
+        }
         let repo_ctx = RepositoryContext::new_with_workspace_root(
             invocation.name.clone(),
             repo_attr,
             working_dir.to_path_buf(),
-            workspace_root.root().to_path_buf(),
+            workspace_root_path,
         )
+        .with_label_resolution(cell_paths)
         .with_repo_env(repo_env);
 
         tracing::debug!(
