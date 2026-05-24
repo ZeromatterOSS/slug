@@ -575,6 +575,10 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
                 )
             });
         let usages_digest = compute_extension_input_hash(current_extension);
+        // Spoke pre-seeding runs while constructing bootstrap cell data, before
+        // this helper has a `DiceComputations` handle. Keep it on the sync
+        // recorded-input API; normal DICE extension replay validates through
+        // `ModuleExtensionRecordedInputsKey`.
         let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
             current_ext_id,
             &bzl_transitive_digest,

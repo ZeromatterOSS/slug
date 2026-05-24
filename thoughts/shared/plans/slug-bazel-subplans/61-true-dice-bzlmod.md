@@ -701,8 +701,22 @@ Observed SDK result at the checkpoint:
   one tracked lockfile read and does not add a second direct read from extension
   execution. This is still transitional because the values are carried through
   injected session data rather than a final lockfile replay-input key.
-- Current slice validation passed with `cargo build -p slug`, `cargo test -p
-  slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
+- Recorded-input validation for DICE extension replay is now owned by the named
+  child key `ModuleExtensionRecordedInputsKey`: lockfile cache selection chooses
+  the matching entry and cached repo specs, then visible/hidden replay computes
+  the child key before accepting a replay hit. The key still uses the
+  transitional polled FILE/DIRENTS/DIRTREE marker helpers until lower-level
+  watched filesystem keys exist. Lockfile spoke pre-seeding remains on the
+  synchronous bootstrap path because it does not have a `DiceComputations`
+  handle. Focused validation passed with `cargo test -p slug_bzlmod
+  recorded_file_input_changed_rejects_replay -- --nocapture`, `cargo test -p
+  slug_bzlmod recorded_inputs_key_rejects_file_edit -- --nocapture`, `cargo
+  test -p slug_bzlmod
+  visible_lockfile_replay_validates_recorded_file_through_dice_key --
+  --nocapture`, `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git
+  diff --check`.
+- Earlier broad replay validation passed with `cargo build -p slug`, `cargo
+  test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
   -p slug_file_watcher -- --nocapture`, `cargo test -p
   slug_interpreter_for_build module_extension_executor_impl -- --nocapture`,

@@ -335,6 +335,42 @@ pub fn validate_recorded_inputs_current(
     validate_recorded_inputs_for_replay(recorded_inputs, workspace_root, repo_env, repo_mappings)
 }
 
+/// Lockfile extension replay data selected after extension-id and digest checks.
+///
+/// Recorded-input validation is intentionally left to the caller so DICE replay
+/// paths can route it through a named child key.
+#[derive(Debug, Clone)]
+pub(crate) struct SelectedExtensionCache {
+    pub(crate) selected_key: String,
+    pub(crate) repo_specs: fxhash::FxHashMap<String, RepoSpec>,
+    pub(crate) recorded_inputs: Vec<String>,
+    pub(crate) workspace_root: Option<PathBuf>,
+    pub(crate) repo_env: Option<BTreeMap<String, String>>,
+    pub(crate) repo_mappings: Option<crate::RepoMappingSnapshot>,
+}
+
+impl SelectedExtensionCache {
+    pub(crate) fn recorded_inputs_current(&self) -> Result<(), String> {
+        validate_recorded_inputs_current(
+            &self.recorded_inputs,
+            self.workspace_root.as_deref(),
+            self.repo_env.as_ref(),
+            self.repo_mappings.as_ref(),
+        )
+    }
+
+    pub(crate) fn record_hit(&self, extension_id: &str) {
+        record_bzlmod_event(
+            BzlmodEventKind::ExtensionReplayHit,
+            format!(
+                "{extension_id}:{}:{} repo specs",
+                self.selected_key,
+                self.repo_specs.len()
+            ),
+        );
+    }
+}
+
 impl LockfileRepoSpec {
     /// Create a new lockfile repo spec.
     pub fn new(repo_rule_id: String) -> Self {
@@ -937,27 +973,52 @@ impl Lockfile {
         root_module_name: Option<&str>,
         repo_mapping_overrides: Option<&crate::RepoMappingOverrides>,
     ) -> Option<fxhash::FxHashMap<String, RepoSpec>> {
-        // Try exact match first, then normalized forms for Bazel lockfile compat.
-        // Lockfiles may use any of:
-        //   - slug internal:        "@<apparent>//pkg:file.bzl%name"
-        //   - bazel 9 canonical:    "@@<canonical>+//pkg:file.bzl%name"
-        //   - bazel legacy/relative: "//pkg:file.bzl%name"
-        // Also handle ":" prefix used by some older serialization paths.
-        let mut candidate_keys = vec![
-            extension_id.to_owned(),
-            lockfile_canonical_extension_id(extension_id),
-        ];
-        if extension_id.starts_with(':') {
-            candidate_keys.push(format!("//{}", extension_id));
+        let selected = self.select_extension_cache_for_workspace(
+            extension_id,
+            bzl_transitive_digest,
+            usages_digest,
+            workspace_root,
+            repo_env,
+            repo_mappings,
+            root_module_name,
+            repo_mapping_overrides,
+        )?;
+        if let Err(reason) = selected.recorded_inputs_current() {
+            record_bzlmod_event(
+                BzlmodEventKind::ExtensionReplayMissReason,
+                format!("{extension_id}:{reason}"),
+            );
+            tracing::debug!(
+                "Extension cache miss for '{}': recorded input validation failed ({})",
+                extension_id,
+                reason
+            );
+            return None;
         }
-        if let Some(stripped) = extension_id.strip_prefix("//") {
-            candidate_keys.push(stripped.to_owned());
-        }
-        candidate_keys.sort();
-        candidate_keys.dedup();
+        tracing::debug!(
+            "Extension cache hit for '{}' via '{}': {} repo specs",
+            extension_id,
+            selected.selected_key,
+            selected.repo_specs.len()
+        );
+        selected.record_hit(extension_id);
+        Some(selected.repo_specs)
+    }
 
+    pub(crate) fn select_extension_cache_for_workspace(
+        &self,
+        extension_id: &str,
+        bzl_transitive_digest: &str,
+        usages_digest: &str,
+        workspace_root: Option<&Path>,
+        repo_env: Option<&BTreeMap<String, String>>,
+        repo_mappings: Option<&crate::RepoMappingSnapshot>,
+        root_module_name: Option<&str>,
+        repo_mapping_overrides: Option<&crate::RepoMappingOverrides>,
+    ) -> Option<SelectedExtensionCache> {
         let mut saw_candidate = false;
         let mut selected = None;
+        let candidate_keys = Self::extension_candidate_keys(extension_id);
         for candidate_key in &candidate_keys {
             let Some(ext_data) = self.module_extensions.get(candidate_key) else {
                 continue;
@@ -995,6 +1056,8 @@ impl Lockfile {
             return None;
         };
 
+        let general = ext_data.general.as_ref()?;
+        let recorded_inputs = general.recorded_inputs.clone();
         let canonical_extension_id = lockfile_canonical_extension_id(extension_id);
         let augmented_repo_mappings;
         let repo_mappings_for_validation = if let (Some(base_mappings), Some(root_module_name)) =
@@ -1030,21 +1093,6 @@ impl Lockfile {
         } else {
             repo_mappings
         };
-
-        if let Err(reason) =
-            ext_data.recorded_inputs_current(workspace_root, repo_env, repo_mappings_for_validation)
-        {
-            record_bzlmod_event(
-                BzlmodEventKind::ExtensionReplayMissReason,
-                format!("{extension_id}:{reason}"),
-            );
-            tracing::debug!(
-                "Extension cache miss for '{}': recorded input validation failed ({})",
-                extension_id,
-                reason
-            );
-            return None;
-        }
 
         // Convert lockfile specs back to RepoSpecs
         let repo_specs = ext_data.get_repo_specs()?;
@@ -1088,21 +1136,14 @@ impl Lockfile {
             return None;
         }
 
-        tracing::debug!(
-            "Extension cache hit for '{}' via '{}': {} repo specs",
-            extension_id,
-            selected_key,
-            repo_specs.len()
-        );
-        record_bzlmod_event(
-            BzlmodEventKind::ExtensionReplayHit,
-            format!(
-                "{extension_id}:{selected_key}:{} repo specs",
-                repo_specs.len()
-            ),
-        );
-
-        Some(result)
+        Some(SelectedExtensionCache {
+            selected_key: selected_key.to_owned(),
+            repo_specs: result,
+            recorded_inputs,
+            workspace_root: workspace_root.map(Path::to_path_buf),
+            repo_env: repo_env.cloned(),
+            repo_mappings: repo_mappings_for_validation.cloned(),
+        })
     }
 
     fn extension_candidate_keys(extension_id: &str) -> Vec<String> {
