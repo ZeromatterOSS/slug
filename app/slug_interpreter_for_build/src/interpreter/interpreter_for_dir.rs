@@ -304,6 +304,7 @@ fn are_bzlmod_alias_equivalent(
     apparent: &str,
     canonical: &str,
 ) -> bool {
+    let resolver_has_runtime_snapshot = alias_resolver.has_bzlmod_runtime_alias_snapshot();
     apparent == canonical
         || canonical.strip_suffix('+') == Some(apparent)
         || apparent.strip_suffix('+') == Some(canonical)
@@ -313,10 +314,12 @@ fn are_bzlmod_alias_equivalent(
         || alias_resolver
             .resolve_declared_or_runtime_alias(canonical)
             .is_some_and(|cell| cell.as_str() == apparent)
-        || slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref()
-            == Some(canonical)
-        || slug_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
-            == Some(apparent)
+        || (!resolver_has_runtime_snapshot
+            && slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref()
+                == Some(canonical))
+        || (!resolver_has_runtime_snapshot
+            && slug_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
+                == Some(apparent))
         || extension_repo_internal_name(apparent) == Some(canonical)
         || extension_repo_internal_name(canonical) == Some(apparent)
 }
@@ -379,6 +382,33 @@ mod tests {
 
         assert!(are_bzlmod_alias_equivalent(&resolver, apparent, canonical));
         assert!(are_bzlmod_alias_equivalent(&resolver, canonical, apparent));
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
+            Some(wrong_global.to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn load_cell_equivalence_with_runtime_aliases_ignores_global_miss() -> slug_error::Result<()> {
+        let apparent = "runtime_load_missing_alias";
+        let wrong_global = "wrong_owner++ext+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert!(!are_bzlmod_alias_equivalent(
+            &resolver,
+            apparent,
+            wrong_global
+        ));
         assert_eq!(
             slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
             Some(wrong_global.to_owned())

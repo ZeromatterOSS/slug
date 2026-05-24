@@ -1608,6 +1608,10 @@ impl CellAliasResolver {
         None
     }
 
+    pub fn has_bzlmod_runtime_alias_snapshot(&self) -> bool {
+        self.bzlmod_runtime_aliases.is_some()
+    }
+
     /// resolves a 'CellAlias' into its corresponding 'CellName'
     pub fn resolve(&self, alias: &str) -> slug_error::Result<CellName> {
         if alias.is_empty() {

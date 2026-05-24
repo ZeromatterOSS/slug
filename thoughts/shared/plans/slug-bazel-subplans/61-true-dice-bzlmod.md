@@ -1815,20 +1815,27 @@ What did not work or remains risky:
 - Native repository-rule `build_file` and `patches` label resolution can now use
   resolver-owned bzlmod cell paths from the DICE cell graph during extension
   repository execution. That path prefers graph-owned aliases and cells over
-  stale normal directories, and a resolver-owned miss no longer scans
-  `bazel-external`; legacy native-executor callers without resolver-owned label
-  paths keep the old scan fallback. Scoped aliases are intentionally not
-  flattened because the native executor does not yet carry the declaring-module
-  owner context. Validation passed with focused `cargo test -p slug_bzlmod
-  resolve_build_file_label -- --nocapture` (`6 passed`), `cargo test -p
-  slug_bzlmod http_archive_build_file_uses_resolver_owned_label_path --
-  --nocapture` (`1 passed`), `cargo test -p slug_bzlmod -- --nocapture` (`319
-  passed`), `cargo test -p slug_common bzlmod -- --nocapture` (`10 passed`),
-  `cargo test -p slug_external_cells -- --nocapture` (`8 passed`), `cargo check
-  -p slug_bzlmod -p slug_server`, `cargo build -p slug`, the full Plan 61 Python
-  guardrail with `75 passed in 346.43s`, `cargo fmt --check`, and `git diff
-  --check`. The slugd processes left by the full guardrail were cleaned up
-  afterward.
+  stale normal directories, treats resolver-owned misses as synthetic
+  non-`bazel-external` miss paths, requires explicit graph aliases for apparent
+  module names, and does not promote extension internal names as global aliases.
+  Scoped aliases remain intentionally unflattened because the native executor
+  does not yet carry the declaring-module owner context. Bzlmod load wrong-cell
+  equivalence now also treats a runtime alias snapshot as authoritative before
+  consulting process-global dynamic aliases. Validation passed with focused
+  `cargo test -p slug_bzlmod resolve_build_file_label -- --nocapture` (`8
+  passed`), `cargo test -p slug_bzlmod
+  http_archive_build_file_uses_resolver_owned_label_path -- --nocapture` (`1
+  passed`), `cargo test -p slug_interpreter_for_build load_cell_equivalence --
+  --nocapture` (`6 passed`), `cargo test -p slug_core bzlmod_ -- --nocapture`
+  (`16 passed`), `cargo test -p slug_bzlmod -- --nocapture` (`321 passed`;
+  doctest `1 passed, 4 ignored`), `cargo test -p slug_interpreter_for_build --
+  --nocapture --test-threads=1` (`92 passed`; doctest `1 ignored`), `cargo test
+  -p slug_common bzlmod -- --nocapture` (`10 passed`), `cargo test -p
+  slug_external_cells -- --nocapture` (`8 passed`), `cargo check -p slug_core -p
+  slug_bzlmod -p slug_interpreter_for_build -p slug_server`, `cargo build -p
+  slug`, the full Plan 61 Python guardrail with `75 passed in 47.46s`, `cargo
+  fmt --check`, and `git diff --check`. The four slugd processes left by the
+  full guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final

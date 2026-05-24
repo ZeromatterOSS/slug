@@ -1050,6 +1050,9 @@ fn resolve_build_file_label(
         if let Some(path) = label_resolution.resolve_label(&project_root, &parsed, &repo) {
             return path.to_string_lossy().to_string();
         }
+        return label_path_for_resolver_owned_miss(&project_root, &parsed, &repo)
+            .to_string_lossy()
+            .to_string();
     }
 
     let normal_path = if repo.is_empty() {
@@ -1057,10 +1060,6 @@ fn resolve_build_file_label(
     } else {
         label_path_under(project_root.join("bazel-external").join(&repo), &parsed)
     };
-
-    if label_resolution.is_some() {
-        return normal_path.to_string_lossy().to_string();
-    }
 
     if normal_path.exists() {
         return normal_path.to_string_lossy().to_string();
@@ -1091,8 +1090,7 @@ impl RepositoryLabelResolution {
         }
         for cell in cell_graph.extension_cells.iter() {
             let path = project_relative_or_absolute(project_root, &cell.path);
-            cell_paths.insert(cell.canonical_name.clone(), path.clone());
-            cell_paths.entry(cell.internal_name.clone()).or_insert(path);
+            cell_paths.insert(cell.canonical_name.clone(), path);
         }
 
         let mut resolution = Self { cell_paths };
@@ -1120,15 +1118,6 @@ impl RepositoryLabelResolution {
 
         self.cell_paths
             .get(repo)
-            .or_else(|| {
-                let module_prefix = format!("{repo}+");
-                self.cell_paths
-                    .iter()
-                    .find(|(name, _)| {
-                        name.starts_with(&module_prefix) && name.matches('+').count() == 1
-                    })
-                    .map(|(_, path)| path)
-            })
             .map(|repo_path| label_path_under(repo_path, label))
     }
 
@@ -1139,6 +1128,18 @@ impl RepositoryLabelResolution {
         self.cell_paths
             .entry(apparent_name.to_owned())
             .or_insert(target_path);
+    }
+}
+
+fn label_path_for_resolver_owned_miss(
+    project_root: &Path,
+    label: &crate::repo_mapping::CanonicalLabel,
+    repo: &str,
+) -> PathBuf {
+    if repo.is_empty() {
+        label_path_under(project_root, label)
+    } else {
+        label_path_under(project_root.join(repo), label)
     }
 }
 
@@ -2409,10 +2410,13 @@ mod tests {
     fn resolve_build_file_label_resolver_owned_miss_does_not_scan_bazel_external() {
         let temp = TempDir::new().unwrap();
         let project_root = temp.path();
+        let stale_exact_repo = project_root.join("bazel-external").join("rules_cc");
         let legacy_repo = project_root.join("bazel-external").join("rules_cc+0.1.0");
         let working_dir = project_root.join("bazel-external").join("current_repo");
+        std::fs::create_dir_all(stale_exact_repo.join("cc")).unwrap();
         std::fs::create_dir_all(legacy_repo.join("cc")).unwrap();
         std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(stale_exact_repo.join("cc").join("BUILD.rules"), "").unwrap();
         std::fs::write(legacy_repo.join("cc").join("BUILD.rules"), "").unwrap();
 
         let cell_graph = BzlmodCellGraphValue::empty_for_workspace(WorkspaceId::for_project_root(
@@ -2429,11 +2433,92 @@ mod tests {
 
         assert_eq!(
             PathBuf::from(resolved),
-            project_root
-                .join("bazel-external")
-                .join("rules_cc")
-                .join("cc")
-                .join("BUILD.rules")
+            project_root.join("rules_cc").join("cc").join("BUILD.rules")
+        );
+    }
+
+    #[test]
+    fn resolve_build_file_label_requires_explicit_graph_alias_for_module_name() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let graph_repo = project_root.join("bazel-external").join("rules_cc+0.2.17");
+        let working_dir = project_root.join("bazel-external").join("current_repo");
+        std::fs::create_dir_all(graph_repo.join("cc")).unwrap();
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(graph_repo.join("cc").join("BUILD.rules"), "").unwrap();
+
+        let mut cell_graph = BzlmodCellGraphValue::empty_for_workspace(
+            WorkspaceId::for_project_root(project_root.to_path_buf()),
+        );
+        cell_graph.cells = Arc::new(vec![BzlmodCellGraphCell {
+            name: "rules_cc+0.2.17".to_owned(),
+            path: "bazel-external/rules_cc+0.2.17".to_owned(),
+            module_setup: None,
+            bundled: false,
+        }]);
+        let label_resolution =
+            RepositoryLabelResolution::from_cell_graph(project_root, &cell_graph);
+
+        let resolved = resolve_build_file_label(
+            "@rules_cc//cc:BUILD.rules",
+            &working_dir,
+            Some(&label_resolution),
+        );
+
+        assert_eq!(
+            PathBuf::from(resolved),
+            project_root.join("rules_cc").join("cc").join("BUILD.rules")
+        );
+    }
+
+    #[test]
+    fn resolve_build_file_label_does_not_treat_internal_names_as_global_aliases() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let canonical = "_main+ext+generated";
+        let internal = "generated";
+        let graph_repo = project_root.join("bazel-external").join(canonical);
+        let working_dir = project_root.join("bazel-external").join("current_repo");
+        std::fs::create_dir_all(&graph_repo).unwrap();
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(graph_repo.join("BUILD.repo"), "").unwrap();
+
+        let mut cell_graph = BzlmodCellGraphValue::empty_for_workspace(
+            WorkspaceId::for_project_root(project_root.to_path_buf()),
+        );
+        cell_graph.extension_cells =
+            Arc::new(vec![crate::dice_graph::BzlmodCellGraphExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: internal.to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                extension_id: "@_main//:ext.bzl%ext".to_owned(),
+                spec_hash: String::new(),
+                repo_spec_json: String::new(),
+                repo_env_json: String::new(),
+                materialized: false,
+                lazy: false,
+            }]);
+        let label_resolution =
+            RepositoryLabelResolution::from_cell_graph(project_root, &cell_graph);
+
+        let internal_resolved = resolve_build_file_label(
+            &format!("@{internal}//:BUILD.repo"),
+            &working_dir,
+            Some(&label_resolution),
+        );
+        assert_eq!(
+            PathBuf::from(internal_resolved),
+            project_root.join(internal).join("BUILD.repo")
+        );
+
+        let canonical_resolved = resolve_build_file_label(
+            &format!("@@{canonical}//:BUILD.repo"),
+            &working_dir,
+            Some(&label_resolution),
+        );
+        assert_eq!(
+            PathBuf::from(canonical_resolved),
+            graph_repo.join("BUILD.repo")
         );
     }
 
