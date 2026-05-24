@@ -617,9 +617,15 @@ Observed SDK result at the checkpoint:
   or project_local_override_include_cycle'` (`6 passed, 101 deselected`,
   including the out-of-project mirror tests selected by the same pattern).
 - Project-local and out-of-project `local_path_override` module files now also
-  have present-to-missing deletion guardrails. Validation passed with the
-  focused subset selected by `-k 'project_local_override_module_deletion or
-  out_of_project_local_override_module_deletion'` (`2 passed, 107 deselected`).
+  have missing-to-present creation and present-to-missing deletion guardrails.
+  The creation guardrails warm an empty override module, create `MODULE.bazel`,
+  and require the repaired graph to expose a new generated repo. Validation
+  passed with the focused creation subset selected by `-k
+  'project_local_override_module_creation or
+  out_of_project_local_override_module_creation'` (`2 passed, 112 deselected`);
+  the deletion subset selected by `-k 'project_local_override_module_deletion
+  or out_of_project_local_override_module_deletion'` passed earlier (`2 passed,
+  107 deselected`).
 - Locked registry `source.json` metadata now has focused parse-error and
   invalid UTF-8 failure-transition guardrails: after a warm same-daemon
   registry module resolution, corrupt cached source metadata with matching
@@ -2177,9 +2183,9 @@ using Rust DICE keys and values:
      UTF-8 failures for every module source class. Cached git/archive override
      coverage now includes create/delete, parse/UTF-8 failures, and include
      cycles; project-local and out-of-project local override coverage now
-     includes deletion, parse/UTF-8 failures, and include cycles. Root included
-     segments now have parse/UTF-8 failure, include-cycle, and create/delete
-     coverage. Root `MODULE.bazel` has parse/UTF-8 failure and deletion
+     includes create/delete, parse/UTF-8 failures, and include cycles. Root
+     included segments now have parse/UTF-8 failure, include-cycle, and
+     create/delete coverage. Root `MODULE.bazel` has parse/UTF-8 failure and deletion
      coverage, while registry `MODULE.bazel` has parse/UTF-8 failure coverage;
      remaining source classes still need full matrix coverage.
    - Model registry selection and source metadata for overrides.

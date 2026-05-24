@@ -944,6 +944,61 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_project_local_override_module_creation_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: project-local local_path_override creation is an input."""
+    module_name = "project_local_created_module"
+    local_lib = buck.cwd / "libs" / module_name
+    local_lib.mkdir(parents=True, exist_ok=True)
+    module_file = local_lib / "MODULE.bazel"
+    _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_project_local_create")
+
+bazel_dep(name = "{module_name}")
+local_path_override(
+    module_name = "{module_name}",
+    path = "libs/{module_name}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "created_repo" not in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "created_repo" not in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(
+        module_file,
+        f"""module(name = "{module_name}", version = "1.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "created_repo")
+""",
+    )
+    output, created = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "created_repo" in output
+    assert created["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_out_of_project_local_override_parse_failure_invalidates_bzlmod_resolution(
     buck: Buck,
 ) -> None:
@@ -1161,6 +1216,61 @@ local_path_override(
     output, deleted = await _audit_cells_and_counters(buck)
     assert module_name in output
     assert deleted["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_out_of_project_local_override_module_creation_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: out-of-project local_path_override creation is an input."""
+    module_name = "external_local_created_module"
+    local_lib = buck.cwd.parent / f"{buck.cwd.name}_{module_name}"
+    local_lib.mkdir(parents=True, exist_ok=True)
+    module_file = local_lib / "MODULE.bazel"
+    _write(
+        local_lib / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_external_local_create")
+
+bazel_dep(name = "{module_name}")
+local_path_override(
+    module_name = "{module_name}",
+    path = "{local_lib.as_posix()}",
+)
+""",
+    )
+
+    before = await _bzlmod_counters(buck)
+    output, first = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "created_repo" not in output
+    assert first["bzlmod_resolution_compute"] > before["bzlmod_resolution_compute"]
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "created_repo" not in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    _write(
+        module_file,
+        f"""module(name = "{module_name}", version = "1.0")
+dep = use_extension("//:dep_ext.bzl", "dep_ext")
+use_repo(dep, "created_repo")
+""",
+    )
+    output, created = await _audit_cells_and_counters(buck)
+    assert module_name in output
+    assert "created_repo" in output
+    assert created["bzlmod_resolution_compute"] > warm["bzlmod_resolution_compute"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
