@@ -56,6 +56,7 @@ use crate::dice_graph::repo_env_policy_digest;
 use crate::lockfile::compute_sha256_hex;
 use crate::lockfile::validate_recorded_inputs_current;
 use crate::repo_spec::RepoSpec;
+use crate::repository_invocations::AttrValue;
 use crate::repository_invocations::RepositoryInvocation;
 
 pub(crate) const REPO_RECORDED_INPUTS_FILE: &str = ".slug_repo_recorded_inputs";
@@ -639,6 +640,12 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
     let canonical_name = key.canonical_repo.as_ref();
     let repo_spec = key.repo_spec.as_ref();
     let repo_dir = repo_dir_for_materialization_manifest_key(key);
+    if repo_spec_requires_build_file(repo_spec)
+        && !repo_dir.join("BUILD.bazel").exists()
+        && !repo_dir.join("BUILD").exists()
+    {
+        return "layout-missing-build-file".to_owned();
+    }
     match repo_spec_to_invocation(canonical_name, repo_spec) {
         Ok(invocation) => {
             if crate::repository_executor::repo_layout_is_valid_for_invocation(
@@ -651,6 +658,27 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
             }
         }
         Err(e) => format!("layout-unclassifiable:{e}"),
+    }
+}
+
+fn repo_spec_requires_build_file(repo_spec: &RepoSpec) -> bool {
+    repo_spec
+        .attributes
+        .get("build_file")
+        .is_some_and(attr_value_is_present)
+        || repo_spec
+            .attributes
+            .get("build_file_content")
+            .is_some_and(attr_value_is_present)
+}
+
+fn attr_value_is_present(value: &AttrValue) -> bool {
+    match value {
+        AttrValue::None => false,
+        AttrValue::String(s) | AttrValue::Label(s) => !s.is_empty(),
+        AttrValue::StringList(items) => !items.is_empty(),
+        AttrValue::Dict(entries) => !entries.is_empty(),
+        AttrValue::Int(_) | AttrValue::Bool(_) => true,
     }
 }
 
@@ -1771,6 +1799,39 @@ mod tests {
                 .recorded_inputs_state
                 .contains("inputs-invalid:recorded_input_changed")
         );
+    }
+
+    #[test]
+    fn materialization_manifest_layout_rejects_missing_declared_build_file() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+missing_build_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "payload\n").unwrap();
+
+        let repo_spec = RepoSpec::new("@@example//:repo.bzl%custom_repository".to_owned())
+            .with_attr(
+                "build_file_content".to_owned(),
+                AttrValue::String("exports_files([\"data.txt\"])\n".to_owned()),
+            );
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec.clone()),
+        );
+
+        let missing = repo_materialization_manifest_for_key(&key);
+        assert_eq!(missing.layout_state.as_ref(), "layout-missing-build-file");
+
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        let present = repo_materialization_manifest_for_key(&key);
+        assert_eq!(present.layout_state.as_ref(), "layout-valid");
+        assert_ne!(missing.digest, present.digest);
     }
 
     #[tokio::test]

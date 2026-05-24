@@ -728,11 +728,6 @@ pub(crate) async fn get_file_ops_delegate(
                 .as_deref()
                 .unwrap_or(setup.spec_hash.as_ref()),
         );
-    let is_stale_missing_build = marker_path.exists()
-        && !setup.repo_spec_json.is_empty()
-        && repo_spec_requires_build_file(&setup.repo_spec_json)
-        && !source_path.join("BUILD.bazel").exists()
-        && !source_path.join("BUILD").exists();
     let is_stale_foreign_symlink = marker_contents.as_deref().is_some_and(is_complete_marker)
         && repo_has_foreign_top_level_symlink(&source_path, &project_root_path);
     let is_stale_invalid_layout = !setup.repo_spec_json.is_empty()
@@ -753,7 +748,6 @@ pub(crate) async fn get_file_ops_delegate(
         || is_stale_output_state
         || is_stale_spec_unknown_complete
         || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
-        || is_stale_missing_build
         || is_stale_foreign_symlink
         || is_stale_invalid_layout
         || is_stale_recorded_inputs
@@ -1059,30 +1053,6 @@ pub(crate) async fn get_file_ops_delegate(
         source_path,
         digest_config,
     )))
-}
-
-fn repo_spec_requires_build_file(repo_spec_json: &str) -> bool {
-    let Ok(repo_spec) = serde_json::from_str::<RepoSpec>(repo_spec_json) else {
-        return false;
-    };
-    repo_spec
-        .attributes
-        .get("build_file")
-        .is_some_and(attr_value_is_present)
-        || repo_spec
-            .attributes
-            .get("build_file_content")
-            .is_some_and(attr_value_is_present)
-}
-
-fn attr_value_is_present(value: &RepoAttrValue) -> bool {
-    match value {
-        RepoAttrValue::None => false,
-        RepoAttrValue::String(s) | RepoAttrValue::Label(s) => !s.is_empty(),
-        RepoAttrValue::StringList(items) => !items.is_empty(),
-        RepoAttrValue::Dict(entries) => !entries.is_empty(),
-        RepoAttrValue::Int(_) | RepoAttrValue::Bool(_) => true,
-    }
 }
 
 fn repo_spec_layout_is_invalid(
