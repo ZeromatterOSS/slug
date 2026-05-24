@@ -417,6 +417,40 @@ mod tests {
     }
 
     #[test]
+    fn load_import_resolution_with_runtime_aliases_rejects_global_miss() -> slug_error::Result<()> {
+        let apparent = "runtime_load_parse_missing_alias";
+        let wrong_global = "wrong_owner++ext+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let current_dir =
+            CellPathWithAllowedRelativeDir::new(CellPath::testing_new("root//pkg"), None);
+
+        let parsed = parse_import(
+            &resolver,
+            RelativeImports::Allow {
+                current_dir_with_allowed_relative: &current_dir,
+                package_dir: None,
+            },
+            &format!("@{apparent}//pkg:defs.bzl"),
+        );
+
+        assert!(parsed.is_err());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
+            Some(wrong_global.to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
     fn load_cell_equivalence_accepts_empty_version_module_suffix() {
         let resolver = test_alias_resolver();
         assert!(are_bzlmod_alias_equivalent(

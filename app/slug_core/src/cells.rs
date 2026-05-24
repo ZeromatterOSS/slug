@@ -1620,10 +1620,18 @@ impl CellAliasResolver {
         if alias == self.current.as_str() {
             return Ok(self.current);
         }
+        let has_runtime_snapshot = self.has_bzlmod_runtime_alias_snapshot();
         if let Some(canonical_name) = self
             .resolve_scoped_bzlmod_repo_alias_from_runtime(alias)
             .or_else(|| {
-                resolve_scoped_bzlmod_repo_alias_for_current_cell(self.current.as_str(), alias)
+                (!has_runtime_snapshot)
+                    .then(|| {
+                        resolve_scoped_bzlmod_repo_alias_for_current_cell(
+                            self.current.as_str(),
+                            alias,
+                        )
+                    })
+                    .flatten()
             })
         {
             if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
@@ -1636,7 +1644,11 @@ impl CellAliasResolver {
 
         if let Some(canonical_name) = self
             .resolve_dynamic_extension_cell_alias_from_runtime(alias)
-            .or_else(|| resolve_dynamic_extension_cell_alias(alias))
+            .or_else(|| {
+                (!has_runtime_snapshot)
+                    .then(|| resolve_dynamic_extension_cell_alias(alias))
+                    .flatten()
+            })
         {
             if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
                 return Ok(cell_name);
@@ -1644,15 +1656,17 @@ impl CellAliasResolver {
         }
 
         if self.has_bzlmod_runtime_extension_cell(alias)
-            || get_dynamic_extension_cell(alias).is_some()
+            || (!has_runtime_snapshot && get_dynamic_extension_cell(alias).is_some())
         {
             if let Ok(cell_name) = CellName::unchecked_new(alias) {
                 return Ok(cell_name);
             }
         }
 
-        if let Some(cell_name) = resolve_bzlmod_apparent_alias_from_external_dir(alias) {
-            return Ok(cell_name);
+        if !has_runtime_snapshot {
+            if let Some(cell_name) = resolve_bzlmod_apparent_alias_from_external_dir(alias) {
+                return Ok(cell_name);
+            }
         }
 
         if matches!(
@@ -1680,23 +1694,25 @@ impl CellAliasResolver {
                     return Ok(cell_name);
                 }
             }
-            // Check the global dynamic registry
-            if get_dynamic_extension_cell(&candidate).is_some() {
-                if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
-                    // Register the apparent name as an alias for this cell too
-                    register_dynamic_extension_cell(
-                        candidate.clone(),
-                        format!("bazel-external/{}", candidate),
-                    );
-                    return Ok(cell_name);
+            if !has_runtime_snapshot {
+                // Check the global dynamic registry
+                if get_dynamic_extension_cell(&candidate).is_some() {
+                    if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                        // Register the apparent name as an alias for this cell too
+                        register_dynamic_extension_cell(
+                            candidate.clone(),
+                            format!("bazel-external/{}", candidate),
+                        );
+                        return Ok(cell_name);
+                    }
                 }
-            }
-            // Check if a bazel-external directory exists for this candidate
-            let candidate_path = format!("bazel-external/{}", candidate);
-            if std::path::Path::new(&candidate_path).exists() {
-                if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
-                    register_dynamic_extension_cell(candidate, candidate_path);
-                    return Ok(cell_name);
+                // Check if a bazel-external directory exists for this candidate
+                let candidate_path = format!("bazel-external/{}", candidate);
+                if std::path::Path::new(&candidate_path).exists() {
+                    if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                        register_dynamic_extension_cell(candidate, candidate_path);
+                        return Ok(cell_name);
+                    }
                 }
             }
         }
@@ -2276,6 +2292,16 @@ impl CellResolver {
             return self.get_or_create_bzlmod_runtime_cell(cell, runtime_cell);
         }
 
+        if self.0.bzlmod_runtime_cell_snapshot.is_some() {
+            if let Some(instance) = self.bzlmod_static_module_cell_for_canonical_name(cell) {
+                return Ok(instance);
+            }
+            return Err(slug_error::Error::from(CellError::UnknownCellName(
+                cell,
+                self.0.cells.keys().copied().collect(),
+            )));
+        }
+
         // Check global dynamic registry (populated by extension execution).
         // Resolve through the canonical helper so apparent-name/suffix fallback is
         // deterministic and respects known module-cell collisions.
@@ -2388,6 +2414,26 @@ impl CellResolver {
             .iter()
             .find(|cell| cell.canonical_name == name || cell.internal_name == name)
             .cloned()
+    }
+
+    fn bzlmod_static_module_cell_for_canonical_name(
+        &self,
+        cell: CellName,
+    ) -> Option<&CellInstance> {
+        let canonical_name = cell.as_str();
+        let module_name = canonical_name.strip_suffix('+')?;
+        if module_name.is_empty() {
+            return None;
+        }
+
+        let module_cell = CellName::unchecked_new(module_name).ok()?;
+        let instance = self.0.cells.get(&module_cell)?;
+        let cell_root = instance.path().as_project_relative_path().as_str();
+        let external_repo = cell_root
+            .strip_prefix("bazel-external/")?
+            .split('/')
+            .next()?;
+        (external_repo == canonical_name).then_some(instance)
     }
 
     fn get_or_create_bzlmod_runtime_cell(
@@ -3073,7 +3119,7 @@ mod tests {
 
         register_dynamic_extension_cell(stale_global.to_owned(), runtime_path.clone());
         let stale_cell = CellName::testing_new(stale_global);
-        assert_eq!(resolver.get(stale_cell)?.name(), stale_cell);
+        assert!(resolver.get(stale_cell).is_err());
 
         let runtime_cell = CellName::testing_new(canonical);
         assert_eq!(
@@ -3084,6 +3130,108 @@ mod tests {
                 runtime_cell,
                 ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
             )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_runtime_snapshot_rejects_process_global_alias_misses() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let apparent = "runtime_missing_alias";
+        let wrong_global = "wrong_owner++ext+generated";
+        register_dynamic_extension_cell_alias(apparent.to_owned(), wrong_global.to_owned());
+        register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+        register_scoped_bzlmod_repo_alias(
+            "root".to_owned(),
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(
+            resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        assert_eq!(
+            resolve_scoped_bzlmod_repo_alias_for_current_cell("root", apparent).as_deref(),
+            Some(wrong_global)
+        );
+        assert!(root_aliases.resolve(apparent).is_err());
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+        assert!(resolver.get(CellName::testing_new(wrong_global)).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_runtime_snapshot_resolves_static_canonical_module_cell() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let owner = CellName::testing_new("owner");
+        let owner_canonical = CellName::testing_new("owner+");
+        let root_path = CellRootPathBuf::testing_new("");
+        let owner_path = CellRootPathBuf::testing_new("bazel-external/owner+");
+        let cell_roots = [(root, root_path.as_path()), (owner, owner_path.as_path())];
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &root_path),
+        )?;
+        let owner_instance = CellInstance::new(
+            owner,
+            owner_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &owner_path),
+        )?;
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance, owner_instance],
+            root_aliases,
+            snapshot,
+        )?;
+
+        assert_eq!(resolver.get(owner_canonical)?.name(), owner);
+        let load_path = CellPath::new(
+            owner_canonical,
+            ForwardRelativePathBuf::unchecked_new("replay_ext.bzl".to_owned()).into(),
+        );
+        assert_eq!(
+            resolver.resolve_path(load_path.as_ref())?,
+            ProjectRelativePathBuf::unchecked_new("bazel-external/owner+/replay_ext.bzl".into())
         );
 
         Ok(())
@@ -3403,6 +3551,10 @@ mod tests {
 
     #[test]
     fn canonical_dynamic_extension_cell_name_preserves_exact_external_cell() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "exact_external_cell_test_unique";
         let canonical = "owner+extension+exact_external_cell_test_unique";
         register_dynamic_extension_cell(
@@ -3426,6 +3578,7 @@ mod tests {
 
     #[test]
     fn canonical_bazel_repo_name_uses_empty_version_module_suffix() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(tmp.path().join("bazel-external/llvm+")).unwrap();
         reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
@@ -3435,6 +3588,7 @@ mod tests {
 
     #[test]
     fn action_external_cell_name_uses_canonical_generated_repo_suffix() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let apparent = "rustc_linux_x86_64_1_95_0";
         let canonical = "rules_rs++toolchains+rustc_linux_x86_64_1_95_0";
@@ -3450,6 +3604,7 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn action_external_cell_name_uses_external_symlink_target() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let apparent = "rustc_linux_x86_64_1_95_0";
         let canonical = "rules_rs++toolchains+rustc_linux_x86_64_1_95_0";
@@ -3468,6 +3623,10 @@ mod tests {
 
     #[test]
     fn cell_alias_resolver_prefers_scoped_bzlmod_repo_alias() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "scoped_alias_test_project";
         let wanted = "owner++toolchain+scoped_alias_test_project";
         let global_wrong = "owner+other_extension+scoped_alias_test_project";
@@ -3492,6 +3651,10 @@ mod tests {
 
     #[test]
     fn scoped_bzlmod_repo_alias_resolves_double_plus_owner() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "scoped_alias_test_double_plus_project";
         let wanted = "double_owner++toolchain+scoped_alias_test_double_plus_project";
         register_scoped_bzlmod_repo_alias(
@@ -3511,6 +3674,10 @@ mod tests {
 
     #[test]
     fn scoped_bzlmod_repo_alias_resolves_double_plus_owner_without_separator() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "scoped_alias_test_double_plus_project_no_separator";
         let wanted = "double_owner_no_separator++toolchain+scoped_alias_test_double_plus_project";
         register_scoped_bzlmod_repo_alias(
@@ -3530,6 +3697,10 @@ mod tests {
 
     #[test]
     fn scoped_bzlmod_repo_alias_resolves_apparent_generated_repo_cell() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "crates";
         let wanted = "rules_rs++crate+crates";
         register_scoped_bzlmod_repo_alias(
@@ -3546,6 +3717,10 @@ mod tests {
 
     #[test]
     fn scoped_bzlmod_repo_alias_resolves_archive_override_module_cell() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "rules_rust";
         let wanted = "rules_rust+";
         register_scoped_bzlmod_repo_alias(
@@ -3562,6 +3737,10 @@ mod tests {
 
     #[test]
     fn scoped_bzlmod_repo_alias_last_registration_wins() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "rules_rust";
         register_scoped_bzlmod_repo_alias(
             "rules_rs".to_owned(),
@@ -3582,6 +3761,10 @@ mod tests {
 
     #[test]
     fn scoped_bzlmod_repo_alias_resolves_same_extension_dynamic_alias() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         register_dynamic_extension_cell_alias(
             "crates".to_owned(),
             "rules_rs++crate+crates".to_owned(),
@@ -3609,6 +3792,10 @@ mod tests {
 
     #[test]
     fn scoped_bzlmod_repo_alias_resolves_ordinary_module_owner() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
         let apparent = "scoped_alias_test_module_project";
         let wanted = "tar.bzl++toolchains+scoped_alias_test_module_project";
         register_scoped_bzlmod_repo_alias(

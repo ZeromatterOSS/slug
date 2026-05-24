@@ -1815,27 +1815,30 @@ What did not work or remains risky:
 - Native repository-rule `build_file` and `patches` label resolution can now use
   resolver-owned bzlmod cell paths from the DICE cell graph during extension
   repository execution. That path prefers graph-owned aliases and cells over
-  stale normal directories, treats resolver-owned misses as synthetic
-  non-`bazel-external` miss paths, requires explicit graph aliases for apparent
-  module names, and does not promote extension internal names as global aliases.
-  Scoped aliases remain intentionally unflattened because the native executor
-  does not yet carry the declaring-module owner context. Bzlmod load wrong-cell
-  equivalence now also treats a runtime alias snapshot as authoritative before
-  consulting process-global dynamic aliases. Validation passed with focused
-  `cargo test -p slug_bzlmod resolve_build_file_label -- --nocapture` (`8
+  stale normal directories, rejects resolver-owned misses instead of reading
+  source-tree or `bazel-external` collision paths, requires explicit graph
+  aliases for apparent module names, and does not promote extension internal
+  names as global aliases. Scoped aliases remain intentionally unflattened
+  because the native executor does not yet carry the declaring-module owner
+  context. Bzlmod load resolution now treats a runtime alias/cell snapshot as
+  authoritative before consulting process-global dynamic aliases, scoped aliases,
+  or cells, while canonical `module+` load paths can still resolve through an
+  existing static module cell whose graph-owned path is
+  `bazel-external/module+`. Validation passed with focused
+  `cargo test -p slug_bzlmod resolve_build_file_label -- --nocapture` (`9
   passed`), `cargo test -p slug_bzlmod
   http_archive_build_file_uses_resolver_owned_label_path -- --nocapture` (`1
-  passed`), `cargo test -p slug_interpreter_for_build load_cell_equivalence --
-  --nocapture` (`6 passed`), `cargo test -p slug_core bzlmod_ -- --nocapture`
-  (`16 passed`), `cargo test -p slug_bzlmod -- --nocapture` (`321 passed`;
-  doctest `1 passed, 4 ignored`), `cargo test -p slug_interpreter_for_build --
-  --nocapture --test-threads=1` (`92 passed`; doctest `1 ignored`), `cargo test
-  -p slug_common bzlmod -- --nocapture` (`10 passed`), `cargo test -p
-  slug_external_cells -- --nocapture` (`8 passed`), `cargo check -p slug_core -p
-  slug_bzlmod -p slug_interpreter_for_build -p slug_server`, `cargo build -p
-  slug`, the full Plan 61 Python guardrail with `75 passed in 47.46s`, `cargo
-  fmt --check`, and `git diff --check`. The four slugd processes left by the
-  full guardrail were cleaned up afterward.
+  passed`), `cargo test -p slug_core bzlmod_ -- --nocapture` (`18 passed`),
+  `cargo test -p slug_interpreter_for_build load_ -- --nocapture
+  --test-threads=1` (`9 passed`), `cargo test -p slug_analysis
+  runtime_aliases_before_globals -- --nocapture` (`4 passed`), `cargo test -p
+  slug_bzlmod -- --nocapture` (`322 passed`; doctest `1 passed, 4 ignored`),
+  `cargo test -p slug_common bzlmod -- --nocapture` (`10 passed`), `cargo test
+  -p slug_external_cells -- --nocapture` (`8 passed`), `cargo check -p
+  slug_core -p slug_bzlmod -p slug_interpreter_for_build -p slug_analysis -p
+  slug_server`, `cargo build -p slug`, the full Plan 61 Python guardrail with
+  `75 passed in 45.34s`, `cargo fmt --check`, and `git diff --check`. The four
+  slugd processes left by the full guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -2051,6 +2054,11 @@ using Rust DICE keys and values:
   resolver-owned miss from process-global dynamic aliases or directory scans.
   Fallback helpers and callers that do not receive a resolver-owned path map
   still use legacy process-global compatibility lookups.
+- Native repository-rule `build_file`/`patches` label resolution can now receive
+  a resolver-owned cell path map from the bzlmod cell graph. With that map
+  present, a missing repository is an error instead of a synthetic source-tree
+  or `bazel-external` read. Patch resolution preserves the existing non-fatal
+  repository-rule behavior by warning and continuing after resolution errors.
 - Bzlmod load-path wrong-cell equivalence, toolchain implementation/metadata
   label parsing, and C++ toolchain metadata/action-path formatting can now use
   declared aliases and runtime aliases/cells from the active cell alias resolver

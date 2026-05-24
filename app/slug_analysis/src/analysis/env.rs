@@ -5767,7 +5767,7 @@ mod tests {
             slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
-        assert!(resolver.get(CellName::testing_new(wrong_global)).is_ok());
+        assert!(resolver.get(CellName::testing_new(wrong_global)).is_err());
 
         let package_label =
             registered_toolchain_package_label(&resolver, apparent, "toolchains").unwrap();
@@ -5887,7 +5887,7 @@ mod tests {
             slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
-        assert!(resolver.get(CellName::testing_new(wrong_global)).is_ok());
+        assert!(resolver.get(CellName::testing_new(wrong_global)).is_err());
 
         let label = parse_impl_label_to_target_label_with_cell_resolver(
             &format!("@{apparent}//pkg:impl"),
