@@ -2797,6 +2797,7 @@ impl BuckConfigBasedCells {
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
         let mut has_module_bazel = false;
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::default();
+        let mut bzlmod_runtime_cell_snapshot = None;
 
         // ===== Bzlmod Integration =====
         // When MODULE.bazel exists, ALL cell definitions come from bzlmod resolution.
@@ -2819,6 +2820,7 @@ impl BuckConfigBasedCells {
         } else {
             None
         } {
+            let runtime_cell_snapshot = runtime_cell_install_snapshot(&session_data.cell_graph);
             if let Some(project_fs) = project_fs {
                 replay_bzlmod_runtime_state(&session_data.cell_graph, project_fs);
             }
@@ -2866,6 +2868,7 @@ impl BuckConfigBasedCells {
                 ));
             }
             bzlmod_session_data = session_data;
+            bzlmod_runtime_cell_snapshot = Some(runtime_cell_snapshot);
         }
 
         // Legacy .buckconfig cell definitions - only used when MODULE.bazel is NOT present
@@ -2961,7 +2964,8 @@ impl BuckConfigBasedCells {
         }
 
         let cell_resolver = if has_module_bazel {
-            aggregator.make_bzlmod_cell_resolver()?
+            aggregator
+                .make_bzlmod_cell_resolver(bzlmod_runtime_cell_snapshot.unwrap_or_default())?
         } else {
             aggregator.make_cell_resolver()?
         };

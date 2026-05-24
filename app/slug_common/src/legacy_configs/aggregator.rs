@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use instance::CellInstance;
+use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::CellResolver;
 use slug_core::cells::alias::NonEmptyCellAlias;
@@ -131,16 +132,20 @@ impl CellsAggregator {
     }
 
     pub(crate) fn make_cell_resolver(self) -> slug_error::Result<CellResolver> {
-        self.make_cell_resolver_with_root_alias_cell_lookup(true)
+        self.make_cell_resolver_with_root_alias_cell_lookup(true, None)
     }
 
-    pub(crate) fn make_bzlmod_cell_resolver(self) -> slug_error::Result<CellResolver> {
-        self.make_cell_resolver_with_root_alias_cell_lookup(false)
+    pub(crate) fn make_bzlmod_cell_resolver(
+        self,
+        runtime_cell_snapshot: BzlmodRuntimeCellInstallSnapshot,
+    ) -> slug_error::Result<CellResolver> {
+        self.make_cell_resolver_with_root_alias_cell_lookup(false, Some(runtime_cell_snapshot))
     }
 
     fn make_cell_resolver_with_root_alias_cell_lookup(
         self,
         resolve_root_alias_cell_names: bool,
+        bzlmod_runtime_cell_snapshot: Option<BzlmodRuntimeCellInstallSnapshot>,
     ) -> slug_error::Result<CellResolver> {
         let all_cell_roots_for_nested_cells: Vec<_> = self
             .cell_infos
@@ -172,10 +177,19 @@ impl CellsAggregator {
             ],
         );
 
-        if resolve_root_alias_cell_names {
-            CellResolver::new(instances, root_cell_alias_resolver)
-        } else {
-            CellResolver::new_without_root_alias_cell_lookup(instances, root_cell_alias_resolver)
+        match bzlmod_runtime_cell_snapshot {
+            Some(snapshot) => CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+                instances,
+                root_cell_alias_resolver,
+                snapshot,
+            ),
+            None if resolve_root_alias_cell_names => {
+                CellResolver::new(instances, root_cell_alias_resolver)
+            }
+            None => CellResolver::new_without_root_alias_cell_lookup(
+                instances,
+                root_cell_alias_resolver,
+            ),
         }
     }
 }

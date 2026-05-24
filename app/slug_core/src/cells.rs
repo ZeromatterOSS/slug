@@ -1876,6 +1876,7 @@ impl PartialEq for CellResolver {
         self.0.cells == other.0.cells
             && self.0.root_cell == other.0.root_cell
             && self.0.root_cell_alias_resolver == other.0.root_cell_alias_resolver
+            && self.0.bzlmod_runtime_cell_snapshot == other.0.bzlmod_runtime_cell_snapshot
     }
 }
 impl Eq for CellResolver {}
@@ -1883,6 +1884,12 @@ impl Eq for CellResolver {}
 #[derive(Debug, Allocative)]
 struct CellResolverInternals {
     cells: HashMap<CellName, CellInstance>,
+    /// Bzlmod extension cells published by the resolver's cell graph.
+    ///
+    /// This lets exact generated-repo lookups create lazy cells from resolver
+    /// state before falling back to the transitional process-global registry.
+    #[allocative(skip)]
+    bzlmod_runtime_cell_snapshot: Option<Arc<BzlmodRuntimeCellInstallSnapshot>>,
     /// Dynamically-added cells from extension execution (spoke repos, etc.)
     #[allocative(skip)]
     dynamic_cells: RwLock<HashMap<CellName, DynamicBzlmodEntry<&'static CellInstance>>>,
@@ -1898,20 +1905,34 @@ impl CellResolver {
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
     ) -> slug_error::Result<CellResolver> {
-        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, true)
+        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, true, None)
     }
 
     pub fn new_without_root_alias_cell_lookup(
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
     ) -> slug_error::Result<CellResolver> {
-        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, false)
+        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, false, None)
+    }
+
+    pub fn new_bzlmod_with_runtime_cell_snapshot(
+        cells: Vec<CellInstance>,
+        root_cell_alias_resolver: CellAliasResolver,
+        runtime_cell_snapshot: BzlmodRuntimeCellInstallSnapshot,
+    ) -> slug_error::Result<CellResolver> {
+        Self::new_with_root_alias_cell_lookup(
+            cells,
+            root_cell_alias_resolver,
+            false,
+            Some(Arc::new(runtime_cell_snapshot)),
+        )
     }
 
     fn new_with_root_alias_cell_lookup(
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
         resolve_root_alias_cell_names: bool,
+        bzlmod_runtime_cell_snapshot: Option<Arc<BzlmodRuntimeCellInstallSnapshot>>,
     ) -> slug_error::Result<CellResolver> {
         let input_cell_count = cells.len();
         let mut path_mappings: SequenceTrie<FileNameBuf, CellName> = SequenceTrie::new();
@@ -1970,6 +1991,7 @@ impl CellResolver {
         );
         Ok(CellResolver(Arc::new(CellResolverInternals {
             cells: cells_map,
+            bzlmod_runtime_cell_snapshot,
             dynamic_cells: RwLock::new(HashMap::new()),
             root_cell,
             path_mappings,
@@ -2011,6 +2033,10 @@ impl CellResolver {
                 drop(dynamic);
                 return self.get_or_create_dynamic_cell(cell);
             }
+        }
+
+        if let Some(runtime_cell) = self.bzlmod_runtime_extension_cell_for_name(cell.as_str()) {
+            return self.get_or_create_bzlmod_runtime_cell(cell, runtime_cell);
         }
 
         // Check global dynamic registry (populated by extension execution).
@@ -2114,6 +2140,38 @@ impl CellResolver {
                 self.0.cells.keys().copied().collect(),
             )))
         }
+    }
+
+    fn bzlmod_runtime_extension_cell_for_name(
+        &self,
+        name: &str,
+    ) -> Option<BzlmodRuntimeExtensionCell> {
+        self.0
+            .bzlmod_runtime_cell_snapshot
+            .as_ref()?
+            .extension_cells
+            .iter()
+            .find(|cell| cell.canonical_name == name || cell.internal_name == name)
+            .cloned()
+    }
+
+    fn get_or_create_bzlmod_runtime_cell(
+        &self,
+        cell: CellName,
+        runtime_cell: BzlmodRuntimeExtensionCell,
+    ) -> slug_error::Result<&CellInstance> {
+        let rel_path = ProjectRelativePath::new(&runtime_cell.path)?;
+        let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+        let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+        let external = Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(
+            runtime_cell.setup.dupe(),
+        ));
+        let instance = CellInstance::new(cell, cell_path, external, nested)?;
+        ensure_external_symlink(cell.as_str(), &runtime_cell.path);
+        if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
+            dynamic.insert(cell, dynamic_bzlmod_entry(Box::leak(Box::new(instance))));
+        }
+        self.get_or_create_dynamic_cell(cell)
     }
 
     pub fn is_root_cell(&self, name: CellName) -> bool {
@@ -2450,6 +2508,64 @@ mod tests {
         let dynamic_cell = CellName::testing_new("exact_owner++ext+generated");
 
         assert_eq!(cells.get(dynamic_cell)?.name(), dynamic_cell);
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_resolver_uses_runtime_snapshot_for_lazy_extension_cell() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let root_aliases = CellAliasResolver::new(root, HashMap::new())?;
+        let canonical = "owner++ext+generated";
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-test"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                setup: setup.clone(),
+                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: Vec::new(),
+        };
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
+
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+        let cell_name = CellName::testing_new(canonical);
+        let cell = resolver.get(cell_name)?;
+
+        assert_eq!(cell.name(), cell_name);
+        assert_eq!(cell.path().as_str(), format!("bazel-external/{canonical}"));
+        assert!(matches!(
+            cell.external(),
+            Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(origin))
+                if origin == &setup
+        ));
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
 
         Ok(())
     }
