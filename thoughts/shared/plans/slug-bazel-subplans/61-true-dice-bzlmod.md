@@ -1987,6 +1987,14 @@ What did not work or remains risky:
   -- --nocapture` and `cargo test -p slug_analysis
   test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback
   -- --nocapture`.
+- Extension repo file-ops no longer accepts a no-spec/no-spoke
+  `.slug_repo_complete` marker as semantic authority. If setup and registered
+  DICE spokes do not provide a current `RepoSpec`, the path now always enters
+  the DICE spoke/use_repo_rule lookup and the repository execution key so reuse
+  is owned by the materialization manifest. Validation passed with `cargo test
+  -p slug_external_cells no_spec_complete_marker_does_not_skip_dice_execution
+  -- --nocapture`, `cargo test -p slug_external_cells extension_repo::tests --
+  --nocapture`, and `cargo check -p slug_external_cells -p slug_bzlmod`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
@@ -2397,12 +2405,13 @@ using Rust DICE keys and values:
      recorded-input staleness, missing declared BUILD-file checks, and
      layout-validity probes, including foreign top-level symlink checks, to
      this manifest path. Legacy invalid empty target-label checks also belong
-     to manifest layout state now. No-spec extension cells with a current spoke
-     value validate through that spoke's repo spec; only the no-spoke fallback
-     still contains direct file-ops reads. Extension repo execution enters the
-     native repository-rule executor through a fresh path after the manifest
-     decision, so the native marker shortcut is test-only rather than an
-     additional production reuse authority for known extension repo specs.
+     to manifest layout state now. No-spec extension cells no longer reuse a
+     marker-only materialization: they either validate through a current DICE
+     spoke repo spec or enter the use_repo_rule execution key, leaving the
+     materialization manifest as the reuse authority. Extension repo execution
+     enters the native repository-rule executor through a fresh path after the
+     manifest decision, so the native marker shortcut is test-only rather than
+     an additional production reuse authority for known extension repo specs.
    - Built-in `local_repository`/`new_local_repository`, captured Starlark
      `repository_rule(local=True)` repos, and root-local custom
      `use_repo_rule("//:repo.bzl", "rule")` definitions with

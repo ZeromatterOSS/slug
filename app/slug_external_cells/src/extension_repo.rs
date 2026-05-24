@@ -21,7 +21,6 @@
 //! materialized yet, lazy materialization is triggered via `ExtensionRepoExecutionKey`.
 
 use std::fmt::Display;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -134,15 +133,18 @@ fn complete_marker(spec_hash: &str, output_digest: Option<&str>) -> String {
     }
 }
 
+#[cfg(test)]
 fn is_complete_marker(marker: &str) -> bool {
     let marker = marker.trim();
     marker == "complete" || marker.starts_with("complete:")
 }
 
+#[cfg(test)]
 fn is_output_state_marker(marker: &str) -> bool {
     marker.trim().contains(":output:")
 }
 
+#[cfg(test)]
 fn complete_marker_expected_output<'a>(marker: &'a str, spec_hash: &str) -> Option<&'a str> {
     let marker = marker.trim();
     if spec_hash.is_empty() {
@@ -162,6 +164,7 @@ fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
         .is_some_and(|output_digest| !output_digest.is_empty())
 }
 
+#[cfg(test)]
 fn complete_marker_output_state_is_stale(
     repo_path: &std::path::Path,
     marker: &str,
@@ -569,17 +572,7 @@ pub(crate) async fn get_file_ops_delegate(
         None => Arc::new(std::collections::BTreeMap::new()),
     };
 
-    // Check if the repository is fully materialized (marked complete).
-    // We check for .slug_repo_complete rather than just directory existence because
-    // partial materialization (e.g., source downloaded but BUILD.bazel not generated)
-    // can leave directories without the completion marker.
-    //
-    // Marker content distinguishes complete materialization from stale or
-    // corrupted materialization. Non-complete marker content is never semantic
-    // authority; discard it and re-materialize from the current repo spec.
-    let marker_path = source_path.join(".slug_repo_complete");
-    let has_known_repo_spec = !setup.repo_spec_json.is_empty();
-    let repo_spec_for_execution = if has_known_repo_spec {
+    let repo_spec_for_execution = if !setup.repo_spec_json.is_empty() {
         Some(
             serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
                 ExtensionRepoError::DeserializationFailed {
@@ -610,55 +603,6 @@ pub(crate) async fn get_file_ops_delegate(
     } else {
         None
     };
-    let marker_contents = repo_spec_for_execution
-        .is_none()
-        .then(|| {
-            marker_path
-                .exists()
-                .then(|| std::fs::read_to_string(&marker_path).ok())
-                .flatten()
-        })
-        .flatten();
-    let is_stale_non_complete_marker = !has_known_repo_spec
-        && marker_contents
-            .as_deref()
-            .is_some_and(|marker| !is_complete_marker(marker));
-    let is_stale_output_state = !has_known_repo_spec
-        && marker_contents.as_deref().is_some_and(|s| {
-            is_complete_marker(s) && complete_marker_output_state_is_stale(&source_path, s, "")
-        });
-    let is_stale_spec_unknown_complete = !has_known_repo_spec
-        && marker_contents
-            .as_deref()
-            .is_some_and(|s| is_complete_marker(s) && !is_output_state_marker(s));
-    let is_stale_foreign_symlink = !has_known_repo_spec
-        && marker_contents.as_deref().is_some_and(is_complete_marker)
-        && slug_bzlmod::repo_has_foreign_top_level_symlink(&source_path, &project_root_path);
-    let is_stale_recorded_inputs = should_precheck_recorded_inputs(
-        &setup.repo_spec_json,
-        marker_contents.as_deref(),
-        &source_path,
-        repo_env.as_ref(),
-    );
-    if is_stale_non_complete_marker
-        || is_stale_output_state
-        || is_stale_spec_unknown_complete
-        || is_stale_foreign_symlink
-        || is_stale_recorded_inputs
-    {
-        tracing::info!(
-            "Extension repo '{}' has stale materialization; \
-             discarding it and re-materializing",
-            setup.canonical_name
-        );
-        if let Err(e) = std::fs::remove_dir_all(&source_path) {
-            tracing::warn!(
-                "Failed to remove stale extension repo dir for '{}': {} (proceeding anyway)",
-                setup.canonical_name,
-                e
-            );
-        }
-    }
     if let Some(repo_spec) = repo_spec_for_execution {
         let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
             setup.canonical_name.to_string(),
@@ -707,195 +651,102 @@ pub(crate) async fn get_file_ops_delegate(
             digest_config,
         )));
     }
-    if !marker_path.exists() {
-        tracing::warn!(
-            "Extension repo '{}' not materialized, triggering lazy execution (ext_id='{}', repo_spec_json_empty={})",
-            setup.canonical_name,
-            setup.extension_id,
-            setup.repo_spec_json.is_empty()
+    tracing::info!(
+        "No current RepoSpec for '{}', resolving extension '{}' via DICE",
+        setup.canonical_name,
+        setup.extension_id
+    );
+
+    // No current RepoSpec was available from setup or registered extension
+    // spokes. Do not trust an existing completion marker here; look up the
+    // DICE-owned spoke or enter the repository execution key so its
+    // materialization manifest owns reuse.
+    let repo_spec = {
+        let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
+            extension_lookup_workspace_id.clone(),
+            &setup.extension_id,
         );
-
-        // No current RepoSpec was available from setup or extension spokes.
-        // This fallback is expected only for direct use_repo_rule-style cells.
-        let repo_spec = {
-            tracing::info!(
-                "No cached RepoSpec for '{}', executing extension '{}' via DICE",
-                setup.canonical_name,
-                setup.extension_id
-            );
-
-            let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
-                extension_lookup_workspace_id.clone(),
-                &setup.extension_id,
-            );
-            let spokes = match ctx.compute(&lookup_key).await {
-                Ok(Ok(Some(result))) => result,
-                Ok(Ok(None)) => {
-                    // Not a module extension — likely a use_repo_rule() invocation.
-                    // Execute directly as a Starlark repository rule via DICE.
-                    tracing::info!(
-                        "Extension '{}' not in aggregations, treating as use_repo_rule for '{}'",
-                        setup.extension_id,
-                        setup.canonical_name
-                    );
-                    let mut inv = slug_bzlmod::RepositoryInvocation::new(
-                        setup.canonical_name.to_string(),
-                        setup
-                            .extension_id
-                            .split('%')
-                            .last()
-                            .unwrap_or("unknown")
-                            .to_owned(),
-                    );
-                    inv.rule_source = Some(setup.extension_id.to_string());
-                    let repo_spec = slug_bzlmod::RepoSpec::new(setup.extension_id.to_string());
-                    let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
-                        setup.canonical_name.to_string(),
-                        setup.extension_id.to_string(),
-                        repo_spec,
-                        extension_lookup_workspace_id.clone(),
-                        repo_env.clone(),
-                    );
-                    match ctx.compute(&key).await {
-                        Ok(Ok(repo_result)) => {
-                            tracing::info!(
-                                "Materialized use_repo_rule repo '{}' at {:?}",
-                                setup.canonical_name,
-                                repo_result.repo_path
-                            );
-                        }
-                        Ok(Err(e)) => {
-                            return Err(ExtensionRepoError::MaterializationFailed {
-                                canonical_name: setup.canonical_name.to_string(),
-                                reason: format!(
-                                    "use_repo_rule execution failed: {}",
-                                    diagnostic_summary(&e)
-                                ),
-                            }
-                            .into());
-                        }
-                        Err(e) => {
-                            return Err(ExtensionRepoError::MaterializationFailed {
-                                canonical_name: setup.canonical_name.to_string(),
-                                reason: format!(
-                                    "DICE error during use_repo_rule execution: {}",
-                                    diagnostic_summary(&e)
-                                ),
-                            }
-                            .into());
-                        }
+        let spokes = match ctx.compute(&lookup_key).await {
+            Ok(Ok(Some(result))) => result,
+            Ok(Ok(None)) => {
+                // Not a module extension — likely a use_repo_rule() invocation.
+                // Execute directly as a Starlark repository rule via DICE.
+                tracing::info!(
+                    "Extension '{}' not in aggregations, treating as use_repo_rule for '{}'",
+                    setup.extension_id,
+                    setup.canonical_name
+                );
+                let mut inv = slug_bzlmod::RepositoryInvocation::new(
+                    setup.canonical_name.to_string(),
+                    setup
+                        .extension_id
+                        .split('%')
+                        .last()
+                        .unwrap_or("unknown")
+                        .to_owned(),
+                );
+                inv.rule_source = Some(setup.extension_id.to_string());
+                let repo_spec = slug_bzlmod::RepoSpec::new(setup.extension_id.to_string());
+                let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
+                    setup.canonical_name.to_string(),
+                    setup.extension_id.to_string(),
+                    repo_spec,
+                    extension_lookup_workspace_id.clone(),
+                    repo_env.clone(),
+                );
+                match ctx.compute(&key).await {
+                    Ok(Ok(repo_result)) => {
+                        tracing::info!(
+                            "Materialized use_repo_rule repo '{}' at {:?}",
+                            setup.canonical_name,
+                            repo_result.repo_path
+                        );
                     }
-                    // Skip the extension execution path below
-                    if !source_path.exists() {
+                    Ok(Err(e)) => {
                         return Err(ExtensionRepoError::MaterializationFailed {
                             canonical_name: setup.canonical_name.to_string(),
-                            reason: "Repository not found after use_repo_rule execution".to_owned(),
+                            reason: format!(
+                                "use_repo_rule execution failed: {}",
+                                diagnostic_summary(&e)
+                            ),
                         }
                         .into());
                     }
-                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
-                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
-                        cell_name,
-                        setup.canonical_name.to_string(),
-                        source_path,
-                        digest_config,
-                    )));
-                }
-                Ok(Err(e)) => {
-                    return Err(ExtensionRepoError::MaterializationFailed {
-                        canonical_name: setup.canonical_name.to_string(),
-                        reason: format!(
-                            "Extension '{}' spoke lookup failed: {}",
-                            setup.extension_id,
-                            diagnostic_summary(&e)
-                        ),
-                    }
-                    .into());
-                }
-                Err(e) => {
-                    return Err(ExtensionRepoError::MaterializationFailed {
-                        canonical_name: setup.canonical_name.to_string(),
-                        reason: format!(
-                            "Extension '{}' DICE error while looking up spokes: {}",
-                            setup.extension_id,
-                            diagnostic_summary(&e)
-                        ),
-                    }
-                    .into());
-                }
-            };
-
-            // Spoke registration moved to `ensure_extension_spokes_registered`
-            // at the top of `get_file_ops_delegate` so it runs even when the
-            // hub already has `.slug_repo_complete`. This block now resolves
-            // the current repo's spec out of the DICE-owned spoke value.
-
-            match spokes
-                .by_internal_name(&setup.internal_name)
-                .or_else(|| spokes.by_canonical_name(&setup.canonical_name))
-            {
-                Some(spoke) => spoke.repo_spec.as_ref().clone(),
-                None => {
-                    return Err(ExtensionRepoError::MaterializationFailed {
-                        canonical_name: setup.canonical_name.to_string(),
-                        reason: format!(
-                            "Extension '{}' did not generate repo '{}' (available: {})",
-                            setup.extension_id,
-                            setup.internal_name,
-                            repo_names_summary(spokes.spokes.keys().map(|name| name.as_str()))
-                        ),
-                    }
-                    .into());
-                }
-            }
-        };
-
-        // Create the execution key for lazy materialization of this specific repo
-        let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
-            setup.canonical_name.to_string(),
-            setup.extension_id.to_string(),
-            repo_spec,
-            extension_lookup_workspace_id.clone(),
-            repo_env.clone(),
-        );
-        let key_spec_hash = key.spec_hash.clone();
-
-        // Execute via DICE to materialize the repository
-        match ctx.compute(&key).await {
-            Ok(Ok(repo_result)) => {
-                if !key_spec_hash.is_empty() {
-                    match slug_bzlmod::repository_output_digest(&repo_result.repo_path) {
-                        Ok(output_digest) => {
-                            if let Err(e) = std::fs::write(
-                                repo_result.repo_path.join(".slug_repo_complete"),
-                                complete_marker(&key_spec_hash, Some(&output_digest)),
-                            ) {
-                                tracing::warn!(
-                                    "Failed to write spec-hashed completion marker for '{}': {}",
-                                    setup.canonical_name,
-                                    e
-                                );
-                            }
+                    Err(e) => {
+                        return Err(ExtensionRepoError::MaterializationFailed {
+                            canonical_name: setup.canonical_name.to_string(),
+                            reason: format!(
+                                "DICE error during use_repo_rule execution: {}",
+                                diagnostic_summary(&e)
+                            ),
                         }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to compute output-state marker for '{}': {}",
-                                setup.canonical_name,
-                                e
-                            );
-                        }
+                        .into());
                     }
                 }
-                tracing::info!(
-                    "Successfully materialized extension repo '{}' at {:?}",
-                    setup.canonical_name,
-                    repo_result.repo_path
-                );
+                // Skip the extension execution path below
+                if !source_path.exists() {
+                    return Err(ExtensionRepoError::MaterializationFailed {
+                        canonical_name: setup.canonical_name.to_string(),
+                        reason: "Repository not found after use_repo_rule execution".to_owned(),
+                    }
+                    .into());
+                }
+                // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
+                return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+                    cell_name,
+                    setup.canonical_name.to_string(),
+                    source_path,
+                    digest_config,
+                )));
             }
             Ok(Err(e)) => {
                 return Err(ExtensionRepoError::MaterializationFailed {
                     canonical_name: setup.canonical_name.to_string(),
-                    reason: format!("Repo rule execution failed: {}", diagnostic_summary(&e)),
+                    reason: format!(
+                        "Extension '{}' spoke lookup failed: {}",
+                        setup.extension_id,
+                        diagnostic_summary(&e)
+                    ),
                 }
                 .into());
             }
@@ -903,12 +754,98 @@ pub(crate) async fn get_file_ops_delegate(
                 return Err(ExtensionRepoError::MaterializationFailed {
                     canonical_name: setup.canonical_name.to_string(),
                     reason: format!(
-                        "DICE computation failed during repo rule execution: {}",
+                        "Extension '{}' DICE error while looking up spokes: {}",
+                        setup.extension_id,
                         diagnostic_summary(&e)
                     ),
                 }
                 .into());
             }
+        };
+
+        // Spoke registration moved to `ensure_extension_spokes_registered`
+        // at the top of `get_file_ops_delegate` so it runs even when the
+        // hub already has `.slug_repo_complete`. This block now resolves
+        // the current repo's spec out of the DICE-owned spoke value.
+
+        match spokes
+            .by_internal_name(&setup.internal_name)
+            .or_else(|| spokes.by_canonical_name(&setup.canonical_name))
+        {
+            Some(spoke) => spoke.repo_spec.as_ref().clone(),
+            None => {
+                return Err(ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!(
+                        "Extension '{}' did not generate repo '{}' (available: {})",
+                        setup.extension_id,
+                        setup.internal_name,
+                        repo_names_summary(spokes.spokes.keys().map(|name| name.as_str()))
+                    ),
+                }
+                .into());
+            }
+        }
+    };
+
+    // Create the execution key for lazy materialization of this specific repo
+    let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
+        setup.canonical_name.to_string(),
+        setup.extension_id.to_string(),
+        repo_spec,
+        extension_lookup_workspace_id.clone(),
+        repo_env.clone(),
+    );
+    let key_spec_hash = key.spec_hash.clone();
+
+    // Execute via DICE to materialize the repository
+    match ctx.compute(&key).await {
+        Ok(Ok(repo_result)) => {
+            if !key_spec_hash.is_empty() {
+                match slug_bzlmod::repository_output_digest(&repo_result.repo_path) {
+                    Ok(output_digest) => {
+                        if let Err(e) = std::fs::write(
+                            repo_result.repo_path.join(".slug_repo_complete"),
+                            complete_marker(&key_spec_hash, Some(&output_digest)),
+                        ) {
+                            tracing::warn!(
+                                "Failed to write spec-hashed completion marker for '{}': {}",
+                                setup.canonical_name,
+                                e
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to compute output-state marker for '{}': {}",
+                            setup.canonical_name,
+                            e
+                        );
+                    }
+                }
+            }
+            tracing::info!(
+                "Successfully materialized extension repo '{}' at {:?}",
+                setup.canonical_name,
+                repo_result.repo_path
+            );
+        }
+        Ok(Err(e)) => {
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: format!("Repo rule execution failed: {}", diagnostic_summary(&e)),
+            }
+            .into());
+        }
+        Err(e) => {
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: format!(
+                    "DICE computation failed during repo rule execution: {}",
+                    diagnostic_summary(&e)
+                ),
+            }
+            .into());
         }
     }
 
@@ -940,17 +877,6 @@ pub(crate) async fn get_file_ops_delegate(
         source_path,
         digest_config,
     )))
-}
-
-fn should_precheck_recorded_inputs(
-    repo_spec_json: &str,
-    marker_contents: Option<&str>,
-    source_path: &Path,
-    repo_env: &std::collections::BTreeMap<String, String>,
-) -> bool {
-    repo_spec_json.is_empty()
-        && marker_contents.is_some_and(is_complete_marker)
-        && !slug_bzlmod::repository_recorded_inputs_current(source_path, Some(repo_env))
 }
 
 /// Create `external_cells/extension_repo/{canonical_name}` under the workspace
@@ -1108,39 +1034,6 @@ mod tests {
     }
 
     #[test]
-    fn known_repo_spec_defers_recorded_input_staleness_to_manifest() {
-        let base = std::env::temp_dir().join(format!(
-            "slug-recorded-input-precheck-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&base);
-        let repo = base.join("repo");
-        std::fs::create_dir_all(&repo).unwrap();
-        std::fs::write(
-            repo.join(".slug_repo_recorded_inputs"),
-            "ENV:PLAN61_REPO_ENV first\n",
-        )
-        .unwrap();
-        let mut repo_env = std::collections::BTreeMap::new();
-        repo_env.insert("PLAN61_REPO_ENV".to_owned(), "second".to_owned());
-
-        assert!(!should_precheck_recorded_inputs(
-            "{\"repoRuleId\":\"@@//:repo.bzl%repo\"}",
-            Some("complete"),
-            &repo,
-            &repo_env
-        ));
-        assert!(should_precheck_recorded_inputs(
-            "",
-            Some("complete"),
-            &repo,
-            &repo_env
-        ));
-
-        let _ = std::fs::remove_dir_all(&base);
-    }
-
-    #[test]
     fn complete_marker_detection_requires_current_spec_hash_when_available() {
         let base =
             std::env::temp_dir().join(format!("slug-complete-marker-{}", std::process::id()));
@@ -1189,5 +1082,64 @@ mod tests {
         ));
         assert!(!is_complete_marker("stub:sha256-old"));
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[tokio::test]
+    async fn no_spec_complete_marker_does_not_skip_dice_execution() -> slug_error::Result<()> {
+        use slug_bzlmod::SetBzlmodSessionData;
+        use slug_common::dice::data::testing::SetTestingIoProvider;
+        use slug_core::fs::project::ProjectRootTemp;
+        use slug_execute::digest_config::SetDigestConfig;
+
+        let fs = ProjectRootTemp::new()?;
+        let canonical_name = "+local_repository+stale";
+        let source_path = fs
+            .path()
+            .root()
+            .as_path()
+            .join("bazel-external")
+            .join(canonical_name);
+        std::fs::create_dir_all(&source_path)?;
+        std::fs::write(source_path.join(".slug_repo_complete"), "complete\n")?;
+
+        let workspace_id = slug_bzlmod::WorkspaceId::new(
+            fs.path().root().to_path_buf(),
+            fs.path().root().as_path().join("buck-out/custom-output"),
+        );
+        let dice = dice::testing::DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+                data.set_digest_config(DigestConfig::testing_default());
+            })
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater
+            .set_bzlmod_session_data(slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id))?;
+        let mut dice = updater.commit().await;
+
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical_name),
+            extension_id: Arc::from(
+                "@bazel_tools//tools/build_defs/repo:local.bzl%local_repository",
+            ),
+            internal_name: Arc::from("stale"),
+            spec_hash: Arc::from(""),
+            repo_spec_json: Arc::from(""),
+            repo_env_json: Arc::from(""),
+            materialized: false,
+        };
+
+        let result =
+            get_file_ops_delegate(&mut dice, CellName::testing_new(canonical_name), setup).await;
+
+        assert!(
+            result.is_err(),
+            "no-spec extension repos must enter DICE execution instead of trusting an existing complete marker"
+        );
+
+        Ok(())
     }
 }
