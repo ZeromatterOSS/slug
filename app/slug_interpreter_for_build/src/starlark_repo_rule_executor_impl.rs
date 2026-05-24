@@ -44,20 +44,31 @@ use slug_bzlmod::repository_invocations::RepositoryInvocation;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;
+use slug_common::file_ops::error::FileReadErrorContext;
 use slug_common::file_ops::metadata::RawPathMetadata;
 use slug_core::cells::CellResolver;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::fs::project::ProjectRoot;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_fs::paths::abs_path::AbsPath;
 use slug_fs::paths::forward_rel_path::ForwardRelativePath;
+use slug_interpreter::from_freeze::from_freeze_error;
 use slug_interpreter::load_module::InterpreterCalculation;
 use slug_interpreter::paths::module::StarlarkModulePath;
+use starlark::environment::FrozenModule;
+use starlark::environment::Globals;
+use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
+use starlark::eval::ReturnFileLoader;
+use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
 use starlark::values::OwnedFrozenValueTyped;
 
+use crate::interpreter::globals::register_load_natives;
 use crate::module_extension_executor_impl::parse_bzlmod_bzl_path;
 use crate::repository_ctx::AttrValue as CtxAttrValue;
 use crate::repository_ctx::RepositoryAttr;
@@ -69,9 +80,6 @@ use crate::repository_rule::FrozenStarlarkRepositoryRule;
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
 enum StarlarkRepoRuleError {
-    #[error("Repository rule '{name}' not found in module '{path}'")]
-    RuleNotFound { name: String, path: String },
-
     #[error("Value '{name}' in '{path}' is not a repository_rule")]
     NotARepositoryRule { name: String, path: String },
 
@@ -153,8 +161,249 @@ fn coerced_attr_to_ctx_attr_value(
 /// Concrete implementation of Starlark repository rule executor.
 pub struct ConcreteStarlarkRepoRuleExecutor;
 
+struct RootLocalBzlPath {
+    module_id: String,
+    project_path: ProjectRelativePathBuf,
+    package: String,
+}
+
+struct RootLocalBzlModule {
+    content: String,
+    package: String,
+}
+
+fn root_local_bzl_path(
+    bzl_path: &str,
+    current_package: Option<&str>,
+) -> slug_error::Result<Option<RootLocalBzlPath>> {
+    if bzl_path.starts_with('@') {
+        return Ok(None);
+    }
+
+    let (package, file, project_path) = if let Some(rest) = bzl_path.strip_prefix("//") {
+        if let Some((package, file)) = rest.rsplit_once(':') {
+            let project_path = if package.is_empty() {
+                file.to_owned()
+            } else {
+                format!("{package}/{file}")
+            };
+            (package.to_owned(), file.to_owned(), project_path)
+        } else {
+            let (package, file) = rest.rsplit_once('/').unwrap_or(("", rest));
+            (package.to_owned(), file.to_owned(), rest.to_owned())
+        }
+    } else if let Some(file) = bzl_path.strip_prefix(':') {
+        let package = current_package.unwrap_or("");
+        let project_path = if package.is_empty() {
+            file.to_owned()
+        } else {
+            format!("{package}/{file}")
+        };
+        (package.to_owned(), file.to_owned(), project_path)
+    } else {
+        return Ok(None);
+    };
+
+    let module_id = if package.is_empty() {
+        format!("//:{file}")
+    } else {
+        format!("//{package}:{file}")
+    };
+
+    Ok(Some(RootLocalBzlPath {
+        module_id,
+        project_path: ProjectRelativePath::new(&project_path)?.to_owned(),
+        package,
+    }))
+}
+
+async fn collect_root_local_bzl_modules(
+    ctx: &mut DiceComputations<'_>,
+    root: RootLocalBzlPath,
+) -> slug_error::Result<Option<HashMap<String, RootLocalBzlModule>>> {
+    let mut modules = HashMap::new();
+    let mut pending = vec![root];
+
+    while let Some(module) = pending.pop() {
+        if modules.contains_key(&module.module_id) {
+            continue;
+        }
+
+        let content = DiceFileComputations::read_project_file(ctx, &module.project_path)
+            .await
+            .without_package_context_information()
+            .with_buck_error_context(|| {
+                format!(
+                    "Reading root-local repository rule module '{}'",
+                    module.module_id
+                )
+            })?;
+        let ast = AstModule::parse(&module.module_id, content.clone(), &Dialect::Standard)
+            .map_err(|e| slug_error::slug_error!(slug_error::ErrorTag::Input, "{}", e))?;
+
+        for load in ast.loads() {
+            let Some(dep) = root_local_bzl_path(load.module_id, Some(&module.package))? else {
+                tracing::debug!(
+                    "Skipping local-bit precompute for '{}': load '{}' is not root-local",
+                    module.module_id,
+                    load.module_id
+                );
+                return Ok(None);
+            };
+            if !modules.contains_key(&dep.module_id) {
+                pending.push(dep);
+            }
+        }
+
+        modules.insert(
+            module.module_id,
+            RootLocalBzlModule {
+                content,
+                package: module.package,
+            },
+        );
+    }
+
+    Ok(Some(modules))
+}
+
+fn eval_root_local_bzl_module(
+    module_id: &str,
+    modules: &HashMap<String, RootLocalBzlModule>,
+    frozen_modules: &mut HashMap<String, FrozenModule>,
+    globals: &Globals,
+) -> slug_error::Result<FrozenModule> {
+    if let Some(module) = frozen_modules.get(module_id) {
+        return Ok(module.clone());
+    }
+
+    let module_source = modules.get(module_id).ok_or_else(|| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "Root-local repository rule module '{}' was not collected",
+            module_id
+        )
+    })?;
+    let ast = AstModule::parse(module_id, module_source.content.clone(), &Dialect::Standard)
+        .map_err(|e| slug_error::slug_error!(slug_error::ErrorTag::Input, "{}", e))?;
+
+    let mut loaded_modules = Vec::new();
+    for load in ast.loads() {
+        let dep = root_local_bzl_path(load.module_id, Some(&module_source.package))?.ok_or_else(
+            || {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "Load '{}' in '{}' is not root-local",
+                    load.module_id,
+                    module_id
+                )
+            },
+        )?;
+        let frozen = eval_root_local_bzl_module(&dep.module_id, modules, frozen_modules, globals)?;
+        loaded_modules.push((load.module_id.to_owned(), frozen));
+    }
+
+    let loader_modules: HashMap<&str, &FrozenModule> = loaded_modules
+        .iter()
+        .map(|(load_id, module)| (load_id.as_str(), module))
+        .collect();
+    let loader = ReturnFileLoader {
+        modules: &loader_modules,
+    };
+    let module = Module::new();
+    {
+        let mut eval = Evaluator::new(&module);
+        eval.set_loader(&loader);
+        eval.eval_module(ast, globals).map_err(|e| {
+            slug_error::slug_error!(slug_error::ErrorTag::Input, "{}", e.to_string())
+        })?;
+    }
+    let frozen = module.freeze().map_err(from_freeze_error)?;
+    frozen_modules.insert(module_id.to_owned(), frozen.clone());
+    Ok(frozen)
+}
+
+async fn load_root_local_repository_rule(
+    ctx: &mut DiceComputations<'_>,
+    rule_bzl_path: &str,
+    rule_name: &str,
+) -> slug_error::Result<Option<OwnedFrozenValueTyped<FrozenStarlarkRepositoryRule>>> {
+    let Some(root) = root_local_bzl_path(rule_bzl_path, None)? else {
+        return Ok(None);
+    };
+    let root_module_id = root.module_id.clone();
+    let Some(modules) = collect_root_local_bzl_modules(ctx, root).await? else {
+        return Ok(None);
+    };
+
+    let mut builder = GlobalsBuilder::standard();
+    register_load_natives(&mut builder);
+    let globals = builder.build();
+    let mut frozen_modules = HashMap::new();
+    let loaded_module =
+        eval_root_local_bzl_module(&root_module_id, &modules, &mut frozen_modules, &globals)?;
+
+    let rule_value = loaded_module
+        .get_any_visibility(rule_name)
+        .map_err(|e| from_any_with_tag(e, slug_error::ErrorTag::Input))?
+        .0;
+
+    Ok(Some(rule_value.downcast_starlark().map_err(|_| {
+        StarlarkRepoRuleError::NotARepositoryRule {
+            name: rule_name.to_owned(),
+            path: rule_bzl_path.to_owned(),
+        }
+    })?))
+}
+
+async fn load_frozen_repository_rule(
+    ctx: &mut DiceComputations<'_>,
+    rule_bzl_path: &str,
+    rule_name: &str,
+) -> slug_error::Result<OwnedFrozenValueTyped<FrozenStarlarkRepositoryRule>> {
+    let cell_resolver = ctx.get_cell_resolver().await?;
+    let import_path = parse_bzlmod_bzl_path(rule_bzl_path, &cell_resolver)?;
+
+    tracing::debug!("Loading repository rule module from: {}", import_path);
+
+    let loaded_module = ctx
+        .get_loaded_module(StarlarkModulePath::LoadFile(&import_path))
+        .await
+        .buck_error_context(format!(
+            "Loading repository rule bzl file: {}",
+            rule_bzl_path
+        ))?;
+
+    let rule_value = loaded_module
+        .env()
+        .get_any_visibility(rule_name)
+        .map_err(|e| from_any_with_tag(e, slug_error::ErrorTag::Input))?
+        .0;
+
+    Ok(rule_value
+        .downcast_starlark()
+        .map_err(|_| StarlarkRepoRuleError::NotARepositoryRule {
+            name: rule_name.to_owned(),
+            path: rule_bzl_path.to_owned(),
+        })?)
+}
+
 #[async_trait]
 impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
+    async fn rule_is_local(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        rule_bzl_path: &str,
+        rule_name: &str,
+    ) -> slug_error::Result<bool> {
+        let Some(frozen_rule) =
+            load_root_local_repository_rule(ctx, rule_bzl_path, rule_name).await?
+        else {
+            return Ok(false);
+        };
+        Ok(frozen_rule.is_local())
+    }
+
     async fn execute_rule(
         &self,
         ctx: &mut DiceComputations<'_>,
@@ -172,37 +421,8 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             invocation.name
         );
 
-        // 1. Get the cell resolver to parse the bzl path
         let cell_resolver = ctx.get_cell_resolver().await?;
-
-        // 2. Parse the bzl path into an ImportPath
-        let import_path = parse_bzlmod_bzl_path(rule_bzl_path, &cell_resolver)?;
-
-        tracing::debug!("Loading repository rule module from: {}", import_path);
-
-        // 3. Load the module via DICE
-        let loaded_module = ctx
-            .get_loaded_module(StarlarkModulePath::LoadFile(&import_path))
-            .await
-            .buck_error_context(format!(
-                "Loading repository rule bzl file: {}",
-                rule_bzl_path
-            ))?;
-
-        // 4. Get the rule value from the module
-        let rule_value = loaded_module
-            .env()
-            .get_any_visibility(rule_name)
-            .map_err(|e| from_any_with_tag(e, slug_error::ErrorTag::Input))?
-            .0;
-
-        // 5. Downcast to FrozenStarlarkRepositoryRule
-        let frozen_rule: OwnedFrozenValueTyped<FrozenStarlarkRepositoryRule> = rule_value
-            .downcast_starlark()
-            .map_err(|_| StarlarkRepoRuleError::NotARepositoryRule {
-                name: rule_name.to_owned(),
-                path: rule_bzl_path.to_owned(),
-            })?;
+        let frozen_rule = load_frozen_repository_rule(ctx, rule_bzl_path, rule_name).await?;
 
         tracing::debug!("Found repository rule '{}' in module", frozen_rule.name());
 

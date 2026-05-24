@@ -115,6 +115,109 @@ fn validate_precomputed_repo_spec(canonical_name: &str, repo_spec_json: &str) {
     }
 }
 
+async fn resolve_use_repo_rule_local_bits(
+    ctx: &mut DiceComputations<'_>,
+    cells: &mut [slug_bzlmod::PendingRepoCell],
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+) -> slug_error::Result<()> {
+    let Ok(executor) = slug_bzlmod::STARLARK_REPO_RULE_EXECUTOR_IMPL.get() else {
+        return Ok(());
+    };
+
+    let mut declaring_cells = HashMap::new();
+    for (_cell_name, parsed) in parsed_modules {
+        let module_name = if parsed.module.name.is_empty() {
+            root_module_name
+        } else {
+            &parsed.module.name
+        };
+        for invocation in &parsed.repo_rule_invocations {
+            let rule_source = canonicalize_use_repo_rule_source(
+                &invocation.rule_source,
+                module_name,
+                module_name == root_module_name,
+            );
+            declaring_cells.insert(rule_source, module_name.to_owned());
+        }
+    }
+
+    for cell in cells {
+        if cell.repo_spec_json.is_empty() {
+            continue;
+        }
+
+        let mut repo_spec: slug_bzlmod::RepoSpec = serde_json::from_str(&cell.repo_spec_json)
+            .with_buck_error_context(|| {
+                format!(
+                    "Failed to parse precomputed RepoSpec for '{}'",
+                    cell.canonical_name
+                )
+            })?;
+        if repo_spec.local || cell.extension_id != repo_spec.repo_rule_id {
+            continue;
+        }
+
+        let Some((rule_bzl_path, rule_name)) = repo_spec.repo_rule_id.rsplit_once('%') else {
+            continue;
+        };
+        if rule_bzl_path.starts_with('@') {
+            continue;
+        }
+        if !declaring_cells.contains_key(&repo_spec.repo_rule_id) {
+            continue;
+        }
+        if executor
+            .rule_is_local(ctx, rule_bzl_path, rule_name)
+            .await
+            .with_buck_error_context(|| {
+                format!(
+                    "Failed to inspect repository rule '{}' for '{}'",
+                    repo_spec.repo_rule_id, cell.canonical_name
+                )
+            })?
+        {
+            repo_spec.local = true;
+            cell.spec_hash = repo_spec.compute_hash();
+            cell.repo_spec_json =
+                serde_json::to_string(&repo_spec).with_buck_error_context(|| {
+                    format!(
+                        "Failed to serialize local RepoSpec for '{}'",
+                        cell.canonical_name
+                    )
+                })?;
+        }
+    }
+
+    Ok(())
+}
+
+fn canonicalize_use_repo_rule_source(
+    rule_source: &str,
+    module_name: &str,
+    is_root: bool,
+) -> String {
+    let Some((bzl_file, rule_name)) = rule_source.rsplit_once('%') else {
+        return rule_source.to_owned();
+    };
+
+    let resolved = if !is_root {
+        if bzl_file.starts_with("//") {
+            format!("@{}{}", module_name, bzl_file)
+        } else if let Some(rest) = bzl_file.strip_prefix(':') {
+            format!("@{}//:{}", module_name, rest)
+        } else {
+            bzl_file.to_owned()
+        }
+    } else if let Some(rest) = bzl_file.strip_prefix(':') {
+        format!("//:{}", rest)
+    } else {
+        bzl_file.to_owned()
+    };
+
+    format!("{resolved}%{rule_name}")
+}
+
 fn runtime_extension_setup_from_cell_graph(
     cell: &slug_bzlmod::BzlmodCellGraphExtensionCell,
 ) -> ExtensionRepoCellSetup {
@@ -3602,6 +3705,15 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 options.ignore_dev_dependency,
             )?;
+        if let Some(ctx) = dice_ctx.as_deref_mut() {
+            resolve_use_repo_rule_local_bits(
+                ctx,
+                &mut pre_computed_cells,
+                &parsed_modules,
+                root_module_name,
+            )
+            .await?;
+        }
         let mut extension_mapping_cells = pre_computed_cells.clone();
         add_extension_repo_mapping_rows_from_cells(
             &mut repo_mappings,

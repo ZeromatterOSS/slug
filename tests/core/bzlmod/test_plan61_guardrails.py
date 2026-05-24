@@ -1967,6 +1967,48 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_custom_use_repo_rule_local_definition_reexecutes_after_input_edit(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepoDefinitionFunction loads RepoRule; RepositoryFetchFunction skips local cache."""
+    repo_dir = buck.cwd / "bazel-external" / "+custom_local_repository+custom_local"
+    payload = repo_dir / "payload.txt"
+    _write(buck.cwd / "source.txt", "first\n")
+    _write(buck.cwd / "helper.bzl", "LOCAL_REPOSITORY_RULE = True\n")
+    _write(
+        buck.cwd / "repo.bzl",
+        """load("//:helper.bzl", "LOCAL_REPOSITORY_RULE")
+
+def _custom_local_impl(repository_ctx):
+    payload = repository_ctx.read(Label("//:source.txt"), watch = "no")
+    repository_ctx.file("payload.txt", payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"payload.txt\\"])\\nfilegroup(name = \\"payload\\", srcs = [\\"payload.txt\\"])\\n")
+
+custom_local_repository = repository_rule(
+    implementation = _custom_local_impl,
+    local = LOCAL_REPOSITORY_RULE,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_custom_use_repo_rule_local")
+
+repo = use_repo_rule("//:repo.bzl", "custom_local_repository")
+repo(name = "custom_local")
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "root")\n')
+
+    await buck.build("@custom_local//:payload")
+    assert payload.read_text() == "first\n"
+
+    _write(buck.cwd / "source.txt", "second\n")
+    await buck.build("@custom_local//:payload")
+    assert payload.read_text() == "second\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_use_extension_dev_dependency_follows_ignore_policy(
     buck: Buck,
 ) -> None:

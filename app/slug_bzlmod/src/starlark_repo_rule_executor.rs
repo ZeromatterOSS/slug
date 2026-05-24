@@ -80,6 +80,15 @@ pub fn is_builtin_repo_rule(rule_name: &str) -> bool {
 /// - `RepositoryContext` for passing to the implementation function
 #[async_trait]
 pub trait StarlarkRepoRuleExecutorImpl: Send + Sync + 'static {
+    /// Load a repository rule definition and report whether it was declared
+    /// `local = True`.
+    async fn rule_is_local(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        rule_bzl_path: &str,
+        rule_name: &str,
+    ) -> slug_error::Result<bool>;
+
     /// Execute a Starlark repository rule implementation.
     ///
     /// This method:

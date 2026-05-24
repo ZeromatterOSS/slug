@@ -1855,6 +1855,23 @@ What did not work or remains risky:
   --check`, `git diff --check`, and the focused Plan 61 local-repository marker
   subset (`3 passed, 72 deselected`). No slugd processes remained after
   cleanup.
+- Root-local custom `use_repo_rule("//:repo.bzl", "rule")` definitions now
+  inspect the Starlark `repository_rule(local = ...)` bit during DICE bzlmod
+  resolution before serializing precomputed `RepoSpec`s. The pre-cell-resolver
+  path uses DICE-tracked project-file reads for root-local `.bzl` files and
+  their root-local loads, then marks local repo specs non-cacheable through the
+  existing repository-rule execution path. Bazel anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepoRule.java:54-63`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryModule.java:58-72`,
+  and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryFetchFunction.java:493-497`.
+  Validation passed with `cargo check -p slug_bzlmod -p slug_common -p
+  slug_interpreter_for_build -p slug_server`, `cargo build -p slug`, and
+  focused Plan 61 guardrail
+  `test_custom_use_repo_rule_local_definition_reexecutes_after_input_edit` (`1
+  passed, 75 deselected`), then the focused local-repository marker subset
+  including that guardrail (`4 passed, 72 deselected`). No slugd processes
+  remained after cleanup.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -2136,10 +2153,18 @@ using Rust DICE keys and values:
      native repository-rule executor through a fresh path after the manifest
      decision, so the native marker shortcut is test-only rather than an
      additional production reuse authority for known extension repo specs.
-   - Built-in `local_repository`/`new_local_repository` and captured Starlark
-     `repository_rule(local=True)` repos are non-cacheable; remaining custom
-     `use_repo_rule()` local semantics need the loaded repository-rule
-     definition's `local` bit rather than rule-name heuristics.
+   - Built-in `local_repository`/`new_local_repository`, captured Starlark
+     `repository_rule(local=True)` repos, and root-local custom
+     `use_repo_rule("//:repo.bzl", "rule")` definitions with
+     `repository_rule(local=True)` are non-cacheable. The root-local
+     precompute path now inspects the repository-rule definition's `local` bit,
+     including root-local `.bzl` loads, before serializing the `RepoSpec`, and
+     the focused guardrail
+     `test_custom_use_repo_rule_local_definition_reexecutes_after_input_edit`
+     proves rematerialization after an unwatched input edit. Remaining custom
+     `use_repo_rule()` local semantics for external/cross-repo `.bzl` files
+     need the real loaded-module graph available after the bzlmod cell graph is
+     established rather than the root-local precompute fallback.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
