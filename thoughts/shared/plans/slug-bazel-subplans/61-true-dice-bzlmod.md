@@ -294,13 +294,16 @@ Observed SDK result at the checkpoint:
   registry when non-empty, and `RegistryOverride` is implemented by both single
   and multiple version overrides. Focused Plan 61 guardrails prove both
   directives select a cached override registry instead of the default registry.
-  A same-daemon guardrail now also covers override-registry source metadata:
-  after warming a `single_version_override(registry = ...)` module, corrupting
-  that override registry's `source.json` with a matching lockfile hash fails
-  the next `audit cell`, and repair introduces a new dependency from the
-  override registry module instead of reusing the old graph. Validation passed
-  with `-k 'single_version_override_registry_source_json_parse_failure'`
-  (`1 passed, 116 deselected`).
+  Same-daemon guardrails now also cover override-registry source metadata: after
+  warming a `single_version_override(registry = ...)` module, corrupting that
+  override registry's `source.json` with a matching lockfile hash fails the next
+  `audit cell`, and repair introduces a new dependency from the override
+  registry module instead of reusing the old graph. The same metadata path is
+  covered for `multiple_version_override(registry = ...)` UTF-8 failures.
+  Validation passed with `-k
+  'single_version_override_registry_source_json_parse_failure or
+  multiple_version_override_registry_source_json_utf8_failure'` (`2 passed, 116
+  deselected`).
   Override patch fields remain blocked: Bazel validates main-repo patch labels,
   applies `single_version_override` patches to the discovered `MODULE.bazel`,
   and appends the same patches to the final repo spec; non-registry
@@ -2212,7 +2215,9 @@ using Rust DICE keys and values:
      coverage, while registry `MODULE.bazel` has parse/UTF-8 failure coverage;
      remaining source classes still need full matrix coverage.
    - Model registry selection and source metadata for overrides. Single-version
-     override registry source metadata has same-daemon parse-failure coverage.
+     override registry source metadata has same-daemon parse-failure coverage;
+     multiple-version override registry source metadata has same-daemon UTF-8
+     failure coverage.
 
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
