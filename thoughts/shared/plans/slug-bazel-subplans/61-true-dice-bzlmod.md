@@ -917,6 +917,14 @@ Observed SDK result at the checkpoint:
   test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
   focused Plan 61 Python replay subset, the full Plan 61 Python guardrail with
   72 tests, `cargo fmt --check`, and `git diff --check`.
+- The now-empty `BzlmodResolutionResult` wrapper was removed. The legacy
+  resolution key returns the transitional `BzlmodSessionData` payload directly,
+  and config-load replay consumes that payload without a parallel result shell.
+  Validation passed with `cargo check -p slug_bzlmod -p slug_common`, `cargo
+  test -p slug_common cell_graph -- --nocapture`, `cargo test -p slug_common
+  bzlmod -- --nocapture`, `cargo build -p slug`, the focused Plan 61 Python
+  replay subset, the full Plan 61 Python guardrail with 72 tests, `cargo
+  fmt --check`, and `git diff --check`.
 
 ## Consolidated Learnings
 
@@ -963,9 +971,11 @@ What did not work or remains risky:
   conservative session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
   still exists as the legacy resolver payload even though it is no longer an
-  injected DICE key. The session payload now carries exact workspace identity,
-  without a parallel `project_root` field, for the narrower injected values,
-  but the values are still populated from the legacy resolver output.
+  injected DICE key and no longer sits behind a separate
+  `BzlmodResolutionResult` wrapper. The session payload now carries exact
+  workspace identity, without a parallel `project_root` field, for the narrower
+  injected values, but the values are still populated from the legacy resolver
+  output.
 - Non-root module parsing for extension aggregation is now a named DICE key, but
   module source discovery, fetch/cache layout, selected graph construction, and
   the final parsed-module list still live inside the legacy resolution bridge.

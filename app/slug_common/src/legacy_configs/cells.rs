@@ -463,13 +463,6 @@ pub struct BuckConfigBasedCells {
     pub bzlmod_session_data: slug_bzlmod::BzlmodSessionData,
 }
 
-/// Result of bzlmod dependency resolution.
-#[derive(Clone, PartialEq, Eq, Allocative)]
-struct BzlmodResolutionResult {
-    /// DICE-injected bzlmod facts derived from this resolution.
-    session_data: slug_bzlmod::BzlmodSessionData,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodExternalModuleSymlink {
     entry_name: String,
@@ -554,78 +547,78 @@ struct BzlmodDynamicAlias {
     canonical_name: String,
 }
 
-impl BzlmodResolutionResult {
-    fn replay_runtime_state(&self, project_root: &ProjectRoot) {
-        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(
-            project_root.root().to_path_buf(),
-        );
-        let cell_graph = &self.session_data.cell_graph;
+fn replay_bzlmod_runtime_state(
+    session_data: &slug_bzlmod::BzlmodSessionData,
+    project_root: &ProjectRoot,
+) {
+    slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(
+        project_root.root().to_path_buf(),
+    );
+    let cell_graph = &session_data.cell_graph;
 
-        let external_base_dir = project_root.root().as_path().join("bazel-external");
-        let buck_out_external_cells_dir = project_root
-            .root()
-            .as_path()
-            .join("buck-out/v2/external_cells/bzlmod");
-        let mut valid_symlink_names = std::collections::HashSet::new();
-        for symlink in cell_graph.module_symlinks.iter() {
-            valid_symlink_names.insert(symlink.entry_name.clone());
-            let link_path = external_base_dir.join(&symlink.entry_name);
-            if let Err(e) = ensure_symlink(&link_path, &symlink.source_path) {
-                tracing::warn!(
-                    "Failed to create symlink for bzlmod module '{}': {}",
-                    symlink.entry_name,
-                    e
-                );
-            }
-            let buck_out_link = buck_out_external_cells_dir.join(&symlink.entry_name);
-            if let Err(e) = ensure_symlink(&buck_out_link, &symlink.source_path) {
-                tracing::warn!(
-                    "Failed to create external_cells symlink for bzlmod module '{}': {}",
-                    symlink.entry_name,
-                    e
-                );
-            }
+    let external_base_dir = project_root.root().as_path().join("bazel-external");
+    let buck_out_external_cells_dir = project_root
+        .root()
+        .as_path()
+        .join("buck-out/v2/external_cells/bzlmod");
+    let mut valid_symlink_names = std::collections::HashSet::new();
+    for symlink in cell_graph.module_symlinks.iter() {
+        valid_symlink_names.insert(symlink.entry_name.clone());
+        let link_path = external_base_dir.join(&symlink.entry_name);
+        if let Err(e) = ensure_symlink(&link_path, &symlink.source_path) {
+            tracing::warn!(
+                "Failed to create symlink for bzlmod module '{}': {}",
+                symlink.entry_name,
+                e
+            );
         }
-        cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
-        cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
+        let buck_out_link = buck_out_external_cells_dir.join(&symlink.entry_name);
+        if let Err(e) = ensure_symlink(&buck_out_link, &symlink.source_path) {
+            tracing::warn!(
+                "Failed to create external_cells symlink for bzlmod module '{}': {}",
+                symlink.entry_name,
+                e
+            );
+        }
+    }
+    cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
+    cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
 
-        let runtime_cell_snapshot = runtime_cell_install_snapshot(cell_graph);
-        slug_core::cells::install_bzlmod_runtime_cell_snapshot(&runtime_cell_snapshot);
+    let runtime_cell_snapshot = runtime_cell_install_snapshot(cell_graph);
+    slug_core::cells::install_bzlmod_runtime_cell_snapshot(&runtime_cell_snapshot);
 
-        let cell_pairs: Vec<(String, String)> = self
-            .session_data
-            .cell_graph
-            .cells
-            .iter()
-            .map(|cell| (cell.name.clone(), cell.path.clone()))
-            .chain(
-                cell_graph
-                    .extension_cells
-                    .iter()
-                    .filter(|cell| !cell.lazy)
-                    .map(|cell| (cell.canonical_name.clone(), cell.path.clone())),
-            )
-            .collect();
-        slug_core::cells::ensure_external_symlinks_for_cells(&cell_pairs);
-        for alias in cell_graph.root_aliases.iter() {
-            let alias_str = alias.apparent_name.as_str();
-            if let Some(cell) = cell_graph
-                .cells
-                .iter()
-                .find(|cell| cell.name == alias.target_name)
-            {
-                slug_core::cells::ensure_external_symlink(alias_str, cell.path.as_str());
-            } else if let Some(cell) = cell_graph
+    let cell_pairs: Vec<(String, String)> = session_data
+        .cell_graph
+        .cells
+        .iter()
+        .map(|cell| (cell.name.clone(), cell.path.clone()))
+        .chain(
+            cell_graph
                 .extension_cells
                 .iter()
                 .filter(|cell| !cell.lazy)
-                .find(|cell| cell.canonical_name == alias.target_name)
-            {
-                slug_core::cells::ensure_external_symlink(alias_str, cell.path.as_str());
-            }
+                .map(|cell| (cell.canonical_name.clone(), cell.path.clone())),
+        )
+        .collect();
+    slug_core::cells::ensure_external_symlinks_for_cells(&cell_pairs);
+    for alias in cell_graph.root_aliases.iter() {
+        let alias_str = alias.apparent_name.as_str();
+        if let Some(cell) = cell_graph
+            .cells
+            .iter()
+            .find(|cell| cell.name == alias.target_name)
+        {
+            slug_core::cells::ensure_external_symlink(alias_str, cell.path.as_str());
+        } else if let Some(cell) = cell_graph
+            .extension_cells
+            .iter()
+            .filter(|cell| !cell.lazy)
+            .find(|cell| cell.canonical_name == alias.target_name)
+        {
+            slug_core::cells::ensure_external_symlink(alias_str, cell.path.as_str());
         }
-        slug_core::cells::repair_external_symlink_targets(project_root.root().as_path());
     }
+    slug_core::cells::repair_external_symlink_targets(project_root.root().as_path());
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -2481,7 +2474,7 @@ impl Key for NonRootModuleFilesKey {
 
 #[async_trait]
 impl Key for LegacyBzlmodResolutionDiceKey {
-    type Value = slug_error::Result<Arc<Option<BzlmodResolutionResult>>>;
+    type Value = slug_error::Result<Arc<Option<slug_bzlmod::BzlmodSessionData>>>;
 
     async fn compute(
         &self,
@@ -2790,7 +2783,7 @@ impl BuckConfigBasedCells {
         project_fs: Option<&ProjectRoot>,
         root_module_file: Option<Arc<slug_bzlmod::RootModuleFileValue>>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
-        dice_bzlmod_resolution: Option<Arc<Option<BzlmodResolutionResult>>>,
+        dice_bzlmod_resolution: Option<Arc<Option<slug_bzlmod::BzlmodSessionData>>>,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
         let processed_config_args = resolve_config_args(config_args).await?;
@@ -2812,7 +2805,7 @@ impl BuckConfigBasedCells {
         // The root cell name is derived from module(name = "...") in MODULE.bazel.
         // .buckconfig [cells], [cell_aliases], and [external_cells] sections are skipped.
         let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
-        if let Some(bzlmod_result) = if let Some(dice_bzlmod_resolution) = dice_bzlmod_resolution {
+        if let Some(session_data) = if let Some(dice_bzlmod_resolution) = dice_bzlmod_resolution {
             dice_bzlmod_resolution.as_ref().clone()
         } else if let Some(project_fs) = project_fs {
             let options = BzlmodResolutionOptions::from_config(&root_config)?;
@@ -2829,10 +2822,9 @@ impl BuckConfigBasedCells {
             None
         } {
             if let Some(project_fs) = project_fs {
-                bzlmod_result.replay_runtime_state(project_fs);
+                replay_bzlmod_runtime_state(&session_data, project_fs);
             }
             has_module_bazel = true;
-            let session_data = bzlmod_result.session_data;
             let cell_graph = &session_data.cell_graph;
 
             // Root cell comes from MODULE.bazel module(name = "...")
@@ -2990,7 +2982,7 @@ impl BuckConfigBasedCells {
     async fn resolve_bzlmod_resolution_from_key(
         key: &LegacyBzlmodResolutionDiceKey,
         dice_ctx: &mut DiceComputations<'_>,
-    ) -> slug_error::Result<Arc<Option<BzlmodResolutionResult>>> {
+    ) -> slug_error::Result<Arc<Option<slug_bzlmod::BzlmodSessionData>>> {
         let root_module_file = key.root_module_file.clone();
         if root_module_file.parsed.is_none() {
             return Ok(Arc::new(None));
@@ -3026,7 +3018,7 @@ impl BuckConfigBasedCells {
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         mut dice_ctx: Option<&mut DiceComputations<'_>>,
-    ) -> slug_error::Result<Option<BzlmodResolutionResult>> {
+    ) -> slug_error::Result<Option<slug_bzlmod::BzlmodSessionData>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
 
@@ -3653,7 +3645,7 @@ impl BuckConfigBasedCells {
         }
 
         // Convert pre-computed cells to the format expected by
-        // BzlmodResolutionResult. Bazel's identity for extension-generated
+        // BzlmodSessionData. Bazel's identity for extension-generated
         // repositories is the canonical repo name; apparent names from
         // use_repo() are repository-mapping entries that point at that identity.
         let mut ext_cells = Vec::new();
@@ -3901,9 +3893,7 @@ impl BuckConfigBasedCells {
         };
         bzlmod_session_data.cell_graph = cell_graph;
 
-        Ok(Some(BzlmodResolutionResult {
-            session_data: bzlmod_session_data,
-        }))
+        Ok(Some(bzlmod_session_data))
     }
 
     pub(crate) fn get_cell_aliases_from_config(
@@ -4331,7 +4321,7 @@ mod tests {
             None,
             None,
             None,
-            Some(Arc::new(Some(BzlmodResolutionResult { session_data }))),
+            Some(Arc::new(Some(session_data))),
         )
         .await?;
         let bazel_tools = CellName::unchecked_new("bazel_tools")?;
