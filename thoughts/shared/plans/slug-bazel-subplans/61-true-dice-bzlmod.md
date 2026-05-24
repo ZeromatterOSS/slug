@@ -2009,6 +2009,12 @@ What did not work or remains risky:
   lockfile_preseed_uses_tracked_bzl_digest_when_provided -- --nocapture`,
   `cargo test -p slug_bzlmod lockfile_preseed_skips_stale_extension_cache --
   --nocapture`, and `cargo check -p slug_common -p slug_bzlmod`.
+- Project-local missing `.bzl` load state in the tracked preseed digest path no
+  longer performs a direct `std::fs` read just to obtain OS error text. The
+  missing-file hash input is the deterministic
+  `No such file or directory (os error 2)` state already expected by the
+  guardrails, while `ExtensionBzlTransitiveDigestKey` and non-DICE callers
+  remain on the transitional direct scanner.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before
@@ -2326,9 +2332,10 @@ using Rust DICE keys and values:
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.
    - Lockfile spoke pre-seeding uses the tracked project-file digest producer
-     when DICE inputs are available; `ExtensionBzlTransitiveDigestKey` and
-     non-DICE bootstrap/preseed callers still use the transitional direct
-     literal-load scanner.
+     when DICE inputs are available, including deterministic project-local
+     missing-file digest state without a direct filesystem read;
+     `ExtensionBzlTransitiveDigestKey` and non-DICE bootstrap/preseed callers
+     still use the transitional direct literal-load scanner.
    - Reject replay when any loaded implementation file changes, not only
      literal loads that the transitional scanner can find.
 

@@ -1517,7 +1517,7 @@ async fn read_bzl_digest_file_input(
                     text: Some(content),
                 },
                 Ok(None) => BzlDigestFileInput::Missing {
-                    error: std_fs_read_error(path),
+                    error: BZL_DIGEST_MISSING_FILE_ERROR.to_owned(),
                 },
                 Err(e) => BzlDigestFileInput::ReadError {
                     error: e.to_string(),
@@ -1540,12 +1540,7 @@ async fn read_bzl_digest_file_input(
     })
 }
 
-fn std_fs_read_error(path: &Path) -> String {
-    match std::fs::read(path) {
-        Ok(_) => std::io::Error::from(std::io::ErrorKind::NotFound).to_string(),
-        Err(e) => e.to_string(),
-    }
-}
+const BZL_DIGEST_MISSING_FILE_ERROR: &str = "No such file or directory (os error 2)";
 
 fn hash_extension_bzl_digest_inputs(
     extension_id: &str,
@@ -4943,6 +4938,69 @@ ext = module_extension(implementation = _impl)
         assert_eq!(tracked.as_ref(), direct);
         assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
             tracked
+        )));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn tracked_extension_bzl_digest_matches_legacy_missing_project_load_digest()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file(
+            "ext.bzl",
+            r#"
+load(":helper.bzl", "HELPER")
+
+def _impl(module_ctx):
+    pass
+
+ext = module_extension(implementation = _impl)
+"#,
+        );
+
+        let extension_id = "@@root//:ext.bzl%ext";
+        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?;
+        let key = TrackedExtensionBzlDigestKey {
+            project_root: project_root.clone(),
+            extension_id: Arc::from(extension_id),
+            repo_mappings: Arc::new(repo_mappings.clone()),
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let direct_missing =
+            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                extension_id,
+                fs.path().root().as_path(),
+                Some(&repo_mappings),
+            );
+        let tracked_missing = dice.compute(&key).await??;
+        assert_eq!(tracked_missing.as_ref(), direct_missing);
+        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
+            tracked_missing.clone()
+        )));
+
+        fs.write_file("helper.bzl", "HELPER = 'created'\n");
+        let direct_created =
+            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                extension_id,
+                fs.path().root().as_path(),
+                Some(&repo_mappings),
+            );
+        let mut dice = dice.into_updater().commit().await;
+        let tracked_created = dice.compute(&key).await??;
+
+        assert_ne!(tracked_missing, tracked_created);
+        assert_eq!(tracked_created.as_ref(), direct_created);
+        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
+            tracked_created
         )));
         Ok(())
     }
