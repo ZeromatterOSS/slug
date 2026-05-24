@@ -1928,6 +1928,7 @@ async fn extract_cc_toolchain_features_metadata(
         toolchain_config_label,
         cell_resolver.as_ref(),
     )?;
+    let metadata_ctx = MetadataLabelContext::new(cell_resolver.as_ref());
     let config_node = target_node_for_metadata(ctx, &config_target).await?;
 
     let mut feature_names = Vec::new();
@@ -1946,6 +1947,7 @@ async fn extract_cc_toolchain_features_metadata(
                     target_cfg,
                     &mut HashSet::new(),
                     &mut data_labels,
+                    metadata_ctx,
                 )
                 .await,
             );
@@ -1960,6 +1962,7 @@ async fn extract_cc_toolchain_features_metadata(
                     feature_set_label,
                     target_cfg,
                     &mut HashSet::new(),
+                    metadata_ctx,
                 )
                 .await
                 {
@@ -1975,6 +1978,7 @@ async fn extract_cc_toolchain_features_metadata(
                             target_cfg,
                             &mut HashSet::new(),
                             &mut data_labels,
+                            metadata_ctx,
                         )
                         .await;
                         if !flag_sets.is_empty() {
@@ -2278,10 +2282,52 @@ fn metadata_label_key(label: &TargetLabel) -> String {
     label.to_string()
 }
 
-fn metadata_canonicalize_target_label(label: TargetLabel) -> TargetLabel {
+#[derive(Clone, Copy)]
+struct MetadataLabelContext<'a> {
+    cell_resolver: Option<&'a slug_core::cells::CellResolver>,
+}
+
+impl<'a> MetadataLabelContext<'a> {
+    fn new(cell_resolver: Option<&'a slug_core::cells::CellResolver>) -> Self {
+        Self { cell_resolver }
+    }
+
+    #[cfg(test)]
+    fn empty() -> Self {
+        Self {
+            cell_resolver: None,
+        }
+    }
+
+    fn canonical_dynamic_extension_cell_name(&self, cell_name: &str) -> Option<String> {
+        self.cell_resolver
+            .and_then(|cell_resolver| {
+                cell_resolver
+                    .root_cell_cell_alias_resolver()
+                    .resolve_declared_or_runtime_alias(cell_name)
+                    .map(|resolved| {
+                        cell_resolver
+                            .get(resolved)
+                            .map(|cell| cell.name().as_str().to_owned())
+                            .unwrap_or_else(|_| resolved.as_str().to_owned())
+                    })
+            })
+            .or_else(|| slug_core::cells::canonical_dynamic_extension_cell_name(cell_name))
+    }
+
+    fn external_cell_name(&self, cell_name: &str) -> String {
+        self.canonical_dynamic_extension_cell_name(cell_name)
+            .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
+            .unwrap_or_else(|| cell_name.to_owned())
+    }
+}
+
+fn metadata_canonicalize_target_label(
+    label: TargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
+) -> TargetLabel {
     let cell_name = label.pkg().cell_name().as_str().to_owned();
-    let Some(canonical_cell_name) =
-        slug_core::cells::canonical_dynamic_extension_cell_name(&cell_name)
+    let Some(canonical_cell_name) = metadata_ctx.canonical_dynamic_extension_cell_name(&cell_name)
     else {
         return label;
     };
@@ -2339,8 +2385,12 @@ fn metadata_owner_scoped_repo_candidates(owner_cell_name: &str) -> Vec<String> {
     candidates
 }
 
-fn metadata_canonicalize_label_for_owner(owner: &TargetLabel, label: TargetLabel) -> TargetLabel {
-    let canonical = metadata_canonicalize_target_label(label.dupe());
+fn metadata_canonicalize_label_for_owner(
+    owner: &TargetLabel,
+    label: TargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
+) -> TargetLabel {
+    let canonical = metadata_canonicalize_target_label(label.dupe(), metadata_ctx);
     if canonical != label {
         return canonical;
     }
@@ -2373,10 +2423,11 @@ fn metadata_canonicalize_label_for_owner(owner: &TargetLabel, label: TargetLabel
 fn metadata_path_for_label(
     label: &TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> String {
     let buck_out_root = slug_execute::path::artifact_path::get_artifact_path_buck_out_root();
     let cell_name = label.pkg().cell_name().as_str();
-    let external_cell_name = metadata_external_cell_name(cell_name);
+    let external_cell_name = metadata_ctx.external_cell_name(cell_name);
     let cfg_hash = target_cfg.output_hash().as_str();
     let cell_relative_path = label.pkg().cell_relative_path().as_str();
     let target_name = label.name().as_str();
@@ -2410,15 +2461,12 @@ fn metadata_path_for_label(
     }
 }
 
-fn metadata_external_cell_name(cell_name: &str) -> String {
-    slug_core::cells::canonical_dynamic_extension_cell_name(cell_name)
-        .or_else(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
-        .unwrap_or_else(|| cell_name.to_owned())
-}
-
-fn metadata_source_path_for_label(label: &TargetLabel) -> String {
+fn metadata_source_path_for_label(
+    label: &TargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
+) -> String {
     let cell_name = label.pkg().cell_name().as_str();
-    let external_cell_name = metadata_external_cell_name(cell_name);
+    let external_cell_name = metadata_ctx.external_cell_name(cell_name);
     let cell_relative_path = label.pkg().cell_relative_path().as_str();
     let target_name = label.name().as_str();
     if slug_core::cells::is_root_cell_name(cell_name) {
@@ -2441,12 +2489,13 @@ async fn metadata_resolve_alias_label(
     ctx: &mut DiceComputations<'_>,
     label: TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> TargetLabel {
-    let mut current = metadata_canonicalize_target_label(label);
+    let mut current = metadata_canonicalize_target_label(label, metadata_ctx);
     let mut seen = HashSet::new();
     const MAX_DEPTH: usize = 16;
     for _ in 0..MAX_DEPTH {
-        current = metadata_canonicalize_target_label(current);
+        current = metadata_canonicalize_target_label(current, metadata_ctx);
         let key = metadata_label_key(&current);
         if !seen.insert(key) {
             break;
@@ -2466,7 +2515,7 @@ async fn metadata_resolve_alias_label(
         else {
             break;
         };
-        current = metadata_canonicalize_label_for_owner(&current, next);
+        current = metadata_canonicalize_label_for_owner(&current, next, metadata_ctx);
     }
     current
 }
@@ -2475,6 +2524,7 @@ async fn metadata_source_directory_path_for_label(
     ctx: &mut DiceComputations<'_>,
     label: &TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> Option<String> {
     let node = target_node_for_metadata(ctx, label).await?;
     let source_directory = metadata_attr_label(&node, "source_directory", target_cfg)?;
@@ -2483,28 +2533,30 @@ async fn metadata_source_directory_path_for_label(
     let source_label = labels_from_coerced_attr(&srcs_attr.value, target_cfg)
         .into_iter()
         .next()?;
-    Some(metadata_source_path_for_label(&source_label))
+    Some(metadata_source_path_for_label(&source_label, metadata_ctx))
 }
 
 async fn metadata_format_path_for_label(
     ctx: &mut DiceComputations<'_>,
     label: TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> String {
-    let resolved = metadata_resolve_alias_label(ctx, label, target_cfg).await;
+    let resolved = metadata_resolve_alias_label(ctx, label, target_cfg, metadata_ctx).await;
     if let Some(source_path) =
-        metadata_source_directory_path_for_label(ctx, &resolved, target_cfg).await
+        metadata_source_directory_path_for_label(ctx, &resolved, target_cfg, metadata_ctx).await
     {
         return source_path;
     }
-    metadata_path_for_label(&resolved, target_cfg)
+    metadata_path_for_label(&resolved, target_cfg, metadata_ctx)
 }
 
 fn metadata_static_library_path_for_label(
     label: &TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> String {
-    let target_path = metadata_path_for_label(label, target_cfg);
+    let target_path = metadata_path_for_label(label, target_cfg, metadata_ctx);
     let target_name = label.name().as_str();
     let basename = target_name
         .rsplit_once('/')
@@ -2529,11 +2581,12 @@ fn metadata_named_output_path_for_label(
     label: &TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
     output_name: &str,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> String {
     if output_name.is_empty() {
-        return metadata_path_for_label(label, target_cfg);
+        return metadata_path_for_label(label, target_cfg, metadata_ctx);
     }
-    let target_path = metadata_path_for_label(label, target_cfg);
+    let target_path = metadata_path_for_label(label, target_cfg, metadata_ctx);
     let Some((dir, _)) = target_path.rsplit_once('/') else {
         return output_name.to_owned();
     };
@@ -2549,33 +2602,43 @@ fn metadata_output_path_for_label_with_declared_name(
     label: &TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
     declared_output_name: Option<&str>,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> String {
     declared_output_name
-        .map(|output_name| metadata_named_output_path_for_label(label, target_cfg, output_name))
-        .unwrap_or_else(|| metadata_path_for_label(label, target_cfg))
+        .map(|output_name| {
+            metadata_named_output_path_for_label(label, target_cfg, output_name, metadata_ctx)
+        })
+        .unwrap_or_else(|| metadata_path_for_label(label, target_cfg, metadata_ctx))
 }
 
 fn metadata_default_output_path_for_node(
     label: &TargetLabel,
     node: &TargetNode,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> String {
     if let Some(shared_lib_name) = metadata_shared_lib_name_for_node(node) {
-        return metadata_named_output_path_for_label(label, target_cfg, &shared_lib_name);
+        return metadata_named_output_path_for_label(
+            label,
+            target_cfg,
+            &shared_lib_name,
+            metadata_ctx,
+        );
     }
 
     let target_name = label.name().as_str();
     if metadata_rule_name(node) == Some("cc_static_library")
         || target_name.ends_with(".static_with_cfg")
     {
-        return metadata_static_library_path_for_label(label, target_cfg);
+        return metadata_static_library_path_for_label(label, target_cfg, metadata_ctx);
     }
-    metadata_path_for_label(label, target_cfg)
+    metadata_path_for_label(label, target_cfg, metadata_ctx)
 }
 
 async fn configured_target_node_for_metadata(
     ctx: &mut DiceComputations<'_>,
     label: &ConfiguredTargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> Option<(ConfiguredTargetLabel, ConfiguredTargetNode)> {
     if let Some(node) = ctx
         .get_internal_configured_target_node(label)
@@ -2584,7 +2647,8 @@ async fn configured_target_node_for_metadata(
         .and_then(|node| node.require_compatible().ok())
         .map(|node| node.dupe())
     {
-        let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe());
+        let canonical =
+            metadata_canonicalize_target_label(label.unconfigured().dupe(), metadata_ctx);
         let output_label = if canonical == *label.unconfigured() {
             label.dupe()
         } else {
@@ -2593,7 +2657,7 @@ async fn configured_target_node_for_metadata(
         return Some((output_label, node));
     }
 
-    let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe());
+    let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe(), metadata_ctx);
     if canonical == *label.unconfigured() {
         return None;
     }
@@ -2606,8 +2670,11 @@ async fn configured_target_node_for_metadata(
         .map(|node| (canonical, node.dupe()))
 }
 
-fn metadata_configured_label_key(label: &ConfiguredTargetLabel) -> String {
-    let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe());
+fn metadata_configured_label_key(
+    label: &ConfiguredTargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
+) -> String {
+    let canonical = metadata_canonicalize_target_label(label.unconfigured().dupe(), metadata_ctx);
     format!(
         "{}#{}",
         metadata_label_key(&canonical),
@@ -2618,25 +2685,39 @@ fn metadata_configured_label_key(label: &ConfiguredTargetLabel) -> String {
 fn metadata_configured_labels_equivalent(
     left: &ConfiguredTargetLabel,
     right: &ConfiguredTargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> bool {
-    metadata_configured_label_key(left) == metadata_configured_label_key(right)
+    metadata_configured_label_key(left, metadata_ctx)
+        == metadata_configured_label_key(right, metadata_ctx)
 }
 
-fn metadata_target_labels_equivalent(left: &TargetLabel, right: &TargetLabel) -> bool {
-    metadata_label_key(&metadata_canonicalize_target_label(left.dupe()))
-        == metadata_label_key(&metadata_canonicalize_target_label(right.dupe()))
+fn metadata_target_labels_equivalent(
+    left: &TargetLabel,
+    right: &TargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
+) -> bool {
+    metadata_label_key(&metadata_canonicalize_target_label(
+        left.dupe(),
+        metadata_ctx,
+    )) == metadata_label_key(&metadata_canonicalize_target_label(
+        right.dupe(),
+        metadata_ctx,
+    ))
 }
 
 fn metadata_configured_exports_dep(
     configured_node: &ConfiguredTargetNode,
     owner: &ConfiguredTargetLabel,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> Option<ConfiguredTargetNode> {
     let exports_attr = configured_node
         .target_node()
         .attr_or_none("exports", AttrInspectOptions::All)?;
     let exports = labels_from_coerced_attr(&exports_attr.value, owner.cfg())
         .into_iter()
-        .map(|label| metadata_canonicalize_label_for_owner(owner.unconfigured(), label))
+        .map(|label| {
+            metadata_canonicalize_label_for_owner(owner.unconfigured(), label, metadata_ctx)
+        })
         .collect::<Vec<_>>();
     if exports.is_empty() {
         return None;
@@ -2645,9 +2726,9 @@ fn metadata_configured_exports_dep(
     configured_node
         .deps()
         .find(|dep| {
-            exports
-                .iter()
-                .any(|export| metadata_target_labels_equivalent(dep.label().unconfigured(), export))
+            exports.iter().any(|export| {
+                metadata_target_labels_equivalent(dep.label().unconfigured(), export, metadata_ctx)
+            })
         })
         .map(|dep| dep.dupe())
 }
@@ -2703,6 +2784,7 @@ async fn metadata_default_output_data_for_label_configured(
     ctx: &mut DiceComputations<'_>,
     label: TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> Vec<(ConfiguredTargetLabel, String)> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
@@ -2710,7 +2792,7 @@ async fn metadata_default_output_data_for_label_configured(
     let mut stack = vec![(initial, None::<String>)];
 
     while let Some((configured, declared_output_name)) = stack.pop() {
-        if !seen.insert(metadata_configured_label_key(&configured)) {
+        if !seen.insert(metadata_configured_label_key(&configured, metadata_ctx)) {
             continue;
         }
         let fallback_node = target_node_for_metadata(ctx, configured.unconfigured()).await;
@@ -2721,7 +2803,7 @@ async fn metadata_default_output_data_for_label_configured(
         });
 
         let Some((configured, configured_node)) =
-            configured_target_node_for_metadata(ctx, &configured).await
+            configured_target_node_for_metadata(ctx, &configured, metadata_ctx).await
         else {
             if let Some(node) = fallback_node.as_ref() {
                 if matches!(
@@ -2733,8 +2815,11 @@ async fn metadata_default_output_data_for_label_configured(
                         .map(|srcs| labels_from_coerced_attr(&srcs.value, configured.cfg()))
                         .unwrap_or_default();
                     for src in srcs.into_iter().rev() {
-                        let src =
-                            metadata_canonicalize_label_for_owner(configured.unconfigured(), src);
+                        let src = metadata_canonicalize_label_for_owner(
+                            configured.unconfigured(),
+                            src,
+                            metadata_ctx,
+                        );
                         stack.push((src.configure(configured.cfg().dupe()), None));
                     }
                     continue;
@@ -2751,6 +2836,7 @@ async fn metadata_default_output_data_for_label_configured(
                             let actual = metadata_canonicalize_label_for_owner(
                                 configured.unconfigured(),
                                 actual,
+                                metadata_ctx,
                             );
                             stack.push((actual.configure(configured.cfg().dupe()), None));
                         }
@@ -2766,6 +2852,7 @@ async fn metadata_default_output_data_for_label_configured(
                         configured.unconfigured(),
                         node,
                         configured.cfg(),
+                        metadata_ctx,
                     )
                 })
                 .unwrap_or_else(|| {
@@ -2778,9 +2865,14 @@ async fn metadata_default_output_data_for_label_configured(
                         metadata_static_library_path_for_label(
                             configured.unconfigured(),
                             configured.cfg(),
+                            metadata_ctx,
                         )
                     } else {
-                        metadata_path_for_label(configured.unconfigured(), configured.cfg())
+                        metadata_path_for_label(
+                            configured.unconfigured(),
+                            configured.cfg(),
+                            metadata_ctx,
+                        )
                     }
                 });
             out.push((configured.dupe(), output_path));
@@ -2800,6 +2892,7 @@ async fn metadata_default_output_data_for_label_configured(
                     metadata_canonicalize_label_for_owner(
                         configured.unconfigured(),
                         dep.label().unconfigured().dupe(),
+                        metadata_ctx,
                     )
                     .configure(dep.label().cfg().dupe())
                 })
@@ -2820,6 +2913,7 @@ async fn metadata_default_output_data_for_label_configured(
                 let actual = metadata_canonicalize_label_for_owner(
                     configured.unconfigured(),
                     dep.label().unconfigured().dupe(),
+                    metadata_ctx,
                 );
                 stack.push((
                     actual.configure(dep.label().cfg().dupe()),
@@ -2830,7 +2924,8 @@ async fn metadata_default_output_data_for_label_configured(
         }
 
         if metadata_should_forward_exports(&configured, configured_node.target_node()) {
-            if let Some(export_dep) = metadata_configured_exports_dep(&configured_node, &configured)
+            if let Some(export_dep) =
+                metadata_configured_exports_dep(&configured_node, &configured, metadata_ctx)
             {
                 let declared_output_name = declared_output_name
                     .or_else(|| metadata_shared_lib_name_for_node(export_dep.target_node()));
@@ -2843,12 +2938,14 @@ async fn metadata_default_output_data_for_label_configured(
                                 frontend_label.unconfigured(),
                                 frontend_label.cfg(),
                                 Some(declared_output_name),
+                                metadata_ctx,
                             )
                         } else {
                             metadata_default_output_path_for_node(
                                 frontend_label.unconfigured(),
                                 export_dep.target_node(),
                                 frontend_label.cfg(),
+                                metadata_ctx,
                             )
                         };
                     out.push((frontend_label, output_path));
@@ -2867,12 +2964,14 @@ async fn metadata_default_output_data_for_label_configured(
                 output_unconfigured,
                 output_label.cfg(),
                 Some(declared_output_name),
+                metadata_ctx,
             )
-        } else if metadata_configured_labels_equivalent(&output_label, &configured) {
+        } else if metadata_configured_labels_equivalent(&output_label, &configured, metadata_ctx) {
             metadata_default_output_path_for_node(
                 output_unconfigured,
                 configured_node.target_node(),
                 output_label.cfg(),
+                metadata_ctx,
             )
         } else {
             let output_node = target_node_for_metadata(ctx, output_unconfigured).await;
@@ -2883,9 +2982,12 @@ async fn metadata_default_output_data_for_label_configured(
                         output_unconfigured,
                         node,
                         output_label.cfg(),
+                        metadata_ctx,
                     )
                 })
-                .unwrap_or_else(|| metadata_path_for_label(output_unconfigured, output_label.cfg()))
+                .unwrap_or_else(|| {
+                    metadata_path_for_label(output_unconfigured, output_label.cfg(), metadata_ctx)
+                })
         };
         out.push((output_label, output_path));
     }
@@ -2898,6 +3000,7 @@ async fn metadata_toolchain_action_data(
     metadata: &CcToolchainFeaturesMetadata,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
     matches_action: fn(&[String]) -> bool,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> Vec<(ConfiguredTargetLabel, Arc<str>)> {
     let mut data = Vec::new();
     for entry in metadata
@@ -2905,9 +3008,13 @@ async fn metadata_toolchain_action_data(
         .iter()
         .filter(|entry| matches_action(&entry.actions))
     {
-        for (output_label, output_path) in
-            metadata_default_output_data_for_label_configured(ctx, entry.label.dupe(), target_cfg)
-                .await
+        for (output_label, output_path) in metadata_default_output_data_for_label_configured(
+            ctx,
+            entry.label.dupe(),
+            target_cfg,
+            metadata_ctx,
+        )
+        .await
         {
             data.push((output_label, output_path.into()));
         }
@@ -2920,6 +3027,7 @@ async fn metadata_toolchain_runtime_data(
     toolchain_label: &TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
     attr_name: &str,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> Vec<(ConfiguredTargetLabel, Arc<str>)> {
     let Some(toolchain_node) = target_node_for_metadata(ctx, toolchain_label).await else {
         return Vec::new();
@@ -2930,9 +3038,15 @@ async fn metadata_toolchain_runtime_data(
 
     let mut data = Vec::new();
     for runtime_label in labels_from_coerced_attr(&runtime_attr.value, target_cfg) {
-        let runtime_label = metadata_canonicalize_label_for_owner(toolchain_label, runtime_label);
-        for (output_label, output_path) in
-            metadata_default_output_data_for_label_configured(ctx, runtime_label, target_cfg).await
+        let runtime_label =
+            metadata_canonicalize_label_for_owner(toolchain_label, runtime_label, metadata_ctx);
+        for (output_label, output_path) in metadata_default_output_data_for_label_configured(
+            ctx,
+            runtime_label,
+            target_cfg,
+            metadata_ctx,
+        )
+        .await
         {
             data.push((output_label, output_path.into()));
         }
@@ -2953,6 +3067,7 @@ async fn metadata_format_substitution_for_label(
     ctx: &mut DiceComputations<'_>,
     label: TargetLabel,
     target_cfg: &slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'_>,
 ) -> MetadataFormatSubstitution {
     let key = metadata_label_key(&label);
     if key.contains("/variables:") {
@@ -2967,7 +3082,7 @@ async fn metadata_format_substitution_for_label(
         }
     }
     MetadataFormatSubstitution::Literal(
-        metadata_format_path_for_label(ctx, label, target_cfg).await,
+        metadata_format_path_for_label(ctx, label, target_cfg, metadata_ctx).await,
     )
 }
 
@@ -3060,6 +3175,7 @@ fn metadata_feature_labels_for_set<'a>(
     feature_set_label: TargetLabel,
     target_cfg: &'a slug_core::configuration::data::ConfigurationData,
     seen: &'a mut HashSet<String>,
+    metadata_ctx: MetadataLabelContext<'a>,
 ) -> futures::future::BoxFuture<'a, Vec<TargetLabel>> {
     async move {
         let key = metadata_label_key(&feature_set_label);
@@ -3076,7 +3192,14 @@ fn metadata_feature_labels_for_set<'a>(
                 if let Some(all_of) = node.attr_or_none("all_of", AttrInspectOptions::All) {
                     for label in labels_from_coerced_attr(&all_of.value, target_cfg) {
                         features.extend(
-                            metadata_feature_labels_for_set(ctx, label, target_cfg, seen).await,
+                            metadata_feature_labels_for_set(
+                                ctx,
+                                label,
+                                target_cfg,
+                                seen,
+                                metadata_ctx,
+                            )
+                            .await,
                         );
                     }
                 }
@@ -3092,12 +3215,19 @@ fn metadata_with_features_for_constraints<'a>(
     ctx: &'a mut DiceComputations<'_>,
     labels: Vec<TargetLabel>,
     target_cfg: &'a slug_core::configuration::data::ConfigurationData,
+    metadata_ctx: MetadataLabelContext<'a>,
 ) -> futures::future::BoxFuture<'a, Vec<CcWithFeatureSet>> {
     async move {
         let mut result = Vec::new();
         for label in labels {
-            let features =
-                metadata_feature_labels_for_set(ctx, label, target_cfg, &mut HashSet::new()).await;
+            let features = metadata_feature_labels_for_set(
+                ctx,
+                label,
+                target_cfg,
+                &mut HashSet::new(),
+                metadata_ctx,
+            )
+            .await;
             let mut names = Vec::new();
             for feature in features {
                 if let Some(name) = metadata_feature_name(ctx, feature).await {
@@ -3118,6 +3248,7 @@ fn metadata_action_names_for_label<'a>(
     action_label: TargetLabel,
     target_cfg: &'a slug_core::configuration::data::ConfigurationData,
     seen: &'a mut HashSet<String>,
+    metadata_ctx: MetadataLabelContext<'a>,
 ) -> futures::future::BoxFuture<'a, Vec<String>> {
     async move {
         let key = metadata_label_key(&action_label);
@@ -3141,7 +3272,14 @@ fn metadata_action_names_for_label<'a>(
                 if let Some(actions_attr) = node.attr_or_none("actions", AttrInspectOptions::All) {
                     for label in labels_from_coerced_attr(&actions_attr.value, target_cfg) {
                         names.extend(
-                            metadata_action_names_for_label(ctx, label, target_cfg, seen).await,
+                            metadata_action_names_for_label(
+                                ctx,
+                                label,
+                                target_cfg,
+                                seen,
+                                metadata_ctx,
+                            )
+                            .await,
                         );
                     }
                 }
@@ -3282,9 +3420,11 @@ fn metadata_flag_sets_for_args_label<'a>(
     target_cfg: &'a slug_core::configuration::data::ConfigurationData,
     seen: &'a mut HashSet<String>,
     data_labels: &'a mut Vec<CcToolchainDataLabelMetadata>,
+    metadata_ctx: MetadataLabelContext<'a>,
 ) -> futures::future::BoxFuture<'a, Vec<CcFlagSet>> {
     async move {
-        let args_label = metadata_resolve_alias_label(ctx, args_label, target_cfg).await;
+        let args_label =
+            metadata_resolve_alias_label(ctx, args_label, target_cfg, metadata_ctx).await;
         let key = metadata_label_key(&args_label);
         if !seen.insert(key) {
             return Vec::new();
@@ -3304,6 +3444,7 @@ fn metadata_flag_sets_for_args_label<'a>(
                                 target_cfg,
                                 seen,
                                 data_labels,
+                                metadata_ctx,
                             )
                             .await,
                         );
@@ -3324,6 +3465,7 @@ fn metadata_flag_sets_for_args_label<'a>(
                                 action_label,
                                 target_cfg,
                                 &mut HashSet::new(),
+                                metadata_ctx,
                             )
                             .await,
                         );
@@ -3335,10 +3477,15 @@ fn metadata_flag_sets_for_args_label<'a>(
                     for (placeholder, label) in
                         metadata_format_map_from_attr(&format_attr.value, target_cfg)
                     {
-                        let label = metadata_canonicalize_label_for_owner(&args_label, label);
-                        let substitution =
-                            metadata_format_substitution_for_label(ctx, label.dupe(), target_cfg)
-                                .await;
+                        let label =
+                            metadata_canonicalize_label_for_owner(&args_label, label, metadata_ctx);
+                        let substitution = metadata_format_substitution_for_label(
+                            ctx,
+                            label.dupe(),
+                            target_cfg,
+                            metadata_ctx,
+                        )
+                        .await;
                         if matches!(substitution, MetadataFormatSubstitution::Literal(_)) {
                             data_labels.push(CcToolchainDataLabelMetadata {
                                 actions: actions.clone(),
@@ -3351,7 +3498,8 @@ fn metadata_flag_sets_for_args_label<'a>(
 
                 if let Some(data_attr) = node.attr_or_none("data", AttrInspectOptions::All) {
                     for label in labels_from_coerced_attr(&data_attr.value, target_cfg) {
-                        let label = metadata_canonicalize_label_for_owner(&args_label, label);
+                        let label =
+                            metadata_canonicalize_label_for_owner(&args_label, label, metadata_ctx);
                         data_labels.push(CcToolchainDataLabelMetadata {
                             actions: actions.clone(),
                             label,
@@ -3375,6 +3523,7 @@ fn metadata_flag_sets_for_args_label<'a>(
                             target_cfg,
                             &mut HashSet::new(),
                             data_labels,
+                            metadata_ctx,
                         )
                         .await
                         {
@@ -3418,6 +3567,7 @@ fn metadata_flag_sets_for_args_label<'a>(
                         ctx,
                         labels_from_coerced_attr(&attr.value, target_cfg),
                         target_cfg,
+                        metadata_ctx,
                     )
                     .await
                 } else {
@@ -3437,6 +3587,7 @@ fn metadata_feature_flag_sets<'a>(
     target_cfg: &'a slug_core::configuration::data::ConfigurationData,
     seen: &'a mut HashSet<String>,
     data_labels: &'a mut Vec<CcToolchainDataLabelMetadata>,
+    metadata_ctx: MetadataLabelContext<'a>,
 ) -> futures::future::BoxFuture<'a, Vec<CcFlagSet>> {
     async move {
         let key = metadata_label_key(&feature_label);
@@ -3452,6 +3603,7 @@ fn metadata_feature_flag_sets<'a>(
                     ctx,
                     labels_from_coerced_attr(&attr.value, target_cfg),
                     target_cfg,
+                    metadata_ctx,
                 )
                 .await
             } else {
@@ -3467,6 +3619,7 @@ fn metadata_feature_flag_sets<'a>(
                         target_cfg,
                         &mut HashSet::new(),
                         data_labels,
+                        metadata_ctx,
                     )
                     .await
                     .into_iter()
@@ -3741,6 +3894,7 @@ async fn run_analysis_with_env_underlying(
             if any_resolved {
                 let target_cfg = node.label().cfg().dupe();
                 let cell_resolver = optional_cell_resolver(dice).await?;
+                let metadata_ctx = MetadataLabelContext::new(cell_resolver.as_ref());
                 let mut toolchain_providers = std::collections::HashMap::<
                     String,
                     Option<FrozenProviderCollectionValue>,
@@ -3817,6 +3971,7 @@ async fn run_analysis_with_env_underlying(
                                                     metadata,
                                                     &target_cfg,
                                                     metadata_actions_include_compile,
+                                                    metadata_ctx,
                                                 )
                                                 .await
                                             } else {
@@ -3829,6 +3984,7 @@ async fn run_analysis_with_env_underlying(
                                                 metadata,
                                                 &target_cfg,
                                                 metadata_actions_include_link,
+                                                metadata_ctx,
                                             )
                                             .await
                                         } else {
@@ -3843,7 +3999,13 @@ async fn run_analysis_with_env_underlying(
                                                     cell_resolver.as_ref(),
                                                 )
                                             })
-                                            .map(|label| metadata_path_for_label(&label, &target_cfg));
+                                            .map(|label| {
+                                                metadata_path_for_label(
+                                                    &label,
+                                                    &target_cfg,
+                                                    metadata_ctx,
+                                                )
+                                            });
                                         // Bazel's rules_cc asks for C++ runtime libraries from
                                         // rule semantics at the link point. The executable link
                                         // frontier proven by Bazel aquery needs the selected
@@ -3854,6 +4016,7 @@ async fn run_analysis_with_env_underlying(
                                             &target_label,
                                             &target_cfg,
                                             "static_runtime_lib",
+                                            metadata_ctx,
                                         )
                                         .await;
                                         let dynamic_runtime_data = Vec::new();
@@ -5203,7 +5366,12 @@ mod tests {
         let label = TargetLabel::testing_parse("@llvm++llvm_source+libcxx//:libcxx.shared");
 
         assert_eq!(
-            metadata_named_output_path_for_label(&label, &cfg, "libc++.so.1"),
+            metadata_named_output_path_for_label(
+                &label,
+                &cfg,
+                "libc++.so.1",
+                MetadataLabelContext::empty()
+            ),
             format!(
                 "{}/gen/llvm++llvm_source+libcxx/{}/external/llvm++llvm_source+libcxx/libc++.so.1",
                 slug_execute::path::artifact_path::get_artifact_path_buck_out_root(),
@@ -5222,7 +5390,8 @@ mod tests {
             metadata_output_path_for_label_with_declared_name(
                 &forwarded,
                 &cfg,
-                Some("libc++.so.1")
+                Some("libc++.so.1"),
+                MetadataLabelContext::empty()
             ),
             format!(
                 "{}/gen/llvm++llvm_source+libcxx/{}/external/llvm++llvm_source+libcxx/libc++.so.1",
@@ -5324,13 +5493,19 @@ mod tests {
             vec![original_node],
         );
 
-        let export_dep = metadata_configured_exports_dep(&with_cfg_node, &with_cfg_label).unwrap();
+        let export_dep = metadata_configured_exports_dep(
+            &with_cfg_node,
+            &with_cfg_label,
+            MetadataLabelContext::empty(),
+        )
+        .unwrap();
         let frontend_label =
             metadata_with_cfg_frontend_label(&with_cfg_label, export_dep.label().cfg()).unwrap();
         let output_path = metadata_output_path_for_label_with_declared_name(
             frontend_label.unconfigured(),
             frontend_label.cfg(),
             metadata_shared_lib_name_for_node(export_dep.target_node()).as_deref(),
+            MetadataLabelContext::empty(),
         );
 
         assert_eq!(
@@ -5365,8 +5540,8 @@ mod tests {
         );
 
         assert_eq!(
-            metadata_configured_label_key(&apparent),
-            metadata_configured_label_key(&canonical)
+            metadata_configured_label_key(&apparent, MetadataLabelContext::empty()),
+            metadata_configured_label_key(&canonical, MetadataLabelContext::empty())
         );
     }
 
@@ -5384,7 +5559,82 @@ mod tests {
             cfg.dupe(),
         );
 
-        assert!(metadata_configured_labels_equivalent(&apparent, &canonical));
+        assert!(metadata_configured_labels_equivalent(
+            &apparent,
+            &canonical,
+            MetadataLabelContext::empty()
+        ));
+    }
+
+    #[test]
+    fn metadata_paths_prefer_runtime_aliases_before_globals() -> slug_error::Result<()> {
+        let apparent = "plan61_metadata_runtime_alias";
+        let canonical = "plan61_owner++metadata+generated";
+        let wrong_global = "plan61_wrong_owner++metadata+generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@plan61_owner//:metadata.bzl%metadata"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-plan61-metadata-runtime-alias"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                setup,
+                registration: BzlmodRuntimeExtensionCellRegistration::Lazy,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let label = TargetLabel::testing_parse(&format!("@{apparent}//pkg:lib"));
+        let path =
+            metadata_path_for_label(&label, &cfg, MetadataLabelContext::new(Some(&resolver)));
+        assert!(path.contains(&format!("external/{canonical}/pkg/lib")));
+
+        let legacy_path = metadata_path_for_label(&label, &cfg, MetadataLabelContext::empty());
+        assert!(legacy_path.contains(&format!("external/{wrong_global}/pkg/lib")));
+        Ok(())
     }
 
     #[test]
