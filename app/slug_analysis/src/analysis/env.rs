@@ -4497,7 +4497,9 @@ async fn resolve_toolchain_types(
             ("candidate_count", candidates.len()),
         ],
     );
-    let first = resolve_toolchains_multi_group(&requests, &target, &candidates);
+    let declared_toolchains = get_declared_toolchains();
+    let first =
+        resolve_toolchains_multi_group(&requests, &target, &candidates, &declared_toolchains);
     let (
         first_error,
         first_group_count,
@@ -4572,7 +4574,13 @@ async fn resolve_toolchain_types(
                 ("candidate_count", candidates.len()),
             ],
         );
-        let retry = resolve_toolchains_multi_group(&requests, &target, &candidates);
+        let retry_declared_toolchains = get_declared_toolchains();
+        let retry = resolve_toolchains_multi_group(
+            &requests,
+            &target,
+            &candidates,
+            &retry_declared_toolchains,
+        );
         let (
             retry_error,
             retry_group_count,

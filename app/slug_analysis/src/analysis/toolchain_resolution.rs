@@ -29,7 +29,7 @@ use std::collections::HashSet;
 use slug_core::configuration::data::ConfigurationData;
 use slug_core::execution_types::execution::ExecutionPlatform;
 
-use super::native_rule_analysis::get_declared_toolchains;
+use super::native_rule_analysis::DeclaredToolchainInfo;
 
 /// A required toolchain type for a rule.
 #[derive(Debug, Clone)]
@@ -239,6 +239,7 @@ fn normalize_bzlmod_repo_name(repo: &str) -> &str {
 /// - `required_types`: The toolchain types the target's rule requires
 /// - `target_platform`: The target platform's constraints
 /// - `exec_platforms`: Available execution platforms (ordered by priority)
+/// - `declared`: Declared toolchains snapshot in registration order
 /// - `target_exec_constraints`: Additional exec constraints from the target
 ///
 /// # Returns
@@ -248,6 +249,7 @@ pub fn resolve_toolchains(
     required_types: &[RequiredToolchainType],
     target_platform: &PlatformConstraints,
     exec_platforms: &[PlatformConstraints],
+    declared: &[(String, DeclaredToolchainInfo)],
     target_exec_constraints: &[String],
 ) -> Result<ToolchainResolutionResult, String> {
     if required_types.is_empty() {
@@ -273,8 +275,6 @@ pub fn resolve_toolchains(
         });
     }
 
-    // Get all declared toolchains from the global registry
-    let declared = get_declared_toolchains();
     tracing::debug!(
         "Declared toolchains registry has {} entries. Required: {:?}",
         declared.len(),
@@ -317,7 +317,7 @@ pub fn resolve_toolchains(
             let mut found = None;
 
             // Search declared toolchains in registration order (priority)
-            for (tc_label, tc_info) in &declared {
+            for (tc_label, tc_info) in declared {
                 // Check toolchain_type matches. Compare the registered
                 // type against the request's canonical (alias-resolved)
                 // form so an alias like
@@ -461,6 +461,7 @@ pub fn resolve_toolchains_multi_group(
     requests: &[ExecGroupResolutionRequest],
     target_platform: &PlatformConstraints,
     exec_platforms: &[PlatformConstraints],
+    declared: &[(String, DeclaredToolchainInfo)],
 ) -> Result<MultiGroupResolutionResult, String> {
     let mut groups = HashMap::new();
     for req in requests {
@@ -468,6 +469,7 @@ pub fn resolve_toolchains_multi_group(
             &req.required_types,
             target_platform,
             exec_platforms,
+            declared,
             &req.exec_constraints,
         )?;
         groups.insert(req.group_name.clone(), result);
@@ -490,9 +492,82 @@ mod tests {
         let target_platform = PlatformConstraints::host_platform();
         let exec_platforms = vec![PlatformConstraints::host_platform()];
 
-        let result = resolve_toolchains(&[], &target_platform, &exec_platforms, &[]).unwrap();
+        let result = resolve_toolchains(&[], &target_platform, &exec_platforms, &[], &[]).unwrap();
 
         assert!(result.resolved_toolchains.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_toolchains_uses_explicit_declared_snapshot() {
+        let required = vec![RequiredToolchainType {
+            type_label: "@rules//:toolchain_type".to_owned(),
+            canonical_type_label: "@rules//:toolchain_type".to_owned(),
+            mandatory: true,
+        }];
+        let target_platform = PlatformConstraints {
+            label: "@platforms//:target".to_owned(),
+            constraint_values: HashSet::new(),
+        };
+        let exec_platforms = vec![PlatformConstraints {
+            label: "@platforms//:exec".to_owned(),
+            constraint_values: HashSet::new(),
+        }];
+        let first_declared = vec![(
+            "@toolchains//:first".to_owned(),
+            DeclaredToolchainInfo {
+                toolchain_type: "@rules//:toolchain_type".to_owned(),
+                toolchain_impl: "@toolchains//:first_impl".to_owned(),
+                cc_toolchain_config: None,
+                cc_toolchain_module_map: None,
+                exec_compatible_with: Vec::new(),
+                target_compatible_with: Vec::new(),
+                target_settings: Vec::new(),
+            },
+        )];
+        let second_declared = vec![(
+            "@toolchains//:second".to_owned(),
+            DeclaredToolchainInfo {
+                toolchain_type: "@rules//:toolchain_type".to_owned(),
+                toolchain_impl: "@toolchains//:second_impl".to_owned(),
+                cc_toolchain_config: None,
+                cc_toolchain_module_map: None,
+                exec_compatible_with: Vec::new(),
+                target_compatible_with: Vec::new(),
+                target_settings: Vec::new(),
+            },
+        )];
+
+        let first = resolve_toolchains(
+            &required,
+            &target_platform,
+            &exec_platforms,
+            &first_declared,
+            &[],
+        )
+        .unwrap();
+        let second = resolve_toolchains(
+            &required,
+            &target_platform,
+            &exec_platforms,
+            &second_declared,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(
+            first.resolved_toolchains["@rules//:toolchain_type"]
+                .as_ref()
+                .unwrap()
+                .toolchain_impl,
+            "@toolchains//:first_impl"
+        );
+        assert_eq!(
+            second.resolved_toolchains["@rules//:toolchain_type"]
+                .as_ref()
+                .unwrap()
+                .toolchain_impl,
+            "@toolchains//:second_impl"
+        );
     }
 
     #[test]
@@ -670,7 +745,8 @@ mod tests {
         ];
 
         let result =
-            resolve_toolchains_multi_group(&requests, &target_platform, &exec_platforms).unwrap();
+            resolve_toolchains_multi_group(&requests, &target_platform, &exec_platforms, &[])
+                .unwrap();
         assert_eq!(
             result.groups["default"].exec_platform,
             darwin_platform.label
@@ -698,7 +774,8 @@ mod tests {
         ];
 
         let result =
-            resolve_toolchains_multi_group(&requests, &target_platform, &exec_platforms).unwrap();
+            resolve_toolchains_multi_group(&requests, &target_platform, &exec_platforms, &[])
+                .unwrap();
         assert_eq!(result.groups.len(), 2);
         assert!(result.groups.contains_key("default"));
         assert!(result.groups.contains_key("link"));

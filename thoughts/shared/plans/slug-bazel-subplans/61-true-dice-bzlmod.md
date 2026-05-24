@@ -1727,6 +1727,16 @@ What did not work or remains risky:
   diagnostic-only pending toolchain repo logs; removing that poll reduces
   incidental filesystem state without completing the final DICE-owned
   toolchain/materialization graph.
+- Toolchain resolution now takes an explicit declared-toolchain snapshot from
+  its caller instead of reading the process-global registry inside the pure
+  resolver. The caller still snapshots transitional global state, so this only
+  narrows the ownership boundary; it does not make registered toolchains
+  DICE-owned. Validation passed with `cargo test -p slug_analysis
+  test_resolve_toolchains_uses_explicit_declared_snapshot -- --nocapture`,
+  `cargo test -p slug_analysis toolchain_resolution -- --nocapture` (`8
+  passed`), `cargo check -p slug_analysis -p slug_server`, `cargo build -p
+  slug`, and the full Plan 61 Python guardrail with `74 passed in 39.83s`.
+  The slugd processes left by the full guardrail were cleaned up afterward.
 - Repository-rule watched inputs are now captured in a sidecar, and root-file,
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
@@ -1963,10 +1973,13 @@ using Rust DICE keys and values:
      installation, module-version projection, extension-aggregation projection,
      and registered toolchain/platform projection consume that value. Remaining
      installed lookup state still needs to depend on it instead of
-     process-global maps. Runtime module-symlink replay now writes under that
-     graph's workspace output base, and extension-repo symlink replay uses the
-     same graph output base, but the graph itself is still legacy-produced and
-     runtime registration remains process-global transitional plumbing.
+     process-global maps. Toolchain resolution receives an explicit declared
+     toolchain snapshot from the caller, but the snapshot producer is still a
+     process-global transitional registry rather than a DICE-owned value.
+     Runtime module-symlink replay now writes under that graph's workspace
+     output base, and extension-repo symlink replay uses the same graph output
+     base, but the graph itself is still legacy-produced and runtime
+     registration remains process-global transitional plumbing.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
