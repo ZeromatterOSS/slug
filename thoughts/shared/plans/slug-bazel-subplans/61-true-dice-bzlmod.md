@@ -504,7 +504,7 @@ Observed SDK result at the checkpoint:
 - Registered toolchain loading no longer uses a process-global "loaded once"
   flag that can mask same-daemon bzlmod registration changes. The temporary
   global registry is still process state, but the fast path is now keyed by the
-  DICE-derived project root plus registered-toolchain list and clears/reloads
+  DICE-derived workspace identity plus registered-toolchain list and clears/reloads
   when that signature changes.
 - Root and included `MODULE.bazel` reads now run through a `slug_common` DICE
   key backed by `DiceFileComputations::read_project_file_if_exists` for the
@@ -1975,6 +1975,18 @@ What did not work or remains risky:
   aliases without leaking root apparent names or consulting stale process-global
   aliases on runtime misses. Validation passed with `cargo test -p slug_common
   bzlmod_non_root_alias_resolver_preserves_runtime_snapshot -- --nocapture`.
+- Registered toolchain loading's temporary process-global fast path now keys
+  its loaded signature by the DICE-projected `WorkspaceId` plus registered
+  toolchain list, so isolated output bases for the same project root cannot
+  share a stale `DeclaredToolchainInfo` registry. If the DICE projection is
+  unavailable, the fallback now clears the registry/deferred pool and leaves the
+  loaded signature uncached instead of synthesizing a project-root-only
+  workspace identity. Validation passed with
+  `cargo test -p slug_analysis
+  test_toolchain_loading_signature_includes_workspace_id_and_registered_toolchains
+  -- --nocapture` and `cargo test -p slug_analysis
+  test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback
+  -- --nocapture`.
 - Toolchain implementation labels, toolchain type alias chasing, C++ toolchain
   metadata labels, module-map metadata labels, and target-setting labels now
   parse through the active cell resolver's declared/runtime alias snapshot before

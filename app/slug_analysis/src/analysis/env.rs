@@ -12,7 +12,6 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::atomic::AtomicUsize;
@@ -54,7 +53,6 @@ use slug_build_api::interpreter::rule_defs::provider::collection::ProviderCollec
 use slug_build_api::validation::transitive_validations::TransitiveValidations;
 use slug_build_api::validation::transitive_validations::TransitiveValidationsData;
 use slug_common::dice::cells::HasCellResolver;
-use slug_common::dice::data::HasIoProvider;
 use slug_core::cells::cell_path::CellPathRef;
 use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePath;
@@ -1047,7 +1045,7 @@ pub fn get_deps_from_analysis_results(
 /// into the process-global `DeclaredToolchainInfo` registry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ToolchainLoadingSignature {
-    project_root: PathBuf,
+    workspace_id: slug_bzlmod::WorkspaceId,
     registered_toolchains: Vec<slug_bzlmod::RegisteredToolchain>,
 }
 
@@ -1072,11 +1070,15 @@ static DEFERRED_TOOLCHAIN_LOAD_LOCK: LazyLock<futures::lock::Mutex<()>> =
 
 /// Reset the eager loading flag (for fresh builds / daemon restart).
 pub fn reset_toolchain_loading() {
+    clear_toolchains_loaded_signature();
+    clear_declared_toolchains();
+    set_deferred_toolchains(Vec::new());
+}
+
+fn clear_toolchains_loaded_signature() {
     if let Ok(mut signature) = TOOLCHAINS_LOADED_SIGNATURE.write() {
         *signature = None;
     }
-    clear_declared_toolchains();
-    set_deferred_toolchains(Vec::new());
 }
 
 fn toolchains_loaded_for_signature(signature: &ToolchainLoadingSignature) -> bool {
@@ -1090,6 +1092,13 @@ fn mark_toolchains_loaded(signature: ToolchainLoadingSignature) {
     if let Ok(mut loaded_signature) = TOOLCHAINS_LOADED_SIGNATURE.write() {
         *loaded_signature = Some(signature);
     }
+}
+
+fn clear_uncached_toolchain_loading_state_after_lookup_error(started: Instant) {
+    clear_declared_toolchains();
+    set_deferred_toolchains(Vec::new());
+    clear_toolchains_loaded_signature();
+    eager_toolchain_loading_checkpoint(4, "registered_toolchains_unavailable", started, []);
 }
 
 fn eager_toolchain_loading_checkpoint(
@@ -1126,25 +1135,27 @@ fn eager_toolchain_loading_checkpoint(
 /// Runs once per registered-toolchain signature.
 pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>) {
     let started = Instant::now();
-    let project_root = dice
-        .global_data()
-        .get_io_provider()
-        .project_root()
-        .root()
-        .to_path_buf();
-    let registered = match slug_bzlmod::registered_toolchains_for_current_workspace(dice).await {
-        Ok(data) => data.registered_toolchains.clone(),
-        Err(e) => {
-            tracing::warn!(
-                "Bzlmod registered toolchains unavailable while loading toolchains: {}",
-                e
-            );
-            Vec::new()
-        }
-    };
+    let (workspace_id, registered) =
+        match slug_bzlmod::registered_toolchains_for_current_workspace(dice).await {
+            Ok(data) => (
+                data.workspace_id.clone(),
+                data.registered_toolchains.clone(),
+            ),
+            Err(e) => {
+                tracing::warn!(
+                    "Bzlmod registered toolchains unavailable while loading toolchains: {}",
+                    e
+                );
+                eager_toolchain_loading_checkpoint(1, "lock_wait_start", started, []);
+                let _guard = EAGER_TOOLCHAIN_LOAD_LOCK.lock().await;
+                eager_toolchain_loading_checkpoint(2, "lock_acquired", started, []);
+                clear_uncached_toolchain_loading_state_after_lookup_error(started);
+                return;
+            }
+        };
 
     let signature = ToolchainLoadingSignature {
-        project_root,
+        workspace_id,
         registered_toolchains: registered.clone(),
     };
 
@@ -5290,6 +5301,7 @@ pub fn get_user_defined_rule_spec(
 mod tests {
     use std::collections::BTreeMap;
     use std::collections::HashMap;
+    use std::path::PathBuf;
 
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
@@ -6156,17 +6168,27 @@ mod tests {
     }
 
     #[test]
-    fn test_toolchain_loading_signature_includes_registered_toolchains() {
+    fn test_toolchain_loading_signature_includes_workspace_id_and_registered_toolchains() {
         let first = ToolchainLoadingSignature {
-            project_root: PathBuf::from("/tmp/plan61-toolchains"),
+            workspace_id: slug_bzlmod::WorkspaceId::new(
+                PathBuf::from("/tmp/plan61-toolchains"),
+                PathBuf::from("/tmp/plan61-toolchains/buck-out/one"),
+            ),
             registered_toolchains: vec![slug_bzlmod::RegisteredToolchain {
                 module: "root".to_owned(),
                 label: "@first//:all".to_owned(),
                 is_root: true,
             }],
         };
-        let second = ToolchainLoadingSignature {
-            project_root: PathBuf::from("/tmp/plan61-toolchains"),
+        let different_workspace = ToolchainLoadingSignature {
+            workspace_id: slug_bzlmod::WorkspaceId::new(
+                PathBuf::from("/tmp/plan61-toolchains"),
+                PathBuf::from("/tmp/plan61-toolchains/buck-out/two"),
+            ),
+            registered_toolchains: first.registered_toolchains.clone(),
+        };
+        let different_registered = ToolchainLoadingSignature {
+            workspace_id: first.workspace_id.clone(),
             registered_toolchains: vec![slug_bzlmod::RegisteredToolchain {
                 module: "root".to_owned(),
                 label: "@second//:all".to_owned(),
@@ -6174,7 +6196,37 @@ mod tests {
             }],
         };
 
-        assert_ne!(first, second);
+        assert_ne!(first, different_workspace);
+        assert_ne!(first, different_registered);
+    }
+
+    #[test]
+    fn test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback() {
+        reset_toolchain_loading();
+
+        let loaded = ToolchainLoadingSignature {
+            workspace_id: slug_bzlmod::WorkspaceId::new(
+                PathBuf::from("/tmp/plan61-toolchains"),
+                PathBuf::from("/tmp/plan61-toolchains/buck-out/one"),
+            ),
+            registered_toolchains: vec![slug_bzlmod::RegisteredToolchain {
+                module: "root".to_owned(),
+                label: "@first//:all".to_owned(),
+                is_root: true,
+            }],
+        };
+        mark_toolchains_loaded(loaded.clone());
+        set_deferred_toolchains(vec![DeferredToolchain {
+            module: "rules_rust".to_owned(),
+            label: "@rules_rust//rust:all".to_owned(),
+        }]);
+
+        clear_uncached_toolchain_loading_state_after_lookup_error(Instant::now());
+
+        assert!(!toolchains_loaded_for_signature(&loaded));
+        assert!(get_deferred_toolchains().is_empty());
+
+        reset_toolchain_loading();
     }
 
     #[test]
