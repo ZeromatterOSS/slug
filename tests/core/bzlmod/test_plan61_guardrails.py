@@ -2484,6 +2484,29 @@ single_version_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_multiple_version_override_requires_two_versions(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleFileGlobals.multipleVersionOverride min arity."""
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_multiple_override_min_versions")
+bazel_dep(name = "dep", version = "1.0.0")
+multiple_version_override(
+    module_name = "dep",
+    versions = ["1.0.0"],
+)
+""",
+    )
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "multiple_version_override() must specify at least 2 versions" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_multiple_version_override_registry_uses_override_registry(
     buck: Buck,
 ) -> None:
@@ -2531,7 +2554,7 @@ async def test_multiple_version_override_registry_uses_override_registry(
 bazel_dep(name = "bbb", version = "1.0.0")
 multiple_version_override(
     module_name = "ccc",
-    versions = ["1.0.0"],
+    versions = ["1.0.0", "1.0.0"],
     registry = "https://override.example",
 )
 """,
@@ -2625,7 +2648,7 @@ async def test_multiple_version_override_registry_source_json_utf8_failure_inval
 bazel_dep(name = "bbb", version = "1.0.0")
 multiple_version_override(
     module_name = "ccc",
-    versions = ["1.0.0"],
+    versions = ["1.0.0", "1.0.0"],
     registry = "https://override.example",
 )
 """,
@@ -2774,7 +2797,7 @@ async def test_multiple_version_override_registry_source_json_creation_invalidat
 bazel_dep(name = "bbb", version = "1.0.0")
 multiple_version_override(
     module_name = "ccc",
-    versions = ["1.0.0"],
+    versions = ["1.0.0", "1.0.0"],
     registry = "https://override.example",
 )
 """,

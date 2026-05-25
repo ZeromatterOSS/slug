@@ -745,6 +745,22 @@ git_override(
     }
 
     #[test]
+    fn test_parse_multiple_version_override_requires_two_versions() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+multiple_version_override(
+    module_name = "dep",
+    versions = ["1.0.0"],
+)
+"#;
+
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("multiple_version_override() must specify at least 2 versions"));
+    }
+
+    #[test]
     fn test_parse_single_version_override_with_patches_errors() {
         let content = r#"
 module(name = "test", version = "1.0.0")

@@ -714,6 +714,11 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             .map(|v| Version::parse(v))
             .collect::<slug_error::Result<Vec<_>>>()
             .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?;
+        if parsed_versions.len() < 2 {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "multiple_version_override() must specify at least 2 versions"
+            )));
+        }
 
         ctx.overrides
             .push(Override::MultipleVersion(MultipleVersionOverride {

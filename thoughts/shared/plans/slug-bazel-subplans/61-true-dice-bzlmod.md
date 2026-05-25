@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`134 passed in 110.00s`) after rebuilding `target/debug/slug`.
+  (`135 passed in 105.94s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -344,6 +344,19 @@ Observed SDK result at the checkpoint:
   passed, 122 deselected`). Missing-to-present creation validation passed with
   `-k 'single_version_override_registry_source_json_creation or
   multiple_version_override_registry_source_json_creation'` (`2 passed, 130
+  deselected`).
+  `multiple_version_override(versions = ...)` now follows Bazel's parser
+  minimum by rejecting fewer than two versions before resolution. Bazel source
+  anchor: `ModuleFileGlobals.java:1035-1052`. The source-metadata guardrails
+  use syntactically valid two-entry override lists; this closes the directive
+  parser mismatch without claiming full multiple-version coexistence/selection
+  support. Validation passed with `cargo test -p slug_bzlmod
+  multiple_version_override -- --nocapture` (`3 passed`) and the
+  explicit-binary Plan 61 selector
+  `-k 'multiple_version_override_requires_two_versions or
+  multiple_version_override_registry_uses_override_registry or
+  multiple_version_override_registry_source_json_utf8_failure or
+  multiple_version_override_registry_source_json_creation'` (`4 passed, 131
   deselected`).
   Override patch fields remain blocked: Bazel validates main-repo patch labels,
   applies `single_version_override` patches to the discovered `MODULE.bazel`,
