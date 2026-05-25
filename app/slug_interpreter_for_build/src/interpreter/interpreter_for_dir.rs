@@ -292,15 +292,7 @@ fn canonicalize_bzlmod_load_path(
         return Ok(path);
     }
 
-    let resolver_has_runtime_snapshot = alias_resolver.has_bzlmod_runtime_alias_snapshot();
-    let canonical = alias_resolver
-        .resolve_declared_or_runtime_alias(path.cell().as_str())
-        .map(|cell| cell.as_str().to_owned())
-        .or_else(|| {
-            (!resolver_has_runtime_snapshot)
-                .then(|| slug_core::cells::canonical_bazel_repo_name_for_cell(path.cell().as_str()))
-        })
-        .unwrap_or_else(|| path.cell().as_str().to_owned());
+    let canonical = alias_resolver.canonical_bzlmod_repo_name_for_cell(path.cell().as_str());
     if canonical == path.cell().as_str() {
         Ok(path)
     } else {

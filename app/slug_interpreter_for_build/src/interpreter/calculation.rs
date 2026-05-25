@@ -30,6 +30,7 @@ use slug_common::dice::cells::HasCellResolver;
 use slug_common::package_listing::dice::DicePackageListingResolver;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::bzl::ImportPath;
+use slug_core::cells::CellAliasResolver;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::name::CellName;
@@ -81,9 +82,13 @@ static PACKAGE_EVALUATION_SEMAPHORE: Lazy<Semaphore> =
 
 fn canonicalize_bzlmod_module_path(
     path: StarlarkModulePath<'_>,
+    alias_resolver: &CellAliasResolver,
 ) -> slug_error::Result<OwnedStarlarkModulePath> {
-    fn import_path(path: &ImportPath) -> slug_error::Result<ImportPath> {
-        let cell_path = canonicalize_bzlmod_cell_path(path.path().clone())?;
+    fn import_path(
+        path: &ImportPath,
+        alias_resolver: &CellAliasResolver,
+    ) -> slug_error::Result<ImportPath> {
+        let cell_path = canonicalize_bzlmod_cell_path(path.path().clone(), alias_resolver)?;
         ImportPath::new_with_build_file_cells(
             cell_path.clone(),
             BuildFileCell::new(cell_path.cell()),
@@ -91,19 +96,28 @@ fn canonicalize_bzlmod_module_path(
     }
 
     Ok(match path {
-        StarlarkModulePath::LoadFile(path) => OwnedStarlarkModulePath::LoadFile(import_path(path)?),
-        StarlarkModulePath::JsonFile(path) => OwnedStarlarkModulePath::JsonFile(import_path(path)?),
-        StarlarkModulePath::TomlFile(path) => OwnedStarlarkModulePath::TomlFile(import_path(path)?),
+        StarlarkModulePath::LoadFile(path) => {
+            OwnedStarlarkModulePath::LoadFile(import_path(path, alias_resolver)?)
+        }
+        StarlarkModulePath::JsonFile(path) => {
+            OwnedStarlarkModulePath::JsonFile(import_path(path, alias_resolver)?)
+        }
+        StarlarkModulePath::TomlFile(path) => {
+            OwnedStarlarkModulePath::TomlFile(import_path(path, alias_resolver)?)
+        }
         StarlarkModulePath::BxlFile(path) => OwnedStarlarkModulePath::BxlFile(path.clone()),
     })
 }
 
-fn canonicalize_bzlmod_cell_path(path: CellPath) -> slug_error::Result<CellPath> {
-    if slug_core::cells::is_root_cell_name(path.cell().as_str()) {
+fn canonicalize_bzlmod_cell_path(
+    path: CellPath,
+    alias_resolver: &CellAliasResolver,
+) -> slug_error::Result<CellPath> {
+    if path.cell() == alias_resolver.resolve_self() {
         return Ok(path);
     }
 
-    let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(path.cell().as_str());
+    let canonical = alias_resolver.canonical_bzlmod_repo_name_for_cell(path.cell().as_str());
     if canonical == path.cell().as_str() {
         Ok(path)
     } else {
@@ -353,7 +367,11 @@ impl InterpreterCalculationImpl for InterpreterCalculationInstance {
         starlark_path: StarlarkModulePath<'_>,
     ) -> slug_error::Result<LoadedModule> {
         let key = if ctx.is_bzlmod().await? {
-            canonicalize_bzlmod_module_path(starlark_path)?
+            let cell_resolver = ctx.get_cell_resolver().await?;
+            canonicalize_bzlmod_module_path(
+                starlark_path,
+                cell_resolver.root_cell_cell_alias_resolver(),
+            )?
         } else {
             OwnedStarlarkModulePath::new(starlark_path)
         };
@@ -434,4 +452,111 @@ pub struct InterpreterResultsKeyActivationData {
     pub time_span: TimeSpan,
     pub dep_packages: Option<Vec<PackageLabel>>,
     pub spans: SmallVec<[SpanId; 1]>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::CellAliasResolver;
+
+    use super::*;
+
+    fn test_alias_resolver() -> CellAliasResolver {
+        CellAliasResolver::new(CellName::testing_new("root"), HashMap::new()).unwrap()
+    }
+
+    #[test]
+    fn bzlmod_eval_import_cell_path_uses_runtime_aliases_before_globals() -> slug_error::Result<()>
+    {
+        let apparent = "eval_import_runtime_alias";
+        let canonical = "eval_owner++ext+generated";
+        let wrong_global = "eval_wrong_owner++ext+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        let path = canonicalize_bzlmod_cell_path(
+            CellPath::new(
+                CellName::testing_new(apparent),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new("defs.bzl".into()),
+            ),
+            &resolver,
+        )?;
+
+        assert_eq!(canonical, path.cell().as_str());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_eval_import_cell_path_runtime_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let apparent = "eval_import_runtime_miss_alias";
+        let wrong_global = "eval_wrong_owner++ext+missing";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &BzlmodRuntimeCellInstallSnapshot::default(),
+        )?;
+
+        let path = canonicalize_bzlmod_cell_path(
+            CellPath::new(
+                CellName::testing_new(apparent),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new("defs.bzl".into()),
+            ),
+            &resolver,
+        )?;
+
+        assert_eq!(apparent, path.cell().as_str());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_eval_import_cell_path_keeps_legacy_global_fallback() -> slug_error::Result<()> {
+        let apparent = "eval_import_legacy_alias";
+        let canonical = "eval_owner++ext+legacy_generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            canonical.to_owned(),
+        );
+        let resolver = test_alias_resolver();
+
+        let path = canonicalize_bzlmod_cell_path(
+            CellPath::new(
+                CellName::testing_new(apparent),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new("defs.bzl".into()),
+            ),
+            &resolver,
+        )?;
+
+        assert_eq!(canonical, path.cell().as_str());
+        Ok(())
+    }
 }

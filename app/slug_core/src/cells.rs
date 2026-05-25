@@ -1640,6 +1640,23 @@ impl CellAliasResolver {
         self.bzlmod_runtime_aliases.is_some()
     }
 
+    /// Return the canonical Bazel repository name for a cell using this
+    /// resolver's declared aliases and bzlmod runtime snapshot before the
+    /// transitional process-global fallback.
+    pub fn canonical_bzlmod_repo_name_for_cell(&self, cell_name: &str) -> String {
+        if cell_name == self.resolve_self().as_str() {
+            return cell_name.to_owned();
+        }
+
+        let has_runtime_snapshot = self.has_bzlmod_runtime_alias_snapshot();
+        self.resolve_declared_or_runtime_alias(cell_name)
+            .map(|cell| cell.as_str().to_owned())
+            .or_else(|| {
+                (!has_runtime_snapshot).then(|| canonical_bazel_repo_name_for_cell(cell_name))
+            })
+            .unwrap_or_else(|| cell_name.to_owned())
+    }
+
     /// resolves a 'CellAlias' into its corresponding 'CellName'
     pub fn resolve(&self, alias: &str) -> slug_error::Result<CellName> {
         if alias.is_empty() {
@@ -2967,6 +2984,89 @@ mod tests {
 
         assert_eq!(cells.get(dynamic_cell)?.name(), dynamic_cell);
 
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_bzlmod_repo_name_for_cell_uses_runtime_snapshot_before_globals()
+    -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let apparent = "canonical_runtime_alias";
+        let canonical = "owner++ext+canonical_runtime_alias";
+        let wrong_global = "wrong_owner++ext+canonical_runtime_alias";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        register_dynamic_extension_cell_alias(apparent.to_owned(), wrong_global.to_owned());
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(
+            resolver.canonical_bzlmod_repo_name_for_cell(apparent),
+            canonical
+        );
+        assert_eq!(
+            resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_bzlmod_repo_name_for_cell_runtime_miss_is_authoritative() -> slug_error::Result<()>
+    {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let apparent = "canonical_runtime_miss";
+        let wrong_global = "wrong_owner++ext+canonical_runtime_miss";
+        register_dynamic_extension_cell_alias(apparent.to_owned(), wrong_global.to_owned());
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &BzlmodRuntimeCellInstallSnapshot::default(),
+        )?;
+
+        assert_eq!(
+            resolver.canonical_bzlmod_repo_name_for_cell(apparent),
+            apparent
+        );
+        assert_eq!(
+            resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_bzlmod_repo_name_for_cell_keeps_legacy_global_fallback() -> slug_error::Result<()>
+    {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let apparent = "canonical_legacy_alias";
+        let canonical = "owner++ext+canonical_legacy_alias";
+        register_dynamic_extension_cell_alias(apparent.to_owned(), canonical.to_owned());
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
+
+        assert_eq!(resolver.canonical_bzlmod_repo_name_for_cell("root"), "root");
+        assert_eq!(
+            resolver.canonical_bzlmod_repo_name_for_cell(apparent),
+            canonical
+        );
         Ok(())
     }
 

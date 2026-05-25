@@ -2274,16 +2274,25 @@ Observed SDK result at the checkpoint:
   scoped search found no remaining downstream
   `slug_bzlmod::BzlmodCellGraphDataKey` or
   `slug_bzlmod::dice_graph::BzlmodCellGraphDataKey` references.
-- Bzlmod load-path canonicalization now uses the active interpreter
-  `CellAliasResolver` before consulting process-global repo-name helpers. When
-  a resolver has a runtime bzlmod alias snapshot, runtime aliases and module
-  aliases are authoritative and misses do not fall back to stale
-  process-global dynamic aliases; legacy resolvers without a runtime snapshot
-  keep the old directory/global fallback. Validation passed with `cargo fmt`,
-  `cargo test -p slug_interpreter_for_build bzlmod_load_path -- --nocapture`,
-  `cargo test -p slug_interpreter_for_build
+  A clean reviewing subagent later reported no findings over the API-hiding
+  slice and independently reran the focused multi-crate check and helper tests
+  in a separate target directory.
+- Bzlmod load-path canonicalization now uses a shared
+  `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper before
+  consulting process-global repo-name helpers. When a resolver has a runtime
+  bzlmod alias snapshot, runtime aliases and module aliases are authoritative
+  and misses do not fall back to stale process-global dynamic aliases; legacy
+  resolvers without a runtime snapshot keep the old directory/global fallback.
+  Both `InterpreterForDir` load resolution and DICE eval-import key
+  canonicalization use the helper. Validation passed with `cargo fmt`, `cargo
+  test -p slug_core canonical_bzlmod_repo_name_for_cell -- --nocapture`, `cargo
+  test -p slug_interpreter_for_build bzlmod_load_path -- --nocapture`, `cargo
+  test -p slug_interpreter_for_build
   load_import_resolution_with_runtime_aliases_rejects_global_miss --
-  --nocapture`, and `cargo check -p slug_interpreter_for_build`.
+  --nocapture`, `cargo test -p slug_interpreter_for_build
+  bzlmod_eval_import_cell_path -- --nocapture`, and `cargo check -p slug_core
+  -p slug_interpreter_for_build`; `cargo fmt --check` and `git diff --check`
+  also passed before commit.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
