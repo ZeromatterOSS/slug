@@ -188,6 +188,29 @@ fn ensure_extension_aggregations_data_workspace(
     Ok(())
 }
 
+fn extension_spokes_recorded_inputs_current(spokes: &ExtensionSpokesValue) -> bool {
+    validate_recorded_inputs_current(
+        spokes.recorded_inputs.as_slice(),
+        spokes
+            .recorded_input_workspace_root
+            .as_deref()
+            .map(PathBuf::as_path),
+        Some(spokes.recorded_input_repo_env.as_ref()),
+        Some(spokes.recorded_input_repo_mappings.as_ref()),
+    )
+    .is_ok()
+}
+
+fn optional_extension_spokes_validity(
+    value: &slug_error::Result<Option<Arc<ExtensionSpokesValue>>>,
+) -> bool {
+    match value {
+        Ok(Some(spokes)) => extension_spokes_recorded_inputs_current(spokes.as_ref()),
+        Ok(None) => true,
+        Err(_) => false,
+    }
+}
+
 #[async_trait]
 impl Key for BzlmodExtensionAggregationKey {
     type Value = slug_error::Result<Option<Arc<BzlmodExtensionAggregationValue>>>;
@@ -324,7 +347,7 @@ impl Key for ExtensionSpokesByExtensionIdKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+        optional_extension_spokes_validity(x)
     }
 }
 
@@ -422,7 +445,7 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+        optional_extension_spokes_validity(x)
     }
 }
 
@@ -519,6 +542,10 @@ impl Key for ExtensionSpokesKey {
             project_root: self.workspace_id.canonical_project_root.clone(),
             repo_env: repo_env.clone(),
             spokes,
+            recorded_inputs: Arc::new(result.recorded_inputs.clone()),
+            recorded_input_workspace_root: result.recorded_input_context.workspace_root.clone(),
+            recorded_input_repo_env: result.recorded_input_context.repo_env.clone(),
+            recorded_input_repo_mappings: result.recorded_input_context.repo_mappings.clone(),
         }))
     }
 
@@ -526,6 +553,13 @@ impl Key for ExtensionSpokesKey {
         match (x, y) {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(spokes) => extension_spokes_recorded_inputs_current(spokes.as_ref()),
+            Err(_) => false,
         }
     }
 }
@@ -589,6 +623,64 @@ pub struct ModuleExtensionResult {
     /// excludes them from normal replay invalidation.
     #[allocative(skip)]
     pub metadata: ModuleExtensionMetadata,
+
+    /// Recorded inputs that affect extension execution.
+    pub recorded_inputs: Vec<String>,
+
+    /// Current-command context needed to validate recorded inputs for DICE value
+    /// reuse after fresh extension execution.
+    #[allocative(skip)]
+    recorded_input_context: ModuleExtensionRecordedInputContext,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct ModuleExtensionRecordedInputContext {
+    #[allocative(skip)]
+    workspace_root: Option<Arc<PathBuf>>,
+    #[allocative(skip)]
+    repo_env: Arc<BTreeMap<String, String>>,
+    #[allocative(skip)]
+    repo_mappings: Arc<RepoMappingSnapshot>,
+}
+
+impl ModuleExtensionRecordedInputContext {
+    fn empty() -> Self {
+        Self {
+            workspace_root: None,
+            repo_env: Arc::new(BTreeMap::new()),
+            repo_mappings: Arc::new(RepoMappingSnapshot::new()),
+        }
+    }
+
+    fn new(
+        workspace_root: Option<PathBuf>,
+        repo_env: BTreeMap<String, String>,
+        repo_mappings: RepoMappingSnapshot,
+    ) -> Self {
+        Self {
+            workspace_root: workspace_root.map(Arc::new),
+            repo_env: Arc::new(repo_env),
+            repo_mappings: Arc::new(repo_mappings),
+        }
+    }
+
+    fn from_selected_cache(selected: &SelectedExtensionCache) -> Self {
+        Self::new(
+            selected.workspace_root.clone(),
+            selected.repo_env.clone().unwrap_or_default(),
+            selected.repo_mappings.clone().unwrap_or_default(),
+        )
+    }
+
+    fn recorded_inputs_current(&self, recorded_inputs: &[String]) -> bool {
+        validate_recorded_inputs_current(
+            recorded_inputs,
+            self.workspace_root.as_deref().map(PathBuf::as_path),
+            Some(self.repo_env.as_ref()),
+            Some(self.repo_mappings.as_ref()),
+        )
+        .is_ok()
+    }
 }
 
 impl ModuleExtensionResult {
@@ -611,6 +703,7 @@ impl ModuleExtensionResult {
             generated_repo_specs,
             root_module_name,
             ModuleExtensionMetadata::default(),
+            Vec::new(),
         )
     }
 
@@ -620,6 +713,27 @@ impl ModuleExtensionResult {
         generated_repo_specs: FxHashMap<String, RepoSpec>,
         root_module_name: &str,
         metadata: ModuleExtensionMetadata,
+        recorded_inputs: Vec<String>,
+    ) -> Self {
+        Self::new_with_metadata_and_recorded_input_context(
+            extension_id,
+            input_hash,
+            generated_repo_specs,
+            root_module_name,
+            metadata,
+            recorded_inputs,
+            ModuleExtensionRecordedInputContext::empty(),
+        )
+    }
+
+    fn new_with_metadata_and_recorded_input_context(
+        extension_id: Arc<str>,
+        input_hash: String,
+        generated_repo_specs: FxHashMap<String, RepoSpec>,
+        root_module_name: &str,
+        metadata: ModuleExtensionMetadata,
+        recorded_inputs: Vec<String>,
+        recorded_input_context: ModuleExtensionRecordedInputContext,
     ) -> Self {
         let canonical_names =
             build_canonical_names(&extension_id, &generated_repo_specs, root_module_name);
@@ -629,6 +743,8 @@ impl ModuleExtensionResult {
             generated_repo_specs,
             canonical_names,
             metadata,
+            recorded_inputs,
+            recorded_input_context,
         }
     }
 
@@ -663,6 +779,11 @@ impl ModuleExtensionResult {
             .iter()
             .find(|(_, c)| c.as_str() == canonical)
             .map(|(i, _)| i.as_str())
+    }
+
+    fn recorded_inputs_current(&self) -> bool {
+        self.recorded_input_context
+            .recorded_inputs_current(&self.recorded_inputs)
     }
 }
 
@@ -1108,6 +1229,37 @@ impl ModuleExtensionExecutionKey {
         self.project_root.as_ref().map(|p| p.as_ref())
     }
 
+    async fn validate_fresh_recorded_inputs_dependency(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        recorded_inputs: Vec<String>,
+    ) -> slug_error::Result<Vec<String>> {
+        if recorded_inputs.is_empty() {
+            return Ok(recorded_inputs);
+        }
+        let key = ModuleExtensionRecordedInputsKey {
+            recorded_inputs: Arc::new(recorded_inputs),
+            workspace_root: self.project_root.clone(),
+            repo_env: Some(self.repo_env.clone()),
+            repo_mappings: Some(self.repo_mappings.clone()),
+        };
+        match ctx.compute(&key).await {
+            Ok(Ok(())) => Ok(key.recorded_inputs.as_ref().clone()),
+            Ok(Err(reason)) => Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "Fresh module extension '{}' recorded stale input: {}",
+                self.extension_id,
+                reason
+            )),
+            Err(e) => Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "DICE compute failed while validating fresh recorded inputs for '{}': {}",
+                self.extension_id,
+                e
+            )),
+        }
+    }
+
     fn execution_workspace_id(&self) -> Result<crate::WorkspaceId, ModuleExtensionError> {
         self.workspace_id
             .clone()
@@ -1263,15 +1415,22 @@ impl Key for ModuleExtensionExecutionKey {
                             );
                             selected_cache.record_hit(&self.extension_id);
 
-                            let result = ModuleExtensionResult::new_with_metadata(
-                                self.extension_id.clone(),
-                                self.input_hash.to_string(),
-                                selected_cache.repo_specs,
-                                &self.root_module_name,
-                                ModuleExtensionMetadata {
-                                    facts: prior_facts.clone(),
-                                },
-                            );
+                            let recorded_input_context =
+                                ModuleExtensionRecordedInputContext::from_selected_cache(
+                                    &selected_cache,
+                                );
+                            let result =
+                                ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
+                                    self.extension_id.clone(),
+                                    self.input_hash.to_string(),
+                                    selected_cache.repo_specs,
+                                    &self.root_module_name,
+                                    ModuleExtensionMetadata {
+                                        facts: prior_facts.clone(),
+                                    },
+                                    selected_cache.recorded_inputs.clone(),
+                                    recorded_input_context,
+                                );
 
                             return Ok(Arc::new(result));
                         }
@@ -1332,15 +1491,22 @@ impl Key for ModuleExtensionExecutionKey {
                         );
                         selected_cache.record_hit(&self.extension_id);
 
-                        let result = ModuleExtensionResult::new_with_metadata(
-                            self.extension_id.clone(),
-                            self.input_hash.to_string(),
-                            selected_cache.repo_specs,
-                            &self.root_module_name,
-                            ModuleExtensionMetadata {
-                                facts: prior_facts.clone(),
-                            },
-                        );
+                        let recorded_input_context =
+                            ModuleExtensionRecordedInputContext::from_selected_cache(
+                                &selected_cache,
+                            );
+                        let result =
+                            ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
+                                self.extension_id.clone(),
+                                self.input_hash.to_string(),
+                                selected_cache.repo_specs,
+                                &self.root_module_name,
+                                ModuleExtensionMetadata {
+                                    facts: prior_facts.clone(),
+                                },
+                                selected_cache.recorded_inputs.clone(),
+                                recorded_input_context,
+                            );
 
                         return Ok(Arc::new(result));
                     }
@@ -1409,7 +1575,15 @@ impl Key for ModuleExtensionExecutionKey {
         }
 
         // Check for execution errors
-        let output = execution_result?;
+        let mut output = execution_result?;
+        output.recorded_inputs = self
+            .validate_fresh_recorded_inputs_dependency(ctx, output.recorded_inputs)
+            .await?;
+        tracing::debug!(
+            "Extension '{}' recorded {} input(s)",
+            self.extension_id,
+            output.recorded_inputs.len()
+        );
         validate_error_mode_facts(
             &self.extension_id,
             self.lockfile_mode,
@@ -1418,12 +1592,18 @@ impl Key for ModuleExtensionExecutionKey {
         )?;
 
         // 7. Build result with canonical names
-        let result = ModuleExtensionResult::new_with_metadata(
+        let result = ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
             self.extension_id.clone(),
             self.input_hash.to_string(),
             output.generated_repo_specs.clone(),
             &self.root_module_name,
             output.metadata.clone(),
+            output.recorded_inputs.clone(),
+            ModuleExtensionRecordedInputContext::new(
+                self.project_root.as_deref().cloned(),
+                self.repo_env.as_ref().clone(),
+                self.repo_mappings.as_ref().clone(),
+            ),
         );
 
         tracing::info!(
@@ -1444,7 +1624,9 @@ impl Key for ModuleExtensionExecutionKey {
 
     fn validity(x: &Self::Value) -> bool {
         // Don't cache errors - retry on next request
-        x.is_ok()
+        x.as_ref()
+            .map(|result| result.recorded_inputs_current())
+            .unwrap_or(false)
     }
 }
 
@@ -2541,6 +2723,82 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn extension_execution_result_validity_rejects_fresh_recorded_input_edit() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let watched = temp_dir.path().join("watched.txt");
+        std::fs::write(&watched, "first\n").unwrap();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        let result = ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
+            Arc::from("@@root//:ext.bzl%ext"),
+            "usages-digest".to_owned(),
+            repo_specs,
+            "_main",
+            ModuleExtensionMetadata::default(),
+            vec![
+                crate::lockfile::recorded_file_input_with_recorded_path(
+                    PathBuf::from("@@//watched.txt").as_path(),
+                    &watched,
+                )
+                .unwrap(),
+            ],
+            ModuleExtensionRecordedInputContext::new(
+                Some(temp_dir.path().to_path_buf()),
+                BTreeMap::new(),
+                crate::RepoMappingSnapshot::new(),
+            ),
+        );
+        let value = Ok(Arc::new(result));
+
+        assert!(<ModuleExtensionExecutionKey as Key>::validity(&value));
+        std::fs::write(&watched, "second\n").unwrap();
+        assert!(!<ModuleExtensionExecutionKey as Key>::validity(&value));
+    }
+
+    #[test]
+    fn extension_spokes_validity_rejects_fresh_recorded_input_edit() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let watched = temp_dir.path().join("watched.txt");
+        std::fs::write(&watched, "first\n").unwrap();
+        let workspace_id = crate::WorkspaceId::for_project_root(temp_dir.path().to_path_buf());
+        let value = Ok(Arc::new(ExtensionSpokesValue {
+            workspace_id: workspace_id.clone(),
+            extension_id: Arc::from("@@root//:ext.bzl%ext"),
+            project_root: workspace_id.canonical_project_root.clone(),
+            repo_env: Arc::new(BTreeMap::new()),
+            spokes: BTreeMap::new(),
+            recorded_inputs: Arc::new(vec![
+                crate::lockfile::recorded_file_input_with_recorded_path(
+                    PathBuf::from("@@//watched.txt").as_path(),
+                    &watched,
+                )
+                .unwrap(),
+            ]),
+            recorded_input_workspace_root: Some(Arc::new(temp_dir.path().to_path_buf())),
+            recorded_input_repo_env: Arc::new(BTreeMap::new()),
+            recorded_input_repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
+        }));
+        let optional_value = Ok(Some(value.as_ref().unwrap().clone()));
+
+        assert!(<ExtensionSpokesKey as Key>::validity(&value));
+        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
+            &optional_value
+        ));
+        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+            &optional_value
+        ));
+
+        std::fs::write(&watched, "second\n").unwrap();
+        assert!(!<ExtensionSpokesKey as Key>::validity(&value));
+        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
+            &optional_value
+        ));
+        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+            &optional_value
+        ));
+    }
+
     #[tokio::test]
     async fn visible_lockfile_replay_validates_recorded_file_through_dice_key()
     -> slug_error::Result<()> {
@@ -2835,12 +3093,14 @@ mod tests {
             ModuleExtensionMetadata {
                 facts: serde_json::json!({"resource": {"checksum": "abc"}}),
             },
+            vec!["ENV:PLAN61_ENV value".to_owned()],
         );
 
         assert_eq!(
             result.metadata.facts,
             serde_json::json!({"resource": {"checksum": "abc"}})
         );
+        assert_eq!(result.recorded_inputs, vec!["ENV:PLAN61_ENV value"]);
     }
 
     #[test]

@@ -290,10 +290,19 @@ impl LockfileExtensionData {
 
 /// Build a Bazel-style recorded FILE input marker for current filesystem state.
 pub fn recorded_file_input(path: &Path) -> std::io::Result<String> {
+    recorded_file_input_with_recorded_path(path, path)
+}
+
+/// Build a Bazel-style recorded FILE input marker using a Bazel repo-friendly
+/// recorded path while hashing the actual on-disk path.
+pub fn recorded_file_input_with_recorded_path(
+    recorded_path: &Path,
+    actual_path: &Path,
+) -> std::io::Result<String> {
     Ok(format_recorded_input(
         "FILE",
-        path,
-        &recorded_file_marker_value(path)?,
+        recorded_path,
+        &recorded_file_marker_value(actual_path)?,
     ))
 }
 
@@ -540,6 +549,22 @@ fn resolve_recorded_path(path: &Path, workspace_root: Option<&Path>) -> Result<P
             };
             return Ok(workspace_root.join(rest));
         }
+    }
+    if let Some(rest) = raw.strip_prefix("@@")
+        && let Some(separator) = rest.rfind("+//")
+    {
+        let Some(workspace_root) = workspace_root else {
+            return Err("recorded_input_unsupported".to_owned());
+        };
+        let repo = &rest[..separator];
+        let repo_relative = &rest[separator + 3..];
+        if repo.is_empty() {
+            return Err("recorded_input_unsupported".to_owned());
+        }
+        return Ok(workspace_root
+            .join("bazel-external")
+            .join(repo)
+            .join(repo_relative));
     }
     Err("recorded_input_unsupported".to_owned())
 }
@@ -1202,6 +1227,23 @@ impl Lockfile {
         usages_digest: String,
         generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
     ) {
+        self.set_extension_cache_with_recorded_inputs(
+            extension_id,
+            bzl_transitive_digest,
+            usages_digest,
+            generated_repo_specs,
+            Vec::new(),
+        );
+    }
+
+    pub fn set_extension_cache_with_recorded_inputs(
+        &mut self,
+        extension_id: String,
+        bzl_transitive_digest: String,
+        usages_digest: String,
+        generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
+        recorded_inputs: Vec<String>,
+    ) {
         // Convert RepoSpecs to lockfile format. Sort by key so the
         // serialised lockfile JSON is stable across invocations
         // regardless of the in-memory FxHashMap's insertion order.
@@ -1212,8 +1254,11 @@ impl Lockfile {
             .map(|(name, spec)| (name.clone(), LockfileRepoSpec::from_repo_spec(spec)))
             .collect();
 
-        let ext_data =
+        let mut ext_data =
             LockfileExtensionData::new(bzl_transitive_digest, usages_digest, lockfile_specs);
+        if let Some(general) = ext_data.general.as_mut() {
+            general.recorded_inputs = recorded_inputs;
+        }
 
         tracing::debug!(
             "Caching extension '{}' with {} repo specs",
@@ -1943,6 +1988,33 @@ mod tests {
     }
 
     #[test]
+    fn test_set_extension_cache_with_recorded_inputs() {
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("numpy".to_owned(), RepoSpec::new("rule".to_owned()));
+
+        lockfile.set_extension_cache_with_recorded_inputs(
+            "@@pip//pip:pip.bzl%pip".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+            vec!["ENV:PLAN61_REPO_ENV first".to_owned()],
+        );
+
+        let general = lockfile
+            .module_extensions
+            .get("@@pip//pip:pip.bzl%pip")
+            .unwrap()
+            .general
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            general.recorded_inputs,
+            vec!["ENV:PLAN61_REPO_ENV first".to_owned()]
+        );
+    }
+
+    #[test]
     fn recorded_file_input_matches_current_sha() {
         let dir = TempDir::new().unwrap();
         let watched = dir.path().join("watched.txt");
@@ -2030,6 +2102,52 @@ mod tests {
             .unwrap()
             .recorded_inputs
             .push(format!("FILE:@@//watched.txt {digest}"));
+
+        let cached = lockfile.get_extension_cache_for_workspace(
+            "@@ext//ext.bzl%ext",
+            "bzl-digest",
+            "usages-digest",
+            Some(dir.path()),
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_external_repo_file_input_matches_current_sha() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir
+            .path()
+            .join("bazel-external")
+            .join("rules_zig")
+            .join("zig/private/versions.json");
+        fs::create_dir_all(watched.parent().unwrap()).unwrap();
+        fs::write(&watched, "first\n").unwrap();
+        let digest = hex::encode(Sha256::digest(fs::read(&watched).unwrap()));
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@ext//ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut("@@ext//ext.bzl%ext")
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(format!(
+                "FILE:@@rules_zig+//zig/private/versions.json {digest}"
+            ));
 
         let cached = lockfile.get_extension_cache_for_workspace(
             "@@ext//ext.bzl%ext",

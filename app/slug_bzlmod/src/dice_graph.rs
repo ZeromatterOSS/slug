@@ -1522,6 +1522,10 @@ pub struct ExtensionSpokesValue {
     pub project_root: Arc<PathBuf>,
     pub repo_env: Arc<BTreeMap<String, String>>,
     pub spokes: BTreeMap<String, ExtensionSpoke>,
+    pub(crate) recorded_inputs: Arc<Vec<String>>,
+    pub(crate) recorded_input_workspace_root: Option<Arc<PathBuf>>,
+    pub(crate) recorded_input_repo_env: Arc<BTreeMap<String, String>>,
+    pub(crate) recorded_input_repo_mappings: Arc<crate::RepoMappingSnapshot>,
 }
 
 impl ExtensionSpokesValue {

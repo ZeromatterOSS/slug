@@ -171,6 +171,7 @@ pub use lockfile::recorded_dirents_input;
 pub use lockfile::recorded_dirtree_input;
 pub use lockfile::recorded_env_input;
 pub use lockfile::recorded_file_input;
+pub use lockfile::recorded_file_input_with_recorded_path;
 pub use module_extension_executor::ExtensionExecutionOutput;
 pub use module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 pub use module_extension_executor::ModuleExtensionExecutorImpl;

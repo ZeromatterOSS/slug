@@ -573,16 +573,7 @@ pub(crate) async fn get_file_ops_delegate(
         None => Arc::new(std::collections::BTreeMap::new()),
     };
 
-    let repo_spec_for_execution = if !setup.repo_spec_json.is_empty() {
-        Some(
-            serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
-                ExtensionRepoError::DeserializationFailed {
-                    canonical_name: setup.canonical_name.to_string(),
-                    reason: e.to_string(),
-                }
-            })?,
-        )
-    } else if let Some(spokes) = registered_spokes.as_ref() {
+    let repo_spec_for_execution = if let Some(spokes) = registered_spokes.as_ref() {
         match spokes
             .by_internal_name(setup.internal_name.as_ref())
             .or_else(|| spokes.by_canonical_name(setup.canonical_name.as_ref()))
@@ -601,6 +592,15 @@ pub(crate) async fn get_file_ops_delegate(
                 .into());
             }
         }
+    } else if !setup.repo_spec_json.is_empty() {
+        Some(
+            serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
+                ExtensionRepoError::DeserializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: e.to_string(),
+                }
+            })?,
+        )
     } else {
         None
     };

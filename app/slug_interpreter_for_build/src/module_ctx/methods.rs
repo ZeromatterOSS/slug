@@ -24,6 +24,7 @@ use starlark::values::ValueLike;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 
 use crate::module_ctx::context::ModuleContext;
+use crate::module_ctx::context::ShouldWatch;
 use crate::module_ctx::metadata::StarlarkModuleExtensionMetadata;
 use crate::module_ctx::metadata::validate_facts_value;
 use crate::repository_ctx::DownloadInfo;
@@ -68,47 +69,15 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Read a file and return its contents as a string.
-    #[allow(unused_variables)]
     fn read(
         this: &ModuleContext,
         #[starlark(require = pos)] path: Value,
         #[starlark(require = named, default = "auto")] watch: &str,
     ) -> starlark::Result<String> {
-        let resolved = if let Some(s) = path.unpack_str() {
-            if Path::new(s).is_absolute() {
-                PathBuf::from(s)
-            } else if let Some(ref wd) = this.working_dir {
-                wd.join(s)
-            } else {
-                PathBuf::from(s)
-            }
-        } else if let Some(repo_path) = path.downcast_ref::<RepositoryPath>() {
-            repo_path.absolute_path()
-        } else if path.get_type() == "Label" {
-            let label_str = format!("{}", path);
-            let resolved = if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str)
-            {
-                resolved
-            } else {
-                let workspace_root = this
-                    .working_dir
-                    .as_ref()
-                    .map(|wd| wd.as_ref().as_path())
-                    .unwrap_or_else(|| Path::new("."));
-                PathBuf::from(resolve_label_to_path(&label_str, workspace_root))
-            };
-            // Plan 36: drive lazy spoke materialization before the read.
-            ensure_label_path_materialized(&resolved);
-            resolved
-        } else {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "module_ctx.read() requires a string, Label, or path object, got {}",
-                path.get_type()
-            )
-            .into());
-        };
+        let should_watch = ShouldWatch::parse(watch)?;
+        let resolved = resolve_module_ctx_input_path(this, path, "module_ctx.read()")?;
         let path_str = resolved.to_string_lossy().to_string();
+        this.maybe_record_file_input(&resolved, should_watch)?;
         let content = std::fs::read_to_string(&resolved).map_err(|e| {
             let working_dir = this
                 .working_dir
@@ -482,6 +451,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         default: starlark::values::none::NoneOr<&str>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
+        this.record_env_input(name)?;
         match this.repo_env().get(name) {
             Some(v) => Ok(heap.alloc(v)),
             None => match default {
@@ -548,16 +518,10 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = "")] output: &str,
         #[starlark(require = named, default = "")] strip_prefix: &str,
         #[starlark(require = named)] _rename_files: Option<Value<'v>>,
-        #[starlark(require = named, default = false)] _watch_archive: bool,
+        #[starlark(require = named, default = "auto")] watch_archive: &str,
     ) -> starlark::Result<Value<'v>> {
-        let archive_str = archive.unpack_str().unwrap_or("");
-        let archive_path = if Path::new(archive_str).is_absolute() {
-            PathBuf::from(archive_str)
-        } else if let Some(ref wd) = this.working_dir {
-            wd.join(archive_str)
-        } else {
-            PathBuf::from(archive_str)
-        };
+        let should_watch = ShouldWatch::parse(watch_archive)?;
+        let archive_path = resolve_module_ctx_input_path(this, archive, "module_ctx.extract()")?;
 
         let output_dir = if output.is_empty() {
             if let Some(ref wd) = this.working_dir {
@@ -573,6 +537,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             PathBuf::from(output)
         };
 
+        this.maybe_record_file_input(&archive_path, should_watch)?;
         let data = std::fs::read(&archive_path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -611,7 +576,8 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         this: &ModuleContext,
         #[starlark(require = pos)] path: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = resolve_module_ctx_input_path(this, path, "module_ctx.watch()")?;
+        let resolved = resolve_module_ctx_input_path(this, path, "module_ctx.watch()")?;
+        this.record_file_input(&resolved)?;
         Ok(Value::new_none())
     }
 

@@ -72,6 +72,9 @@ pub struct ExtensionExecutionOutput {
 
     /// Metadata returned by the extension implementation.
     pub metadata: ModuleExtensionMetadata,
+
+    /// Recorded inputs that affect extension execution.
+    pub recorded_inputs: Vec<String>,
 }
 
 /// Trait for module extension execution.
@@ -145,9 +148,11 @@ mod tests {
         let output = ExtensionExecutionOutput {
             generated_repo_specs: specs,
             metadata: ModuleExtensionMetadata::default(),
+            recorded_inputs: vec!["ENV:PLAN61_TEST value".to_owned()],
         };
 
         assert_eq!(output.generated_repo_specs.len(), 1);
         assert!(output.generated_repo_specs.contains_key("test_repo"));
+        assert_eq!(output.recorded_inputs, vec!["ENV:PLAN61_TEST value"]);
     }
 }

@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use allocative::Allocative;
 use derive_more::Display;
@@ -98,6 +99,32 @@ pub struct ModuleContext {
     /// Effective command repository environment for this extension execution.
     #[allocative(skip)]
     repo_env: Arc<BTreeMap<String, String>>,
+    /// Recorded inputs collected by module_ctx.watch/getenv and declared environ.
+    #[allocative(skip)]
+    recorded_inputs: Arc<Mutex<Vec<String>>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ShouldWatch {
+    Yes,
+    No,
+    Auto,
+}
+
+impl ShouldWatch {
+    pub(crate) fn parse(value: &str) -> starlark::Result<Self> {
+        match value {
+            "yes" => Ok(Self::Yes),
+            "no" => Ok(Self::No),
+            "auto" => Ok(Self::Auto),
+            _ => Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "bad value for 'watch' parameter; want 'yes', 'no', or 'auto', got {}",
+                value
+            )
+            .into()),
+        }
+    }
 }
 
 starlark_simple_value!(ModuleContext);
@@ -123,6 +150,7 @@ impl ModuleContext {
             cell_paths: HashMap::new(),
             facts: empty_facts(),
             repo_env: Arc::new(BTreeMap::new()),
+            recorded_inputs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -140,6 +168,7 @@ impl ModuleContext {
             cell_paths: HashMap::new(),
             facts: empty_facts(),
             repo_env: Arc::new(BTreeMap::new()),
+            recorded_inputs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -154,6 +183,7 @@ impl ModuleContext {
             cell_paths: HashMap::new(),
             facts: empty_facts(),
             repo_env: Arc::new(BTreeMap::new()),
+            recorded_inputs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -293,6 +323,148 @@ impl ModuleContext {
     pub fn repo_env(&self) -> &BTreeMap<String, String> {
         &self.repo_env
     }
+
+    /// Return recorded inputs collected during module extension execution.
+    pub fn recorded_inputs(&self) -> slug_error::Result<Vec<String>> {
+        self.recorded_inputs
+            .lock()
+            .map(|inputs| inputs.clone())
+            .map_err(|_| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "module_ctx recorded input lock poisoned"
+                )
+            })
+    }
+
+    pub fn record_file_input(&self, path: &Path) -> starlark::Result<()> {
+        self.maybe_record_file_input(path, ShouldWatch::Yes)
+    }
+
+    pub(crate) fn maybe_record_file_input(
+        &self,
+        path: &Path,
+        should_watch: ShouldWatch,
+    ) -> starlark::Result<()> {
+        if should_watch == ShouldWatch::No {
+            return Ok(());
+        }
+        if let Some(working_dir) = self.working_dir()
+            && path.starts_with(working_dir)
+        {
+            if should_watch == ShouldWatch::Auto {
+                return Ok(());
+            }
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "attempted to watch path under working directory"
+            )
+            .into());
+        }
+        let Some(recorded_path) = self.recorded_path_for_watch(path, should_watch)? else {
+            return Ok(());
+        };
+        let recorded = slug_bzlmod::recorded_file_input_with_recorded_path(&recorded_path, path)
+            .map_err(|e| {
+                starlark::Error::from(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "Failed to record module_ctx.watch input '{}': {}",
+                    path.display(),
+                    e
+                ))
+            })?;
+        self.record_input(recorded)
+    }
+
+    fn recorded_path_for_watch(
+        &self,
+        path: &Path,
+        should_watch: ShouldWatch,
+    ) -> starlark::Result<Option<PathBuf>> {
+        let mut cell_paths: Vec<_> = self
+            .cell_paths
+            .iter()
+            .filter(|(cell_name, _)| {
+                !cell_name.is_empty() && !slug_core::cells::is_root_cell_name(cell_name)
+            })
+            .collect();
+        cell_paths.sort_by(|(_, left), (_, right)| {
+            right
+                .components()
+                .count()
+                .cmp(&left.components().count())
+                .then_with(|| right.cmp(left))
+        });
+        for (cell_name, cell_path) in cell_paths {
+            if let Ok(repo_relative) = path.strip_prefix(cell_path) {
+                let recorded = format!("@@{}+//{}", cell_name, repo_relative.to_string_lossy());
+                return Ok(Some(PathBuf::from(recorded)));
+            }
+        }
+        if let Some(project_root) = &self.project_root
+            && let Ok(workspace_relative) = path.strip_prefix(project_root)
+        {
+            let recorded = format!("@@//{}", workspace_relative.to_string_lossy());
+            return Ok(Some(PathBuf::from(recorded)));
+        }
+        if should_watch == ShouldWatch::Auto {
+            return Ok(None);
+        }
+        Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "attempted to watch path outside workspace, but it's prohibited in the current context"
+        )
+        .into())
+    }
+
+    pub fn record_env_input(&self, name: &str) -> starlark::Result<()> {
+        let recorded =
+            slug_bzlmod::recorded_env_input(name, self.repo_env.get(name).map(String::as_str));
+        self.record_input(recorded)
+    }
+
+    fn record_input(&self, recorded: String) -> starlark::Result<()> {
+        let mut inputs = self.recorded_inputs.lock().map_err(|_| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "module_ctx recorded input lock poisoned"
+            ))
+        })?;
+        let (identity, value) = split_recorded_input(&recorded).ok_or_else(|| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "malformed recorded input '{}'",
+                recorded
+            ))
+        })?;
+        if let Some(existing) = inputs
+            .iter()
+            .find(|input| split_recorded_input(input).is_some_and(|(key, _)| key == identity))
+        {
+            let (_, existing_value) = split_recorded_input(existing).expect("checked above");
+            if existing_value == value {
+                return Ok(());
+            }
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Conflicting values recorded for input {}: '{}' vs '{}'",
+                identity,
+                existing_value,
+                value
+            )
+            .into());
+        }
+        inputs.push(recorded);
+        Ok(())
+    }
+}
+
+fn split_recorded_input(recorded: &str) -> Option<(&str, &str)> {
+    let (identity, value) = recorded.split_once(' ')?;
+    if identity.is_empty() {
+        return None;
+    }
+    Some((identity, value))
 }
 
 #[starlark_value(type = "module_ctx")]

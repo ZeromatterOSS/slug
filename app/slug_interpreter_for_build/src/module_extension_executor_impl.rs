@@ -197,6 +197,26 @@ pub(crate) fn parse_bzlmod_bzl_path(
 /// This struct is registered via late binding at program startup.
 pub struct ConcreteModuleExtensionExecutor;
 
+fn record_declared_extension_environ(
+    module_ctx: &crate::module_ctx::ModuleContext,
+    environ: &[String],
+) -> slug_error::Result<()> {
+    let mut env_names: Vec<&String> = environ.iter().collect();
+    env_names.sort();
+    env_names.dedup();
+    for env in env_names {
+        module_ctx.record_env_input(env).map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to record module extension declared environ '{}': {}",
+                env,
+                e
+            )
+        })?;
+    }
+    Ok(())
+}
+
 impl ConcreteModuleExtensionExecutor {
     /// Try to execute the extension's Starlark implementation.
     ///
@@ -297,6 +317,9 @@ impl ConcreteModuleExtensionExecutor {
         // `mctx.path(Label)` / `mctx.read(Label)` calls inside the eval
         // can drive lazy materialization of sibling-extension spoke
         // repos via `slug_bzlmod::materialize_spoke_sync`.
+        record_declared_extension_environ(&module_ctx, frozen_extension.environ())?;
+        let recorded_inputs_ctx = module_ctx.clone();
+
         let (result, specs) = slug_bzlmod::with_extension_dice(ctx, workspace_id, || {
             with_repo_spec_registry(|| {
                 // Create a Starlark module for evaluation
@@ -354,10 +377,12 @@ impl ConcreteModuleExtensionExecutor {
 
         // Check for execution errors
         let metadata = result?;
+        let recorded_inputs = recorded_inputs_ctx.recorded_inputs()?;
 
         Ok(ExtensionExecutionOutput {
             generated_repo_specs: specs,
             metadata,
+            recorded_inputs,
         })
     }
 }
@@ -550,5 +575,30 @@ mod tests {
         assert_eq!(modules[0].name, "_main");
         assert!(modules[0].is_root);
         assert!(modules[0].tags_by_class.contains_key("parse"));
+    }
+
+    #[test]
+    fn test_declared_extension_environ_records_inputs() {
+        let mut repo_env = BTreeMap::new();
+        repo_env.insert("PLAN61_DECLARED_ENV".to_owned(), "from-context".to_owned());
+        let ctx = crate::module_ctx::ModuleContext::empty().with_repo_env(Arc::new(repo_env));
+
+        record_declared_extension_environ(
+            &ctx,
+            &[
+                "PLAN61_DECLARED_MISSING".to_owned(),
+                "PLAN61_DECLARED_ENV".to_owned(),
+                "PLAN61_DECLARED_ENV".to_owned(),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            ctx.recorded_inputs().unwrap(),
+            vec![
+                "ENV:PLAN61_DECLARED_ENV from-context".to_owned(),
+                "ENV:PLAN61_DECLARED_MISSING \\0".to_owned(),
+            ]
+        );
     }
 }

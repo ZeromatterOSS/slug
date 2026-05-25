@@ -859,6 +859,61 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo test -p slug_bzlmod -- --nocapture`, `cargo test -p
   slug_external_cells -- --nocapture`, `cargo build -p slug`, and focused Plan
   61 repo-env/replay guardrails.
+- Module extension fresh execution now captures recorded inputs for
+  `module_ctx.watch()`, `module_ctx.getenv()`, and declared
+  `module_extension(environ = [...])`, threads them through
+  `ExtensionExecutionOutput` and `ModuleExtensionResult`, and exposes a
+  lockfile cache writer helper that preserves those inputs. The capture path
+  now de-duplicates repeated inputs, rejects conflicting same-input values,
+  rejects explicit watches under the temporary module-extension working
+  directory or outside the workspace/external-repo classifier, and records
+  accepted files with Bazel-style repo-friendly identities such as `@@//...`
+  and `@@repo+//...` while hashing the actual path. `module_ctx.read(...,
+  watch = ...)` and `module_ctx.extract(..., watch_archive = ...)` now share
+  that classifier, including `auto`/`yes`/`no` handling. Fresh
+  `ModuleExtensionResult` values carry recorded-input validation context so
+  DICE value reuse is rejected after a recorded file changes, and fresh
+  execution records a `ModuleExtensionRecordedInputsKey` child dependency before
+  accepting the result instead of only validating lockfile replay hits. Plain
+  `module_ctx.os.environ` dictionary access remains non-recording to match
+  Bazel docs that reading the dictionary itself does not establish an env
+  dependency. Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp cargo check
+  -p slug_bzlmod -p slug_interpreter_for_build -p slug_external_cells`, focused
+  `slug_interpreter_for_build` module-context tests, focused `slug_bzlmod`
+  recorded-input/result-validity tests, `cargo test -p slug_bzlmod --
+  --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo
+  build -p slug`, the fresh recorded-file Plan 61 guardrail, `cargo fmt
+  --check`, and `git diff --check`.
+- Warm no-op DICE cutoffs for polled bzlmod inputs now put the current poll
+  digest in key identity instead of forcing the child key invalid every
+  transaction. `AbsoluteTextFileInputKey` covers out-of-project local overrides
+  and hidden/output-base text inputs, while `TrackedExtensionBzlDigestKey` carries
+  the direct transitional literal-load digest used by lockfile pre-seeding and
+  root extension replay-summary formation. This preserves edit/create/delete
+  transitions through a new key but lets same-key warm values stay valid, so the
+  replay-summary bridge no longer recomputes on every no-op command. Validation
+  passed with `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_common
+  tracked_extension_bzl_digest -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
+  cargo test -p slug_common
+  absolute_text_file_input_key -- --nocapture`, `cargo build -p slug`, a
+  focused Plan 61 replay subset covering warm replay and project/mapped `.bzl`
+  create/edit/delete transitions, the full Plan 61 Python guardrail with 119
+  tests, `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_common bzlmod --
+  --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp cargo check -p slug_common -p
+  slug_bzlmod -p slug_interpreter_for_build -p slug_external_cells`, `cargo fmt
+  --check`, and `git diff --check`. A clean review found two TOCTOU hazards in
+  this slice; follow-up fixes made `AbsoluteTextFileInputKey` return the same
+  polled observation that formed its digest key and made
+  `module_ctx.extract(watch_archive = ...)` record the archive before reading
+  archive bytes. Follow-up validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp
+  cargo test -p slug_common absolute_text_file_input_key -- --nocapture`,
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_interpreter_for_build
+  module_context -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p
+  slug_common tracked_extension_bzl_digest -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
+  cargo test -p slug_common bzlmod -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
+  cargo check -p slug_common -p slug_bzlmod -p slug_interpreter_for_build -p
+  slug_external_cells`, `cargo build -p slug`, and the full Plan 61 Python
+  guardrail with 119 tests.
 - Registered toolchain and execution-platform facts now have their own
   injected DICE values. `RegisteredToolchainsKey` and
   `RegisteredExecutionPlatformsKey` no longer compute the whole

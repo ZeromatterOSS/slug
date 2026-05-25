@@ -5701,6 +5701,63 @@ use_repo(env, "env_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_fresh_module_ctx_read_watch_file_edit_invalidates_extension_result(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: read(..., watch='yes') records a Skyframe extension dep."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+watch_input_ext+watched_repo"
+    _write(buck.cwd / "watched.txt", "first\n")
+    _write(
+        buck.cwd / "watch_input_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+watched_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _watch_input_ext_impl(module_ctx):
+    payload = module_ctx.read(Label("//:watched.txt"), watch = "yes")
+    watched_repo_rule(name = "watched_repo", payload = payload)
+
+watch_input_ext = module_extension(
+    implementation = _watch_input_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_watch_input")
+
+watch_input = use_extension("//:watch_input_ext.bzl", "watch_input_ext")
+use_repo(watch_input, "watched_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_watched_repo",
+    srcs = ["@watched_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_watched_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    _write(buck.cwd / "watched.txt", "second\n")
+    await buck.build("//:uses_watched_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_repo_env_uses_command_key_input(buck: Buck) -> None:
     """Bazel anchors: RepositoryContext.getenv and RepositoryFunction."""
     repo_dir = buck.cwd / "bazel-external" / "_main+repo_env_ext+env_repo"
