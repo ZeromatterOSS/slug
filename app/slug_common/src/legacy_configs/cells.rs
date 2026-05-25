@@ -1250,8 +1250,7 @@ struct BzlmodProjectionBridgeDiceKey {
     resolution_key: slug_bzlmod::BzlmodResolutionKey,
     options: BzlmodResolutionOptions,
     root_module_file: Arc<slug_bzlmod::RootModuleFileValue>,
-    visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
-    hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
+    lockfile_inputs: Arc<slug_bzlmod::BzlmodLockfileInputsValue>,
     local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
     non_registry_override_inputs: Arc<NonRegistryOverrideModuleInputsValue>,
     registry_file_inputs: Arc<RegistryFileInputsValue>,
@@ -1265,6 +1264,22 @@ struct TrackedLockfileContentKey {
     kind: slug_bzlmod::LockfileContentKind,
     path: Arc<PathBuf>,
     poll_digest: String,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodLockfileInputsBridgeKey({}, {:?})",
+    workspace_id.stable_hash(),
+    lockfile_mode
+)]
+struct BzlmodLockfileInputsBridgeKey {
+    project_root: AbsNormPathBuf,
+    workspace_id: slug_bzlmod::WorkspaceId,
+    lockfile_mode: slug_bzlmod::LockfileMode,
+    hidden_lockfile_path: Option<PathBuf>,
+    root_module_present: bool,
+    visible_poll_digest: Option<String>,
+    hidden_poll_digest: Option<String>,
 }
 
 #[async_trait]
@@ -1334,6 +1349,99 @@ impl Key for TrackedLockfileContentKey {
     }
 }
 
+#[async_trait]
+impl Key for BzlmodLockfileInputsBridgeKey {
+    type Value = slug_error::Result<Arc<slug_bzlmod::BzlmodLockfileInputsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        if !self.root_module_present || self.lockfile_mode == slug_bzlmod::LockfileMode::Off {
+            return Ok(Arc::new(
+                slug_bzlmod::BzlmodLockfileInputsValue::from_values(
+                    self.hidden_lockfile_path.clone(),
+                    None,
+                    None,
+                    self.lockfile_mode,
+                ),
+            ));
+        }
+
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        let visible_path = slug_bzlmod::lockfile_path(project_fs.root().as_path());
+        let Some(visible_poll_digest) = self.visible_poll_digest.clone() else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "BzlmodLockfileInputsBridgeKey requires a visible lockfile poll digest"
+            ));
+        };
+        let visible_lockfile = ctx
+            .compute(&TrackedLockfileContentKey {
+                project_root: self.project_root.clone(),
+                kind: slug_bzlmod::LockfileContentKind::Workspace,
+                path: Arc::new(visible_path),
+                poll_digest: visible_poll_digest,
+            })
+            .await?
+            .buck_error_context("Computing visible MODULE.bazel.lock for bzlmod resolution")?;
+        let hidden_lockfile = match (&self.hidden_lockfile_path, &self.hidden_poll_digest) {
+            (Some(path), Some(poll_digest)) => Some(
+                ctx.compute(&TrackedLockfileContentKey {
+                    project_root: self.project_root.clone(),
+                    kind: slug_bzlmod::LockfileContentKind::Hidden,
+                    path: Arc::new(path.clone()),
+                    poll_digest: poll_digest.clone(),
+                })
+                .await?
+                .buck_error_context(
+                    "Computing hidden MODULE.bazel lockfile for bzlmod resolution",
+                )?,
+            ),
+            (Some(_), None) => {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "BzlmodLockfileInputsBridgeKey requires a hidden lockfile poll digest"
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "BzlmodLockfileInputsBridgeKey received a hidden lockfile poll digest without a hidden lockfile path"
+                ));
+            }
+            (None, None) => None,
+        };
+
+        Ok(Arc::new(
+            slug_bzlmod::BzlmodLockfileInputsValue::from_values(
+                self.hidden_lockfile_path.clone(),
+                Some(visible_lockfile),
+                hidden_lockfile,
+                self.lockfile_mode,
+            ),
+        ))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => bzlmod_lockfile_inputs_identity_eq(x, y),
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => {
+                lockfile_content_value_tracked(&value.visible_lockfile)
+                    && lockfile_content_value_tracked(&value.hidden_lockfile)
+            }
+            Err(_) => false,
+        }
+    }
+}
+
 impl PartialEq for BzlmodProjectionBridgeDiceKey {
     fn eq(&self, other: &Self) -> bool {
         self.project_root == other.project_root
@@ -1341,8 +1449,7 @@ impl PartialEq for BzlmodProjectionBridgeDiceKey {
             && bzlmod_resolution_options_policy_eq(&self.options, &other.options)
             && self.root_module_file.path == other.root_module_file.path
             && self.root_module_file.input_digest == other.root_module_file.input_digest
-            && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
-            && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
+            && bzlmod_lockfile_inputs_identity_eq(&self.lockfile_inputs, &other.lockfile_inputs)
             && self.local_override_inputs.digest == other.local_override_inputs.digest
             && self.non_registry_override_inputs.digest == other.non_registry_override_inputs.digest
             && self.registry_file_inputs.digest == other.registry_file_inputs.digest
@@ -1359,13 +1466,36 @@ impl std::hash::Hash for BzlmodProjectionBridgeDiceKey {
         hash_bzlmod_resolution_options_policy(&self.options, state);
         self.root_module_file.path.hash(state);
         self.root_module_file.input_digest.hash(state);
-        hash_lockfile_content_identity(&self.visible_lockfile, state);
-        hash_lockfile_content_identity(&self.hidden_lockfile, state);
+        hash_bzlmod_lockfile_inputs_identity(&self.lockfile_inputs, state);
         self.local_override_inputs.digest.hash(state);
         self.non_registry_override_inputs.digest.hash(state);
         self.registry_file_inputs.digest.hash(state);
         self.extension_replay_summary_digest.hash(state);
     }
+}
+
+fn bzlmod_lockfile_inputs_identity_eq(
+    left: &slug_bzlmod::BzlmodLockfileInputsValue,
+    right: &slug_bzlmod::BzlmodLockfileInputsValue,
+) -> bool {
+    left.hidden_lockfile_path == right.hidden_lockfile_path
+        && left.visible_lockfile_digest == right.visible_lockfile_digest
+        && left.hidden_lockfile_digest == right.hidden_lockfile_digest
+        && left.lockfile_mode == right.lockfile_mode
+        && lockfile_content_identity_eq(&left.visible_lockfile, &right.visible_lockfile)
+        && lockfile_content_identity_eq(&left.hidden_lockfile, &right.hidden_lockfile)
+}
+
+fn hash_bzlmod_lockfile_inputs_identity<H: std::hash::Hasher>(
+    value: &slug_bzlmod::BzlmodLockfileInputsValue,
+    state: &mut H,
+) {
+    value.hidden_lockfile_path.hash(state);
+    value.visible_lockfile_digest.hash(state);
+    value.hidden_lockfile_digest.hash(state);
+    value.lockfile_mode.hash(state);
+    hash_lockfile_content_identity(&value.visible_lockfile, state);
+    hash_lockfile_content_identity(&value.hidden_lockfile, state);
 }
 
 fn lockfile_content_identity_eq(
@@ -1396,6 +1526,13 @@ fn hash_lockfile_content_identity<H: std::hash::Hasher>(
             value.digest.hash(state);
         }
         None => false.hash(state),
+    }
+}
+
+fn lockfile_content_value_tracked(value: &Option<Arc<slug_bzlmod::LockfileContentValue>>) -> bool {
+    match value {
+        Some(value) => value.tracked_by_dice,
+        None => true,
     }
 }
 
@@ -2707,6 +2844,39 @@ impl BuckConfigBasedCells {
             .await?
             .buck_error_context("Computing root MODULE.bazel for bzlmod resolution")?;
         let project_root = AbsNormPathBuf::try_from(project_root_path)?;
+        let should_read_lockfiles = root_module_file.parsed.is_some()
+            && options.lockfile_mode != slug_bzlmod::LockfileMode::Off;
+        let visible_poll_digest = if should_read_lockfiles {
+            let visible_path = slug_bzlmod::lockfile_path(project_fs.root().as_path());
+            Some(text_file_poll_digest(
+                project_fs,
+                &visible_path,
+                b"lockfile-content-poll-v1",
+            )?)
+        } else {
+            None
+        };
+        let hidden_poll_digest = if should_read_lockfiles {
+            options
+                .hidden_lockfile_path
+                .as_ref()
+                .map(|path| text_file_poll_digest(project_fs, path, b"lockfile-content-poll-v1"))
+                .transpose()?
+        } else {
+            None
+        };
+        let lockfile_inputs = dice_ctx
+            .compute(&BzlmodLockfileInputsBridgeKey {
+                project_root: project_root.clone(),
+                workspace_id: workspace_id.clone(),
+                lockfile_mode: options.lockfile_mode,
+                hidden_lockfile_path: options.hidden_lockfile_path.clone(),
+                root_module_present: root_module_file.parsed.is_some(),
+                visible_poll_digest,
+                hidden_poll_digest,
+            })
+            .await?
+            .buck_error_context("Computing bzlmod lockfile inputs for projection bridge")?;
         let local_overrides = local_overrides_from_root_module(
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
@@ -2739,54 +2909,8 @@ impl BuckConfigBasedCells {
             .buck_error_context(
                 "Computing non-registry override MODULE.bazel inputs for bzlmod resolution",
             )?;
-        let visible_lockfile = if root_module_file.parsed.is_some()
-            && options.lockfile_mode != slug_bzlmod::LockfileMode::Off
-        {
-            let visible_path = slug_bzlmod::lockfile_path(project_fs.root().as_path());
-            let visible_poll_digest =
-                text_file_poll_digest(project_fs, &visible_path, b"lockfile-content-poll-v1")?;
-            Some(
-                dice_ctx
-                    .compute(&TrackedLockfileContentKey {
-                        project_root: project_root.clone(),
-                        kind: slug_bzlmod::LockfileContentKind::Workspace,
-                        path: Arc::new(visible_path),
-                        poll_digest: visible_poll_digest,
-                    })
-                    .await?
-                    .buck_error_context(
-                        "Computing visible MODULE.bazel.lock for bzlmod resolution",
-                    )?,
-            )
-        } else {
-            None
-        };
-        let hidden_lockfile = if root_module_file.parsed.is_some()
-            && options.lockfile_mode != slug_bzlmod::LockfileMode::Off
-        {
-            if let Some(path) = &options.hidden_lockfile_path {
-                let hidden_poll_digest =
-                    text_file_poll_digest(project_fs, path, b"lockfile-content-poll-v1")?;
-                Some(
-                    dice_ctx
-                        .compute(&TrackedLockfileContentKey {
-                            project_root: project_root.clone(),
-                            kind: slug_bzlmod::LockfileContentKind::Hidden,
-                            path: Arc::new(path.clone()),
-                            poll_digest: hidden_poll_digest,
-                        })
-                        .await?
-                        .buck_error_context(
-                            "Computing hidden MODULE.bazel lockfile for bzlmod resolution",
-                        )?,
-                )
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        let registry_file_hashes = visible_lockfile
+        let registry_file_hashes = lockfile_inputs
+            .visible_lockfile
             .as_ref()
             .and_then(|value| value.lockfile.as_deref())
             .map(|lockfile| {
@@ -2813,10 +2937,12 @@ impl BuckConfigBasedCells {
                     parsed,
                     &local_override_inputs.parsed_modules,
                     project_fs,
-                    visible_lockfile
+                    lockfile_inputs
+                        .visible_lockfile
                         .as_ref()
                         .and_then(|value| value.lockfile.as_deref()),
-                    hidden_lockfile
+                    lockfile_inputs
+                        .hidden_lockfile
                         .as_ref()
                         .and_then(|value| value.lockfile.as_deref()),
                     &options.repo_env,
@@ -2831,8 +2957,7 @@ impl BuckConfigBasedCells {
             resolution_key,
             options,
             root_module_file,
-            visible_lockfile,
-            hidden_lockfile,
+            lockfile_inputs,
             local_override_inputs,
             non_registry_override_inputs,
             registry_file_inputs,
@@ -3085,8 +3210,8 @@ impl BuckConfigBasedCells {
             &key.options,
             Some(key.resolution_key.workspace_id.clone()),
             Some(root_module_file.as_ref()),
-            key.visible_lockfile.clone(),
-            key.hidden_lockfile.clone(),
+            key.lockfile_inputs.visible_lockfile.clone(),
+            key.lockfile_inputs.hidden_lockfile.clone(),
             Some(dice_ctx),
         )
         .await
@@ -4246,12 +4371,76 @@ mod tests {
         })
     }
 
+    fn minimal_lockfile_json(marker: &str) -> String {
+        format!(
+            r#"{{
+  "lockFileVersion": 26,
+  "facts": {{
+    "marker": "{marker}"
+  }}
+}}
+"#
+        )
+    }
+
+    async fn compute_bzlmod_lockfile_inputs_bridge(
+        dice: &mut DiceComputations<'_>,
+        project_fs: &ProjectRoot,
+        lockfile_mode: slug_bzlmod::LockfileMode,
+        hidden_lockfile_path: Option<PathBuf>,
+        root_module_present: bool,
+    ) -> slug_error::Result<Arc<slug_bzlmod::BzlmodLockfileInputsValue>> {
+        let should_read_lockfiles =
+            root_module_present && lockfile_mode != slug_bzlmod::LockfileMode::Off;
+        let visible_poll_digest = if should_read_lockfiles {
+            let visible_path = slug_bzlmod::lockfile_path(project_fs.root().as_path());
+            Some(text_file_poll_digest(
+                project_fs,
+                &visible_path,
+                b"lockfile-content-poll-v1",
+            )?)
+        } else {
+            None
+        };
+        let hidden_poll_digest = if should_read_lockfiles {
+            hidden_lockfile_path
+                .as_ref()
+                .map(|path| text_file_poll_digest(project_fs, path, b"lockfile-content-poll-v1"))
+                .transpose()?
+        } else {
+            None
+        };
+        let project_root = project_fs.root().to_path_buf();
+        dice.compute(&BzlmodLockfileInputsBridgeKey {
+            project_root: AbsNormPathBuf::try_from(project_root.clone())?,
+            workspace_id: slug_bzlmod::WorkspaceId::new(
+                project_root.clone(),
+                project_root.join("buck-out/v2"),
+            ),
+            lockfile_mode,
+            hidden_lockfile_path,
+            root_module_present,
+            visible_poll_digest,
+            hidden_poll_digest,
+        })
+        .await?
+    }
+
     fn bzlmod_projection_bridge_key(
         hidden_lockfile: Arc<slug_bzlmod::LockfileContentValue>,
     ) -> BzlmodProjectionBridgeDiceKey {
         let project_root = PathBuf::from("/tmp/slug-plan61-hidden-lockfile-key-test");
         let workspace_id =
             slug_bzlmod::WorkspaceId::new(project_root.clone(), PathBuf::from("/tmp/output-base"));
+        let lockfile_inputs = Arc::new(slug_bzlmod::BzlmodLockfileInputsValue::from_values(
+            Some(PathBuf::from("/tmp/hidden/MODULE.bazel.lock")),
+            Some(lockfile_value(
+                "/tmp/workspace/MODULE.bazel.lock",
+                "visible-lockfile",
+            )),
+            Some(hidden_lockfile),
+            slug_bzlmod::LockfileMode::Update,
+        ));
 
         BzlmodProjectionBridgeDiceKey {
             project_root: AbsNormPathBuf::try_from(project_root.clone()).unwrap(),
@@ -4274,11 +4463,7 @@ mod tests {
                 input_count: 1,
                 parsed: None,
             }),
-            visible_lockfile: Some(lockfile_value(
-                "/tmp/workspace/MODULE.bazel.lock",
-                "visible-lockfile",
-            )),
-            hidden_lockfile: Some(hidden_lockfile),
+            lockfile_inputs,
             local_override_inputs: Arc::new(LocalOverrideModuleInputsValue {
                 digest: "local-overrides".to_owned(),
                 parsed_modules: Vec::new(),
@@ -5069,6 +5254,145 @@ ext = module_extension(implementation = _impl)
         assert!(<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
             tracked_created
         )));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_lockfile_inputs_bridge_tracks_visible_lockfile_edits() -> slug_error::Result<()>
+    {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
+        fs.write_file("MODULE.bazel.lock", &minimal_lockfile_json("first"));
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = compute_bzlmod_lockfile_inputs_bridge(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Update,
+            None,
+            true,
+        )
+        .await?;
+        let first_digest = first
+            .visible_lockfile_digest
+            .clone()
+            .expect("visible lockfile should be read");
+
+        fs.write_file("MODULE.bazel.lock", &minimal_lockfile_json("second"));
+        let mut updater = dice.into_updater();
+        let mut changes = crate::file_ops::dice::FileChangeTracker::new();
+        changes.project_file_contents_changed(ProjectRelativePathBuf::unchecked_new(
+            "MODULE.bazel.lock".to_owned(),
+        ));
+        changes.write_to_dice(&mut updater)?;
+        let mut dice = updater.commit().await;
+        let second = compute_bzlmod_lockfile_inputs_bridge(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Update,
+            None,
+            true,
+        )
+        .await?;
+
+        assert_ne!(
+            first_digest,
+            second
+                .visible_lockfile_digest
+                .as_deref()
+                .expect("edited visible lockfile should be read")
+        );
+        assert!(second.hidden_lockfile.is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_lockfile_inputs_bridge_tracks_hidden_lockfile_fail_open()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
+        fs.write_file("MODULE.bazel.lock", &minimal_lockfile_json("visible"));
+        let hidden_dir = tempfile::Builder::new()
+            .prefix("slug-plan61-hidden-lockfile-inputs-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let hidden_path = hidden_dir.path().join("MODULE.bazel.lock");
+        std::fs::write(&hidden_path, minimal_lockfile_json("hidden")).unwrap();
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = compute_bzlmod_lockfile_inputs_bridge(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Update,
+            Some(hidden_path.clone()),
+            true,
+        )
+        .await?;
+        assert!(first.hidden_lockfile_digest.is_some());
+
+        std::fs::write(&hidden_path, "{ this is not json }\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let invalid = compute_bzlmod_lockfile_inputs_bridge(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Update,
+            Some(hidden_path.clone()),
+            true,
+        )
+        .await?;
+
+        assert!(invalid.hidden_lockfile_digest.is_none());
+        assert!(
+            invalid
+                .hidden_lockfile
+                .as_ref()
+                .expect("hidden lockfile path should still be represented")
+                .lockfile
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_lockfile_inputs_bridge_mode_off_reads_no_lockfiles() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
+        fs.write_file("MODULE.bazel.lock", "{ this is not json }\n");
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let inputs = compute_bzlmod_lockfile_inputs_bridge(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Off,
+            None,
+            true,
+        )
+        .await?;
+
+        assert_eq!(inputs.lockfile_mode, slug_bzlmod::LockfileMode::Off);
+        assert!(inputs.visible_lockfile.is_none());
+        assert!(inputs.hidden_lockfile.is_none());
         Ok(())
     }
 

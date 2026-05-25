@@ -567,12 +567,29 @@ Observed SDK result at the checkpoint:
 - `ModuleExtensionExecutionKey` now includes the tracked visible/hidden
   `LockfileContentValue` identity in equality and hashing instead of relying
   only on separate digest fields. This keeps the replay key honest about the
-  actual lockfile values consumed by extension execution while lockfile-input
-  production remains a follow-up that is not yet split out of the projection
-  bridge. Validation passed
+  actual lockfile values consumed by extension execution; at that checkpoint,
+  lockfile-input production still remained a follow-up not yet split out of the
+  projection bridge. Validation passed
   with focused `cargo test -p slug_bzlmod tracked_lockfile_value_identity --
   --nocapture`, broader `cargo test -p slug_bzlmod lockfile -- --nocapture`
   (`64 passed`), `cargo check -p slug_bzlmod -p slug_common`, touched-file
+  `rustfmt --edition 2024`, and `git diff --check`.
+- Lockfile input production now has a named
+  `BzlmodLockfileInputsBridgeKey` that owns visible/hidden
+  `TrackedLockfileContentKey` reads and returns the shared
+  `BzlmodLockfileInputsValue`; `BzlmodProjectionBridgeDiceKey` carries that
+  bundle instead of separate visible/hidden lockfile fields. This is still a
+  transitional bridge because the legacy resolver consumes the bundle, but the
+  lockfile read/replay producer is now separate from projection-bridge key
+  assembly. Validation passed with focused `cargo test -p slug_common
+  bzlmod_lockfile_inputs_bridge -- --nocapture`, focused `cargo test -p
+  slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
+  slug_bzlmod -p slug_common -p slug_server`, `cargo build -p slug`, selected
+  `pytest tests/core/bzlmod/test_plan61_guardrails.py -k
+  'lockfile_mode_off_does_not_read_lockfiles or
+  visible_lockfile_edit_is_observed_in_same_daemon or
+  visible_lockfile_creation_is_observed_in_same_daemon or
+  visible_lockfile_deletion_is_observed_in_same_daemon'`, touched-file
   `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
@@ -2813,6 +2830,10 @@ using Rust DICE keys and values:
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
      hidden/output-base lockfile bytes are polled into lockfile key identity
      while the final watched-input graph is still pending.
+   - The projection bridge now gets visible/hidden lockfile values from a named
+     lockfile-input bridge key instead of producing those reads inline, but the
+     resulting `BzlmodLockfileInputsValue` still feeds the legacy resolver until
+     the true lockfile policy/value graph replaces the projection bridge.
    - DICE-backed bzlmod resolution now requires the tracked visible and hidden
      lockfile values when lockfile mode/path policy says those inputs are
      active, instead of silently falling back to a direct lockfile read inside
