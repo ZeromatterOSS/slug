@@ -494,6 +494,15 @@ Observed SDK result at the checkpoint:
   slug_external_cells -p slug_analysis`, `cargo build -p slug`, and the full
   Plan 61 Python guardrail file (`125 passed in 147.72s`). No stale `slugd`
   process remained after post-run cleanup.
+- `LegacyBzlmodResolutionDiceKey` now returns the narrower
+  `BzlmodProjectionData` payload instead of caching `BzlmodSessionData` as its
+  DICE value. The wrapped resolver still builds the legacy session internally,
+  then converts it at the key boundary, so this is a demotion of the bridge
+  payload rather than the final Skyframe-shaped resolver rewrite. Validation
+  passed with focused `cargo test -p slug_common explicit_output_base --
+  --nocapture`, `cargo check -p slug_common -p slug_server`, `cargo build -p
+  slug`, and the full Plan 61 Python guardrail file (`125 passed in 162.30s`).
+  No stale `slugd` process remained after post-run cleanup.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -1833,8 +1842,9 @@ What worked:
 What did not work or remains risky:
 
 - A single transitional `LegacyBzlmodResolutionDiceKey` still wraps the legacy
-  resolver. Its command-policy identity now comes from a DICE key, but the
-  wrapped resolver is still not a Skyframe-shaped module graph.
+  resolver. Its command-policy identity now comes from a DICE key, and its
+  cached value is the narrowed `BzlmodProjectionData` payload, but the wrapped
+  resolver is still not a Skyframe-shaped module graph.
 - The resolved graph, repo-mapping snapshots, cell graph, and registered
   toolchain and execution platform facts are still assembled during legacy
   cell setup, then injected as transitional command data. Registered
@@ -1845,10 +1855,12 @@ What did not work or remains risky:
   injected payload. The module-version value still carries a conservative
   session invalidation identity until the remaining
   interpreter/materialization inputs are explicit, and `BzlmodSessionData`
-  still exists as the legacy resolver payload even though it is no longer an
-  injected DICE key and no longer sits behind a separate
-  `BzlmodResolutionResult` wrapper. The session payload now carries the
-  current workspace identity inside its named cell graph, while module-version
+  still exists as the legacy resolver's internal payload even though it is no
+  longer an injected DICE key, no longer sits behind a separate
+  `BzlmodResolutionResult` wrapper, and no longer crosses the
+  `LegacyBzlmodResolutionDiceKey` value boundary. The session payload now
+  carries the current workspace identity inside its named cell graph, while
+  module-version
   data, resolution facts, registrations, repo-env, lockfile-input,
   repo-mapping, and extension-aggregation data also carry source workspace
   provenance so stale cross-workspace projection data cannot be paired with

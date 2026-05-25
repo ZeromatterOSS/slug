@@ -2562,7 +2562,7 @@ impl Key for NonRootModuleFilesKey {
 
 #[async_trait]
 impl Key for LegacyBzlmodResolutionDiceKey {
-    type Value = slug_error::Result<Arc<Option<slug_bzlmod::BzlmodSessionData>>>;
+    type Value = slug_error::Result<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>;
 
     async fn compute(
         &self,
@@ -2723,15 +2723,11 @@ impl BuckConfigBasedCells {
                 .buck_error_context("Computing bzlmod resolution through DICE")?;
             (key, bzlmod_resolution)
         };
-        let projection_data_for_dice = bzlmod_resolution
-            .as_ref()
-            .clone()
-            .map(slug_bzlmod::BzlmodProjectionData::from)
-            .unwrap_or_else(|| {
-                slug_bzlmod::BzlmodProjectionData::for_workspace(
-                    key.resolution_key.workspace_id.clone(),
-                )
-            });
+        let projection_data_for_dice = bzlmod_resolution.as_ref().clone().unwrap_or_else(|| {
+            slug_bzlmod::BzlmodProjectionData::for_workspace(
+                key.resolution_key.workspace_id.clone(),
+            )
+        });
 
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
@@ -2926,7 +2922,7 @@ impl BuckConfigBasedCells {
         project_fs: Option<&ProjectRoot>,
         root_module_file: Option<Arc<slug_bzlmod::RootModuleFileValue>>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
-        dice_bzlmod_resolution: Option<Arc<Option<slug_bzlmod::BzlmodSessionData>>>,
+        dice_bzlmod_resolution: Option<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>,
         empty_workspace_id: Option<slug_bzlmod::WorkspaceId>,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
@@ -2965,7 +2961,8 @@ impl BuckConfigBasedCells {
         // The root cell name is derived from module(name = "...") in MODULE.bazel.
         // .buckconfig [cells], [cell_aliases], and [external_cells] sections are skipped.
         let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
-        if let Some(session_data) = if let Some(dice_bzlmod_resolution) = dice_bzlmod_resolution {
+        if let Some(projection_data) = if let Some(dice_bzlmod_resolution) = dice_bzlmod_resolution
+        {
             dice_bzlmod_resolution.as_ref().clone()
         } else if let Some(project_fs) = project_fs {
             let options = BzlmodResolutionOptions::from_config(&root_config)?;
@@ -2979,15 +2976,16 @@ impl BuckConfigBasedCells {
                 None,
             )
             .await?
+            .map(slug_bzlmod::BzlmodProjectionData::from)
         } else {
             None
         } {
-            let runtime_cell_snapshot = runtime_cell_install_snapshot(&session_data.cell_graph);
+            let runtime_cell_snapshot = runtime_cell_install_snapshot(&projection_data.cell_graph);
             if let Some(project_fs) = project_fs {
-                replay_bzlmod_runtime_state(&session_data.cell_graph, project_fs);
+                replay_bzlmod_runtime_state(&projection_data.cell_graph, project_fs);
             }
             has_module_bazel = true;
-            let cell_graph = &session_data.cell_graph;
+            let cell_graph = &projection_data.cell_graph;
 
             // Root cell comes from MODULE.bazel module(name = "...")
             let root_cell_name = CellName::unchecked_new(&cell_graph.root_module_name)?;
@@ -3144,7 +3142,7 @@ impl BuckConfigBasedCells {
     async fn resolve_bzlmod_resolution_from_key(
         key: &LegacyBzlmodResolutionDiceKey,
         dice_ctx: &mut DiceComputations<'_>,
-    ) -> slug_error::Result<Arc<Option<slug_bzlmod::BzlmodSessionData>>> {
+    ) -> slug_error::Result<Arc<Option<slug_bzlmod::BzlmodProjectionData>>> {
         let root_module_file = key.root_module_file.clone();
         if root_module_file.parsed.is_none() {
             return Ok(Arc::new(None));
@@ -3161,7 +3159,7 @@ impl BuckConfigBasedCells {
             Some(dice_ctx),
         )
         .await
-        .map(Arc::new)
+        .map(|resolution| Arc::new(resolution.map(slug_bzlmod::BzlmodProjectionData::from)))
     }
 
     /// Resolve bzlmod dependencies from MODULE.bazel if it exists.
@@ -4961,8 +4959,9 @@ mod tests {
         let project_root = PathBuf::from("/tmp/slug-plan61-bundled-cell-graph-test");
         let workspace_id =
             slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"));
-        let mut session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id.clone());
-        session_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
+        let mut projection_data =
+            slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
+        projection_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
             workspace_id,
             root_module_name: "root".to_owned(),
             cells: Arc::new(vec![slug_bzlmod::BzlmodCellGraphCell {
@@ -4983,7 +4982,7 @@ mod tests {
             None,
             None,
             None,
-            Some(Arc::new(Some(session_data))),
+            Some(Arc::new(Some(projection_data))),
             None,
         )
         .await?;
