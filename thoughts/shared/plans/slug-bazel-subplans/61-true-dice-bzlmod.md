@@ -2322,6 +2322,15 @@ What did not work or remains risky:
   passed, 7 filtered out`), `cargo test -p slug_analysis toolchain_loading --
   --nocapture` (`2 passed, 39 filtered out`), `cargo fmt --check`, and `git
   diff --check`.
+- `extension_execution_dice` is no longer a public crate module. Downstream
+  crates continue to use the explicit crate-root APIs that are still required
+  for extension execution and the transitional tracked `.bzl` digest bridge,
+  while the unused `build_canonical_names` crate-root helper export was
+  removed. Focused validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp cargo
+  check -p slug_bzlmod -p slug_common -p slug_interpreter_for_build -p
+  slug_external_cells`, `cargo test -p slug_bzlmod build_canonical_names --
+  --nocapture` (`1 passed, 331 filtered out`), `cargo fmt --check`, and `git
+  diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

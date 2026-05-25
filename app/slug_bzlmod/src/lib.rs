@@ -28,7 +28,7 @@
 
 pub mod cache;
 pub mod dice_graph;
-pub mod extension_execution_dice;
+mod extension_execution_dice;
 pub mod extensions;
 pub mod fetch;
 pub mod globals;
@@ -142,7 +142,6 @@ pub use extension_execution_dice::BzlLoadLocation;
 pub use extension_execution_dice::ModuleExtensionError;
 pub use extension_execution_dice::ModuleExtensionExecutionKey;
 pub use extension_execution_dice::ModuleExtensionResult;
-pub use extension_execution_dice::build_canonical_names;
 pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::compute_bzl_transitive_digest_for_project_with_repo_mappings;
 pub use extension_execution_dice::extension_bzl_location_under_project;
