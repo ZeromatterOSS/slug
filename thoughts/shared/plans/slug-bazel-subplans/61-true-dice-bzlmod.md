@@ -2994,6 +2994,15 @@ What did not work or remains risky:
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
   DICE-owned repository materialization manifest.
+- `repository_ctx.read(..., watch = "auto")` now mirrors Bazel 9's
+  `StarlarkBaseExternalContext.readFile` path by recording a FILE input when
+  the read path can be watched, while `watch = "no"` remains unrecorded and
+  generated-repo working-directory reads remain skipped for `auto`. The new
+  guardrail `test_repository_ctx_read_label_auto_watch_reexecutes_materialized_repo`
+  first failed because no recorded-input sidecar was written, then passed after
+  the fix. Validation also reran the adjacent repository watch/watch-tree
+  guardrails (`3 passed` total) after `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-read-watch
+  cargo build -p slug`.
 - Repository materialization recorded-input sidecars are now split into named
   manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
   reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
@@ -3624,6 +3633,11 @@ using Rust DICE keys and values:
      rule bit after the bzlmod cell graph is established, and
      `test_external_use_repo_rule_local_definition_reexecutes_after_input_edit`
      proves rematerialization after an unwatched input edit for that class.
+   - `repository_ctx.read(Label(...))` with default `watch = "auto"` now records
+     the read file as a repository materialization input, so editing the source
+     label file rematerializes the generated repository in the same daemon. This
+     closes the implicit-read half of Bazel's `readFile`/`RepoRecordedInput.File`
+     behavior for workspace-label reads.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

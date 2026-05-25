@@ -2526,13 +2526,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Read a file and return its contents.
-    #[allow(unused_variables)]
     fn read<'v>(
         this: &RepositoryContext,
         #[starlark(require = pos)] path: Value<'v>,
         #[starlark(require = named, default = "auto")] watch: &str,
     ) -> starlark::Result<String> {
-        let _ = watch;
         let file_path = if let Some(s) = path.unpack_str() {
             if is_bazel_label_string(s) {
                 let path = this.resolve_label_to_filesystem_path(s);
@@ -2551,6 +2549,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             this.resolve_path(&path.to_str())
         };
+        repository_ctx_maybe_record_read_input(this, &file_path, watch)?;
         std::fs::read_to_string(&file_path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -2903,6 +2902,46 @@ fn repository_ctx_resolve_watch_path(
         path.get_type()
     )
     .into())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RepositoryCtxWatchMode {
+    Yes,
+    No,
+    Auto,
+}
+
+fn parse_repository_ctx_watch_mode(watch: &str) -> starlark::Result<RepositoryCtxWatchMode> {
+    match watch {
+        "yes" => Ok(RepositoryCtxWatchMode::Yes),
+        "no" => Ok(RepositoryCtxWatchMode::No),
+        "auto" => Ok(RepositoryCtxWatchMode::Auto),
+        other => Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "bad value for 'watch' parameter; want 'yes', 'no', or 'auto', got {}",
+            other
+        )
+        .into()),
+    }
+}
+
+fn repository_ctx_maybe_record_read_input(
+    this: &RepositoryContext,
+    path: &Path,
+    watch: &str,
+) -> starlark::Result<()> {
+    match parse_repository_ctx_watch_mode(watch)? {
+        RepositoryCtxWatchMode::No => Ok(()),
+        RepositoryCtxWatchMode::Auto if path.starts_with(this.working_dir()) => Ok(()),
+        RepositoryCtxWatchMode::Yes if path.starts_with(this.working_dir()) => {
+            Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "attempted to watch path under working directory"
+            )
+            .into())
+        }
+        RepositoryCtxWatchMode::Yes | RepositoryCtxWatchMode::Auto => this.record_file_input(path),
+    }
 }
 
 #[starlark_value(type = "repository_ctx")]
