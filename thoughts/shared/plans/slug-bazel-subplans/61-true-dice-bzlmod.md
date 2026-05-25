@@ -2274,6 +2274,16 @@ Observed SDK result at the checkpoint:
   scoped search found no remaining downstream
   `slug_bzlmod::BzlmodCellGraphDataKey` or
   `slug_bzlmod::dice_graph::BzlmodCellGraphDataKey` references.
+- Bzlmod load-path canonicalization now uses the active interpreter
+  `CellAliasResolver` before consulting process-global repo-name helpers. When
+  a resolver has a runtime bzlmod alias snapshot, runtime aliases and module
+  aliases are authoritative and misses do not fall back to stale
+  process-global dynamic aliases; legacy resolvers without a runtime snapshot
+  keep the old directory/global fallback. Validation passed with `cargo fmt`,
+  `cargo test -p slug_interpreter_for_build bzlmod_load_path -- --nocapture`,
+  `cargo test -p slug_interpreter_for_build
+  load_import_resolution_with_runtime_aliases_rejects_global_miss --
+  --nocapture`, and `cargo check -p slug_interpreter_for_build`.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
@@ -3418,11 +3428,13 @@ using Rust DICE keys and values:
   present, a missing repository is an error instead of a synthetic source-tree
   or `bazel-external` read. Patch resolution preserves the existing non-fatal
   repository-rule behavior by warning and continuing after resolution errors.
-- Bzlmod load-path wrong-cell equivalence, toolchain implementation/metadata
-  label parsing, and C++ toolchain metadata/action-path formatting can now use
-  declared aliases and runtime aliases/cells from the active cell alias resolver
-  before consulting process-global dynamic aliases, but remaining compatibility
-  adapters still retain process-global fallback behavior.
+- Bzlmod load-path wrong-cell equivalence and load-path canonicalization,
+  toolchain implementation/metadata label parsing, and C++ toolchain
+  metadata/action-path formatting can now use declared aliases and runtime
+  aliases/cells from the active cell alias resolver before consulting
+  process-global dynamic aliases. Runtime-snapshot load-path misses are now
+  authoritative, but remaining compatibility adapters still retain
+  process-global fallback behavior.
 - `config_setting(flag_values = ...)` build-setting lookup now also uses the
   active cell alias resolver for bzlmod repo-spelling normalization before
   consulting process-global dynamic aliases.

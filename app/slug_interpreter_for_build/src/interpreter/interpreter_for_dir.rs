@@ -266,7 +266,8 @@ impl LoadResolver for InterpreterLoadResolver {
         }
 
         if self.config.bzlmod_mode {
-            path = canonicalize_bzlmod_load_path(path)?;
+            path =
+                canonicalize_bzlmod_load_path(path, self.config.cell_info.cell_alias_resolver())?;
         }
 
         let build_file_cell = if self.config.bzlmod_mode {
@@ -283,12 +284,23 @@ impl LoadResolver for InterpreterLoadResolver {
     }
 }
 
-fn canonicalize_bzlmod_load_path(path: CellPath) -> slug_error::Result<CellPath> {
-    if slug_core::cells::is_root_cell_name(path.cell().as_str()) {
+fn canonicalize_bzlmod_load_path(
+    path: CellPath,
+    alias_resolver: &CellAliasResolver,
+) -> slug_error::Result<CellPath> {
+    if path.cell() == alias_resolver.resolve_self() {
         return Ok(path);
     }
 
-    let canonical = slug_core::cells::canonical_bazel_repo_name_for_cell(path.cell().as_str());
+    let resolver_has_runtime_snapshot = alias_resolver.has_bzlmod_runtime_alias_snapshot();
+    let canonical = alias_resolver
+        .resolve_declared_or_runtime_alias(path.cell().as_str())
+        .map(|cell| cell.as_str().to_owned())
+        .or_else(|| {
+            (!resolver_has_runtime_snapshot)
+                .then(|| slug_core::cells::canonical_bazel_repo_name_for_cell(path.cell().as_str()))
+        })
+        .unwrap_or_else(|| path.cell().as_str().to_owned());
     if canonical == path.cell().as_str() {
         Ok(path)
     } else {
@@ -470,17 +482,119 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(tmp.path().join("bazel-external/rules_rust+"))?;
         slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let resolver = test_alias_resolver();
 
-        let path = canonicalize_bzlmod_load_path(CellPath::new(
-            CellName::testing_new("rules_rust"),
-            slug_core::cells::paths::CellRelativePathBuf::unchecked_new(
-                "rust/settings/settings.bzl".into(),
+        let path = canonicalize_bzlmod_load_path(
+            CellPath::new(
+                CellName::testing_new("rules_rust"),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new(
+                    "rust/settings/settings.bzl".into(),
+                ),
             ),
-        ))?;
+            &resolver,
+        )?;
 
         assert_eq!("rules_rust+", path.cell().as_str());
         assert_eq!("rust/settings/settings.bzl", path.path().as_str());
 
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_load_path_uses_runtime_aliases_before_globals() -> slug_error::Result<()> {
+        let apparent = "runtime_load_path_alias";
+        let canonical = "owner++ext+generated";
+        let wrong_global = "wrong_owner++ext+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        let path = canonicalize_bzlmod_load_path(
+            CellPath::new(
+                CellName::testing_new(apparent),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new("defs.bzl".into()),
+            ),
+            &resolver,
+        )?;
+
+        assert_eq!(canonical, path.cell().as_str());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_load_path_with_runtime_aliases_ignores_global_miss() -> slug_error::Result<()> {
+        let apparent = "runtime_load_path_missing_alias";
+        let wrong_global = "wrong_owner++ext+missing";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        let path = canonicalize_bzlmod_load_path(
+            CellPath::new(
+                CellName::testing_new(apparent),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new("defs.bzl".into()),
+            ),
+            &resolver,
+        )?;
+
+        assert_eq!(apparent, path.cell().as_str());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_load_path_uses_resolver_owned_module_alias() -> slug_error::Result<()> {
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            slug_core::cells::alias::NonEmptyCellAlias::new("rules_rust".to_owned())?,
+            CellName::testing_new("rules_rust+"),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            aliases,
+            &BzlmodRuntimeCellInstallSnapshot::default(),
+        )?;
+
+        let path = canonicalize_bzlmod_load_path(
+            CellPath::new(
+                CellName::testing_new("rules_rust"),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new(
+                    "rust/settings/settings.bzl".into(),
+                ),
+            ),
+            &resolver,
+        )?;
+
+        assert_eq!("rules_rust+", path.cell().as_str());
+        assert_eq!("rust/settings/settings.bzl", path.path().as_str());
         Ok(())
     }
 
