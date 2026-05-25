@@ -664,6 +664,43 @@ module(
     }
 
     #[test]
+    fn test_parse_module_bazel_compatibility_rejects_invalid_argument_shape() {
+        for constraint in ["9.0.1", "=9.0.1", "==9.0.1", ">9.0", ">9.0.1dd"] {
+            let content = format!(
+                r#"
+module(
+    name = "my_project",
+    version = "2.0.0",
+    bazel_compatibility = ["{constraint}"],
+)
+"#
+            );
+
+            let err = parse_module_bazel_content(&content, "MODULE.bazel")
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("invalid version argument"),
+                "{constraint}: {err}"
+            );
+            assert!(err.contains("valid argument must"), "{constraint}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_parse_module_bazel_compatibility_dash_operator() {
+        let content = r#"
+module(
+    name = "my_project",
+    version = "2.0.0",
+    bazel_compatibility = ["-99.0.0"],
+)
+"#;
+
+        parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+    }
+
+    #[test]
     fn test_parse_bazel_dep() {
         let content = r#"
 module(name = "test", version = "1.0.0")

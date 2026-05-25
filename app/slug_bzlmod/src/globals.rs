@@ -398,28 +398,48 @@ fn validate_bazel_compatibility(module_name: &str, constraints: &[&str]) -> star
     Ok(())
 }
 
-fn bazel_compatibility_constraint_matches(
-    current: &Version,
-    constraint: &str,
-) -> starlark::Result<bool> {
-    let constraint = constraint.trim();
+fn parse_bazel_compatibility_constraint<'a>(
+    constraint: &'a str,
+) -> starlark::Result<(&'static str, &'a str)> {
     let (op, required) = if let Some(required) = constraint.strip_prefix(">=") {
         (">=", required)
     } else if let Some(required) = constraint.strip_prefix("<=") {
         ("<=", required)
-    } else if let Some(required) = constraint.strip_prefix("==") {
-        ("=", required)
     } else if let Some(required) = constraint.strip_prefix('>') {
         (">", required)
     } else if let Some(required) = constraint.strip_prefix('<') {
         ("<", required)
-    } else if let Some(required) = constraint.strip_prefix('=') {
-        ("=", required)
+    } else if let Some(required) = constraint.strip_prefix('-') {
+        ("-", required)
     } else {
-        ("=", constraint)
+        return Err(invalid_bazel_compatibility_argument(constraint));
     };
 
-    let required = Version::parse(required.trim())
+    let parts: Vec<&str> = required.split('.').collect();
+    if parts.len() != 3
+        || parts
+            .iter()
+            .any(|part| part.is_empty() || !part.chars().all(|c| c.is_ascii_digit()))
+    {
+        return Err(invalid_bazel_compatibility_argument(constraint));
+    }
+
+    Ok((op, required))
+}
+
+fn invalid_bazel_compatibility_argument(constraint: &str) -> starlark::Error {
+    starlark::Error::new_other(anyhow::anyhow!(
+        "invalid version argument '{}': valid argument must 1) start with (<,<=,>,>=,-); 2) contain a version number in form of X.X.X where X is a number",
+        constraint
+    ))
+}
+
+fn bazel_compatibility_constraint_matches(
+    current: &Version,
+    constraint: &str,
+) -> starlark::Result<bool> {
+    let (op, required) = parse_bazel_compatibility_constraint(constraint)?;
+    let required = Version::parse(required)
         .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?;
     let ordering = current.cmp(&required);
     Ok(match op {
@@ -427,7 +447,7 @@ fn bazel_compatibility_constraint_matches(
         ">" => ordering == Ordering::Greater,
         "<=" => ordering != Ordering::Greater,
         "<" => ordering == Ordering::Less,
-        "=" => ordering == Ordering::Equal,
+        "-" => ordering != Ordering::Equal,
         _ => false,
     })
 }
@@ -1311,7 +1331,7 @@ mod bazel_compatibility_tests {
     #[test]
     fn accepts_matching_bazel_compatibility_constraints() {
         validate_bazel_compatibility("root", &[">=6.0.0", "<99.0.0"]).unwrap();
-        validate_bazel_compatibility("root", &[SLUG_BAZEL_COMPATIBILITY_VERSION]).unwrap();
+        validate_bazel_compatibility("root", &["-99.0.0"]).unwrap();
     }
 
     #[test]
@@ -1328,9 +1348,24 @@ mod bazel_compatibility_tests {
         let current = Version::parse(SLUG_BAZEL_COMPATIBILITY_VERSION).unwrap();
         assert!(bazel_compatibility_constraint_matches(&current, ">=9.0.0").unwrap());
         assert!(bazel_compatibility_constraint_matches(&current, "<=9.0.1").unwrap());
-        assert!(bazel_compatibility_constraint_matches(&current, "=9.0.1").unwrap());
+        assert!(bazel_compatibility_constraint_matches(&current, "-9.0.0").unwrap());
         assert!(!bazel_compatibility_constraint_matches(&current, ">9.0.1").unwrap());
         assert!(!bazel_compatibility_constraint_matches(&current, "<9.0.1").unwrap());
+        assert!(!bazel_compatibility_constraint_matches(&current, "-9.0.1").unwrap());
+    }
+
+    #[test]
+    fn rejects_invalid_bazel_compatibility_argument_shape() {
+        for constraint in ["9.0.1", "=9.0.1", "==9.0.1", ">9.0", ">9.0.1dd"] {
+            let err = validate_bazel_compatibility("root", &[constraint])
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("invalid version argument"),
+                "{constraint}: {err}"
+            );
+            assert!(err.contains("valid argument must"), "{constraint}: {err}");
+        }
     }
 }
 

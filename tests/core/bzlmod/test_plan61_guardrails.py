@@ -4719,6 +4719,42 @@ async def test_bazel_compatibility_incompatible_version_fails(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_bazel_compatibility_argument_shape_follows_bazel(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleFileGlobals.checkAllCompatibilityVersions."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(
+    name = "plan61_bazel_compatibility_dash",
+    version = "1.0",
+    bazel_compatibility = ["-99.0.0"],
+)
+""",
+    )
+    await buck.build("//:x")
+
+    for constraint in ["9.0.1", "=9.0.1", "==9.0.1", ">9.0", ">9.0.1dd"]:
+        _write(
+            buck.cwd / "MODULE.bazel",
+            f"""module(
+    name = "plan61_bazel_compatibility_shape",
+    version = "1.0",
+    bazel_compatibility = ["{constraint}"],
+)
+""",
+        )
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert "invalid version argument" in str(exc.value)
+        assert "valid argument must" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_max_compatibility_level_is_bazel9_noop(
     buck: Buck,
 ) -> None:

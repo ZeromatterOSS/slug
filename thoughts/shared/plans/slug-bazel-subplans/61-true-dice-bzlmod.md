@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`138 passed in 107.27s`) after rebuilding `target/debug/slug`.
+  (`139 passed in 107.50s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -423,6 +423,19 @@ Observed SDK result at the checkpoint:
   Validation passed with `cargo test -p slug_bzlmod module_called --
   --nocapture` (`2 passed`) and the explicit-binary Plan 61 selector
   `-k 'module_called_after_non_module_directive_fails'` (`1 passed, 137
+  deselected`).
+  `module(bazel_compatibility = [...])` argument-shape validation now matches
+  Bazel's raw compatibility string grammar: each entry must start with `<`,
+  `<=`, `>`, `>=`, or `-` and then contain exactly three numeric release
+  segments. Slug no longer accepts bare versions, `=`, or `==` compatibility
+  arguments, and `-X.Y.Z` now means any version except the exact release.
+  Bazel source anchors: `ModuleFileGlobals.java:63-67` and `:212-223`,
+  `BazelVersion.java:75-96`, and
+  `BazelModuleResolutionFunctionTest.java:39-51` plus `:200-211`.
+  Validation passed with `cargo test -p slug_bzlmod bazel_compatibility --
+  --nocapture` (`7 passed`) and the explicit-binary Plan 61 selector
+  `-k 'bazel_compatibility_argument_shape_follows_bazel or
+  bazel_compatibility_incompatible_version_fails'` (`2 passed, 137
   deselected`).
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
