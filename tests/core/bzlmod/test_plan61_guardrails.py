@@ -4826,6 +4826,52 @@ repo(name = "_foo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_called_after_non_module_directive_fails(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: module() must be first if present."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    cases = [
+        """bazel_dep(name = "dep", version = "1.0.0")
+module(name = "plan61_late_module_after_dep")
+""",
+        """ext = use_extension("//:ext.bzl", "ext")
+module(name = "plan61_late_module_after_extension")
+""",
+        """include("//:deps.MODULE.bazel")
+module(name = "plan61_late_module_after_include")
+""",
+    ]
+
+    for content in cases:
+        _write(buck.cwd / "deps.MODULE.bazel", "# empty included segment\n")
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert "if module() is called, it must be called before any other functions" in str(
+            exc.value
+        )
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        'include("//:deps.MODULE.bazel")\n',
+    )
+    _write(
+        buck.cwd / "deps.MODULE.bazel",
+        'module(name = "bet-you-didnt-expect-this-didya")\n',
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "if module() is called, it must be called before any other functions" in str(
+        exc.value
+    )
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_isolated_extension_usage_fails_until_supported(
     buck: Buck,
 ) -> None:

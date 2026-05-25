@@ -1034,6 +1034,53 @@ module(name = "second", version = "2.0.0")
         assert!(result.is_err());
     }
 
+    #[test]
+    fn test_parse_module_called_after_non_module_directive_errors() {
+        let cases = [
+            r#"
+bazel_dep(name = "dep", version = "1.0.0")
+module(name = "test", version = "1.0.0")
+"#,
+            r#"
+ext = use_extension("//:ext.bzl", "ext")
+module(name = "test", version = "1.0.0")
+"#,
+            r#"
+include("//:deps.MODULE.bazel")
+module(name = "test", version = "1.0.0")
+"#,
+        ];
+
+        for content in cases {
+            let err = parse_module_bazel_content(content, "MODULE.bazel")
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("if module() is called, it must be called before any other functions"),
+                "{err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_module_called_in_included_segment_errors() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path().join("MODULE.bazel");
+        let included = dir.path().join("deps.MODULE.bazel");
+        std::fs::write(&root, r#"include("//:deps.MODULE.bazel")"#).unwrap();
+        std::fs::write(
+            &included,
+            r#"module(name = "bet-you-didnt-expect-this-didya")"#,
+        )
+        .unwrap();
+
+        let err = parse_module_bazel(&root).unwrap_err().to_string();
+        assert!(
+            err.contains("if module() is called, it must be called before any other functions"),
+            "{err}"
+        );
+    }
+
     // ========================================================================
     // Extension Parsing Tests (Phase 5)
     // ========================================================================

@@ -178,6 +178,10 @@ pub struct ModuleFileContext {
     /// The module declaration, if present.
     pub module: Option<ModuleDecl>,
 
+    /// Whether a non-`module()` directive has already executed. Bazel requires
+    /// `module()` to be first if present, across included MODULE.bazel segments.
+    pub had_non_module_call: bool,
+
     /// All bazel_dep() declarations.
     pub bazel_deps: Vec<BazelDep>,
 
@@ -206,6 +210,10 @@ pub struct ModuleFileContext {
     /// the included file in a fresh Starlark module so variable bindings do not
     /// cross include boundaries.
     pub include_labels: Vec<String>,
+}
+
+fn mark_non_module_called(ctx: &mut ModuleFileContext) {
+    ctx.had_non_module_call = true;
 }
 
 /// A repository rule invocation from MODULE.bazel (via use_repo_rule).
@@ -504,7 +512,9 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
-        ctx.borrow_mut().include_labels.push(label.to_owned());
+        let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
+        ctx.include_labels.push(label.to_owned());
         Ok(NoneType)
     }
 
@@ -546,6 +556,11 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         if ctx.module.is_some() {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
                 "module() can only be called once per MODULE.bazel file"
+            )));
+        }
+        if ctx.had_non_module_call {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "if module() is called, it must be called before any other functions"
             )));
         }
         validate_optional_bazel_module_name(name)?;
@@ -604,6 +619,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         validate_bazel_module_name(name)?;
 
         let parsed_version = if version.is_empty() {
@@ -660,6 +676,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         validate_bazel_module_name(module_name)?;
 
         ctx.overrides.push(Override::LocalPath(LocalPathOverride {
@@ -699,6 +716,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         validate_bazel_module_name(module_name)?;
 
         let parsed_version = if version.is_empty() {
@@ -755,6 +773,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         validate_bazel_module_name(module_name)?;
 
         let parsed_versions: Vec<Version> = versions
@@ -814,6 +833,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         validate_bazel_module_name(module_name)?;
         let patches = validate_and_reject_unsupported_override_patches(
             "archive_override",
@@ -872,6 +892,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         validate_bazel_module_name(module_name)?;
         let patches = validate_and_reject_unsupported_override_patches(
             "git_override",
@@ -920,6 +941,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
 
         if isolate {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
@@ -967,6 +989,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
 
         // Get the extension proxy
         let proxy = extension.downcast_ref::<ExtensionProxy>().ok_or_else(|| {
@@ -1019,6 +1042,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         for tc in toolchains.items {
             ctx.registered_toolchains.push(RegisteredItem {
                 label: tc.to_owned(),
@@ -1045,6 +1069,9 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        let ctx = get_module_context(eval)?;
+        mark_non_module_called(&mut ctx.borrow_mut());
+
         let proxy = RepoRuleProxy {
             rule_bzl_file: rule_bzl_file.to_owned(),
             rule_name: rule_name.to_owned(),
@@ -1070,6 +1097,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
         for p in platforms.items {
             ctx.registered_execution_platforms.push(RegisteredItem {
                 label: p.to_owned(),
@@ -1107,6 +1135,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
 
         // Record the overrides on the extension
         if let Some(ext) = ctx.extensions.get_mut(proxy.index()) {
@@ -1151,6 +1180,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        mark_non_module_called(&mut ctx);
 
         // Record the injected repos on the extension
         if let Some(ext) = ctx.extensions.get_mut(proxy.index()) {
@@ -1217,6 +1247,10 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
             .unwrap_or("");
         if !name.is_empty() {
             validate_user_provided_repo_name(name)?;
+        }
+
+        if let Ok(module_ctx) = get_module_context(eval) {
+            mark_non_module_called(&mut module_ctx.borrow_mut());
         }
 
         if !name.is_empty() {

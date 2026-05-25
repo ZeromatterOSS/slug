@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`137 passed in 106.19s`) after rebuilding `target/debug/slug`.
+  (`138 passed in 107.27s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -414,6 +414,16 @@ Observed SDK result at the checkpoint:
   explicit-binary Plan 61 selector
   `-k 'invalid_user_provided_repo_names_fail_at_module_parse'` (`1 passed,
   136 deselected`).
+  `module()` ordering now follows Bazel's shared MODULE.bazel context rule:
+  if `module()` is present, it must execute before any other directive, including
+  an `include()` whose included segment tries to call `module()`. Bazel source
+  anchors: `ModuleFileGlobals.java:157-171`,
+  `ModuleThreadContext.java:132-137`, and
+  `ModuleFileFunctionTest.java:484-502` plus `:1518-1544`.
+  Validation passed with `cargo test -p slug_bzlmod module_called --
+  --nocapture` (`2 passed`) and the explicit-binary Plan 61 selector
+  `-k 'module_called_after_non_module_directive_fails'` (`1 passed, 137
+  deselected`).
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
