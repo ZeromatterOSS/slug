@@ -282,7 +282,7 @@ pub struct BzlmodProjectionData {
     pub registered_toolchains: RegisteredToolchainsDataValue,
     pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
     pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
-    pub lockfile_inputs: BzlmodLockfileInputsValue,
+    pub lockfile_inputs: BzlmodLockfileInputsDataValue,
     pub repo_env: BzlmodRepoEnvDataValue,
     pub resolution_facts: BzlmodResolutionFactsValue,
     pub repo_mappings: BzlmodRepoMappingsDataValue,
@@ -308,7 +308,10 @@ impl BzlmodProjectionData {
                 workspace_id.clone(),
                 Arc::new(HashMap::new()),
             ),
-            lockfile_inputs: BzlmodLockfileInputsValue::default(),
+            lockfile_inputs: BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            ),
             repo_env: BzlmodRepoEnvDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(BTreeMap::new()),
@@ -388,6 +391,11 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
             data.extension_aggregations.workspace_id.as_ref(),
         )?;
         validate_projection_workspace(
+            "lockfile-input data",
+            cell_graph_workspace_id,
+            data.lockfile_inputs.workspace_id.as_ref(),
+        )?;
+        validate_projection_workspace(
             "repo-env data",
             cell_graph_workspace_id,
             data.repo_env.workspace_id.as_ref(),
@@ -403,11 +411,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
             data.repo_mappings.workspace_id.as_ref(),
         )?;
 
-        let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
-        let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
-            data.cell_graph.workspace_id.clone(),
-            lockfile_inputs.clone(),
-        ));
+        let lockfile_inputs_data = Arc::new(data.lockfile_inputs.clone());
         let repo_env_data = Arc::new(data.repo_env.clone());
         let module_versions = Arc::new(data.module_versions.clone());
         let resolution_facts = Arc::new(data.resolution_facts.clone());
@@ -558,6 +562,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn set_bzlmod_projection_data_rejects_mismatched_lockfile_input_provenance()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-lockfile-provenance-workspace"),
+            PathBuf::from("/tmp/slug-plan61-lockfile-provenance-output-base"),
+        );
+        let other_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-lockfile-provenance-other"),
+            PathBuf::from("/tmp/slug-plan61-lockfile-provenance-other-output"),
+        );
+        let mut data = BzlmodProjectionData::for_workspace(workspace_id);
+        data.lockfile_inputs = BzlmodLockfileInputsDataValue::for_workspace(
+            other_workspace_id,
+            Arc::new(BzlmodLockfileInputsValue::default()),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let err = updater.set_bzlmod_projection_data(data).unwrap_err();
+        assert!(err.to_string().contains("lockfile-input data"), "{err:?}");
+        assert!(
+            err.to_string().contains(
+                "but its cell graph root is '/tmp/slug-plan61-lockfile-provenance-workspace'"
+            ),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn set_bzlmod_projection_data_derives_lockfile_digests_from_values()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
@@ -581,13 +620,16 @@ mod tests {
             tracked_by_dice: true,
             lockfile: None,
         });
-        data.lockfile_inputs = BzlmodLockfileInputsValue::from_values(
-            Some(PathBuf::from(
-                "/tmp/slug-plan61-projection-lockfile-output-base/MODULE.bazel.lock",
+        data.lockfile_inputs = BzlmodLockfileInputsDataValue::for_workspace(
+            workspace_id.clone(),
+            Arc::new(BzlmodLockfileInputsValue::from_values(
+                Some(PathBuf::from(
+                    "/tmp/slug-plan61-projection-lockfile-output-base/MODULE.bazel.lock",
+                )),
+                Some(visible_lockfile),
+                Some(hidden_lockfile),
+                LockfileMode::Update,
             )),
-            Some(visible_lockfile),
-            Some(hidden_lockfile),
-            LockfileMode::Update,
         );
         data.repo_env = BzlmodRepoEnvDataValue::for_workspace(
             workspace_id.clone(),

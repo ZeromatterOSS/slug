@@ -4041,11 +4041,14 @@ impl BuckConfigBasedCells {
                 Arc::new(aggregated),
             );
         bzlmod_projection_data.lockfile_inputs =
-            slug_bzlmod::BzlmodLockfileInputsValue::from_values(
-                hidden_lockfile_path,
-                visible_lockfile_value,
-                hidden_lockfile_value,
-                options.lockfile_mode,
+            slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
+                bzlmod_projection_data.cell_graph.workspace_id.clone(),
+                Arc::new(slug_bzlmod::BzlmodLockfileInputsValue::from_values(
+                    hidden_lockfile_path,
+                    visible_lockfile_value,
+                    hidden_lockfile_value,
+                    options.lockfile_mode,
+                )),
             );
 
         // Collect toolchain and execution platform registrations from all modules.
