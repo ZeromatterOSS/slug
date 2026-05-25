@@ -2206,7 +2206,10 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_core dynamic_extension -- --nocapture`, `cargo test -p
   slug_core canonical_bazel_repo_name -- --nocapture`, `cargo test -p
   slug_core bzlmod_runtime_snapshot -- --nocapture`, `cargo check -p
-  slug_core`, and `git diff --check`.
+  slug_core`, `cargo build -p slug`, `pytest
+  tests/core/bzlmod/test_plan61_guardrails.py` (146 passed), and `git diff
+  --check`. The test-created `slugd` daemons were cleaned up after the Python
+  guardrail run.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
