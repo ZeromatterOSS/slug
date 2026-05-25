@@ -93,6 +93,10 @@ Observed SDK result at the checkpoint:
   first replays from the daemon hidden lockfile, then editing that hidden
   lockfile removes the cached extension entry and forces the extension to run
   and fail instead of reusing stale replay state.
+- Latest Plan 61 guardrail validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
+  (`125 passed in 89.69s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -608,12 +612,13 @@ Observed SDK result at the checkpoint:
   visible_lockfile_deletion_is_observed_in_same_daemon'`, touched-file
   `rustfmt --edition 2024`, and `git diff --check`.
 - Local override and cached git/archive override `MODULE.bazel` poll identity
-  now comes from named DICE poll keys
+  now flows through named DICE poll keys
   (`LocalOverrideModuleInputsPollKey` and
-  `NonRegistryOverrideModuleInputsPollKey`) instead of direct polling during
-  projection-bridge key assembly. The real module-input keys still receive the
-  resulting digest, preserving warm no-op projection reuse while moving
-  out-of-project poll ownership into auditable child keys. Validation passed
+  `NonRegistryOverrideModuleInputsPollKey`). The current out-of-project
+  observation is still gathered before key construction until the watched
+  filesystem API exists, but that observation is part of key identity and the
+  key returns the same observed value, preserving warm no-op projection reuse
+  while edits create a different key. Validation passed
   with focused `cargo test -p slug_common
   override_module_inputs_poll_key_repolls -- --nocapture`, focused `cargo test
   -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
@@ -624,13 +629,12 @@ Observed SDK result at the checkpoint:
   cached_git_override_module_edit_invalidates_bzlmod_resolution or
   cached_archive_override_module_edit_invalidates_bzlmod_resolution'`,
   touched-file `rustfmt --edition 2024`, and `git diff --check`.
-- Registry lockfile-hash file poll identity now comes from the named
-  `RegistryFileInputsPollKey` instead of direct polling during
-  projection-bridge key assembly. Project-root cache files stay
-  `project-tracked` in the poll key and rely on `RegistryFileInputsKey`'s
-  DICE file dependencies; out-of-project cache paths remain explicitly polled
-  child inputs and transaction-invalid until the watched-filesystem API is
-  available. Validation passed with focused `cargo test -p slug_common
+- Registry lockfile-hash file poll identity now flows through the named
+  `RegistryFileInputsPollKey`. Project-root cache files stay `project-tracked`
+  in the observed poll digest and rely on `RegistryFileInputsKey`'s DICE file
+  dependencies; out-of-project cache paths are directly observed before key
+  construction until the watched-filesystem API exists, and that observation is
+  part of the poll-key identity. Validation passed with focused `cargo test -p slug_common
   registry_file_inputs_poll_digest -- --nocapture`, focused `cargo test -p
   slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
   slug_common -p slug_server`, `cargo build -p slug`, selected `pytest
@@ -640,13 +644,13 @@ Observed SDK result at the checkpoint:
   locked_registry_metadata_delete_invalidates_bzlmod_resolution or
   locked_registry_source_json_parse_failure_invalidates_bzlmod_resolution'`,
   touched-file `rustfmt --edition 2024`, and `git diff --check`.
-- Non-root `MODULE.bazel` poll identity now comes from the named
-  `NonRootModuleFilesPollKey` instead of direct polling during extension-input
-  assembly. Project-root non-root module files stay `project-tracked` in the
-  poll key and rely on `NonRootModuleFilesKey`'s DICE file dependencies;
-  out-of-project non-root module files and their included segments remain
-  explicitly polled child inputs and transaction-invalid until the
-  watched-filesystem API is available. Validation passed with focused
+- Non-root `MODULE.bazel` poll identity now flows through the named
+  `NonRootModuleFilesPollKey`. Project-root non-root module files stay
+  `project-tracked` in the observed poll digest and rely on
+  `NonRootModuleFilesKey`'s DICE file dependencies; out-of-project non-root
+  module files and their included segments are directly observed before key
+  construction until the watched-filesystem API exists, and that observation is
+  part of the poll-key identity. Validation passed with focused
   `cargo test -p slug_common non_root_module_files_poll -- --nocapture`,
   focused `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`,
   `cargo check -p slug_common -p slug_server`, `cargo build -p slug`, selected
@@ -1119,12 +1123,14 @@ Observed SDK result at the checkpoint:
   --check`, and `git diff --check`.
 - Warm no-op DICE cutoffs for polled bzlmod inputs now put the current poll
   digest in key identity instead of forcing the child key invalid every
-  transaction. `AbsoluteTextFileInputKey` covers out-of-project local overrides
-  and hidden/output-base text inputs, while `TrackedExtensionBzlDigestKey` carries
-  the direct transitional literal-load digest used by lockfile pre-seeding and
-  root extension replay-summary formation. This preserves edit/create/delete
-  transitions through a new key but lets same-key warm values stay valid, so the
-  replay-summary bridge no longer recomputes on every no-op command. Validation
+  transaction. `AbsoluteTextFileInputKey` covers generic out-of-project text
+  inputs, `TrackedLockfileContentKey` carries the observed hidden/output-base
+  lockfile input when that file is outside the project root, and
+  `TrackedExtensionBzlDigestKey` carries the direct transitional literal-load
+  digest used by lockfile pre-seeding and root extension replay-summary
+  formation. This preserves edit/create/delete transitions through a new key
+  but lets same-key warm values stay valid, so the replay-summary bridge no
+  longer recomputes on every no-op command. Validation
   passed with `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_common
   tracked_extension_bzl_digest -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
   cargo test -p slug_common
@@ -1147,6 +1153,19 @@ Observed SDK result at the checkpoint:
   cargo check -p slug_common -p slug_bzlmod -p slug_interpreter_for_build -p
   slug_external_cells`, `cargo build -p slug`, and the full Plan 61 Python
   guardrail with 119 tests.
+- Follow-up warm no-op poll-key and hidden-lockfile validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_common
+  override_module_inputs_poll_key_repolls -- --nocapture`,
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_common
+  registry_file_inputs_poll_digest -- --nocapture`,
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_common
+  non_root_module_files_poll -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
+  cargo test -p slug_common bzlmod_lockfile_inputs_bridge -- --nocapture`,
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo check -p slug_common -p slug_server`,
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo build -p slug`, focused Plan 61
+  guardrails for out-of-project poll-key warm reuse and hidden lockfile warm
+  replay, and the full explicit-binary Plan 61 guardrail
+  (`125 passed in 89.69s`).
 - Registered toolchain and execution-platform facts now have their own
   injected DICE values. `RegisteredToolchainsKey` and
   `RegisteredExecutionPlatformsKey` no longer compute the whole
@@ -2853,18 +2872,19 @@ using Rust DICE keys and values:
    override/registry-cache sources.
    - Root, included, and project-local local override module segments now use
      tracked project-file DICE inputs; out-of-project local override and
-     cached git/archive override `MODULE.bazel` files are read through named
-     DICE poll keys and still polled into higher-level key identity. The
+     cached git/archive override `MODULE.bazel` files are observed before
+     constructing named DICE poll keys and still polled into higher-level key
+     identity. The
      DICE-backed resolver now rejects missing tracked root module input instead
      of direct-parsing the root module in the DICE path. Non-root module files
      discovered from the transitional cell graph now read through the named
      `NonRootModuleFilesPollKey`; project-root paths are DICE-tracked in the
-     parse key, while out-of-project paths are still polled into higher-level
-     key identity.
+     parse key, while out-of-project paths are still directly observed into
+     higher-level key identity.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
-     out-of-root cache paths are read through the named
-     `RegistryFileInputsPollKey` and still polled into higher-level key
+     out-of-root cache paths are directly observed before constructing the
+     named `RegistryFileInputsPollKey` and still polled into higher-level key
      identity while the final watched-input graph is still pending. Locked
      registry `source.json`
      checksum, parse/UTF-8 failure, and deletion transitions now have
@@ -2899,9 +2919,11 @@ using Rust DICE keys and values:
 
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
-     hidden/output-base lockfile bytes use explicit polled child keys and are
-     invalid across transactions while the final watched-input graph is still
-     pending.
+     hidden/output-base lockfile bytes are directly observed into
+     `TrackedLockfileContentKey` identity before compute, so same-key warm
+     values remain valid while create/edit/delete transitions create a new key.
+     This remains transitional until the final watched-input graph replaces the
+     direct observation.
    - The projection bridge now gets visible/hidden lockfile values from a named
      lockfile-input bridge key instead of producing those reads inline, but the
      resulting `BzlmodLockfileInputsValue` still feeds the legacy resolver until

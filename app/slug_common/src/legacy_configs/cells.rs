@@ -1234,6 +1234,7 @@ struct TrackedLockfileContentKey {
     project_root: AbsNormPathBuf,
     kind: slug_bzlmod::LockfileContentKind,
     path: Arc<PathBuf>,
+    observed: Option<AbsoluteTextFileInputValue>,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -1247,6 +1248,7 @@ struct BzlmodLockfileInputsBridgeKey {
     workspace_id: slug_bzlmod::WorkspaceId,
     lockfile_mode: slug_bzlmod::LockfileMode,
     hidden_lockfile_path: Option<PathBuf>,
+    hidden_lockfile_observed: Option<AbsoluteTextFileInputValue>,
     root_module_present: bool,
 }
 
@@ -1260,12 +1262,14 @@ impl Key for TrackedLockfileContentKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        let (content, tracking) =
-            read_text_file_for_project_input(ctx, &project_fs, &self.path).await?;
+        let (content, tracking) = if let Some(observed) = &self.observed {
+            (observed.content.clone(), BzlmodFileInputTracking::Polled)
+        } else {
+            read_text_file_for_project_input(ctx, &project_fs, &self.path).await?
+        };
         // Project-root lockfiles are tracked by DICE file deps. Out-of-project
-        // hidden/output-base lockfiles are polled through AbsoluteTextFileInputKey
-        // and therefore are intentionally invalid across transactions until they
-        // have a real filesystem watcher source.
+        // hidden/output-base lockfiles are polled into this key before compute;
+        // create/edit/delete transitions produce a different key identity.
         let tracked_by_dice = tracking == BzlmodFileInputTracking::Project;
         let path = self.path.clone();
         let Some(content) = content else {
@@ -1311,10 +1315,7 @@ impl Key for TrackedLockfileContentKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => value.tracked_by_dice,
-            Err(_) => false,
-        }
+        x.is_ok()
     }
 }
 
@@ -1345,6 +1346,7 @@ impl Key for BzlmodLockfileInputsBridgeKey {
                 project_root: self.project_root.clone(),
                 kind: slug_bzlmod::LockfileContentKind::Workspace,
                 path: Arc::new(visible_path),
+                observed: None,
             })
             .await?
             .buck_error_context("Computing visible MODULE.bazel.lock for bzlmod resolution")?;
@@ -1354,6 +1356,7 @@ impl Key for BzlmodLockfileInputsBridgeKey {
                     project_root: self.project_root.clone(),
                     kind: slug_bzlmod::LockfileContentKind::Hidden,
                     path: Arc::new(path.clone()),
+                    observed: self.hidden_lockfile_observed.clone(),
                 })
                 .await?
                 .buck_error_context(
@@ -1381,13 +1384,7 @@ impl Key for BzlmodLockfileInputsBridgeKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => {
-                lockfile_content_value_tracked(&value.visible_lockfile)
-                    && lockfile_content_value_tracked(&value.hidden_lockfile)
-            }
-            Err(_) => false,
-        }
+        x.is_ok()
     }
 }
 
@@ -1475,13 +1472,6 @@ fn hash_lockfile_content_identity<H: std::hash::Hasher>(
             value.digest.hash(state);
         }
         None => false.hash(state),
-    }
-}
-
-fn lockfile_content_value_tracked(value: &Option<Arc<slug_bzlmod::LockfileContentValue>>) -> bool {
-    match value {
-        Some(value) => value.tracked_by_dice,
-        None => true,
     }
 }
 
@@ -1760,6 +1750,7 @@ struct NonRegistryOverrideModuleInputsKey {
 struct LocalOverrideModuleInputsPollKey {
     project_root: AbsNormPathBuf,
     overrides: Vec<(String, String)>,
+    observed: BzlmodInputsPollValue,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -1767,9 +1758,10 @@ struct LocalOverrideModuleInputsPollKey {
 struct NonRegistryOverrideModuleInputsPollKey {
     project_root: AbsNormPathBuf,
     overrides: Vec<(String, PathBuf)>,
+    observed: BzlmodInputsPollValue,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 struct BzlmodInputsPollValue {
     digest: String,
     has_polled_inputs: bool,
@@ -1795,6 +1787,7 @@ struct RegistryFileInputsKey {
 struct RegistryFileInputsPollKey {
     project_root: AbsNormPathBuf,
     registry_file_hashes: Vec<(String, String)>,
+    observed: BzlmodInputsPollValue,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -1824,6 +1817,7 @@ struct NonRootModuleFilesKey {
 struct NonRootModuleFilesPollKey {
     project_root: AbsNormPathBuf,
     inputs: Vec<NonRootModuleFileInput>,
+    observed: BzlmodInputsPollValue,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -2475,9 +2469,7 @@ impl Key for LocalOverrideModuleInputsPollKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        local_override_inputs_poll_digest(&project_fs, &self.project_root, &self.overrides)
-            .map(Arc::new)
+        Ok(Arc::new(self.observed.clone()))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2488,10 +2480,7 @@ impl Key for LocalOverrideModuleInputsPollKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => !value.has_polled_inputs,
-            Err(_) => false,
-        }
+        x.is_ok()
     }
 }
 
@@ -2504,8 +2493,7 @@ impl Key for NonRegistryOverrideModuleInputsPollKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        non_registry_override_inputs_poll_digest(&project_fs, &self.overrides).map(Arc::new)
+        Ok(Arc::new(self.observed.clone()))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2516,10 +2504,7 @@ impl Key for NonRegistryOverrideModuleInputsPollKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => !value.has_polled_inputs,
-            Err(_) => false,
-        }
+        x.is_ok()
     }
 }
 
@@ -2532,8 +2517,7 @@ impl Key for RegistryFileInputsPollKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        registry_file_inputs_poll_digest(&project_fs, &self.registry_file_hashes).map(Arc::new)
+        Ok(Arc::new(self.observed.clone()))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2544,10 +2528,7 @@ impl Key for RegistryFileInputsPollKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => !value.has_polled_inputs,
-            Err(_) => false,
-        }
+        x.is_ok()
     }
 }
 
@@ -2560,8 +2541,7 @@ impl Key for NonRootModuleFilesPollKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        non_root_module_files_poll_digest(&project_fs, &self.inputs).map(Arc::new)
+        Ok(Arc::new(self.observed.clone()))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2572,10 +2552,7 @@ impl Key for NonRootModuleFilesPollKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => !value.has_polled_inputs,
-            Err(_) => false,
-        }
+        x.is_ok()
     }
 }
 
@@ -2976,12 +2953,25 @@ impl BuckConfigBasedCells {
             .await?
             .buck_error_context("Computing root MODULE.bazel for bzlmod resolution")?;
         let project_root = AbsNormPathBuf::try_from(project_root_path)?;
+        let hidden_lockfile_observed = if root_module_file.parsed.is_some()
+            && options.lockfile_mode != slug_bzlmod::LockfileMode::Off
+        {
+            match options.hidden_lockfile_path.as_ref() {
+                Some(path) if project_relative_path_for_abs_path(project_fs, path).is_none() => {
+                    Some(read_absolute_text_file_input_value(path)?)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
         let lockfile_inputs = dice_ctx
             .compute(&BzlmodLockfileInputsBridgeKey {
                 project_root: project_root.clone(),
                 workspace_id: workspace_id.clone(),
                 lockfile_mode: options.lockfile_mode,
                 hidden_lockfile_path: options.hidden_lockfile_path.clone(),
+                hidden_lockfile_observed,
                 root_module_present: root_module_file.parsed.is_some(),
             })
             .await?
@@ -2990,10 +2980,13 @@ impl BuckConfigBasedCells {
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
         );
+        let local_override_poll_observed =
+            local_override_inputs_poll_digest(project_fs, &project_root, &local_overrides)?;
         let local_override_poll = dice_ctx
             .compute(&LocalOverrideModuleInputsPollKey {
                 project_root: project_root.clone(),
                 overrides: local_overrides.clone(),
+                observed: local_override_poll_observed,
             })
             .await?
             .buck_error_context(
@@ -3013,10 +3006,13 @@ impl BuckConfigBasedCells {
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
         )?;
+        let non_registry_override_poll_observed =
+            non_registry_override_inputs_poll_digest(project_fs, &non_registry_overrides)?;
         let non_registry_override_poll = dice_ctx
             .compute(&NonRegistryOverrideModuleInputsPollKey {
                 project_root: project_root.clone(),
                 overrides: non_registry_overrides.clone(),
+                observed: non_registry_override_poll_observed,
             })
             .await?
             .buck_error_context(
@@ -3044,10 +3040,13 @@ impl BuckConfigBasedCells {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        let registry_file_poll_observed =
+            registry_file_inputs_poll_digest(project_fs, &registry_file_hashes)?;
         let registry_file_poll = dice_ctx
             .compute(&RegistryFileInputsPollKey {
                 project_root: project_root.clone(),
                 registry_file_hashes: registry_file_hashes.clone(),
+                observed: registry_file_poll_observed,
             })
             .await?
             .buck_error_context("Computing registry file poll identity for bzlmod resolution")?;
@@ -3792,10 +3791,12 @@ impl BuckConfigBasedCells {
         parsed_modules.push((parsed.module.name.clone(), parsed.clone()));
         let non_root_inputs = non_root_module_file_inputs(project_root, &cells, &module_symlinks);
         let mut non_root_parsed_modules = if let Some(ctx) = dice_ctx.as_mut() {
+            let poll_observed = non_root_module_files_poll_digest(project_root, &non_root_inputs)?;
             let poll = ctx
                 .compute(&NonRootModuleFilesPollKey {
                     project_root: project_root_abs.clone(),
                     inputs: non_root_inputs.clone(),
+                    observed: poll_observed,
                 })
                 .await?
                 .buck_error_context(
@@ -4528,6 +4529,18 @@ mod tests {
         root_module_present: bool,
     ) -> slug_error::Result<Arc<slug_bzlmod::BzlmodLockfileInputsValue>> {
         let project_root = project_fs.root().to_path_buf();
+        let hidden_lockfile_observed = if root_module_present
+            && lockfile_mode != slug_bzlmod::LockfileMode::Off
+        {
+            match hidden_lockfile_path.as_ref() {
+                Some(path) if project_relative_path_for_abs_path(project_fs, path).is_none() => {
+                    Some(read_absolute_text_file_input_value(path)?)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
         dice.compute(&BzlmodLockfileInputsBridgeKey {
             project_root: AbsNormPathBuf::try_from(project_root.clone())?,
             workspace_id: slug_bzlmod::WorkspaceId::new(
@@ -4536,6 +4549,7 @@ mod tests {
             ),
             lockfile_mode,
             hidden_lockfile_path,
+            hidden_lockfile_observed,
             root_module_present,
         })
         .await?
@@ -4869,13 +4883,17 @@ mod tests {
             .unwrap();
         let module_path = external.path().join("MODULE.bazel");
         std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
-        let project_root = fs.path().root().to_path_buf();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let overrides = vec![(
+            "dep".to_owned(),
+            external.path().to_string_lossy().into_owned(),
+        )];
+        let first_observed =
+            local_override_inputs_poll_digest(fs.path(), &project_root, &overrides)?;
         let key = LocalOverrideModuleInputsPollKey {
-            project_root: AbsNormPathBuf::try_from(project_root)?,
-            overrides: vec![(
-                "dep".to_owned(),
-                external.path().to_string_lossy().into_owned(),
-            )],
+            project_root: project_root.clone(),
+            overrides: overrides.clone(),
+            observed: first_observed,
         };
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
@@ -4895,7 +4913,15 @@ mod tests {
         )
         .unwrap();
         let mut dice = dice.into_updater().commit().await;
-        let second = dice.compute(&key).await??;
+        let second_observed =
+            local_override_inputs_poll_digest(fs.path(), &project_root, &overrides)?;
+        let second = dice
+            .compute(&LocalOverrideModuleInputsPollKey {
+                project_root,
+                overrides,
+                observed: second_observed,
+            })
+            .await??;
 
         assert!(second.has_polled_inputs);
         assert_ne!(first.digest, second.digest);
@@ -4912,10 +4938,13 @@ mod tests {
             .unwrap();
         let module_path = external.path().join("MODULE.bazel");
         std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
-        let project_root = fs.path().root().to_path_buf();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let overrides = vec![("dep".to_owned(), external.path().to_path_buf())];
+        let first_observed = non_registry_override_inputs_poll_digest(fs.path(), &overrides)?;
         let key = NonRegistryOverrideModuleInputsPollKey {
-            project_root: AbsNormPathBuf::try_from(project_root)?,
-            overrides: vec![("dep".to_owned(), external.path().to_path_buf())],
+            project_root: project_root.clone(),
+            overrides: overrides.clone(),
+            observed: first_observed,
         };
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
@@ -4935,7 +4964,14 @@ mod tests {
         )
         .unwrap();
         let mut dice = dice.into_updater().commit().await;
-        let second = dice.compute(&key).await??;
+        let second_observed = non_registry_override_inputs_poll_digest(fs.path(), &overrides)?;
+        let second = dice
+            .compute(&NonRegistryOverrideModuleInputsPollKey {
+                project_root,
+                overrides,
+                observed: second_observed,
+            })
+            .await??;
 
         assert!(second.has_polled_inputs);
         assert_ne!(first.digest, second.digest);
@@ -5040,12 +5076,16 @@ mod tests {
             "bazel_dep(name = \"included_dep\", version = \"1.0\")\n",
         )
         .unwrap();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let inputs = vec![NonRootModuleFileInput {
+            module_key: "dep".to_owned(),
+            module_bazel_path: module_path,
+        }];
+        let first_observed = non_root_module_files_poll_digest(fs.path(), &inputs)?;
         let key = NonRootModuleFilesPollKey {
-            project_root: AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?,
-            inputs: vec![NonRootModuleFileInput {
-                module_key: "dep".to_owned(),
-                module_bazel_path: module_path,
-            }],
+            project_root: project_root.clone(),
+            inputs: inputs.clone(),
+            observed: first_observed,
         };
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
@@ -5065,7 +5105,14 @@ mod tests {
         )
         .unwrap();
         let mut dice = dice.into_updater().commit().await;
-        let second = dice.compute(&key).await??;
+        let second_observed = non_root_module_files_poll_digest(fs.path(), &inputs)?;
+        let second = dice
+            .compute(&NonRootModuleFilesPollKey {
+                project_root,
+                inputs,
+                observed: second_observed,
+            })
+            .await??;
 
         assert!(second.has_polled_inputs);
         assert_ne!(first.digest, second.digest);
