@@ -1637,10 +1637,8 @@ pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
 /// cannot be resolved locally, it falls back to the old extension-id digest so
 /// external/registry cases keep their existing behavior until 61.6 owns the
 /// full Starlark load graph.
-pub fn compute_bzl_transitive_digest_for_project(
-    extension_id: &str,
-    project_root: &Path,
-) -> String {
+#[cfg(test)]
+fn compute_bzl_transitive_digest_for_project(extension_id: &str, project_root: &Path) -> String {
     compute_bzl_transitive_digest_for_project_with_repo_mappings(extension_id, project_root, None)
 }
 

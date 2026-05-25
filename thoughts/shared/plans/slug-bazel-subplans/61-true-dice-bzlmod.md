@@ -2247,6 +2247,15 @@ What did not work or remains risky:
   cargo test -p slug_bzlmod repository_invocations -- --nocapture` (`6
   passed, 326 filtered out`), `cargo check -p slug_bzlmod`,
   `cargo fmt --check`, and `git diff --check`.
+- The unmapped best-effort project `.bzl` digest helper is no longer exported
+  from `slug_bzlmod` and is test-only. The mapped transitional scanner remains
+  available for bootstrap/preseed callers that still need repo mappings, while
+  production callers cannot choose the weaker unmapped shortcut outside the
+  keyed extension-spoke/replay paths. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-bzl-digest-target
+  cargo test -p slug_bzlmod project_bzl_digest -- --nocapture` (`6 passed,
+  326 filtered out`), `cargo check -p slug_bzlmod`, `cargo fmt --check`, and
+  `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
