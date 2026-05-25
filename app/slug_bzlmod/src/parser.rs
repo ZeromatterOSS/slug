@@ -266,6 +266,7 @@ fn parsed_module_file_from_context(
 ) -> slug_error::Result<ParsedModuleFile> {
     // Extract results from context
     let ctx = context.borrow();
+    validate_extension_repo_imports(&ctx.extensions)?;
     if validate_extension_repo_directives_flag {
         validate_extension_repo_directives(&ctx.extensions, &ctx.repo_name_usages)?;
     }
@@ -305,6 +306,40 @@ fn validate_extension_repo_directives(
     validate_extension_repo_directives_with_visibility(extension_usages, |repo_name| {
         repo_name_usages.contains_key(repo_name)
     })
+}
+
+fn validate_extension_repo_imports(
+    extension_usages: &[crate::types::ExtensionUsage],
+) -> slug_error::Result<()> {
+    let mut imports_by_extension =
+        std::collections::HashMap::<String, (&str, std::collections::HashSet<&str>)>::new();
+    for ext in extension_usages {
+        let (extension_name, imports) = imports_by_extension
+            .entry(ext.extension_id())
+            .or_insert_with(|| (&ext.extension_name, std::collections::HashSet::new()));
+        let extension_name = *extension_name;
+        for use_repo in &ext.imports {
+            for repo_name in &use_repo.repos {
+                if !imports.insert(repo_name.as_str()) {
+                    return Err(ModuleParseError::EvalError(format!(
+                        "The repo exported as '{}' by module extension '{}' is already imported",
+                        repo_name, extension_name
+                    ))
+                    .into());
+                }
+            }
+            for (_apparent_name, repo_name) in &use_repo.repo_mapping {
+                if !imports.insert(repo_name.as_str()) {
+                    return Err(ModuleParseError::EvalError(format!(
+                        "The repo exported as '{}' by module extension '{}' is already imported",
+                        repo_name, extension_name
+                    ))
+                    .into());
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn validate_parsed_root_extension_repo_directives(
@@ -367,31 +402,9 @@ fn validate_extension_repo_directives_with_visibility(
 
         for use_repo in &ext.imports {
             for repo_name in &use_repo.repos {
-                if let Some((_, previous_export)) = state
-                    .imports
-                    .iter()
-                    .find(|(_, exported_repo)| **exported_repo == repo_name.as_str())
-                {
-                    return Err(ModuleParseError::EvalError(format!(
-                        "The repo exported as '{}' by module extension '{}' is already imported",
-                        previous_export, state.extension_name
-                    ))
-                    .into());
-                }
                 state.imports.insert(repo_name.as_str(), repo_name.as_str());
             }
             for (apparent_name, repo_name) in &use_repo.repo_mapping {
-                if let Some((_, previous_export)) = state
-                    .imports
-                    .iter()
-                    .find(|(_, exported_repo)| **exported_repo == repo_name.as_str())
-                {
-                    return Err(ModuleParseError::EvalError(format!(
-                        "The repo exported as '{}' by module extension '{}' is already imported",
-                        previous_export, state.extension_name
-                    ))
-                    .into());
-                }
                 state
                     .imports
                     .insert(apparent_name.as_str(), repo_name.as_str());
@@ -1598,6 +1611,41 @@ use_repo(ext, "some_repo", again = "some_repo")
         let err = parse_module_bazel_content(content, "MODULE.bazel")
             .unwrap_err()
             .to_string();
+        assert!(err.contains("repo exported as 'some_repo'"));
+        assert!(err.contains("already imported"));
+    }
+
+    #[test]
+    fn test_parse_non_root_duplicate_imported_extension_repo_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "some_repo", again = "some_repo")
+"#;
+        let err = parse_non_root_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo exported as 'some_repo'"));
+        assert!(err.contains("already imported"));
+    }
+
+    #[test]
+    fn test_ignored_extension_repo_directives_still_validate_duplicate_imports() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "some_repo", again = "some_repo")
+"#;
+        let mut session = ModuleFileParseSession::new(std::path::PathBuf::from("."))
+            .allow_ignored_extension_repo_directives();
+        session
+            .eval_segment(
+                std::path::Path::new("MODULE.bazel"),
+                content,
+                sha256_hex(content.as_bytes()),
+            )
+            .unwrap();
+        let err = session.finish().unwrap_err().to_string();
         assert!(err.contains("repo exported as 'some_repo'"));
         assert!(err.contains("already imported"));
     }

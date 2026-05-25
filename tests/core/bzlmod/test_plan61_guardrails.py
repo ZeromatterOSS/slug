@@ -4950,6 +4950,15 @@ async def test_extension_repo_import_and_override_conflicts_fail_at_module_parse
 ext = use_extension("//:ext.bzl", "ext")
 use_repo(ext, "some_repo", again = "some_repo")
 """,
+            (),
+            "already imported",
+        ),
+        (
+            """module(name = "plan61_duplicate_exported_import_ignore_dev")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "some_repo", again = "some_repo")
+""",
+            ("--ignore_dev_dependency",),
             "already imported",
         ),
         (
@@ -4961,17 +4970,49 @@ use_repo(ext, bar = "foo")
 override_repo(ext, baz = "bar")
 override_repo(ext, foo = "override")
 """,
+            (),
             "is itself overridden with 'override'",
         ),
     ]
 
-    for content, expected in cases:
+    for content, args, expected in cases:
         _write(buck.cwd / "MODULE.bazel", content)
 
         with pytest.raises(BuckException) as exc:
-            await buck.build("//:x")
+            await buck.build("//:x", *args)
 
         assert expected in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_non_root_duplicate_extension_repo_import_fails_at_module_parse(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: use_repo duplicate exported repo checks are not root-only."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    dep = buck.cwd / "dep"
+    dep.mkdir()
+    _write(
+        dep / "MODULE.bazel",
+        """module(name = "dep", version = "1.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "some_repo", again = "some_repo")
+""",
+    )
+    _write(dep / "BUILD.bazel", "")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_non_root_duplicate_exported_import")
+bazel_dep(name = "dep", version = "1.0")
+local_path_override(module_name = "dep", path = "dep")
+""",
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "repo exported as 'some_repo'" in str(exc.value)
+    assert "already imported" in str(exc.value)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
