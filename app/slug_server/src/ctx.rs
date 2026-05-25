@@ -619,7 +619,6 @@ impl ServerCommandContext<'_> {
                         .await?)
                         .clone(),
                     is_bzlmod: new_configs.is_bzlmod,
-                    bzlmod_session_data: new_configs.bzlmod_session_data,
                 })
             } else {
                 // If there is no previous command but the flag was set, then the flag is ignored,
@@ -741,10 +740,6 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
             profiler_instrumentation_override.clone(),
             self.cmd_ctx.disable_starlark_types,
             self.cmd_ctx.unstable_typecheck,
-        )?;
-        slug_bzlmod::SetBzlmodSessionData::set_bzlmod_session_data(
-            &mut ctx,
-            cells_and_configs.bzlmod_session_data,
         )?;
         ctx.set_is_bzlmod(is_bzlmod)?;
 

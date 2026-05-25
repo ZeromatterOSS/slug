@@ -559,9 +559,6 @@ pub struct BuckConfigBasedCells {
     /// True when MODULE.bazel is present - all cell resolution is done via bzlmod.
     /// Per-cell .buckconfig [repository_aliases] sections are ignored in this mode.
     pub is_bzlmod: bool,
-    /// Bzlmod facts from MODULE.bazel resolution that must participate in DICE
-    /// invalidation for this command.
-    pub bzlmod_session_data: slug_bzlmod::BzlmodSessionData,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -2711,20 +2708,26 @@ impl BuckConfigBasedCells {
         updater: &mut DiceTransactionUpdater,
         output_base: Option<PathBuf>,
     ) -> slug_error::Result<Self> {
-        let mut dice_ctx = updater.existing_state().await;
-        let key = Self::build_dice_bzlmod_resolution_key(
-            project_fs,
-            config_args,
-            &mut dice_ctx,
-            output_base,
-        )
-        .await?;
-        let bzlmod_resolution = dice_ctx
-            .compute(&key)
-            .await?
-            .buck_error_context("Computing bzlmod resolution through DICE")?;
+        let (key, bzlmod_resolution) = {
+            let mut dice_ctx = updater.existing_state().await;
+            let key = Self::build_dice_bzlmod_resolution_key(
+                project_fs,
+                config_args,
+                &mut dice_ctx,
+                output_base,
+            )
+            .await?;
+            let bzlmod_resolution = dice_ctx
+                .compute(&key)
+                .await?
+                .buck_error_context("Computing bzlmod resolution through DICE")?;
+            (key, bzlmod_resolution)
+        };
+        let session_data_for_dice = bzlmod_resolution.as_ref().clone().unwrap_or_else(|| {
+            slug_bzlmod::BzlmodSessionData::for_workspace(key.resolution_key.workspace_id.clone())
+        });
 
-        Self::parse_with_file_ops_and_options_inner(
+        let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
             Some(project_fs),
             None,
@@ -2733,7 +2736,9 @@ impl BuckConfigBasedCells {
             Some(key.resolution_key.workspace_id.clone()),
         )
         .await
-        .buck_error_context("Parsing cells")
+        .buck_error_context("Parsing cells")?;
+        slug_bzlmod::SetBzlmodSessionData::set_bzlmod_session_data(updater, session_data_for_dice)?;
+        Ok(configs)
     }
 
     async fn build_dice_bzlmod_resolution_key(
@@ -2944,8 +2949,6 @@ impl BuckConfigBasedCells {
                     slug_bzlmod::WorkspaceId::new(PathBuf::new(), PathBuf::from("buck-out/v2"))
                 })
         });
-        let mut bzlmod_session_data =
-            slug_bzlmod::BzlmodSessionData::for_workspace(empty_workspace_id.clone());
         let mut bzlmod_runtime_cell_snapshot = None;
 
         // ===== Bzlmod Integration =====
@@ -3017,7 +3020,6 @@ impl BuckConfigBasedCells {
                     CellName::unchecked_new(&alias.target_name)?,
                 ));
             }
-            bzlmod_session_data = session_data;
             bzlmod_runtime_cell_snapshot = Some(runtime_cell_snapshot);
         }
 
@@ -3127,7 +3129,6 @@ impl BuckConfigBasedCells {
                 args: processed_config_args,
             },
             is_bzlmod: has_module_bazel,
-            bzlmod_session_data,
         })
     }
 
@@ -4742,14 +4743,10 @@ mod tests {
             .await?;
 
         assert!(!configs.is_bzlmod);
+        let mut dice = updater.commit().await;
+        let cell_graph = dice.compute(&slug_bzlmod::BzlmodCellGraphDataKey).await?;
         assert_eq!(
-            configs
-                .bzlmod_session_data
-                .cell_graph
-                .workspace_id
-                .output_base
-                .as_ref()
-                .as_path(),
+            cell_graph.workspace_id.output_base.as_ref().as_path(),
             output_base.as_path()
         );
         Ok(())
@@ -4763,6 +4760,31 @@ mod tests {
             .path()
             .resolve(ProjectRelativePath::new("buck-out/custom-direct")?);
 
+        let repo_env = BTreeMap::new();
+        let options = BzlmodResolutionOptions {
+            lockfile_mode: slug_bzlmod::LockfileMode::Off,
+            ignore_dev_dependency: false,
+            allow_yanked_versions_env: None,
+            allow_yanked_versions_flags: Vec::new(),
+            hidden_lockfile_path: None,
+            repo_env_digest: slug_bzlmod::repo_env_policy_digest(&repo_env),
+            repo_env,
+        };
+        let workspace_id = slug_bzlmod::WorkspaceId::new(
+            fs.path().root().to_path_buf(),
+            output_base.to_path_buf(),
+        );
+        let session_data = BuckConfigBasedCells::resolve_bzlmod_dependencies_with_options(
+            fs.path(),
+            &options,
+            Some(workspace_id),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await?
+        .expect("MODULE.bazel should produce bzlmod session data");
         let configs = BuckConfigBasedCells::parse_with_config_args_and_output_base(
             fs.path(),
             &[],
@@ -4772,8 +4794,7 @@ mod tests {
 
         assert!(configs.is_bzlmod);
         assert_eq!(
-            configs
-                .bzlmod_session_data
+            session_data
                 .cell_graph
                 .workspace_id
                 .output_base

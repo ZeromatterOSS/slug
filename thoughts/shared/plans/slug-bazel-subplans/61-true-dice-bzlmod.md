@@ -472,6 +472,17 @@ Observed SDK result at the checkpoint:
   remains as the legacy resolver payload for populating the narrower injected
   DICE values, but the DICE graph no longer exposes that payload as a direct
   computed dependency.
+- `BuckConfigBasedCells` no longer stores `BzlmodSessionData` or carries it
+  through server config state. The persisted config-load path injects the
+  narrower bzlmod DICE projections immediately after successful cell parsing,
+  including the explicit empty-session projection for no-`MODULE.bazel`
+  workspaces. Validation passed with focused `cargo test -p slug_common
+  explicit_output_base -- --nocapture` and `cargo check -p slug_common -p
+  slug_server`, followed by `cargo build -p slug` and the full Plan 61 Python
+  guardrail file (`125 passed in 151.47s`). No stale `slugd` process remained
+  after post-run cleanup. This still leaves the legacy resolver payload and
+  `SetBzlmodSessionData` projection API in place until the resolved graph is
+  produced directly by DICE keys.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -2878,6 +2889,9 @@ using Rust DICE keys and values:
 
 9. Delete transitional APIs.
    - Remove `BzlmodSessionData` fields as the authority for graph semantics.
+     `BuckConfigBasedCells` no longer stores the payload or returns it to the
+     server updater, but the legacy resolver still builds a `BzlmodSessionData`
+     value to populate the narrower injected projections.
    - `BzlmodSessionData::default()` is removed; remaining empty session
      construction must explicitly name the project-root sentinel while the
      session bridge is still being unwound. The generic project-root empty
