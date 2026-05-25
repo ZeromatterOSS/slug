@@ -640,6 +640,22 @@ Observed SDK result at the checkpoint:
   locked_registry_metadata_delete_invalidates_bzlmod_resolution or
   locked_registry_source_json_parse_failure_invalidates_bzlmod_resolution'`,
   touched-file `rustfmt --edition 2024`, and `git diff --check`.
+- Non-root `MODULE.bazel` poll identity now comes from the named
+  `NonRootModuleFilesPollKey` instead of direct polling during extension-input
+  assembly. Project-root non-root module files stay `project-tracked` in the
+  poll key and rely on `NonRootModuleFilesKey`'s DICE file dependencies;
+  out-of-project non-root module files and their included segments remain
+  explicitly polled child inputs and transaction-invalid until the
+  watched-filesystem API is available. Validation passed with focused
+  `cargo test -p slug_common non_root_module_files_poll -- --nocapture`,
+  focused `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`,
+  `cargo check -p slug_common -p slug_server`, `cargo build -p slug`, selected
+  `pytest tests/core/bzlmod/test_plan61_guardrails.py -k
+  'non_root_included_module_segment_edit_invalidates_extension_graph or
+  non_root_use_extension_dev_dependency_is_always_ignored or
+  non_root_use_repo_rule_dev_dependency_is_always_ignored or
+  non_root_override_repo_is_ignored or non_root_inject_repo_is_ignored'`,
+  touched-file `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -2840,8 +2856,11 @@ using Rust DICE keys and values:
      cached git/archive override `MODULE.bazel` files are read through named
      DICE poll keys and still polled into higher-level key identity. The
      DICE-backed resolver now rejects missing tracked root module input instead
-     of direct-parsing the root module in the DICE path. Keep extending that
-     shape to every non-root module source.
+     of direct-parsing the root module in the DICE path. Non-root module files
+     discovered from the transitional cell graph now read through the named
+     `NonRootModuleFilesPollKey`; project-root paths are DICE-tracked in the
+     parse key, while out-of-project paths are still polled into higher-level
+     key identity.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are read through the named

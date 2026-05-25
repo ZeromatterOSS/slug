@@ -1819,6 +1819,13 @@ struct NonRootModuleFilesKey {
     poll_digest: String,
 }
 
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("NonRootModuleFilesPollKey({}, {})", project_root.display(), inputs.len())]
+struct NonRootModuleFilesPollKey {
+    project_root: AbsNormPathBuf,
+    inputs: Vec<NonRootModuleFileInput>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct NonRootModuleFilesValue {
     digest: String,
@@ -2285,10 +2292,12 @@ fn non_root_module_file_inputs(
 fn non_root_module_files_poll_digest(
     project_fs: &ProjectRoot,
     inputs: &[NonRootModuleFileInput],
-) -> slug_error::Result<String> {
+) -> slug_error::Result<BzlmodInputsPollValue> {
     let mut hasher = Sha256::new();
     hasher.update(b"non-root-module-files-poll-v1");
     hasher.update([0]);
+    let mut has_polled_inputs = false;
+
     for input in inputs {
         hasher.update(input.module_key.as_bytes());
         hasher.update([0]);
@@ -2301,6 +2310,7 @@ fn non_root_module_files_poll_digest(
             continue;
         }
 
+        has_polled_inputs = true;
         match read_absolute_text_file_input(&input.module_bazel_path)? {
             (Some(content), Some(content_digest)) => {
                 hasher.update(b"present");
@@ -2330,7 +2340,11 @@ fn non_root_module_files_poll_digest(
         }
         hasher.update([0]);
     }
-    Ok(hex::encode(hasher.finalize()))
+
+    Ok(BzlmodInputsPollValue {
+        digest: hex::encode(hasher.finalize()),
+        has_polled_inputs,
+    })
 }
 
 async fn parse_non_root_module_files(
@@ -2520,6 +2534,34 @@ impl Key for RegistryFileInputsPollKey {
     ) -> Self::Value {
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
         registry_file_inputs_poll_digest(&project_fs, &self.registry_file_hashes).map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_polled_inputs,
+            Err(_) => false,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for NonRootModuleFilesPollKey {
+    type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        non_root_module_files_poll_digest(&project_fs, &self.inputs).map(Arc::new)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3750,11 +3792,19 @@ impl BuckConfigBasedCells {
         parsed_modules.push((parsed.module.name.clone(), parsed.clone()));
         let non_root_inputs = non_root_module_file_inputs(project_root, &cells, &module_symlinks);
         let mut non_root_parsed_modules = if let Some(ctx) = dice_ctx.as_mut() {
-            let poll_digest = non_root_module_files_poll_digest(project_root, &non_root_inputs)?;
+            let poll = ctx
+                .compute(&NonRootModuleFilesPollKey {
+                    project_root: project_root_abs.clone(),
+                    inputs: non_root_inputs.clone(),
+                })
+                .await?
+                .buck_error_context(
+                    "Computing non-root MODULE.bazel poll identity for bzlmod resolution",
+                )?;
             ctx.compute(&NonRootModuleFilesKey {
                 project_root: project_root_abs.clone(),
                 inputs: non_root_inputs,
-                poll_digest,
+                poll_digest: poll.digest.clone(),
             })
             .await?
             .buck_error_context("Computing non-root MODULE.bazel inputs for bzlmod resolution")?
@@ -4942,6 +4992,80 @@ mod tests {
         std::fs::write(&registry_path, "{\"mirrors\": []}\n").unwrap();
         let second =
             registry_file_inputs_poll_digest_for_cache(fs.path(), &cache, &registry_file_hashes)?;
+
+        assert!(second.has_polled_inputs);
+        assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[test]
+    fn non_root_module_files_poll_digest_marks_project_inputs_tracked() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let module_path = fs.path().root().as_path().join("libs/dep/MODULE.bazel");
+        std::fs::create_dir_all(module_path.parent().unwrap()).unwrap();
+        std::fs::write(&module_path, "module(name = \"dep\", version = \"1.0\")\n").unwrap();
+        let inputs = vec![NonRootModuleFileInput {
+            module_key: "dep".to_owned(),
+            module_bazel_path: module_path.clone(),
+        }];
+
+        let first = non_root_module_files_poll_digest(fs.path(), &inputs)?;
+        assert!(!first.has_polled_inputs);
+
+        std::fs::write(&module_path, "module(name = \"dep\", version = \"2.0\")\n").unwrap();
+        let second = non_root_module_files_poll_digest(fs.path(), &inputs)?;
+
+        assert!(!second.has_polled_inputs);
+        assert_eq!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn non_root_module_files_poll_key_repolls_out_of_project_include()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-non-root-module-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        let include_path = external.path().join("deps.MODULE.bazel");
+        std::fs::write(
+            &module_path,
+            "module(name = \"dep\", version = \"1.0\")\ninclude(\"//:deps.MODULE.bazel\")\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &include_path,
+            "bazel_dep(name = \"included_dep\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let key = NonRootModuleFilesPollKey {
+            project_root: AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?,
+            inputs: vec![NonRootModuleFileInput {
+                module_key: "dep".to_owned(),
+                module_bazel_path: module_path,
+            }],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_polled_inputs);
+
+        std::fs::write(
+            &include_path,
+            "bazel_dep(name = \"included_dep\", version = \"2.0\")\n",
+        )
+        .unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
 
         assert!(second.has_polled_inputs);
         assert_ne!(first.digest, second.digest);
