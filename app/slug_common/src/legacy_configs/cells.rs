@@ -3186,7 +3186,7 @@ impl BuckConfigBasedCells {
                     project_fs,
                     &options,
                     false,
-                    Some(empty_workspace_id.clone()),
+                    empty_workspace_id.clone(),
                     None,
                     None,
                     None,
@@ -3370,7 +3370,7 @@ impl BuckConfigBasedCells {
             &project_root,
             &key.options,
             true,
-            Some(key.resolution_key.workspace_id.clone()),
+            key.resolution_key.workspace_id.clone(),
             Some(root_module_file.as_ref()),
             key.lockfile_inputs.visible_lockfile.clone(),
             key.lockfile_inputs.hidden_lockfile.clone(),
@@ -3394,7 +3394,7 @@ impl BuckConfigBasedCells {
         project_root: &ProjectRoot,
         options: &BzlmodResolutionOptions,
         validate_root_extension_repo_directives: bool,
-        workspace_id: Option<slug_bzlmod::WorkspaceId>,
+        workspace_id: slug_bzlmod::WorkspaceId,
         root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
@@ -3460,13 +3460,6 @@ impl BuckConfigBasedCells {
         let workspace_root = project_root.root().as_path();
         let mut resolved_graph_for_aliases = None;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
-        let workspace_id = workspace_id.unwrap_or_else(|| {
-            let workspace_root = workspace_root.to_path_buf();
-            slug_bzlmod::WorkspaceId::new(
-                workspace_root.clone(),
-                workspace_root.join("buck-out/v2"),
-            )
-        });
         let mut bzlmod_projection_data =
             slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id);
         bzlmod_projection_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
@@ -5216,10 +5209,7 @@ mod tests {
             fs.path(),
             &options,
             true,
-            Some(slug_bzlmod::WorkspaceId::new(
-                project_root.clone(),
-                project_root.join("buck-out/v2"),
-            )),
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2")),
             Some(&root_module_file),
             None,
             None,
@@ -5262,10 +5252,7 @@ mod tests {
             fs.path(),
             &options,
             true,
-            Some(slug_bzlmod::WorkspaceId::new(
-                project_root.clone(),
-                project_root.join("buck-out/v2"),
-            )),
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2")),
             None,
             None,
             None,
@@ -5344,7 +5331,7 @@ mod tests {
             fs.path(),
             &options,
             true,
-            Some(workspace_id),
+            workspace_id,
             None,
             None,
             None,

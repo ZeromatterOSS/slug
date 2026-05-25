@@ -2155,6 +2155,14 @@ Observed SDK result at the checkpoint:
   slug_bzlmod extension_aggregation -- --nocapture`, `cargo test -p
   slug_bzlmod semantic_projection -- --nocapture`, `cargo check -p
   slug_bzlmod -p slug_common -p slug_external_cells`, and `git diff --check`.
+- The legacy bzlmod resolver entry point now requires an explicit
+  `WorkspaceId` instead of accepting `Option<WorkspaceId>` and deriving one
+  from project root. Both persisted bridge and non-persisted bootstrap paths now
+  pass the workspace identity chosen by their caller. Validation passed with
+  `cargo fmt --check`, `cargo test -p slug_common
+  bzlmod_projection_bridge -- --nocapture`, `cargo test -p slug_common
+  explicit_output_base -- --nocapture`, `cargo check -p slug_common`, and
+  `git diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -3385,6 +3393,7 @@ using Rust DICE keys and values:
      Module extension execution keys require workspace identity instead of
      carrying optional provenance. The remaining bzlmod projection data wrappers
      also require workspace provenance instead of accepting absent provenance.
+     The legacy resolver entry point requires an explicit workspace identity too.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key/context inputs as the graph migrates.
