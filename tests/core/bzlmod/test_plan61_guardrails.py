@@ -3489,13 +3489,14 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
         f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json"
     )
 
-    def write_lockfile(include_module_hash: bool) -> None:
+    def write_lockfile(omit_url: str | None = None) -> None:
         registry_file_hashes = {
             registry_url: _sha256(registry_cache / "bazel_registry.json"),
+            module_url: _sha256(module_cache / "MODULE.bazel"),
             source_url: _sha256(module_cache / "source.json"),
         }
-        if include_module_hash:
-            registry_file_hashes[module_url] = _sha256(module_cache / "MODULE.bazel")
+        if omit_url is not None:
+            registry_file_hashes.pop(omit_url)
         _write(
             buck.cwd / "MODULE.bazel.lock",
             json.dumps(
@@ -3513,7 +3514,7 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
         )
 
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    write_lockfile(include_module_hash=True)
+    write_lockfile()
     result = await buck.audit("cell", "--lockfile_mode=error", env=env)
     assert module_name in result.stdout
     first = await _bzlmod_counters(buck, "--lockfile_mode=error", env=env)
@@ -3523,14 +3524,25 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     warm = await _bzlmod_counters(buck, "--lockfile_mode=error", env=env)
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
-    write_lockfile(include_module_hash=False)
+    write_lockfile(omit_url=module_url)
     with pytest.raises(BuckException) as exc:
         await buck.audit("cell", "--lockfile_mode=error", env=env)
     failure_stderr = exc.value.stderr
     assert "Missing checksum for registry file" in failure_stderr
     assert module_url in failure_stderr
 
-    write_lockfile(include_module_hash=True)
+    write_lockfile()
+    result = await buck.audit("cell", "--lockfile_mode=error", env=env)
+    assert module_name in result.stdout
+
+    write_lockfile(omit_url=source_url)
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", "--lockfile_mode=error", env=env)
+    failure_stderr = exc.value.stderr
+    assert "Missing checksum for registry file" in failure_stderr
+    assert source_url in failure_stderr
+
+    write_lockfile()
     result = await buck.audit("cell", "--lockfile_mode=error", env=env)
     assert module_name in result.stdout
 

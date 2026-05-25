@@ -679,11 +679,15 @@ Observed SDK result at the checkpoint:
   `test_lockfile_selected_yanked_version_edit_invalidates_bzlmod_resolution`.
 - Visible lockfile registry hash policy now has same-daemon missing-checksum
   coverage under `--lockfile_mode=error`: a locked registry module warms with
-  all registry file hashes present, removing only the selected
-  `MODULE.bazel` registry hash from the lockfile fails before mutable registry
-  content is accepted, and restoring the hash succeeds again. Validation passed
-  with the focused guardrail selected by `-k 'missing_registry_checksum'`
-  (`1 passed, 111 deselected`).
+  all registry file hashes present, removing only the selected `MODULE.bazel`
+  registry hash from the lockfile fails before mutable registry content is
+  accepted, restoring the hash succeeds again, and removing only the selected
+  `source.json` registry hash fails before source metadata is accepted.
+  Validation passed with the focused guardrail selected by `-k
+  'missing_registry_checksum'` (`1 passed, 122 deselected`).
+- After adding the locked registry metadata deletion and override-registry
+  source deletion guardrails, the full Plan 61 Python guardrail passed with
+  `123 passed in 155.11s`; no stale `slugd` process remained after cleanup.
 - Visible lockfile missing-to-present creation and present-to-missing deletion
   now have same-daemon error-mode coverage: creating an invalid
   `MODULE.bazel.lock` makes the next `audit cell` fail instead of reusing the
