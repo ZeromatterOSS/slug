@@ -25,6 +25,7 @@ use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::DiceTransactionUpdater;
 use dice::Key;
+use serde::Deserialize;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod::BzlmodEventKind;
@@ -1798,6 +1799,13 @@ struct RegistryFileInputsValue {
     has_untracked_inputs: bool,
 }
 
+#[derive(Debug, Deserialize)]
+struct BazelRegistryJsonForValidation {
+    mirrors: Option<Vec<String>>,
+    #[serde(rename = "moduleBasePath")]
+    module_base_path: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 struct NonRootModuleFileInput {
     module_key: String,
@@ -2686,6 +2694,24 @@ fn registry_file_inputs_poll_digest_for_cache(
     })
 }
 
+fn validate_bazel_registry_json_file(url: &str, content: &str) -> slug_error::Result<()> {
+    if !url.ends_with("/bazel_registry.json") {
+        return Ok(());
+    }
+
+    // Bazel's IndexRegistry parses this top-level metadata with a
+    // BazelRegistryJson shape (mirrors/moduleBasePath) before using registry
+    // mirrors. Keep the transitional registry-file input bridge honest by
+    // rejecting malformed cached metadata even when the lockfile hash matches.
+    let BazelRegistryJsonForValidation {
+        mirrors,
+        module_base_path,
+    } = serde_json::from_str::<BazelRegistryJsonForValidation>(content)
+        .with_buck_error_context(|| format!("Failed to parse bazel_registry.json at {url}"))?;
+    drop((mirrors, module_base_path));
+    Ok(())
+}
+
 #[async_trait]
 impl Key for RegistryFileInputsKey {
     type Value = slug_error::Result<Arc<RegistryFileInputsValue>>;
@@ -2739,6 +2765,7 @@ impl Key for RegistryFileInputsKey {
                             actual_hash
                         ));
                     }
+                    validate_bazel_registry_json_file(url, &content)?;
                     hasher.update(actual_hash);
                 }
                 None => {
@@ -5031,6 +5058,23 @@ mod tests {
 
         assert!(second.has_polled_inputs);
         assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[test]
+    fn validate_bazel_registry_json_file_rejects_malformed_metadata() -> slug_error::Result<()> {
+        let registry_url = "https://bcr.bazel.build/bazel_registry.json";
+        validate_bazel_registry_json_file(registry_url, "{}\n")?;
+        validate_bazel_registry_json_file(registry_url, "{\"mirrors\": []}\n")?;
+        validate_bazel_registry_json_file(
+            "https://bcr.bazel.build/modules/dep/1.0/source.json",
+            "{not json}\n",
+        )?;
+
+        let err = validate_bazel_registry_json_file(registry_url, "{not json}\n")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Failed to parse bazel_registry.json"), "{err}");
         Ok(())
     }
 

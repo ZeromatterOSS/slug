@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`125 passed in 89.69s`) after rebuilding `target/debug/slug`.
+  (`126 passed in 90.46s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -884,12 +884,22 @@ Observed SDK result at the checkpoint:
   'locked_registry_module_parse_failure or locked_registry_module_utf8_failure'`
   (`2 passed, 102 deselected`) and the deletion guardrail selected by `-k
   'locked_registry_module_delete'` (`1 passed, 119 deselected`).
-- Locked top-level registry metadata now has deletion coverage too: after a
-  warm same-daemon registry module resolution, deleting cached
-  `bazel_registry.json` while the visible lockfile still carries its checksum
-  fails the next `audit cell` with a registry checksum error instead of reusing
-  the stale warm graph. Validation passed with the focused guardrail selected
-  by `-k 'locked_registry_metadata_delete'` (`1 passed, 121 deselected`).
+- Locked top-level registry metadata now has deletion, parse-error, and
+  invalid-UTF-8 coverage: after a warm same-daemon registry module resolution,
+  deleting cached `bazel_registry.json` while the visible lockfile still
+  carries its checksum fails the next `audit cell` with a registry checksum
+  error, and corrupting the same file with a matching lockfile hash fails
+  during registry metadata parsing instead of reusing the stale warm graph.
+  The Slug parse check is anchored to Bazel's `IndexRegistry`, which parses
+  top-level `bazel_registry.json` into its `BazelRegistryJson` metadata shape
+  before using registry mirrors. Validation passed with the focused guardrail
+  selected by `-k 'locked_registry_metadata_parse_and_utf8_failures'` (`1
+  passed, 125 deselected`) and the registry metadata/source subset selected by
+  `-k 'locked_registry_metadata_delete or
+  locked_registry_metadata_parse_and_utf8_failures or
+  locked_registry_source_json_parse_failure or
+  locked_registry_source_json_utf8_failure or
+  locked_registry_source_json_delete'` (`5 passed, 121 deselected`).
 - Visible lockfile `selectedYankedVersions` now has same-daemon edit coverage:
   a locked registry module warms as not-yanked, editing only the lockfile
   selected-yanked entry for that selected version fails the next `audit cell`,
