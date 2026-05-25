@@ -2088,6 +2088,23 @@ What did not work or remains risky:
   `No such file or directory (os error 2)` state already expected by the
   guardrails, while `ExtensionBzlTransitiveDigestKey` and non-DICE callers
   remain on the transitional direct scanner.
+- `ExtensionBzlTransitiveDigestKey` now asks the interpreter-side module
+  extension executor for the actual loaded-module graph digest before falling
+  back to the transitional literal-load scanner. The loaded-graph path reads
+  each loaded `.bzl` implementation file through `DiceFileComputations` and
+  preserves the existing `bzl_transitive_v2` hash format, using the caller's
+  replay extension id rather than any internal aggregation spelling and
+  excluding Slug's implicit `@slug_builtins` autoload from Bazel lockfile input
+  identity. Missing-load cases still fall back so existing lockfile replay can
+  cover a missing helper until creation makes the graph loadable and stale.
+  Validation passed with `cargo check -p slug_bzlmod -p
+  slug_interpreter_for_build`, `cargo test -p slug_bzlmod
+  bzl_transitive_digest -- --nocapture`, `cargo build -p slug`, focused Plan 61
+  Python guardrails for project-local transitive edit, project-local missing
+  transitive creation, and mapped external edit/create/delete replay rejection
+  (`5 passed`), the eight replay/materialization guardrails exposed by the
+  first full run (`8 passed` after the identity/autoload fix), and the full Plan
+  61 Python guardrail (`119 passed in 132.46s`).
 - Out-of-project bzlmod text reads used by module-file inputs, includes,
   registry-cache files, and hidden lockfiles now flow through a named
   `AbsoluteTextFileInputKey` child when the parent DICE computation reads the
@@ -2605,6 +2622,11 @@ using Rust DICE keys and values:
 4. Replace best-effort extension `.bzl` digesting with the actual loaded module
    graph.
    - Reuse the Starlark loader or expose its load graph to bzlmod keys.
+     `ExtensionBzlTransitiveDigestKey` now uses a late-bound
+     interpreter-side loaded graph digest when the graph loads successfully;
+     Slug's implicit `@slug_builtins` autoload is excluded from the Bazel
+     lockfile digest, and missing-load cases and non-DICE bootstrap/preseed
+     callers still use the transitional scanner.
    - Keep the current external `bazel-external/<repo>` and mapped literal-load
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.

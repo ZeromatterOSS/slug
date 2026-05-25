@@ -144,6 +144,7 @@ pub use extension_execution_dice::ModuleExtensionExecutionKey;
 pub use extension_execution_dice::ModuleExtensionResult;
 pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::compute_bzl_transitive_digest_for_project_with_repo_mappings;
+pub use extension_execution_dice::compute_bzl_transitive_digest_from_file_contents;
 pub use extension_execution_dice::extension_bzl_location_under_project;
 pub use extension_execution_dice::extract_extension_name;
 pub use extension_execution_dice::extract_owning_module;

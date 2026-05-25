@@ -267,6 +267,27 @@ impl Key for ExtensionBzlTransitiveDigestKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        let aggregation = ctx
+            .compute(&BzlmodExtensionAggregationKey {
+                workspace_id: self.workspace_id.clone(),
+                extension_id: self.extension_id.clone(),
+            })
+            .await??;
+        if let Some(aggregation) = aggregation {
+            if let Ok(executor) = MODULE_EXTENSION_EXECUTOR_IMPL.get() {
+                if let Some(digest) = executor
+                    .extension_bzl_transitive_digest(
+                        ctx,
+                        self.extension_id.as_ref(),
+                        aggregation.aggregated.as_ref(),
+                    )
+                    .await?
+                {
+                    return Ok(Arc::from(digest));
+                }
+            }
+        }
+
         let repo_mappings = ctx
             .compute(&BzlmodRepoMappingsKey::for_workspace_id(
                 self.workspace_id.clone(),
@@ -1805,6 +1826,33 @@ pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"bzl_transitive_v1:");
     hasher.update(extension_id.as_bytes());
+
+    let hash = hasher.finalize();
+    base64::engine::general_purpose::STANDARD.encode(hash)
+}
+
+pub fn compute_bzl_transitive_digest_from_file_contents(
+    extension_id: &str,
+    file_contents: &BTreeMap<String, String>,
+) -> String {
+    if file_contents.is_empty() {
+        return compute_bzl_transitive_digest(extension_id);
+    }
+
+    use base64::Engine;
+    use sha2::Digest;
+    use sha2::Sha256;
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"bzl_transitive_v2:");
+    hasher.update(extension_id.as_bytes());
+    hasher.update([0]);
+    for (path, content) in file_contents {
+        hasher.update(path.as_bytes());
+        hasher.update([0]);
+        hasher.update(content.as_bytes());
+        hasher.update([0]);
+    }
 
     let hash = hasher.finalize();
     base64::engine::general_purpose::STANDARD.encode(hash)

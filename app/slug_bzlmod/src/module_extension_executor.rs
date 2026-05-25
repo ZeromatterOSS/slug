@@ -86,6 +86,20 @@ pub struct ExtensionExecutionOutput {
 /// - The extension's .bzl file loading infrastructure
 #[async_trait]
 pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
+    /// Compute the caller's extension implementation `.bzl` transitive digest
+    /// from the interpreter's loaded-module graph.
+    ///
+    /// Returning `Ok(None)` tells bzlmod to keep using its transitional fallback
+    /// scanner for cases where the extension module cannot be loaded at this
+    /// point, such as missing transitive loads that an existing lockfile replay
+    /// may still cover.
+    async fn extension_bzl_transitive_digest(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        extension_id: &str,
+        aggregated: &AggregatedExtension,
+    ) -> slug_error::Result<Option<String>>;
+
     /// Execute a module extension and return the captured RepoSpecs.
     ///
     /// This method:

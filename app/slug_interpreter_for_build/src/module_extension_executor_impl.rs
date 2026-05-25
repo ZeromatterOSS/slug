@@ -44,6 +44,8 @@
 //! calls during extension execution record their specs instead of executing.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -53,9 +55,12 @@ use slug_bzlmod::AggregatedExtension;
 use slug_bzlmod::ExtensionExecutionOutput;
 use slug_bzlmod::ModuleExtensionExecutorImpl;
 use slug_bzlmod::WorkspaceId;
+use slug_bzlmod::compute_bzl_transitive_digest_from_file_contents;
 use slug_bzlmod::with_repo_spec_registry;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
+use slug_common::file_ops::dice::DiceFileComputations;
+use slug_common::file_ops::error::FileReadErrorContext;
 use slug_core::bzl::ImportPath;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
@@ -64,6 +69,7 @@ use slug_core::cells::paths::CellRelativePathBuf;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_interpreter::load_module::InterpreterCalculation;
+use slug_interpreter::paths::module::OwnedStarlarkModulePath;
 use slug_interpreter::paths::module::StarlarkModulePath;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
@@ -218,6 +224,62 @@ fn record_declared_extension_environ(
 }
 
 impl ConcreteModuleExtensionExecutor {
+    async fn try_loaded_bzl_transitive_digest(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        extension_id: &str,
+        aggregated: &AggregatedExtension,
+    ) -> slug_error::Result<Option<String>> {
+        let cell_resolver = ctx.get_cell_resolver().await?;
+        let import_path = parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
+        let root_path = OwnedStarlarkModulePath::new(StarlarkModulePath::LoadFile(&import_path));
+
+        if let Err(e) = ctx.get_loaded_module(root_path.borrow()).await {
+            tracing::debug!(
+                "Falling back to literal .bzl digest scanner for extension '{}': {}",
+                aggregated.extension_id,
+                e
+            );
+            return Ok(None);
+        }
+
+        let mut queue = VecDeque::from([root_path]);
+        let mut seen = BTreeSet::new();
+        let mut file_contents = BTreeMap::new();
+        while let Some(module_path) = queue.pop_front() {
+            if !seen.insert(module_path.to_string()) {
+                continue;
+            }
+            // The interpreter autoloads Slug's Bazel-compat builtins. Those
+            // are not Bazel module-extension implementation inputs.
+            if module_path.path().cell().as_str() == "slug_builtins" {
+                continue;
+            }
+
+            let loaded_module = ctx.get_loaded_module(module_path.borrow()).await?;
+            if matches!(module_path.borrow(), StarlarkModulePath::LoadFile(_)) {
+                let cell_path = module_path.path();
+                let cell = cell_resolver.get(cell_path.cell())?;
+                let project_relative = cell.path().join(cell_path.path());
+                let content = DiceFileComputations::read_file(ctx, cell_path)
+                    .await
+                    .without_package_context_information()?;
+                file_contents.insert(project_relative.as_str().to_owned(), content);
+            }
+
+            for import in loaded_module.direct_imports() {
+                if matches!(import.borrow(), StarlarkModulePath::LoadFile(_)) {
+                    queue.push_back(import.clone());
+                }
+            }
+        }
+
+        Ok(Some(compute_bzl_transitive_digest_from_file_contents(
+            extension_id,
+            &file_contents,
+        )))
+    }
+
     /// Try to execute the extension's Starlark implementation.
     ///
     /// This:
@@ -389,6 +451,16 @@ impl ConcreteModuleExtensionExecutor {
 
 #[async_trait]
 impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
+    async fn extension_bzl_transitive_digest(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        extension_id: &str,
+        aggregated: &AggregatedExtension,
+    ) -> slug_error::Result<Option<String>> {
+        self.try_loaded_bzl_transitive_digest(ctx, extension_id, aggregated)
+            .await
+    }
+
     async fn execute_extension(
         &self,
         ctx: &mut DiceComputations<'_>,
