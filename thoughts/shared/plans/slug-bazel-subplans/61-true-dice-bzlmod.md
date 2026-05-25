@@ -3209,15 +3209,25 @@ What did not work or remains risky:
   now uses canonical generated repo names from that snapshot for direct cell
   existence and for same-extension sibling fallback before consulting
   process-global dynamic maps, so internal generated repo names are not made
-  root-visible merely by snapshot membership. Build-setting labels that arrive
-  in Bazel canonical `@@repo//...` form now normalize to Slug's internal cell
-  name after dynamic alias resolution. Extension repository execution
-  constructors, bzlmod projection-key constructors, and materialization-manifest
-  helper constructors that derive workspace identity from project root are
-  test-only, so production execution/materialization code has to pass the
-  explicit workspace identity. Generic empty-session construction from only a
-  project root is also test-only; no-project interpreter setup uses a named
-  sentinel. The graph is still
+  root-visible merely by snapshot membership. `CellResolver::get()` now follows
+  that same boundary: runtime snapshot extension cells materialize only by
+  canonical generated repo name, not by internal generated repo name. Validation
+  passed with `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-cell-resolver
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-cell-resolver-target
+  cargo test -p slug_core bzlmod_resolver_uses_runtime_snapshot_for_lazy_extension_cell -- --nocapture`,
+  `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-cell-resolver
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-cell-resolver-target
+  cargo test -p slug_core bzlmod_runtime_snapshot -- --nocapture`, and
+  `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-cell-resolver
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-cell-resolver-target
+  cargo check -p slug_core`. Build-setting labels that arrive in Bazel canonical
+  `@@repo//...` form now normalize to Slug's internal cell name after dynamic
+  alias resolution. Extension repository execution constructors, bzlmod
+  projection-key constructors, and materialization-manifest helper constructors
+  that derive workspace identity from project root are test-only, so production
+  execution/materialization code has to pass the explicit workspace identity.
+  Generic empty-session construction from only a project root is also test-only;
+  no-project interpreter setup uses a named sentinel. The graph is still
   legacy-produced, and alias compatibility plus runtime registration remain
   process-global transitional plumbing, so this does not yet make the runtime
   bzlmod cell graph DICE-owned.
@@ -3480,10 +3490,12 @@ using Rust DICE keys and values:
   workspace identity, including output base when replayed from a bzlmod cell
   graph, but they remain process-global maps rather than a DICE-owned
   `BzlmodCellGraphKey`. Resolver-local promoted dynamic cells from graph
-  snapshots and current extension-spoke values are graph-owned, but directory
-  scans and alias-compatibility maps are still process-local lookup
-  accelerators rather than DICE inputs. Directory-scan fallbacks are disabled
-  once the active transitional scope includes an output base.
+  snapshots and current extension-spoke values are graph-owned, and direct
+  resolver lookup no longer materializes runtime snapshot cells by internal
+  generated repo name, but directory scans and alias-compatibility maps are
+  still process-local lookup accelerators rather than DICE inputs.
+  Directory-scan fallbacks are disabled once the active transitional scope
+  includes an output base.
 - Module extension and repository-context label path resolution now receive
   resolver-owned cell path maps from the active cell resolver, and those maps are
   authoritative when present. `module_ctx.path(Label(...))`,

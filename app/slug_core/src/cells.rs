@@ -2471,7 +2471,7 @@ impl CellResolver {
             .as_ref()?
             .extension_cells
             .iter()
-            .find(|cell| cell.canonical_name == name || cell.internal_name == name)
+            .find(|cell| cell.canonical_name == name)
             .cloned()
     }
 
@@ -3196,6 +3196,8 @@ mod tests {
                 if origin == &setup
         ));
         assert_eq!(get_dynamic_extension_cell(canonical), None);
+        assert!(resolver.get(CellName::testing_new("generated")).is_err());
+        assert!(resolver.get(CellName::testing_new("sibling")).is_err());
         reset_dynamic_bzlmod_state_for_project_root(tmp.path().join("after"));
         assert_eq!(get_dynamic_extension_cell(canonical), None);
         assert_eq!(resolver.get(cell_name)?.name(), cell_name);
