@@ -183,6 +183,8 @@ pub use parser::ParsedModuleFileWithInputs;
 pub use parser::include_label_to_path;
 pub use parser::parse_module_bazel;
 pub use parser::parse_module_bazel_content;
+pub use parser::parse_non_root_module_bazel;
+pub use parser::parse_non_root_module_bazel_content;
 pub use pending_repo_cells::ExtensionCellDefinitions;
 pub use pending_repo_cells::PendingRepoCell;
 pub use pending_repo_cells::RepoAlias;

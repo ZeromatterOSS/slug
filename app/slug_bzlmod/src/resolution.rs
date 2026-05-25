@@ -30,8 +30,8 @@ use slug_error::BuckErrorContext;
 use crate::cache::ModuleCache;
 use crate::fetch::SourceFetcher;
 use crate::lockfile::LockfileMode;
-use crate::parser::parse_module_bazel;
-use crate::parser::parse_module_bazel_content;
+use crate::parser::parse_non_root_module_bazel;
+use crate::parser::parse_non_root_module_bazel_content;
 use crate::registry::RegistryClient;
 use crate::types::BazelDep;
 use crate::types::LocalPathOverride;
@@ -745,13 +745,11 @@ impl MvsResolver {
 
         // Parse MODULE.bazel
         let filename = format!("{}@{}/MODULE.bazel", dep.name, version_str);
-        let parsed =
-            parse_module_bazel_content(&module_bazel_file.content, &filename).map_err(|e| {
-                MvsResolutionError::DependencyResolutionFailed {
-                    name: dep.name.clone(),
-                    version: version_str.to_string(),
-                    reason: format!("Failed to parse MODULE.bazel: {}", e),
-                }
+        let parsed = parse_non_root_module_bazel_content(&module_bazel_file.content, &filename)
+            .map_err(|e| MvsResolutionError::DependencyResolutionFailed {
+                name: dep.name.clone(),
+                version: version_str.to_string(),
+                reason: format!("Failed to parse MODULE.bazel: {}", e),
             })?;
 
         Ok(DiscoveredModule {
@@ -828,8 +826,8 @@ impl MvsResolver {
                 // Parse MODULE.bazel from the fetched source
                 let module_bazel_path = dest_dir.join("MODULE.bazel");
                 let parsed_module = if module_bazel_path.exists() {
-                    let parsed =
-                        parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
+                    let parsed = parse_non_root_module_bazel(&module_bazel_path)
+                        .with_buck_error_context(|| {
                             format!(
                                 "Failed to parse MODULE.bazel for git override '{}'",
                                 g.module_name
@@ -893,8 +891,8 @@ impl MvsResolver {
                 // Parse MODULE.bazel from the fetched source
                 let module_bazel_path = dest_dir.join("MODULE.bazel");
                 let parsed_module = if module_bazel_path.exists() {
-                    let parsed =
-                        parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
+                    let parsed = parse_non_root_module_bazel(&module_bazel_path)
+                        .with_buck_error_context(|| {
                             format!(
                                 "Failed to parse MODULE.bazel for archive override '{}'",
                                 a.module_name
@@ -1602,12 +1600,13 @@ pub fn resolve_local_override(
     let module_bazel_path = module_path.join("MODULE.bazel");
 
     let (parsed_module, has_module_file) = if module_bazel_path.exists() {
-        let parsed = parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
-            format!(
-                "Failed to parse MODULE.bazel for local module '{}' at {:?}",
-                override_info.module_name, module_bazel_path
-            )
-        })?;
+        let parsed =
+            parse_non_root_module_bazel(&module_bazel_path).with_buck_error_context(|| {
+                format!(
+                    "Failed to parse MODULE.bazel for local module '{}' at {:?}",
+                    override_info.module_name, module_bazel_path
+                )
+            })?;
         (parsed.module, parsed.has_module_directive)
     } else {
         // No MODULE.bazel - create an empty module with the override name
@@ -1886,18 +1885,19 @@ impl RemoteModuleResolver {
 
         // Parse the MODULE.bazel
         let filename = format!("{}@{}/MODULE.bazel", name, version_str);
-        let parsed = parse_module_bazel_content(&module_bazel_content, &filename).map_err(|e| {
-            tracing::error!(
-                "Failed to parse MODULE.bazel for {}@{}: {}",
-                name,
-                version_str,
-                e
-            );
-            RemoteResolutionError::FetchFailed {
-                name: name.clone(),
-                version: version_str.to_string(),
-            }
-        })?;
+        let parsed = parse_non_root_module_bazel_content(&module_bazel_content, &filename)
+            .map_err(|e| {
+                tracing::error!(
+                    "Failed to parse MODULE.bazel for {}@{}: {}",
+                    name,
+                    version_str,
+                    e
+                );
+                RemoteResolutionError::FetchFailed {
+                    name: name.clone(),
+                    version: version_str.to_string(),
+                }
+            })?;
 
         // Fetch source.json
         let source_info = self

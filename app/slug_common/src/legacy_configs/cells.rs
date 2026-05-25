@@ -33,6 +33,7 @@ use slug_bzlmod::ModuleSource;
 use slug_bzlmod::MvsResolver;
 use slug_bzlmod::ParsedModuleFile;
 use slug_bzlmod::parse_module_bazel;
+use slug_bzlmod::parse_non_root_module_bazel;
 use slug_bzlmod::record_bzlmod_event;
 use slug_bzlmod::resolve_local_modules;
 use slug_core::cells::CellAliasResolver;
@@ -908,6 +909,7 @@ impl Key for TrackedRootModuleFileKey {
             &project_fs,
             root_path.as_ref(),
             content,
+            true,
         )
         .await?;
         let input_digest = slug_bzlmod::module_file_inputs_digest(&parsed_with_inputs.inputs);
@@ -934,12 +936,18 @@ async fn parse_module_with_tracked_project_includes(
     project_fs: &ProjectRoot,
     module_path: &Path,
     module_content: String,
+    validate_extension_repo_directives: bool,
 ) -> slug_error::Result<slug_bzlmod::ParsedModuleFileWithInputs> {
     let module_root = module_path
         .parent()
         .unwrap_or_else(|| Path::new(""))
         .to_path_buf();
-    let mut session = slug_bzlmod::ModuleFileParseSession::new(module_root.clone());
+    let mut session = if validate_extension_repo_directives {
+        slug_bzlmod::ModuleFileParseSession::new(module_root.clone())
+    } else {
+        slug_bzlmod::ModuleFileParseSession::new(module_root.clone())
+            .allow_ignored_extension_repo_directives()
+    };
     let module_digest = slug_bzlmod::compute_sha256_hex(module_content.as_bytes());
     let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
     let mut pending = Vec::new();
@@ -980,12 +988,18 @@ async fn parse_module_with_tracked_project_includes(
 fn parse_module_with_polled_includes(
     module_path: &Path,
     module_content: String,
+    validate_extension_repo_directives: bool,
 ) -> slug_error::Result<slug_bzlmod::ParsedModuleFileWithInputs> {
     let module_root = module_path
         .parent()
         .unwrap_or_else(|| Path::new(""))
         .to_path_buf();
-    let mut session = slug_bzlmod::ModuleFileParseSession::new_silent(module_root.clone());
+    let mut session = if validate_extension_repo_directives {
+        slug_bzlmod::ModuleFileParseSession::new_silent(module_root.clone())
+    } else {
+        slug_bzlmod::ModuleFileParseSession::new_silent(module_root.clone())
+            .allow_ignored_extension_repo_directives()
+    };
     let module_digest = slug_bzlmod::compute_sha256_hex(module_content.as_bytes());
     let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
     let mut pending = Vec::new();
@@ -1841,6 +1855,7 @@ async fn local_override_module_inputs_digest(
                     &project_fs,
                     &module_bazel_path,
                     content,
+                    false,
                 )
                 .await
                 .with_buck_error_context(|| {
@@ -1948,7 +1963,7 @@ fn local_override_inputs_poll_digest(
                 hasher.update([0]);
 
                 let parsed_with_inputs =
-                    parse_module_with_polled_includes(&module_bazel_path, content)
+                    parse_module_with_polled_includes(&module_bazel_path, content, false)
                         .with_buck_error_context(|| {
                             format!(
                                 "Failed to parse MODULE.bazel for local override '{}' at {:?}",
@@ -2015,6 +2030,7 @@ async fn non_registry_override_module_inputs_digest(
                     &project_fs,
                     &module_bazel_path,
                     content,
+                    false,
                 )
                 .await
                 .with_buck_error_context(|| {
@@ -2079,6 +2095,7 @@ fn non_registry_override_inputs_poll_digest(
                 let parsed_with_inputs = parse_module_with_polled_includes(
                     &module_bazel_path,
                     content,
+                    false,
                 )
                 .with_buck_error_context(|| {
                     format!(
@@ -2171,7 +2188,7 @@ fn non_root_module_files_poll_digest(
                 hasher.update(content_digest.as_bytes());
                 hasher.update([0]);
                 let parsed_with_inputs =
-                    parse_module_with_polled_includes(&input.module_bazel_path, content)
+                    parse_module_with_polled_includes(&input.module_bazel_path, content, false)
                         .with_buck_error_context(|| {
                             format!(
                                 "Failed to parse non-root MODULE.bazel for '{}' at {:?}",
@@ -2228,6 +2245,7 @@ async fn parse_non_root_module_files(
             &project_fs,
             &input.module_bazel_path,
             content,
+            false,
         )
         .await
         .with_buck_error_context(|| {
@@ -2268,8 +2286,8 @@ fn parse_non_root_module_files_direct(
         if !input.module_bazel_path.exists() {
             continue;
         }
-        let parsed =
-            parse_module_bazel(&input.module_bazel_path).with_buck_error_context(|| {
+        let parsed = parse_non_root_module_bazel(&input.module_bazel_path)
+            .with_buck_error_context(|| {
                 format!(
                     "Failed to parse non-root MODULE.bazel for '{}' at {:?}",
                     input.module_key, input.module_bazel_path
@@ -4569,6 +4587,7 @@ mod tests {
             &project_root,
             &module_path,
             module_content,
+            true,
         )
         .await?;
         let first_digest = slug_bzlmod::module_file_inputs_digest(&parsed.inputs);
@@ -4588,6 +4607,7 @@ mod tests {
             &project_root,
             &module_path,
             module_content,
+            true,
         )
         .await?;
         let second_digest = slug_bzlmod::module_file_inputs_digest(&parsed.inputs);

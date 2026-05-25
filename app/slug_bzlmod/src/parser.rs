@@ -55,6 +55,7 @@ pub struct ModuleFileParseSession {
     module_root: PathBuf,
     inputs: Vec<ModuleFileInputDigest>,
     record_events: bool,
+    validate_extension_repo_directives: bool,
 }
 
 impl ModuleFileParseSession {
@@ -64,6 +65,7 @@ impl ModuleFileParseSession {
             module_root,
             inputs: Vec::new(),
             record_events: true,
+            validate_extension_repo_directives: true,
         }
     }
 
@@ -73,6 +75,7 @@ impl ModuleFileParseSession {
             module_root,
             inputs: Vec::new(),
             record_events: false,
+            validate_extension_repo_directives: true,
         }
     }
 
@@ -111,9 +114,17 @@ impl ModuleFileParseSession {
 
     pub fn finish(self) -> slug_error::Result<ParsedModuleFileWithInputs> {
         Ok(ParsedModuleFileWithInputs {
-            parsed: parsed_module_file_from_context(&self.context)?,
+            parsed: parsed_module_file_from_context(
+                &self.context,
+                self.validate_extension_repo_directives,
+            )?,
             inputs: self.inputs,
         })
+    }
+
+    pub fn allow_ignored_extension_repo_directives(mut self) -> Self {
+        self.validate_extension_repo_directives = false;
+        self
     }
 }
 
@@ -189,6 +200,21 @@ pub fn parse_module_bazel_content(
     content: &str,
     filename: &str,
 ) -> slug_error::Result<ParsedModuleFile> {
+    parse_module_bazel_content_with_options(content, filename, true)
+}
+
+pub fn parse_non_root_module_bazel_content(
+    content: &str,
+    filename: &str,
+) -> slug_error::Result<ParsedModuleFile> {
+    parse_module_bazel_content_with_options(content, filename, false)
+}
+
+fn parse_module_bazel_content_with_options(
+    content: &str,
+    filename: &str,
+    validate_extension_repo_directives: bool,
+) -> slug_error::Result<ParsedModuleFile> {
     let context = new_module_file_context();
     eval_module_bazel_content_into_context(content, filename, &context, true)?;
 
@@ -199,7 +225,7 @@ pub fn parse_module_bazel_content(
         .into());
     }
 
-    parsed_module_file_from_context(&context)
+    parsed_module_file_from_context(&context, validate_extension_repo_directives)
 }
 
 fn eval_module_bazel_content_into_context(
@@ -233,10 +259,13 @@ fn eval_module_bazel_content_into_context(
 
 fn parsed_module_file_from_context(
     context: &std::cell::RefCell<ModuleFileContext>,
+    validate_extension_repo_directives_flag: bool,
 ) -> slug_error::Result<ParsedModuleFile> {
     // Extract results from context
     let ctx = context.borrow();
-    validate_extension_repo_directives(&ctx.extensions)?;
+    if validate_extension_repo_directives_flag {
+        validate_extension_repo_directives(&ctx.extensions)?;
+    }
 
     let (module_info, has_module_directive) = match &ctx.module {
         Some(decl) => {
@@ -354,13 +383,45 @@ pub fn parse_module_bazel(path: &Path) -> slug_error::Result<ParsedModuleFile> {
     )
 }
 
+pub fn parse_non_root_module_bazel(path: &Path) -> slug_error::Result<ParsedModuleFile> {
+    let content = std::fs::read_to_string(path)
+        .buck_error_context(format!("Failed to read MODULE.bazel at {:?}", path))?;
+    Ok(parse_non_root_module_bazel_content_from_path(
+        path,
+        &content,
+        sha256_hex(content.as_bytes()),
+    )?
+    .parsed)
+}
+
 pub fn parse_module_bazel_content_from_path(
     path: &Path,
     content: &str,
     digest: String,
 ) -> slug_error::Result<ParsedModuleFileWithInputs> {
+    parse_module_bazel_content_from_path_with_options(path, content, digest, true)
+}
+
+pub fn parse_non_root_module_bazel_content_from_path(
+    path: &Path,
+    content: &str,
+    digest: String,
+) -> slug_error::Result<ParsedModuleFileWithInputs> {
+    parse_module_bazel_content_from_path_with_options(path, content, digest, false)
+}
+
+fn parse_module_bazel_content_from_path_with_options(
+    path: &Path,
+    content: &str,
+    digest: String,
+    validate_extension_repo_directives: bool,
+) -> slug_error::Result<ParsedModuleFileWithInputs> {
     let module_root = path.parent().unwrap_or_else(|| Path::new("")).to_path_buf();
-    let mut session = ModuleFileParseSession::new(module_root);
+    let mut session = if validate_extension_repo_directives {
+        ModuleFileParseSession::new(module_root)
+    } else {
+        ModuleFileParseSession::new(module_root).allow_ignored_extension_repo_directives()
+    };
     let mut include_stack = Vec::new();
     let include_labels = session.eval_segment(path, content, digest)?;
     eval_module_bazel_includes_with_reader(
@@ -967,6 +1028,23 @@ inject_repo(ext, generated = "helper")
         assert!(err.contains("Cannot import repo 'generated'"));
         assert!(err.contains("has been injected into module extension 'ext'"));
         assert!(err.contains("Please refer to @helper directly"));
+    }
+
+    #[test]
+    fn test_parse_non_root_use_repo_of_injected_repo_allows_ignored_inject() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "generated")
+inject_repo(ext, generated = "helper")
+"#;
+        let parsed = parse_non_root_module_bazel_content(content, "MODULE.bazel").unwrap();
+
+        assert_eq!(parsed.extension_usages.len(), 1);
+        assert_eq!(
+            parsed.extension_usages[0].injected_repos,
+            vec![("generated".to_owned(), "helper".to_owned())]
+        );
     }
 
     #[test]

@@ -7472,6 +7472,71 @@ local_path_override(module_name = "helper", path = "helper")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_non_root_inject_repo_is_ignored(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: inject_repo() is ignored outside the root module."""
+    owner = buck.cwd / "owner"
+    helper = buck.cwd / "helper"
+    owner.mkdir()
+    helper.mkdir()
+    _write(helper / "MODULE.bazel", 'module(name = "helper", version = "1.0")\n')
+    _write(helper / "BUILD.bazel", "# helper intentionally has no payload.txt\n")
+    _write(
+        owner / "ext.bzl",
+        """def _repo_impl(ctx):
+    ctx.file("payload.txt", "generated payload\\n")
+    ctx.file("BUILD.bazel", "exports_files([\\"payload.txt\\"])\\nfilegroup(name = \\"payload\\", srcs = [\\"payload.txt\\"])\\n")
+
+repo = repository_rule(implementation = _repo_impl)
+
+def _ext_impl(module_ctx):
+    repo(name = "generated")
+
+ext = module_extension(implementation = _ext_impl)
+""",
+    )
+    _write(
+        owner / "MODULE.bazel",
+        """module(name = "owner", version = "1.0")
+bazel_dep(name = "helper", version = "1.0")
+local_path_override(module_name = "helper", path = "../helper")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, generated = "helper")
+use_repo(ext, "generated")
+""",
+    )
+    _write(
+        owner / "BUILD.bazel",
+        """filegroup(
+    name = "uses_generated",
+    srcs = ["@generated//:payload.txt"],
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_non_root_inject_repo")
+bazel_dep(name = "owner", version = "1.0")
+bazel_dep(name = "helper", version = "1.0")
+local_path_override(module_name = "owner", path = "owner")
+local_path_override(module_name = "helper", path = "helper")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "root",
+    srcs = ["@owner//:uses_generated"],
+)
+""",
+    )
+
+    await buck.build("//:root")
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_inject_repo_is_ignored_under_ignore_dev_dependency(
     buck: Buck,
 ) -> None:

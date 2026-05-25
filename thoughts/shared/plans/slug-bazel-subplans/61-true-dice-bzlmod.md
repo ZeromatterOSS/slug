@@ -289,6 +289,15 @@ Observed SDK result at the checkpoint:
 - After adding the non-root `override_repo()` guardrail, the full Plan 61
   Python guardrail passed with `124 passed in 126.29s`; no stale `slugd`
   process remained after cleanup.
+- Non-root `inject_repo()` usages now take the same ignored-directive path:
+  root module parsing keeps strict duplicate/injected-use_repo validation, but
+  non-root module-file parsing records the directives without failing before
+  the resolver can ignore them. This matches `ModuleFileGlobals.injectRepo`,
+  whose docs and early return use the same root-only/ignore-dev-dependency
+  policy as `override_repo()`. Validation passed with focused `slug_bzlmod`
+  parser tests, `cargo check -p slug_bzlmod -p slug_common`, `cargo build -p
+  slug`, and the Plan 61 guardrail selected by `-k
+  'non_root_inject_repo_is_ignored'` (`1 passed, 124 deselected`).
 - `use_extension(..., isolate = True)` has been Bazel-grounded as a larger
   blocker, not a safe small patch. Bazel 9.0.1 rejects it unless
   `--experimental_isolated_extension_usages` is set; with the flag, each
