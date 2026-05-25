@@ -4775,6 +4775,49 @@ single_version_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_single_version_override_patch_cmds_and_strip_fail_until_supported(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SVO patch_cmds/patch_strip are final RepoSpec attrs."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_svo_patch_cmds_unsupported")
+bazel_dep(name = "dep", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patch_cmds = ["echo patched"],
+)
+""",
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "single_version_override(patch_cmds = ...)" in str(exc.value)
+    assert "final repo spec" in str(exc.value)
+
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_svo_patch_strip_unsupported")
+bazel_dep(name = "dep", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patch_strip = 1,
+)
+""",
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:x")
+
+    assert "single_version_override(patch_strip = ...)" in str(exc.value)
+    assert "patch_args" in str(exc.value)
+    assert "final repo spec" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_archive_override_patches_fail_until_supported(
     buck: Buck,
 ) -> None:

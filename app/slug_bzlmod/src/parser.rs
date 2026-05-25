@@ -858,6 +858,41 @@ single_version_override(
     }
 
     #[test]
+    fn test_parse_single_version_override_patch_cmds_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patch_cmds = ["echo patched"],
+)
+"#;
+
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("single_version_override(patch_cmds = ...)"));
+        assert!(err.contains("final repo spec"));
+    }
+
+    #[test]
+    fn test_parse_single_version_override_patch_strip_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patch_strip = 1,
+)
+"#;
+
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("single_version_override(patch_strip = ...)"));
+        assert!(err.contains("patch_args"));
+        assert!(err.contains("final repo spec"));
+    }
+
+    #[test]
     fn test_parse_no_module_directive() {
         let content = r#"
 bazel_dep(name = "rules_cc", version = "0.0.9")

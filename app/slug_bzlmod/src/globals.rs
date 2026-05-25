@@ -79,6 +79,28 @@ fn validate_and_reject_unsupported_override_patches(
     )))
 }
 
+fn reject_unsupported_single_version_patch_cmds(
+    patch_cmds: &UnpackList<&str>,
+) -> starlark::Result<()> {
+    if patch_cmds.items.is_empty() {
+        return Ok(());
+    }
+
+    Err(starlark::Error::new_other(anyhow::anyhow!(
+        "single_version_override(patch_cmds = ...) is not yet supported by Slug; Bazel appends patch_cmds to the final repo spec"
+    )))
+}
+
+fn reject_unsupported_single_version_patch_strip(patch_strip: i32) -> starlark::Result<()> {
+    if patch_strip == 0 {
+        return Ok(());
+    }
+
+    Err(starlark::Error::new_other(anyhow::anyhow!(
+        "single_version_override(patch_strip = ...) is not yet supported by Slug; Bazel appends patch_args to the final repo spec"
+    )))
+}
+
 fn validate_override_patch_label(
     module: Option<&ModuleDecl>,
     raw_label: &str,
@@ -624,6 +646,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] version: &str,
         #[starlark(require = named, default = "")] registry: &str,
         #[starlark(require = named, default = UnpackList::default())] patches: UnpackList<&str>,
+        #[starlark(require = named, default = UnpackList::default())] patch_cmds: UnpackList<&str>,
         #[starlark(require = named, default = 0)] patch_strip: i32,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
@@ -641,6 +664,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             ctx.module.as_ref(),
             &patches,
         )?;
+        reject_unsupported_single_version_patch_cmds(&patch_cmds)?;
+        reject_unsupported_single_version_patch_strip(patch_strip)?;
 
         ctx.overrides
             .push(Override::SingleVersion(SingleVersionOverride {
@@ -652,7 +677,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                     Some(registry.to_owned())
                 },
                 patches,
-                patch_strip: patch_strip as u32,
+                patch_strip: 0,
             }));
 
         Ok(NoneType)

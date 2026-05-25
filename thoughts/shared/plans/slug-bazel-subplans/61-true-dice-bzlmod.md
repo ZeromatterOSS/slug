@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`133 passed in 105.35s`) after rebuilding `target/debug/slug`.
+  (`134 passed in 110.00s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -351,18 +351,27 @@ Observed SDK result at the checkpoint:
   `archive_override`/`git_override` patches also affect repository
   materialization. Slug now validates the Bazel main-repository patch-label rule
   before failing loudly when supported main-repo override `patches = [...]` are
-  present instead of silently ignoring part of Bazel's behavior. Bazel source
-  anchors: `ModuleFileGlobals.java:522-545`,
-  `ModuleFileFunction.java:823-840`, and
-  `ModuleFileFunctionTest.java:1717-1780`. Focused Plan 61 guardrails cover
-  `single_version_override`, `archive_override`, and `git_override` patch
-  rejection plus the external-repository patch-label error. Validation passed
-  with `cargo test -p slug_bzlmod patches -- --nocapture` (`4 passed`) and
-  explicit-binary Plan 61 pytest selector
+  present, and when `single_version_override(patch_cmds = ...)` or standalone
+  nonzero `patch_strip` would otherwise affect the final repo spec, instead of
+  silently ignoring part of Bazel's behavior. Bazel source anchors:
+  `ModuleFileGlobals.java:522-545` and `:930-995`,
+  `ModuleFileFunction.java:823-840`,
+  `InterimModule.java:252-269`, and
+  `ModuleFileFunctionTest.java:1717-1780` plus `:1803-1928`. Focused Plan 61
+  guardrails cover `single_version_override`, `archive_override`, and
+  `git_override` patch rejection, the external-repository patch-label error,
+  and `single_version_override` patch command/strip rejection. Validation
+  passed with `cargo test -p slug_bzlmod patches -- --nocapture` (`4 passed`),
+  `cargo test -p slug_bzlmod single_version_override_patch -- --nocapture`
+  (`2 passed`), and explicit-binary Plan 61 pytest selector
   `-k 'override_patches_external_repo_labels or
   single_version_override_patches_fail_until_supported or
   archive_override_patches_fail_until_supported or
   git_override_patches_fail_until_supported'` (`4 passed, 129 deselected`).
+  Follow-up explicit-binary selector
+  `-k 'single_version_override_patches_fail_until_supported or
+  single_version_override_patch_cmds_and_strip_fail_until_supported'` passed
+  (`2 passed, 132 deselected`).
   Full support still needs DICE-tracked patch-file inputs plus repository
   materialization patch identity.
 - Root `register_toolchains(..., dev_dependency = True)` and
