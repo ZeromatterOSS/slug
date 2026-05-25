@@ -106,7 +106,7 @@ fn create_extension_execution_key_from_aggregation(
         repo_mappings.repo_mappings.as_ref().clone(),
         repo_mappings.repo_mapping_overrides.as_ref().clone(),
         bzl_transitive_digest,
-        Some(aggregation.workspace_id.clone()),
+        aggregation.workspace_id.clone(),
     )
 }
 
@@ -948,7 +948,7 @@ pub struct ModuleExtensionExecutionKey {
     /// Workspace identity for DICE lookups triggered while executing the
     /// extension. This carries the exact workspace/output-base identity from
     /// the parent DICE key instead of re-deriving it from project root.
-    pub workspace_id: Option<crate::WorkspaceId>,
+    pub workspace_id: crate::WorkspaceId,
 
     /// Hidden lockfile path used as a fallback for replay data and prior facts.
     ///
@@ -1100,7 +1100,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: None,
-            workspace_id: None,
+            workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
@@ -1183,7 +1183,7 @@ impl ModuleExtensionExecutionKey {
             repo_mappings,
             repo_mapping_overrides,
             bzl_transitive_digest,
-            Some(workspace_id),
+            workspace_id,
         )
     }
 
@@ -1201,7 +1201,7 @@ impl ModuleExtensionExecutionKey {
         repo_mappings: RepoMappingSnapshot,
         repo_mapping_overrides: RepoMappingOverrides,
         bzl_transitive_digest: Arc<str>,
-        workspace_id: Option<crate::WorkspaceId>,
+        workspace_id: crate::WorkspaceId,
     ) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
@@ -1257,7 +1257,7 @@ impl ModuleExtensionExecutionKey {
             aggregated,
             root_module_name,
             project_root: Some(project_root),
-            workspace_id: Some(workspace_id),
+            workspace_id,
             hidden_lockfile_path,
             visible_lockfile_digest,
             hidden_lockfile_digest,
@@ -1282,7 +1282,7 @@ impl ModuleExtensionExecutionKey {
             aggregated: Arc::new(AggregatedExtension::default()),
             root_module_name: Arc::from("_main"),
             project_root: None,
-            workspace_id: None,
+            workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
             hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
@@ -1341,13 +1341,8 @@ impl ModuleExtensionExecutionKey {
         }
     }
 
-    fn execution_workspace_id(&self) -> Result<crate::WorkspaceId, ModuleExtensionError> {
-        self.workspace_id
-            .clone()
-            .ok_or_else(|| ModuleExtensionError::ExecutionFailed {
-                extension_id: self.extension_id.to_string(),
-                reason: "missing DICE workspace identity for module extension execution".to_owned(),
-            })
+    fn execution_workspace_id(&self) -> crate::WorkspaceId {
+        self.workspace_id.clone()
     }
 }
 
@@ -1611,7 +1606,7 @@ impl Key for ModuleExtensionExecutionKey {
         );
 
         // 2. Create temporary working directory for module_ctx I/O
-        let workspace_id = self.execution_workspace_id()?;
+        let workspace_id = self.execution_workspace_id();
         record_bzlmod_event(BzlmodEventKind::ExtensionEval, self.extension_id.as_ref());
         let temp_dir = create_temp_extension_dir(&self.extension_id)?;
 
@@ -3020,7 +3015,7 @@ mod tests {
             crate::RepoMappingSnapshot::new(),
             crate::RepoMappingOverrides::new(),
             Arc::from("bzl-digest"),
-            Some(workspace_id),
+            workspace_id,
         );
         let mut dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -3094,7 +3089,7 @@ mod tests {
             crate::RepoMappingSnapshot::new(),
             crate::RepoMappingOverrides::new(),
             Arc::from("bzl-digest"),
-            Some(workspace_id),
+            workspace_id,
         );
         let mut dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -3394,7 +3389,7 @@ mod tests {
         assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
         assert!(key.project_root.is_some());
         assert_eq!(key.project_root().unwrap(), &PathBuf::from("/tmp/project"));
-        let workspace_id = key.workspace_id.as_ref().unwrap();
+        let workspace_id = &key.workspace_id;
         assert_eq!(
             workspace_id.canonical_project_root.as_ref(),
             &PathBuf::from("/tmp/project")
@@ -3406,17 +3401,19 @@ mod tests {
     }
 
     #[test]
-    fn test_extension_execution_requires_workspace_id() {
+    fn test_extension_execution_carries_workspace_id() {
         use crate::extensions::AggregatedExtension;
 
-        let missing = ModuleExtensionExecutionKey::new(
+        let minimal = ModuleExtensionExecutionKey::new(
             AggregatedExtension::new("@@module//ext.bzl", "test"),
             "_main".to_owned(),
         );
-        let err = missing.execution_workspace_id().unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("missing DICE workspace identity for module extension execution")
+        assert_eq!(
+            minimal
+                .execution_workspace_id()
+                .canonical_project_root
+                .as_ref(),
+            &PathBuf::from("__test__")
         );
 
         let present = ModuleExtensionExecutionKey::new_with_lockfile(
@@ -3434,7 +3431,6 @@ mod tests {
         assert_eq!(
             present
                 .execution_workspace_id()
-                .unwrap()
                 .canonical_project_root
                 .as_ref(),
             &PathBuf::from("/tmp/project")
@@ -3497,10 +3493,10 @@ mod tests {
             crate::RepoMappingSnapshot::new(),
             crate::RepoMappingOverrides::new(),
         );
-        key3.workspace_id = Some(crate::WorkspaceId::new(
+        key3.workspace_id = crate::WorkspaceId::new(
             PathBuf::from("/project1"),
             PathBuf::from("/alternate-output-base"),
-        ));
+        );
 
         assert_ne!(key1, key3);
 
@@ -3801,7 +3797,7 @@ mod tests {
                 crate::RepoMappingSnapshot::new(),
                 crate::RepoMappingOverrides::new(),
                 Arc::from("bzl-digest"),
-                Some(workspace_id),
+                workspace_id,
             )
         }
 

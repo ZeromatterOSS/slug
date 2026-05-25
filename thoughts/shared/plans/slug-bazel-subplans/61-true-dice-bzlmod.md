@@ -2137,6 +2137,14 @@ Observed SDK result at the checkpoint:
   extension_repo_key -- --nocapture`, `cargo test -p slug_bzlmod
   materialization_manifest -- --nocapture`, `cargo check -p slug_bzlmod -p
   slug_external_cells -p slug_common`, and `git diff --check`.
+- `ModuleExtensionExecutionKey` now requires workspace identity instead of
+  storing optional provenance. Production extension execution keys still inherit
+  the aggregation workspace, while test-only minimal constructors use an
+  explicit test sentinel instead of modeling an absent-workspace production
+  state. Validation passed with `cargo fmt --check`, `cargo test -p
+  slug_bzlmod extension_execution -- --nocapture`, `cargo test -p
+  slug_bzlmod replay_input_data -- --nocapture`, `cargo check -p slug_bzlmod
+  -p slug_external_cells`, and `git diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -3364,6 +3372,8 @@ using Rust DICE keys and values:
      materialization-manifest helpers that derive workspace identity from only a
      project root are also test-only. Zero-repo-env convenience constructors
      for extension execution and materialization manifests are test-only too.
+     Module extension execution keys require workspace identity instead of
+     carrying optional provenance.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key/context inputs as the graph migrates.
