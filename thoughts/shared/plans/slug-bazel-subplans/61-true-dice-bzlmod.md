@@ -301,14 +301,15 @@ Observed SDK result at the checkpoint:
   registry module instead of reusing the old graph. The same metadata path is
   covered for `multiple_version_override(registry = ...)` deletion, parse, and
   UTF-8 failures, and `single_version_override(registry = ...)` now has
-  deletion-transition coverage for the override registry's selected
-  `source.json`.
+  deletion-transition and UTF-8 failure coverage for the override registry's
+  selected `source.json`.
   Validation passed with `-k
   'single_version_override_registry_source_json_parse_failure or
   multiple_version_override_registry_source_json_utf8_failure'` (`2 passed, 116
   deselected`) and with `-k
   'single_version_override_registry_source_json_delete'` (`1 passed, 122
-  deselected`); the multiple-version guardrail selected by
+  deselected`) after adding delete-plus-repair and UTF-8-plus-repair to that
+  flow; the multiple-version guardrail selected by
   `-k 'multiple_version_override_registry_source_json_utf8_failure'` now covers
   delete-plus-repair and parse-plus-repair before the UTF-8 transition (`1
   passed, 122 deselected`).
@@ -2643,8 +2644,9 @@ using Rust DICE keys and values:
      coverage.
    - Model registry selection and source metadata for overrides. Single-version
      override registry source metadata has same-daemon parse-failure and
-     deletion coverage; multiple-version override registry source metadata has
-     same-daemon deletion, parse-failure, and UTF-8 failure coverage.
+     deletion/UTF-8 coverage; multiple-version override registry source
+     metadata has same-daemon deletion, parse-failure, and UTF-8 failure
+     coverage.
 
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
