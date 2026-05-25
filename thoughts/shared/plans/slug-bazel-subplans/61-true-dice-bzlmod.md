@@ -2299,6 +2299,15 @@ What did not work or remains risky:
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-direct-key-target cargo check -p
   slug_bzlmod` and `cargo test -p slug_bzlmod execution_key -- --nocapture`
   (`3 passed, 329 filtered out`).
+- The production no-op `record_invocation` export was removed from
+  `slug_bzlmod`; only the test registry hook remains. Non-extension
+  `repository_rule()` invocation now explicitly does not write to the removed
+  transitional hook, while MODULE.bazel repository directives continue to be
+  captured through module globals. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-record-hook-target cargo check -p
+  slug_bzlmod -p slug_interpreter_for_build` and `cargo test -p slug_bzlmod
+  repository_invocations -- --nocapture` (`6 passed, 326 filtered out`).
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

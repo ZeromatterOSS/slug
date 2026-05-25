@@ -204,7 +204,6 @@ pub use repository_execution::repo_execution_spec_hash;
 pub use repository_executor::repository_output_digest;
 pub use repository_invocations::AttrValue as RepoAttrValue;
 pub use repository_invocations::RepositoryInvocation;
-pub use repository_invocations::record_invocation;
 pub use resolution::AllowedYankedVersions;
 pub use resolution::ModuleKey;
 pub use resolution::ModuleSource;

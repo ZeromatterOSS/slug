@@ -239,11 +239,6 @@ pub fn record_invocation(invocation: RepositoryInvocation) {
     });
 }
 
-/// Production MODULE.bazel parsing records repository-rule directives directly
-/// in `ModuleFileContext`; there is no caller-managed registry to update here.
-#[cfg(not(test))]
-pub fn record_invocation(_invocation: RepositoryInvocation) {}
-
 /// Check if there's an active registry for the current thread.
 #[cfg(test)]
 fn has_active_registry() -> bool {

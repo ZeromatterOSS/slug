@@ -56,9 +56,7 @@ use allocative::Allocative;
 use derive_more::Display;
 use slug_bzlmod::RepoAttrValue;
 use slug_bzlmod::RepoSpec;
-use slug_bzlmod::RepositoryInvocation;
 use slug_bzlmod::in_extension_context;
-use slug_bzlmod::record_invocation;
 use slug_bzlmod::record_repo_spec;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
@@ -109,11 +107,6 @@ enum RepositoryRuleError {
     RuleCalledBeforeFreezing,
     #[error("Repository rule `name` attribute is required")]
     NameAttributeRequired,
-}
-
-/// Convert a Starlark value to a RepoAttrValue for recording invocations.
-fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
-    starlark_to_repo_attr_value_with_label_context(value, None)
 }
 
 fn starlark_to_repo_attr_value_with_label_context(
@@ -551,7 +544,8 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
 
         // Check if we're in module extension execution context.
         // In extension context, we capture RepoSpecs for deferred execution.
-        // Outside extension context, we record RepositoryInvocations for immediate tracking.
+        // MODULE.bazel repository directives are captured by module globals, so
+        // a raw repository_rule() call outside extension execution is inert.
         if in_extension_context() {
             let label_context = repo_label_context_from_eval(eval);
             // Build a RepoSpec for deferred execution.
@@ -599,18 +593,12 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
                 self.name,
             );
         } else {
-            // Build the invocation record for MODULE.bazel/WORKSPACE context
-            let mut invocation = RepositoryInvocation::new(name.to_owned(), self.name.clone());
-
-            // Convert all kwargs to RepoAttrValue
-            for (key, value) in kwargs.iter() {
-                let attr_value = starlark_to_repo_attr_value(*value);
-                invocation.attrs.insert(key.as_str().to_owned(), attr_value);
-            }
-
-            // Record the invocation in the thread-local registry
-            // This will be collected after MODULE.bazel/extension parsing completes
-            record_invocation(invocation);
+            tracing::debug!(
+                "Ignoring repository rule '{}' invocation for '{}' outside extension context; \
+                 MODULE.bazel repository directives are captured by module globals",
+                self.name,
+                name,
+            );
         }
 
         Ok(Value::new_none())
