@@ -21,6 +21,7 @@
 //! materialized yet, lazy materialization is triggered via `ExtensionRepoExecutionKey`.
 
 use std::fmt::Display;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -701,12 +702,14 @@ pub(crate) async fn get_file_ops_delegate(
             }
             .into());
         }
-        return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+        return Ok(file_ops_delegate_for_materialized_extension_repo(
             cell_name,
-            setup.canonical_name.to_string(),
+            &project_root_path,
+            &extension_lookup_workspace_id,
+            &setup,
             source_path,
             digest_config,
-        )));
+        ));
     }
     tracing::info!(
         "No current RepoSpec for '{}', resolving extension '{}' via DICE",
@@ -789,12 +792,14 @@ pub(crate) async fn get_file_ops_delegate(
                     .into());
                 }
                 // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
-                return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+                return Ok(file_ops_delegate_for_materialized_extension_repo(
                     cell_name,
-                    setup.canonical_name.to_string(),
+                    &project_root_path,
+                    &extension_lookup_workspace_id,
+                    &setup,
                     source_path,
                     digest_config,
-                )));
+                ));
             }
             Ok(Err(e)) => {
                 return Err(ExtensionRepoError::MaterializationFailed {
@@ -891,25 +896,41 @@ pub(crate) async fn get_file_ops_delegate(
         .into());
     }
 
-    // Create an external_cells/extension_repo/{canonical_name} symlink under the
-    // workspace output base
-    // pointing to bazel-external/{canonical_name}. `resolve_external_cell_source`
-    // in buck_out_path.rs builds action command lines that reference source files
-    // at the output-base path (mirroring how bzlmod cells get a parallel symlink
-    // in legacy_configs/cells.rs). Without this, gcc/clang can't find the actual
-    // files.
-    ensure_output_base_extension_repo_symlink(
+    Ok(file_ops_delegate_for_materialized_extension_repo(
+        cell_name,
         &project_root_path,
-        extension_lookup_workspace_id.output_base.as_ref(),
+        &extension_lookup_workspace_id,
+        &setup,
+        source_path,
+        digest_config,
+    ))
+}
+
+fn file_ops_delegate_for_materialized_extension_repo(
+    cell_name: CellName,
+    project_root: &Path,
+    workspace_id: &slug_bzlmod::WorkspaceId,
+    setup: &ExtensionRepoCellSetup,
+    source_path: PathBuf,
+    digest_config: DigestConfig,
+) -> Arc<dyn FileOpsDelegate> {
+    // Create an external_cells/extension_repo/{canonical_name} symlink under the
+    // workspace output base pointing to bazel-external/{canonical_name}.
+    // `resolve_external_cell_source` in buck_out_path.rs builds action command
+    // lines that reference source files at the output-base path (mirroring how
+    // bzlmod cells get a parallel symlink in legacy_configs/cells.rs).
+    ensure_output_base_extension_repo_symlink(
+        project_root,
+        workspace_id.output_base.as_ref(),
         &setup.canonical_name,
     );
 
-    Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+    Arc::new(ExtensionRepoFileOpsDelegate::new(
         cell_name,
         setup.canonical_name.to_string(),
         source_path,
         digest_config,
-    )))
+    ))
 }
 
 /// Create `external_cells/extension_repo/{canonical_name}` under the workspace
@@ -1107,6 +1128,45 @@ mod tests {
                 .exists()
         );
 
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn extension_repo_delegate_replays_workspace_output_base_symlink() {
+        let base = std::env::temp_dir().join(format!(
+            "slug-extension-delegate-link-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        let project_root = base.join("project");
+        let output_base = base.join("custom-output");
+        let canonical_name = "_main+ext+delegate_repo";
+        let source = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&source).unwrap();
+        let workspace_id = slug_bzlmod::WorkspaceId::new(project_root.clone(), output_base.clone());
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical_name),
+            extension_id: Arc::from("@_main//:ext.bzl%ext"),
+            internal_name: Arc::from("delegate_repo"),
+            spec_hash: Arc::from("sha256-test"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: true,
+        };
+
+        let _delegate = file_ops_delegate_for_materialized_extension_repo(
+            CellName::testing_new(canonical_name),
+            &project_root,
+            &workspace_id,
+            &setup,
+            source.clone(),
+            DigestConfig::testing_default(),
+        );
+
+        let explicit_link = output_base
+            .join("external_cells/extension_repo")
+            .join(canonical_name);
+        assert_eq!(std::fs::read_link(explicit_link).unwrap(), source);
         let _ = std::fs::remove_dir_all(&base);
     }
 

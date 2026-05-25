@@ -2220,6 +2220,17 @@ Observed SDK result at the checkpoint:
   extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
   `cargo test -p slug_external_cells extension_repo -- --nocapture`, `cargo
   check -p slug_external_cells -p slug_bzlmod`, and `git diff --check`.
+- Successful extension repo file-ops delegate creation now always replays the
+  output-base `external_cells/extension_repo/<canonical>` symlink through a
+  single helper, including known-spec and use_repo_rule early-return paths.
+  Previously only the late extension-execution branch replayed that symlink,
+  which left some materialized repos without the output-base source path used
+  by action command lines. Validation passed with `cargo fmt --check`, `cargo
+  test -p slug_external_cells
+  extension_repo_delegate_replays_workspace_output_base_symlink --
+  --nocapture`, `cargo test -p slug_external_cells extension_repo --
+  --nocapture`, `cargo check -p slug_external_cells -p slug_bzlmod`, and `git
+  diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
