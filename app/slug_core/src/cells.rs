@@ -1141,7 +1141,7 @@ fn desired_external_symlink_target(
 ) -> (std::path::PathBuf, u8) {
     let target = external_symlink_target(project_root, cell_path);
     let priority = module_form_priority(cell_path);
-    if cell_name.contains('+') {
+    if cell_name.contains('+') || !dynamic_bzlmod_directory_scan_allowed() {
         return (target, priority);
     }
     if let Some(module_target) = preferred_module_form_target(project_root, cell_name, priority) {
@@ -1154,6 +1154,9 @@ fn desired_external_symlink_target(
 }
 
 pub fn repair_external_symlink_targets(project_root: &std::path::Path) {
+    if !dynamic_bzlmod_directory_scan_allowed() {
+        return;
+    }
     let external_dir = project_root.join("external");
     let Ok(entries) = std::fs::read_dir(&external_dir) else {
         return;
@@ -1282,7 +1285,10 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
                         // the right files.
                         let current_str = current.to_string_lossy();
                         let current_priority = module_form_priority(&current_str);
-                        if current_priority > desired_priority {
+                        if dynamic_bzlmod_directory_scan_allowed()
+                            && !cell_name.contains('+')
+                            && current_priority > desired_priority
+                        {
                             tracing::debug!(
                                 "ensure_external_symlink: keeping {} (was {} pri={}, would be {} pri={})",
                                 link_path.display(),
@@ -3776,6 +3782,30 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn workspace_scoped_external_symlink_replaces_stale_physical_fallback() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("out");
+        let apparent = "rustc_linux_x86_64_1_95_0";
+        let stale = "rules_rs++toolchains+rustc_linux_x86_64_1_95_0";
+        let apparent_path = tmp.path().join("bazel-external").join(apparent);
+        let stale_path = tmp.path().join("bazel-external").join(stale);
+        std::fs::create_dir_all(&apparent_path).unwrap();
+        std::fs::create_dir_all(&stale_path).unwrap();
+        std::fs::create_dir(tmp.path().join("external")).unwrap();
+        std::os::unix::fs::symlink(&stale_path, tmp.path().join("external").join(apparent))
+            .unwrap();
+        reset_dynamic_bzlmod_state_for_workspace(tmp.path().to_path_buf(), output);
+
+        let apparent_cell_path = format!("bazel-external/{apparent}");
+        ensure_external_symlinks_for_cells(&[(apparent, apparent_cell_path.as_str())]);
+
+        let repaired = std::fs::read_link(tmp.path().join("external").join(apparent)).unwrap();
+        assert_eq!(repaired, apparent_path);
+    }
+
+    #[test]
     fn cell_alias_resolver_prefers_scoped_bzlmod_repo_alias() -> slug_error::Result<()> {
         let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir()?;
@@ -4020,6 +4050,7 @@ mod tests {
 
     #[test]
     fn desired_external_symlink_target_prefers_module_form_for_apparent_alias() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let project_root = tmp.path();
         let bazel_external = project_root.join("bazel-external");
@@ -4027,6 +4058,7 @@ mod tests {
         let extension_repo = bazel_external.join("rules_foreign_cc++ext+rules_python");
         std::fs::create_dir_all(&module_repo).unwrap();
         std::fs::create_dir_all(&extension_repo).unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(project_root.to_path_buf());
 
         let (target, priority) = desired_external_symlink_target(
             project_root,
@@ -4040,6 +4072,7 @@ mod tests {
 
     #[test]
     fn desired_external_symlink_target_keeps_canonical_extension_cell() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let project_root = tmp.path();
         let bazel_external = project_root.join("bazel-external");
@@ -4047,6 +4080,7 @@ mod tests {
         let extension_repo = bazel_external.join("rules_foreign_cc++ext+rules_python");
         std::fs::create_dir_all(&module_repo).unwrap();
         std::fs::create_dir_all(&extension_repo).unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(project_root.to_path_buf());
 
         let (target, priority) = desired_external_symlink_target(
             project_root,
@@ -4060,11 +4094,12 @@ mod tests {
 
     #[test]
     fn ensure_external_symlinks_for_cells_creates_canonical_module_link() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let project_root = tmp.path();
         let module_repo = project_root.join("bazel-external").join("rules_python+");
         std::fs::create_dir_all(&module_repo).unwrap();
-        set_dynamic_project_root(project_root.to_path_buf());
+        reset_dynamic_bzlmod_state_for_project_root(project_root.to_path_buf());
 
         ensure_external_symlinks_for_cells(&[("rules_python", "bazel-external/rules_python+")]);
 
@@ -4111,6 +4146,7 @@ mod tests {
 
     #[test]
     fn repair_external_symlink_targets_collapses_symlink_chain() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
         let external = root.join("external");
@@ -4148,6 +4184,7 @@ mod tests {
             .unwrap();
         }
 
+        reset_dynamic_bzlmod_state_for_project_root(root.to_path_buf());
         repair_external_symlink_targets(root);
 
         assert_eq!(
@@ -4158,6 +4195,7 @@ mod tests {
 
     #[test]
     fn repair_external_symlink_targets_prefers_double_plus_canonical_repo() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
         let external = root.join("external");
@@ -4185,6 +4223,7 @@ mod tests {
         )
         .unwrap();
 
+        reset_dynamic_bzlmod_state_for_project_root(root.to_path_buf());
         repair_external_symlink_targets(root);
 
         assert_eq!(
@@ -4195,6 +4234,7 @@ mod tests {
 
     #[test]
     fn repair_external_symlink_targets_prefers_module_form_over_extension_repo() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
         let external = root.join("external");
@@ -4222,6 +4262,7 @@ mod tests {
         )
         .unwrap();
 
+        reset_dynamic_bzlmod_state_for_project_root(root.to_path_buf());
         repair_external_symlink_targets(root);
 
         assert_eq!(

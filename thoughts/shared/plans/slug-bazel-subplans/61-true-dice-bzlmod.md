@@ -2210,17 +2210,19 @@ Observed SDK result at the checkpoint:
   tests/core/bzlmod/test_plan61_guardrails.py` (146 passed), and `git diff
   --check`. The test-created `slugd` daemons were cleaned up after the Python
   guardrail run.
-- Workspace-scoped action external-name formatting no longer uses shared
-  `external/` symlinks or physical `bazel-external` suffix scans as canonical
-  generated-repo evidence. It can still use explicit current-scope dynamic
-  registrations and canonical `bazel-external/<repo-with-plus>` cell paths, but
-  stale project-root filesystem state cannot rewrite apparent names for another
-  output-base workspace. Validation passed with `cargo fmt --check`, `cargo
-  test -p slug_core
-  workspace_scoped_action_external_cell_name_ignores_physical_fallbacks --
-  --nocapture`, `cargo test -p slug_core action_external_cell_name --
-  --nocapture`, `cargo test -p slug_core dynamic_extension -- --nocapture`,
-  `cargo check -p slug_core`, and `git diff --check`.
+- Workspace-scoped action external-name formatting and `external/` symlink
+  repair no longer use shared `external/` symlinks or physical
+  `bazel-external` suffix scans as canonical generated-repo evidence. They can
+  still use explicit current-scope dynamic registrations and canonical
+  `bazel-external/<repo-with-plus>` cell paths, but stale project-root
+  filesystem state cannot rewrite apparent names or preserve a stale
+  `external/<apparent>` link for another output-base workspace. Validation
+  passed with `cargo fmt --check`, `cargo test -p slug_core
+  workspace_scoped_external_symlink_replaces_stale_physical_fallback --
+  --nocapture`, `cargo test -p slug_core external_symlink -- --nocapture`,
+  `cargo test -p slug_core cells::tests -- --nocapture --test-threads=1`,
+  `cargo test -p slug_core dynamic_extension -- --nocapture`, `cargo check -p
+  slug_core`, and `git diff --check`.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
