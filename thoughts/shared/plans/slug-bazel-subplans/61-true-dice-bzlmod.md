@@ -2179,6 +2179,24 @@ What did not work or remains risky:
   materialization_manifest_key_observes_marker_state_dependency -- --nocapture`,
   plus `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git diff
   --check`.
+- Repository materialization marker state is now split into named manifest child
+  keys: `RepoMaterializationMarkerContentKey` reads the local-rule marker and
+  `.slug_repo_complete` content, while `RepoMaterializationOutputDigestKey`
+  computes the output-tree digest only when the complete marker names an
+  expected digest. The exposed marker-state strings are unchanged, but the DICE
+  graph now has an auditable child dependency for marker content and output
+  integrity. A clean review of the previous recorded-input slice caught that
+  the test-only direct manifest helper still referenced the deleted
+  synchronous recorded-input helper; that direct helper is now restored as
+  `#[cfg(test)]` code while the production manifest path remains child-keyed.
+  Focused validation passed with `CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-marker-target
+  cargo test -p slug_bzlmod materialization_manifest_key_observes --
+  --nocapture` (`3 passed, 328 filtered out`), `cargo test -p slug_bzlmod
+  materialization_manifest -- --nocapture` (`10 passed, 321 filtered out`),
+  `cargo test -p slug_bzlmod
+  test_archive_repo_manifest_tracks_output_digest_marker_state -- --nocapture`
+  (`1 passed, 330 filtered out`), `cargo check -p slug_bzlmod`, `cargo
+  fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

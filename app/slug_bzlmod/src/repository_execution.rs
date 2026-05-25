@@ -62,6 +62,7 @@ use crate::repository_invocations::RepositoryInvocation;
 
 pub(crate) const REPO_RECORDED_INPUTS_FILE: &str = ".slug_repo_recorded_inputs";
 const REPO_RULE_LOCAL_FILE: &str = ".slug_repo_rule_local";
+const MARKER_CONTENT_PREFIX: &str = "marker-content:";
 
 /// Errors that can occur during repository rule execution.
 #[derive(Debug, slug_error::Error)]
@@ -500,7 +501,19 @@ fn complete_marker_expected_output<'a>(marker: &'a str, spec_hash: &str) -> Opti
     marker.strip_prefix(&format!("complete:{spec_hash}:output:"))
 }
 
+#[cfg(test)]
 fn complete_marker_state(marker: &str, spec_hash: &str, repo_dir: &Path) -> String {
+    complete_marker_state_with_output_digest(marker, spec_hash, || {
+        crate::repository_executor::repository_output_digest(repo_dir).map_err(|e| e.to_string())
+    })
+}
+
+#[cfg(test)]
+fn complete_marker_state_with_output_digest(
+    marker: &str,
+    spec_hash: &str,
+    current_output_digest: impl FnOnce() -> Result<String, String>,
+) -> String {
     let marker = marker.trim();
     if !complete_marker_matches(marker, spec_hash) {
         return format!("marker-mismatch:{marker}");
@@ -508,7 +521,7 @@ fn complete_marker_state(marker: &str, spec_hash: &str, repo_dir: &Path) -> Stri
     let Some(expected_output_digest) = complete_marker_expected_output(marker, spec_hash) else {
         return format!("marker:{marker}");
     };
-    match crate::repository_executor::repository_output_digest(repo_dir) {
+    match current_output_digest() {
         Ok(current_output_digest) if current_output_digest == expected_output_digest => {
             format!("marker:{marker}")
         }
@@ -640,6 +653,18 @@ fn repo_materialization_manifest_for_key(
     )
 }
 
+#[cfg(test)]
+fn repo_materialization_recorded_inputs_state_for_key(
+    key: &RepoMaterializationManifestKey,
+) -> String {
+    let repo_dir = repo_dir_for_materialization_manifest_key(key);
+    match repository_recorded_inputs_digest(&repo_dir, Some(key.repo_env.as_ref())) {
+        Ok(Some(digest)) => format!("inputs:{digest}:valid"),
+        Ok(None) => "inputs:none".to_owned(),
+        Err(reason) => format!("inputs-invalid:{reason}"),
+    }
+}
+
 fn repo_dir_for_materialization_manifest_key(key: &RepoMaterializationManifestKey) -> PathBuf {
     let canonical_name = key.canonical_repo.as_ref();
     key.workspace_id
@@ -648,24 +673,52 @@ fn repo_dir_for_materialization_manifest_key(key: &RepoMaterializationManifestKe
         .join(canonical_name)
 }
 
+#[cfg(test)]
 fn repo_materialization_marker_state_for_key(key: &RepoMaterializationManifestKey) -> String {
+    let content_state = repo_materialization_marker_content_state_for_key(key);
+    repo_materialization_marker_state_from_content_state(
+        key.repo_spec_digest.as_ref(),
+        &repo_dir_for_materialization_manifest_key(key),
+        &content_state,
+    )
+}
+
+#[cfg(test)]
+fn repo_materialization_marker_content_state_for_key(
+    key: &RepoMaterializationManifestKey,
+) -> String {
     let repo_spec = key.repo_spec.as_ref();
-    let spec_hash = key.repo_spec_digest.as_ref();
     let repo_dir = repo_dir_for_materialization_manifest_key(key);
+    repo_materialization_marker_content_state(repo_spec.local, &repo_dir)
+}
+
+fn repo_materialization_marker_content_state(repo_spec_local: bool, repo_dir: &Path) -> String {
     let marker_path = repo_dir.join(".slug_repo_complete");
-    if repo_spec.local || repo_dir.join(REPO_RULE_LOCAL_FILE).exists() {
+    if repo_spec_local || repo_dir.join(REPO_RULE_LOCAL_FILE).exists() {
         "local-rule".to_owned()
     } else if marker_path.exists() {
         match std::fs::read_to_string(&marker_path) {
             Ok(marker) => {
                 let trimmed = marker.trim();
-                complete_marker_state(trimmed, spec_hash, &repo_dir)
+                format!("{MARKER_CONTENT_PREFIX}{trimmed}")
             }
             Err(e) => format!("marker-unreadable:{e}"),
         }
     } else {
         "marker-absent".to_owned()
     }
+}
+
+#[cfg(test)]
+fn repo_materialization_marker_state_from_content_state(
+    spec_hash: &str,
+    repo_dir: &Path,
+    content_state: &str,
+) -> String {
+    let Some(marker) = content_state.strip_prefix(MARKER_CONTENT_PREFIX) else {
+        return content_state.to_owned();
+    };
+    complete_marker_state(marker, spec_hash, repo_dir)
 }
 
 fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKey) -> String {
@@ -787,10 +840,44 @@ impl Key for RepoMaterializationMarkerStateKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Arc::from(repo_materialization_marker_state_for_key(&self.0).as_str())
+        let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
+        let content_key = RepoMaterializationMarkerContentKey {
+            repo_spec_local: self.0.repo_spec.local,
+            repo_dir: Arc::new(repo_dir.clone()),
+        };
+        let content_state = match ctx.compute(&content_key).await {
+            Ok(content_state) => content_state,
+            Err(e) => return Arc::from(format!("marker-unreadable:{e}").as_str()),
+        };
+        let Some(marker) = content_state.strip_prefix(MARKER_CONTENT_PREFIX) else {
+            return content_state;
+        };
+        let spec_hash = self.0.repo_spec_digest.as_ref();
+        if !complete_marker_matches(marker, spec_hash) {
+            return Arc::from(format!("marker-mismatch:{marker}").as_str());
+        }
+        let Some(expected_output_digest) = complete_marker_expected_output(marker, spec_hash)
+        else {
+            return Arc::from(format!("marker:{marker}").as_str());
+        };
+        let output_digest_key = RepoMaterializationOutputDigestKey {
+            repo_dir: Arc::new(repo_dir),
+        };
+        match ctx.compute(&output_digest_key).await {
+            Ok(Ok(current_output_digest))
+                if current_output_digest.as_ref() == expected_output_digest =>
+            {
+                Arc::from(format!("marker:{marker}").as_str())
+            }
+            Ok(Ok(current_output_digest)) => Arc::from(
+                format!("marker-output-mismatch:{marker}:current:{current_output_digest}").as_str(),
+            ),
+            Ok(Err(e)) => Arc::from(format!("marker-output-unreadable:{marker}:{e}").as_str()),
+            Err(e) => Arc::from(format!("marker-output-unreadable:{marker}:{e}").as_str()),
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -802,6 +889,75 @@ impl Key for RepoMaterializationMarkerStateKey {
         // slug_common's project file watcher without creating a crate cycle.
         // Keeping it as a child key lets unchanged state cut off the parent
         // manifest while changed state invalidates repository execution.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display(
+    "RepoMaterializationMarkerContentKey({}, {})",
+    repo_spec_local,
+    repo_dir.display()
+)]
+struct RepoMaterializationMarkerContentKey {
+    repo_spec_local: bool,
+    repo_dir: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationMarkerContentKey {
+    type Value = Arc<str>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Arc::from(
+            repo_materialization_marker_content_state(self.repo_spec_local, &self.repo_dir)
+                .as_str(),
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display("RepoMaterializationOutputDigestKey({})", repo_dir.display())]
+struct RepoMaterializationOutputDigestKey {
+    repo_dir: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationOutputDigestKey {
+    type Value = Result<Arc<str>, Arc<str>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        crate::repository_executor::repository_output_digest(&self.repo_dir)
+            .map(|digest| Arc::from(digest.as_str()))
+            .map_err(|e| {
+                let reason = e.to_string();
+                Arc::from(reason.as_str())
+            })
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
         false
     }
 }
@@ -2173,6 +2329,54 @@ mod tests {
         let second = dice.compute(&key).await.unwrap().unwrap();
         assert_ne!(first.digest, second.digest);
         assert_eq!(second.marker_state.as_ref(), format!("marker:{marker}"));
+    }
+
+    #[tokio::test]
+    async fn materialization_manifest_key_observes_marker_output_digest_dependency() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+archive_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.invalid/archive.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let spec_hash = repo_spec.compute_hash();
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        let marker = complete_marker(&spec_hash, &output_digest);
+        std::fs::write(repo_dir.join(".slug_repo_complete"), format!("{marker}\n")).unwrap();
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await.unwrap().unwrap();
+        assert_eq!(first.marker_state.as_ref(), format!("marker:{marker}"));
+
+        std::fs::write(repo_dir.join("data.txt"), "corrupt").unwrap();
+
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await.unwrap().unwrap();
+        assert_ne!(first.digest, second.digest);
+        assert!(second.marker_state.starts_with("marker-output-mismatch:"));
     }
 
     #[tokio::test]
