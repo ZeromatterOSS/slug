@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`129 passed in 93.12s`) after rebuilding `target/debug/slug`.
+  (`130 passed in 98.72s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -897,18 +897,22 @@ Observed SDK result at the checkpoint:
   'locked_registry_module_delete'` (`1 passed, 119 deselected`) plus the
   creation guardrail selected by `-k 'locked_registry_module_creation'` (`1
   passed, 127 deselected`).
-- Locked top-level registry metadata now has deletion, parse-error, and
-  invalid-UTF-8 coverage: after a warm same-daemon registry module resolution,
-  deleting cached `bazel_registry.json` while the visible lockfile still
-  carries its checksum fails the next `audit cell` with a registry checksum
-  error, and corrupting the same file with a matching lockfile hash fails
-  during registry metadata parsing instead of reusing the stale warm graph.
+- Locked top-level registry metadata now has creation, deletion, parse-error,
+  and invalid-UTF-8 coverage: after a warm same-daemon registry module
+  resolution, deleting cached `bazel_registry.json` while the visible lockfile
+  still carries its checksum fails the next `audit cell` with a registry
+  checksum error, and corrupting the same file with a matching lockfile hash
+  fails during registry metadata parsing instead of reusing the stale warm graph.
+  A missing-to-present case starts with a locked missing metadata file, creates
+  the exact bytes named by the lockfile hash, and then warms cleanly.
   The Slug parse check is anchored to Bazel's `IndexRegistry`, which treats
   blank JSON as absent metadata and otherwise parses top-level
   `bazel_registry.json` into its `BazelRegistryJson` metadata shape before using
   registry mirrors. Validation passed with the focused guardrail selected by
   `-k 'locked_registry_metadata_parse_and_utf8_failures'` (`1 passed, 125
-  deselected`) and the registry metadata/source subset selected by `-k
+  deselected`), the creation guardrail selected by `-k
+  'locked_registry_metadata_creation'` (`1 passed, 129 deselected`), and the
+  registry metadata/source subset selected by `-k
   'locked_registry_metadata_delete or
   locked_registry_metadata_parse_and_utf8_failures or
   locked_registry_source_json_parse_failure or
@@ -2914,8 +2918,9 @@ using Rust DICE keys and values:
      checksum, parse/UTF-8 failure, and create/delete transitions now have
      same-daemon guardrails, locked registry `MODULE.bazel` parse/UTF-8
      failure and create/delete transitions have same-daemon guardrails, and locked
-     top-level `bazel_registry.json` deletion has same-daemon guardrail coverage;
-     its metadata validation preserves Bazel's blank-JSON-as-absent behavior.
+     top-level `bazel_registry.json` create/delete transitions have same-daemon
+     guardrail coverage; its metadata validation preserves Bazel's
+     blank-JSON-as-absent behavior.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
      have same-daemon warm-reuse, edit-invalidation, and create/delete
      transition guardrails. Both cached override source classes also have
@@ -2931,9 +2936,10 @@ using Rust DICE keys and values:
      cycles; project-local and out-of-project local override coverage now
      includes create/delete, parse/UTF-8 failures, and include cycles. Root
      included segments now have parse/UTF-8 failure, include-cycle, and
-     create/delete coverage. Root and registry `MODULE.bazel` files plus locked
-     registry `source.json` have parse/UTF-8 failure and create/delete coverage;
-     remaining source classes still need full matrix coverage.
+     create/delete coverage. Root `MODULE.bazel` plus locked registry
+     `MODULE.bazel`, `source.json`, and `bazel_registry.json` have parse/UTF-8
+     failure and create/delete coverage; remaining source classes still need full
+     matrix coverage.
    - Model registry selection and source metadata for overrides. Single-version
      override registry source metadata has same-daemon parse-failure and
      deletion/UTF-8 coverage; multiple-version override registry source
