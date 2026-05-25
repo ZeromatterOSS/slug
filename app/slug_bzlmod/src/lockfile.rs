@@ -1387,14 +1387,6 @@ fn read_lockfile_at_path(
     Ok(Some(parsed))
 }
 
-/// Read a lockfile path with explicit Bazel lockfile policy.
-pub fn read_lockfile_path_with_mode(
-    path: &Path,
-    mode: LockfileMode,
-) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
-    read_lockfile_at_path(path.to_path_buf(), mode)
-}
-
 /// Read a hidden lockfile using Bazel's hidden-lockfile policy.
 ///
 /// Bazel parses the hidden output-base lockfile as `update` regardless of the

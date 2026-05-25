@@ -2256,6 +2256,19 @@ What did not work or remains risky:
   cargo test -p slug_bzlmod project_bzl_digest -- --nocapture` (`6 passed,
   326 filtered out`), `cargo check -p slug_bzlmod`, `cargo fmt --check`, and
   `git diff --check`.
+- Two more unused public wrappers were removed from `slug_bzlmod`'s crate
+  root: the root-default extension aggregation wrapper and the explicit
+  lockfile-path reader wrapper. Production callers still use the policy-aware
+  aggregation and lockfile APIs, while the redundant direct wrappers no longer
+  advertise transitional bypass surfaces. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-wrapper-target
+  cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  aggregate_extensions -- --nocapture` (`2 passed, 330 filtered out`), `cargo
+  test -p slug_bzlmod lockfile_reader -- --nocapture` (`2 passed, 330
+  filtered out`), `cargo test -p slug_bzlmod hidden_lockfile -- --nocapture`
+  (`3 passed, 329 filtered out`), `cargo test -p slug_bzlmod
+  malformed_lockfile -- --nocapture` (`3 passed, 329 filtered out`),
+  `cargo fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

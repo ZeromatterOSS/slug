@@ -135,7 +135,7 @@ pub fn aggregate_extensions(
 }
 
 /// Aggregate extension usages, filtering dev_dependency from non-root modules.
-pub fn aggregate_extensions_with_root(
+fn aggregate_extensions_with_root(
     module_extensions: &HashMap<String, Vec<ExtensionUsage>>,
     root_module_name: Option<&str>,
 ) -> HashMap<String, AggregatedExtension> {
