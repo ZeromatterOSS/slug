@@ -260,7 +260,7 @@ impl Key for BzlmodExtensionAggregationKey {
 
 #[async_trait]
 impl Key for ExtensionBzlTransitiveDigestKey {
-    type Value = slug_error::Result<Arc<str>>;
+    type Value = slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>>;
 
     async fn compute(
         &self,
@@ -283,7 +283,9 @@ impl Key for ExtensionBzlTransitiveDigestKey {
                     )
                     .await?
                 {
-                    return Ok(Arc::from(digest));
+                    return Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
+                        digest, true,
+                    )));
                 }
             }
         }
@@ -293,14 +295,14 @@ impl Key for ExtensionBzlTransitiveDigestKey {
                 self.workspace_id.clone(),
             ))
             .await??;
-        Ok(Arc::from(
+        Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
             compute_bzl_transitive_digest_for_project_with_repo_mappings(
                 &self.extension_id,
                 self.workspace_id.canonical_project_root.as_path(),
                 Some(repo_mappings.repo_mappings.as_ref()),
-            )
-            .as_str(),
-        ))
+            ),
+            false,
+        )))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -311,10 +313,29 @@ impl Key for ExtensionBzlTransitiveDigestKey {
     }
 
     fn validity(_x: &Self::Value) -> bool {
-        // The current digest producer still performs best-effort direct
-        // filesystem reads. Recompute it each transaction so parent lookup
-        // keys can cut off only after this scanned digest is refreshed.
-        false
+        match _x {
+            Ok(value) => value.dice_tracked,
+            Err(_) => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct ExtensionBzlTransitiveDigestValue {
+    digest: Arc<str>,
+    dice_tracked: bool,
+}
+
+impl ExtensionBzlTransitiveDigestValue {
+    fn new(digest: String, dice_tracked: bool) -> Self {
+        Self {
+            digest: Arc::from(digest),
+            dice_tracked,
+        }
+    }
+
+    fn digest(&self) -> &str {
+        &self.digest
     }
 }
 
@@ -345,7 +366,7 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
             self.workspace_id.clone(),
             &self.extension_id,
-            &bzl_transitive_digest,
+            bzl_transitive_digest.digest(),
         );
 
         match ctx.compute(&spokes_key).await {
@@ -443,7 +464,7 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
             self.workspace_id.clone(),
             extension_id.as_ref(),
-            &bzl_transitive_digest,
+            bzl_transitive_digest.digest(),
         );
 
         match ctx.compute(&spokes_key).await {
@@ -2416,9 +2437,24 @@ mod tests {
         let failed_canonical_owner: slug_error::Result<Option<Arc<str>>> = Err(
             slug_error::slug_error!(slug_error::ErrorTag::Tier0, "canonical owner failed"),
         );
-        let first_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
-        let same_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("first"));
-        let changed_digest: slug_error::Result<Arc<str>> = Ok(Arc::from("second"));
+        let first_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> =
+            Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
+                "first".to_owned(),
+                true,
+            )));
+        let same_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> = Ok(Arc::new(
+            ExtensionBzlTransitiveDigestValue::new("first".to_owned(), true),
+        ));
+        let changed_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> =
+            Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
+                "second".to_owned(),
+                true,
+            )));
+        let fallback_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> =
+            Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
+                "first".to_owned(),
+                false,
+            )));
 
         assert!(<BzlmodExtensionAggregationKey as Key>::validity(
             &missing_aggregation
@@ -2453,8 +2489,11 @@ mod tests {
             &first_digest,
             &changed_digest
         ));
-        assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
+        assert!(<ExtensionBzlTransitiveDigestKey as Key>::validity(
             &first_digest
+        ));
+        assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
+            &fallback_digest
         ));
     }
 

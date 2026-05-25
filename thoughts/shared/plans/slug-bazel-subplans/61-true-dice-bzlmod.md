@@ -2105,6 +2105,14 @@ What did not work or remains risky:
   (`5 passed`), the eight replay/materialization guardrails exposed by the
   first full run (`8 passed` after the identity/autoload fix), and the full Plan
   61 Python guardrail (`119 passed in 132.46s`).
+- Loaded-graph `ExtensionBzlTransitiveDigestKey` values now carry a tracked
+  source bit: DICE-loaded graph digests are transaction-valid, while fallback
+  literal-scanner digests remain invalid across transactions so missing-load
+  creation can still be observed. Validation passed with `cargo test -p
+  slug_bzlmod extension_spokes_lookup_keys_cache_after_digest_dependency --
+  --nocapture`, `cargo check -p slug_bzlmod -p slug_interpreter_for_build`,
+  `cargo build -p slug`, focused Plan 61 replay/warm-noop guardrails (`4
+  passed`), and the full Plan 61 Python guardrail (`119 passed in 129.83s`).
 - Out-of-project bzlmod text reads used by module-file inputs, includes,
   registry-cache files, and hidden lockfiles now flow through a named
   `AbsoluteTextFileInputKey` child when the parent DICE computation reads the
@@ -2626,7 +2634,9 @@ using Rust DICE keys and values:
      interpreter-side loaded graph digest when the graph loads successfully;
      Slug's implicit `@slug_builtins` autoload is excluded from the Bazel
      lockfile digest, and missing-load cases and non-DICE bootstrap/preseed
-     callers still use the transitional scanner.
+     callers still use the transitional scanner. Loaded-graph digest values are
+     transaction-valid; fallback-scanner digest values remain invalid across
+     transactions.
    - Keep the current external `bazel-external/<repo>` and mapped literal-load
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.
