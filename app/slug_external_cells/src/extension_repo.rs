@@ -524,6 +524,58 @@ fn repo_env_from_setup(
         })
 }
 
+async fn repo_env_for_extension_repo_execution(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: &slug_bzlmod::WorkspaceId,
+    setup: &ExtensionRepoCellSetup,
+    registered_spokes: Option<&Arc<slug_bzlmod::ExtensionSpokesValue>>,
+) -> slug_error::Result<Arc<std::collections::BTreeMap<String, String>>> {
+    if let Some(spokes) = registered_spokes {
+        return Ok(spokes.repo_env.clone());
+    }
+
+    let repo_env = match ctx
+        .compute(&slug_bzlmod::BzlmodRepoEnvKey::for_workspace_id(
+            workspace_id.clone(),
+        ))
+        .await
+    {
+        Ok(Ok(repo_env)) => repo_env,
+        Ok(Err(e)) => {
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: format!(
+                    "Current bzlmod repo-env lookup failed: {}",
+                    diagnostic_summary(&e)
+                ),
+            }
+            .into());
+        }
+        Err(e) => {
+            return Err(ExtensionRepoError::MaterializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: format!(
+                    "DICE error while reading current bzlmod repo-env: {}",
+                    diagnostic_summary(&e)
+                ),
+            }
+            .into());
+        }
+    };
+
+    if !setup.repo_env_json.is_empty() {
+        let setup_repo_env = repo_env_from_setup(setup)?;
+        if setup_repo_env.as_ref() != repo_env.as_ref() {
+            tracing::debug!(
+                "Ignoring stale serialized repo-env for extension repo '{}' in favor of current DICE projection",
+                setup.canonical_name
+            );
+        }
+    }
+
+    Ok(repo_env)
+}
+
 /// Get the file ops delegate for an extension-generated repository cell.
 ///
 /// This computes the expected path for the materialized repository
@@ -566,12 +618,16 @@ pub(crate) async fn get_file_ops_delegate(
     )
     .await?;
     // A dynamic cell origin can outlive the command that created it. Prefer
-    // the current DICE spoke value when this is a module-extension repo.
-    let repo_env = match registered_spokes.as_ref() {
-        Some(spokes) => spokes.repo_env.clone(),
-        None if !setup.repo_env_json.is_empty() => repo_env_from_setup(&setup)?,
-        None => Arc::new(std::collections::BTreeMap::new()),
-    };
+    // the current DICE spoke value when this is a module-extension repo, and
+    // otherwise use the current repo-env projection rather than serialized
+    // setup plumbing.
+    let repo_env = repo_env_for_extension_repo_execution(
+        ctx,
+        &extension_lookup_workspace_id,
+        &setup,
+        registered_spokes.as_ref(),
+    )
+    .await?;
 
     let repo_spec_for_execution = if let Some(spokes) = registered_spokes.as_ref() {
         match spokes
@@ -985,6 +1041,50 @@ mod tests {
             slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"))
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn extension_repo_setup_repo_env_uses_current_dice_projection() -> slug_error::Result<()>
+    {
+        use slug_bzlmod::SetBzlmodProjectionData;
+
+        let project_root =
+            std::env::temp_dir().join(format!("slug-repo-env-workspace-{}", std::process::id()));
+        let output_base =
+            std::env::temp_dir().join(format!("slug-repo-env-output-{}", std::process::id()));
+        let workspace_id = slug_bzlmod::WorkspaceId::new(project_root, output_base);
+        let mut repo_env = std::collections::BTreeMap::new();
+        repo_env.insert("TOKEN".to_owned(), "current".to_owned());
+        let mut projection = slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
+        projection.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
+            workspace_id.clone(),
+            Arc::new(repo_env),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_bzlmod_projection_data(projection)?;
+        let mut dice = updater.commit().await;
+
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from("_main+ext+repo"),
+            extension_id: Arc::from("@_main//:ext.bzl%ext"),
+            internal_name: Arc::from("repo"),
+            spec_hash: Arc::from("sha256-test"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from(r#"{"TOKEN":"stale"}"#),
+            materialized: false,
+        };
+
+        let actual =
+            repo_env_for_extension_repo_execution(&mut dice, &workspace_id, &setup, None).await?;
+
+        assert_eq!(actual.get("TOKEN").map(String::as_str), Some("current"));
         Ok(())
     }
 

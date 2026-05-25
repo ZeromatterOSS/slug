@@ -2210,6 +2210,16 @@ Observed SDK result at the checkpoint:
   tests/core/bzlmod/test_plan61_guardrails.py` (146 passed), and `git diff
   --check`. The test-created `slugd` daemons were cleaned up after the Python
   guardrail run.
+- Extension repo materialization now reads the current command repo-env through
+  `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
+  using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
+  semantic input. The serialized value is still parsed for compatibility
+  validation and can reveal malformed setup state, but stale serialized values
+  no longer drive repository execution. Validation passed with `cargo fmt
+  --check`, `cargo test -p slug_external_cells
+  extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
+  `cargo test -p slug_external_cells extension_repo -- --nocapture`, `cargo
+  check -p slug_external_cells -p slug_bzlmod`, and `git diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -2537,7 +2547,9 @@ What did not work or remains risky:
   exposes repository rule specs remains transitional, and the repo-env key is
   still populated from injected resolver output, but repo-env itself no longer
   comes from the interpreter build-config adapter or a materialization-time
-  injected-session lookup at runtime.
+  injected-session lookup at runtime. Extension repo materialization also
+  prefers that current repo-env key over serialized setup repo-env when a
+  current DICE spoke value is unavailable.
 - Registered toolchain and execution-platform facts now reach analysis through
   narrower DICE values, and the eager-load fast path is keyed by the
   DICE-derived registration signature, but the final `DeclaredToolchainInfo`
