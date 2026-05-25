@@ -35,6 +35,7 @@ pub mod globals;
 pub mod integrity;
 mod lockfile;
 mod module_extension_executor;
+mod module_names;
 mod parser;
 pub mod pending_repo_cells;
 pub mod registry;

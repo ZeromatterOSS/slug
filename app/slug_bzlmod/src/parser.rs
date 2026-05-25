@@ -699,6 +699,51 @@ bazel_dep(name = "rules_cc", version = "0.0.9", repo_name = "cc_rules")
     }
 
     #[test]
+    fn test_parse_invalid_module_names_follow_bazel() {
+        let cases = [
+            r#"
+module(name = "f.", version = "1.0.0")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+bazel_dep(name = "Foo", version = "1.0.0")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+local_path_override(module_name = "_dep", path = "../dep")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+single_version_override(module_name = "dep+", version = "1.0.0")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+multiple_version_override(module_name = "dep+", versions = ["1.0.0", "2.0.0"])
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+archive_override(module_name = "dep+", urls = ["https://example.test/dep.tar.gz"])
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+git_override(
+    module_name = "dep+",
+    remote = "https://example.test/dep.git",
+    commit = "abc123",
+)
+"#,
+        ];
+
+        for content in cases {
+            let err = parse_module_bazel_content(content, "MODULE.bazel")
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("invalid module name"), "{err}");
+            assert!(err.contains("valid names must"), "{err}");
+        }
+    }
+
+    #[test]
     fn test_parse_local_path_override() {
         let content = r#"
 module(name = "test", version = "1.0.0")

@@ -30,6 +30,8 @@ use slug_error::BuckErrorContext;
 use crate::cache::ModuleCache;
 use crate::fetch::SourceFetcher;
 use crate::lockfile::LockfileMode;
+use crate::module_names::invalid_bazel_module_name_message;
+use crate::module_names::is_valid_bazel_module_name;
 use crate::parser::parse_non_root_module_bazel;
 use crate::parser::parse_non_root_module_bazel_content;
 use crate::registry::RegistryClient;
@@ -248,7 +250,8 @@ fn parse_allowed_yanked_versions_entry(
         if !is_valid_bazel_module_name(name) {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
-                "Parsing {context} failed, invalid module name '{name}': valid names must 1) only contain lowercase letters (a-z), digits (0-9), dots (.), hyphens (-), and underscores (_); 2) begin with a lowercase letter; 3) end with a lowercase letter or digit."
+                "Parsing {context} failed, {}",
+                invalid_bazel_module_name_message(name)
             ));
         }
         Version::parse(version).with_buck_error_context(|| {
@@ -258,22 +261,6 @@ fn parse_allowed_yanked_versions_entry(
     }
 
     Ok(false)
-}
-
-fn is_valid_bazel_module_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    if !first.is_ascii_lowercase() {
-        return false;
-    }
-    let last = name.chars().last().unwrap();
-    if !(last.is_ascii_lowercase() || last.is_ascii_digit()) {
-        return false;
-    }
-    name.chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '-' | '_'))
 }
 
 /// Selection group key for MVS algorithm.

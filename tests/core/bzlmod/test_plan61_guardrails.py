@@ -4743,6 +4743,49 @@ local_path_override(module_name = "dep", path = "dep")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_invalid_module_names_fail_at_module_parse(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleFileGlobals.validateModuleName."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    cases = [
+        """module(name = "f.", version = "1.0.0")
+""",
+        """module(name = "plan61_bad_bazel_dep_name")
+bazel_dep(name = "Foo", version = "1.0.0")
+""",
+        """module(name = "plan61_bad_local_override_name")
+local_path_override(module_name = "_dep", path = "../dep")
+""",
+        """module(name = "plan61_bad_single_override_name")
+single_version_override(module_name = "dep+", version = "1.0.0")
+""",
+        """module(name = "plan61_bad_multiple_override_name")
+multiple_version_override(module_name = "dep+", versions = ["1.0.0", "2.0.0"])
+""",
+        """module(name = "plan61_bad_archive_override_name")
+archive_override(module_name = "dep+", urls = ["file:///does/not/matter.tar.gz"])
+""",
+        """module(name = "plan61_bad_git_override_name")
+git_override(
+    module_name = "dep+",
+    remote = "file:///does/not/matter.git",
+    commit = "0000000000000000000000000000000000000000",
+)
+""",
+    ]
+
+    for content in cases:
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert "invalid module name" in str(exc.value)
+        assert "valid names must" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_isolated_extension_usage_fails_until_supported(
     buck: Buck,
 ) -> None:

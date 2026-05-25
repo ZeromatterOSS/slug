@@ -45,6 +45,8 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::UnpackTuple;
 
+use crate::module_names::invalid_bazel_module_name_message;
+use crate::module_names::is_valid_bazel_module_name;
 use crate::types::ArchiveOverride;
 use crate::types::BazelDep;
 use crate::types::ExtensionTag;
@@ -128,6 +130,24 @@ fn validate_override_patch_label(
     Err(starlark::Error::new_other(anyhow::anyhow!(
         "invalid label in 'patches': only patches in the main repository can be applied, not from '@{repo}'"
     )))
+}
+
+fn validate_bazel_module_name(raw_name: &str) -> starlark::Result<()> {
+    if is_valid_bazel_module_name(raw_name) {
+        return Ok(());
+    }
+
+    Err(starlark::Error::new_other(anyhow::anyhow!(
+        "{}",
+        invalid_bazel_module_name_message(raw_name)
+    )))
+}
+
+fn validate_optional_bazel_module_name(raw_name: &str) -> starlark::Result<()> {
+    if raw_name.is_empty() {
+        return Ok(());
+    }
+    validate_bazel_module_name(raw_name)
 }
 
 /// Context for MODULE.bazel evaluation.
@@ -508,6 +528,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                 "module() can only be called once per MODULE.bazel file"
             )));
         }
+        validate_optional_bazel_module_name(name)?;
 
         let parsed_version = if version.is_empty() {
             Version::empty()
@@ -562,6 +583,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        validate_bazel_module_name(name)?;
 
         let parsed_version = if version.is_empty() {
             Version::empty()
@@ -614,6 +636,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        validate_bazel_module_name(module_name)?;
 
         ctx.overrides.push(Override::LocalPath(LocalPathOverride {
             module_name: module_name.to_owned(),
@@ -652,6 +675,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        validate_bazel_module_name(module_name)?;
 
         let parsed_version = if version.is_empty() {
             Version::empty()
@@ -707,6 +731,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        validate_bazel_module_name(module_name)?;
 
         let parsed_versions: Vec<Version> = versions
             .items
@@ -765,6 +790,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        validate_bazel_module_name(module_name)?;
         let patches = validate_and_reject_unsupported_override_patches(
             "archive_override",
             ctx.module.as_ref(),
@@ -822,6 +848,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
+        validate_bazel_module_name(module_name)?;
         let patches = validate_and_reject_unsupported_override_patches(
             "git_override",
             ctx.module.as_ref(),

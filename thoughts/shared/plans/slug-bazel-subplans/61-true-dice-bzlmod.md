@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`135 passed in 105.94s`) after rebuilding `target/debug/slug`.
+  (`136 passed in 105.87s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -387,6 +387,18 @@ Observed SDK result at the checkpoint:
   (`2 passed, 132 deselected`).
   Full support still needs DICE-tracked patch-file inputs plus repository
   materialization patch identity.
+  Bazel module-name validation now runs while parsing `module(name = ...)`,
+  `bazel_dep(name = ...)`, and every override directive's `module_name`,
+  instead of only in later command-line yanked-version parsing. Bazel source
+  anchors: `ModuleFileGlobals.java:70-78`, `:172-180`, `:284`,
+  `:976`, `:1040`, `:1088`, `:1133`, `:1174`, and
+  `ModuleFileFunctionTest.java:1320-1356`. Validation passed with
+  `cargo test -p slug_bzlmod invalid_module_names -- --nocapture`
+  (`1 passed`), `cargo test -p slug_bzlmod
+  allowed_yanked_versions_rejects_bad_format_and_module_name -- --nocapture`
+  (`1 passed`), and the explicit-binary Plan 61 selector
+  `-k 'invalid_module_names_fail_at_module_parse'` (`1 passed, 135
+  deselected`).
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
