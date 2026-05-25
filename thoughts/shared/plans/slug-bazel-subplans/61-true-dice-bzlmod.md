@@ -2233,6 +2233,16 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_core cells::tests -- --nocapture --test-threads=1`,
   `cargo test -p slug_core dynamic_extension -- --nocapture`, `cargo check -p
   slug_core`, and `git diff --check`.
+  A clean reviewing subagent re-reviewed the full action/symlink fallback
+  series after the transition fixes and reported no findings, with focused
+  `slug_core` workspace, external-symlink, and action-external-name tests
+  passing. After rebuilding `target/debug/slug`, the full Plan 61 Python
+  guardrail passed again with
+  `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx
+  --tb=short` (`146 passed in 111.32s`). The four test-created `slugd`
+  daemons were killed by PID after the run, and a follow-up `pgrep -af
+  'target/debug/slugd|slugd'` found no remaining daemon.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
