@@ -591,6 +591,22 @@ Observed SDK result at the checkpoint:
   visible_lockfile_creation_is_observed_in_same_daemon or
   visible_lockfile_deletion_is_observed_in_same_daemon'`, touched-file
   `rustfmt --edition 2024`, and `git diff --check`.
+- `TrackedLockfileContentKey` now reports real tracking provenance: project-root
+  lockfiles remain transaction-valid DICE file dependencies, while
+  out-of-project hidden/output-base lockfiles are explicitly polled children and
+  invalid across transactions. The lockfile-input bridge no longer accepts
+  caller-precomputed visible/hidden poll digests, so poll ownership stays inside
+  the lockfile read key rather than `BzlmodProjectionBridgeDiceKey` assembly.
+  Validation passed with focused `cargo test -p slug_common
+  bzlmod_lockfile_inputs_bridge -- --nocapture`, focused `cargo test -p
+  slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
+  slug_common -p slug_server`, `cargo build -p slug`, selected `pytest
+  tests/core/bzlmod/test_plan61_guardrails.py -k
+  'lockfile_mode_off_does_not_read_lockfiles or
+  visible_lockfile_edit_is_observed_in_same_daemon or
+  visible_lockfile_creation_is_observed_in_same_daemon or
+  visible_lockfile_deletion_is_observed_in_same_daemon'`, touched-file
+  `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -2828,8 +2844,9 @@ using Rust DICE keys and values:
 
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
-     hidden/output-base lockfile bytes are polled into lockfile key identity
-     while the final watched-input graph is still pending.
+     hidden/output-base lockfile bytes use explicit polled child keys and are
+     invalid across transactions while the final watched-input graph is still
+     pending.
    - The projection bridge now gets visible/hidden lockfile values from a named
      lockfile-input bridge key instead of producing those reads inline, but the
      resulting `BzlmodLockfileInputsValue` still feeds the legacy resolver until
