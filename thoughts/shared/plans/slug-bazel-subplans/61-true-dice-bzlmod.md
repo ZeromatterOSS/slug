@@ -2209,6 +2209,16 @@ What did not work or remains risky:
   test -p slug_bzlmod materialization_manifest -- --nocapture` (`11 passed,
   321 filtered out`), `cargo check -p slug_bzlmod`, `cargo fmt --check`, and
   `git diff --check`.
+- Extension repo file-ops no longer recomputes the repository output digest or
+  rewrites `.slug_repo_complete` after `ExtensionRepoExecutionKey` succeeds;
+  marker output-state writing is now left to the repository execution key that
+  owns the materialization manifest. The no-spec fallback still enters DICE
+  execution rather than trusting an existing marker. Focused validation passed
+  with `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-external-target
+  cargo test -p slug_external_cells complete_marker -- --nocapture` (`2
+  passed, 6 filtered out`), `cargo check -p slug_external_cells`, `cargo
+  fmt --check`, and `git diff --check`; an initial run without `TMPDIR` failed
+  because `/tmp` was full.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

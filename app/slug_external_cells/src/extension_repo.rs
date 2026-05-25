@@ -124,6 +124,7 @@ fn repo_names_summary<'a>(repo_names: impl Iterator<Item = &'a str>) -> String {
     }
 }
 
+#[cfg(test)]
 fn complete_marker(spec_hash: &str, output_digest: Option<&str>) -> String {
     match (spec_hash.is_empty(), output_digest) {
         (true, None) => "complete".to_owned(),
@@ -796,34 +797,10 @@ pub(crate) async fn get_file_ops_delegate(
         extension_lookup_workspace_id.clone(),
         repo_env.clone(),
     );
-    let key_spec_hash = key.spec_hash.clone();
 
     // Execute via DICE to materialize the repository
     match ctx.compute(&key).await {
         Ok(Ok(repo_result)) => {
-            if !key_spec_hash.is_empty() {
-                match slug_bzlmod::repository_output_digest(&repo_result.repo_path) {
-                    Ok(output_digest) => {
-                        if let Err(e) = std::fs::write(
-                            repo_result.repo_path.join(".slug_repo_complete"),
-                            complete_marker(&key_spec_hash, Some(&output_digest)),
-                        ) {
-                            tracing::warn!(
-                                "Failed to write spec-hashed completion marker for '{}': {}",
-                                setup.canonical_name,
-                                e
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to compute output-state marker for '{}': {}",
-                            setup.canonical_name,
-                            e
-                        );
-                    }
-                }
-            }
             tracing::info!(
                 "Successfully materialized extension repo '{}' at {:?}",
                 setup.canonical_name,
