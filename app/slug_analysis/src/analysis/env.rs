@@ -4300,6 +4300,10 @@ async fn run_analysis_with_env_underlying(
             "rule_impl_evaluator_start",
             evaluate_rule_started,
         );
+        let analysis_cell_alias_resolver = Some(
+            dice.get_cell_alias_resolver(analysis_env.label.pkg().cell_name())
+                .await?,
+        );
         let (ctx, list_res) = reentrant_eval.with_evaluator(|mut eval| {
             eval.set_print_handler(&print);
             eval.set_soft_error_handler(&SlugStarlarkSoftErrorHandler);
@@ -4313,6 +4317,7 @@ async fn run_analysis_with_env_underlying(
                 eval.heap(),
                 Some(attributes),
                 Some(analysis_env.label.dupe()),
+                analysis_cell_alias_resolver,
                 Some(plugins.into()),
                 registry,
                 dice.global_data().get_digest_config(),

@@ -3221,6 +3221,21 @@ What did not work or remains risky:
   legacy-produced, and alias compatibility plus runtime registration remain
   process-global transitional plumbing, so this does not yet make the runtime
   bzlmod cell graph DICE-owned.
+- Bazel-visible analysis repository strings now carry the active
+  `CellAliasResolver` into `AnalysisContext` when normal rule analysis prepares
+  `ctx`. `ctx.workspace_name`, runfiles workspace names, `ctx.bin_dir`,
+  `ctx.genfiles_dir`, and the `workspace_root_from_label` helper use
+  resolver-owned bzlmod runtime aliases/cells before the legacy
+  process-global canonical-name helper; contexts without a resolver snapshot
+  keep the old fallback. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/tmp/slug-plan61-worker-analysis-context-target
+  cargo test -p slug_build_api analysis_context_repo_name_ -- --nocapture`
+  (`2 passed`) and `TMPDIR=/var/mnt/dev/.slug-tmp
+  CARGO_TARGET_DIR=/tmp/slug-plan61-worker-analysis-context-target cargo check
+  -p slug_build_api -p slug_analysis -p slug_action_impl -p slug_anon_target`.
+  The requested `/tmp/slug-plan61-worker-analysis-context-target` target path
+  was a symlink to `/var/mnt/dev/slug-plan61-worker-analysis-context-target`
+  because `/tmp` was full before validation.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of

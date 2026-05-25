@@ -917,7 +917,7 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
                                         actions.as_ref(),
                                         exe_val,
                                         default_runfiles_value,
-                                        workspace_name,
+                                        &workspace_name,
                                     )?;
                                     (Some(wrapped), Some(tree))
                                 }

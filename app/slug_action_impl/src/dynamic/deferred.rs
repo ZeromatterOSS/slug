@@ -244,6 +244,7 @@ async fn execute_lambda(
                             heap,
                             dynamic_lambda_ctx_data.lambda.attributes()?,
                             self_key.owner().configured_label(),
+                            None,
                             dynamic_lambda_ctx_data.lambda.plugins()?,
                             dynamic_lambda_ctx_data.registry,
                             dynamic_lambda_ctx_data.digest_config,
