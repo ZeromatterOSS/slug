@@ -2163,6 +2163,15 @@ Observed SDK result at the checkpoint:
   bzlmod_projection_bridge -- --nocapture`, `cargo test -p slug_common
   explicit_output_base -- --nocapture`, `cargo check -p slug_common`, and
   `git diff --check`.
+- The outer `parse_with_file_ops_and_options_inner` helper now also requires
+  its empty-projection workspace identity explicitly. Public project-root
+  wrappers choose the default or caller-provided output base, persisted bridge
+  parsing passes the bridge key workspace, and no-project test parsing passes
+  the named no-project sentinel. Validation passed with `cargo fmt --check`,
+  `cargo test -p slug_common explicit_output_base -- --nocapture`, `cargo test
+  -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
+  slug_common -p slug_interpreter_for_build`, and `git diff --check`; a
+  `testing_parse` filter matched zero tests and was not counted as evidence.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -3394,6 +3403,8 @@ using Rust DICE keys and values:
      carrying optional provenance. The remaining bzlmod projection data wrappers
      also require workspace provenance instead of accepting absent provenance.
      The legacy resolver entry point requires an explicit workspace identity too.
+     The outer parse helper also requires callers to choose the empty-projection
+     workspace identity explicitly.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key/context inputs as the graph migrates.

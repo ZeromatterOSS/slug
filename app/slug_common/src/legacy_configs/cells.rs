@@ -2893,9 +2893,17 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs), None, None)
-            .await
-            .buck_error_context("Parsing cells")
+        let project_root = project_fs.root().to_path_buf();
+        let workspace_id =
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"));
+        Self::parse_with_file_ops_and_options_inner(
+            config_args,
+            Some(project_fs),
+            None,
+            workspace_id,
+        )
+        .await
+        .buck_error_context("Parsing cells")
     }
 
     pub async fn parse_with_config_args_and_output_base(
@@ -2909,7 +2917,7 @@ impl BuckConfigBasedCells {
             config_args,
             Some(project_fs),
             None,
-            Some(workspace_id),
+            workspace_id,
         )
         .await
         .buck_error_context("Parsing cells")
@@ -2946,7 +2954,7 @@ impl BuckConfigBasedCells {
             config_args,
             Some(project_fs),
             Some(bzlmod_projection),
-            Some(key.resolution_key.workspace_id.clone()),
+            key.resolution_key.workspace_id.clone(),
         )
         .await
         .buck_error_context("Parsing cells")?;
@@ -3130,16 +3138,23 @@ impl BuckConfigBasedCells {
     pub async fn testing_parse(
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, None, None, None)
-            .await
-            .buck_error_context("Parsing cells")
+        Self::parse_with_file_ops_and_options_inner(
+            config_args,
+            None,
+            None,
+            slug_bzlmod::BzlmodProjectionData::empty_no_project_sentinel()
+                .cell_graph
+                .workspace_id,
+        )
+        .await
+        .buck_error_context("Parsing cells")
     }
 
     async fn parse_with_file_ops_and_options_inner(
         config_args: &[slug_cli_proto::ConfigOverride],
         project_fs: Option<&ProjectRoot>,
         bzlmod_projection_bridge: Option<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>,
-        empty_workspace_id: Option<slug_bzlmod::WorkspaceId>,
+        empty_workspace_id: slug_bzlmod::WorkspaceId,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
         let processed_config_args = resolve_config_args(config_args).await?;
@@ -3155,21 +3170,7 @@ impl BuckConfigBasedCells {
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
         let mut has_module_bazel = false;
         // Non-bzlmod parsing still injects empty bzlmod projections for legacy
-        // consumers. Use the DICE workspace identity when available, otherwise
-        // derive one from the real project root or the no-project test sentinel.
-        let empty_workspace_id = empty_workspace_id.unwrap_or_else(|| {
-            project_fs
-                .map(|project_fs| {
-                    let project_root = project_fs.root().to_path_buf();
-                    slug_bzlmod::WorkspaceId::new(
-                        project_root.clone(),
-                        project_root.join("buck-out/v2"),
-                    )
-                })
-                .unwrap_or_else(|| {
-                    slug_bzlmod::WorkspaceId::new(PathBuf::new(), PathBuf::from("buck-out/v2"))
-                })
-        });
+        // consumers. The caller must choose the workspace identity explicitly.
         let mut bzlmod_runtime_cell_snapshot = None;
 
         // ===== Bzlmod Integration =====
@@ -5528,7 +5529,9 @@ mod tests {
             &[],
             None,
             Some(Arc::new(Some(projection_data))),
-            None,
+            slug_bzlmod::BzlmodProjectionData::empty_no_project_sentinel()
+                .cell_graph
+                .workspace_id,
         )
         .await?;
         let bazel_tools = CellName::unchecked_new("bazel_tools")?;
