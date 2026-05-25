@@ -62,7 +62,8 @@ pub fn execute_repository_rule(
 
 /// Execute a repository rule after the caller has already classified
 /// materialization reuse through its own manifest/input state.
-pub fn execute_repository_rule_fresh(
+#[cfg(test)]
+fn execute_repository_rule_fresh(
     invocation: &RepositoryInvocation,
     project_root: &Path,
 ) -> slug_error::Result<RepositoryRuleResult> {

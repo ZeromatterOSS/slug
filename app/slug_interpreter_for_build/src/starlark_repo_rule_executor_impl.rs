@@ -37,10 +37,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
+use slug_bzlmod::RepositoryInvocation;
 use slug_bzlmod::StarlarkRepoRuleExecution;
 use slug_bzlmod::StarlarkRepoRuleExecutorImpl;
 use slug_bzlmod::WorkspaceId;
-use slug_bzlmod::repository_invocations::RepositoryInvocation;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;

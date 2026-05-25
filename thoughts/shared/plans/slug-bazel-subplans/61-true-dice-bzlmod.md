@@ -2278,6 +2278,18 @@ What did not work or remains risky:
   cargo test -p slug_bzlmod repo_spec_to_invocation -- --nocapture` (`5
   passed, 327 filtered out`), `cargo check -p slug_bzlmod`,
   `cargo fmt --check`, and `git diff --check`.
+- Repository execution implementation modules are no longer public crate
+  modules. `repository_execution`, `repository_executor`, and
+  `repository_invocations` are private behind the crate-root execution-facing
+  exports, and the only downstream direct module import was moved to
+  `slug_bzlmod::RepositoryInvocation`. The stale fresh-execution helper exposed
+  by the now-private executor module is test-only, and unused test-only
+  registry methods were removed. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-module-visibility-target
+  cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  fresh_repository_execution_bypasses_marker_shortcut -- --nocapture` (`1
+  passed, 331 filtered out`), `cargo check -p slug_interpreter_for_build`,
+  `cargo fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

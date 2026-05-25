@@ -1674,11 +1674,6 @@ impl RepositoryRegistry {
         self.invocations.get(name)
     }
 
-    /// Get all invocations.
-    pub fn all(&self) -> impl Iterator<Item = &RepositoryInvocation> {
-        self.invocations.values()
-    }
-
     /// Check if a repository is registered.
     pub fn contains(&self, name: &str) -> bool {
         self.invocations.contains_key(name)
@@ -1687,19 +1682,6 @@ impl RepositoryRegistry {
     /// Get the number of registered repositories.
     pub fn len(&self) -> usize {
         self.invocations.len()
-    }
-
-    /// Check if the registry is empty.
-    pub fn is_empty(&self) -> bool {
-        self.invocations.is_empty()
-    }
-
-    /// Create DICE keys for all registered repositories.
-    pub fn execution_keys(&self) -> Vec<RepositoryRuleExecutionKey> {
-        self.invocations
-            .values()
-            .map(RepositoryRuleExecutionKey::from_invocation)
-            .collect()
     }
 }
 
