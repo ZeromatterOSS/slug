@@ -2195,6 +2195,18 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_core bzlmod_runtime_snapshot -- --nocapture`, `cargo
   test -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check
   -p slug_core -p slug_common`, and `git diff --check`.
+- Workspace-scoped bzlmod contexts no longer use the physical
+  `bazel-external` directory-scan compatibility fallbacks to synthesize module
+  or extension-generated cells. Project-root-only legacy scopes keep the old
+  scan behavior, but once a command has an output-base workspace identity the
+  resolver must use explicit runtime snapshots or scoped dynamic registrations
+  rather than rediscovering shared on-disk repos. Validation passed with `cargo
+  fmt --check`, `cargo test -p slug_core
+  workspace_scoped_bzlmod_entries_do_not_scan_bazel_external -- --nocapture`,
+  `cargo test -p slug_core dynamic_extension -- --nocapture`, `cargo test -p
+  slug_core canonical_bazel_repo_name -- --nocapture`, `cargo test -p
+  slug_core bzlmod_runtime_snapshot -- --nocapture`, `cargo check -p
+  slug_core`, and `git diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -3294,7 +3306,8 @@ using Rust DICE keys and values:
   `BzlmodCellGraphKey`. Resolver-local promoted dynamic cells from graph
   snapshots and current extension-spoke values are graph-owned, but directory
   scans and alias-compatibility maps are still process-local lookup
-  accelerators rather than DICE inputs.
+  accelerators rather than DICE inputs. Directory-scan fallbacks are disabled
+  once the active transitional scope includes an output base.
 - Module extension and repository-context label path resolution now receive
   resolver-owned cell path maps from the active cell resolver, and those maps are
   authoritative when present. `module_ctx.path(Label(...))`,

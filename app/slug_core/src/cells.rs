@@ -712,6 +712,10 @@ fn dynamic_bzlmod_scope() -> DynamicBzlmodScope {
         })
 }
 
+fn dynamic_bzlmod_directory_scan_allowed() -> bool {
+    dynamic_bzlmod_scope().output_base.is_none()
+}
+
 fn clear_dynamic_bzlmod_state_for_new_root() {
     if let Ok(mut cells) = DYNAMIC_EXTENSION_CELLS.lock() {
         cells.clear();
@@ -1708,12 +1712,14 @@ impl CellAliasResolver {
                         return Ok(cell_name);
                     }
                 }
-                // Check if a bazel-external directory exists for this candidate
-                let candidate_path = format!("bazel-external/{}", candidate);
-                if std::path::Path::new(&candidate_path).exists() {
-                    if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
-                        register_dynamic_extension_cell(candidate, candidate_path);
-                        return Ok(cell_name);
+                if dynamic_bzlmod_directory_scan_allowed() {
+                    // Check if a bazel-external directory exists for this candidate.
+                    let candidate_path = format!("bazel-external/{}", candidate);
+                    if std::path::Path::new(&candidate_path).exists() {
+                        if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                            register_dynamic_extension_cell(candidate, candidate_path);
+                            return Ok(cell_name);
+                        }
                     }
                 }
             }
@@ -1784,6 +1790,9 @@ fn resolve_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<CellNa
     if alias.contains('+') {
         return None;
     }
+    if !dynamic_bzlmod_directory_scan_allowed() {
+        return None;
+    }
 
     let canonical_name = {
         let mut cache = BZLMOD_APPARENT_ALIAS_CACHE.lock().ok()?;
@@ -1807,6 +1816,9 @@ fn resolve_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<CellNa
 }
 
 fn scan_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<String> {
+    if !dynamic_bzlmod_directory_scan_allowed() {
+        return None;
+    }
     let bazel_ext_dir = dynamic_project_root()
         .map(|root| root.join("bazel-external"))
         .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
@@ -1861,6 +1873,9 @@ fn cache_bzlmod_apparent_alias_for_canonical_name(canonical_name: &str) {
 }
 
 fn scan_dynamic_extension_suffix_from_external_dir(name: &str) -> Option<String> {
+    if !dynamic_bzlmod_directory_scan_allowed() {
+        return None;
+    }
     if name.contains('+') {
         return scan_exact_dynamic_extension_from_external_dir(name);
     }
@@ -1909,6 +1924,9 @@ fn scan_exact_dynamic_extension_from_external_dir(name: &str) -> Option<String> 
 }
 
 fn scan_dynamic_extension_suffix_from_external_dir_uncached(name: &str) -> Option<String> {
+    if !dynamic_bzlmod_directory_scan_allowed() {
+        return None;
+    }
     let bazel_ext_dir = dynamic_project_root()
         .map(|root| root.join("bazel-external"))
         .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
@@ -2336,7 +2354,7 @@ impl CellResolver {
         // This handles spoke repos from extensions that may not be in the dynamic
         // registry yet (e.g., the first time an extension is triggered).
         // Use the root cell's path to determine the project root directory.
-        {
+        if dynamic_bzlmod_directory_scan_allowed() {
             let cell_str = cell.as_str();
             let bazel_ext_dir = dynamic_project_root()
                 .map(|root| root.join("bazel-external"))
@@ -3566,6 +3584,30 @@ mod tests {
 
         reset_dynamic_bzlmod_state_for_workspace(root, output_b);
         assert_eq!(get_dynamic_extension_cell(canonical), None);
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_scoped_bzlmod_entries_do_not_scan_bazel_external() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        let root = tmp.path().join("workspace");
+        let output = tmp.path().join("out");
+        let canonical = "owner++ext+repo";
+        std::fs::create_dir_all(root.join("bazel-external").join(canonical))?;
+        std::fs::create_dir_all(root.join("bazel-external/dep+1.0"))?;
+        reset_dynamic_bzlmod_state_for_workspace(root, output);
+
+        assert_eq!(canonical_dynamic_extension_cell_name("repo"), None);
+        assert_eq!(canonical_dynamic_extension_cell_name(canonical), None);
+        assert_eq!(canonical_bzlmod_module_cell_name("dep"), None);
+
+        let cells = CellResolver::testing_with_names_and_paths(&[(
+            CellName::testing_new("root"),
+            CellRootPathBuf::testing_new(""),
+        )]);
+        assert!(cells.get(CellName::testing_new(canonical)).is_err());
+
         Ok(())
     }
 
