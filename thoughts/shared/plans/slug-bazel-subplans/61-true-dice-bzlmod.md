@@ -2308,6 +2308,20 @@ What did not work or remains risky:
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-record-hook-target cargo check -p
   slug_bzlmod -p slug_interpreter_for_build` and `cargo test -p slug_bzlmod
   repository_invocations -- --nocapture` (`6 passed, 326 filtered out`).
+- The project-root-only `WorkspaceId::for_project_root` constructor is now
+  test-only. Production fallback/session construction names the output base
+  explicitly with `WorkspaceId::new(...)`, and cross-crate guardrail tests
+  assert default-output-base identities with explicit construction instead of
+  reusing the shorthand helper. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-workspace-id-target cargo check -p
+  slug_bzlmod -p slug_common -p slug_external_cells -p slug_analysis`, `cargo
+  test -p slug_common cell_graph -- --nocapture` (`3 passed, 101 filtered
+  out`), `cargo test -p slug_external_cells
+  extension_spoke_lookup_uses_injected_workspace_identity -- --nocapture` (`1
+  passed, 7 filtered out`), `cargo test -p slug_analysis toolchain_loading --
+  --nocapture` (`2 passed, 39 filtered out`), `cargo fmt --check`, and `git
+  diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

@@ -6221,7 +6221,10 @@ mod tests {
                 registered_toolchains: Vec::new(),
             };
             let project_root_fallback = ToolchainLoadingSignature {
-                workspace_id: slug_bzlmod::WorkspaceId::for_project_root(project_root),
+                workspace_id: slug_bzlmod::WorkspaceId::new(
+                    project_root.clone(),
+                    project_root.join("buck-out/v2"),
+                ),
                 registered_toolchains: Vec::new(),
             };
 
@@ -6329,7 +6332,10 @@ mod tests {
             ));
             assert!(!toolchains_loaded_for_signature(
                 &ToolchainLoadingSignature {
-                    workspace_id: slug_bzlmod::WorkspaceId::for_project_root(project_root),
+                    workspace_id: slug_bzlmod::WorkspaceId::new(
+                        project_root.clone(),
+                        project_root.join("buck-out/v2"),
+                    ),
                     registered_toolchains: Vec::new(),
                 }
             ));

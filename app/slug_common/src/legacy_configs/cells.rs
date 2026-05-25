@@ -3061,9 +3061,15 @@ impl BuckConfigBasedCells {
         let empty_workspace_id = empty_workspace_id.unwrap_or_else(|| {
             project_fs
                 .map(|project_fs| {
-                    slug_bzlmod::WorkspaceId::for_project_root(project_fs.root().to_path_buf())
+                    let project_root = project_fs.root().to_path_buf();
+                    slug_bzlmod::WorkspaceId::new(
+                        project_root.clone(),
+                        project_root.join("buck-out/v2"),
+                    )
                 })
-                .unwrap_or_else(|| slug_bzlmod::WorkspaceId::for_project_root(PathBuf::new()))
+                .unwrap_or_else(|| {
+                    slug_bzlmod::WorkspaceId::new(PathBuf::new(), PathBuf::from("buck-out/v2"))
+                })
         });
         let mut bzlmod_session_data =
             slug_bzlmod::BzlmodSessionData::for_workspace(empty_workspace_id.clone());
@@ -3350,7 +3356,11 @@ impl BuckConfigBasedCells {
         let mut resolved_graph_for_aliases = None;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let workspace_id = workspace_id.unwrap_or_else(|| {
-            slug_bzlmod::WorkspaceId::for_project_root(workspace_root.to_path_buf())
+            let workspace_root = workspace_root.to_path_buf();
+            slug_bzlmod::WorkspaceId::new(
+                workspace_root.clone(),
+                workspace_root.join("buck-out/v2"),
+            )
         });
         let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
         bzlmod_session_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
@@ -4874,9 +4884,9 @@ mod tests {
 
     #[test]
     fn runtime_cell_install_snapshot_derives_from_cell_graph() {
-        let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(PathBuf::from(
-            "/tmp/slug-plan61-cell-graph-runtime-test",
-        ));
+        let project_root = PathBuf::from("/tmp/slug-plan61-cell-graph-runtime-test");
+        let workspace_id =
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"));
         let cell_graph = slug_bzlmod::BzlmodCellGraphValue {
             workspace_id,
             root_module_name: "root".to_owned(),
@@ -5016,9 +5026,9 @@ mod tests {
 
     #[tokio::test]
     async fn bzlmod_cell_resolver_uses_bundled_cells_from_cell_graph() -> slug_error::Result<()> {
-        let workspace_id = slug_bzlmod::WorkspaceId::for_project_root(PathBuf::from(
-            "/tmp/slug-plan61-bundled-cell-graph-test",
-        ));
+        let project_root = PathBuf::from("/tmp/slug-plan61-bundled-cell-graph-test");
+        let workspace_id =
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"));
         let mut session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id.clone());
         session_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
             workspace_id,

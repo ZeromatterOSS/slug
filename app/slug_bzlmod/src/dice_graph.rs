@@ -63,6 +63,7 @@ impl WorkspaceId {
         &self.stable_hash
     }
 
+    #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::new(project_root.clone(), project_root.join("buck-out/v2"))
     }

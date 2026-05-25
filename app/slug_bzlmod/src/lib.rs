@@ -304,7 +304,10 @@ impl BzlmodSessionData {
     }
 
     pub fn empty_no_project_sentinel() -> Self {
-        Self::for_workspace(WorkspaceId::for_project_root(PathBuf::new()))
+        Self::for_workspace(WorkspaceId::new(
+            PathBuf::new(),
+            PathBuf::from("buck-out/v2"),
+        ))
     }
 
     #[cfg(test)]

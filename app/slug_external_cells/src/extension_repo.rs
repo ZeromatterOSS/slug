@@ -982,7 +982,7 @@ mod tests {
         assert_eq!(actual, workspace_id);
         assert_ne!(
             actual,
-            slug_bzlmod::WorkspaceId::for_project_root(project_root)
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"))
         );
 
         Ok(())
