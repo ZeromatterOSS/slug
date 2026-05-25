@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`139 passed in 107.50s`) after rebuilding `target/debug/slug`.
+  (`140 passed in 127.07s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -246,10 +246,13 @@ Observed SDK result at the checkpoint:
   and `--ignore_dev_dependency` removes those root dev dependencies from the
   command's bzlmod graph. Local Bazel 9.1.0 evidence showed the same root dev
   dependency builds by default and disappears with `--ignore_dev_dependency`.
-- Root `use_repo_rule(..., dev_dependency = True)` now carries the
+- Root `use_repo_rule(...)(..., dev_dependency = True)` now carries the
   `dev_dependency` bit into repo-rule invocations, participates by default, and
   is excluded under `--ignore_dev_dependency`; non-root dev repo rules are
-  filtered from precomputed and eager repo-rule registration paths.
+  filtered from precomputed and eager repo-rule registration paths. The
+  `use_repo_rule()` factory itself rejects `dev_dependency`, matching Bazel's
+  parameter split between `ModuleFileGlobals.useRepoRule` and
+  `RepoRuleProxy.call`.
 - Root `use_extension(..., dev_dependency = True)` now participates by default
   and is excluded from extension aggregation, precomputed repo cells, and
   lockfile replay under `--ignore_dev_dependency`.
@@ -441,7 +444,19 @@ Observed SDK result at the checkpoint:
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain
   skipped. Focused `slug_common` unit coverage verifies the collection policy.
-- Non-root `use_repo_rule(..., dev_dependency = True)` and
+- `use_repo_rule()` now matches Bazel's dev-dependency call shape: the factory
+  takes only the `.bzl` label and rule symbol, while the returned proxy call
+  accepts `dev_dependency = True`, validates the repository name, carries the
+  bit into the implicit repo-rule extension proxy, and omits that keyword from
+  the repository-rule attrs. Bazel source anchors:
+  `ModuleFileGlobals.java:819-829` and `:840-867`. Validation passed with
+  `cargo test -p slug_bzlmod use_repo_rule -- --nocapture` (`4 passed`) and
+  the explicit-binary Plan 61 selector
+  `-k 'use_repo_rule_rejects_dev_dependency_on_factory or
+  root_use_repo_rule_dev_dependency_follows_ignore_policy or
+  non_root_use_repo_rule_dev_dependency_is_always_ignored'` (`3 passed, 137
+  deselected`).
+- Non-root `use_repo_rule(...)(..., dev_dependency = True)` and
   `use_extension(..., dev_dependency = True)` now have explicit negative
   guardrails proving the generated repos stay unavailable both by default and
   under `--ignore_dev_dependency`. The full Plan 61 guardrail file passed with

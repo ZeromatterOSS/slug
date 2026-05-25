@@ -1169,13 +1169,27 @@ pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", isolate =
     fn test_parse_use_repo_rule_with_dev_dependency() {
         let content = r#"
 module(name = "test", version = "1.0.0")
-repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", dev_dependency = True)
-repo(name = "dev_repo", path = "dev_repo")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+repo(name = "dev_repo", path = "dev_repo", dev_dependency = True)
 "#;
         let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
         let invocation = &parsed.repo_rule_invocations[0];
         assert_eq!(invocation.name, "dev_repo");
         assert!(invocation.dev_dependency);
+        assert!(!invocation.attrs.contains_key("dev_dependency"));
+    }
+
+    #[test]
+    fn test_parse_use_repo_rule_rejects_dev_dependency_on_factory() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", dev_dependency = True)
+repo(name = "dev_repo", path = "dev_repo")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("dev_dependency"), "{err}");
     }
 
     #[test]

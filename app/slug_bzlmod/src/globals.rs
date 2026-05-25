@@ -1075,7 +1075,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     /// Returns a repo rule callable for use in MODULE.bazel.
     ///
     /// This is a Bazel 7.1+ feature that allows creating repository rules
-    /// inline in MODULE.bazel without using extensions.
+    /// inline in MODULE.bazel without using extensions. The returned proxy
+    /// accepts a per-repository `dev_dependency` keyword, matching Bazel 9.
     ///
     /// # Example
     ///
@@ -1086,7 +1087,6 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     fn use_repo_rule<'v>(
         #[starlark(require = pos)] rule_bzl_file: &str,
         #[starlark(require = pos)] rule_name: &str,
-        #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let ctx = get_module_context(eval)?;
@@ -1095,7 +1095,6 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let proxy = RepoRuleProxy {
             rule_bzl_file: rule_bzl_file.to_owned(),
             rule_name: rule_name.to_owned(),
-            dev_dependency,
         };
 
         Ok(eval.heap().alloc(proxy))
@@ -1233,8 +1232,6 @@ pub struct RepoRuleProxy {
     rule_bzl_file: String,
     /// The repo rule name.
     rule_name: String,
-    /// Whether invocations from this proxy are dev-only.
-    dev_dependency: bool,
 }
 
 impl Display for RepoRuleProxy {
@@ -1264,39 +1261,48 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
         let name = kwargs
             .get("name")
             .and_then(|v| v.unpack_str())
-            .unwrap_or("");
-        if !name.is_empty() {
-            validate_user_provided_repo_name(name)?;
-        }
+            .ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "repo rule proxy calls require a string name argument"
+                ))
+            })?;
+        validate_user_provided_repo_name(name)?;
+
+        let dev_dependency = match kwargs.get("dev_dependency") {
+            Some(value) => value.unpack_bool().ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "repo rule proxy dev_dependency must be a bool"
+                ))
+            })?,
+            None => false,
+        };
 
         if let Ok(module_ctx) = get_module_context(eval) {
             mark_non_module_called(&mut module_ctx.borrow_mut());
         }
 
-        if !name.is_empty() {
-            // Record in the module context so it can be processed as a cell
-            if let Ok(module_ctx) = get_module_context(eval) {
-                let mut ctx = module_ctx.borrow_mut();
-                // Store as a repo rule invocation with rule source info
-                let rule_source = format!("{}%{}", self.rule_bzl_file, self.rule_name);
-                let owning_module = ctx.module.as_ref().map(|m| m.name.as_str());
-                let mut attrs = indexmap::IndexMap::new();
-                for (key, value) in kwargs.iter() {
-                    let key_str = key.as_str();
-                    if key_str != "name" {
-                        attrs.insert(
-                            key_str.to_owned(),
-                            starlark_to_tag_value(*value, owning_module)?,
-                        );
-                    }
+        // Record in the module context so it can be processed as a cell
+        if let Ok(module_ctx) = get_module_context(eval) {
+            let mut ctx = module_ctx.borrow_mut();
+            // Store as a repo rule invocation with rule source info
+            let rule_source = format!("{}%{}", self.rule_bzl_file, self.rule_name);
+            let owning_module = ctx.module.as_ref().map(|m| m.name.as_str());
+            let mut attrs = indexmap::IndexMap::new();
+            for (key, value) in kwargs.iter() {
+                let key_str = key.as_str();
+                if key_str != "name" && key_str != "dev_dependency" {
+                    attrs.insert(
+                        key_str.to_owned(),
+                        starlark_to_tag_value(*value, owning_module)?,
+                    );
                 }
-                ctx.repo_rule_invocations.push(RepoRuleInvocation {
-                    name: name.to_owned(),
-                    rule_source,
-                    dev_dependency: self.dev_dependency,
-                    attrs,
-                });
             }
+            ctx.repo_rule_invocations.push(RepoRuleInvocation {
+                name: name.to_owned(),
+                rule_source,
+                dev_dependency,
+                attrs,
+            });
         }
 
         Ok(Value::new_none())

@@ -5356,10 +5356,30 @@ consumer(name = "uses_deferred_toolchain")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_use_repo_rule_rejects_dev_dependency_on_factory(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleFileGlobals.useRepoRule has no dev_dependency parameter."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "root")\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_use_repo_rule_factory_dev_dependency")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", dev_dependency = True)
+repo(name = "repo_rule_dev_repo", path = "repo_rule_dev_repo")
+""",
+    )
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:root")
+
+    assert "dev_dependency" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_root_use_repo_rule_dev_dependency_follows_ignore_policy(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: use_repo_rule(dev_dependency=True) is root-only unless ignored."""
+    """Bazel anchor: repo_rule_proxy.call(dev_dependency=True) is root-only unless ignored."""
     dev_repo = buck.cwd / "repo_rule_dev_repo"
     dev_repo.mkdir()
     _write(dev_repo / ".buckroot", "")
@@ -5375,8 +5395,8 @@ async def test_root_use_repo_rule_dev_dependency_follows_ignore_policy(
     _write(
         buck.cwd / "MODULE.bazel",
         """module(name = "plan61_guardrails")
-repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", dev_dependency = True)
-repo(name = "repo_rule_dev_repo", path = "repo_rule_dev_repo")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+repo(name = "repo_rule_dev_repo", path = "repo_rule_dev_repo", dev_dependency = True)
 """,
     )
     _write(
@@ -5398,7 +5418,7 @@ repo(name = "repo_rule_dev_repo", path = "repo_rule_dev_repo")
 async def test_non_root_use_repo_rule_dev_dependency_is_always_ignored(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: non-root use_repo_rule(dev_dependency=True) is ignored."""
+    """Bazel anchor: non-root repo_rule_proxy.call(dev_dependency=True) is ignored."""
     dep = buck.cwd / "libs/dep_with_dev_repo_rule"
     dev_repo = buck.cwd / "repo_rule_non_root_dev_repo"
     dep.mkdir(parents=True)
@@ -5416,8 +5436,8 @@ async def test_non_root_use_repo_rule_dev_dependency_is_always_ignored(
     _write(
         dep / "MODULE.bazel",
         """module(name = "dep_with_dev_repo_rule", version = "1.0")
-repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", dev_dependency = True)
-repo(name = "repo_rule_non_root_dev_repo", path = "../../repo_rule_non_root_dev_repo")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+repo(name = "repo_rule_non_root_dev_repo", path = "../../repo_rule_non_root_dev_repo", dev_dependency = True)
 """,
     )
     _write(dep / "BUILD.bazel", 'filegroup(name = "dep", srcs = [])\n')
