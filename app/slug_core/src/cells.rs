@@ -749,7 +749,7 @@ fn set_dynamic_bzlmod_scope(scope: DynamicBzlmodScope, always_reset: bool) {
     };
     ensure_execroot_layout(root);
     if scope.output_base.is_none() {
-        repair_external_symlink_targets(root);
+        repair_external_symlink_targets_impl(root);
     }
     let should_reset = DYNAMIC_BZLMOD_SCOPE
         .read()
@@ -1159,6 +1159,10 @@ pub fn repair_external_symlink_targets(project_root: &std::path::Path) {
     if !dynamic_bzlmod_directory_scan_allowed() {
         return;
     }
+    repair_external_symlink_targets_impl(project_root);
+}
+
+fn repair_external_symlink_targets_impl(project_root: &std::path::Path) {
     let external_dir = project_root.join("external");
     let Ok(entries) = std::fs::read_dir(&external_dir) else {
         return;
@@ -1248,6 +1252,7 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
         Some(root) => root,
         None => return,
     };
+    let filesystem_fallback_allowed = dynamic_bzlmod_directory_scan_allowed();
     let external_dir = project_root.join("external");
     let link_path = external_dir.join(cell_name);
     let (desired_target, desired_priority) =
@@ -1287,7 +1292,7 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
                         // the right files.
                         let current_str = current.to_string_lossy();
                         let current_priority = module_form_priority(&current_str);
-                        if dynamic_bzlmod_directory_scan_allowed()
+                        if filesystem_fallback_allowed
                             && !cell_name.contains('+')
                             && current_priority > desired_priority
                         {
@@ -1322,7 +1327,10 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
                                 // its mtime on every invocation, the file
                                 // watcher would pick that up, and DICE would
                                 // invalidate package loads. Leave it.
-                                return;
+                                if filesystem_fallback_allowed {
+                                    return;
+                                }
+                                let _ = remove_external_symlink(&link_path);
                             }
                             _ => {
                                 tracing::debug!(
@@ -3809,6 +3817,30 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
+    fn workspace_scoped_external_symlink_replaces_unmaterialized_stale_link() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("out");
+        let apparent = "rustc_linux_x86_64_1_95_0";
+        let stale = "rules_rs++toolchains+rustc_linux_x86_64_1_95_0";
+        std::fs::create_dir(tmp.path().join("external")).unwrap();
+        let stale_target = external_symlink_relative_target(&format!("bazel-external/{stale}"));
+        std::os::unix::fs::symlink(&stale_target, tmp.path().join("external").join(apparent))
+            .unwrap();
+        reset_dynamic_bzlmod_state_for_workspace(tmp.path().to_path_buf(), output);
+
+        let apparent_cell_path = format!("bazel-external/{apparent}");
+        ensure_external_symlinks_for_cells(&[(apparent, apparent_cell_path.as_str())]);
+
+        let repaired = std::fs::read_link(tmp.path().join("external").join(apparent)).unwrap();
+        assert_eq!(
+            repaired,
+            external_symlink_relative_target(&apparent_cell_path)
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
     fn workspace_scope_reset_does_not_run_legacy_external_symlink_repair() {
         let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
@@ -3830,6 +3862,32 @@ mod tests {
         assert_eq!(
             std::fs::canonicalize(root.join("external").join(apparent)).unwrap(),
             std::fs::canonicalize(extension_repo).unwrap()
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn project_root_scope_reset_runs_legacy_external_symlink_repair_after_workspace_scope() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let output = root.join("out");
+        let apparent = "rules_rust";
+        let extension_repo = root
+            .join("bazel-external")
+            .join("rules_rs++rules_rust+rules_rust");
+        let module_repo = root.join("bazel-external").join("rules_rust+0.69.0");
+        reset_dynamic_bzlmod_state_for_workspace(root.to_path_buf(), output);
+        std::fs::create_dir_all(&extension_repo).unwrap();
+        std::fs::create_dir_all(&module_repo).unwrap();
+        std::fs::create_dir(root.join("external")).unwrap();
+        std::os::unix::fs::symlink(&extension_repo, root.join("external").join(apparent)).unwrap();
+
+        reset_dynamic_bzlmod_state_for_project_root(root.to_path_buf());
+
+        assert_eq!(
+            std::fs::canonicalize(root.join("external").join(apparent)).unwrap(),
+            std::fs::canonicalize(module_repo).unwrap()
         );
     }
 
