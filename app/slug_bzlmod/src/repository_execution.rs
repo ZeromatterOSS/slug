@@ -526,17 +526,6 @@ pub fn repository_recorded_inputs_current(
     repository_recorded_inputs_digest(repo_dir, repo_env).is_ok()
 }
 
-fn repository_recorded_inputs_state(
-    repo_dir: &Path,
-    repo_env: Option<&BTreeMap<String, String>>,
-) -> String {
-    match repository_recorded_inputs_digest(repo_dir, repo_env) {
-        Ok(None) => "inputs:none".to_owned(),
-        Ok(Some(digest)) => format!("inputs:{digest}:valid"),
-        Err(reason) => format!("inputs-invalid:{reason}"),
-    }
-}
-
 fn repository_recorded_inputs_digest(
     repo_dir: &Path,
     repo_env: Option<&BTreeMap<String, String>>,
@@ -547,13 +536,17 @@ fn repository_recorded_inputs_digest(
     }
     let content =
         std::fs::read_to_string(&manifest_path).map_err(|_| "recorded_inputs_unreadable")?;
-    let recorded_inputs: Vec<String> = content
+    let recorded_inputs = parse_repository_recorded_inputs(&content);
+    validate_recorded_inputs_current(&recorded_inputs, None, repo_env, None)?;
+    Ok(Some(compute_sha256_hex(content.as_bytes())))
+}
+
+fn parse_repository_recorded_inputs(content: &str) -> Vec<String> {
+    content
         .lines()
         .filter(|line| !line.trim().is_empty())
         .map(ToOwned::to_owned)
-        .collect();
-    validate_recorded_inputs_current(&recorded_inputs, None, repo_env, None)?;
-    Ok(Some(compute_sha256_hex(content.as_bytes())))
+        .collect()
 }
 
 fn write_repository_recorded_inputs(repo_dir: &Path, inputs: &[String]) -> slug_error::Result<()> {
@@ -757,13 +750,6 @@ fn attr_value_is_present(value: &AttrValue) -> bool {
     }
 }
 
-fn repo_materialization_recorded_inputs_state_for_key(
-    key: &RepoMaterializationManifestKey,
-) -> String {
-    let repo_dir = repo_dir_for_materialization_manifest_key(key);
-    repository_recorded_inputs_state(&repo_dir, Some(key.repo_env.as_ref()))
-}
-
 fn repo_materialization_manifest_from_states(
     key: &RepoMaterializationManifestKey,
     marker_state: Arc<str>,
@@ -880,10 +866,110 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
 
     async fn compute(
         &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
+        let content_key = RepoMaterializationRecordedInputsManifestContentKey {
+            repo_dir: Arc::new(repo_dir),
+        };
+        let manifest_content = match ctx.compute(&content_key).await {
+            Ok(Ok(Some(content))) => content,
+            Ok(Ok(None)) => return Arc::from("inputs:none"),
+            Ok(Err(reason)) => return Arc::from(format!("inputs-invalid:{reason}").as_str()),
+            Err(e) => return Arc::from(format!("inputs-invalid:{e}").as_str()),
+        };
+        let recorded_inputs = Arc::new(parse_repository_recorded_inputs(&manifest_content));
+        let validation_key = RepoMaterializationRecordedInputsValidationKey {
+            recorded_inputs,
+            repo_env: self.0.repo_env.clone(),
+        };
+        match ctx.compute(&validation_key).await {
+            Ok(Ok(())) => Arc::from(
+                format!(
+                    "inputs:{}:valid",
+                    compute_sha256_hex(manifest_content.as_bytes())
+                )
+                .as_str(),
+            ),
+            Ok(Err(reason)) => Arc::from(format!("inputs-invalid:{reason}").as_str()),
+            Err(e) => Arc::from(format!("inputs-invalid:{e}").as_str()),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display(
+    "RepoMaterializationRecordedInputsManifestContentKey({})",
+    repo_dir.display()
+)]
+struct RepoMaterializationRecordedInputsManifestContentKey {
+    repo_dir: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationRecordedInputsManifestContentKey {
+    type Value = Result<Option<Arc<str>>, Arc<str>>;
+
+    async fn compute(
+        &self,
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Arc::from(repo_materialization_recorded_inputs_state_for_key(&self.0).as_str())
+        let manifest_path = self.repo_dir.join(REPO_RECORDED_INPUTS_FILE);
+        if !manifest_path.exists() {
+            return Ok(None);
+        }
+        std::fs::read_to_string(&manifest_path)
+            .map(|content| Some(Arc::from(content.as_str())))
+            .map_err(|_| Arc::from("recorded_inputs_unreadable"))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display(
+    "RepoMaterializationRecordedInputsValidationKey({})",
+    recorded_inputs.len()
+)]
+struct RepoMaterializationRecordedInputsValidationKey {
+    recorded_inputs: Arc<Vec<String>>,
+    repo_env: Arc<BTreeMap<String, String>>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationRecordedInputsValidationKey {
+    type Value = Result<(), Arc<str>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        validate_recorded_inputs_current(
+            self.recorded_inputs.as_slice(),
+            None,
+            Some(self.repo_env.as_ref()),
+            None,
+        )
+        .map_err(Arc::from)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2087,6 +2173,70 @@ mod tests {
         let second = dice.compute(&key).await.unwrap().unwrap();
         assert_ne!(first.digest, second.digest);
         assert_eq!(second.marker_state.as_ref(), format!("marker:{marker}"));
+    }
+
+    #[tokio::test]
+    async fn materialization_manifest_key_observes_recorded_input_state_dependency() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+watched_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        let watched = project_root.join("watched.txt");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(&watched, "first\n").unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "stable\n").unwrap();
+
+        let repo_spec = RepoSpec::new("@@//:watched_repo.bzl%watched_repository".to_owned());
+        let spec_hash = repo_spec.compute_hash();
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&spec_hash, &output_digest),
+        )
+        .unwrap();
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await.unwrap().unwrap();
+        assert_eq!(first.recorded_inputs_state.as_ref(), "inputs:none");
+
+        std::fs::write(
+            repo_dir.join(REPO_RECORDED_INPUTS_FILE),
+            format!(
+                "{}\n",
+                crate::lockfile::recorded_file_input(&watched).unwrap()
+            ),
+        )
+        .unwrap();
+
+        let mut dice = dice.into_updater().commit().await;
+        let current = dice.compute(&key).await.unwrap().unwrap();
+        assert_ne!(first.digest, current.digest);
+        assert!(current.recorded_inputs_state.ends_with(":valid"));
+
+        std::fs::write(&watched, "second\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let stale = dice.compute(&key).await.unwrap().unwrap();
+        assert_ne!(current.digest, stale.digest);
+        assert!(
+            stale
+                .recorded_inputs_state
+                .contains("inputs-invalid:recorded_input_changed")
+        );
     }
 
     #[tokio::test]

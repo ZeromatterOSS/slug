@@ -1238,7 +1238,7 @@ impl Key for ModuleExtensionExecutionKey {
                     workspace_lockfile_facts = facts;
                     workspace_lockfile_facts_present = true;
                 }
-                if let Some(selected_cache) = lockfile.select_extension_cache_for_workspace(
+                match lockfile.select_extension_cache_for_workspace(
                     &self.extension_id,
                     &bzl_transitive_digest,
                     &usages_digest,
@@ -1248,41 +1248,45 @@ impl Key for ModuleExtensionExecutionKey {
                     Some(self.root_module_name()),
                     Some(self.repo_mapping_overrides.as_ref()),
                 ) {
-                    if selected_cache_recorded_inputs_current(
-                        ctx,
-                        &self.extension_id,
-                        &selected_cache,
-                    )
-                    .await?
-                    {
-                        tracing::info!(
-                            "Extension '{}' cache HIT: using {} cached repo specs",
-                            self.extension_id,
-                            selected_cache.repo_specs.len()
-                        );
-                        selected_cache.record_hit(&self.extension_id);
+                    Some(selected_cache) => {
+                        if selected_cache_recorded_inputs_current(
+                            ctx,
+                            &self.extension_id,
+                            &selected_cache,
+                        )
+                        .await?
+                        {
+                            tracing::info!(
+                                "Extension '{}' cache HIT: using {} cached repo specs",
+                                self.extension_id,
+                                selected_cache.repo_specs.len()
+                            );
+                            selected_cache.record_hit(&self.extension_id);
 
-                        let result = ModuleExtensionResult::new_with_metadata(
-                            self.extension_id.clone(),
-                            self.input_hash.to_string(),
-                            selected_cache.repo_specs,
-                            &self.root_module_name,
-                            ModuleExtensionMetadata {
-                                facts: prior_facts.clone(),
-                            },
-                        );
+                            let result = ModuleExtensionResult::new_with_metadata(
+                                self.extension_id.clone(),
+                                self.input_hash.to_string(),
+                                selected_cache.repo_specs,
+                                &self.root_module_name,
+                                ModuleExtensionMetadata {
+                                    facts: prior_facts.clone(),
+                                },
+                            );
 
-                        return Ok(Arc::new(result));
+                            return Ok(Arc::new(result));
+                        }
+                    }
+                    None => {
+                        record_bzlmod_event(
+                            BzlmodEventKind::ExtensionReplayMissReason,
+                            format!("{}:digest_or_entry_miss", self.extension_id),
+                        );
+                        tracing::debug!(
+                            "Extension '{}' cache MISS: digests don't match",
+                            self.extension_id
+                        );
                     }
                 }
-                record_bzlmod_event(
-                    BzlmodEventKind::ExtensionReplayMissReason,
-                    format!("{}:digest_or_entry_miss", self.extension_id),
-                );
-                tracing::debug!(
-                    "Extension '{}' cache MISS: digests don't match",
-                    self.extension_id
-                );
             } else {
                 record_bzlmod_event(
                     BzlmodEventKind::ExtensionReplayMissReason,
@@ -2585,6 +2589,80 @@ mod tests {
             None,
             Some(visible_lockfile),
             None,
+            LockfileMode::Update,
+            BTreeMap::new(),
+            crate::RepoMappingSnapshot::new(),
+            crate::RepoMappingOverrides::new(),
+            Arc::from("bzl-digest"),
+            Some(workspace_id),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.contains_repo("repo"));
+
+        std::fs::write(&watched, "second\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let err = dice.compute(&key).await?.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("module extension executor is not initialized"),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn hidden_lockfile_replay_validates_recorded_file_through_dice_key()
+    -> slug_error::Result<()> {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let project_root = temp_dir.path().to_path_buf();
+        let watched = project_root.join("watched.txt");
+        std::fs::write(&watched, "first\n").unwrap();
+
+        let aggregated = AggregatedExtension::new("@root//:ext.bzl", "ext");
+        let extension_id = aggregated.extension_id.clone();
+        let usages_digest = compute_extension_input_hash(&aggregated);
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+
+        let mut lockfile = crate::lockfile::Lockfile::new();
+        lockfile.set_extension_cache(
+            extension_id.clone(),
+            "bzl-digest".to_owned(),
+            usages_digest,
+            &repo_specs,
+        );
+        lockfile
+            .module_extensions
+            .get_mut(&extension_id)
+            .unwrap()
+            .general
+            .as_mut()
+            .unwrap()
+            .recorded_inputs
+            .push(crate::lockfile::recorded_file_input(&watched).unwrap());
+        let hidden_lockfile = Arc::new(LockfileContentValue {
+            path: Arc::new(project_root.join("buck-out/v2/MODULE.bazel.lock")),
+            digest: Some("hidden-lockfile-digest".to_owned()),
+            tracked_by_dice: true,
+            lockfile: Some(Arc::new(lockfile)),
+        });
+        let workspace_id = crate::WorkspaceId::for_project_root(project_root.clone());
+        let key = ModuleExtensionExecutionKey::new_with_tracked_lockfiles_and_bzl_digest(
+            aggregated,
+            "_main".to_owned(),
+            project_root.clone(),
+            Some(project_root.join("buck-out/v2/MODULE.bazel.lock")),
+            None,
+            Some("hidden-lockfile-digest".to_owned()),
+            None,
+            Some(hidden_lockfile),
             LockfileMode::Update,
             BTreeMap::new(),
             crate::RepoMappingSnapshot::new(),

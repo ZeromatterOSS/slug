@@ -713,8 +713,12 @@ Observed SDK result at the checkpoint:
   slug_bzlmod recorded_inputs_key_rejects_file_edit -- --nocapture`, `cargo
   test -p slug_bzlmod
   visible_lockfile_replay_validates_recorded_file_through_dice_key --
+  --nocapture`, `cargo test -p slug_bzlmod
+  hidden_lockfile_replay_validates_recorded_file_through_dice_key --
   --nocapture`, `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git
-  diff --check`.
+  diff --check`. The visible replay path no longer records a generic
+  `digest_or_entry_miss` when cache selection succeeded and only recorded-input
+  validation rejected the replay.
 - Earlier broad replay validation passed with `cargo build -p slug`, `cargo
   test -p slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
   --nocapture`, `cargo test -p slug_external_cells -- --nocapture`, `cargo test
@@ -2159,6 +2163,22 @@ What did not work or remains risky:
   recursive `watch_tree()`, and repo-env reads participate in same-daemon DICE
   invalidation. This is still marker/layout plumbing rather than a final
   DICE-owned repository materialization manifest.
+- Repository materialization recorded-input sidecars are now split into named
+  manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
+  reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
+  validates the recorded FILE/DIRENTS/DIRTREE/ENV markers before the parent
+  `RepoMaterializationManifestKey` accepts reuse. These keys still poll disk
+  until the lower-level watched filesystem API is available in `slug_bzlmod`,
+  but the manifest graph now has an auditable child dependency for the sidecar
+  content and validation result. Focused validation passed with `cargo test -p
+  slug_bzlmod
+  materialization_manifest_key_observes_recorded_input_state_dependency --
+  --nocapture`, `cargo test -p slug_bzlmod
+  test_recorded_input_manifest_changes_materialization_manifest -- --nocapture`,
+  and `cargo test -p slug_bzlmod
+  materialization_manifest_key_observes_marker_state_dependency -- --nocapture`,
+  plus `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git diff
+  --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
