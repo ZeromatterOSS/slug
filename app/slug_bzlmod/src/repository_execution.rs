@@ -1649,11 +1649,13 @@ fn extract_rule_name_from_id(repo_rule_id: &str) -> Option<String> {
 /// This holds all recorded repository invocations so they can be looked up
 /// when a DICE computation needs to execute them.
 #[derive(Debug, Default, Clone, Allocative)]
+#[cfg(test)]
 pub struct RepositoryRegistry {
     /// Map from repository name to invocation.
     invocations: std::collections::HashMap<String, RepositoryInvocation>,
 }
 
+#[cfg(test)]
 impl RepositoryRegistry {
     /// Create a new empty registry.
     pub fn new() -> Self {

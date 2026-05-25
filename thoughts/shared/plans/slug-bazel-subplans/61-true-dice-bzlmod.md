@@ -2229,6 +2229,15 @@ What did not work or remains risky:
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-marker-target cargo test -p
   slug_bzlmod materialization_manifest -- --nocapture` (`11 passed, 321
   filtered out`), `cargo fmt --check`, and `git diff --check`.
+- The unused repository-rule registry facade is no longer a public
+  `slug_bzlmod` API. `RepositoryRegistry` is test-only and the crate-root
+  re-export was removed, leaving production repository execution keyed through
+  `RepositoryRuleExecutionKey` and `ExtensionRepoExecutionKey` instead of an
+  externally usable transitional registry. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-api-target
+  cargo test -p slug_bzlmod test_repository_registry -- --nocapture` (`1
+  passed, 331 filtered out`), `cargo check -p slug_bzlmod`,
+  `cargo fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
