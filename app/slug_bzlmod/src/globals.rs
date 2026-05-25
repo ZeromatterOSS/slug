@@ -61,16 +61,50 @@ use crate::version::Version;
 
 const SLUG_BAZEL_COMPATIBILITY_VERSION: &str = "9.0.1";
 
-fn reject_unsupported_override_patches(
+fn validate_and_reject_unsupported_override_patches(
     directive: &str,
+    module: Option<&ModuleDecl>,
     patches: &UnpackList<&str>,
 ) -> starlark::Result<Vec<String>> {
+    for patch in &patches.items {
+        validate_override_patch_label(module, patch)?;
+    }
+
     if patches.items.is_empty() {
         return Ok(Vec::new());
     }
 
     Err(starlark::Error::new_other(anyhow::anyhow!(
         "{directive}(patches = ...) is not yet supported by Slug; Bazel applies override patches during MODULE.bazel discovery and repository materialization"
+    )))
+}
+
+fn validate_override_patch_label(
+    module: Option<&ModuleDecl>,
+    raw_label: &str,
+) -> starlark::Result<()> {
+    let label =
+        crate::repo_mapping::canonicalize_label_with_package_context(raw_label, "", "", None)
+            .ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "invalid label \"{raw_label}\" in 'patches'"
+                ))
+            })?;
+
+    let repo = label.repo().as_str();
+    if repo.is_empty() {
+        return Ok(());
+    }
+
+    let main_repo_name = module
+        .and_then(|module| module.repo_name.as_deref().or(Some(module.name.as_str())))
+        .unwrap_or_default();
+    if !main_repo_name.is_empty() && repo == main_repo_name {
+        return Ok(());
+    }
+
+    Err(starlark::Error::new_other(anyhow::anyhow!(
+        "invalid label in 'patches': only patches in the main repository can be applied, not from '@{repo}'"
     )))
 }
 
@@ -602,7 +636,11 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             Version::parse(version)
                 .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
-        let patches = reject_unsupported_override_patches("single_version_override", &patches)?;
+        let patches = validate_and_reject_unsupported_override_patches(
+            "single_version_override",
+            ctx.module.as_ref(),
+            &patches,
+        )?;
 
         ctx.overrides
             .push(Override::SingleVersion(SingleVersionOverride {
@@ -697,7 +735,11 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
-        let patches = reject_unsupported_override_patches("archive_override", &patches)?;
+        let patches = validate_and_reject_unsupported_override_patches(
+            "archive_override",
+            ctx.module.as_ref(),
+            &patches,
+        )?;
 
         ctx.overrides.push(Override::Archive(ArchiveOverride {
             module_name: module_name.to_owned(),
@@ -750,7 +792,11 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
-        let patches = reject_unsupported_override_patches("git_override", &patches)?;
+        let patches = validate_and_reject_unsupported_override_patches(
+            "git_override",
+            ctx.module.as_ref(),
+            &patches,
+        )?;
 
         ctx.overrides.push(Override::Git(GitOverride {
             module_name: module_name.to_owned(),

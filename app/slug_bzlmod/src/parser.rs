@@ -796,6 +796,68 @@ git_override(
     }
 
     #[test]
+    fn test_parse_override_patches_reject_external_repo_labels() {
+        let single_version = r#"
+module(name = "test", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patches = ["@unknown_repo//:fix.patch"],
+)
+"#;
+        let err = parse_module_bazel_content(single_version, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("only patches in the main repository can be applied"));
+        assert!(err.contains("@unknown_repo"));
+
+        let archive = r#"
+module(name = "test", version = "1.0.0")
+archive_override(
+    module_name = "dep",
+    urls = ["https://example.test/dep.tar.gz"],
+    patches = ["@unknown_repo//:fix.patch"],
+)
+"#;
+        let err = parse_module_bazel_content(archive, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("only patches in the main repository can be applied"));
+        assert!(err.contains("@unknown_repo"));
+
+        let git = r#"
+module(name = "test", version = "1.0.0")
+git_override(
+    module_name = "dep",
+    remote = "https://example.test/dep.git",
+    commit = "abc123",
+    patches = ["@unknown_repo//:fix.patch"],
+)
+"#;
+        let err = parse_module_bazel_content(git, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("only patches in the main repository can be applied"));
+        assert!(err.contains("@unknown_repo"));
+    }
+
+    #[test]
+    fn test_parse_override_patches_treat_module_repo_name_as_main_repo() {
+        let content = r#"
+module(name = "test", repo_name = "root_repo", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patches = ["@root_repo//:fix.patch"],
+)
+"#;
+
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("single_version_override(patches = ...)"));
+        assert!(!err.contains("only patches in the main repository can be applied"));
+    }
+
+    #[test]
     fn test_parse_no_module_directive() {
         let content = r#"
 bazel_dep(name = "rules_cc", version = "0.0.9")

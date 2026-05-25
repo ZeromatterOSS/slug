@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`132 passed in 105.42s`) after rebuilding `target/debug/slug`.
+  (`133 passed in 105.35s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -349,11 +349,22 @@ Observed SDK result at the checkpoint:
   applies `single_version_override` patches to the discovered `MODULE.bazel`,
   and appends the same patches to the final repo spec; non-registry
   `archive_override`/`git_override` patches also affect repository
-  materialization. Slug now fails loudly when override `patches = [...]` are
-  present instead of silently ignoring part of Bazel's behavior. Focused Plan
-  61 guardrails cover `single_version_override`, `archive_override`, and
-  `git_override` patch rejection. Full support still needs DICE-tracked
-  patch-file inputs plus repository materialization patch identity.
+  materialization. Slug now validates the Bazel main-repository patch-label rule
+  before failing loudly when supported main-repo override `patches = [...]` are
+  present instead of silently ignoring part of Bazel's behavior. Bazel source
+  anchors: `ModuleFileGlobals.java:522-545`,
+  `ModuleFileFunction.java:823-840`, and
+  `ModuleFileFunctionTest.java:1717-1780`. Focused Plan 61 guardrails cover
+  `single_version_override`, `archive_override`, and `git_override` patch
+  rejection plus the external-repository patch-label error. Validation passed
+  with `cargo test -p slug_bzlmod patches -- --nocapture` (`4 passed`) and
+  explicit-binary Plan 61 pytest selector
+  `-k 'override_patches_external_repo_labels or
+  single_version_override_patches_fail_until_supported or
+  archive_override_patches_fail_until_supported or
+  git_override_patches_fail_until_supported'` (`4 passed, 129 deselected`).
+  Full support still needs DICE-tracked patch-file inputs plus repository
+  materialization patch identity.
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain

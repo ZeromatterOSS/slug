@@ -4830,6 +4830,50 @@ git_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_override_patches_external_repo_labels_follow_bazel_main_repo_rule(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleFileGlobals.convertAndValidatePatchLabel."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    cases = [
+        """module(name = "plan61_svo_patch_external_repo")
+bazel_dep(name = "dep", version = "1.0.0")
+single_version_override(
+    module_name = "dep",
+    patches = ["@unknown_repo//:fix.patch"],
+)
+""",
+        """module(name = "plan61_archive_patch_external_repo")
+bazel_dep(name = "dep", version = "1.0.0")
+archive_override(
+    module_name = "dep",
+    urls = ["file:///does/not/matter.tar.gz"],
+    patches = ["@unknown_repo//:fix.patch"],
+)
+""",
+        """module(name = "plan61_git_patch_external_repo")
+bazel_dep(name = "dep", version = "1.0.0")
+git_override(
+    module_name = "dep",
+    remote = "file:///does/not/matter.git",
+    commit = "0000000000000000000000000000000000000000",
+    patches = ["@unknown_repo//:fix.patch"],
+)
+""",
+    ]
+
+    for content in cases:
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert "invalid label in 'patches'" in str(exc.value)
+        assert "only patches in the main repository can be applied" in str(exc.value)
+        assert "@unknown_repo" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_two_workspaces_do_not_share_bzlmod_state(
     buck: Buck,
 ) -> None:
