@@ -890,12 +890,13 @@ Observed SDK result at the checkpoint:
   carries its checksum fails the next `audit cell` with a registry checksum
   error, and corrupting the same file with a matching lockfile hash fails
   during registry metadata parsing instead of reusing the stale warm graph.
-  The Slug parse check is anchored to Bazel's `IndexRegistry`, which parses
-  top-level `bazel_registry.json` into its `BazelRegistryJson` metadata shape
-  before using registry mirrors. Validation passed with the focused guardrail
-  selected by `-k 'locked_registry_metadata_parse_and_utf8_failures'` (`1
-  passed, 125 deselected`) and the registry metadata/source subset selected by
-  `-k 'locked_registry_metadata_delete or
+  The Slug parse check is anchored to Bazel's `IndexRegistry`, which treats
+  blank JSON as absent metadata and otherwise parses top-level
+  `bazel_registry.json` into its `BazelRegistryJson` metadata shape before using
+  registry mirrors. Validation passed with the focused guardrail selected by
+  `-k 'locked_registry_metadata_parse_and_utf8_failures'` (`1 passed, 125
+  deselected`) and the registry metadata/source subset selected by `-k
+  'locked_registry_metadata_delete or
   locked_registry_metadata_parse_and_utf8_failures or
   locked_registry_source_json_parse_failure or
   locked_registry_source_json_utf8_failure or
@@ -2900,8 +2901,8 @@ using Rust DICE keys and values:
      checksum, parse/UTF-8 failure, and deletion transitions now have
      same-daemon guardrails, locked registry `MODULE.bazel` parse/UTF-8
      failure and deletion transitions have same-daemon guardrails, and locked
-     top-level `bazel_registry.json` deletion has same-daemon guardrail
-     coverage.
+     top-level `bazel_registry.json` deletion has same-daemon guardrail coverage;
+     its metadata validation preserves Bazel's blank-JSON-as-absent behavior.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
      have same-daemon warm-reuse, edit-invalidation, and create/delete
      transition guardrails. Both cached override source classes also have

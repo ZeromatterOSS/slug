@@ -2699,10 +2699,15 @@ fn validate_bazel_registry_json_file(url: &str, content: &str) -> slug_error::Re
         return Ok(());
     }
 
-    // Bazel's IndexRegistry parses this top-level metadata with a
-    // BazelRegistryJson shape (mirrors/moduleBasePath) before using registry
-    // mirrors. Keep the transitional registry-file input bridge honest by
-    // rejecting malformed cached metadata even when the lockfile hash matches.
+    // Bazel's IndexRegistry treats blank JSON as absent metadata, otherwise it
+    // parses this top-level file with a BazelRegistryJson shape
+    // (mirrors/moduleBasePath) before using registry mirrors. Keep the
+    // transitional registry-file input bridge honest by rejecting malformed
+    // cached metadata even when the lockfile hash matches.
+    if content.trim().is_empty() {
+        return Ok(());
+    }
+
     let BazelRegistryJsonForValidation {
         mirrors,
         module_base_path,
@@ -5064,6 +5069,7 @@ mod tests {
     #[test]
     fn validate_bazel_registry_json_file_rejects_malformed_metadata() -> slug_error::Result<()> {
         let registry_url = "https://bcr.bazel.build/bazel_registry.json";
+        validate_bazel_registry_json_file(registry_url, "\n\t  ")?;
         validate_bazel_registry_json_file(registry_url, "{}\n")?;
         validate_bazel_registry_json_file(registry_url, "{\"mirrors\": []}\n")?;
         validate_bazel_registry_json_file(
