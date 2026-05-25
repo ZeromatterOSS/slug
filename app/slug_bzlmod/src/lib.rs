@@ -411,7 +411,7 @@ mod tests {
     #[tokio::test]
     async fn set_bzlmod_projection_data_uses_projection_workspace_id() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
-            PathBuf::from("/tmp/slug-plan61-session-workspace"),
+            PathBuf::from("/tmp/slug-plan61-projection-workspace"),
             PathBuf::from("/tmp/slug-plan61-custom-output-base"),
         );
         let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
@@ -468,13 +468,13 @@ mod tests {
     async fn set_bzlmod_projection_data_derives_lockfile_digests_from_values()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
-            PathBuf::from("/tmp/slug-plan61-session-lockfile-digest"),
-            PathBuf::from("/tmp/slug-plan61-session-lockfile-output-base"),
+            PathBuf::from("/tmp/slug-plan61-projection-lockfile-digest"),
+            PathBuf::from("/tmp/slug-plan61-projection-lockfile-output-base"),
         );
         let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
         let visible_lockfile = Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from(
-                "/tmp/slug-plan61-session-lockfile-digest/MODULE.bazel.lock",
+                "/tmp/slug-plan61-projection-lockfile-digest/MODULE.bazel.lock",
             )),
             digest: Some("visible-digest".to_owned()),
             tracked_by_dice: true,
@@ -482,7 +482,7 @@ mod tests {
         });
         let hidden_lockfile = Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from(
-                "/tmp/slug-plan61-session-lockfile-output-base/MODULE.bazel.lock",
+                "/tmp/slug-plan61-projection-lockfile-output-base/MODULE.bazel.lock",
             )),
             digest: Some("hidden-digest".to_owned()),
             tracked_by_dice: true,
@@ -490,7 +490,7 @@ mod tests {
         });
         data.lockfile_inputs = BzlmodLockfileInputsValue::from_values(
             Some(PathBuf::from(
-                "/tmp/slug-plan61-session-lockfile-output-base/MODULE.bazel.lock",
+                "/tmp/slug-plan61-projection-lockfile-output-base/MODULE.bazel.lock",
             )),
             Some(visible_lockfile),
             Some(hidden_lockfile),
@@ -500,7 +500,7 @@ mod tests {
             workspace_id.clone(),
             Arc::new(BTreeMap::from([(
                 "TOKEN".to_owned(),
-                "from-session".to_owned(),
+                "from-projection".to_owned(),
             )])),
         );
         data.resolution_facts.registry_file_hashes.insert(
@@ -539,7 +539,7 @@ mod tests {
             .await??;
         assert_eq!(
             repo_env.get("TOKEN").map(String::as_str),
-            Some("from-session")
+            Some("from-projection")
         );
         let resolution_facts = dice
             .compute(&BzlmodResolutionFactsKey::for_workspace_id(
@@ -570,7 +570,7 @@ mod tests {
                 .repo_env
                 .get("TOKEN")
                 .map(String::as_str),
-            Some("from-session")
+            Some("from-projection")
         );
         assert_eq!(
             module_versions
@@ -970,7 +970,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn current_workspace_helpers_use_session_workspace_id() -> slug_error::Result<()> {
+    async fn current_workspace_helpers_use_projection_workspace_id() -> slug_error::Result<()> {
         let project_root = PathBuf::from("/tmp/slug-plan61-current-workspace-helper");
         let workspace_id = WorkspaceId::new(
             project_root.clone(),

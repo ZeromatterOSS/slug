@@ -1241,11 +1241,11 @@ fn text_file_poll_digest(
 
 #[derive(Clone, Debug, Display, Allocative)]
 #[display(
-    "LegacyBzlmodResolutionDiceKey({}, {})",
+    "BzlmodProjectionBridgeDiceKey({}, {})",
     project_root.display(),
     resolution_key.command_policy_digest
 )]
-struct LegacyBzlmodResolutionDiceKey {
+struct BzlmodProjectionBridgeDiceKey {
     project_root: AbsNormPathBuf,
     resolution_key: slug_bzlmod::BzlmodResolutionKey,
     options: BzlmodResolutionOptions,
@@ -1334,7 +1334,7 @@ impl Key for TrackedLockfileContentKey {
     }
 }
 
-impl PartialEq for LegacyBzlmodResolutionDiceKey {
+impl PartialEq for BzlmodProjectionBridgeDiceKey {
     fn eq(&self, other: &Self) -> bool {
         self.project_root == other.project_root
             && self.resolution_key == other.resolution_key
@@ -1350,9 +1350,9 @@ impl PartialEq for LegacyBzlmodResolutionDiceKey {
     }
 }
 
-impl Eq for LegacyBzlmodResolutionDiceKey {}
+impl Eq for BzlmodProjectionBridgeDiceKey {}
 
-impl std::hash::Hash for LegacyBzlmodResolutionDiceKey {
+impl std::hash::Hash for BzlmodProjectionBridgeDiceKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.project_root.hash(state);
         self.resolution_key.hash(state);
@@ -2561,7 +2561,7 @@ impl Key for NonRootModuleFilesKey {
 }
 
 #[async_trait]
-impl Key for LegacyBzlmodResolutionDiceKey {
+impl Key for BzlmodProjectionBridgeDiceKey {
     type Value = slug_error::Result<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>;
 
     async fn compute(
@@ -2569,7 +2569,7 @@ impl Key for LegacyBzlmodResolutionDiceKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        BuckConfigBasedCells::resolve_bzlmod_resolution_from_key(self, ctx).await
+        BuckConfigBasedCells::compute_bzlmod_projection_bridge(self, ctx).await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2683,19 +2683,19 @@ impl BuckConfigBasedCells {
         config_args: &[slug_cli_proto::ConfigOverride],
         dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<Self> {
-        let key =
-            Self::build_dice_bzlmod_resolution_key(project_fs, config_args, dice_ctx, None).await?;
-        let bzlmod_resolution = dice_ctx
+        let key = Self::build_bzlmod_projection_bridge_key(project_fs, config_args, dice_ctx, None)
+            .await?;
+        let bzlmod_projection = dice_ctx
             .compute(&key)
             .await?
-            .buck_error_context("Computing bzlmod resolution through DICE")?;
+            .buck_error_context("Computing bzlmod projection bridge through DICE")?;
 
         Self::parse_with_file_ops_and_options_inner(
             config_args,
             Some(project_fs),
             None,
             None,
-            Some(bzlmod_resolution),
+            Some(bzlmod_projection),
             Some(key.resolution_key.workspace_id.clone()),
         )
         .await
@@ -2708,22 +2708,22 @@ impl BuckConfigBasedCells {
         updater: &mut DiceTransactionUpdater,
         output_base: Option<PathBuf>,
     ) -> slug_error::Result<Self> {
-        let (key, bzlmod_resolution) = {
+        let (key, bzlmod_projection) = {
             let mut dice_ctx = updater.existing_state().await;
-            let key = Self::build_dice_bzlmod_resolution_key(
+            let key = Self::build_bzlmod_projection_bridge_key(
                 project_fs,
                 config_args,
                 &mut dice_ctx,
                 output_base,
             )
             .await?;
-            let bzlmod_resolution = dice_ctx
+            let bzlmod_projection = dice_ctx
                 .compute(&key)
                 .await?
-                .buck_error_context("Computing bzlmod resolution through DICE")?;
-            (key, bzlmod_resolution)
+                .buck_error_context("Computing bzlmod projection bridge through DICE")?;
+            (key, bzlmod_projection)
         };
-        let projection_data_for_dice = bzlmod_resolution.as_ref().clone().unwrap_or_else(|| {
+        let projection_data_for_dice = bzlmod_projection.as_ref().clone().unwrap_or_else(|| {
             slug_bzlmod::BzlmodProjectionData::for_workspace(
                 key.resolution_key.workspace_id.clone(),
             )
@@ -2734,7 +2734,7 @@ impl BuckConfigBasedCells {
             Some(project_fs),
             None,
             None,
-            Some(bzlmod_resolution),
+            Some(bzlmod_projection),
             Some(key.resolution_key.workspace_id.clone()),
         )
         .await
@@ -2746,12 +2746,12 @@ impl BuckConfigBasedCells {
         Ok(configs)
     }
 
-    async fn build_dice_bzlmod_resolution_key(
+    async fn build_bzlmod_projection_bridge_key(
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
         dice_ctx: &mut DiceComputations<'_>,
         output_base: Option<PathBuf>,
-    ) -> slug_error::Result<LegacyBzlmodResolutionDiceKey> {
+    ) -> slug_error::Result<BzlmodProjectionBridgeDiceKey> {
         let root_config = LegacyBuckConfig::from_overrides_only(config_args)?;
         let options = BzlmodResolutionOptions::from_config(&root_config)?;
         let project_root_path = project_fs.root().to_path_buf();
@@ -2893,7 +2893,7 @@ impl BuckConfigBasedCells {
             }
             None => None,
         };
-        let key = LegacyBzlmodResolutionDiceKey {
+        let key = BzlmodProjectionBridgeDiceKey {
             project_root,
             resolution_key,
             options,
@@ -2976,7 +2976,6 @@ impl BuckConfigBasedCells {
                 None,
             )
             .await?
-            .map(slug_bzlmod::BzlmodProjectionData::from)
         } else {
             None
         } {
@@ -3139,8 +3138,8 @@ impl BuckConfigBasedCells {
         })
     }
 
-    async fn resolve_bzlmod_resolution_from_key(
-        key: &LegacyBzlmodResolutionDiceKey,
+    async fn compute_bzlmod_projection_bridge(
+        key: &BzlmodProjectionBridgeDiceKey,
         dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<Arc<Option<slug_bzlmod::BzlmodProjectionData>>> {
         let root_module_file = key.root_module_file.clone();
@@ -3159,7 +3158,7 @@ impl BuckConfigBasedCells {
             Some(dice_ctx),
         )
         .await
-        .map(|resolution| Arc::new(resolution.map(slug_bzlmod::BzlmodProjectionData::from)))
+        .map(Arc::new)
     }
 
     /// Resolve bzlmod dependencies from MODULE.bazel if it exists.
@@ -4315,14 +4314,14 @@ mod tests {
         })
     }
 
-    fn legacy_bzlmod_resolution_key(
+    fn bzlmod_projection_bridge_key(
         hidden_lockfile: Arc<slug_bzlmod::LockfileContentValue>,
-    ) -> LegacyBzlmodResolutionDiceKey {
+    ) -> BzlmodProjectionBridgeDiceKey {
         let project_root = PathBuf::from("/tmp/slug-plan61-hidden-lockfile-key-test");
         let workspace_id =
             slug_bzlmod::WorkspaceId::new(project_root.clone(), PathBuf::from("/tmp/output-base"));
 
-        LegacyBzlmodResolutionDiceKey {
+        BzlmodProjectionBridgeDiceKey {
             project_root: AbsNormPathBuf::try_from(project_root.clone()).unwrap(),
             resolution_key: slug_bzlmod::BzlmodResolutionKey {
                 workspace_id,
@@ -4452,7 +4451,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bzlmod_resolution_key_uses_explicit_output_base() -> slug_error::Result<()> {
+    async fn bzlmod_projection_bridge_key_uses_explicit_output_base() -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
         let output_base = fs
@@ -4467,7 +4466,7 @@ mod tests {
             .commit()
             .await;
 
-        let key = BuckConfigBasedCells::build_dice_bzlmod_resolution_key(
+        let key = BuckConfigBasedCells::build_bzlmod_projection_bridge_key(
             fs.path(),
             &[],
             &mut dice,
@@ -5143,12 +5142,12 @@ ext = module_extension(implementation = _impl)
     }
 
     #[test]
-    fn legacy_bzlmod_resolution_key_includes_hidden_lockfile_identity() {
-        let first = legacy_bzlmod_resolution_key(lockfile_value(
+    fn bzlmod_projection_bridge_key_includes_hidden_lockfile_identity() {
+        let first = bzlmod_projection_bridge_key(lockfile_value(
             "/tmp/hidden/MODULE.bazel.lock",
             "hidden-lockfile-first",
         ));
-        let second = legacy_bzlmod_resolution_key(lockfile_value(
+        let second = bzlmod_projection_bridge_key(lockfile_value(
             "/tmp/hidden/MODULE.bazel.lock",
             "hidden-lockfile-second",
         ));

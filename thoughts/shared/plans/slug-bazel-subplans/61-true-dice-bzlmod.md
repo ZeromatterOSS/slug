@@ -85,7 +85,7 @@ Observed SDK result at the checkpoint:
   manifests against the existing Bazel 9.0.1 post-lease manifests showed exact
   mode parity, matching non-ELF hashes, and the same four accepted ELF hash
   differences listed above.
-- `LegacyBzlmodResolutionDiceKey` now includes hidden lockfile identity in
+- The former `LegacyBzlmodResolutionDiceKey` now includes hidden lockfile identity in
   equality and hashing, matching the existing visible-lockfile bridge identity.
   A focused Rust regression test covers this key property, and the hidden
   lockfile Python guardrail subset plus the full Plan 61 guardrail file pass.
@@ -494,7 +494,7 @@ Observed SDK result at the checkpoint:
   slug_external_cells -p slug_analysis`, `cargo build -p slug`, and the full
   Plan 61 Python guardrail file (`125 passed in 147.72s`). No stale `slugd`
   process remained after post-run cleanup.
-- `LegacyBzlmodResolutionDiceKey` now returns the narrower
+- The former `LegacyBzlmodResolutionDiceKey` now returns the narrower
   `BzlmodProjectionData` payload instead of caching `BzlmodSessionData` as its
   DICE value. The wrapped resolver still populated a legacy session-shaped
   structure internally at this checkpoint, then converted it at the key
@@ -517,6 +517,20 @@ Observed SDK result at the checkpoint:
   slug`, touched-file `rustfmt --edition 2024 --check`, `git diff --check`,
   and the full Plan 61 Python guardrail file (`125 passed in 139.29s`). No
   stale `slugd[...]` process remained after post-run cleanup.
+- The internal legacy DICE wrapper is now named
+  `BzlmodProjectionBridgeDiceKey` instead of
+  `LegacyBzlmodResolutionDiceKey`, and its compute path/error context now says
+  it computes the projection bridge rather than a DICE-owned bzlmod resolution
+  graph. This is a naming/API demotion only: the bridge still wraps the legacy
+  resolver and still returns `BzlmodProjectionData` until module graph,
+  repo-mapping, lockfile, repo-env, registration, and cell-graph facts have
+  true DICE producers. The direct no-op `BzlmodProjectionData::from`
+  conversions and stale session-named projection tests were removed in the
+  same cleanup. Validation passed with focused `cargo test -p slug_common
+  bzlmod_projection_bridge_key -- --nocapture`, focused `cargo test -p
+  slug_bzlmod projection -- --nocapture`, `cargo check -p slug_bzlmod -p
+  slug_common -p slug_server`, touched-file `rustfmt --edition 2024`, and
+  `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -1792,10 +1806,10 @@ Observed SDK result at the checkpoint:
   slug_common -p slug_external_cells -p slug_server`, `cargo build -p slug`,
   `cargo fmt --check`, and `git diff --check`.
 - The persisted config-load path now also preserves the keyed output base when
-  no `MODULE.bazel` exists. The empty bzlmod session projection is initialized
-  from the same `WorkspaceId` used by `LegacyBzlmodResolutionDiceKey`, rather
-  than falling back to `<project>/buck-out/v2` after DICE reports no root
-  module. Validation passed with focused `cargo test -p slug_common
+  no `MODULE.bazel` exists. The empty bzlmod projection is initialized from
+  the same `WorkspaceId` used by the projection bridge key, rather than
+  falling back to `<project>/buck-out/v2` after DICE reports no root module.
+  Validation passed with focused `cargo test -p slug_common
   persisted_empty_bzlmod_session_preserves_explicit_output_base --
   --nocapture`, `cargo check -p slug_common -p slug_server`, `cargo build -p
   slug`, `cargo fmt --check`, and `git diff --check`.
@@ -1855,7 +1869,7 @@ What worked:
 
 What did not work or remains risky:
 
-- A single transitional `LegacyBzlmodResolutionDiceKey` still wraps the legacy
+- A single transitional `BzlmodProjectionBridgeDiceKey` still wraps the legacy
   resolver. Its command-policy identity now comes from a DICE key, and its
   cached value is the narrowed `BzlmodProjectionData` payload, but the wrapped
   resolver is still not a Skyframe-shaped module graph.
@@ -2691,16 +2705,18 @@ using Rust DICE keys and values:
 ## Remaining Work
 
 1. Replace the legacy resolution bridge.
-   - Delete or strictly demote `LegacyBzlmodResolutionDiceKey`.
+   - Replace `BzlmodProjectionBridgeDiceKey` with true graph producers. The
+     old `LegacyBzlmodResolutionDiceKey` name has been demoted away, but the
+     bridge still wraps the legacy resolver.
    - Build the resolved graph from DICE-owned module-file/source keys.
    - Ensure graph identity includes every command policy value that Bazel uses:
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
    - Module-version/toolchain/platform consumers, current-workspace helpers,
-     and the remaining session bridge now derive workspace identity from the
+     and the remaining projection bridge now derive workspace identity from the
      named cell graph, and the persisted config-load key carries the daemon
-     output base, including no-`MODULE.bazel` empty-session projections, but
+     output base, including no-`MODULE.bazel` empty projections, but
      their data payloads are still injected from the legacy resolver. Daemon
      bootstrap direct parsing now passes its isolated buck-out path into the
      transitional workspace identity too.
