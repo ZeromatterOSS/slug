@@ -721,13 +721,13 @@ fn repo_materialization_marker_state_from_content_state(
     complete_marker_state(marker, spec_hash, repo_dir)
 }
 
+#[cfg(test)]
 fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKey) -> String {
     let canonical_name = key.canonical_repo.as_ref();
     let repo_spec = key.repo_spec.as_ref();
     let repo_dir = repo_dir_for_materialization_manifest_key(key);
     if repo_spec_requires_build_file(repo_spec)
-        && !repo_dir.join("BUILD.bazel").exists()
-        && !repo_dir.join("BUILD").exists()
+        && !repo_materialization_build_file_present(&repo_dir)
     {
         return "layout-missing-build-file".to_owned();
     }
@@ -740,17 +740,26 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
     ) {
         return "layout-foreign-top-level-symlink".to_owned();
     }
+    repo_materialization_invocation_layout_state(canonical_name, repo_spec, &repo_dir)
+}
+
+fn repo_materialization_build_file_present(repo_dir: &Path) -> bool {
+    repo_dir.join("BUILD.bazel").exists() || repo_dir.join("BUILD").exists()
+}
+
+fn repo_materialization_invocation_layout_state(
+    canonical_name: &str,
+    repo_spec: &RepoSpec,
+    repo_dir: &Path,
+) -> String {
     match repo_spec_to_invocation(canonical_name, repo_spec) {
-        Ok(invocation) => {
-            if crate::repository_executor::repo_layout_is_valid_for_invocation(
-                &invocation,
-                &repo_dir,
-            ) {
-                "layout-valid".to_owned()
-            } else {
-                "layout-invalid".to_owned()
-            }
-        }
+        Ok(invocation) => match crate::repository_executor::repo_layout_is_valid_for_invocation(
+            &invocation,
+            repo_dir,
+        ) {
+            true => "layout-valid".to_owned(),
+            false => "layout-invalid".to_owned(),
+        },
         Err(e) => format!("layout-unclassifiable:{e}"),
     }
 }
@@ -984,10 +993,186 @@ impl Key for RepoMaterializationLayoutStateKey {
 
     async fn compute(
         &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let repo_spec = self.0.repo_spec.as_ref();
+        let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
+        if repo_spec_requires_build_file(repo_spec) {
+            let build_file_present = ctx
+                .compute(&RepoMaterializationBuildFilePresenceKey {
+                    repo_dir: Arc::new(repo_dir.clone()),
+                })
+                .await
+                .unwrap_or(false);
+            if !build_file_present {
+                return Arc::from("layout-missing-build-file");
+            }
+        }
+
+        let invalid_empty_target_label = ctx
+            .compute(&RepoMaterializationInvalidEmptyTargetLabelKey {
+                repo_dir: Arc::new(repo_dir.clone()),
+            })
+            .await
+            .unwrap_or(false);
+        if invalid_empty_target_label {
+            return Arc::from("layout-invalid-empty-target-label");
+        }
+
+        let foreign_top_level_symlink = ctx
+            .compute(&RepoMaterializationForeignTopLevelSymlinkKey {
+                repo_dir: Arc::new(repo_dir.clone()),
+                project_root: self.0.workspace_id.canonical_project_root.clone(),
+            })
+            .await
+            .unwrap_or(false);
+        if foreign_top_level_symlink {
+            return Arc::from("layout-foreign-top-level-symlink");
+        }
+
+        ctx.compute(&RepoMaterializationInvocationLayoutStateKey(self.0.clone()))
+            .await
+            .unwrap_or_else(|e| Arc::from(format!("layout-unclassifiable:{e}").as_str()))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display(
+    "RepoMaterializationBuildFilePresenceKey({})",
+    repo_dir.display()
+)]
+struct RepoMaterializationBuildFilePresenceKey {
+    repo_dir: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationBuildFilePresenceKey {
+    type Value = bool;
+
+    async fn compute(
+        &self,
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Arc::from(repo_materialization_layout_state_for_key(&self.0).as_str())
+        repo_materialization_build_file_present(&self.repo_dir)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display(
+    "RepoMaterializationInvalidEmptyTargetLabelKey({})",
+    repo_dir.display()
+)]
+struct RepoMaterializationInvalidEmptyTargetLabelKey {
+    repo_dir: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationInvalidEmptyTargetLabelKey {
+    type Value = bool;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        repo_has_invalid_empty_target_label(&self.repo_dir)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display(
+    "RepoMaterializationForeignTopLevelSymlinkKey({}, {})",
+    repo_dir.display(),
+    project_root.display()
+)]
+struct RepoMaterializationForeignTopLevelSymlinkKey {
+    repo_dir: Arc<PathBuf>,
+    project_root: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationForeignTopLevelSymlinkKey {
+    type Value = bool;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        repo_has_foreign_top_level_symlink(&self.repo_dir, &self.project_root)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, Eq, Allocative)]
+#[display("RepoMaterializationInvocationLayoutStateKey({})", _0)]
+struct RepoMaterializationInvocationLayoutStateKey(RepoMaterializationManifestKey);
+
+impl PartialEq for RepoMaterializationInvocationLayoutStateKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl std::hash::Hash for RepoMaterializationInvocationLayoutStateKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+#[async_trait]
+impl Key for RepoMaterializationInvocationLayoutStateKey {
+    type Value = Arc<str>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let canonical_name = self.0.canonical_repo.as_ref();
+        let repo_spec = self.0.repo_spec.as_ref();
+        let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
+        Arc::from(
+            repo_materialization_invocation_layout_state(canonical_name, repo_spec, &repo_dir)
+                .as_str(),
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2279,6 +2464,46 @@ mod tests {
         let valid = repo_materialization_manifest_for_key(&key);
         assert_eq!(valid.layout_state.as_ref(), "layout-valid");
         assert_ne!(foreign.digest, valid.digest);
+    }
+
+    #[tokio::test]
+    async fn materialization_manifest_key_observes_layout_state_dependency() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+missing_build_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "payload\n").unwrap();
+
+        let repo_spec = RepoSpec::new("@@example//:repo.bzl%custom_repository".to_owned())
+            .with_attr(
+                "build_file_content".to_owned(),
+                AttrValue::String("exports_files([\"data.txt\"])\n".to_owned()),
+            );
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await.unwrap().unwrap();
+        assert_eq!(first.layout_state.as_ref(), "layout-missing-build-file");
+
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await.unwrap().unwrap();
+        assert_ne!(first.digest, second.digest);
+        assert_eq!(second.layout_state.as_ref(), "layout-valid");
     }
 
     #[tokio::test]

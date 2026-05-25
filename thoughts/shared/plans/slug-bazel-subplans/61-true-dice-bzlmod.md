@@ -2197,6 +2197,18 @@ What did not work or remains risky:
   test_archive_repo_manifest_tracks_output_digest_marker_state -- --nocapture`
   (`1 passed, 330 filtered out`), `cargo check -p slug_bzlmod`, `cargo
   fmt --check`, and `git diff --check`.
+- Repository materialization layout state is now split into named manifest
+  child keys too: `RepoMaterializationBuildFilePresenceKey`,
+  `RepoMaterializationInvalidEmptyTargetLabelKey`,
+  `RepoMaterializationForeignTopLevelSymlinkKey`, and
+  `RepoMaterializationInvocationLayoutStateKey`. The parent layout key still
+  exposes the same `layout-*` states, but BUILD-file presence, BUILD content
+  scans, top-level symlink scans, and rule-specific layout validation are now
+  auditable child dependencies instead of one direct helper. Focused validation
+  passed with `CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-marker-target cargo
+  test -p slug_bzlmod materialization_manifest -- --nocapture` (`11 passed,
+  321 filtered out`), `cargo check -p slug_bzlmod`, `cargo fmt --check`, and
+  `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
