@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`141 passed in 142.01s`) after rebuilding `target/debug/slug`.
+  (`143 passed in 109.84s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -410,26 +410,47 @@ Observed SDK result at the checkpoint:
   `ModuleFileGlobals.java:179`, `:301-307`, `:853-867`,
   `ModuleThreadContext.java:221-229`, and
   `ModuleFileFunctionTest.java:1360-1406`. Root-policy-sensitive
-  `override_repo()`/`inject_repo()` repo-name validation remains tied to the
-  remaining directive-semantics migration instead of being forced into the
-  parser. Validation passed with `cargo test -p slug_bzlmod
+  `override_repo()`/`inject_repo()` repo-name validation is handled by the
+  directive-semantics pass after Bazel's root/`--ignore_dev_dependency` early
+  return, rather than being forced into the raw function calls. Validation
+  passed with `cargo test -p slug_bzlmod
   user_provided_repo_names -- --nocapture` (`1 passed`) and the
   explicit-binary Plan 61 selector
   `-k 'invalid_user_provided_repo_names_fail_at_module_parse'` (`1 passed,
   136 deselected`).
+  Root `override_repo()`/`inject_repo()` rows now validate both the exported
+  generated repo name and the overriding visible repo name, then reject an
+  overriding repo that is not visible in the current module scope. This mirrors
+  Bazel's `addRepoOverride` and `buildUsage` checks while preserving the early
+  ignored path for non-root or `--ignore_dev_dependency` directives. Bazel
+  source anchors: `ModuleFileGlobals.java:716-735` and `:776-795`, plus
+  `ModuleThreadContext.java:239-258` and `:287-299`. Validation passed with
+  `cargo test -p slug_bzlmod parse_ -- --nocapture` (`62 passed`) and the
+  explicit-binary Plan 61 selector
+  `-k 'override_and_inject_repo_missing_visible_repo_fails_at_module_parse or
+  invalid_user_provided_repo_names_fail_at_module_parse or
+  non_root_override_repo_is_ignored or non_root_inject_repo_is_ignored'`
+  (`4 passed, 138 deselected`).
   Root-module repo-name collision validation now covers the Bazel parse-time
   ownership rows for `module(name = ...)`, `module(repo_name = ...)`, and
   visible `bazel_dep()` repo names, including duplicate `repo_name` aliases
-  across included MODULE.bazel segments. Bazel source anchors:
+  across included MODULE.bazel segments. It also preserves Bazel's non-collision
+  case where an explicit `module(repo_name = ...)` means the module `name` is
+  no longer a visible apparent repo name and may be reused by a dependency's
+  `repo_name`. Repo-name usage diagnostics now retain the previous Starlark
+  location instead of only the previous usage text. Bazel source anchors:
   `ModuleFileGlobals.java:177-180`, `:301-317`, and
   `ModuleThreadContext.java:110-118`, plus
   `ModuleFileFunctionTest.java:509-529` and `:1505-1514`. This does not claim
   the larger `bazel_dep(repo_name = None)` nodep behavior is complete.
   Validation passed with `cargo test -p slug_bzlmod repo_name -- --nocapture`
-  (`8 passed`) and the explicit-binary Plan 61 selector
-  `-k 'repo_name_collisions_fail_at_module_parse or
-  invalid_user_provided_repo_names_fail_at_module_parse'` (`2 passed, 139
-  deselected`).
+  (`9 passed`) and the explicit-binary Plan 61 selector
+  `-k 'explicit_module_repo_name_frees_module_name_for_dep_repo or
+  repo_name_collisions_fail_at_module_parse or
+  override_and_inject_repo_missing_visible_repo_fails_at_module_parse or
+  invalid_user_provided_repo_names_fail_at_module_parse or
+  non_root_override_repo_is_ignored or non_root_inject_repo_is_ignored'`
+  (`6 passed, 137 deselected`).
   `module()` ordering now follows Bazel's shared MODULE.bazel context rule:
   if `module()` is present, it must execute before any other directive, including
   an `include()` whose included segment tries to call `module()`. Bazel source

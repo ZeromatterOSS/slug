@@ -174,22 +174,54 @@ fn add_repo_name_usage(
     ctx: &mut ModuleFileContext,
     repo_name: &str,
     how: &str,
+    location: Option<String>,
 ) -> starlark::Result<()> {
     if repo_name.is_empty() {
         return Ok(());
     }
-    if let Some(previous) = ctx
-        .repo_name_usages
-        .insert(repo_name.to_owned(), how.to_owned())
-    {
+    if let Some(previous) = ctx.repo_name_usages.insert(
+        repo_name.to_owned(),
+        RepoNameUsage::new(how, location.clone()),
+    ) {
+        let current_location = location
+            .as_deref()
+            .map(|loc| format!(" at {loc}"))
+            .unwrap_or_default();
+        let previous_location = previous
+            .location
+            .as_deref()
+            .map(|loc| format!(" at {loc}"))
+            .unwrap_or_default();
         return Err(starlark::Error::new_other(anyhow::anyhow!(
-            "The repo name '{}' cannot be defined {} as it is already defined {}",
+            "The repo name '{}' cannot be defined {}{} as it is already defined {}{}",
             repo_name,
             how,
-            previous
+            current_location,
+            previous.how,
+            previous_location
         )));
     }
     Ok(())
+}
+
+fn current_starlark_location(eval: &Evaluator<'_, '_, '_>) -> Option<String> {
+    eval.call_stack_top_location()
+        .map(|location| location.to_string())
+}
+
+#[derive(Debug, Clone)]
+pub struct RepoNameUsage {
+    pub how: String,
+    pub location: Option<String>,
+}
+
+impl RepoNameUsage {
+    fn new(how: &str, location: Option<String>) -> Self {
+        Self {
+            how: how.to_owned(),
+            location,
+        }
+    }
 }
 
 /// Context for MODULE.bazel evaluation.
@@ -210,7 +242,7 @@ pub struct ModuleFileContext {
     /// Repo names made visible by module(), bazel_dep(), use_repo(), and
     /// use_repo_rule() directives. This mirrors Bazel's ModuleThreadContext
     /// collision checks for parse-time repo-name ownership.
-    pub repo_name_usages: HashMap<String, String>,
+    pub repo_name_usages: HashMap<String, RepoNameUsage>,
 
     /// All override declarations.
     pub overrides: Vec<Override>,
@@ -597,6 +629,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         bazel_compatibility: UnpackList<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let location = current_starlark_location(eval);
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
 
@@ -612,8 +645,21 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         }
         validate_optional_bazel_module_name(name)?;
         validate_optional_user_provided_repo_name(repo_name)?;
-        add_repo_name_usage(&mut ctx, name, "as the current module name")?;
-        add_repo_name_usage(&mut ctx, repo_name, "as the module's own repo name")?;
+        if repo_name.is_empty() {
+            add_repo_name_usage(
+                &mut ctx,
+                name,
+                "as the current module name",
+                location.clone(),
+            )?;
+        } else {
+            add_repo_name_usage(
+                &mut ctx,
+                repo_name,
+                "as the module's own repo name",
+                location.clone(),
+            )?;
+        }
 
         let parsed_version = if version.is_empty() {
             Version::empty()
@@ -666,6 +712,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let location = current_starlark_location(eval);
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
         mark_non_module_called(&mut ctx);
@@ -683,7 +730,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         } else if let Some(s) = repo_name.unpack_str() {
             let visible_name = if s.is_empty() { name } else { s };
             validate_user_provided_repo_name(visible_name)?;
-            add_repo_name_usage(&mut ctx, visible_name, "by a bazel_dep")?;
+            add_repo_name_usage(&mut ctx, visible_name, "by a bazel_dep", location.clone())?;
             if s.is_empty() {
                 None
             } else {
@@ -1044,6 +1091,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(kwargs)] kwargs: starlark::collections::SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let location = current_starlark_location(eval);
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
         mark_non_module_called(&mut ctx);
@@ -1061,6 +1109,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         // Add positional repo names
         for repo in repos.items {
             validate_user_provided_repo_name(repo)?;
+            add_repo_name_usage(&mut ctx, repo, "by a use_repo", location.clone())?;
             use_repo.repos.push(repo.to_string());
         }
 
@@ -1069,6 +1118,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             if let Some(actual_name) = actual_value.unpack_str() {
                 validate_user_provided_repo_name(apparent_name)?;
                 validate_user_provided_repo_name(actual_name)?;
+                add_repo_name_usage(&mut ctx, apparent_name, "by a use_repo", location.clone())?;
                 use_repo
                     .repo_mapping
                     .push((apparent_name.clone(), actual_name.to_owned()));
@@ -1291,6 +1341,7 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
         args: &starlark::eval::Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        let location = current_starlark_location(eval);
         // Record the repo rule invocation so it can be materialized later.
         // This is called when e.g. http_file(name="toml2json_linux_amd64", ...)
         // appears in MODULE.bazel via use_repo_rule().
@@ -1321,6 +1372,7 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
         // Record in the module context so it can be processed as a cell
         if let Ok(module_ctx) = get_module_context(eval) {
             let mut ctx = module_ctx.borrow_mut();
+            add_repo_name_usage(&mut ctx, name, "by a repo rule", location.clone())?;
             // Store as a repo rule invocation with rule source info
             let rule_source = format!("{}%{}", self.rule_bzl_file, self.rule_name);
             let owning_module = ctx.module.as_ref().map(|m| m.name.as_str());

@@ -4849,6 +4849,15 @@ use_repo(ext, foo = "_foo")
 repo = use_repo_rule("//:repo.bzl", "repo")
 repo(name = "_foo")
 """,
+        """module(name = "plan61_bad_override_repo_key")
+bazel_dep(name = "helper", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, _foo = "helper")
+""",
+        """module(name = "plan61_bad_inject_repo_value")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, generated = "_foo")
+""",
     ]
 
     for content in cases:
@@ -4859,6 +4868,34 @@ repo(name = "_foo")
 
         assert "invalid user-provided repo name" in str(exc.value)
         assert "must start with a letter or a number" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_override_and_inject_repo_missing_visible_repo_fails_at_module_parse(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleThreadContext.ModuleExtensionUsageBuilder.buildUsage."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    cases = [
+        """module(name = "plan61_missing_override_repo")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, generated = "missing")
+""",
+        """module(name = "plan61_missing_inject_repo")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, generated = "missing")
+""",
+    ]
+
+    for content in cases:
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert "repo exported as 'generated'" in str(exc.value)
+        assert "overridden with 'missing'" in str(exc.value)
+        assert "no repo is visible under this name" in str(exc.value)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -4889,6 +4926,28 @@ bazel_dep(name = "plan61_repo_name_collision", version = "1.0.0")
         assert "The repo name" in str(exc.value)
         assert "cannot be defined" in str(exc.value)
         assert "already defined" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_explicit_module_repo_name_frees_module_name_for_dep_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: module(repo_name=...) addRepoNameUsage branch."""
+    dep = buck.cwd / "dep"
+    dep.mkdir()
+    _write(dep / "MODULE.bazel", 'module(name = "dep", version = "1.0.0")\n')
+    _write(dep / "BUILD.bazel", "")
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_free_module_name", repo_name = "plan61_actual_root_repo")
+
+bazel_dep(name = "dep", version = "1.0.0", repo_name = "plan61_free_module_name")
+local_path_override(module_name = "dep", path = "dep")
+""",
+    )
+
+    await buck.build("//:x")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

@@ -30,8 +30,11 @@ use starlark::syntax::DialectTypes;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::record_bzlmod_event;
 use crate::globals::ModuleFileContext;
+use crate::globals::RepoNameUsage;
 use crate::globals::new_module_file_context;
 use crate::globals::register_module_file_globals;
+use crate::module_names::invalid_user_provided_repo_name_message;
+use crate::module_names::is_valid_user_provided_repo_name;
 use crate::types::Module as BzlModule;
 use crate::types::ParsedModuleFile;
 
@@ -264,7 +267,7 @@ fn parsed_module_file_from_context(
     // Extract results from context
     let ctx = context.borrow();
     if validate_extension_repo_directives_flag {
-        validate_extension_repo_directives(&ctx.extensions)?;
+        validate_extension_repo_directives(&ctx.extensions, &ctx.repo_name_usages)?;
     }
 
     let (module_info, has_module_directive) = match &ctx.module {
@@ -297,6 +300,7 @@ fn parsed_module_file_from_context(
 
 fn validate_extension_repo_directives(
     extension_usages: &[crate::types::ExtensionUsage],
+    repo_name_usages: &std::collections::HashMap<String, RepoNameUsage>,
 ) -> slug_error::Result<()> {
     struct ExtensionDirectiveState<'a> {
         extension_name: &'a str,
@@ -317,6 +321,20 @@ fn validate_extension_repo_directives(
         for (repo_name, overriding_repo) in
             ext.repo_overrides.iter().chain(ext.injected_repos.iter())
         {
+            if !is_valid_user_provided_repo_name(repo_name) {
+                return Err(
+                    ModuleParseError::EvalError(invalid_user_provided_repo_name_message(repo_name))
+                        .into(),
+                );
+            }
+            if !is_valid_user_provided_repo_name(overriding_repo) {
+                return Err(
+                    ModuleParseError::EvalError(invalid_user_provided_repo_name_message(
+                        overriding_repo,
+                    ))
+                    .into(),
+                );
+            }
             if let Some(previous_override) = state
                 .repo_overrides
                 .insert(repo_name.as_str(), overriding_repo.as_str())
@@ -340,6 +358,17 @@ fn validate_extension_repo_directives(
         let Some(state) = states.get(&ext.extension_id()) else {
             continue;
         };
+        for (repo_name, overriding_repo) in
+            ext.repo_overrides.iter().chain(ext.injected_repos.iter())
+        {
+            if !repo_name_usages.contains_key(overriding_repo) {
+                return Err(ModuleParseError::EvalError(format!(
+                    "The repo exported as '{}' by module extension '{}' is overridden with '{}', but no repo is visible under this name",
+                    repo_name, state.extension_name, overriding_repo
+                ))
+                .into());
+            }
+        }
         for use_repo in &ext.imports {
             for repo_name in &use_repo.repos {
                 if let Some(overriding_repo) = state.injected_repos.get(repo_name.as_str()) {
@@ -761,6 +790,19 @@ bazel_dep(name = "aaa", version = "1.0.0")
             assert!(err.contains("cannot be defined"), "{err}");
             assert!(err.contains("already defined"), "{err}");
         }
+    }
+
+    #[test]
+    fn test_parse_explicit_module_repo_name_frees_module_name() {
+        let content = r#"
+module(name = "aaa", version = "1.0.0", repo_name = "bbb")
+bazel_dep(name = "ccc", version = "1.0.0", repo_name = "aaa")
+"#;
+
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        assert_eq!(parsed.module.name, "aaa");
+        assert_eq!(parsed.module.repo_name.as_deref(), Some("bbb"));
+        assert_eq!(parsed.module.bazel_deps[0].apparent_name(), "aaa");
     }
 
     #[test]
@@ -1279,6 +1321,8 @@ use_repo(pip, "pip", "pip_internal")
     fn test_parse_override_repo_positional_and_keyword() {
         let content = r#"
 module(name = "test", version = "1.0.0")
+bazel_dep(name = "generated", version = "1.0.0")
+bazel_dep(name = "replacement", version = "1.0.0")
 ext = use_extension("//:ext.bzl", "ext")
 override_repo(ext, "generated", public = "replacement")
 "#;
@@ -1297,6 +1341,8 @@ override_repo(ext, "generated", public = "replacement")
     fn test_parse_duplicate_override_repo_rows_error() {
         let content = r#"
 module(name = "test", version = "1.0.0")
+bazel_dep(name = "generated", version = "1.0.0")
+bazel_dep(name = "replacement", version = "1.0.0")
 ext = use_extension("//:ext.bzl", "ext")
 override_repo(ext, "generated")
 override_repo(ext, generated = "replacement")
@@ -1313,6 +1359,8 @@ override_repo(ext, generated = "replacement")
     fn test_parse_duplicate_override_and_inject_repo_rows_error() {
         let content = r#"
 module(name = "test", version = "1.0.0")
+bazel_dep(name = "replacement", version = "1.0.0")
+bazel_dep(name = "helper", version = "1.0.0")
 ext = use_extension("//:ext.bzl", "ext")
 override_repo(ext, generated = "replacement")
 inject_repo(ext, generated = "helper")
@@ -1329,6 +1377,8 @@ inject_repo(ext, generated = "helper")
     fn test_parse_duplicate_override_repo_across_same_extension_proxies_errors() {
         let content = r#"
 module(name = "test", version = "1.0.0")
+bazel_dep(name = "replacement", version = "1.0.0")
+bazel_dep(name = "helper", version = "1.0.0")
 first = use_extension("//:ext.bzl", "ext")
 second = use_extension("//:ext.bzl", "ext")
 override_repo(first, generated = "replacement")
@@ -1346,6 +1396,7 @@ inject_repo(second, generated = "helper")
     fn test_parse_use_repo_of_injected_repo_errors() {
         let content = r#"
 module(name = "test", version = "1.0.0")
+bazel_dep(name = "helper", version = "1.0.0")
 ext = use_extension("//:ext.bzl", "ext")
 use_repo(ext, "generated")
 inject_repo(ext, generated = "helper")
@@ -1379,6 +1430,7 @@ inject_repo(ext, generated = "helper")
     fn test_parse_use_repo_of_injected_repo_across_same_extension_proxies_errors() {
         let content = r#"
 module(name = "test", version = "1.0.0")
+bazel_dep(name = "helper", version = "1.0.0")
 first = use_extension("//:ext.bzl", "ext")
 second = use_extension("//:ext.bzl", "ext")
 use_repo(first, alias = "generated")
@@ -1390,6 +1442,21 @@ inject_repo(second, generated = "helper")
         assert!(err.contains("Cannot import repo 'generated'"));
         assert!(err.contains("has been injected into module extension 'ext'"));
         assert!(err.contains("Please refer to @helper directly"));
+    }
+
+    #[test]
+    fn test_parse_override_repo_missing_visible_repo_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, generated = "missing")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo exported as 'generated'"));
+        assert!(err.contains("overridden with 'missing'"));
+        assert!(err.contains("no repo is visible under this name"));
     }
 
     #[test]
