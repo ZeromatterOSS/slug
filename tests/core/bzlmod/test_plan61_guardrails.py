@@ -2254,6 +2254,129 @@ bazel_dep(name = "ddd", version = "1.0.0")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_single_version_override_registry_source_json_delete_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: RegistryOverride source metadata deletion is observable."""
+    cache_home = buck.cwd / "cache_home"
+    default_registry = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    override_registry = cache_home / "slug" / "registry" / "override.example"
+    default_registry.mkdir(parents=True)
+    override_registry.mkdir(parents=True)
+    _write(default_registry / "bazel_registry.json", "{}\n")
+    _write(override_registry / "bazel_registry.json", "{}\n")
+
+    bbb = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "bbb",
+        "1.0.0",
+        'module(name = "bbb", version = "1.0.0")\n'
+        'bazel_dep(name = "ccc", version = "1.0.0")\n',
+    )
+    ccc_override = _write_cached_registry_module(
+        cache_home,
+        "override.example",
+        "ccc",
+        "1.0.0",
+        'module(name = "ccc", version = "1.0.0")\n',
+    )
+    ddd = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "ddd",
+        "1.0.0",
+        'module(name = "ddd", version = "1.0.0")\n',
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_single_override_registry_source_delete")
+
+bazel_dep(name = "bbb", version = "1.0.0")
+single_version_override(
+    module_name = "ccc",
+    registry = "https://override.example",
+)
+""",
+    )
+
+    source_url = "https://override.example/modules/ccc/1.0.0/source.json"
+
+    def registry_hashes() -> dict[str, str]:
+        return {
+            "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                default_registry / "bazel_registry.json"
+            ),
+            "https://override.example/bazel_registry.json": _sha256(
+                override_registry / "bazel_registry.json"
+            ),
+            "https://bcr.bazel.build/modules/bbb/1.0.0/MODULE.bazel": _sha256(
+                bbb / "MODULE.bazel"
+            ),
+            "https://bcr.bazel.build/modules/bbb/1.0.0/source.json": _sha256(
+                bbb / "source.json"
+            ),
+            "https://override.example/modules/ccc/1.0.0/MODULE.bazel": _sha256(
+                ccc_override / "MODULE.bazel"
+            ),
+            source_url: _sha256(ccc_override / "source.json"),
+            "https://bcr.bazel.build/modules/ddd/1.0.0/MODULE.bazel": _sha256(
+                ddd / "MODULE.bazel"
+            ),
+            "https://bcr.bazel.build/modules/ddd/1.0.0/source.json": _sha256(
+                ddd / "source.json"
+            ),
+        }
+
+    def write_lockfile() -> None:
+        _write(
+            buck.cwd / "MODULE.bazel.lock",
+            json.dumps(
+                {
+                    "lockFileVersion": 26,
+                    "registryFileHashes": registry_hashes(),
+                    "selectedYankedVersions": {},
+                    "moduleExtensions": {},
+                    "facts": {},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+        )
+
+    write_lockfile()
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    output, first = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+    assert "ddd" not in output
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+    assert "ddd" not in output
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    (ccc_override / "source.json").unlink()
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "source.json" in failure_stderr
+    assert "override.example" in failure_stderr
+
+    _write(ccc_override / "source.json", "{}\n")
+    _write(
+        ccc_override / "MODULE.bazel",
+        """module(name = "ccc", version = "1.0.0")
+bazel_dep(name = "ddd", version = "1.0.0")
+""",
+    )
+    write_lockfile()
+    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+    assert "ddd" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_multiple_version_override_registry_uses_override_registry(
     buck: Buck,
 ) -> None:

@@ -299,10 +299,14 @@ Observed SDK result at the checkpoint:
   override registry's `source.json` with a matching lockfile hash fails the next
   `audit cell`, and repair introduces a new dependency from the override
   registry module instead of reusing the old graph. The same metadata path is
-  covered for `multiple_version_override(registry = ...)` UTF-8 failures.
+  covered for `multiple_version_override(registry = ...)` UTF-8 failures, and
+  `single_version_override(registry = ...)` now has deletion-transition
+  coverage for the override registry's selected `source.json`.
   Validation passed with `-k
   'single_version_override_registry_source_json_parse_failure or
   multiple_version_override_registry_source_json_utf8_failure'` (`2 passed, 116
+  deselected`) and with `-k
+  'single_version_override_registry_source_json_delete'` (`1 passed, 122
   deselected`).
   Override patch fields remain blocked: Bazel validates main-repo patch labels,
   applies `single_version_override` patches to the discovered `MODULE.bazel`,
@@ -2630,9 +2634,9 @@ using Rust DICE keys and values:
      and deletion coverage; remaining source classes still need full matrix
      coverage.
    - Model registry selection and source metadata for overrides. Single-version
-     override registry source metadata has same-daemon parse-failure coverage;
-     multiple-version override registry source metadata has same-daemon UTF-8
-     failure coverage.
+     override registry source metadata has same-daemon parse-failure and
+     deletion coverage; multiple-version override registry source metadata has
+     same-daemon UTF-8 failure coverage.
 
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
