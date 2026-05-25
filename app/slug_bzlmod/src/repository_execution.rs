@@ -1604,7 +1604,7 @@ impl Key for ExtensionRepoExecutionKey {
 ///
 /// # Returns
 /// A RepositoryInvocation that can be passed to the repository executor.
-pub fn repo_spec_to_invocation(
+pub(crate) fn repo_spec_to_invocation(
     canonical_name: &str,
     repo_spec: &RepoSpec,
 ) -> slug_error::Result<RepositoryInvocation> {

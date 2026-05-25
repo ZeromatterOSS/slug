@@ -2269,6 +2269,15 @@ What did not work or remains risky:
   (`3 passed, 329 filtered out`), `cargo test -p slug_bzlmod
   malformed_lockfile -- --nocapture` (`3 passed, 329 filtered out`),
   `cargo fmt --check`, and `git diff --check`.
+- `repo_spec_to_invocation` is no longer exported from the `slug_bzlmod` crate
+  root and is now crate-private. Extension repository execution still uses it
+  internally when converting a captured `RepoSpec` into the native repository
+  executor invocation, but external callers cannot bypass the
+  `ExtensionRepoExecutionKey` path by building invocations directly. Focused
+  validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-api-target
+  cargo test -p slug_bzlmod repo_spec_to_invocation -- --nocapture` (`5
+  passed, 327 filtered out`), `cargo check -p slug_bzlmod`,
+  `cargo fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
