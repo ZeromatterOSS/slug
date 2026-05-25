@@ -55,6 +55,7 @@ mod version;
 // ============================================================================
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+#[cfg(test)]
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -331,10 +332,7 @@ impl BzlmodProjectionData {
     }
 
     pub fn empty_no_project_sentinel() -> Self {
-        Self::for_workspace(WorkspaceId::new(
-            PathBuf::new(),
-            PathBuf::from("buck-out/v2"),
-        ))
+        Self::for_workspace(WorkspaceId::no_project_sentinel())
     }
 
     #[cfg(test)]

@@ -63,6 +63,10 @@ impl WorkspaceId {
         &self.stable_hash
     }
 
+    pub fn no_project_sentinel() -> Self {
+        Self::new(PathBuf::new(), PathBuf::from("buck-out/v2"))
+    }
+
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::new(project_root.clone(), project_root.join("buck-out/v2"))
@@ -1827,6 +1831,14 @@ mod tests {
 
         assert_ne!(first, second);
         assert_ne!(first.stable_hash(), second.stable_hash());
+    }
+
+    #[test]
+    fn workspace_id_names_no_project_sentinel() {
+        let sentinel = WorkspaceId::no_project_sentinel();
+
+        assert_eq!(sentinel.canonical_project_root.as_ref(), &PathBuf::new());
+        assert_eq!(sentinel.output_base.as_ref(), &PathBuf::from("buck-out/v2"));
     }
 
     #[test]

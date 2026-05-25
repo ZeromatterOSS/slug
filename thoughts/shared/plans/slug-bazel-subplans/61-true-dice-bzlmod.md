@@ -2172,6 +2172,16 @@ Observed SDK result at the checkpoint:
   -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
   slug_common -p slug_interpreter_for_build`, and `git diff --check`; a
   `testing_parse` filter matched zero tests and was not counted as evidence.
+- The no-project workspace sentinel is now named directly on `WorkspaceId`, so
+  callers that only need identity no longer construct an empty
+  `BzlmodProjectionData` just to extract its cell graph workspace. The empty
+  no-project projection remains available for test-only interpreter setup that
+  still needs a full injected payload. Validation passed with `cargo fmt
+  --check`, `cargo test -p slug_bzlmod
+  workspace_id_names_no_project_sentinel -- --nocapture`, `cargo test -p
+  slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
+  slug_bzlmod -p slug_common -p slug_interpreter_for_build`, and `git diff
+  --check`.
 - Transitional process-global bzlmod dynamic-cell entries are now scoped by
   workspace identity, including output base, instead of only project root.
   Runtime bzlmod replay sets that scope from the DICE-projected cell graph
@@ -3407,7 +3417,8 @@ using Rust DICE keys and values:
    - Generic empty session construction is removed from production paths.
      Remaining empty projection construction must explicitly carry workspace
      identity while the projection bridge is still being unwound. The
-     no-project sentinel is named.
+     no-project sentinel is named on `WorkspaceId`; empty projection
+     construction now remains only where a full transitional payload is needed.
    - Extension repository execution constructors that derive workspace identity
      from project root are test-only; production code must pass explicit
      workspace identity and repo-env. Bzlmod projection-key and

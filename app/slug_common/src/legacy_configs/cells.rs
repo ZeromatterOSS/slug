@@ -3143,9 +3143,7 @@ impl BuckConfigBasedCells {
             config_args,
             None,
             None,
-            slug_bzlmod::BzlmodProjectionData::empty_no_project_sentinel()
-                .cell_graph
-                .workspace_id,
+            slug_bzlmod::WorkspaceId::no_project_sentinel(),
         )
         .await
         .buck_error_context("Parsing cells")
@@ -5530,9 +5528,7 @@ mod tests {
             &[],
             None,
             Some(Arc::new(Some(projection_data))),
-            slug_bzlmod::BzlmodProjectionData::empty_no_project_sentinel()
-                .cell_graph
-                .workspace_id,
+            slug_bzlmod::WorkspaceId::no_project_sentinel(),
         )
         .await?;
         let bazel_tools = CellName::unchecked_new("bazel_tools")?;
