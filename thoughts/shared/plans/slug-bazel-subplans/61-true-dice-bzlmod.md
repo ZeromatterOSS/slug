@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`143 passed in 109.84s`) after rebuilding `target/debug/slug`.
+  (`144 passed in 109.42s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -431,6 +431,22 @@ Observed SDK result at the checkpoint:
   invalid_user_provided_repo_names_fail_at_module_parse or
   non_root_override_repo_is_ignored or non_root_inject_repo_is_ignored'`
   (`4 passed, 138 deselected`).
+  The command path now keeps root MODULE parsing policy-neutral for bootstrap
+  and DICE input tracking, then validates those root directive rows only in the
+  command/DICE projection bridge when `--ignore_dev_dependency` is inactive.
+  This preserves Bazel's `shouldIgnoreDevDeps()` early return for ignored
+  root `override_repo()`/`inject_repo()` rows: missing or invalid overriding
+  repos do not fail before the directive is ignored, while default-mode
+  commands still reject the same rows before registry resolution. Validation
+  passed with `cargo test -p slug_bzlmod
+  ignored_extension_repo_directives -- --nocapture` (`1 passed`) and the
+  explicit-binary Plan 61 selector
+  `-k 'override_and_inject_repo_are_ignored_before_validation_under_ignore_dev
+  or override_and_inject_repo_missing_visible_repo_fails_at_module_parse or
+  invalid_user_provided_repo_names_fail_at_module_parse or
+  explicit_module_repo_name_frees_module_name_for_dep_repo or
+  inject_repo_is_ignored_under_ignore_dev_dependency'`
+  (`5 passed, 139 deselected`).
   Root-module repo-name collision validation now covers the Bazel parse-time
   ownership rows for `module(name = ...)`, `module(repo_name = ...)`, and
   visible `bazel_dep()` repo names, including duplicate `repo_name` aliases

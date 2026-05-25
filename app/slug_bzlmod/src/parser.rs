@@ -302,6 +302,49 @@ fn validate_extension_repo_directives(
     extension_usages: &[crate::types::ExtensionUsage],
     repo_name_usages: &std::collections::HashMap<String, RepoNameUsage>,
 ) -> slug_error::Result<()> {
+    validate_extension_repo_directives_with_visibility(extension_usages, |repo_name| {
+        repo_name_usages.contains_key(repo_name)
+    })
+}
+
+pub fn validate_parsed_root_extension_repo_directives(
+    parsed: &ParsedModuleFile,
+) -> slug_error::Result<()> {
+    let mut repo_names = std::collections::HashSet::new();
+    let module_repo_name = parsed
+        .module
+        .repo_name
+        .as_deref()
+        .unwrap_or(parsed.module.name.as_str());
+    if !module_repo_name.is_empty() {
+        repo_names.insert(module_repo_name.to_owned());
+    }
+    for dep in &parsed.module.bazel_deps {
+        repo_names.insert(dep.apparent_name().to_owned());
+    }
+    for ext in &parsed.extension_usages {
+        for import in &ext.imports {
+            for repo_name in &import.repos {
+                repo_names.insert(repo_name.clone());
+            }
+            for (apparent_name, _) in &import.repo_mapping {
+                repo_names.insert(apparent_name.clone());
+            }
+        }
+    }
+    for invocation in &parsed.repo_rule_invocations {
+        repo_names.insert(invocation.name.clone());
+    }
+
+    validate_extension_repo_directives_with_visibility(&parsed.extension_usages, |repo_name| {
+        repo_names.contains(repo_name)
+    })
+}
+
+fn validate_extension_repo_directives_with_visibility(
+    extension_usages: &[crate::types::ExtensionUsage],
+    mut repo_is_visible: impl FnMut(&str) -> bool,
+) -> slug_error::Result<()> {
     struct ExtensionDirectiveState<'a> {
         extension_name: &'a str,
         repo_overrides: std::collections::HashMap<&'a str, &'a str>,
@@ -361,7 +404,7 @@ fn validate_extension_repo_directives(
         for (repo_name, overriding_repo) in
             ext.repo_overrides.iter().chain(ext.injected_repos.iter())
         {
-            if !repo_name_usages.contains_key(overriding_repo) {
+            if !repo_is_visible(overriding_repo) {
                 return Err(ModuleParseError::EvalError(format!(
                     "The repo exported as '{}' by module extension '{}' is overridden with '{}', but no repo is visible under this name",
                     repo_name, state.extension_name, overriding_repo
@@ -410,6 +453,19 @@ pub fn parse_module_bazel(path: &Path) -> slug_error::Result<ParsedModuleFile> {
         parse_module_bazel_content_from_path(path, &content, sha256_hex(content.as_bytes()))?
             .parsed,
     )
+}
+
+pub fn parse_module_bazel_allow_ignored_extension_repo_directives(
+    path: &Path,
+) -> slug_error::Result<ParsedModuleFile> {
+    let content = std::fs::read_to_string(path)
+        .buck_error_context(format!("Failed to read MODULE.bazel at {:?}", path))?;
+    Ok(parse_non_root_module_bazel_content_from_path(
+        path,
+        &content,
+        sha256_hex(content.as_bytes()),
+    )?
+    .parsed)
 }
 
 pub fn parse_non_root_module_bazel(path: &Path) -> slug_error::Result<ParsedModuleFile> {
@@ -1452,6 +1508,31 @@ ext = use_extension("//:ext.bzl", "ext")
 override_repo(ext, generated = "missing")
 "#;
         let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo exported as 'generated'"));
+        assert!(err.contains("overridden with 'missing'"));
+        assert!(err.contains("no repo is visible under this name"));
+    }
+
+    #[test]
+    fn test_ignored_extension_repo_directives_validate_after_parse() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, generated = "missing")
+"#;
+        let mut session = ModuleFileParseSession::new(std::path::PathBuf::from("."))
+            .allow_ignored_extension_repo_directives();
+        session
+            .eval_segment(
+                std::path::Path::new("MODULE.bazel"),
+                content,
+                sha256_hex(content.as_bytes()),
+            )
+            .unwrap();
+        let parsed = session.finish().unwrap().parsed;
+        let err = validate_parsed_root_extension_repo_directives(&parsed)
             .unwrap_err()
             .to_string();
         assert!(err.contains("repo exported as 'generated'"));

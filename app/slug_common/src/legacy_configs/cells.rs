@@ -33,7 +33,7 @@ use slug_bzlmod::ModuleCache;
 use slug_bzlmod::ModuleSource;
 use slug_bzlmod::MvsResolver;
 use slug_bzlmod::ParsedModuleFile;
-use slug_bzlmod::parse_module_bazel;
+use slug_bzlmod::parse_module_bazel_allow_ignored_extension_repo_directives;
 use slug_bzlmod::parse_non_root_module_bazel;
 use slug_bzlmod::record_bzlmod_event;
 use slug_bzlmod::resolve_local_modules;
@@ -907,7 +907,7 @@ impl Key for TrackedRootModuleFileKey {
             &project_fs,
             root_path.as_ref(),
             content,
-            true,
+            false,
         )
         .await?;
         let input_digest = slug_bzlmod::module_file_inputs_digest(&parsed_with_inputs.inputs);
@@ -3185,6 +3185,7 @@ impl BuckConfigBasedCells {
                 Self::resolve_bzlmod_dependencies_with_options(
                     project_fs,
                     &options,
+                    false,
                     Some(empty_workspace_id.clone()),
                     None,
                     None,
@@ -3368,6 +3369,7 @@ impl BuckConfigBasedCells {
         Self::resolve_bzlmod_dependencies_with_options(
             &project_root,
             &key.options,
+            true,
             Some(key.resolution_key.workspace_id.clone()),
             Some(root_module_file.as_ref()),
             key.lockfile_inputs.visible_lockfile.clone(),
@@ -3391,6 +3393,7 @@ impl BuckConfigBasedCells {
     async fn resolve_bzlmod_dependencies_with_options(
         project_root: &ProjectRoot,
         options: &BzlmodResolutionOptions,
+        validate_root_extension_repo_directives: bool,
         workspace_id: Option<slug_bzlmod::WorkspaceId>,
         root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
@@ -3435,13 +3438,18 @@ impl BuckConfigBasedCells {
 
             // Parse MODULE.bazel. Bazel treats root module-file parse/compile
             // errors as bzlmod failures, not as a signal to disable bzlmod.
-            parse_module_bazel(module_bazel_path.as_path()).with_buck_error_context(|| {
-                format!(
-                    "Failed to parse root MODULE.bazel at {}",
-                    module_bazel_path.display()
-                )
-            })?
+            parse_module_bazel_allow_ignored_extension_repo_directives(module_bazel_path.as_path())
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to parse root MODULE.bazel at {}",
+                        module_bazel_path.display()
+                    )
+                })?
         };
+
+        if validate_root_extension_repo_directives && !options.ignore_dev_dependency {
+            slug_bzlmod::validate_parsed_root_extension_repo_directives(&parsed)?;
+        }
 
         let mut cells = Vec::new();
         let mut aliases = Vec::new();
@@ -5204,6 +5212,7 @@ mod tests {
         let err = BuckConfigBasedCells::resolve_bzlmod_dependencies_with_options(
             fs.path(),
             &options,
+            true,
             Some(slug_bzlmod::WorkspaceId::new(
                 project_root.clone(),
                 project_root.join("buck-out/v2"),
@@ -5249,6 +5258,7 @@ mod tests {
         let err = BuckConfigBasedCells::resolve_bzlmod_dependencies_with_options(
             fs.path(),
             &options,
+            true,
             Some(slug_bzlmod::WorkspaceId::new(
                 project_root.clone(),
                 project_root.join("buck-out/v2"),
@@ -5330,6 +5340,7 @@ mod tests {
         let projection_data = BuckConfigBasedCells::resolve_bzlmod_dependencies_with_options(
             fs.path(),
             &options,
+            true,
             Some(workspace_id),
             None,
             None,

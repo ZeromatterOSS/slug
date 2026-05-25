@@ -4827,6 +4827,10 @@ async def test_invalid_user_provided_repo_names_fail_at_module_parse(
 ) -> None:
     """Bazel anchor: RepositoryName.validateUserProvidedRepoName."""
     _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    helper = buck.cwd / "helper"
+    helper.mkdir()
+    _write(helper / "MODULE.bazel", 'module(name = "helper", version = "1.0.0")\n')
+    _write(helper / "BUILD.bazel", "")
     cases = [
         """module(name = "plan61_bad_module_repo_name", repo_name = "_foo")
 """,
@@ -4851,6 +4855,7 @@ repo(name = "_foo")
 """,
         """module(name = "plan61_bad_override_repo_key")
 bazel_dep(name = "helper", version = "1.0.0")
+local_path_override(module_name = "helper", path = "helper")
 ext = use_extension("//:ext.bzl", "ext")
 override_repo(ext, _foo = "helper")
 """,
@@ -4896,6 +4901,37 @@ inject_repo(ext, generated = "missing")
         assert "repo exported as 'generated'" in str(exc.value)
         assert "overridden with 'missing'" in str(exc.value)
         assert "no repo is visible under this name" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_override_and_inject_repo_are_ignored_before_validation_under_ignore_dev(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: override_repo()/inject_repo() shouldIgnoreDevDeps early return."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    cases = [
+        """module(name = "plan61_ignore_invalid_override_repo")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, _bad = "missing")
+""",
+        """module(name = "plan61_ignore_invalid_inject_repo")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, generated = "_bad")
+""",
+        """module(name = "plan61_ignore_missing_override_repo")
+ext = use_extension("//:ext.bzl", "ext")
+override_repo(ext, generated = "missing")
+""",
+        """module(name = "plan61_ignore_missing_inject_repo")
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, generated = "missing")
+""",
+    ]
+
+    for content in cases:
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        await buck.build("//:x", "--ignore_dev_dependency")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
