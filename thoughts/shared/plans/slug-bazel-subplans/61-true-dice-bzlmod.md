@@ -2145,6 +2145,16 @@ Observed SDK result at the checkpoint:
   slug_bzlmod extension_execution -- --nocapture`, `cargo test -p
   slug_bzlmod replay_input_data -- --nocapture`, `cargo check -p slug_bzlmod
   -p slug_external_cells`, and `git diff --check`.
+- Bzlmod projection data wrappers now require workspace provenance instead of
+  accepting absent provenance. Repo-env, repo-mapping, resolution-facts,
+  module-version, extension-aggregation, registered-toolchain, and
+  registered-execution-platform data keys now reject cross-workspace injection
+  unconditionally. Validation passed with `cargo fmt --check`, `cargo test -p
+  slug_bzlmod set_bzlmod_projection_data -- --nocapture`, `cargo test -p
+  slug_bzlmod data_only_projection -- --nocapture`, `cargo test -p
+  slug_bzlmod extension_aggregation -- --nocapture`, `cargo test -p
+  slug_bzlmod semantic_projection -- --nocapture`, `cargo check -p
+  slug_bzlmod -p slug_common -p slug_external_cells`, and `git diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -3373,7 +3383,8 @@ using Rust DICE keys and values:
      project root are also test-only. Zero-repo-env convenience constructors
      for extension execution and materialization manifests are test-only too.
      Module extension execution keys require workspace identity instead of
-     carrying optional provenance.
+     carrying optional provenance. The remaining bzlmod projection data wrappers
+     also require workspace provenance instead of accepting absent provenance.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key/context inputs as the graph migrates.

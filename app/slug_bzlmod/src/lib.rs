@@ -350,19 +350,17 @@ pub trait SetBzlmodProjectionData {
 fn validate_projection_workspace(
     field: &str,
     cell_graph_workspace_id: &WorkspaceId,
-    data_workspace_id: Option<&WorkspaceId>,
+    data_workspace_id: &WorkspaceId,
 ) -> slug_error::Result<()> {
-    if let Some(data_workspace_id) = data_workspace_id {
-        if data_workspace_id != cell_graph_workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodProjectionData carries {} for project root '{}', \
-                 but its cell graph root is '{}'",
-                field,
-                data_workspace_id.canonical_project_root.display(),
-                cell_graph_workspace_id.canonical_project_root.display()
-            ));
-        }
+    if data_workspace_id != cell_graph_workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "BzlmodProjectionData carries {} for project root '{}', \
+             but its cell graph root is '{}'",
+            field,
+            data_workspace_id.canonical_project_root.display(),
+            cell_graph_workspace_id.canonical_project_root.display()
+        ));
     }
     Ok(())
 }
@@ -373,42 +371,42 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         validate_projection_workspace(
             "module-version data",
             cell_graph_workspace_id,
-            data.module_versions.workspace_id.as_ref(),
+            &data.module_versions.workspace_id,
         )?;
         validate_projection_workspace(
             "registered-toolchain data",
             cell_graph_workspace_id,
-            data.registered_toolchains.workspace_id.as_ref(),
+            &data.registered_toolchains.workspace_id,
         )?;
         validate_projection_workspace(
             "registered-execution-platform data",
             cell_graph_workspace_id,
-            data.registered_execution_platforms.workspace_id.as_ref(),
+            &data.registered_execution_platforms.workspace_id,
         )?;
         validate_projection_workspace(
             "extension-aggregation data",
             cell_graph_workspace_id,
-            data.extension_aggregations.workspace_id.as_ref(),
+            &data.extension_aggregations.workspace_id,
         )?;
         validate_projection_workspace(
             "lockfile-input data",
             cell_graph_workspace_id,
-            Some(&data.lockfile_inputs.workspace_id),
+            &data.lockfile_inputs.workspace_id,
         )?;
         validate_projection_workspace(
             "repo-env data",
             cell_graph_workspace_id,
-            data.repo_env.workspace_id.as_ref(),
+            &data.repo_env.workspace_id,
         )?;
         validate_projection_workspace(
             "resolution-facts data",
             cell_graph_workspace_id,
-            data.resolution_facts.workspace_id.as_ref(),
+            &data.resolution_facts.workspace_id,
         )?;
         validate_projection_workspace(
             "repo-mapping data",
             cell_graph_workspace_id,
-            data.repo_mappings.workspace_id.as_ref(),
+            &data.repo_mappings.workspace_id,
         )?;
 
         let lockfile_inputs_data = Arc::new(data.lockfile_inputs.clone());
@@ -848,7 +846,7 @@ mod tests {
         assert_eq!(module_versions.workspace_id, workspace_id);
         assert_eq!(registered_toolchains.workspace_id, workspace_id);
         assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
-        assert_eq!(repo_mappings.workspace_id.as_ref(), Some(&workspace_id));
+        assert_eq!(repo_mappings.workspace_id, workspace_id);
         assert_eq!(lockfile_inputs.lockfile_mode, LockfileMode::Update);
         assert!(repo_env.is_empty());
 
@@ -1089,7 +1087,7 @@ mod tests {
                 workspace_id.clone(),
             ))
             .await??;
-        assert_eq!(repo_mappings.workspace_id.as_ref(), Some(&workspace_id));
+        assert_eq!(repo_mappings.workspace_id, workspace_id);
 
         let resolution_facts = dice
             .compute(&BzlmodResolutionFactsKey::for_workspace_id(

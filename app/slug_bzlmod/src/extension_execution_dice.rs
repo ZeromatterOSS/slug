@@ -172,10 +172,7 @@ fn ensure_extension_aggregations_data_workspace(
     key_name: &str,
     subject: &str,
 ) -> slug_error::Result<()> {
-    let Some(data_workspace_id) = aggregations.workspace_id.as_ref() else {
-        return Ok(());
-    };
-    if data_workspace_id != workspace_id {
+    if aggregations.workspace_id != *workspace_id {
         return Err(slug_error::slug_error!(
             slug_error::ErrorTag::Tier0,
             "{} for '{}' was computed with project root '{}', \
@@ -183,7 +180,7 @@ fn ensure_extension_aggregations_data_workspace(
             key_name,
             subject,
             workspace_id.canonical_project_root.display(),
-            data_workspace_id.canonical_project_root.display()
+            aggregations.workspace_id.canonical_project_root.display()
         ));
     }
     Ok(())
@@ -2435,17 +2432,17 @@ mod tests {
         use crate::BzlmodExtensionAggregationsDataValue;
         use crate::extensions::AggregatedExtension;
 
-        let mut data = BzlmodExtensionAggregationsDataValue::default();
+        let workspace_id =
+            crate::WorkspaceId::for_project_root(PathBuf::from("/tmp/slug-plan61-ext-data"));
+        let mut extensions = std::collections::HashMap::new();
         let mut root_ext = AggregatedExtension::new("@root//:ext.bzl", "ext");
         root_ext.extension_id = "@root//:ext.bzl%ext".to_owned();
         let mut dep_ext = AggregatedExtension::new("@dep//:ext.bzl", "ext");
         dep_ext.extension_id = "@dep//:ext.bzl%ext".to_owned();
-        Arc::get_mut(&mut data.extension_aggregations)
-            .unwrap()
-            .insert(root_ext.extension_id.clone(), root_ext);
-        Arc::get_mut(&mut data.extension_aggregations)
-            .unwrap()
-            .insert(dep_ext.extension_id.clone(), dep_ext);
+        extensions.insert(root_ext.extension_id.clone(), root_ext);
+        extensions.insert(dep_ext.extension_id.clone(), dep_ext);
+        let data =
+            BzlmodExtensionAggregationsDataValue::for_workspace(workspace_id, Arc::new(extensions));
 
         let dep_id = extension_id_for_canonical_repo(&data, "root", "dep++ext+tool").unwrap();
         assert_eq!(dep_id, "@dep//:ext.bzl%ext");
