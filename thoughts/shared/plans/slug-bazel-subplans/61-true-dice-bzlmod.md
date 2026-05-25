@@ -2121,6 +2121,14 @@ Observed SDK result at the checkpoint:
   slug_bzlmod -p slug_common`, `cargo test -p slug_common
   bzlmod_projection_bridge -- --nocapture`, and `cargo test -p slug_common
   bzlmod_lockfile_inputs_bridge -- --nocapture`.
+- `BzlmodLockfileInputsDataValue` now requires `WorkspaceId` provenance rather
+  than storing it as an optional field. This removes the last absent-provenance
+  path from lockfile-input projection data; focused validation passed with
+  `cargo fmt --check`, `cargo test -p slug_bzlmod
+  set_bzlmod_projection_data -- --nocapture`, `cargo test -p slug_bzlmod
+  replay_input_data -- --nocapture`, `cargo test -p slug_bzlmod
+  data_only_projection -- --nocapture`, and `cargo check -p slug_bzlmod -p
+  slug_common`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence

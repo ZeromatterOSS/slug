@@ -393,7 +393,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         validate_projection_workspace(
             "lockfile-input data",
             cell_graph_workspace_id,
-            data.lockfile_inputs.workspace_id.as_ref(),
+            Some(&data.lockfile_inputs.workspace_id),
         )?;
         validate_projection_workspace(
             "repo-env data",

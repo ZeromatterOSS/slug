@@ -538,7 +538,7 @@ impl BzlmodLockfileInputsKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodLockfileInputsDataValue {
-    pub workspace_id: Option<WorkspaceId>,
+    pub workspace_id: WorkspaceId,
     pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
 }
 
@@ -548,7 +548,7 @@ impl BzlmodLockfileInputsDataValue {
         lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
     ) -> Self {
         Self {
-            workspace_id: Some(workspace_id),
+            workspace_id,
             lockfile_inputs,
         }
     }
@@ -884,16 +884,14 @@ impl Key for BzlmodLockfileInputsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let data = ctx.compute(&BzlmodLockfileInputsDataKey).await?;
-        if let Some(data_workspace_id) = data.workspace_id.as_ref() {
-            if data_workspace_id != &self.workspace_id {
-                return Err(slug_error::slug_error!(
-                    slug_error::ErrorTag::Tier0,
-                    "BzlmodLockfileInputsKey was computed with project root '{}', \
-                     but current bzlmod lockfile input data root is '{}'",
-                    self.workspace_id.canonical_project_root.display(),
-                    data_workspace_id.canonical_project_root.display()
-                ));
-            }
+        if data.workspace_id != self.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodLockfileInputsKey was computed with project root '{}', \
+                 but current bzlmod lockfile input data root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                data.workspace_id.canonical_project_root.display()
+            ));
         }
         Ok(data.lockfile_inputs.clone())
     }
