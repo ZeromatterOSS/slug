@@ -858,6 +858,142 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn data_only_projection_keys_do_not_depend_on_cell_graph_workspace()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-data-projection-workspace"),
+            PathBuf::from("/tmp/slug-plan61-data-projection-output-base"),
+        );
+        let other_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-data-projection-other"),
+            PathBuf::from("/tmp/slug-plan61-data-projection-other-output"),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodCellGraphDataKey,
+            Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+                other_workspace_id,
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodModuleVersionsDataKey,
+            Arc::new(BzlmodModuleVersionsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(HashMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoEnvDataKey,
+            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::from([(
+                    "TOKEN".to_owned(),
+                    "current-workspace".to_owned(),
+                )])),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoMappingsDataKey,
+            Arc::new(BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingOverrides::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodResolutionFactsDataKey,
+            Arc::new(BzlmodResolutionFactsValue::for_workspace(
+                workspace_id.clone(),
+                indexmap::IndexMap::new(),
+                indexmap::IndexMap::new(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRegisteredToolchainsDataKey,
+            Arc::new(RegisteredToolchainsDataValue::for_workspace(
+                workspace_id.clone(),
+                Vec::new(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRegisteredExecutionPlatformsDataKey,
+            Arc::new(RegisteredExecutionPlatformsDataValue::for_workspace(
+                workspace_id.clone(),
+                Vec::new(),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let lockfile_inputs = dice
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(lockfile_inputs.lockfile_mode, LockfileMode::Update);
+
+        let repo_env = dice
+            .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
+            .await??;
+        assert_eq!(
+            repo_env.get("TOKEN").map(String::as_str),
+            Some("current-workspace")
+        );
+
+        let repo_mappings = dice
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(repo_mappings.workspace_id.as_ref(), Some(&workspace_id));
+
+        let resolution_facts = dice
+            .compute(&BzlmodResolutionFactsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert!(resolution_facts.registry_file_hashes.is_empty());
+        assert!(resolution_facts.selected_yanked_versions.is_empty());
+
+        let registered_toolchains = dice
+            .compute(&RegisteredToolchainsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(registered_toolchains.workspace_id, workspace_id);
+
+        let registered_execution_platforms = dice
+            .compute(&RegisteredExecutionPlatformsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
+
+        let err = dice
+            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id))
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("bzlmod cell graph root"),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn projection_data_rejects_wrong_workspace() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-projection-workspace"),

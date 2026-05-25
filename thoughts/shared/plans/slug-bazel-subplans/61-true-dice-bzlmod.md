@@ -2089,6 +2089,18 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, the focused Plan 61 Python repo-env/lockfile replay
   subset, the full Plan 61 Python guardrail with 72 tests, `cargo
   fmt --check`, and `git diff --check`.
+- Data-only bzlmod projection keys now trust their own workspace-checked
+  injected values instead of computing `BzlmodCellGraphKey` as an incidental
+  prerequisite. This keeps `BzlmodLockfileInputsKey`, `BzlmodRepoEnvKey`,
+  `BzlmodRepoMappingsKey`, `BzlmodResolutionFactsKey`,
+  `RegisteredToolchainsKey`, and `RegisteredExecutionPlatformsKey` independent
+  from cell-graph root facts, while `ModuleVersionsKey` still depends on the
+  named cell graph because it needs the root module name for conservative
+  invalidation. Validation passed with `cargo fmt --check`, focused
+  `cargo test -p slug_bzlmod data_only_projection -- --nocapture`,
+  `cargo test -p slug_bzlmod semantic_projection -- --nocapture`,
+  `cargo test -p slug_bzlmod replay_input_data -- --nocapture`, and
+  `cargo check -p slug_bzlmod -p slug_common`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -2221,10 +2233,12 @@ What did not work or remains risky:
   cell setup, then injected as transitional command data. Registered
   toolchain/platform consumers, extension aggregation consumers, extension
   replay-input consumers, repo-mapping consumers, and module-version consumers
-  now read narrower injected DICE values. The named cell graph now owns
-  workspace identity for those projections rather than duplicating it in each
-  injected payload. The module-version value still carries a conservative
-  projection invalidation identity until the remaining
+  now read narrower injected DICE values. Data-only projections carry their own
+  source workspace provenance and no longer force an unrelated cell-graph
+  compute; module-version and extension-aggregation consumers still read the
+  named cell graph where they need root module or graph facts. The
+  module-version value still carries a conservative projection invalidation
+  identity until the remaining
   interpreter/materialization inputs are explicit. `BzlmodSessionData` and
   `BzlmodSessionDataKey` have been removed, but `BzlmodProjectionData` remains
   a transitional legacy-produced payload rather than a set of true
@@ -3056,13 +3070,14 @@ using Rust DICE keys and values:
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
-   - Module-version/toolchain/platform consumers, current-workspace helpers,
-     and the remaining projection bridge now derive workspace identity from the
-     named cell graph, and the persisted config-load key carries the daemon
-     output base, including no-`MODULE.bazel` empty projections, but
-     their data payloads are still injected from the legacy resolver. Daemon
-     bootstrap direct parsing now passes its isolated buck-out path into the
-     transitional workspace identity too.
+   - Module-version consumers and current-workspace helpers still read the
+     named cell graph where they need root or graph facts, and the persisted
+     config-load key carries the daemon output base, including
+     no-`MODULE.bazel` empty projections. Data-only projection keys now rely on
+     their own source workspace provenance instead of deriving identity through
+     the cell graph, but their data payloads are still injected from the legacy
+     resolver. Daemon bootstrap direct parsing now passes its isolated buck-out
+     path into the transitional workspace identity too.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path is removed, but the transitional key still
      wraps the legacy resolver.
@@ -3220,9 +3235,12 @@ using Rust DICE keys and values:
   but remain process-global compatibility adapters.
 - `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
      including bundled bzlmod cells, and resolver assembly, runtime
-     installation, module-version projection, extension-aggregation projection,
-     and registered toolchain/platform projection consume that value. Remaining
-     installed lookup state still needs to depend on it instead of
+     installation, module-version projection, and extension-aggregation
+     projection consume that value. Registered toolchain/platform projection
+     keys use their own workspace-checked injected data, while
+     current-workspace helpers still use the cell graph to choose the active
+     workspace. Remaining installed lookup state still needs to depend on it
+     instead of
      process-global maps. Toolchain resolution, target-setting pre-processing,
      and registered-toolchain package loading now receive caller/resolver-owned
      snapshots before process-global fallback, but the snapshot producers are

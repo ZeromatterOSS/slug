@@ -895,10 +895,6 @@ impl Key for BzlmodLockfileInputsKey {
                 ));
             }
         }
-        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
-            self.workspace_id.clone(),
-        ))
-        .await??;
         Ok(data.lockfile_inputs.clone())
     }
 
@@ -931,10 +927,6 @@ impl Key for BzlmodRepoEnvKey {
                 ));
             }
         }
-        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
-            self.workspace_id.clone(),
-        ))
-        .await??;
         Ok(data.repo_env.clone())
     }
 
@@ -967,10 +959,6 @@ impl Key for BzlmodRepoMappingsKey {
                 ));
             }
         }
-        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
-            self.workspace_id.clone(),
-        ))
-        .await??;
         Ok(data)
     }
 
@@ -1003,10 +991,6 @@ impl Key for BzlmodResolutionFactsKey {
                 ));
             }
         }
-        ctx.compute(&BzlmodCellGraphKey::for_workspace_id(
-            self.workspace_id.clone(),
-        ))
-        .await??;
         Ok(data)
     }
 
@@ -1178,13 +1162,8 @@ impl Key for RegisteredToolchainsKey {
                 ));
             }
         }
-        let cell_graph = ctx
-            .compute(&BzlmodCellGraphKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
         Ok(Arc::new(RegisteredToolchainsValue {
-            workspace_id: cell_graph.workspace_id.clone(),
+            workspace_id: self.workspace_id.clone(),
             registered_toolchains: data.registered_toolchains.clone(),
         }))
     }
@@ -1290,13 +1269,8 @@ impl Key for RegisteredExecutionPlatformsKey {
                 ));
             }
         }
-        let cell_graph = ctx
-            .compute(&BzlmodCellGraphKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
         Ok(Arc::new(RegisteredExecutionPlatformsValue {
-            workspace_id: cell_graph.workspace_id.clone(),
+            workspace_id: self.workspace_id.clone(),
             registered_execution_platforms: data.registered_execution_platforms.clone(),
         }))
     }
