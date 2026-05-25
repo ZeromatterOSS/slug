@@ -532,13 +532,7 @@ fn complete_marker_state_with_output_digest(
     }
 }
 
-pub fn repository_recorded_inputs_current(
-    repo_dir: &Path,
-    repo_env: Option<&BTreeMap<String, String>>,
-) -> bool {
-    repository_recorded_inputs_digest(repo_dir, repo_env).is_ok()
-}
-
+#[cfg(test)]
 fn repository_recorded_inputs_digest(
     repo_dir: &Path,
     repo_env: Option<&BTreeMap<String, String>>,
@@ -772,7 +766,7 @@ fn repo_has_invalid_empty_target_label(repo_path: &Path) -> bool {
     })
 }
 
-pub fn repo_has_foreign_top_level_symlink(repo_path: &Path, project_root: &Path) -> bool {
+fn repo_has_foreign_top_level_symlink(repo_path: &Path, project_root: &Path) -> bool {
     let Ok(entries) = std::fs::read_dir(repo_path) else {
         return false;
     };

@@ -175,7 +175,7 @@ fn is_repo_complete(working_dir: &Path) -> bool {
     repository_output_digest(working_dir).is_ok_and(|digest| digest == expected_output_state)
 }
 
-pub fn repo_layout_is_valid_for_invocation(
+pub(crate) fn repo_layout_is_valid_for_invocation(
     invocation: &RepositoryInvocation,
     working_dir: &Path,
 ) -> bool {

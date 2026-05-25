@@ -2219,6 +2219,16 @@ What did not work or remains risky:
   passed, 6 filtered out`), `cargo check -p slug_external_cells`, `cargo
   fmt --check`, and `git diff --check`; an initial run without `TMPDIR` failed
   because `/tmp` was full.
+- Stale public repository-materialization bypass APIs were removed from the
+  `slug_bzlmod` crate root: recorded-input freshness, foreign symlink probing,
+  and rule-specific layout probing are now internal manifest/executor helpers
+  rather than exported APIs for external callers to consult outside
+  `RepoMaterializationManifestKey`. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-api-target
+  cargo check -p slug_bzlmod`, `TMPDIR=/var/mnt/dev/.slug-tmp
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-marker-target cargo test -p
+  slug_bzlmod materialization_manifest -- --nocapture` (`11 passed, 321
+  filtered out`), `cargo fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
