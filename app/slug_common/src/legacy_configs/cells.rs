@@ -2646,62 +2646,6 @@ impl BuckConfigBasedCells {
         .buck_error_context("Parsing cells")
     }
 
-    pub async fn parse_with_config_args_and_root_module(
-        project_fs: &ProjectRoot,
-        config_args: &[slug_cli_proto::ConfigOverride],
-        root_module_file: Arc<slug_bzlmod::RootModuleFileValue>,
-    ) -> slug_error::Result<Self> {
-        Self::parse_with_config_args_and_bzlmod_inputs(
-            project_fs,
-            config_args,
-            root_module_file,
-            None,
-        )
-        .await
-    }
-
-    pub async fn parse_with_config_args_and_bzlmod_inputs(
-        project_fs: &ProjectRoot,
-        config_args: &[slug_cli_proto::ConfigOverride],
-        root_module_file: Arc<slug_bzlmod::RootModuleFileValue>,
-        visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
-    ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(
-            config_args,
-            Some(project_fs),
-            Some(root_module_file),
-            visible_lockfile,
-            None,
-            None,
-        )
-        .await
-        .buck_error_context("Parsing cells")
-    }
-
-    pub async fn parse_with_config_args_and_bzlmod_projection_bridge(
-        project_fs: &ProjectRoot,
-        config_args: &[slug_cli_proto::ConfigOverride],
-        dice_ctx: &mut DiceComputations<'_>,
-    ) -> slug_error::Result<Self> {
-        let key = Self::build_bzlmod_projection_bridge_key(project_fs, config_args, dice_ctx, None)
-            .await?;
-        let bzlmod_projection = dice_ctx
-            .compute(&key)
-            .await?
-            .buck_error_context("Computing bzlmod projection bridge through DICE")?;
-
-        Self::parse_with_file_ops_and_options_inner(
-            config_args,
-            Some(project_fs),
-            None,
-            None,
-            Some(bzlmod_projection),
-            Some(key.resolution_key.workspace_id.clone()),
-        )
-        .await
-        .buck_error_context("Parsing cells")
-    }
-
     pub async fn parse_with_config_args_and_persisted_bzlmod_projection_bridge(
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],

@@ -548,6 +548,14 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`,
   `cargo check -p slug_common -p slug_server`, touched-file
   `rustfmt --edition 2024`, and `git diff --check`.
+- Unused config parsing entrypoints that allowed direct root-module/lockfile
+  injection, plus the unused non-persisted projection-bridge parser entrypoint,
+  were removed. Normal command setup now enters bzlmod through the persisted
+  projection bridge or the remaining non-DICE bootstrap parser, reducing the
+  transitional API surface without changing the remaining legacy-resolver
+  blocker. Validation passed with focused `cargo test -p slug_common
+  bzlmod_projection_bridge -- --nocapture`, `cargo check -p slug_common -p
+  slug_server`, touched-file `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
