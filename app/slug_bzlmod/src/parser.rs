@@ -736,6 +736,34 @@ bazel_dep(name = "rules_cc", version = "0.0.9", repo_name = "cc_rules")
     }
 
     #[test]
+    fn test_parse_repo_name_collisions_follow_bazel() {
+        let cases = [
+            r#"
+module(name = "aaa", version = "1.0.0", repo_name = "bbb")
+bazel_dep(name = "bbb", version = "1.0.0")
+"#,
+            r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "java_foo", version = "1.0.0", repo_name = "foo")
+bazel_dep(name = "python_foo", version = "1.0.0", repo_name = "foo")
+"#,
+            r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "aaa", version = "1.0.0")
+"#,
+        ];
+
+        for content in cases {
+            let err = parse_module_bazel_content(content, "MODULE.bazel")
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("The repo name"), "{err}");
+            assert!(err.contains("cannot be defined"), "{err}");
+            assert!(err.contains("already defined"), "{err}");
+        }
+    }
+
+    #[test]
     fn test_parse_invalid_module_names_follow_bazel() {
         let cases = [
             r#"

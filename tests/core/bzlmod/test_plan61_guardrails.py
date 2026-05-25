@@ -4862,6 +4862,36 @@ repo(name = "_foo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repo_name_collisions_fail_at_module_parse(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleThreadContext.addRepoNameUsage."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    cases = [
+        """module(name = "plan61_repo_name_collision", repo_name = "dep")
+bazel_dep(name = "dep", version = "1.0.0")
+""",
+        """module(name = "plan61_repo_name_collision")
+bazel_dep(name = "java_foo", version = "1.0.0", repo_name = "foo")
+bazel_dep(name = "python_foo", version = "1.0.0", repo_name = "foo")
+""",
+        """module(name = "plan61_repo_name_collision")
+bazel_dep(name = "plan61_repo_name_collision", version = "1.0.0")
+""",
+    ]
+
+    for content in cases:
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert "The repo name" in str(exc.value)
+        assert "cannot be defined" in str(exc.value)
+        assert "already defined" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_called_after_non_module_directive_fails(
     buck: Buck,
 ) -> None:

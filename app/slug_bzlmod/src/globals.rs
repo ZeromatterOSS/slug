@@ -23,6 +23,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
 
@@ -40,7 +41,6 @@ use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
-use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::UnpackTuple;
@@ -170,6 +170,28 @@ fn validate_optional_user_provided_repo_name(raw_name: &str) -> starlark::Result
     validate_user_provided_repo_name(raw_name)
 }
 
+fn add_repo_name_usage(
+    ctx: &mut ModuleFileContext,
+    repo_name: &str,
+    how: &str,
+) -> starlark::Result<()> {
+    if repo_name.is_empty() {
+        return Ok(());
+    }
+    if let Some(previous) = ctx
+        .repo_name_usages
+        .insert(repo_name.to_owned(), how.to_owned())
+    {
+        return Err(starlark::Error::new_other(anyhow::anyhow!(
+            "The repo name '{}' cannot be defined {} as it is already defined {}",
+            repo_name,
+            how,
+            previous
+        )));
+    }
+    Ok(())
+}
+
 /// Context for MODULE.bazel evaluation.
 ///
 /// This context accumulates the parsed directives during evaluation.
@@ -184,6 +206,11 @@ pub struct ModuleFileContext {
 
     /// All bazel_dep() declarations.
     pub bazel_deps: Vec<BazelDep>,
+
+    /// Repo names made visible by module(), bazel_dep(), use_repo(), and
+    /// use_repo_rule() directives. This mirrors Bazel's ModuleThreadContext
+    /// collision checks for parse-time repo-name ownership.
+    pub repo_name_usages: HashMap<String, String>,
 
     /// All override declarations.
     pub overrides: Vec<Override>,
@@ -585,6 +612,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         }
         validate_optional_bazel_module_name(name)?;
         validate_optional_user_provided_repo_name(repo_name)?;
+        add_repo_name_usage(&mut ctx, name, "as the current module name")?;
+        add_repo_name_usage(&mut ctx, repo_name, "as the module's own repo name")?;
 
         let parsed_version = if version.is_empty() {
             Version::empty()
@@ -633,7 +662,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = "")] version: &str,
         #[starlark(require = named, default = -1)] max_compatibility_level: i32,
-        #[starlark(require = named, default = NoneOr::None)] repo_name: NoneOr<&str>,
+        #[starlark(require = named, default = "")] repo_name: Value<'v>,
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
@@ -649,13 +678,21 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                 .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
 
-        let repo_name_str = match repo_name {
-            NoneOr::None => None,
-            NoneOr::Other(s) if s.is_empty() => None,
-            NoneOr::Other(s) => {
-                validate_user_provided_repo_name(s)?;
+        let repo_name_str = if repo_name.is_none() {
+            None
+        } else if let Some(s) = repo_name.unpack_str() {
+            let visible_name = if s.is_empty() { name } else { s };
+            validate_user_provided_repo_name(visible_name)?;
+            add_repo_name_usage(&mut ctx, visible_name, "by a bazel_dep")?;
+            if s.is_empty() {
+                None
+            } else {
                 Some(s.to_owned())
             }
+        } else {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "bazel_dep(repo_name = ...) must be a string or None"
+            )));
         };
 
         let dep = BazelDep {

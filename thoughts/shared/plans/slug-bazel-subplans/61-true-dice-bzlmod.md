@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`140 passed in 127.07s`) after rebuilding `target/debug/slug`.
+  (`141 passed in 142.01s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -417,6 +417,19 @@ Observed SDK result at the checkpoint:
   explicit-binary Plan 61 selector
   `-k 'invalid_user_provided_repo_names_fail_at_module_parse'` (`1 passed,
   136 deselected`).
+  Root-module repo-name collision validation now covers the Bazel parse-time
+  ownership rows for `module(name = ...)`, `module(repo_name = ...)`, and
+  visible `bazel_dep()` repo names, including duplicate `repo_name` aliases
+  across included MODULE.bazel segments. Bazel source anchors:
+  `ModuleFileGlobals.java:177-180`, `:301-317`, and
+  `ModuleThreadContext.java:110-118`, plus
+  `ModuleFileFunctionTest.java:509-529` and `:1505-1514`. This does not claim
+  the larger `bazel_dep(repo_name = None)` nodep behavior is complete.
+  Validation passed with `cargo test -p slug_bzlmod repo_name -- --nocapture`
+  (`8 passed`) and the explicit-binary Plan 61 selector
+  `-k 'repo_name_collisions_fail_at_module_parse or
+  invalid_user_provided_repo_names_fail_at_module_parse'` (`2 passed, 139
+  deselected`).
   `module()` ordering now follows Bazel's shared MODULE.bazel context rule:
   if `module()` is present, it must execute before any other directive, including
   an `include()` whose included segment tries to call `module()`. Bazel source
