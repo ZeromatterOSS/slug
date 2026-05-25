@@ -2216,9 +2216,13 @@ Observed SDK result at the checkpoint:
   still use explicit current-scope dynamic registrations and canonical
   `bazel-external/<repo-with-plus>` cell paths, but stale project-root
   filesystem state cannot rewrite apparent names or preserve a stale
-  `external/<apparent>` link for another output-base workspace. Validation
-  passed with `cargo fmt --check`, `cargo test -p slug_core
+  `external/<apparent>` link for another output-base workspace. Entering an
+  output-base workspace scope also skips the legacy symlink repair pass instead
+  of running it under the previous process-global scope. Validation passed with
+  `cargo fmt --check`, `cargo test -p slug_core
   workspace_scoped_external_symlink_replaces_stale_physical_fallback --
+  --nocapture`, `cargo test -p slug_core
+  workspace_scope_reset_does_not_run_legacy_external_symlink_repair --
   --nocapture`, `cargo test -p slug_core external_symlink -- --nocapture`,
   `cargo test -p slug_core cells::tests -- --nocapture --test-threads=1`,
   `cargo test -p slug_core dynamic_extension -- --nocapture`, `cargo check -p

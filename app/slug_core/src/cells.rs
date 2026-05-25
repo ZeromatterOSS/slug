@@ -748,7 +748,9 @@ fn set_dynamic_bzlmod_scope(scope: DynamicBzlmodScope, always_reset: bool) {
         return;
     };
     ensure_execroot_layout(root);
-    repair_external_symlink_targets(root);
+    if scope.output_base.is_none() {
+        repair_external_symlink_targets(root);
+    }
     let should_reset = DYNAMIC_BZLMOD_SCOPE
         .read()
         .ok()
@@ -3803,6 +3805,32 @@ mod tests {
 
         let repaired = std::fs::read_link(tmp.path().join("external").join(apparent)).unwrap();
         assert_eq!(repaired, apparent_path);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn workspace_scope_reset_does_not_run_legacy_external_symlink_repair() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let output = root.join("out");
+        let apparent = "rules_rust";
+        let extension_repo = root
+            .join("bazel-external")
+            .join("rules_rs++rules_rust+rules_rust");
+        let module_repo = root.join("bazel-external").join("rules_rust+0.69.0");
+        reset_dynamic_bzlmod_state_for_project_root(root.to_path_buf());
+        std::fs::create_dir_all(&extension_repo).unwrap();
+        std::fs::create_dir_all(&module_repo).unwrap();
+        std::fs::create_dir(root.join("external")).unwrap();
+        std::os::unix::fs::symlink(&extension_repo, root.join("external").join(apparent)).unwrap();
+
+        reset_dynamic_bzlmod_state_for_workspace(root.to_path_buf(), output);
+
+        assert_eq!(
+            std::fs::canonicalize(root.join("external").join(apparent)).unwrap(),
+            std::fs::canonicalize(extension_repo).unwrap()
+        );
     }
 
     #[test]
