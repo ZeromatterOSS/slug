@@ -2615,16 +2615,9 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(
-            config_args,
-            Some(project_fs),
-            None,
-            None,
-            None,
-            None,
-        )
-        .await
-        .buck_error_context("Parsing cells")
+        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs), None, None)
+            .await
+            .buck_error_context("Parsing cells")
     }
 
     pub async fn parse_with_config_args_and_output_base(
@@ -2637,8 +2630,6 @@ impl BuckConfigBasedCells {
         Self::parse_with_file_ops_and_options_inner(
             config_args,
             Some(project_fs),
-            None,
-            None,
             None,
             Some(workspace_id),
         )
@@ -2676,8 +2667,6 @@ impl BuckConfigBasedCells {
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
             Some(project_fs),
-            None,
-            None,
             Some(bzlmod_projection),
             Some(key.resolution_key.workspace_id.clone()),
         )
@@ -2856,7 +2845,7 @@ impl BuckConfigBasedCells {
     pub async fn testing_parse(
         config_args: &[slug_cli_proto::ConfigOverride],
     ) -> slug_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(config_args, None, None, None, None, None)
+        Self::parse_with_file_ops_and_options_inner(config_args, None, None, None)
             .await
             .buck_error_context("Parsing cells")
     }
@@ -2864,8 +2853,6 @@ impl BuckConfigBasedCells {
     async fn parse_with_file_ops_and_options_inner(
         config_args: &[slug_cli_proto::ConfigOverride],
         project_fs: Option<&ProjectRoot>,
-        root_module_file: Option<Arc<slug_bzlmod::RootModuleFileValue>>,
-        visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         bzlmod_projection_bridge: Option<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>,
         empty_workspace_id: Option<slug_bzlmod::WorkspaceId>,
     ) -> slug_error::Result<Self> {
@@ -2914,8 +2901,8 @@ impl BuckConfigBasedCells {
                     project_fs,
                     &options,
                     Some(empty_workspace_id.clone()),
-                    root_module_file.as_deref(),
-                    visible_lockfile.clone(),
+                    None,
+                    None,
                     None,
                     None,
                 )
@@ -4928,8 +4915,6 @@ mod tests {
 
         let configs = BuckConfigBasedCells::parse_with_file_ops_and_options_inner(
             &[],
-            None,
-            None,
             None,
             Some(Arc::new(Some(projection_data))),
             None,

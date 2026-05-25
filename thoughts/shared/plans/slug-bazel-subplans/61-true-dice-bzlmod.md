@@ -556,6 +556,14 @@ Observed SDK result at the checkpoint:
   blocker. Validation passed with focused `cargo test -p slug_common
   bzlmod_projection_bridge -- --nocapture`, `cargo check -p slug_common -p
   slug_server`, touched-file `rustfmt --edition 2024`, and `git diff --check`.
+- The private config parser no longer accepts root-module or visible-lockfile
+  injection slots. Its only bzlmod override is now the explicit transitional
+  projection bridge payload, while non-DICE bootstrap callers still use the
+  direct parser path. This further narrows the session-era API surface without
+  replacing the legacy resolver. Validation passed with focused `cargo test -p
+  slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
+  slug_common -p slug_server`, touched-file `rustfmt --edition 2024`, and
+  `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
