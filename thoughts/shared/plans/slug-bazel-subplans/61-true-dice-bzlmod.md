@@ -1319,6 +1319,17 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo build -p slug`, the focused Plan 61 Python override/replay
   subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt --check`,
   and `git diff --check`.
+- Bazel-style transition input/output build-setting labels now parse with the
+  active bzlmod root `CellAliasResolver` when DICE has a cell resolver, so
+  generated-repo aliases resolve through the resolver-owned runtime snapshot
+  before any process-global alias fallback. Focused coverage proves a stale
+  process-global alias cannot override the runtime snapshot for transition
+  build-setting labels. Validation passed with `cargo test -p slug_transition
+  transition_build_setting_labels_prefer_runtime_alias_snapshot --
+  --nocapture`, `cargo test -p slug_transition --lib -- --nocapture`, `cargo
+  check -p slug_transition`, `cargo build -p slug`, the focused Plan 61
+  guardrail `deferred_toolchain_retry_recomputes_target_settings`, `cargo fmt`,
+  and `git diff --check`.
 - Resolver-local promoted generated-repo cells now distinguish graph-owned cells
   from transitional root-scoped discoveries. Cells created from the
   graph-derived runtime snapshot remain available through that resolver even
@@ -2692,6 +2703,10 @@ using Rust DICE keys and values:
 - `config_setting(flag_values = ...)` build-setting lookup now also uses the
   active cell alias resolver for bzlmod repo-spelling normalization before
   consulting process-global dynamic aliases.
+- Bazel-style transition input/output build-setting label parsing now also uses
+  the active cell alias resolver, so transition-produced settings no longer
+  need process-global generated-repo aliases when a runtime snapshot is
+  available.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
   cells, but the final cell graph is still injected from legacy-produced data.

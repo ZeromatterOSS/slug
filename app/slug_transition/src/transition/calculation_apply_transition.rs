@@ -26,6 +26,8 @@ use slug_build_api::interpreter::rule_defs::provider::builtin::platform_info::Pl
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use slug_build_api::transition::TRANSITION_CALCULATION;
 use slug_build_api::transition::TransitionCalculation;
+use slug_common::dice::cells::HasCellResolver;
+use slug_core::cells::CellAliasResolver;
 use slug_core::configuration::build_setting::BuildSettingLabel;
 use slug_core::configuration::build_setting::BuildSettingValue;
 use slug_core::configuration::cfg_diff::cfg_diff;
@@ -82,6 +84,7 @@ fn call_transition_function<'v>(
     transition: &TransitionData,
     output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
     conf: &ConfigurationData,
+    cell_alias_resolver: Option<&CellAliasResolver>,
     refs: Value<'v>,
     attrs: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
@@ -93,6 +96,7 @@ fn call_transition_function<'v>(
             transition,
             output_defaults,
             conf,
+            cell_alias_resolver,
             attrs,
             eval,
         );
@@ -160,6 +164,7 @@ fn call_bazel_transition_function<'v>(
     transition: &TransitionData,
     output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
     conf: &ConfigurationData,
+    cell_alias_resolver: Option<&CellAliasResolver>,
     attrs: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> slug_error::Result<TransitionApplied> {
@@ -175,7 +180,7 @@ fn call_bazel_transition_function<'v>(
     let inputs = transition.inputs();
     let mut settings_entries: Vec<(&str, Value<'v>)> = Vec::new();
     for input in inputs {
-        let value = resolve_setting_value(input, transition_id, conf, eval)?;
+        let value = resolve_setting_value(input, transition_id, conf, cell_alias_resolver, eval)?;
         settings_entries.push((eval.heap().alloc_str(input).as_str(), value));
     }
     let settings_dict = eval.heap().alloc(starlark::values::dict::AllocDict(
@@ -217,6 +222,7 @@ fn call_bazel_transition_function<'v>(
                     conf,
                     transition_id,
                     output_defaults,
+                    cell_alias_resolver,
                     &inner,
                     transition.outputs(),
                 )?;
@@ -229,6 +235,7 @@ fn call_bazel_transition_function<'v>(
             conf,
             transition_id,
             output_defaults,
+            cell_alias_resolver,
             &dict,
             transition.outputs(),
         )?;
@@ -250,6 +257,7 @@ fn apply_setting_dict_to_cfg(
     conf: &ConfigurationData,
     transition_id: &TransitionId,
     output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
+    cell_alias_resolver: Option<&CellAliasResolver>,
     dict: &DictRef<'_>,
     declared_outputs: &[String],
 ) -> slug_error::Result<ConfigurationData> {
@@ -270,7 +278,8 @@ fn apply_setting_dict_to_cfg(
                 declared_outputs
             ));
         }
-        let label = build_setting_label_from_transition_label(key_str, transition_id)?;
+        let label =
+            build_setting_label_from_transition_label(key_str, transition_id, cell_alias_resolver)?;
         let value = build_setting_value_from_starlark(v)?;
         if is_default_command_line_option_setting(&label, &value) {
             out = out.without_build_setting(&label)?;
@@ -293,27 +302,30 @@ fn apply_setting_dict_to_cfg(
 fn build_setting_label_from_transition_label(
     raw: &str,
     transition_id: &TransitionId,
+    cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> slug_error::Result<BuildSettingLabel> {
     if raw.starts_with("//command_line_option:") || raw.starts_with('@') {
-        return BuildSettingLabel::from_bazel_label(raw);
+        return BuildSettingLabel::from_bazel_label_with_alias_resolver(raw, cell_alias_resolver);
     }
 
     if raw.starts_with("//") {
         match transition_id {
             TransitionId::MagicObject { path, .. } | TransitionId::AnonymousBazel { path, .. } => {
-                return BuildSettingLabel::from_bazel_label(&format!("@{}{}", path.cell(), raw));
+                return BuildSettingLabel::from_bazel_label_with_alias_resolver(
+                    &format!("@{}{}", path.cell(), raw),
+                    cell_alias_resolver,
+                );
             }
             TransitionId::Target(label) => {
-                return BuildSettingLabel::from_bazel_label(&format!(
-                    "@{}{}",
-                    label.target().pkg().cell_name(),
-                    raw
-                ));
+                return BuildSettingLabel::from_bazel_label_with_alias_resolver(
+                    &format!("@{}{}", label.target().pkg().cell_name(), raw),
+                    cell_alias_resolver,
+                );
             }
         }
     }
 
-    BuildSettingLabel::from_bazel_label(raw)
+    BuildSettingLabel::from_bazel_label_with_alias_resolver(raw, cell_alias_resolver)
 }
 
 fn is_default_command_line_option_setting(
@@ -439,10 +451,12 @@ async fn transition_output_defaults(
     ctx: &mut DiceComputations<'_>,
     transition_id: &TransitionId,
     outputs: &[String],
+    cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> slug_error::Result<Vec<(BuildSettingLabel, BuildSettingValue)>> {
     let mut defaults = Vec::new();
     for output in outputs {
-        let label = build_setting_label_from_transition_label(output, transition_id)?;
+        let label =
+            build_setting_label_from_transition_label(output, transition_id, cell_alias_resolver)?;
         if label.is_command_line_option() {
             continue;
         }
@@ -511,6 +525,7 @@ fn apply_anonymous_bazel_transition(
     conf: &ConfigurationData,
     transition_id: &TransitionId,
     output_defaults: &[(BuildSettingLabel, BuildSettingValue)],
+    cell_alias_resolver: Option<&CellAliasResolver>,
     outputs: &[String],
     bazel_all_attrs: Option<&[(String, Arc<ConfiguredAttr>)]>,
 ) -> slug_error::Result<TransitionApplied> {
@@ -531,7 +546,8 @@ fn apply_anonymous_bazel_transition(
         let Some(value) = build_setting_value_from_configured_attr(attr)? else {
             continue;
         };
-        let label = build_setting_label_from_transition_label(output, transition_id)?;
+        let label =
+            build_setting_label_from_transition_label(output, transition_id, cell_alias_resolver)?;
         if is_default_command_line_option_setting(&label, &value) {
             out = out.without_build_setting(&label)?;
             continue;
@@ -563,9 +579,12 @@ fn resolve_setting_value<'v>(
     setting_label: &str,
     transition_id: &TransitionId,
     conf: &ConfigurationData,
+    cell_alias_resolver: Option<&CellAliasResolver>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> slug_error::Result<Value<'v>> {
-    if let Ok(label) = build_setting_label_from_transition_label(setting_label, transition_id) {
+    if let Ok(label) =
+        build_setting_label_from_transition_label(setting_label, transition_id, cell_alias_resolver)
+    {
         if let Ok(Some(value)) = conf.get_build_setting(&label) {
             return Ok(build_setting_value_to_starlark(value, eval));
         }
@@ -648,16 +667,24 @@ async fn do_apply_transition(
         }
     }
 
+    let cell_alias_resolver = transition_cell_alias_resolver(ctx).await?;
+
     let transition = match ctx.fetch_transition(transition_id).await {
         Ok(transition) => transition,
         Err(e) if matches!(transition_id, TransitionId::AnonymousBazel { .. }) => {
             if let TransitionId::AnonymousBazel { outputs, .. } = transition_id {
-                let output_defaults =
-                    transition_output_defaults(ctx, transition_id, outputs).await?;
+                let output_defaults = transition_output_defaults(
+                    ctx,
+                    transition_id,
+                    outputs,
+                    cell_alias_resolver.as_ref(),
+                )
+                .await?;
                 return apply_anonymous_bazel_transition(
                     conf,
                     transition_id,
                     &output_defaults,
+                    cell_alias_resolver.as_ref(),
                     outputs,
                     bazel_all_attrs,
                 );
@@ -667,7 +694,13 @@ async fn do_apply_transition(
         Err(e) => return Err(e),
     };
     let output_defaults = if transition.is_bazel_style() {
-        transition_output_defaults(ctx, transition_id, transition.outputs()).await?
+        transition_output_defaults(
+            ctx,
+            transition_id,
+            transition.outputs(),
+            cell_alias_resolver.as_ref(),
+        )
+        .await?
     } else {
         Vec::new()
     };
@@ -743,6 +776,7 @@ async fn do_apply_transition(
                     &transition,
                     &output_defaults,
                     conf,
+                    cell_alias_resolver.as_ref(),
                     refs,
                     attrs,
                     eval,
@@ -753,6 +787,7 @@ async fn do_apply_transition(
                             &transition,
                             &output_defaults,
                             &new,
+                            cell_alias_resolver.as_ref(),
                             refs,
                             attrs,
                             eval,
@@ -788,6 +823,16 @@ async fn do_apply_transition(
         let (token, _) = finished_eval.finish(None)?;
         Ok((token, res))
     })
+}
+
+async fn transition_cell_alias_resolver(
+    ctx: &mut DiceComputations<'_>,
+) -> slug_error::Result<Option<CellAliasResolver>> {
+    if !ctx.is_cell_resolver_key_set().await? {
+        return Ok(None);
+    }
+    let cell_resolver = ctx.get_cell_resolver().await?;
+    Ok(Some(cell_resolver.root_cell_cell_alias_resolver().dupe()))
 }
 
 #[async_trait]
@@ -953,9 +998,14 @@ impl TransitionCalculation for TransitionCalculationImpl {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     use slug_core::bzl::ImportPath;
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::name::CellName;
     use slug_core::configuration::build_setting::BuildSettingLabel;
     use slug_core::configuration::build_setting::BuildSettingValue;
     use slug_core::configuration::data::ConfigurationData;
@@ -1023,6 +1073,7 @@ mod tests {
                 "@@rules_python//python/config_settings:add_srcs_to_runfiles".to_owned(),
             ]),
             &[],
+            None,
             &["@@rules_python//python/config_settings:add_srcs_to_runfiles".to_owned()],
             Some(&[]),
         )?;
@@ -1064,6 +1115,7 @@ mod tests {
             "//command_line_option:platforms",
             &llvm_transition_id(),
             &base,
+            None,
             &mut eval,
         )?;
         let list = starlark::values::list::ListRef::from_value(value)
@@ -1077,6 +1129,7 @@ mod tests {
         let label = super::build_setting_label_from_transition_label(
             "//config:ubsan",
             &llvm_transition_id(),
+            None,
         )?;
         let expected = BuildSettingLabel::from_bazel_label("@llvm//config:ubsan")?;
         assert_eq!(label, expected);
@@ -1086,8 +1139,11 @@ mod tests {
     #[test]
     fn anonymous_relative_build_setting_labels_use_defining_cell() -> slug_error::Result<()> {
         let transition_id = anonymous_llvm_transition_id(vec!["//config:ubsan".to_owned()]);
-        let label =
-            super::build_setting_label_from_transition_label("//config:ubsan", &transition_id)?;
+        let label = super::build_setting_label_from_transition_label(
+            "//config:ubsan",
+            &transition_id,
+            None,
+        )?;
         let expected = BuildSettingLabel::from_bazel_label("@llvm//config:ubsan")?;
         assert_eq!(label, expected);
         Ok(())
@@ -1101,6 +1157,7 @@ mod tests {
         let label = super::build_setting_label_from_transition_label(
             "//rust/private:bootstrap_setting",
             &transition_id,
+            None,
         )?;
         let expected =
             BuildSettingLabel::from_bazel_label("@rules_rust//rust/private:bootstrap_setting")?;
@@ -1133,6 +1190,7 @@ mod tests {
             &base,
             &llvm_transition_id(),
             &[],
+            None,
             &dict_ref,
             &["//command_line_option:platforms".to_owned()],
         )?;
@@ -1162,6 +1220,7 @@ mod tests {
             &base,
             &llvm_transition_id(),
             &[(asan.clone(), BuildSettingValue::Bool(false))],
+            None,
             &dict_ref,
             &["//config:asan".to_owned()],
         )?;
@@ -1186,12 +1245,50 @@ mod tests {
             &base,
             &transition_id,
             &[(asan.clone(), BuildSettingValue::Bool(false))],
+            None,
             &["//config:asan".to_owned()],
             Some(&[("s_123_asan".to_owned(), attr)]),
         )?;
         assert_eq!(
             updated,
             super::TransitionApplied::Single(base.without_build_setting(&asan)?)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn transition_build_setting_labels_prefer_runtime_alias_snapshot() -> slug_error::Result<()> {
+        let apparent = "plan61_transition_runtime_alias";
+        let canonical = "plan61_owner++settings+generated";
+        let wrong_global = "plan61_wrong_owner++settings+generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        let label = super::build_setting_label_from_transition_label(
+            &format!("@@{apparent}//pkg:flag"),
+            &llvm_transition_id(),
+            Some(&resolver),
+        )?;
+
+        assert_eq!(label.target().pkg().cell_name().as_str(), canonical);
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
         );
         Ok(())
     }

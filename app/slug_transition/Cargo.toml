@@ -23,6 +23,7 @@ starlark_map = { workspace = true }
 slug_analysis = { workspace = true }
 slug_build_api = { workspace = true }
 slug_build_api_derive = { workspace = true }
+slug_common = { workspace = true }
 slug_core = { workspace = true }
 slug_error = { workspace = true }
 slug_events = { workspace = true }
