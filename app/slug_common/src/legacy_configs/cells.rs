@@ -667,8 +667,9 @@ fn replay_bzlmod_runtime_state(
     cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
     project_root: &ProjectRoot,
 ) {
-    slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(
+    slug_core::cells::reset_dynamic_bzlmod_state_for_workspace(
         project_root.root().to_path_buf(),
+        cell_graph.workspace_id.output_base.as_ref().clone(),
     );
 
     let external_base_dir = project_root.root().as_path().join("bazel-external");

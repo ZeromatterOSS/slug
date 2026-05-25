@@ -136,6 +136,11 @@ mod tests {
 
     #[test]
     fn build_setting_labels_resolve_dynamic_extension_aliases() {
+        let _guard = crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK
+            .lock()
+            .unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         crate::cells::register_dynamic_extension_cell_alias(
             "rules_rs++rules_rust+rules_rust".to_owned(),
             "rules_rust+".to_owned(),

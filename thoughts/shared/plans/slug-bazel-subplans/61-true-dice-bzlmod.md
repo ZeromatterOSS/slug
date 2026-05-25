@@ -2172,6 +2172,19 @@ Observed SDK result at the checkpoint:
   -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
   slug_common -p slug_interpreter_for_build`, and `git diff --check`; a
   `testing_parse` filter matched zero tests and was not counted as evidence.
+- Transitional process-global bzlmod dynamic-cell entries are now scoped by
+  workspace identity, including output base, instead of only project root.
+  Runtime bzlmod replay sets that scope from the DICE-projected cell graph
+  workspace, so generated repo paths, setups, apparent aliases, and scoped
+  repo aliases registered through the compatibility maps cannot be reused by
+  another output-base workspace under the same project root. This does not make
+  the maps DICE-owned, and filesystem directory-scan compatibility fallbacks
+  remain transitional. Validation passed with `cargo fmt --check`, `cargo test
+  -p slug_core dynamic_bzlmod_entries_are_scoped_to_current_output_base --
+  --nocapture`, `cargo test -p slug_core dynamic_extension -- --nocapture`,
+  `cargo test -p slug_core bzlmod_runtime_snapshot -- --nocapture`, `cargo
+  test -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check
+  -p slug_core -p slug_common`, and `git diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -3265,12 +3278,13 @@ using Rust DICE keys and values:
    - Extension repo execution/materialization keys now preserve the workspace
   identity and output base, but generated repo cell graph ownership and
   final materialization state are still not fully DICE-owned.
-- Dynamic generated-repo cell maps are now project-root scoped, but they
-  remain process-global maps rather than a DICE-owned `BzlmodCellGraphKey`.
-  Resolver-local promoted dynamic cells from graph snapshots and current
-  extension-spoke values are graph-owned, but directory-scan caches and
-  alias-compatibility maps are still process-local lookup accelerators rather
-  than DICE inputs.
+- Dynamic generated-repo cell maps are now scoped by the active transitional
+  workspace identity, including output base when replayed from a bzlmod cell
+  graph, but they remain process-global maps rather than a DICE-owned
+  `BzlmodCellGraphKey`. Resolver-local promoted dynamic cells from graph
+  snapshots and current extension-spoke values are graph-owned, but directory
+  scans and alias-compatibility maps are still process-local lookup
+  accelerators rather than DICE inputs.
 - Module extension and repository-context label path resolution now receive
   resolver-owned cell path maps from the active cell resolver, and those maps are
   authoritative when present. `module_ctx.path(Label(...))`,
@@ -3302,8 +3316,9 @@ using Rust DICE keys and values:
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.
-- Temporary root-cell and non-root cell-name adapters are project-root scoped,
-  but remain process-global compatibility adapters.
+- Temporary root-cell and non-root cell-name adapters are scoped by the same
+  transitional workspace adapter when available, but remain process-global
+  compatibility adapters.
 - `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
      including bundled bzlmod cells, and resolver assembly, runtime
      installation, module-version projection, and extension-aggregation

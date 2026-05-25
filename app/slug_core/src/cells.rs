@@ -133,25 +133,47 @@ static ROOT_CELL_NAME: std::sync::LazyLock<std::sync::RwLock<Option<DynamicBzlmo
 static EXTERNAL_CELL_NAMES: std::sync::Mutex<Option<DynamicBzlmodEntry<Vec<String>>>> =
     std::sync::Mutex::new(None);
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DynamicBzlmodScope {
+    project_root: Option<std::path::PathBuf>,
+    output_base: Option<std::path::PathBuf>,
+}
+
+impl DynamicBzlmodScope {
+    fn for_project_root(project_root: std::path::PathBuf) -> Self {
+        Self {
+            project_root: Some(project_root),
+            output_base: None,
+        }
+    }
+
+    fn for_workspace(project_root: std::path::PathBuf, output_base: std::path::PathBuf) -> Self {
+        Self {
+            project_root: Some(project_root),
+            output_base: Some(output_base),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct DynamicBzlmodEntry<T> {
-    project_root: Option<std::path::PathBuf>,
+    scope: DynamicBzlmodScope,
     value: T,
 }
 
 fn dynamic_bzlmod_entry<T>(value: T) -> DynamicBzlmodEntry<T> {
     DynamicBzlmodEntry {
-        project_root: dynamic_project_root(),
+        scope: dynamic_bzlmod_scope(),
         value,
     }
 }
 
-fn dynamic_bzlmod_entry_matches_current_root<T>(entry: &DynamicBzlmodEntry<T>) -> bool {
-    entry.project_root == dynamic_project_root()
+fn dynamic_bzlmod_entry_matches_current_scope<T>(entry: &DynamicBzlmodEntry<T>) -> bool {
+    entry.scope == dynamic_bzlmod_scope()
 }
 
-fn dynamic_bzlmod_value_for_current_root<T: Clone>(entry: &DynamicBzlmodEntry<T>) -> Option<T> {
-    dynamic_bzlmod_entry_matches_current_root(entry).then(|| entry.value.clone())
+fn dynamic_bzlmod_value_for_current_scope<T: Clone>(entry: &DynamicBzlmodEntry<T>) -> Option<T> {
+    dynamic_bzlmod_entry_matches_current_scope(entry).then(|| entry.value.clone())
 }
 
 /// Dynamic cell registry for extension repos created at runtime.
@@ -178,7 +200,7 @@ static DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE: std::sync::LazyLock<
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
 #[cfg(test)]
-static BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
+pub(crate) static BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
 
 /// Plan 36: dynamic-cell sibling registry that carries the
@@ -202,9 +224,14 @@ static DYNAMIC_EXTENSION_CELL_SETUPS: std::sync::LazyLock<
     >,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
-/// Current project root for the temporary dynamic bzlmod cell adapter.
-static DYNAMIC_PROJECT_ROOT: std::sync::LazyLock<std::sync::RwLock<Option<std::path::PathBuf>>> =
-    std::sync::LazyLock::new(|| std::sync::RwLock::new(None));
+/// Current workspace for the temporary dynamic bzlmod cell adapter.
+static DYNAMIC_BZLMOD_SCOPE: std::sync::LazyLock<std::sync::RwLock<DynamicBzlmodScope>> =
+    std::sync::LazyLock::new(|| {
+        std::sync::RwLock::new(DynamicBzlmodScope {
+            project_root: None,
+            output_base: None,
+        })
+    });
 
 const MAX_UNKNOWN_CELL_ALIAS_SUGGESTIONS: usize = 50;
 
@@ -371,7 +398,7 @@ pub fn resolve_dynamic_extension_cell_alias(apparent_name: &str) -> Option<Strin
         .and_then(|aliases| {
             aliases
                 .get(apparent_name)
-                .and_then(dynamic_bzlmod_value_for_current_root)
+                .and_then(dynamic_bzlmod_value_for_current_scope)
         })
 }
 
@@ -392,7 +419,7 @@ pub fn resolve_scoped_bzlmod_repo_alias(owner_module: &str, apparent_name: &str)
     SCOPED_BZLMOD_REPO_ALIASES.lock().ok().and_then(|aliases| {
         aliases
             .get(&(owner_module.to_owned(), apparent_name.to_owned()))
-            .and_then(dynamic_bzlmod_value_for_current_root)
+            .and_then(dynamic_bzlmod_value_for_current_scope)
     })
 }
 
@@ -418,7 +445,7 @@ pub fn resolve_scoped_bzlmod_repo_alias_for_current_cell(
         &|owner_module| {
             aliases
                 .get(&(owner_module.to_owned(), apparent_name.to_owned()))
-                .and_then(dynamic_bzlmod_value_for_current_root)
+                .and_then(dynamic_bzlmod_value_for_current_scope)
         },
         &|apparent_name| resolve_dynamic_extension_cell_alias(apparent_name),
     )
@@ -512,7 +539,7 @@ pub fn canonical_dynamic_extension_cell_name(name: &str) -> Option<String> {
     let cells = DYNAMIC_EXTENSION_CELLS.lock().ok()?;
     if cells
         .get(name)
-        .is_some_and(dynamic_bzlmod_entry_matches_current_root)
+        .is_some_and(dynamic_bzlmod_entry_matches_current_scope)
     {
         return Some(name.to_owned());
     }
@@ -528,7 +555,7 @@ pub fn canonical_dynamic_extension_cell_name(name: &str) -> Option<String> {
     let suffix = format!("+{name}");
     if let Some(canonical) = cells
         .iter()
-        .filter(|(_, entry)| dynamic_bzlmod_entry_matches_current_root(entry))
+        .filter(|(_, entry)| dynamic_bzlmod_entry_matches_current_scope(entry))
         .map(|(canonical, _)| canonical)
         .filter(|canonical| canonical.ends_with(&suffix))
         .min()
@@ -550,7 +577,7 @@ pub fn canonical_bzlmod_module_cell_name(name: &str) -> Option<String> {
         let mut cache = BZLMOD_APPARENT_ALIAS_CACHE.lock().ok()?;
         match cache
             .get(name)
-            .and_then(dynamic_bzlmod_value_for_current_root)
+            .and_then(dynamic_bzlmod_value_for_current_scope)
         {
             Some(cached) => cached,
             None => {
@@ -667,14 +694,22 @@ pub fn get_dynamic_extension_cell_setup(
     DYNAMIC_EXTENSION_CELL_SETUPS
         .lock()
         .ok()
-        .and_then(|m| m.get(name).and_then(dynamic_bzlmod_value_for_current_root))
+        .and_then(|m| m.get(name).and_then(dynamic_bzlmod_value_for_current_scope))
 }
 
 fn dynamic_project_root() -> Option<std::path::PathBuf> {
-    DYNAMIC_PROJECT_ROOT
+    dynamic_bzlmod_scope().project_root
+}
+
+fn dynamic_bzlmod_scope() -> DynamicBzlmodScope {
+    DYNAMIC_BZLMOD_SCOPE
         .read()
         .ok()
-        .and_then(|root| root.clone())
+        .map(|scope| scope.clone())
+        .unwrap_or(DynamicBzlmodScope {
+            project_root: None,
+            output_base: None,
+        })
 }
 
 fn clear_dynamic_bzlmod_state_for_new_root() {
@@ -698,27 +733,43 @@ fn clear_dynamic_bzlmod_state_for_new_root() {
     }
 }
 
+fn set_dynamic_bzlmod_scope(scope: DynamicBzlmodScope, always_reset: bool) {
+    let Some(root) = scope.project_root.as_ref() else {
+        return;
+    };
+    ensure_execroot_layout(root);
+    repair_external_symlink_targets(root);
+    let should_reset = DYNAMIC_BZLMOD_SCOPE
+        .read()
+        .ok()
+        .is_none_or(|current_scope| always_reset || *current_scope != scope);
+    if should_reset {
+        clear_dynamic_bzlmod_state_for_new_root();
+    }
+    if let Ok(mut current_scope) = DYNAMIC_BZLMOD_SCOPE.write() {
+        *current_scope = scope;
+    }
+}
+
 /// Set the project root for dynamic cell filesystem scanning.
 pub fn set_dynamic_project_root(root: std::path::PathBuf) {
-    ensure_execroot_layout(&root);
-    repair_external_symlink_targets(&root);
-    if let Ok(mut current_root) = DYNAMIC_PROJECT_ROOT.write() {
-        if current_root.as_ref() != Some(&root) {
-            clear_dynamic_bzlmod_state_for_new_root();
-            *current_root = Some(root);
-        }
-    }
+    set_dynamic_bzlmod_scope(DynamicBzlmodScope::for_project_root(root), false);
 }
 
 /// Reset the temporary dynamic bzlmod cell adapter for a fresh resolution of
 /// `root`, even when the daemon is already serving that root.
 pub fn reset_dynamic_bzlmod_state_for_project_root(root: std::path::PathBuf) {
-    ensure_execroot_layout(&root);
-    repair_external_symlink_targets(&root);
-    clear_dynamic_bzlmod_state_for_new_root();
-    if let Ok(mut current_root) = DYNAMIC_PROJECT_ROOT.write() {
-        *current_root = Some(root);
-    }
+    set_dynamic_bzlmod_scope(DynamicBzlmodScope::for_project_root(root), true);
+}
+
+/// Reset the temporary dynamic bzlmod cell adapter for a fresh resolution of
+/// `root` and output base. The output base is part of bzlmod workspace identity,
+/// so transitional process-global entries must not be reused across it.
+pub fn reset_dynamic_bzlmod_state_for_workspace(
+    root: std::path::PathBuf,
+    output_base: std::path::PathBuf,
+) {
+    set_dynamic_bzlmod_scope(DynamicBzlmodScope::for_workspace(root, output_base), true);
 }
 
 /// Path to the per-project execroot directory used as `cwd` for action
@@ -1315,7 +1366,7 @@ pub fn get_dynamic_extension_cell(name: &str) -> Option<String> {
     DYNAMIC_EXTENSION_CELLS.lock().ok().and_then(|cells| {
         cells
             .get(name)
-            .and_then(dynamic_bzlmod_value_for_current_root)
+            .and_then(dynamic_bzlmod_value_for_current_scope)
     })
 }
 
@@ -1328,7 +1379,7 @@ pub fn is_root_cell_name(cell_name: &str) -> bool {
             .ok()
             .and_then(|root| {
                 root.as_ref()
-                    .and_then(dynamic_bzlmod_value_for_current_root)
+                    .and_then(dynamic_bzlmod_value_for_current_scope)
             })
             .is_some_and(|root| root == cell_name)
 }
@@ -1341,7 +1392,7 @@ pub fn get_external_cell_names() -> Vec<String> {
         .and_then(|names| {
             names
                 .as_ref()
-                .and_then(dynamic_bzlmod_value_for_current_root)
+                .and_then(dynamic_bzlmod_value_for_current_scope)
         })
         .unwrap_or_default()
 }
@@ -1738,7 +1789,7 @@ fn resolve_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<CellNa
         let mut cache = BZLMOD_APPARENT_ALIAS_CACHE.lock().ok()?;
         match cache
             .get(alias)
-            .and_then(dynamic_bzlmod_value_for_current_root)
+            .and_then(dynamic_bzlmod_value_for_current_scope)
         {
             Some(cached) => cached,
             None => {
@@ -1794,7 +1845,7 @@ fn cache_bzlmod_apparent_alias_for_canonical_name(canonical_name: &str) {
     }
     if let Ok(mut cache) = BZLMOD_APPARENT_ALIAS_CACHE.lock() {
         let replace = match cache.get(alias) {
-            Some(entry) if dynamic_bzlmod_entry_matches_current_root(entry) => entry
+            Some(entry) if dynamic_bzlmod_entry_matches_current_scope(entry) => entry
                 .value
                 .as_deref()
                 .is_none_or(|existing| canonical_name < existing),
@@ -1820,7 +1871,7 @@ fn scan_dynamic_extension_suffix_from_external_dir(name: &str) -> Option<String>
         .and_then(|cache| {
             cache
                 .get(name)
-                .and_then(dynamic_bzlmod_value_for_current_root)
+                .and_then(dynamic_bzlmod_value_for_current_scope)
         });
     if let Some(cached) = cached {
         return cached;
@@ -1840,7 +1891,7 @@ fn scan_exact_dynamic_extension_from_external_dir(name: &str) -> Option<String> 
         .and_then(|cache| {
             cache
                 .get(name)
-                .and_then(dynamic_bzlmod_value_for_current_root)
+                .and_then(dynamic_bzlmod_value_for_current_scope)
         });
     if let Some(cached) = cached {
         return cached;
@@ -1889,7 +1940,7 @@ fn cache_dynamic_extension_suffix_for_canonical_name(canonical_name: &str) {
     }
     if let Ok(mut cache) = DYNAMIC_EXTENSION_SUFFIX_SCAN_CACHE.lock() {
         let replace_suffix = match cache.get(suffix) {
-            Some(entry) if dynamic_bzlmod_entry_matches_current_root(entry) => entry
+            Some(entry) if dynamic_bzlmod_entry_matches_current_scope(entry) => entry
                 .value
                 .as_deref()
                 .is_none_or(|existing| canonical_name < existing),
@@ -1927,7 +1978,7 @@ fn cached_bzlmod_apparent_alias_for_tests(alias: &str) -> Option<Option<String>>
     BZLMOD_APPARENT_ALIAS_CACHE.lock().ok().and_then(|cache| {
         cache
             .get(alias)
-            .and_then(dynamic_bzlmod_value_for_current_root)
+            .and_then(dynamic_bzlmod_value_for_current_scope)
     })
 }
 
@@ -1939,7 +1990,7 @@ fn cached_dynamic_extension_suffix_for_tests(alias: &str) -> Option<Option<Strin
         .and_then(|cache| {
             cache
                 .get(alias)
-                .and_then(dynamic_bzlmod_value_for_current_root)
+                .and_then(dynamic_bzlmod_value_for_current_scope)
         })
 }
 
@@ -2092,7 +2143,7 @@ impl DynamicCellInstance {
 
     fn root_scoped_instance_for_current_context(&self) -> Option<&'static CellInstance> {
         match self {
-            Self::RootScoped(entry) => dynamic_bzlmod_value_for_current_root(entry),
+            Self::RootScoped(entry) => dynamic_bzlmod_value_for_current_scope(entry),
             Self::GraphOwned(_) => None,
         }
     }
@@ -2834,6 +2885,9 @@ mod tests {
 
     #[test]
     fn get_cell_path_prefers_dynamic_extension_cell_over_root() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         let canonical = "dynamic_owner++ext+generated_repo";
         let dynamic_path = format!("bazel-external/{canonical}");
         register_dynamic_extension_cell(canonical.to_owned(), dynamic_path.clone());
@@ -2860,6 +2914,7 @@ mod tests {
 
     #[test]
     fn cell_resolver_discovers_exact_dynamic_extension_repo_dir() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir()?;
         std::fs::create_dir_all(tmp.path().join("bazel-external/exact_owner++ext+generated"))?;
         set_dynamic_project_root(tmp.path().to_path_buf());
@@ -3416,7 +3471,8 @@ mod tests {
             )
         );
 
-        *DYNAMIC_PROJECT_ROOT.write().unwrap() = Some(root_b.clone());
+        *DYNAMIC_BZLMOD_SCOPE.write().unwrap() =
+            DynamicBzlmodScope::for_project_root(root_b.clone());
 
         assert_eq!(get_dynamic_extension_cell(canonical), None);
         assert_eq!(resolve_dynamic_extension_cell_alias("repo_alias"), None);
@@ -3438,6 +3494,78 @@ mod tests {
         );
 
         reset_dynamic_bzlmod_state_for_project_root(root_b);
+        Ok(())
+    }
+
+    #[test]
+    fn dynamic_bzlmod_entries_are_scoped_to_current_output_base() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        let root = tmp.path().join("workspace");
+        let output_a = tmp.path().join("out-a");
+        let output_b = tmp.path().join("out-b");
+        reset_dynamic_bzlmod_state_for_workspace(root.clone(), output_a.clone());
+
+        let canonical = "owner++ext+repo";
+        let canonical_path = format!("bazel-external/{canonical}");
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("repo"),
+            spec_hash: Arc::from("sha256-a"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from(r#"{"REPO_ENV":"A"}"#),
+            materialized: false,
+        };
+
+        register_dynamic_extension_cell_with_setup(
+            canonical.to_owned(),
+            canonical_path.clone(),
+            setup.clone(),
+        );
+        register_dynamic_extension_cell_alias("repo_alias".to_owned(), canonical.to_owned());
+        register_scoped_bzlmod_repo_alias(
+            "owner+".to_owned(),
+            "repo".to_owned(),
+            canonical.to_owned(),
+        );
+
+        assert_eq!(
+            get_dynamic_extension_cell(canonical).as_deref(),
+            Some(canonical_path.as_str())
+        );
+        assert_eq!(get_dynamic_extension_cell_setup(canonical), Some(setup));
+        assert_eq!(
+            resolve_dynamic_extension_cell_alias("repo_alias").as_deref(),
+            Some(canonical)
+        );
+        assert_eq!(
+            resolve_scoped_bzlmod_repo_alias("owner+", "repo").as_deref(),
+            Some(canonical)
+        );
+
+        *DYNAMIC_BZLMOD_SCOPE.write().unwrap() =
+            DynamicBzlmodScope::for_workspace(root.clone(), output_b.clone());
+
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
+        assert_eq!(get_dynamic_extension_cell_setup(canonical), None);
+        assert_eq!(resolve_dynamic_extension_cell_alias("repo_alias"), None);
+        assert_eq!(resolve_scoped_bzlmod_repo_alias("owner+", "repo"), None);
+
+        *DYNAMIC_BZLMOD_SCOPE.write().unwrap() =
+            DynamicBzlmodScope::for_workspace(root.clone(), output_a);
+
+        assert_eq!(
+            get_dynamic_extension_cell(canonical).as_deref(),
+            Some(canonical_path.as_str())
+        );
+        assert_eq!(
+            resolve_dynamic_extension_cell_alias("repo_alias").as_deref(),
+            Some(canonical)
+        );
+
+        reset_dynamic_bzlmod_state_for_workspace(root, output_b);
+        assert_eq!(get_dynamic_extension_cell(canonical), None);
         Ok(())
     }
 
