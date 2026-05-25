@@ -5522,9 +5522,12 @@ use_repo(replay, "replayed_repo")
     )
 
     before = await _bzlmod_counters(buck)
-    await buck.build("//:uses_replayed_repo")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_replayed_repo")
     first = await _bzlmod_counters(buck)
-    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+
+    assert "File not found" in str(exc.value)
+    assert "tools/helper.bzl" in str(exc.value)
     assert first["extension_eval"] == before["extension_eval"]
 
     helper_dir = buck.cwd / "tools"
@@ -5895,9 +5898,12 @@ use_repo(replay, "replayed_repo")
     )
 
     before = await _bzlmod_counters(buck)
-    await buck.build("//:uses_replayed_repo")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_replayed_repo")
     first = await _bzlmod_counters(buck)
-    assert first["extension_replay_hit"] > before["extension_replay_hit"]
+
+    assert "File not found" in str(exc.value)
+    assert "helper.bzl" in str(exc.value)
     assert first["extension_eval"] == before["extension_eval"]
 
     _write(helper_dir / "helper.bzl", 'HELPER_SENTINEL = "created mapped helper"\n')

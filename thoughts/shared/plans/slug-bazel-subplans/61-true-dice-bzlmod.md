@@ -2146,8 +2146,7 @@ What did not work or remains risky:
   longer performs a direct `std::fs` read just to obtain OS error text. The
   missing-file hash input is the deterministic
   `No such file or directory (os error 2)` state already expected by the
-  guardrails, while `ExtensionBzlTransitiveDigestKey` and non-DICE callers
-  remain on the transitional direct scanner.
+  guardrails. Non-DICE callers remain on the transitional direct scanner.
 - `ExtensionBzlTransitiveDigestKey` now asks the interpreter-side module
   extension executor for the actual loaded-module graph digest before falling
   back to the transitional literal-load scanner. The loaded-graph path reads
@@ -2177,9 +2176,8 @@ What did not work or remains risky:
   literal scanner when the interpreter-side module extension executor is not
   registered. With an aggregation present, the DICE key now requires the
   executor-owned loaded-graph path and errors if that executor is unavailable;
-  the remaining scanner fallback is limited to the real executor's explicit
-  `Ok(None)` cases such as missing-load replay/bootstrap. Validation passed
-  with `cargo test -p slug_bzlmod
+  the remaining scanner fallback is limited to no-aggregation cases and
+  non-DICE direct callers. Validation passed with `cargo test -p slug_bzlmod
   extension_bzl_digest_key_requires_executor_when_aggregation_exists --
   --nocapture`, `cargo test -p slug_bzlmod bzl_transitive_digest --
   --nocapture`, and `cargo test -p slug_bzlmod
@@ -2188,6 +2186,24 @@ What did not work or remains risky:
   slug`, and the focused Plan 61 replay subset for warm replay, transitive
   loaded `.bzl` edits, missing-load creation, and mapped external
   edit/create/delete replay rejection (`6 passed, 117 deselected`).
+- DICE extension replay no longer falls back to the transitional literal-load
+  scanner when the real executor cannot load the implementation graph. This
+  matches Bazel's `SingleExtensionEvalFunction`: `RegularRunnableExtension.load`
+  loads the extension `.bzl` before lockfile lookup, so a missing transitive
+  load is a module-extension load error rather than a replay hit. Focused
+  guardrails now prove a missing project-local or mapped external helper is not
+  masked by lockfile replay, while creating the helper makes the loaded graph
+  digest stale and runs the extension. Validation passed with `cargo check -p
+  slug_bzlmod -p slug_interpreter_for_build`, `cargo test -p slug_bzlmod
+  bzl_transitive_digest -- --nocapture`, `cargo test -p slug_bzlmod
+  extension_bzl_digest_key_requires_executor_when_aggregation_exists --
+  --nocapture`, `cargo test -p slug_bzlmod
+  extension_spokes_lookup_keys_cache_after_digest_dependency -- --nocapture`,
+  `cargo build -p slug`, and the focused extension `.bzl` replay subset
+  selected by `-k 'extension_bzl_load or transitive_extension_bzl_load or
+  mapped_external_extension_bzl_load'` (`8 passed, 117 deselected`), plus the
+  full Plan 61 Python guardrail (`125 passed in 160.75s`); no stale `slugd`
+  process remained after cleanup.
 - Out-of-project bzlmod text reads used by module-file inputs, includes,
   registry-cache files, and hidden lockfiles now flow through a named
   `AbsoluteTextFileInputKey` child when the parent DICE computation reads the
@@ -2710,22 +2726,22 @@ using Rust DICE keys and values:
    graph.
    - Reuse the Starlark loader or expose its load graph to bzlmod keys.
      `ExtensionBzlTransitiveDigestKey` now uses a late-bound
-     interpreter-side loaded graph digest when the graph loads successfully;
+     interpreter-side loaded graph digest when an aggregation exists;
      Slug's implicit `@slug_builtins` autoload is excluded from the Bazel
-     lockfile digest, and missing-load cases and non-DICE bootstrap/preseed
-     callers still use the transitional scanner. Loaded-graph digest values are
-     transaction-valid; fallback-scanner digest values remain invalid across
-     transactions.
+     lockfile digest, and missing-load cases now fail through the loader before
+     replay instead of falling back to the transitional scanner. Non-DICE
+     bootstrap/preseed callers still use the transitional scanner.
+     Loaded-graph digest values are transaction-valid; fallback-scanner digest
+     values remain invalid across transactions.
    - Keep the current external `bazel-external/<repo>` and mapped literal-load
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.
    - Lockfile spoke pre-seeding uses the tracked project-file digest producer
      when DICE inputs are available, including deterministic project-local
      missing-file digest state without a direct filesystem read;
-     `ExtensionBzlTransitiveDigestKey` still uses the transitional direct
-     literal-load scanner only when the registered executor reports an explicit
-     fallback case, while non-DICE bootstrap/preseed callers still use the
-     scanner directly.
+     `ExtensionBzlTransitiveDigestKey` now errors on real executor load
+     failures, while non-DICE bootstrap/preseed callers still use the scanner
+     directly.
    - Reject replay when any loaded implementation file changes, not only
      literal loads that the transitional scanner can find.
 

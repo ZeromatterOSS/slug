@@ -281,18 +281,16 @@ impl Key for ExtensionBzlTransitiveDigestKey {
                     e
                 )
             })?;
-            if let Some(digest) = executor
+            let digest = executor
                 .extension_bzl_transitive_digest(
                     ctx,
                     self.extension_id.as_ref(),
                     aggregation.aggregated.as_ref(),
                 )
-                .await?
-            {
-                return Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
-                    digest, true,
-                )));
-            }
+                .await?;
+            return Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
+                digest, true,
+            )));
         }
 
         let repo_mappings = ctx

@@ -229,19 +229,17 @@ impl ConcreteModuleExtensionExecutor {
         ctx: &mut DiceComputations<'_>,
         extension_id: &str,
         aggregated: &AggregatedExtension,
-    ) -> slug_error::Result<Option<String>> {
+    ) -> slug_error::Result<String> {
         let cell_resolver = ctx.get_cell_resolver().await?;
         let import_path = parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
         let root_path = OwnedStarlarkModulePath::new(StarlarkModulePath::LoadFile(&import_path));
 
-        if let Err(e) = ctx.get_loaded_module(root_path.borrow()).await {
-            tracing::debug!(
-                "Falling back to literal .bzl digest scanner for extension '{}': {}",
-                aggregated.extension_id,
-                e
-            );
-            return Ok(None);
-        }
+        ctx.get_loaded_module(root_path.borrow())
+            .await
+            .buck_error_context(format!(
+                "Loading extension bzl file for digest: {}",
+                aggregated.extension_bzl_file
+            ))?;
 
         let mut queue = VecDeque::from([root_path]);
         let mut seen = BTreeSet::new();
@@ -274,10 +272,10 @@ impl ConcreteModuleExtensionExecutor {
             }
         }
 
-        Ok(Some(compute_bzl_transitive_digest_from_file_contents(
+        Ok(compute_bzl_transitive_digest_from_file_contents(
             extension_id,
             &file_contents,
-        )))
+        ))
     }
 
     /// Try to execute the extension's Starlark implementation.
@@ -456,7 +454,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         ctx: &mut DiceComputations<'_>,
         extension_id: &str,
         aggregated: &AggregatedExtension,
-    ) -> slug_error::Result<Option<String>> {
+    ) -> slug_error::Result<String> {
         self.try_loaded_bzl_transitive_digest(ctx, extension_id, aggregated)
             .await
     }
