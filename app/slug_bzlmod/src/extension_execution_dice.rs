@@ -2600,7 +2600,7 @@ mod tests {
             aggregations_value(workspace_id.clone(), target.clone(), other.clone()),
         )])?;
         updater.changed_to(vec![(
-            crate::BzlmodCellGraphDataKey,
+            crate::dice_graph::BzlmodCellGraphDataKey,
             cell_graph_with_root(workspace_id.clone()),
         )])?;
         let mut dice = updater.commit().await;
@@ -2661,7 +2661,7 @@ mod tests {
             )),
         )])?;
         updater.changed_to(vec![(
-            crate::BzlmodCellGraphDataKey,
+            crate::dice_graph::BzlmodCellGraphDataKey,
             cell_graph_with_root(workspace_id),
         )])?;
         let mut dice = updater.commit().await;
@@ -2701,7 +2701,7 @@ mod tests {
             )),
         )])?;
         updater.changed_to(vec![(
-            crate::BzlmodCellGraphDataKey,
+            crate::dice_graph::BzlmodCellGraphDataKey,
             cell_graph_with_root(workspace_id),
         )])?;
         let mut dice = updater.commit().await;
@@ -2753,7 +2753,7 @@ mod tests {
             aggregations_value(workspace_id.clone(), target.clone(), other.clone()),
         )])?;
         updater.changed_to(vec![(
-            crate::BzlmodCellGraphDataKey,
+            crate::dice_graph::BzlmodCellGraphDataKey,
             cell_graph_with_root(workspace_id.clone()),
         )])?;
         let mut dice = updater.commit().await;

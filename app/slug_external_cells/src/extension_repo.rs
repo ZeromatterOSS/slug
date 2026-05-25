@@ -472,9 +472,8 @@ async fn workspace_id_for_extension_spoke_lookup(
     ctx: &mut DiceComputations<'_>,
     requesting_canonical_name: &str,
 ) -> slug_error::Result<slug_bzlmod::WorkspaceId> {
-    ctx.compute(&slug_bzlmod::BzlmodCellGraphDataKey)
+    slug_bzlmod::bzlmod_workspace_id_for_current_workspace(ctx)
         .await
-        .map(|data| data.workspace_id.clone())
         .map_err(|e| {
             ExtensionRepoError::MaterializationFailed {
                 canonical_name: requesting_canonical_name.to_owned(),
@@ -1034,6 +1033,8 @@ mod tests {
 
     #[tokio::test]
     async fn extension_spoke_lookup_uses_injected_workspace_identity() -> slug_error::Result<()> {
+        use slug_bzlmod::SetBzlmodProjectionData;
+
         let project_root = std::env::temp_dir().join(format!(
             "slug-spoke-lookup-workspace-{}",
             std::process::id()
@@ -1041,9 +1042,7 @@ mod tests {
         let output_base =
             std::env::temp_dir().join(format!("slug-spoke-lookup-output-{}", std::process::id()));
         let workspace_id = slug_bzlmod::WorkspaceId::new(project_root.clone(), output_base);
-        let injected = Arc::new(slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-            workspace_id.clone(),
-        ));
+        let projection = slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -1051,7 +1050,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.changed_to(vec![(slug_bzlmod::BzlmodCellGraphDataKey, injected)])?;
+        updater.set_bzlmod_projection_data(projection)?;
         let mut dice = updater.commit().await;
 
         let actual = workspace_id_for_extension_spoke_lookup(&mut dice, "_main+ext+tool").await?;

@@ -6256,6 +6256,8 @@ mod tests {
         runtime.enable_all();
         let runtime = runtime.build().unwrap();
         runtime.block_on(async {
+            use slug_bzlmod::SetBzlmodProjectionData;
+
             reset_toolchain_loading();
 
             let loaded = ToolchainLoadingSignature {
@@ -6297,13 +6299,12 @@ mod tests {
                 PathBuf::from("/tmp/plan61-toolchains/buck-out/stale"),
             );
             updater
-                .changed_to(vec![(
-                    slug_bzlmod::BzlmodCellGraphDataKey,
-                    Arc::new(slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-                        requested_workspace.clone(),
-                    )),
-                )])
+                .set_bzlmod_projection_data(slug_bzlmod::BzlmodProjectionData::for_workspace(
+                    requested_workspace.clone(),
+                ))
                 .unwrap();
+            let dice = updater.commit().await;
+            let mut updater = dice.into_updater();
             updater
                 .changed_to(vec![(
                     slug_bzlmod::BzlmodRegisteredToolchainsDataKey,

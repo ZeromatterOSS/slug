@@ -63,7 +63,7 @@ use allocative::Allocative;
 pub use cache::ModuleCache;
 pub use dice_graph::BzlmodCellGraphAlias;
 pub use dice_graph::BzlmodCellGraphCell;
-pub use dice_graph::BzlmodCellGraphDataKey;
+use dice_graph::BzlmodCellGraphDataKey;
 pub use dice_graph::BzlmodCellGraphDynamicAlias;
 pub use dice_graph::BzlmodCellGraphExtensionCell;
 pub use dice_graph::BzlmodCellGraphKey;
@@ -441,7 +441,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
 pub async fn module_versions_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<ModuleVersionsValue>> {
-    let cell_graph = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    let cell_graph = bzlmod_cell_graph_for_current_workspace(ctx).await?;
     let key = ModuleVersionsKey::for_workspace_id(cell_graph.workspace_id.clone());
     ctx.compute(&key).await?
 }
@@ -449,7 +449,7 @@ pub async fn module_versions_for_current_workspace(
 pub async fn registered_toolchains_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<RegisteredToolchainsValue>> {
-    let cell_graph = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    let cell_graph = bzlmod_cell_graph_for_current_workspace(ctx).await?;
     let key = RegisteredToolchainsKey::for_workspace_id(cell_graph.workspace_id.clone());
     ctx.compute(&key).await?
 }
@@ -457,9 +457,26 @@ pub async fn registered_toolchains_for_current_workspace(
 pub async fn registered_execution_platforms_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<RegisteredExecutionPlatformsValue>> {
-    let cell_graph = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    let cell_graph = bzlmod_cell_graph_for_current_workspace(ctx).await?;
     let key = RegisteredExecutionPlatformsKey::for_workspace_id(cell_graph.workspace_id.clone());
     ctx.compute(&key).await?
+}
+
+pub async fn bzlmod_cell_graph_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
+    let injected = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    let key = BzlmodCellGraphKey::for_workspace_id(injected.workspace_id.clone());
+    ctx.compute(&key).await?
+}
+
+pub async fn bzlmod_workspace_id_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<WorkspaceId> {
+    Ok(bzlmod_cell_graph_for_current_workspace(ctx)
+        .await?
+        .workspace_id
+        .clone())
 }
 
 #[cfg(test)]

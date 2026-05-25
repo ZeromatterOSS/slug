@@ -5297,7 +5297,7 @@ mod tests {
 
         assert!(!configs.is_bzlmod);
         let mut dice = updater.commit().await;
-        let cell_graph = dice.compute(&slug_bzlmod::BzlmodCellGraphDataKey).await?;
+        let cell_graph = slug_bzlmod::bzlmod_cell_graph_for_current_workspace(&mut dice).await?;
         assert_eq!(
             cell_graph.workspace_id.output_base.as_ref().as_path(),
             output_base.as_path()
