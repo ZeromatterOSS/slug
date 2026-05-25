@@ -3281,7 +3281,11 @@ What did not work or remains risky:
   slug_build_api rule_defs::provider::dependency::tests -- --nocapture`
   (`3 passed`), `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-followup cargo check
   -p slug_interpreter -p slug_build_api -p slug_analysis`, `cargo fmt --check`,
-  and `git diff --check`.
+  and `git diff --check`. Clean review of `8ea30cce..a0cd7c58` found no issues
+  and reran `git diff --check 8ea30cce..a0cd7c58`, the focused
+  `slug_build_api` dependency tests (`3 passed`), the focused
+  `slug_interpreter` configured-label tests (`4 passed`), and
+  `cargo fmt --check`.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
