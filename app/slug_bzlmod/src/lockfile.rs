@@ -56,7 +56,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use sha2::Digest;
 use sha2::Sha256;
-use slug_error::BuckErrorContext;
 
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::record_bzlmod_event;
@@ -1275,16 +1274,6 @@ impl Default for Lockfile {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Compute SHA256 hash of a file and return as SRI format.
-pub fn compute_file_hash(path: &Path) -> slug_error::Result<String> {
-    let content = fs::read(path).buck_error_context(format!(
-        "Failed to read file for hashing: {}",
-        path.display()
-    ))?;
-
-    Ok(compute_sri_hash(&content))
 }
 
 /// Compute SHA256 hash of bytes and return as SRI format.

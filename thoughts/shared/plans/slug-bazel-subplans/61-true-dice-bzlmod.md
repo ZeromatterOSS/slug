@@ -2352,6 +2352,11 @@ What did not work or remains risky:
   fmt --check`, `git diff --check`, and a scoped search showing no remaining
   `slug_bzlmod::{lockfile,parser,types,extensions,version}::` downstream
   references.
+- The unused private `lockfile::compute_file_hash` helper was removed after the
+  lockfile module was hidden behind crate-root helpers. Focused validation
+  passed with `TMPDIR=/var/mnt/dev/.slug-tmp cargo check -p slug_bzlmod`,
+  `cargo test -p slug_bzlmod recorded -- --nocapture` (`24 passed, 308
+  filtered out`), `cargo fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
