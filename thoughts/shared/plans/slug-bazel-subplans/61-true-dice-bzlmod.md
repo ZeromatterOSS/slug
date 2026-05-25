@@ -607,6 +607,23 @@ Observed SDK result at the checkpoint:
   visible_lockfile_creation_is_observed_in_same_daemon or
   visible_lockfile_deletion_is_observed_in_same_daemon'`, touched-file
   `rustfmt --edition 2024`, and `git diff --check`.
+- Local override and cached git/archive override `MODULE.bazel` poll identity
+  now comes from named DICE poll keys
+  (`LocalOverrideModuleInputsPollKey` and
+  `NonRegistryOverrideModuleInputsPollKey`) instead of direct polling during
+  projection-bridge key assembly. The real module-input keys still receive the
+  resulting digest, preserving warm no-op projection reuse while moving
+  out-of-project poll ownership into auditable child keys. Validation passed
+  with focused `cargo test -p slug_common
+  override_module_inputs_poll_key_repolls -- --nocapture`, focused `cargo test
+  -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
+  slug_common -p slug_server`, `cargo build -p slug`, and selected `pytest
+  tests/core/bzlmod/test_plan61_guardrails.py -k
+  'warm_noop_out_of_project_local_override_reuses_polled_dice_input or
+  out_of_project_local_override_module_creation_invalidates_bzlmod_resolution or
+  cached_git_override_module_edit_invalidates_bzlmod_resolution or
+  cached_archive_override_module_edit_invalidates_bzlmod_resolution'`,
+  touched-file `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -2803,11 +2820,12 @@ using Rust DICE keys and values:
 2. Finish module-file DICE inputs for git, archive, and out-of-project local
    override/registry-cache sources.
    - Root, included, and project-local local override module segments now use
-     tracked project-file DICE inputs; out-of-project local override module
-     files are read through named DICE poll keys and still polled into
-     higher-level key identity. The DICE-backed resolver now rejects missing
-     tracked root module input instead of direct-parsing the root module in the
-     DICE path. Keep extending that shape to every non-root module source.
+     tracked project-file DICE inputs; out-of-project local override and
+     cached git/archive override `MODULE.bazel` files are read through named
+     DICE poll keys and still polled into higher-level key identity. The
+     DICE-backed resolver now rejects missing tracked root module input instead
+     of direct-parsing the root module in the DICE path. Keep extending that
+     shape to every non-root module source.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are polled into key identity while the final

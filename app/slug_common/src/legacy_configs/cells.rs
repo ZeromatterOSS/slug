@@ -1755,6 +1755,26 @@ struct NonRegistryOverrideModuleInputsKey {
     poll_digest: String,
 }
 
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("LocalOverrideModuleInputsPollKey({})", project_root.display())]
+struct LocalOverrideModuleInputsPollKey {
+    project_root: AbsNormPathBuf,
+    overrides: Vec<(String, String)>,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("NonRegistryOverrideModuleInputsPollKey({})", project_root.display())]
+struct NonRegistryOverrideModuleInputsPollKey {
+    project_root: AbsNormPathBuf,
+    overrides: Vec<(String, PathBuf)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct ModuleInputsPollValue {
+    digest: String,
+    has_polled_inputs: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct NonRegistryOverrideModuleInputsValue {
     digest: String,
@@ -1997,10 +2017,11 @@ fn local_override_inputs_poll_digest(
     project_fs: &ProjectRoot,
     project_root: &AbsNormPathBuf,
     overrides: &[(String, String)],
-) -> slug_error::Result<String> {
+) -> slug_error::Result<ModuleInputsPollValue> {
     let mut hasher = Sha256::new();
     hasher.update(b"local-override-module-inputs-poll-v1");
     hasher.update([0]);
+    let mut has_polled_inputs = false;
 
     let mut queue = VecDeque::new();
     for (module_name, path) in overrides {
@@ -2030,6 +2051,7 @@ fn local_override_inputs_poll_digest(
             hasher.update([0]);
             continue;
         }
+        has_polled_inputs = true;
 
         if !visited_module_dirs.insert(normalized_module_dir.clone()) {
             hasher.update(b"already-seen");
@@ -2078,7 +2100,10 @@ fn local_override_inputs_poll_digest(
         }
     }
 
-    Ok(hex::encode(hasher.finalize()))
+    Ok(ModuleInputsPollValue {
+        digest: hex::encode(hasher.finalize()),
+        has_polled_inputs,
+    })
 }
 
 async fn non_registry_override_module_inputs_digest(
@@ -2146,10 +2171,11 @@ async fn non_registry_override_module_inputs_digest(
 fn non_registry_override_inputs_poll_digest(
     project_fs: &ProjectRoot,
     overrides: &[(String, PathBuf)],
-) -> slug_error::Result<String> {
+) -> slug_error::Result<ModuleInputsPollValue> {
     let mut hasher = Sha256::new();
     hasher.update(b"non-registry-override-module-inputs-poll-v1");
     hasher.update([0]);
+    let mut has_polled_inputs = false;
 
     for (module_name, module_dir) in overrides {
         let normalized_module_dir = match module_dir.as_path().canonicalize() {
@@ -2167,6 +2193,7 @@ fn non_registry_override_inputs_poll_digest(
             hasher.update([0]);
             continue;
         }
+        has_polled_inputs = true;
 
         let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
         match read_absolute_text_file_input(&module_bazel_path)? {
@@ -2202,7 +2229,10 @@ fn non_registry_override_inputs_poll_digest(
         hasher.update([0]);
     }
 
-    Ok(hex::encode(hasher.finalize()))
+    Ok(ModuleInputsPollValue {
+        digest: hex::encode(hasher.finalize()),
+        has_polled_inputs,
+    })
 }
 
 fn non_root_module_file_inputs(
@@ -2413,6 +2443,63 @@ fn normalize_path_lexically(path: PathBuf) -> PathBuf {
         }
     }
     normalized
+}
+
+#[async_trait]
+impl Key for LocalOverrideModuleInputsPollKey {
+    type Value = slug_error::Result<Arc<ModuleInputsPollValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        local_override_inputs_poll_digest(&project_fs, &self.project_root, &self.overrides)
+            .map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_polled_inputs,
+            Err(_) => false,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for NonRegistryOverrideModuleInputsPollKey {
+    type Value = slug_error::Result<Arc<ModuleInputsPollValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        non_registry_override_inputs_poll_digest(&project_fs, &self.overrides).map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_polled_inputs,
+            Err(_) => false,
+        }
+    }
 }
 
 #[async_trait]
@@ -2807,13 +2894,20 @@ impl BuckConfigBasedCells {
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
         );
-        let local_override_poll_digest =
-            local_override_inputs_poll_digest(project_fs, &project_root, &local_overrides)?;
+        let local_override_poll = dice_ctx
+            .compute(&LocalOverrideModuleInputsPollKey {
+                project_root: project_root.clone(),
+                overrides: local_overrides.clone(),
+            })
+            .await?
+            .buck_error_context(
+                "Computing local override MODULE.bazel poll identity for bzlmod resolution",
+            )?;
         let local_override_inputs = dice_ctx
             .compute(&LocalOverrideModuleInputsKey {
                 project_root: project_root.clone(),
                 overrides: local_overrides,
-                poll_digest: local_override_poll_digest,
+                poll_digest: local_override_poll.digest.clone(),
             })
             .await?
             .buck_error_context(
@@ -2823,13 +2917,20 @@ impl BuckConfigBasedCells {
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
         )?;
-        let non_registry_override_poll_digest =
-            non_registry_override_inputs_poll_digest(project_fs, &non_registry_overrides)?;
+        let non_registry_override_poll = dice_ctx
+            .compute(&NonRegistryOverrideModuleInputsPollKey {
+                project_root: project_root.clone(),
+                overrides: non_registry_overrides.clone(),
+            })
+            .await?
+            .buck_error_context(
+                "Computing non-registry override MODULE.bazel poll identity for bzlmod resolution",
+            )?;
         let non_registry_override_inputs = dice_ctx
             .compute(&NonRegistryOverrideModuleInputsKey {
                 project_root: project_root.clone(),
                 overrides: non_registry_overrides,
-                poll_digest: non_registry_override_poll_digest,
+                poll_digest: non_registry_override_poll.digest.clone(),
             })
             .await?
             .buck_error_context(
@@ -4645,6 +4746,89 @@ mod tests {
         let second_digest = slug_bzlmod::module_file_inputs_digest(&parsed.inputs);
 
         assert_ne!(first_digest, second_digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn local_override_module_inputs_poll_key_repolls_out_of_project_module()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-local-override-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
+        let project_root = fs.path().root().to_path_buf();
+        let key = LocalOverrideModuleInputsPollKey {
+            project_root: AbsNormPathBuf::try_from(project_root)?,
+            overrides: vec![(
+                "dep".to_owned(),
+                external.path().to_string_lossy().into_owned(),
+            )],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_polled_inputs);
+
+        std::fs::write(
+            &module_path,
+            "module(name = \"dep\")\nbazel_dep(name = \"other\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.has_polled_inputs);
+        assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn non_registry_override_module_inputs_poll_key_repolls_out_of_project_module()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-non-registry-override-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
+        let project_root = fs.path().root().to_path_buf();
+        let key = NonRegistryOverrideModuleInputsPollKey {
+            project_root: AbsNormPathBuf::try_from(project_root)?,
+            overrides: vec![("dep".to_owned(), external.path().to_path_buf())],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_polled_inputs);
+
+        std::fs::write(
+            &module_path,
+            "module(name = \"dep\")\nbazel_dep(name = \"other\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.has_polled_inputs);
+        assert_ne!(first.digest, second.digest);
         Ok(())
     }
 
