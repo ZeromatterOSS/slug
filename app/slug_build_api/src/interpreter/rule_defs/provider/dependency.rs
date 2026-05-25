@@ -48,7 +48,8 @@ use starlark::values::structs::AllocStruct;
 use starlark_map::StarlarkHasher;
 
 use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
-use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured;
+use crate::interpreter::rule_defs::bazel_label::BazelLabel;
+use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured_with_alias_resolver;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfo;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
@@ -91,13 +92,26 @@ starlark_complex_value!(pub Dependency);
 pub struct SourceFileTarget {
     label: ConfiguredProvidersLabel,
     artifact: StarlarkArtifact,
+    cell_alias_resolver: Option<CellAliasResolver>,
 }
 
 starlark::starlark_simple_value!(SourceFileTarget);
 
 impl SourceFileTarget {
     pub fn new(label: ConfiguredProvidersLabel, artifact: StarlarkArtifact) -> Self {
-        Self { label, artifact }
+        Self::new_with_cell_alias_resolver(label, artifact, None)
+    }
+
+    pub fn new_with_cell_alias_resolver(
+        label: ConfiguredProvidersLabel,
+        artifact: StarlarkArtifact,
+        cell_alias_resolver: Option<CellAliasResolver>,
+    ) -> Self {
+        Self {
+            label,
+            artifact,
+            cell_alias_resolver,
+        }
     }
 
     pub fn artifact_value<'v>(&self, heap: Heap<'v>) -> Value<'v> {
@@ -111,6 +125,13 @@ impl SourceFileTarget {
 
     pub fn label(&self) -> &ConfiguredProvidersLabel {
         &self.label
+    }
+
+    fn bazel_label(&self) -> BazelLabel {
+        bazel_label_from_configured_with_alias_resolver(
+            &self.label,
+            self.cell_alias_resolver.as_ref(),
+        )
     }
 }
 
@@ -192,6 +213,13 @@ impl<'v> Dependency<'v> {
             NoneOr::None => Ok(None),
             NoneOr::Other(e) => Ok(Some(&e.0)),
         }
+    }
+
+    fn bazel_label(&self) -> BazelLabel {
+        bazel_label_from_configured_with_alias_resolver(
+            self.label().inner(),
+            self.label().cell_alias_resolver(),
+        )
     }
 }
 
@@ -308,7 +336,7 @@ enum ProviderIndexError {
 fn source_file_target_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn label<'v>(this: &SourceFileTarget, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(bazel_label_from_configured(&this.label)))
+        Ok(heap.alloc(this.bazel_label()))
     }
 
     #[starlark(attribute)]
@@ -367,7 +395,7 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
     /// The label of this dependency.
     #[starlark(attribute)]
     fn label<'v>(this: &Dependency<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(bazel_label_from_configured(this.label().inner())))
+        Ok(heap.alloc(this.bazel_label()))
     }
 
     /// Returns a list of all providers available from this dependency.
@@ -407,14 +435,19 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
         let providers = di.get_sub_target_providers(subtarget).ok_or_else(|| {
             slug_error::Error::from(DependencyError::UnknownSubtarget(subtarget.to_owned()))
         })?;
-        let lbl = StarlarkConfiguredProvidersLabel::from_value(this.label.get())
-            .unwrap()
-            .inner();
+        let label = StarlarkConfiguredProvidersLabel::from_value(this.label.get()).unwrap();
+        let lbl = label.inner();
         let lbl = ConfiguredProvidersLabel::new(
             lbl.target().clone(),
             lbl.name().push(ProviderName::new(subtarget.to_owned())?),
         );
-        Ok(Dependency::new(heap, lbl, providers, None))
+        Ok(Dependency::new_with_cell_alias_resolver(
+            heap,
+            lbl,
+            providers,
+            None,
+            label.cell_alias_resolver().cloned(),
+        ))
     }
 
     /// Gets a specific provider from this dependency by provider type. Returns None if the
@@ -522,4 +555,140 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
 #[starlark_module]
 pub(crate) fn register_dependency(globals: &mut GlobalsBuilder) {
     const Dependency: StarlarkValueAsType<DependencyGen<FrozenValue>> = StarlarkValueAsType::new();
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use slug_artifact::artifact::source_artifact::SourceArtifact;
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::name::CellName;
+    use slug_core::configuration::data::ConfigurationData;
+    use slug_core::package::source_path::SourcePath;
+    use slug_core::provider::label::ProvidersName;
+    use slug_core::target::configured_target_label::ConfiguredTargetLabel;
+    use starlark::environment::Module;
+    use starlark::values::FrozenHeap;
+
+    use super::*;
+
+    fn runtime_resolver(apparent: &str, canonical: &str) -> slug_error::Result<CellAliasResolver> {
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )
+    }
+
+    fn configured_label(apparent: &str) -> ConfiguredProvidersLabel {
+        ConfiguredProvidersLabel::new(
+            ConfiguredTargetLabel::testing_parse(
+                &format!("{apparent}//pkg:target"),
+                ConfigurationData::testing_new(),
+            ),
+            ProvidersName::Default,
+        )
+    }
+
+    #[test]
+    fn dependency_label_prefers_runtime_alias_resolver_before_globals() -> slug_error::Result<()> {
+        let apparent = "plan61_dependency_label_runtime_alias";
+        let canonical = "plan61_owner++dependency_label+generated";
+        let wrong_global = "plan61_wrong_owner++dependency_label+generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = runtime_resolver(apparent, canonical)?;
+        let frozen_heap = FrozenHeap::new();
+        let env = Module::new();
+        let heap = env.heap();
+        let dep = Dependency::new_with_cell_alias_resolver(
+            heap,
+            configured_label(apparent),
+            FrozenProviderCollection::testing_new_default(&frozen_heap),
+            None,
+            Some(resolver),
+        );
+
+        let label = dep.bazel_label();
+
+        assert_eq!(label.workspace_name(), canonical);
+        assert_eq!(label.full(), format!("@@{canonical}//pkg:target"));
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_label_runtime_miss_does_not_fall_back_to_globals() -> slug_error::Result<()> {
+        let apparent = "plan61_dependency_label_runtime_miss";
+        let wrong_global = "plan61_wrong_owner++dependency_label+unowned";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &BzlmodRuntimeCellInstallSnapshot::default(),
+        )?;
+        let frozen_heap = FrozenHeap::new();
+        let env = Module::new();
+        let heap = env.heap();
+        let dep = Dependency::new_with_cell_alias_resolver(
+            heap,
+            configured_label(apparent),
+            FrozenProviderCollection::testing_new_default(&frozen_heap),
+            None,
+            Some(resolver),
+        );
+
+        let label = dep.bazel_label();
+
+        assert_eq!(label.workspace_name(), apparent);
+        assert_eq!(label.full(), format!("@@{apparent}//pkg:target"));
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn source_file_target_label_uses_runtime_alias_resolver() -> slug_error::Result<()> {
+        let apparent = "plan61_source_file_label_runtime_alias";
+        let canonical = "plan61_owner++source_file_label+generated";
+        let artifact = StarlarkArtifact::new(
+            SourceArtifact::new(SourcePath::testing_new(
+                &format!("{apparent}//pkg"),
+                "file.rs",
+            ))
+            .into(),
+        );
+        let target = SourceFileTarget::new_with_cell_alias_resolver(
+            configured_label(apparent),
+            artifact,
+            Some(runtime_resolver(apparent, canonical)?),
+        );
+
+        let label = target.bazel_label();
+
+        assert_eq!(label.workspace_name(), canonical);
+        assert_eq!(label.full(), format!("@@{canonical}//pkg:target"));
+        Ok(())
+    }
 }

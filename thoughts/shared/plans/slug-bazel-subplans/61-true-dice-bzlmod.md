@@ -3270,6 +3270,18 @@ What did not work or remains risky:
   (`3 passed`) and `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-configured-label
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-configured-label-target
   cargo check -p slug_interpreter -p slug_build_api -p slug_analysis`.
+  Clean review of `834f7910` found follow-up gaps where public/derived label
+  paths still dropped the resolver (`Dependency.label`, `SourceFileTarget.label`,
+  `Label.relative`, `Label.same_package_label`, and `Dependency.sub_target`).
+  Those paths now preserve the resolver, and `attrs.source()` source-file
+  targets receive the active analysis resolver. Follow-up validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-followup cargo test -p
+  slug_interpreter configured_label_ -- --nocapture` (`4 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-followup cargo test -p
+  slug_build_api rule_defs::provider::dependency::tests -- --nocapture`
+  (`3 passed`), `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-followup cargo check
+  -p slug_interpreter -p slug_build_api -p slug_analysis`, `cargo fmt --check`,
+  and `git diff --check`.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
@@ -3524,9 +3536,10 @@ using Rust DICE keys and values:
   need process-global generated-repo aliases when a runtime snapshot is
   available.
 - Configured provider `Label` values exposed through normal analysis `ctx.attr`,
-  dependency objects, query-result dependencies, and `ctx.label` now carry the
-  active cell alias resolver for Bazel-visible workspace/repo strings before
-  falling back to process-global dynamic aliases.
+  dependency objects, query-result dependencies, source-file targets, derived
+  same-package/relative labels, subtargets, and `ctx.label` now carry the active
+  cell alias resolver for Bazel-visible workspace/repo strings before falling
+  back to process-global dynamic aliases.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
   cells, but the final cell graph is still injected from legacy-produced data.

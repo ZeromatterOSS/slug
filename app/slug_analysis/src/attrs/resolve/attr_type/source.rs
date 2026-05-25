@@ -49,7 +49,13 @@ pub(crate) trait SourceAttrTypeExt {
         let target = TargetLabel::new(path.package(), target_name).configure_pair(cfg_pair.dupe());
         let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
         let artifact = StarlarkArtifact::new(SourceArtifact::new(path).into());
-        Ok(ctx.heap().alloc(SourceFileTarget::new(label, artifact)))
+        Ok(ctx
+            .heap()
+            .alloc(SourceFileTarget::new_with_cell_alias_resolver(
+                label,
+                artifact,
+                ctx.cell_alias_resolver().cloned(),
+            )))
     }
 
     fn resolve_label<'v>(

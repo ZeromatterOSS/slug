@@ -103,6 +103,10 @@ impl StarlarkConfiguredProvidersLabel {
         &self.label
     }
 
+    pub fn cell_alias_resolver(&self) -> Option<&CellAliasResolver> {
+        self.cell_alias_resolver.as_ref()
+    }
+
     fn bazel_workspace_name(&self) -> String {
         let cell = self.label.target().pkg().cell_name().as_str();
         if slug_core::cells::is_root_cell_name(cell) {
@@ -298,7 +302,12 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
             let new_target = TargetLabel::new(this.label.target().pkg(), target_name);
             let configured = new_target.configure_pair(this.label.target().cfg_pair().dupe());
             let new_label = ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
-            Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(new_label)))
+            Ok(heap.alloc(
+                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                    new_label,
+                    this.cell_alias_resolver.clone(),
+                ),
+            ))
         }
     }
 
@@ -317,7 +326,12 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         let new_target = TargetLabel::new(this.label.target().pkg(), target_name);
         let configured = new_target.configure_pair(this.label.target().cfg_pair().dupe());
         let new_label = ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
-        Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(new_label)))
+        Ok(heap.alloc(
+            StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                new_label,
+                this.cell_alias_resolver.clone(),
+            ),
+        ))
     }
 }
 
@@ -499,6 +513,42 @@ mod tests {
             ))
         }
 
+        fn bzlmod_runtime_alias_label() -> starlark::Result<StarlarkConfiguredProvidersLabel> {
+            let apparent = "plan61_configured_label_runtime_alias_derived";
+            let canonical = "plan61_owner++configured_label+derived";
+            let wrong_global = "plan61_wrong_owner++configured_label+derived";
+            slug_core::cells::register_dynamic_extension_cell_alias(
+                apparent.to_owned(),
+                wrong_global.to_owned(),
+            );
+            let snapshot = BzlmodRuntimeCellInstallSnapshot {
+                extension_cells: Vec::new(),
+                scoped_aliases: Vec::new(),
+                dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                    apparent_name: apparent.to_owned(),
+                    canonical_name: canonical.to_owned(),
+                }],
+            };
+            let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+                CellName::testing_new("root"),
+                HashMap::new(),
+                &snapshot,
+            )
+            .unwrap();
+            Ok(
+                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                    ConfiguredProvidersLabel::new(
+                        ConfiguredTargetLabel::testing_parse(
+                            &format!("{apparent}//pkg:target"),
+                            ConfigurationData::testing_new(),
+                        ),
+                        ProvidersName::Default,
+                    ),
+                    Some(resolver),
+                ),
+            )
+        }
+
         fn providers_label() -> starlark::Result<StarlarkProvidersLabel> {
             Ok(StarlarkProvidersLabel {
                 label: ProvidersLabel::new(
@@ -618,5 +668,19 @@ mod tests {
         assert_eq!(starlark_label.bazel_workspace_name(), apparent);
         assert_eq!(legacy_label.bazel_workspace_name(), wrong_global);
         Ok(())
+    }
+
+    #[test]
+    fn configured_label_derived_labels_keep_runtime_alias_resolver() {
+        let mut a = Assert::new();
+        a.globals_add(register_test_providers_label);
+        a.eq(
+            "\"plan61_owner++configured_label+derived\"",
+            "bzlmod_runtime_alias_label().relative(':other').workspace_name",
+        );
+        a.eq(
+            "\"external/plan61_owner++configured_label+derived\"",
+            "bzlmod_runtime_alias_label().same_package_label('other').workspace_root",
+        );
     }
 }
