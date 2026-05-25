@@ -4935,6 +4935,46 @@ inject_repo(ext, generated = "missing")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_extension_repo_import_and_override_conflicts_fail_at_module_parse(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: ModuleExtensionUsageBuilder import/override bookkeeping."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    override = buck.cwd / "override"
+    override.mkdir()
+    _write(override / "MODULE.bazel", 'module(name = "override", version = "1.0")\n')
+    _write(override / "BUILD.bazel", "")
+    cases = [
+        (
+            """module(name = "plan61_duplicate_exported_import")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "some_repo", again = "some_repo")
+""",
+            "already imported",
+        ),
+        (
+            """module(name = "plan61_override_chain")
+bazel_dep(name = "override", version = "1.0")
+local_path_override(module_name = "override", path = "override")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, bar = "foo")
+override_repo(ext, baz = "bar")
+override_repo(ext, foo = "override")
+""",
+            "is itself overridden with 'override'",
+        ),
+    ]
+
+    for content, expected in cases:
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert expected in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repo_name_collisions_fail_at_module_parse(
     buck: Buck,
 ) -> None:

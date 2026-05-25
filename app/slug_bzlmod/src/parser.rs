@@ -347,19 +347,56 @@ fn validate_extension_repo_directives_with_visibility(
 ) -> slug_error::Result<()> {
     struct ExtensionDirectiveState<'a> {
         extension_name: &'a str,
+        imports: std::collections::HashMap<&'a str, &'a str>,
         repo_overrides: std::collections::HashMap<&'a str, &'a str>,
         injected_repos: std::collections::HashMap<&'a str, &'a str>,
     }
 
     let mut states = std::collections::HashMap::<String, ExtensionDirectiveState<'_>>::new();
+    let mut overriding_repos = std::collections::HashMap::<&str, (&str, &str, &str)>::new();
+    let mut overridden_repos = std::collections::HashMap::<&str, (&str, &str, &str)>::new();
     for ext in extension_usages {
         let state = states
             .entry(ext.extension_id())
             .or_insert_with(|| ExtensionDirectiveState {
                 extension_name: &ext.extension_name,
+                imports: std::collections::HashMap::new(),
                 repo_overrides: std::collections::HashMap::new(),
                 injected_repos: std::collections::HashMap::new(),
             });
+
+        for use_repo in &ext.imports {
+            for repo_name in &use_repo.repos {
+                if let Some((_, previous_export)) = state
+                    .imports
+                    .iter()
+                    .find(|(_, exported_repo)| **exported_repo == repo_name.as_str())
+                {
+                    return Err(ModuleParseError::EvalError(format!(
+                        "The repo exported as '{}' by module extension '{}' is already imported",
+                        previous_export, state.extension_name
+                    ))
+                    .into());
+                }
+                state.imports.insert(repo_name.as_str(), repo_name.as_str());
+            }
+            for (apparent_name, repo_name) in &use_repo.repo_mapping {
+                if let Some((_, previous_export)) = state
+                    .imports
+                    .iter()
+                    .find(|(_, exported_repo)| **exported_repo == repo_name.as_str())
+                {
+                    return Err(ModuleParseError::EvalError(format!(
+                        "The repo exported as '{}' by module extension '{}' is already imported",
+                        previous_export, state.extension_name
+                    ))
+                    .into());
+                }
+                state
+                    .imports
+                    .insert(apparent_name.as_str(), repo_name.as_str());
+            }
+        }
 
         for (repo_name, overriding_repo) in
             ext.repo_overrides.iter().chain(ext.injected_repos.iter())
@@ -412,6 +449,43 @@ fn validate_extension_repo_directives_with_visibility(
                 .into());
             }
         }
+        for (repo_name, overriding_repo) in &ext.repo_overrides {
+            if let Some(imported_as) =
+                state
+                    .imports
+                    .iter()
+                    .find_map(|(local_repo, exported_repo)| {
+                        (*exported_repo == repo_name.as_str()).then_some(*local_repo)
+                    })
+            {
+                overridden_repos.insert(
+                    imported_as,
+                    (
+                        repo_name.as_str(),
+                        overriding_repo.as_str(),
+                        state.extension_name,
+                    ),
+                );
+            }
+            overriding_repos.insert(
+                overriding_repo.as_str(),
+                (
+                    repo_name.as_str(),
+                    overriding_repo.as_str(),
+                    state.extension_name,
+                ),
+            );
+        }
+        for (repo_name, overriding_repo) in &ext.injected_repos {
+            overriding_repos.insert(
+                overriding_repo.as_str(),
+                (
+                    repo_name.as_str(),
+                    overriding_repo.as_str(),
+                    state.extension_name,
+                ),
+            );
+        }
         for use_repo in &ext.imports {
             for repo_name in &use_repo.repos {
                 if let Some(overriding_repo) = state.injected_repos.get(repo_name.as_str()) {
@@ -432,6 +506,20 @@ fn validate_extension_repo_directives_with_visibility(
                 }
             }
         }
+    }
+
+    if let Some((repo_name, override_)) = overriding_repos
+        .iter()
+        .find(|(repo_name, _)| overridden_repos.contains_key(**repo_name))
+    {
+        let Some(override_on_override) = overridden_repos.get(*repo_name) else {
+            return Ok(());
+        };
+        return Err(ModuleParseError::EvalError(format!(
+            "The repo '{}' used as an override for '{}' in module extension '{}' is itself overridden with '{}', which is not supported.",
+            override_.1, override_.0, override_.2, override_on_override.1
+        ))
+        .into());
     }
 
     Ok(())
@@ -1498,6 +1586,38 @@ inject_repo(second, generated = "helper")
         assert!(err.contains("Cannot import repo 'generated'"));
         assert!(err.contains("has been injected into module extension 'ext'"));
         assert!(err.contains("Please refer to @helper directly"));
+    }
+
+    #[test]
+    fn test_parse_duplicate_imported_extension_repo_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "some_repo", again = "some_repo")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo exported as 'some_repo'"));
+        assert!(err.contains("already imported"));
+    }
+
+    #[test]
+    fn test_parse_override_repo_chain_errors() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+bazel_dep(name = "override", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, bar = "foo")
+override_repo(ext, baz = "bar")
+override_repo(ext, foo = "override")
+"#;
+        let err = parse_module_bazel_content(content, "MODULE.bazel")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repo 'bar' used as an override for 'baz'"));
+        assert!(err.contains("is itself overridden with 'override'"));
+        assert!(err.contains("which is not supported"));
     }
 
     #[test]
