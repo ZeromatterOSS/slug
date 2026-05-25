@@ -564,6 +564,16 @@ Observed SDK result at the checkpoint:
   slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
   slug_common -p slug_server`, touched-file `rustfmt --edition 2024`, and
   `git diff --check`.
+- `ModuleExtensionExecutionKey` now includes the tracked visible/hidden
+  `LockfileContentValue` identity in equality and hashing instead of relying
+  only on separate digest fields. This keeps the replay key honest about the
+  actual lockfile values consumed by extension execution while lockfile-input
+  production remains a follow-up that is not yet split out of the projection
+  bridge. Validation passed
+  with focused `cargo test -p slug_bzlmod tracked_lockfile_value_identity --
+  --nocapture`, broader `cargo test -p slug_bzlmod lockfile -- --nocapture`
+  (`64 passed`), `cargo check -p slug_bzlmod -p slug_common`, touched-file
+  `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
