@@ -2580,6 +2580,19 @@ multiple_version_override(
     assert "ddd" not in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
+    (ccc_override / "source.json").unlink()
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "source.json" in failure_stderr
+    assert "override.example" in failure_stderr
+
+    _write(ccc_override / "source.json", "{}\n")
+    write_lockfile()
+    output, _delete_recovered = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+    assert "ddd" not in output
+
     _write_bytes(ccc_override / "source.json", b"\xff\xfeinvalid source metadata\n")
     write_lockfile()
     with pytest.raises(BuckException) as exc:
