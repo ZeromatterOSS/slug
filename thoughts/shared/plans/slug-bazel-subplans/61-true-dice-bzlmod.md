@@ -3285,7 +3285,11 @@ What did not work or remains risky:
   and reran `git diff --check 8ea30cce..a0cd7c58`, the focused
   `slug_build_api` dependency tests (`3 passed`), the focused
   `slug_interpreter` configured-label tests (`4 passed`), and
-  `cargo fmt --check`.
+  `cargo fmt --check`. Binary-build validation then caught remaining
+  resolverless `RuleAnalysisAttrResolutionContext` initializers in anon target
+  and BXL inspection paths; those legacy callers now pass `None` explicitly.
+  Follow-up validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-smoke
+  cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of

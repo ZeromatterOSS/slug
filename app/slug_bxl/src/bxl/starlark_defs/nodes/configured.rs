@@ -530,6 +530,7 @@ fn configured_target_node_value_methods(builder: &mut MethodsBuilder) {
             dep_analysis_results: get_deps_from_analysis_results(dep_analysis?)?,
             query_results,
             execution_platform_resolution: configured_node.execution_platform_resolution().clone(),
+            cell_alias_resolver: None,
         };
 
         let attrs_iter = this.0.attrs(AttrInspectOptions::All);
