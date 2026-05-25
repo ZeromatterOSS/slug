@@ -2391,6 +2391,99 @@ bazel_dep(name = "ddd", version = "1.0.0")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_single_version_override_registry_source_json_creation_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: RegistryOverride source metadata creation is observable."""
+    cache_home = buck.cwd / "cache_home"
+    default_registry = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    override_registry = cache_home / "slug" / "registry" / "override.example"
+    default_registry.mkdir(parents=True)
+    override_registry.mkdir(parents=True)
+    _write(default_registry / "bazel_registry.json", "{}\n")
+    _write(override_registry / "bazel_registry.json", "{}\n")
+
+    bbb = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "bbb",
+        "1.0.0",
+        'module(name = "bbb", version = "1.0.0")\n'
+        'bazel_dep(name = "ccc", version = "1.0.0")\n',
+    )
+    ccc_override = _write_cached_registry_module(
+        cache_home,
+        "override.example",
+        "ccc",
+        "1.0.0",
+        'module(name = "ccc", version = "1.0.0")\n',
+    )
+    source_json = ccc_override / "source.json"
+    source_content = source_json.read_text()
+    source_digest = hashlib.sha256(source_content.encode()).hexdigest()
+    source_json.unlink()
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_single_override_registry_source_create")
+
+bazel_dep(name = "bbb", version = "1.0.0")
+single_version_override(
+    module_name = "ccc",
+    registry = "https://override.example",
+)
+""",
+    )
+
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                        default_registry / "bazel_registry.json"
+                    ),
+                    "https://override.example/bazel_registry.json": _sha256(
+                        override_registry / "bazel_registry.json"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/MODULE.bazel": _sha256(
+                        bbb / "MODULE.bazel"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/source.json": _sha256(
+                        bbb / "source.json"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/MODULE.bazel": _sha256(
+                        ccc_override / "MODULE.bazel"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/source.json": source_digest,
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "source.json" in failure_stderr
+    assert "override.example" in failure_stderr
+
+    _write(source_json, source_content)
+    output, created = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+    assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_multiple_version_override_registry_uses_override_registry(
     buck: Buck,
 ) -> None:
@@ -2640,6 +2733,100 @@ bazel_dep(name = "ddd", version = "1.0.0")
     output, _recovered = await _audit_cells_and_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" in output
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_multiple_version_override_registry_source_json_creation_invalidates_bzlmod_resolution(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: multiple_version_override registry source metadata creation."""
+    cache_home = buck.cwd / "cache_home"
+    default_registry = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    override_registry = cache_home / "slug" / "registry" / "override.example"
+    default_registry.mkdir(parents=True)
+    override_registry.mkdir(parents=True)
+    _write(default_registry / "bazel_registry.json", "{}\n")
+    _write(override_registry / "bazel_registry.json", "{}\n")
+
+    bbb = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "bbb",
+        "1.0.0",
+        'module(name = "bbb", version = "1.0.0")\n'
+        'bazel_dep(name = "ccc", version = "1.0.0")\n',
+    )
+    ccc_override = _write_cached_registry_module(
+        cache_home,
+        "override.example",
+        "ccc",
+        "1.0.0",
+        'module(name = "ccc", version = "1.0.0")\n',
+    )
+    source_json = ccc_override / "source.json"
+    source_content = source_json.read_text()
+    source_digest = hashlib.sha256(source_content.encode()).hexdigest()
+    source_json.unlink()
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_multiple_override_registry_source_create")
+
+bazel_dep(name = "bbb", version = "1.0.0")
+multiple_version_override(
+    module_name = "ccc",
+    versions = ["1.0.0"],
+    registry = "https://override.example",
+)
+""",
+    )
+
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                        default_registry / "bazel_registry.json"
+                    ),
+                    "https://override.example/bazel_registry.json": _sha256(
+                        override_registry / "bazel_registry.json"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/MODULE.bazel": _sha256(
+                        bbb / "MODULE.bazel"
+                    ),
+                    "https://bcr.bazel.build/modules/bbb/1.0.0/source.json": _sha256(
+                        bbb / "source.json"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/MODULE.bazel": _sha256(
+                        ccc_override / "MODULE.bazel"
+                    ),
+                    "https://override.example/modules/ccc/1.0.0/source.json": source_digest,
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell", env=env)
+    failure_stderr = exc.value.stderr
+    assert "source.json" in failure_stderr
+    assert "override.example" in failure_stderr
+
+    _write(source_json, source_content)
+    output, created = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+
+    output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert "ccc" in output
+    assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
