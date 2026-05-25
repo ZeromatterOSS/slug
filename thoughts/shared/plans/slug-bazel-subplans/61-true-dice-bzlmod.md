@@ -650,13 +650,15 @@ Observed SDK result at the checkpoint:
   registry dependency instead of reusing the warm value. Validation passed with
   the focused subset selected by `-k 'locked_registry_source_json_parse_failure
   or locked_registry_source_json_utf8_failure'` (`2 passed, 108 deselected`).
-- Locked registry `MODULE.bazel` files now have focused parse-error and
-  invalid UTF-8 failure-transition guardrails: after a warm same-daemon
-  registry module resolution, corrupt cached module metadata with matching
-  lockfile hashes fails the next `audit cell`, then repair introduces a new
-  registry dependency instead of reusing the warm value. Validation passed with
-  the focused subset selected by `-k 'locked_registry_module_parse_failure or
-  locked_registry_module_utf8_failure'` (`2 passed, 102 deselected`).
+- Locked registry `MODULE.bazel` files now have focused parse-error, invalid
+  UTF-8, and deletion failure-transition guardrails: after a warm same-daemon
+  registry module resolution, corrupting or deleting cached module metadata
+  with matching lockfile hashes fails the next `audit cell`, then repair
+  introduces a new registry dependency instead of reusing the warm value.
+  Validation passed with the focused parse/UTF-8 subset selected by `-k
+  'locked_registry_module_parse_failure or locked_registry_module_utf8_failure'`
+  (`2 passed, 102 deselected`) and the deletion guardrail selected by `-k
+  'locked_registry_module_delete'` (`1 passed, 119 deselected`).
 - Visible lockfile `selectedYankedVersions` now has same-daemon edit coverage:
   a locked registry module warms as not-yanked, editing only the lockfile
   selected-yanked entry for that selected version fails the next `audit cell`,
@@ -2612,9 +2614,10 @@ using Rust DICE keys and values:
      cycles; project-local and out-of-project local override coverage now
      includes create/delete, parse/UTF-8 failures, and include cycles. Root
      included segments now have parse/UTF-8 failure, include-cycle, and
-     create/delete coverage. Root `MODULE.bazel` has parse/UTF-8 failure and deletion
-     coverage, while registry `MODULE.bazel` has parse/UTF-8 failure coverage;
-     remaining source classes still need full matrix coverage.
+     create/delete coverage. Root `MODULE.bazel` has parse/UTF-8 failure and
+     deletion coverage, while registry `MODULE.bazel` has parse/UTF-8 failure
+     and deletion coverage; remaining source classes still need full matrix
+     coverage.
    - Model registry selection and source metadata for overrides. Single-version
      override registry source metadata has same-daemon parse-failure coverage;
      multiple-version override registry source metadata has same-daemon UTF-8
