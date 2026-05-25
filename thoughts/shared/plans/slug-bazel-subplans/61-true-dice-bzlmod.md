@@ -2231,6 +2231,13 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo test -p slug_external_cells extension_repo --
   --nocapture`, `cargo check -p slug_external_cells -p slug_bzlmod`, and `git
   diff --check`.
+- After the extension-repo repo-env and delegate-replay slices, the full Plan
+  61 Python guardrail passed again with a freshly rebuilt Slug binary:
+  `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx
+  --tb=short` (`146 passed in 106.03s`). The four test-created `slugd`
+  daemons were killed by PID after the run, and a follow-up `pgrep -af
+  'target/debug/slugd|slugd'` found no remaining daemon.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
