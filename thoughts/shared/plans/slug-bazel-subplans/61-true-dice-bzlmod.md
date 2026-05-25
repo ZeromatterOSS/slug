@@ -662,6 +662,12 @@ Observed SDK result at the checkpoint:
   'locked_registry_module_parse_failure or locked_registry_module_utf8_failure'`
   (`2 passed, 102 deselected`) and the deletion guardrail selected by `-k
   'locked_registry_module_delete'` (`1 passed, 119 deselected`).
+- Locked top-level registry metadata now has deletion coverage too: after a
+  warm same-daemon registry module resolution, deleting cached
+  `bazel_registry.json` while the visible lockfile still carries its checksum
+  fails the next `audit cell` with a registry checksum error instead of reusing
+  the stale warm graph. Validation passed with the focused guardrail selected
+  by `-k 'locked_registry_metadata_delete'` (`1 passed, 121 deselected`).
 - Visible lockfile `selectedYankedVersions` now has same-daemon edit coverage:
   a locked registry module warms as not-yanked, editing only the lockfile
   selected-yanked entry for that selected version fails the next `audit cell`,
@@ -2600,8 +2606,10 @@ using Rust DICE keys and values:
      out-of-root cache paths are polled into key identity while the final
      watched-input graph is still pending. Locked registry `source.json`
      checksum, parse/UTF-8 failure, and deletion transitions now have
-     same-daemon guardrails, and locked registry `MODULE.bazel` parse/UTF-8
-     failure and deletion transitions have same-daemon guardrails.
+     same-daemon guardrails, locked registry `MODULE.bazel` parse/UTF-8
+     failure and deletion transitions have same-daemon guardrails, and locked
+     top-level `bazel_registry.json` deletion has same-daemon guardrail
+     coverage.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
      have same-daemon warm-reuse, edit-invalidation, and create/delete
      transition guardrails. Both cached override source classes also have

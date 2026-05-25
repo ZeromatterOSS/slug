@@ -2482,6 +2482,12 @@ impl Key for RegistryFileInputsKey {
                 }
                 None => {
                     hasher.update(b"missing");
+                    return Err(slug_error::slug_error!(
+                        slug_error::ErrorTag::Input,
+                        "Registry file checksum mismatch for {}: expected {}, got missing file",
+                        url,
+                        expected_hash
+                    ));
                 }
             }
             hasher.update([0]);
