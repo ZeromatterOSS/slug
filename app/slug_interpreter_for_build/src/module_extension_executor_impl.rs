@@ -49,10 +49,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
+use slug_bzlmod::AggregatedExtension;
 use slug_bzlmod::ExtensionExecutionOutput;
 use slug_bzlmod::ModuleExtensionExecutorImpl;
 use slug_bzlmod::WorkspaceId;
-use slug_bzlmod::extensions::AggregatedExtension;
 use slug_bzlmod::with_repo_spec_registry;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
@@ -507,9 +507,9 @@ pub fn init_module_extension_executor() {
 
 #[cfg(test)]
 mod tests {
-    use slug_bzlmod::extensions::AggregatedExtension;
-    use slug_bzlmod::types::ExtensionTag;
-    use slug_bzlmod::types::TagValue;
+    use slug_bzlmod::AggregatedExtension;
+    use slug_bzlmod::ExtensionTag;
+    use slug_bzlmod::TagValue;
     use tempfile::TempDir;
 
     use super::*;

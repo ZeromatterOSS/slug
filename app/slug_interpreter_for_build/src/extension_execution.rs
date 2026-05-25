@@ -48,12 +48,12 @@ use std::collections::HashMap;
 
 use allocative::Allocative;
 use derive_more::Display;
-use slug_bzlmod::extensions::AggregatedExtension;
-use slug_bzlmod::extensions::ExtensionResult;
-use slug_bzlmod::extensions::GeneratedRepo;
-use slug_bzlmod::extensions::ModuleInfo;
-use slug_bzlmod::types::ExtensionTag;
-use slug_bzlmod::types::TagValue;
+use slug_bzlmod::AggregatedExtension;
+use slug_bzlmod::ExtensionResult;
+use slug_bzlmod::ExtensionTag;
+use slug_bzlmod::GeneratedRepo;
+use slug_bzlmod::ModuleInfo;
+use slug_bzlmod::TagValue;
 use starlark::values::Heap;
 use starlark::values::Value;
 
@@ -330,7 +330,7 @@ impl ExtensionExecutor {
 
 #[cfg(test)]
 mod tests {
-    use slug_bzlmod::types::TagValue;
+    use slug_bzlmod::TagValue;
 
     use super::*;
 

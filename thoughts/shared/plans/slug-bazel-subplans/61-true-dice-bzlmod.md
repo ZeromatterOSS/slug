@@ -2340,6 +2340,18 @@ What did not work or remains risky:
   `TMPDIR=/var/mnt/dev/.slug-tmp cargo check -p slug_bzlmod -p slug_common -p
   slug_interpreter_for_build -p slug_external_cells`, `cargo fmt --check`, and
   `git diff --check`.
+- Remaining data/helper modules that downstream callers reached directly are
+  private behind explicit crate-root exports: `extensions`, `lockfile`,
+  `parser`, `types`, and `version`. Downstream callers now use
+  `slug_bzlmod::{...}` exports for extension data, recorded-input helpers,
+  lockfile parsing/hashing, parse errors, and module-file data types instead of
+  module-path shortcuts. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo check -p slug_bzlmod -p slug_common -p
+  slug_interpreter_for_build -p slug_external_cells`, `cargo test -p
+  slug_bzlmod recorded -- --nocapture` (`24 passed, 308 filtered out`), `cargo
+  fmt --check`, `git diff --check`, and a scoped search showing no remaining
+  `slug_bzlmod::{lockfile,parser,types,extensions,version}::` downstream
+  references.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.

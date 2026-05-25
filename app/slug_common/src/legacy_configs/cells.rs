@@ -33,10 +33,10 @@ use slug_bzlmod::BzlmodEventKind;
 use slug_bzlmod::ModuleCache;
 use slug_bzlmod::ModuleSource;
 use slug_bzlmod::MvsResolver;
+use slug_bzlmod::ParsedModuleFile;
 use slug_bzlmod::parse_module_bazel;
 use slug_bzlmod::record_bzlmod_event;
 use slug_bzlmod::resolve_local_modules;
-use slug_bzlmod::types::ParsedModuleFile;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::CellResolver;
 use slug_core::cells::alias::NonEmptyCellAlias;
@@ -942,7 +942,7 @@ async fn parse_module_with_tracked_project_includes(
         .unwrap_or_else(|| Path::new(""))
         .to_path_buf();
     let mut session = slug_bzlmod::ModuleFileParseSession::new(module_root.clone());
-    let module_digest = slug_bzlmod::lockfile::compute_sha256_hex(module_content.as_bytes());
+    let module_digest = slug_bzlmod::compute_sha256_hex(module_content.as_bytes());
     let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
     let mut pending = Vec::new();
     push_pending_include_labels(&mut pending, include_labels, Vec::new());
@@ -953,7 +953,7 @@ async fn parse_module_with_tracked_project_includes(
             .canonicalize()
             .unwrap_or_else(|_| include_path.clone());
         if ancestors.contains(&canonical) {
-            return Err(slug_bzlmod::parser::ModuleParseError::IncludeError(format!(
+            return Err(slug_bzlmod::ModuleParseError::IncludeError(format!(
                 "cyclic include of {}",
                 label
             ))
@@ -988,7 +988,7 @@ fn parse_module_with_polled_includes(
         .unwrap_or_else(|| Path::new(""))
         .to_path_buf();
     let mut session = slug_bzlmod::ModuleFileParseSession::new_silent(module_root.clone());
-    let module_digest = slug_bzlmod::lockfile::compute_sha256_hex(module_content.as_bytes());
+    let module_digest = slug_bzlmod::compute_sha256_hex(module_content.as_bytes());
     let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
     let mut pending = Vec::new();
     push_pending_include_labels(&mut pending, include_labels, Vec::new());
@@ -999,7 +999,7 @@ fn parse_module_with_polled_includes(
             .canonicalize()
             .unwrap_or_else(|_| include_path.clone());
         if ancestors.contains(&canonical) {
-            return Err(slug_bzlmod::parser::ModuleParseError::IncludeError(format!(
+            return Err(slug_bzlmod::ModuleParseError::IncludeError(format!(
                 "cyclic include of {}",
                 label
             ))
@@ -1092,7 +1092,7 @@ async fn read_bzlmod_file_for_module_inputs(
         else {
             return Ok((None, BzlmodFileInputTracking::Project));
         };
-        let digest = slug_bzlmod::lockfile::compute_sha256_hex(content.as_bytes());
+        let digest = slug_bzlmod::compute_sha256_hex(content.as_bytes());
         return Ok((Some((content, digest)), BzlmodFileInputTracking::Project));
     }
 
@@ -1169,7 +1169,7 @@ fn read_absolute_text_file_input(
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((None, None)),
         Err(e) => return Err(e.into()),
     };
-    let digest = slug_bzlmod::lockfile::compute_sha256_hex(&bytes);
+    let digest = slug_bzlmod::compute_sha256_hex(&bytes);
     let content = String::from_utf8(bytes).map_err(|e| {
         slug_error::slug_error!(
             slug_error::ErrorTag::Input,
@@ -1183,7 +1183,7 @@ fn read_absolute_text_file_input(
 
 fn absolute_text_file_digest(path: &Path) -> slug_error::Result<Option<String>> {
     match std::fs::read(path) {
-        Ok(bytes) => Ok(Some(slug_bzlmod::lockfile::compute_sha256_hex(&bytes))),
+        Ok(bytes) => Ok(Some(slug_bzlmod::compute_sha256_hex(&bytes))),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e.into()),
     }
@@ -1273,8 +1273,8 @@ impl Key for TrackedLockfileContentKey {
         };
 
         record_bzlmod_event(BzlmodEventKind::LockfileRead, path.display().to_string());
-        let digest = slug_bzlmod::lockfile::compute_sri_hash(content.as_bytes());
-        match slug_bzlmod::lockfile::parse_lockfile_content(&path, &content) {
+        let digest = slug_bzlmod::compute_sri_hash(content.as_bytes());
+        match slug_bzlmod::parse_lockfile_content(&path, &content) {
             Ok(lockfile) => Ok(Arc::new(slug_bzlmod::LockfileContentValue {
                 path,
                 digest: Some(digest),
@@ -1560,7 +1560,7 @@ async fn tracked_extension_bzl_digest_for_project(
 async fn tracked_extension_bzl_digests_for_lockfile_preseed(
     ctx: &mut DiceComputations<'_>,
     project_root: &AbsNormPathBuf,
-    aggregated: &HashMap<String, slug_bzlmod::extensions::AggregatedExtension>,
+    aggregated: &HashMap<String, slug_bzlmod::AggregatedExtension>,
     repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
 ) -> slug_error::Result<HashMap<String, String>> {
     let repo_mappings = Arc::new(repo_mappings.clone());
@@ -1862,7 +1862,7 @@ fn local_overrides_from_root_module(
             active_root_overrides(&parsed.module, ignore_dev_dependency)
                 .iter()
                 .filter_map(|override_| match override_ {
-                    slug_bzlmod::types::Override::LocalPath(local) => {
+                    slug_bzlmod::Override::LocalPath(local) => {
                         Some((local.module_name.clone(), local.path.clone()))
                     }
                     _ => None,
@@ -1873,9 +1873,9 @@ fn local_overrides_from_root_module(
 }
 
 fn active_root_overrides(
-    module: &slug_bzlmod::types::Module,
+    module: &slug_bzlmod::Module,
     ignore_dev_dependency: bool,
-) -> Vec<slug_bzlmod::types::Override> {
+) -> Vec<slug_bzlmod::Override> {
     if !ignore_dev_dependency {
         return module.overrides.clone();
     }
@@ -1890,13 +1890,11 @@ fn active_root_overrides(
         .overrides
         .iter()
         .filter(|override_| match override_ {
-            slug_bzlmod::types::Override::LocalPath(local) => {
+            slug_bzlmod::Override::LocalPath(local) => {
                 !ignored_root_dev_deps.contains(&local.module_name)
             }
-            slug_bzlmod::types::Override::Git(git) => {
-                !ignored_root_dev_deps.contains(&git.module_name)
-            }
-            slug_bzlmod::types::Override::Archive(archive) => {
+            slug_bzlmod::Override::Git(git) => !ignored_root_dev_deps.contains(&git.module_name),
+            slug_bzlmod::Override::Archive(archive) => {
                 !ignored_root_dev_deps.contains(&archive.module_name)
             }
             _ => true,
@@ -1916,7 +1914,7 @@ fn non_registry_override_module_dirs_from_root_module(
     if !active_overrides.iter().any(|override_| {
         matches!(
             override_,
-            slug_bzlmod::types::Override::Git(_) | slug_bzlmod::types::Override::Archive(_)
+            slug_bzlmod::Override::Git(_) | slug_bzlmod::Override::Archive(_)
         )
     }) {
         return Ok(Vec::new());
@@ -1925,10 +1923,10 @@ fn non_registry_override_module_dirs_from_root_module(
     Ok(active_overrides
         .iter()
         .filter_map(|override_| match override_ {
-            slug_bzlmod::types::Override::Git(git) => {
+            slug_bzlmod::Override::Git(git) => {
                 Some((git.module_name.clone(), cache.git_override_dir(git)))
             }
-            slug_bzlmod::types::Override::Archive(archive) => Some((
+            slug_bzlmod::Override::Archive(archive) => Some((
                 archive.module_name.clone(),
                 cache.archive_override_dir(archive),
             )),
@@ -2015,10 +2013,10 @@ async fn local_override_module_inputs_digest(
                     .module
                     .overrides
                     .iter()
-                    .any(|override_| matches!(override_, slug_bzlmod::types::Override::Git(_)));
+                    .any(|override_| matches!(override_, slug_bzlmod::Override::Git(_)));
 
                 for override_ in &parsed.module.overrides {
-                    if let slug_bzlmod::types::Override::LocalPath(local) = override_ {
+                    if let slug_bzlmod::Override::LocalPath(local) = override_ {
                         queue.push_back((
                             local.module_name.clone(),
                             normalized_module_dir.clone(),
@@ -2114,7 +2112,7 @@ fn local_override_inputs_poll_digest(
                 }
 
                 for override_ in &parsed_with_inputs.parsed.module.overrides {
-                    if let slug_bzlmod::types::Override::LocalPath(local) = override_ {
+                    if let slug_bzlmod::Override::LocalPath(local) = override_ {
                         queue.push_back((
                             local.module_name.clone(),
                             normalized_module_dir.clone(),
@@ -2619,7 +2617,7 @@ impl Key for RegistryFileInputsKey {
                 Some(content) => {
                     hasher.update(b"present");
                     hasher.update([0]);
-                    let actual_hash = slug_bzlmod::lockfile::compute_sha256_hex(content.as_bytes());
+                    let actual_hash = slug_bzlmod::compute_sha256_hex(content.as_bytes());
                     if &actual_hash != expected_hash {
                         return Err(slug_error::slug_error!(
                             slug_error::ErrorTag::Input,
@@ -3512,9 +3510,7 @@ impl BuckConfigBasedCells {
             let local_override_names: std::collections::HashSet<_> = active_overrides
                 .iter()
                 .filter_map(|o| match o {
-                    slug_bzlmod::types::Override::LocalPath(local) => {
-                        Some(local.module_name.clone())
-                    }
+                    slug_bzlmod::Override::LocalPath(local) => Some(local.module_name.clone()),
                     _ => None,
                 })
                 .collect();
@@ -3790,7 +3786,7 @@ impl BuckConfigBasedCells {
         };
         let mut module_extensions: std::collections::HashMap<
             String,
-            Vec<slug_bzlmod::types::ExtensionUsage>,
+            Vec<slug_bzlmod::ExtensionUsage>,
         > = std::collections::HashMap::new();
         for (module_name, parsed_mod) in &parsed_modules {
             if !parsed_mod.extension_usages.is_empty() {
@@ -4414,10 +4410,10 @@ mod tests {
 
     use dice::UserComputationData;
     use dice::testing::DiceBuilder;
-    use slug_bzlmod::types::Module;
-    use slug_bzlmod::types::ParsedModuleFile;
-    use slug_bzlmod::types::RegisteredItem;
-    use slug_bzlmod::version::Version;
+    use slug_bzlmod::Module;
+    use slug_bzlmod::ParsedModuleFile;
+    use slug_bzlmod::RegisteredItem;
+    use slug_bzlmod::Version;
     use slug_core::fs::project::ProjectRootTemp;
 
     use super::*;

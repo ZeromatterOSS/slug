@@ -820,7 +820,7 @@ impl RepositoryContext {
     }
 
     fn record_file_input(&self, path: &Path) -> starlark::Result<()> {
-        let recorded = slug_bzlmod::lockfile::recorded_file_input(path).map_err(|e| {
+        let recorded = slug_bzlmod::recorded_file_input(path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
                 "Failed to record repository_ctx.watch input '{}': {}",
@@ -833,7 +833,7 @@ impl RepositoryContext {
     }
 
     fn record_dirtree_input(&self, path: &Path) -> starlark::Result<()> {
-        let recorded = slug_bzlmod::lockfile::recorded_dirtree_input(path).map_err(|e| {
+        let recorded = slug_bzlmod::recorded_dirtree_input(path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
                 "Failed to record repository_ctx.watch_tree input '{}': {}",
@@ -846,10 +846,8 @@ impl RepositoryContext {
     }
 
     fn record_env_input(&self, name: &str) -> starlark::Result<()> {
-        let recorded = slug_bzlmod::lockfile::recorded_env_input(
-            name,
-            self.repo_env.get(name).map(String::as_str),
-        );
+        let recorded =
+            slug_bzlmod::recorded_env_input(name, self.repo_env.get(name).map(String::as_str));
         self.record_input(recorded)
     }
 

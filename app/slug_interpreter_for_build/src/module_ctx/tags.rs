@@ -34,7 +34,7 @@ use starlark::values::starlark_value;
 // ============================================================================
 
 /// Serialized tag value that can be stored in simple Starlark values.
-/// This mirrors slug_bzlmod::types::TagValue but is owned and serializable.
+/// This mirrors slug_bzlmod::TagValue but is owned and serializable.
 #[derive(Debug, Clone, Allocative)]
 pub enum SerializedTagValue {
     String(String),

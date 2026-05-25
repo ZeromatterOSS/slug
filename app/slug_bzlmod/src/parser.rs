@@ -171,7 +171,7 @@ fn module_bazel_globals() -> Globals {
 /// # Example
 ///
 /// ```ignore
-/// use slug_bzlmod::parser::parse_module_bazel_content;
+/// use slug_bzlmod::parse_module_bazel_content;
 ///
 /// let content = r#"
 /// module(
