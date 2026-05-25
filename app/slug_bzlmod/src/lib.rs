@@ -344,8 +344,65 @@ pub trait SetBzlmodProjectionData {
     fn set_bzlmod_projection_data(&mut self, data: BzlmodProjectionData) -> slug_error::Result<()>;
 }
 
+fn validate_projection_workspace(
+    field: &str,
+    cell_graph_workspace_id: &WorkspaceId,
+    data_workspace_id: Option<&WorkspaceId>,
+) -> slug_error::Result<()> {
+    if let Some(data_workspace_id) = data_workspace_id {
+        if data_workspace_id != cell_graph_workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodProjectionData carries {} for project root '{}', \
+                 but its cell graph root is '{}'",
+                field,
+                data_workspace_id.canonical_project_root.display(),
+                cell_graph_workspace_id.canonical_project_root.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
 impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_projection_data(&mut self, data: BzlmodProjectionData) -> slug_error::Result<()> {
+        let cell_graph_workspace_id = &data.cell_graph.workspace_id;
+        validate_projection_workspace(
+            "module-version data",
+            cell_graph_workspace_id,
+            data.module_versions.workspace_id.as_ref(),
+        )?;
+        validate_projection_workspace(
+            "registered-toolchain data",
+            cell_graph_workspace_id,
+            data.registered_toolchains.workspace_id.as_ref(),
+        )?;
+        validate_projection_workspace(
+            "registered-execution-platform data",
+            cell_graph_workspace_id,
+            data.registered_execution_platforms.workspace_id.as_ref(),
+        )?;
+        validate_projection_workspace(
+            "extension-aggregation data",
+            cell_graph_workspace_id,
+            data.extension_aggregations.workspace_id.as_ref(),
+        )?;
+        validate_projection_workspace(
+            "repo-env data",
+            cell_graph_workspace_id,
+            data.repo_env.workspace_id.as_ref(),
+        )?;
+        validate_projection_workspace(
+            "resolution-facts data",
+            cell_graph_workspace_id,
+            data.resolution_facts.workspace_id.as_ref(),
+        )?;
+        validate_projection_workspace(
+            "repo-mapping data",
+            cell_graph_workspace_id,
+            data.repo_mappings.workspace_id.as_ref(),
+        )?;
+
         let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
         let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
             data.cell_graph.workspace_id.clone(),
@@ -463,6 +520,39 @@ mod tests {
             .compute(&ModuleVersionsKey::for_workspace_id(workspace_id))
             .await??;
         assert_eq!(module_versions.invalidation.root_module_name, "root_mod");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_bzlmod_projection_data_rejects_mismatched_workspace_provenance()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-projection-consistency-workspace"),
+            PathBuf::from("/tmp/slug-plan61-projection-consistency-output-base"),
+        );
+        let other_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-projection-consistency-other"),
+            PathBuf::from("/tmp/slug-plan61-projection-consistency-other-output"),
+        );
+        let mut data = BzlmodProjectionData::for_workspace(workspace_id);
+        data.repo_env =
+            BzlmodRepoEnvDataValue::for_workspace(other_workspace_id, Arc::new(BTreeMap::new()));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let err = updater.set_bzlmod_projection_data(data).unwrap_err();
+        assert!(err.to_string().contains("repo-env data"), "{err:?}");
+        assert!(
+            err.to_string().contains(
+                "but its cell graph root is '/tmp/slug-plan61-projection-consistency-workspace'"
+            ),
+            "{err:?}"
+        );
 
         Ok(())
     }

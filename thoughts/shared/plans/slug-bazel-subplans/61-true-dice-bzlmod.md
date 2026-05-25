@@ -2101,6 +2101,14 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_bzlmod semantic_projection -- --nocapture`,
   `cargo test -p slug_bzlmod replay_input_data -- --nocapture`, and
   `cargo check -p slug_bzlmod -p slug_common`.
+- `SetBzlmodProjectionData` now rejects an internally mixed transitional
+  projection payload before fanning it out into DICE. The legacy bridge can no
+  longer publish a cell graph from one workspace with repo-env, repo-mapping,
+  resolution, registration, module-version, or extension-aggregation data from
+  another workspace. Validation passed with `cargo fmt --check`, focused
+  `cargo test -p slug_bzlmod set_bzlmod_projection_data -- --nocapture`,
+  focused `cargo test -p slug_bzlmod data_only_projection -- --nocapture`, and
+  `cargo check -p slug_bzlmod -p slug_common`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
