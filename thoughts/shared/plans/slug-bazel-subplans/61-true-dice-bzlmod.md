@@ -177,13 +177,13 @@ Observed SDK result at the checkpoint:
   known_repo_spec_defers_recorded_input_staleness_to_manifest -- --nocapture`,
   `cargo check -p slug_bzlmod -p slug_external_cells -p slug_server`,
   `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
-- DICE-backed bzlmod resolution now fails if it reaches the legacy resolver
+- The DICE-backed bzlmod projection bridge now fails if it reaches the legacy resolver
   without the tracked root `MODULE.bazel` parse result or tracked visible
   lockfile value, and similarly refuses to direct read a configured hidden
   lockfile when the tracked hidden value was not supplied. This keeps direct
   root module and lockfile fallback limited to non-DICE bootstrap paths.
   Validation passed with focused `cargo test -p slug_common
-  'dice_bzlmod_resolution_requires_tracked' -- --nocapture`,
+  'bzlmod_projection_bridge_requires_tracked' -- --nocapture`,
   `cargo check -p slug_common -p slug_server`, `cargo build -p slug`, and
   focused Plan 61 Python guardrails
   `visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only` plus
@@ -540,6 +540,14 @@ Observed SDK result at the checkpoint:
   --nocapture`, focused `cargo test -p slug_bzlmod projection --
   --nocapture`, `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
   touched-file `rustfmt --edition 2024`, and `git diff --check`.
+- Config parsing helpers and direct guardrail tests now use transitional
+  projection-bridge naming, and bridge guardrail
+  errors say they protect the projection bridge rather than a finished DICE
+  resolution graph. This is a naming/API cleanup only; the wrapped legacy
+  resolver remains the structural blocker. Validation passed with focused
+  `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`,
+  `cargo check -p slug_common -p slug_server`, touched-file
+  `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -1819,7 +1827,7 @@ Observed SDK result at the checkpoint:
   the same `WorkspaceId` used by the projection bridge key, rather than
   falling back to `<project>/buck-out/v2` after DICE reports no root module.
   Validation passed with focused `cargo test -p slug_common
-  persisted_empty_bzlmod_session_preserves_explicit_output_base --
+  persisted_empty_bzlmod_projection_preserves_explicit_output_base --
   --nocapture`, `cargo check -p slug_common -p slug_server`, `cargo build -p
   slug`, `cargo fmt --check`, and `git diff --check`.
 - `BzlmodSessionData::empty_for_project_root` is now test-only. The remaining

@@ -2678,7 +2678,7 @@ impl BuckConfigBasedCells {
         .buck_error_context("Parsing cells")
     }
 
-    pub async fn parse_with_config_args_and_dice_bzlmod_resolution(
+    pub async fn parse_with_config_args_and_bzlmod_projection_bridge(
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
         dice_ctx: &mut DiceComputations<'_>,
@@ -2702,7 +2702,7 @@ impl BuckConfigBasedCells {
         .buck_error_context("Parsing cells")
     }
 
-    pub async fn parse_with_config_args_and_persisted_dice_bzlmod_resolution(
+    pub async fn parse_with_config_args_and_persisted_bzlmod_projection_bridge(
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
         updater: &mut DiceTransactionUpdater,
@@ -2922,7 +2922,7 @@ impl BuckConfigBasedCells {
         project_fs: Option<&ProjectRoot>,
         root_module_file: Option<Arc<slug_bzlmod::RootModuleFileValue>>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
-        dice_bzlmod_resolution: Option<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>,
+        bzlmod_projection_bridge: Option<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>,
         empty_workspace_id: Option<slug_bzlmod::WorkspaceId>,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
@@ -2961,24 +2961,25 @@ impl BuckConfigBasedCells {
         // The root cell name is derived from module(name = "...") in MODULE.bazel.
         // .buckconfig [cells], [cell_aliases], and [external_cells] sections are skipped.
         let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
-        if let Some(projection_data) = if let Some(dice_bzlmod_resolution) = dice_bzlmod_resolution
+        if let Some(projection_data) =
+            if let Some(bzlmod_projection_bridge) = bzlmod_projection_bridge {
+                bzlmod_projection_bridge.as_ref().clone()
+            } else if let Some(project_fs) = project_fs {
+                let options = BzlmodResolutionOptions::from_config(&root_config)?;
+                Self::resolve_bzlmod_dependencies_with_options(
+                    project_fs,
+                    &options,
+                    Some(empty_workspace_id.clone()),
+                    root_module_file.as_deref(),
+                    visible_lockfile.clone(),
+                    None,
+                    None,
+                )
+                .await?
+            } else {
+                None
+            }
         {
-            dice_bzlmod_resolution.as_ref().clone()
-        } else if let Some(project_fs) = project_fs {
-            let options = BzlmodResolutionOptions::from_config(&root_config)?;
-            Self::resolve_bzlmod_dependencies_with_options(
-                project_fs,
-                &options,
-                Some(empty_workspace_id.clone()),
-                root_module_file.as_deref(),
-                visible_lockfile.clone(),
-                None,
-                None,
-            )
-            .await?
-        } else {
-            None
-        } {
             let runtime_cell_snapshot = runtime_cell_install_snapshot(&projection_data.cell_graph);
             if let Some(project_fs) = project_fs {
                 replay_bzlmod_runtime_state(&projection_data.cell_graph, project_fs);
@@ -3200,7 +3201,7 @@ impl BuckConfigBasedCells {
             if using_dice_inputs {
                 return Err(slug_error::slug_error!(
                     slug_error::ErrorTag::Input,
-                    "DICE bzlmod resolution requires tracked root MODULE.bazel input"
+                    "DICE bzlmod projection bridge requires tracked root MODULE.bazel input"
                 ));
             }
             // Check if MODULE.bazel exists. This direct fallback remains for
@@ -3261,7 +3262,7 @@ impl BuckConfigBasedCells {
         } else if using_dice_inputs {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
-                "DICE bzlmod resolution requires tracked visible lockfile input"
+                "DICE bzlmod projection bridge requires tracked visible lockfile input"
             ));
         } else {
             slug_bzlmod::read_lockfile_with_mode(
@@ -3276,7 +3277,7 @@ impl BuckConfigBasedCells {
         } else if using_dice_inputs && options.hidden_lockfile_path.is_some() {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
-                "DICE bzlmod resolution requires tracked hidden lockfile input"
+                "DICE bzlmod projection bridge requires tracked hidden lockfile input"
             ));
         } else if let Some(hidden_lockfile_path) = options.hidden_lockfile_path.as_ref() {
             slug_bzlmod::read_hidden_lockfile_path(hidden_lockfile_path)?
@@ -4628,7 +4629,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dice_bzlmod_resolution_requires_tracked_visible_lockfile() -> slug_error::Result<()> {
+    async fn bzlmod_projection_bridge_requires_tracked_visible_lockfile() -> slug_error::Result<()>
+    {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
         let mut dice = DiceBuilder::new()
@@ -4675,13 +4677,13 @@ mod tests {
 
         assert!(
             err.to_string()
-                .contains("DICE bzlmod resolution requires tracked visible lockfile input")
+                .contains("DICE bzlmod projection bridge requires tracked visible lockfile input")
         );
         Ok(())
     }
 
     #[tokio::test]
-    async fn dice_bzlmod_resolution_requires_tracked_root_module() -> slug_error::Result<()> {
+    async fn bzlmod_projection_bridge_requires_tracked_root_module() -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
         let project_root = fs.path().root().to_path_buf();
@@ -4720,7 +4722,7 @@ mod tests {
 
         assert!(
             err.to_string()
-                .contains("DICE bzlmod resolution requires tracked root MODULE.bazel input")
+                .contains("DICE bzlmod projection bridge requires tracked root MODULE.bazel input")
         );
         Ok(())
     }
@@ -4744,7 +4746,7 @@ mod tests {
         let config_args = [slug_cli_proto::ConfigOverride::flag_no_cell("cells.root=.")];
 
         let configs =
-            BuckConfigBasedCells::parse_with_config_args_and_persisted_dice_bzlmod_resolution(
+            BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_projection_bridge(
                 fs.path(),
                 &config_args,
                 &mut updater,
@@ -4763,7 +4765,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn direct_bzlmod_resolution_preserves_explicit_output_base() -> slug_error::Result<()> {
+    async fn direct_bzlmod_projection_preserves_explicit_output_base() -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
         let output_base = fs
