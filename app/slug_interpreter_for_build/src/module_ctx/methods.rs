@@ -628,7 +628,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         eval: &mut starlark::eval::Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let metadata = slug_bzlmod::module_extension_executor::ModuleExtensionMetadata {
+        let metadata = slug_bzlmod::ModuleExtensionMetadata {
             facts: validate_facts_value(facts)?,
         };
         Ok(eval

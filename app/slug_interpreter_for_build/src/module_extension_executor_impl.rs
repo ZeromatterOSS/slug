@@ -323,10 +323,9 @@ impl ConcreteModuleExtensionExecutor {
                 match invoke_result {
                     Ok(return_value) => {
                         if return_value.is_none() {
-                            return Ok::<
-                                slug_bzlmod::module_extension_executor::ModuleExtensionMetadata,
-                                slug_error::Error,
-                            >(Default::default());
+                            return Ok::<slug_bzlmod::ModuleExtensionMetadata, slug_error::Error>(
+                                Default::default(),
+                            );
                         }
 
                         let Some(metadata) =

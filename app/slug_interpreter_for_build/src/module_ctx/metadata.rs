@@ -121,15 +121,15 @@ fn facts_methods(builder: &mut MethodsBuilder) {
 #[display("<module_extension_metadata>")]
 pub struct StarlarkModuleExtensionMetadata {
     #[allocative(skip)]
-    metadata: slug_bzlmod::module_extension_executor::ModuleExtensionMetadata,
+    metadata: slug_bzlmod::ModuleExtensionMetadata,
 }
 
 impl StarlarkModuleExtensionMetadata {
-    pub fn new(metadata: slug_bzlmod::module_extension_executor::ModuleExtensionMetadata) -> Self {
+    pub fn new(metadata: slug_bzlmod::ModuleExtensionMetadata) -> Self {
         Self { metadata }
     }
 
-    pub fn metadata(&self) -> &slug_bzlmod::module_extension_executor::ModuleExtensionMetadata {
+    pub fn metadata(&self) -> &slug_bzlmod::ModuleExtensionMetadata {
         &self.metadata
     }
 }

@@ -2331,6 +2331,15 @@ What did not work or remains risky:
   slug_external_cells`, `cargo test -p slug_bzlmod build_canonical_names --
   --nocapture` (`1 passed, 331 filtered out`), `cargo fmt --check`, and `git
   diff --check`.
+- Additional extension/repository implementation modules are private behind
+  explicit crate-root exports: `module_extension_executor`, `repo_spec`,
+  `spoke_materialization`, and `starlark_repo_rule_executor`. Downstream
+  extension-interpreter code now uses `slug_bzlmod::ModuleExtensionMetadata`
+  directly, and a scoped search found no remaining downstream references to
+  those module paths. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp cargo check -p slug_bzlmod -p slug_common -p
+  slug_interpreter_for_build -p slug_external_cells`, `cargo fmt --check`, and
+  `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
