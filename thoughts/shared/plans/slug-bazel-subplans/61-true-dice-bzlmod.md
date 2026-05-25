@@ -643,13 +643,16 @@ Observed SDK result at the checkpoint:
   the deletion subset selected by `-k 'project_local_override_module_deletion
   or out_of_project_local_override_module_deletion'` passed earlier (`2 passed,
   107 deselected`).
-- Locked registry `source.json` metadata now has focused parse-error and
-  invalid UTF-8 failure-transition guardrails: after a warm same-daemon
-  registry module resolution, corrupt cached source metadata with matching
-  lockfile hashes fails the next `audit cell`, then repair introduces a new
-  registry dependency instead of reusing the warm value. Validation passed with
-  the focused subset selected by `-k 'locked_registry_source_json_parse_failure
-  or locked_registry_source_json_utf8_failure'` (`2 passed, 108 deselected`).
+- Locked registry `source.json` metadata now has focused parse-error, invalid
+  UTF-8, and deletion failure-transition guardrails: after a warm same-daemon
+  registry module resolution, corrupting or deleting cached source metadata
+  with matching lockfile hashes fails the next `audit cell`, then repair
+  introduces a new registry dependency instead of reusing the warm value.
+  Validation passed with the focused parse/UTF-8 subset selected by `-k
+  'locked_registry_source_json_parse_failure or
+  locked_registry_source_json_utf8_failure'` (`2 passed, 108 deselected`) and
+  the deletion guardrail selected by `-k 'locked_registry_source_json_delete'`
+  (`1 passed, 120 deselected`).
 - Locked registry `MODULE.bazel` files now have focused parse-error, invalid
   UTF-8, and deletion failure-transition guardrails: after a warm same-daemon
   registry module resolution, corrupting or deleting cached module metadata
@@ -2596,9 +2599,9 @@ using Rust DICE keys and values:
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are polled into key identity while the final
      watched-input graph is still pending. Locked registry `source.json`
-     checksum and parse-failure transitions now have same-daemon guardrails,
-     and locked registry `MODULE.bazel` parse/UTF-8 failure transitions have
-     same-daemon guardrails.
+     checksum, parse/UTF-8 failure, and deletion transitions now have
+     same-daemon guardrails, and locked registry `MODULE.bazel` parse/UTF-8
+     failure and deletion transitions have same-daemon guardrails.
    - Cached `git_override` and `archive_override` `MODULE.bazel` files now both
      have same-daemon warm-reuse, edit-invalidation, and create/delete
      transition guardrails. Both cached override source classes also have
