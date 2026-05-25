@@ -624,6 +624,22 @@ Observed SDK result at the checkpoint:
   cached_git_override_module_edit_invalidates_bzlmod_resolution or
   cached_archive_override_module_edit_invalidates_bzlmod_resolution'`,
   touched-file `rustfmt --edition 2024`, and `git diff --check`.
+- Registry lockfile-hash file poll identity now comes from the named
+  `RegistryFileInputsPollKey` instead of direct polling during
+  projection-bridge key assembly. Project-root cache files stay
+  `project-tracked` in the poll key and rely on `RegistryFileInputsKey`'s
+  DICE file dependencies; out-of-project cache paths remain explicitly polled
+  child inputs and transaction-invalid until the watched-filesystem API is
+  available. Validation passed with focused `cargo test -p slug_common
+  registry_file_inputs_poll_digest -- --nocapture`, focused `cargo test -p
+  slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
+  slug_common -p slug_server`, `cargo build -p slug`, selected `pytest
+  tests/core/bzlmod/test_plan61_guardrails.py -k
+  'warm_noop_locked_registry_dep_reuses_bzlmod_resolution or
+  locked_registry_source_json_and_registry_metadata_are_bridge_inputs or
+  locked_registry_metadata_delete_invalidates_bzlmod_resolution or
+  locked_registry_source_json_parse_failure_invalidates_bzlmod_resolution'`,
+  touched-file `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -2828,8 +2844,10 @@ using Rust DICE keys and values:
      shape to every non-root module source.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
-     out-of-root cache paths are polled into key identity while the final
-     watched-input graph is still pending. Locked registry `source.json`
+     out-of-root cache paths are read through the named
+     `RegistryFileInputsPollKey` and still polled into higher-level key
+     identity while the final watched-input graph is still pending. Locked
+     registry `source.json`
      checksum, parse/UTF-8 failure, and deletion transitions now have
      same-daemon guardrails, locked registry `MODULE.bazel` parse/UTF-8
      failure and deletion transitions have same-daemon guardrails, and locked

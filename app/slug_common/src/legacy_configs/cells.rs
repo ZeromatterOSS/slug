@@ -1770,7 +1770,7 @@ struct NonRegistryOverrideModuleInputsPollKey {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-struct ModuleInputsPollValue {
+struct BzlmodInputsPollValue {
     digest: String,
     has_polled_inputs: bool,
 }
@@ -1788,6 +1788,13 @@ struct RegistryFileInputsKey {
     project_root: AbsNormPathBuf,
     registry_file_hashes: Vec<(String, String)>,
     poll_digest: String,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("RegistryFileInputsPollKey({})", project_root.display())]
+struct RegistryFileInputsPollKey {
+    project_root: AbsNormPathBuf,
+    registry_file_hashes: Vec<(String, String)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -2017,7 +2024,7 @@ fn local_override_inputs_poll_digest(
     project_fs: &ProjectRoot,
     project_root: &AbsNormPathBuf,
     overrides: &[(String, String)],
-) -> slug_error::Result<ModuleInputsPollValue> {
+) -> slug_error::Result<BzlmodInputsPollValue> {
     let mut hasher = Sha256::new();
     hasher.update(b"local-override-module-inputs-poll-v1");
     hasher.update([0]);
@@ -2100,7 +2107,7 @@ fn local_override_inputs_poll_digest(
         }
     }
 
-    Ok(ModuleInputsPollValue {
+    Ok(BzlmodInputsPollValue {
         digest: hex::encode(hasher.finalize()),
         has_polled_inputs,
     })
@@ -2171,7 +2178,7 @@ async fn non_registry_override_module_inputs_digest(
 fn non_registry_override_inputs_poll_digest(
     project_fs: &ProjectRoot,
     overrides: &[(String, PathBuf)],
-) -> slug_error::Result<ModuleInputsPollValue> {
+) -> slug_error::Result<BzlmodInputsPollValue> {
     let mut hasher = Sha256::new();
     hasher.update(b"non-registry-override-module-inputs-poll-v1");
     hasher.update([0]);
@@ -2229,7 +2236,7 @@ fn non_registry_override_inputs_poll_digest(
         hasher.update([0]);
     }
 
-    Ok(ModuleInputsPollValue {
+    Ok(BzlmodInputsPollValue {
         digest: hex::encode(hasher.finalize()),
         has_polled_inputs,
     })
@@ -2447,7 +2454,7 @@ fn normalize_path_lexically(path: PathBuf) -> PathBuf {
 
 #[async_trait]
 impl Key for LocalOverrideModuleInputsPollKey {
-    type Value = slug_error::Result<Arc<ModuleInputsPollValue>>;
+    type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
 
     async fn compute(
         &self,
@@ -2476,7 +2483,7 @@ impl Key for LocalOverrideModuleInputsPollKey {
 
 #[async_trait]
 impl Key for NonRegistryOverrideModuleInputsPollKey {
-    type Value = slug_error::Result<Arc<ModuleInputsPollValue>>;
+    type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
 
     async fn compute(
         &self,
@@ -2485,6 +2492,34 @@ impl Key for NonRegistryOverrideModuleInputsPollKey {
     ) -> Self::Value {
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
         non_registry_override_inputs_poll_digest(&project_fs, &self.overrides).map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_polled_inputs,
+            Err(_) => false,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for RegistryFileInputsPollKey {
+    type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
+        registry_file_inputs_poll_digest(&project_fs, &self.registry_file_hashes).map(Arc::new)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2581,12 +2616,22 @@ fn cached_registry_file_path(cache: &ModuleCache, url: &str) -> Option<PathBuf> 
 }
 
 fn registry_file_inputs_poll_digest(
+    project_fs: &ProjectRoot,
     registry_file_hashes: &[(String, String)],
-) -> slug_error::Result<String> {
+) -> slug_error::Result<BzlmodInputsPollValue> {
     let cache = ModuleCache::new()?;
+    registry_file_inputs_poll_digest_for_cache(project_fs, &cache, registry_file_hashes)
+}
+
+fn registry_file_inputs_poll_digest_for_cache(
+    project_fs: &ProjectRoot,
+    cache: &ModuleCache,
+    registry_file_hashes: &[(String, String)],
+) -> slug_error::Result<BzlmodInputsPollValue> {
     let mut hasher = Sha256::new();
     hasher.update(b"registry-file-inputs-poll-v1");
     hasher.update([0]);
+    let mut has_polled_inputs = false;
 
     for (url, expected_hash) in registry_file_hashes {
         let Some(path) = cached_registry_file_path(&cache, url) else {
@@ -2599,6 +2644,12 @@ fn registry_file_inputs_poll_digest(
         hasher.update([0]);
         hasher.update(path.to_string_lossy().as_bytes());
         hasher.update([0]);
+        if project_relative_path_for_abs_path(project_fs, &path).is_some() {
+            hasher.update(b"project-tracked");
+            hasher.update([0]);
+            continue;
+        }
+        has_polled_inputs = true;
         match absolute_text_file_digest(&path)? {
             Some(digest) => {
                 hasher.update(b"present");
@@ -2610,7 +2661,10 @@ fn registry_file_inputs_poll_digest(
         hasher.update([0]);
     }
 
-    Ok(hex::encode(hasher.finalize()))
+    Ok(BzlmodInputsPollValue {
+        digest: hex::encode(hasher.finalize()),
+        has_polled_inputs,
+    })
 }
 
 #[async_trait]
@@ -2948,12 +3002,18 @@ impl BuckConfigBasedCells {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        let registry_file_poll_digest = registry_file_inputs_poll_digest(&registry_file_hashes)?;
+        let registry_file_poll = dice_ctx
+            .compute(&RegistryFileInputsPollKey {
+                project_root: project_root.clone(),
+                registry_file_hashes: registry_file_hashes.clone(),
+            })
+            .await?
+            .buck_error_context("Computing registry file poll identity for bzlmod resolution")?;
         let registry_file_inputs = dice_ctx
             .compute(&RegistryFileInputsKey {
                 project_root: project_root.clone(),
                 registry_file_hashes,
-                poll_digest: registry_file_poll_digest,
+                poll_digest: registry_file_poll.digest.clone(),
             })
             .await?
             .buck_error_context("Computing registry file inputs for bzlmod resolution bridge")?;
@@ -4826,6 +4886,62 @@ mod tests {
         .unwrap();
         let mut dice = dice.into_updater().commit().await;
         let second = dice.compute(&key).await??;
+
+        assert!(second.has_polled_inputs);
+        assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[test]
+    fn registry_file_inputs_poll_digest_marks_project_cache_tracked() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let cache = ModuleCache::with_base_dir(fs.path().root().as_path().join("cache"))?;
+        let registry_url = "https://bcr.bazel.build/bazel_registry.json".to_owned();
+        let registry_path = cache
+            .registry_dir("https://bcr.bazel.build")
+            .join("bazel_registry.json");
+        std::fs::create_dir_all(registry_path.parent().unwrap()).unwrap();
+        std::fs::write(&registry_path, "{}\n").unwrap();
+        let registry_hash = slug_bzlmod::compute_sha256_hex("{}\n".as_bytes());
+        let registry_file_hashes = vec![(registry_url, registry_hash)];
+
+        let first =
+            registry_file_inputs_poll_digest_for_cache(fs.path(), &cache, &registry_file_hashes)?;
+        assert!(!first.has_polled_inputs);
+
+        std::fs::write(&registry_path, "{\"mirrors\": []}\n").unwrap();
+        let second =
+            registry_file_inputs_poll_digest_for_cache(fs.path(), &cache, &registry_file_hashes)?;
+
+        assert!(!second.has_polled_inputs);
+        assert_eq!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[test]
+    fn registry_file_inputs_poll_digest_repolls_out_of_project_cache() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-registry-cache-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let cache = ModuleCache::with_base_dir(external.path().join("cache"))?;
+        let registry_url = "https://bcr.bazel.build/bazel_registry.json".to_owned();
+        let registry_path = cache
+            .registry_dir("https://bcr.bazel.build")
+            .join("bazel_registry.json");
+        std::fs::create_dir_all(registry_path.parent().unwrap()).unwrap();
+        std::fs::write(&registry_path, "{}\n").unwrap();
+        let registry_hash = slug_bzlmod::compute_sha256_hex("{}\n".as_bytes());
+        let registry_file_hashes = vec![(registry_url, registry_hash)];
+
+        let first =
+            registry_file_inputs_poll_digest_for_cache(fs.path(), &cache, &registry_file_hashes)?;
+        assert!(first.has_polled_inputs);
+
+        std::fs::write(&registry_path, "{\"mirrors\": []}\n").unwrap();
+        let second =
+            registry_file_inputs_poll_digest_for_cache(fs.path(), &cache, &registry_file_hashes)?;
 
         assert!(second.has_polled_inputs);
         assert_ne!(first.digest, second.digest);
