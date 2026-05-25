@@ -2302,11 +2302,18 @@ Observed SDK result at the checkpoint:
   `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper in both
   target-setting preprocessing and `config_setting(flag_values = ...)` matching.
   Runtime-snapshot misses stay authoritative and do not fall back to stale
-  process-global aliases. Validation passed with `cargo test -p slug_core
-  build_setting_labels -- --nocapture`, `cargo test -p slug_analysis
+  process-global aliases. A clean-review follow-up found that already-canonical
+  `@@owner++extension+repo` build-setting labels could keep the `@@` sigil when
+  the runtime snapshot owned that repo; canonical-sigil stripping now runs even
+  when no repo rewrite is needed, and the runtime-miss guardrail now proves the
+  label stays on the unresolved repo rather than a stale global alias.
+  Earlier validation passed with `cargo test -p slug_analysis
   build_setting_lookup_normalization -- --nocapture`, `cargo check -p
   slug_core -p slug_interpreter_for_build -p slug_analysis`, `cargo fmt
-  --check`, and `git diff --check`.
+  --check`, and `git diff --check`; the clean-review follow-up passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-build-setting
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-build-setting-target
+  cargo test -p slug_core build_setting_labels -- --nocapture`.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the

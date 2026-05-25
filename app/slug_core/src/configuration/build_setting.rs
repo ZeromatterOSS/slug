@@ -92,12 +92,15 @@ impl BuildSettingLabel {
             .map(|rest| ("@@", rest))
             .or_else(|| canon.strip_prefix('@').map(|rest| ("@", rest)))
             && let Some((repo, package_and_target)) = rest.split_once("//")
-            && let Some(canonical) = resolve_bzlmod_build_setting_repo(repo, cell_alias_resolver)
         {
             // Bazel's `@@` marks a canonical repo in label syntax; Slug's
             // internal cell name is the repo name without that sigil.
             let slug_prefix = if prefix == "@@" { "@" } else { prefix };
-            canon = format!("{slug_prefix}{canonical}//{package_and_target}");
+            let canonical = resolve_bzlmod_build_setting_repo(repo, cell_alias_resolver)
+                .unwrap_or_else(|| repo.to_owned());
+            if canonical != repo || prefix == "@@" {
+                canon = format!("{slug_prefix}{canonical}//{package_and_target}");
+            }
         }
 
         let target = TargetLabel::testing_parse(&canon);
@@ -120,10 +123,12 @@ fn resolve_bzlmod_build_setting_repo(
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     use super::BuildSettingLabel;
     use crate::cells::BzlmodRuntimeCellInstallSnapshot;
     use crate::cells::BzlmodRuntimeDynamicAlias;
+    use crate::cells::BzlmodRuntimeExtensionCell;
     use crate::cells::CellAliasResolver;
     use crate::cells::name::CellName;
 
@@ -214,13 +219,61 @@ mod tests {
             Some(&resolver),
         )?;
 
-        let unresolved_canonical_repo = format!("@@{apparent}");
-        assert_eq!(
-            label.target().pkg().cell_name().as_str(),
-            unresolved_canonical_repo.as_str()
-        );
+        assert_eq!(label.target().pkg().cell_name().as_str(), apparent);
         assert_eq!(
             crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn build_setting_labels_strip_canonical_sigil_for_runtime_owned_repo() -> slug_error::Result<()>
+    {
+        let _guard = crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK
+            .lock()
+            .unwrap();
+        let tmp = tempfile::tempdir()?;
+        crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let canonical = "plan61_owner++settings+canonical";
+        let wrong_global = "plan61_wrong_owner++settings+canonical";
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@plan61_owner//:settings.bzl%settings"),
+            internal_name: Arc::from("canonical"),
+            spec_hash: Arc::from("sha256-plan61-build-setting-canonical"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "canonical".to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                setup,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: Vec::new(),
+        };
+        crate::cells::register_dynamic_extension_cell_alias(
+            canonical.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        let label = BuildSettingLabel::from_bazel_label_with_alias_resolver(
+            &format!("@@{canonical}//pkg:flag"),
+            Some(&resolver),
+        )?;
+
+        assert_eq!(label.target().pkg().cell_name().as_str(), canonical);
+        assert_eq!(
+            crate::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref(),
             Some(wrong_global)
         );
         Ok(())
