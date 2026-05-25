@@ -468,10 +468,10 @@ Observed SDK result at the checkpoint:
   yanked-version facts, and repo mappings, so warm no-op builds can still reuse
   DICE state without losing hidden-lockfile/facts invalidation.
 - The monolithic injected `BzlmodSessionDataKey` was removed after the
-  module-version split left it with no live consumers. `BzlmodSessionData`
-  remains as the legacy resolver payload for populating the narrower injected
-  DICE values, but the DICE graph no longer exposes that payload as a direct
-  computed dependency.
+  module-version split left it with no live consumers. At that checkpoint,
+  `BzlmodSessionData` remained only as the legacy resolver payload for
+  populating the narrower injected DICE values, and the DICE graph no longer
+  exposed that payload as a direct computed dependency.
 - `BuckConfigBasedCells` no longer stores `BzlmodSessionData` or carries it
   through server config state. The persisted config-load path injects the
   narrower bzlmod DICE projections immediately after successful cell parsing,
@@ -484,10 +484,10 @@ Observed SDK result at the checkpoint:
   projection API in place until the resolved graph is
   produced directly by DICE keys.
 - The transitional DICE injection API now accepts `BzlmodProjectionData`
-  instead of `BzlmodSessionData`. The legacy resolver still returns
-  `BzlmodSessionData`, but the persisted config-load path converts it before
-  touching DICE, and test/bootstrap helpers now seed only the projection
-  payload. Validation passed with focused `cargo test -p slug_bzlmod
+  instead of `BzlmodSessionData`. At that checkpoint, the legacy resolver
+  still returned `BzlmodSessionData`, but the persisted config-load path
+  converted it before touching DICE, and test/bootstrap helpers seeded only
+  the projection payload. Validation passed with focused `cargo test -p slug_bzlmod
   set_bzlmod_projection_data -- --nocapture`, focused `cargo test -p
   slug_common explicit_output_base -- --nocapture`, affected-crate `cargo
   check -p slug_bzlmod -p slug_common -p slug_interpreter_for_build -p
@@ -496,13 +496,27 @@ Observed SDK result at the checkpoint:
   process remained after post-run cleanup.
 - `LegacyBzlmodResolutionDiceKey` now returns the narrower
   `BzlmodProjectionData` payload instead of caching `BzlmodSessionData` as its
-  DICE value. The wrapped resolver still builds the legacy session internally,
-  then converts it at the key boundary, so this is a demotion of the bridge
-  payload rather than the final Skyframe-shaped resolver rewrite. Validation
+  DICE value. The wrapped resolver still populated a legacy session-shaped
+  structure internally at this checkpoint, then converted it at the key
+  boundary, so this is a demotion of the bridge payload rather than the final
+  Skyframe-shaped resolver rewrite. Validation
   passed with focused `cargo test -p slug_common explicit_output_base --
   --nocapture`, `cargo check -p slug_common -p slug_server`, `cargo build -p
   slug`, and the full Plan 61 Python guardrail file (`125 passed in 162.30s`).
   No stale `slugd` process remained after post-run cleanup.
+- The `BzlmodSessionData` type was removed entirely. The legacy resolver now
+  constructs the transitional `BzlmodProjectionData` payload directly, and
+  `app`/`tests` have no remaining `BzlmodSessionData` or
+  `set_bzlmod_session_data` references. This removes another named
+  session-shaped API without changing the remaining structural blocker: the
+  projection payload is still assembled by the legacy resolver until narrower
+  module/source/graph DICE keys own those facts. Validation passed with focused
+  `cargo test -p slug_bzlmod set_bzlmod_projection_data -- --nocapture`,
+  focused `cargo test -p slug_common explicit_output_base -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_common -p slug_server`, `cargo build -p
+  slug`, touched-file `rustfmt --edition 2024 --check`, `git diff --check`,
+  and the full Plan 61 Python guardrail file (`125 passed in 139.29s`). No
+  stale `slugd[...]` process remained after post-run cleanup.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -1853,14 +1867,12 @@ What did not work or remains risky:
   now read narrower injected DICE values. The named cell graph now owns
   workspace identity for those projections rather than duplicating it in each
   injected payload. The module-version value still carries a conservative
-  session invalidation identity until the remaining
-  interpreter/materialization inputs are explicit, and `BzlmodSessionData`
-  still exists as the legacy resolver's internal payload even though it is no
-  longer an injected DICE key, no longer sits behind a separate
-  `BzlmodResolutionResult` wrapper, and no longer crosses the
-  `LegacyBzlmodResolutionDiceKey` value boundary. The session payload now
-  carries the current workspace identity inside its named cell graph, while
-  module-version
+  projection invalidation identity until the remaining
+  interpreter/materialization inputs are explicit. `BzlmodSessionData` and
+  `BzlmodSessionDataKey` have been removed, but `BzlmodProjectionData` remains
+  a transitional legacy-produced payload rather than a set of true
+  Skyframe-shaped DICE producers. The projection payload now carries the
+  current workspace identity inside its named cell graph, while module-version
   data, resolution facts, registrations, repo-env, lockfile-input,
   repo-mapping, and extension-aggregation data also carry source workspace
   provenance so stale cross-workspace projection data cannot be paired with
@@ -2911,15 +2923,16 @@ using Rust DICE keys and values:
    - Prove apparent aliases do not leak across module scopes.
 
 9. Delete transitional APIs.
-   - Remove `BzlmodSessionData` fields as the authority for graph semantics.
-     `BuckConfigBasedCells` no longer stores the payload or returns it to the
-     server updater, but the legacy resolver still builds a `BzlmodSessionData`
-     value before converting it to `BzlmodProjectionData` for the narrower
-     injected projections.
-   - `BzlmodSessionData::default()` is removed; remaining empty session
-     construction must explicitly name the project-root sentinel while the
-     session bridge is still being unwound. The generic project-root empty
-     session helper is test-only, and the no-project sentinel is named.
+   - `BzlmodSessionData` and `BzlmodSessionDataKey` are removed, and
+     `BuckConfigBasedCells` no longer stores a bzlmod payload or returns it to
+     the server updater. `BzlmodProjectionData` remains as a transitional
+     bridge payload assembled by the legacy resolver; delete that projection
+     API only after module graph, repo mapping, lockfile, repo-env,
+     registration, and cell-graph facts have true DICE producers.
+   - Generic empty session construction is removed from production paths.
+     Remaining empty projection construction must explicitly carry workspace
+     identity while the projection bridge is still being unwound. The
+     no-project sentinel is named.
    - Extension repository execution constructors that derive workspace identity
      from project root are test-only; production code must pass explicit
      workspace identity and repo-env. Bzlmod projection-key and

@@ -56,7 +56,7 @@ thread_local! {
 
     /// Workspace identity paired with `EXTENSION_DICE_PTR`. Synchronous
     /// spoke materialization uses it to construct DICE keys without reading
-    /// injected bzlmod session data in the materialization bridge itself.
+    /// injected bzlmod projection data in the materialization bridge itself.
     static EXTENSION_WORKSPACE_ID: RefCell<Option<crate::WorkspaceId>> = RefCell::new(None);
 }
 

@@ -3180,7 +3180,7 @@ impl BuckConfigBasedCells {
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         mut dice_ctx: Option<&mut DiceComputations<'_>>,
-    ) -> slug_error::Result<Option<slug_bzlmod::BzlmodSessionData>> {
+    ) -> slug_error::Result<Option<slug_bzlmod::BzlmodProjectionData>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
         let using_dice_inputs = dice_ctx.is_some();
@@ -3243,9 +3243,10 @@ impl BuckConfigBasedCells {
                 workspace_root.join("buck-out/v2"),
             )
         });
-        let mut bzlmod_session_data = slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id);
-        bzlmod_session_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
-            bzlmod_session_data.cell_graph.workspace_id.clone(),
+        let mut bzlmod_projection_data =
+            slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id);
+        bzlmod_projection_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
+            bzlmod_projection_data.cell_graph.workspace_id.clone(),
             Arc::new(options.repo_env.clone()),
         );
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
@@ -3382,9 +3383,9 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
-            bzlmod_session_data.resolution_facts =
+            bzlmod_projection_data.resolution_facts =
                 slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    bzlmod_projection_data.cell_graph.workspace_id.clone(),
                     resolved_graph.registry_file_hashes.clone(),
                     resolved_graph.selected_yanked_versions.clone(),
                 );
@@ -3594,9 +3595,9 @@ impl BuckConfigBasedCells {
             for (name, info) in &resolved_graph.modules {
                 version_map.insert(name.clone(), info.version.clone());
             }
-            bzlmod_session_data.module_versions =
+            bzlmod_projection_data.module_versions =
                 slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
-                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    bzlmod_projection_data.cell_graph.workspace_id.clone(),
                     Arc::new(version_map),
                 );
         }
@@ -3738,7 +3739,7 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
-                Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
+                Some(bzlmod_projection_data.repo_env.repo_env.as_ref()),
                 tracked_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
@@ -3773,7 +3774,7 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
-                Some(bzlmod_session_data.repo_env.repo_env.as_ref()),
+                Some(bzlmod_projection_data.repo_env.repo_env.as_ref()),
                 tracked_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
@@ -3798,19 +3799,20 @@ impl BuckConfigBasedCells {
         );
 
         // Aggregate extension usages from all modules and carry them into the
-        // DICE-injected bzlmod session state. This data is needed when
+        // DICE-injected bzlmod projection state. This data is needed when
         // extension repos are lazily executed inside DICE.
-        bzlmod_session_data.extension_aggregations =
+        bzlmod_projection_data.extension_aggregations =
             slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
-                bzlmod_session_data.cell_graph.workspace_id.clone(),
+                bzlmod_projection_data.cell_graph.workspace_id.clone(),
                 Arc::new(aggregated),
             );
-        bzlmod_session_data.lockfile_inputs = slug_bzlmod::BzlmodLockfileInputsValue::from_values(
-            hidden_lockfile_path,
-            visible_lockfile_value,
-            hidden_lockfile_value,
-            options.lockfile_mode,
-        );
+        bzlmod_projection_data.lockfile_inputs =
+            slug_bzlmod::BzlmodLockfileInputsValue::from_values(
+                hidden_lockfile_path,
+                visible_lockfile_value,
+                hidden_lockfile_value,
+                options.lockfile_mode,
+            );
 
         // Collect toolchain and execution platform registrations from all modules.
         // Priority order: root module first, then BFS order of dep graph.
@@ -3859,14 +3861,14 @@ impl BuckConfigBasedCells {
                 all_toolchains.len(),
                 all_exec_platforms.len()
             );
-            bzlmod_session_data.registered_toolchains =
+            bzlmod_projection_data.registered_toolchains =
                 slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    bzlmod_projection_data.cell_graph.workspace_id.clone(),
                     all_toolchains,
                 );
-            bzlmod_session_data.registered_execution_platforms =
+            bzlmod_projection_data.registered_execution_platforms =
                 slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
-                    bzlmod_session_data.cell_graph.workspace_id.clone(),
+                    bzlmod_projection_data.cell_graph.workspace_id.clone(),
                     all_exec_platforms,
                 );
 
@@ -3876,7 +3878,7 @@ impl BuckConfigBasedCells {
         }
 
         // Convert pre-computed cells to the format expected by
-        // BzlmodSessionData. Bazel's identity for extension-generated
+        // BzlmodProjectionData. Bazel's identity for extension-generated
         // repositories is the canonical repo name; apparent names from
         // use_repo() are repository-mapping entries that point at that identity.
         let mut ext_cells = Vec::new();
@@ -3889,7 +3891,7 @@ impl BuckConfigBasedCells {
                 internal_name: Arc::from(cell.internal_name.as_str()),
                 spec_hash: Arc::from(cell.spec_hash.as_str()),
                 repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
-                repo_env_json: repo_env_json(bzlmod_session_data.repo_env.repo_env.as_ref()),
+                repo_env_json: repo_env_json(bzlmod_projection_data.repo_env.repo_env.as_ref()),
                 materialized: false,
             };
             ext_cells.push((cell_name, cell_path, setup));
@@ -4019,11 +4021,12 @@ impl BuckConfigBasedCells {
             &cells,
             resolved_graph_for_aliases.as_ref(),
         );
-        bzlmod_session_data.repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-            bzlmod_session_data.cell_graph.workspace_id.clone(),
-            Arc::new(repo_mappings),
-            Arc::new(repo_mapping_overrides),
-        );
+        bzlmod_projection_data.repo_mappings =
+            slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+                bzlmod_projection_data.cell_graph.workspace_id.clone(),
+                Arc::new(repo_mappings),
+                Arc::new(repo_mapping_overrides),
+            );
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);
@@ -4033,9 +4036,10 @@ impl BuckConfigBasedCells {
         } else {
             parsed.module.name.clone()
         };
-        let lockfile_repo_env_json = repo_env_json(bzlmod_session_data.repo_env.repo_env.as_ref());
+        let lockfile_repo_env_json =
+            repo_env_json(bzlmod_projection_data.repo_env.repo_env.as_ref());
         let cell_graph = slug_bzlmod::BzlmodCellGraphValue {
-            workspace_id: bzlmod_session_data.cell_graph.workspace_id.clone(),
+            workspace_id: bzlmod_projection_data.cell_graph.workspace_id.clone(),
             root_module_name: root_module_name.clone(),
             cells: Arc::new(
                 cells
@@ -4132,9 +4136,9 @@ impl BuckConfigBasedCells {
                     .collect(),
             ),
         };
-        bzlmod_session_data.cell_graph = cell_graph;
+        bzlmod_projection_data.cell_graph = cell_graph;
 
-        Ok(Some(bzlmod_session_data))
+        Ok(Some(bzlmod_projection_data))
     }
 
     pub(crate) fn get_cell_aliases_from_config(
@@ -4781,7 +4785,7 @@ mod tests {
             fs.path().root().to_path_buf(),
             output_base.to_path_buf(),
         );
-        let session_data = BuckConfigBasedCells::resolve_bzlmod_dependencies_with_options(
+        let projection_data = BuckConfigBasedCells::resolve_bzlmod_dependencies_with_options(
             fs.path(),
             &options,
             Some(workspace_id),
@@ -4791,7 +4795,7 @@ mod tests {
             None,
         )
         .await?
-        .expect("MODULE.bazel should produce bzlmod session data");
+        .expect("MODULE.bazel should produce bzlmod projection data");
         let configs = BuckConfigBasedCells::parse_with_config_args_and_output_base(
             fs.path(),
             &[],
@@ -4801,7 +4805,7 @@ mod tests {
 
         assert!(configs.is_bzlmod);
         assert_eq!(
-            session_data
+            projection_data
                 .cell_graph
                 .workspace_id
                 .output_base

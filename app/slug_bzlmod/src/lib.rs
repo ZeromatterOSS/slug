@@ -270,32 +270,9 @@ pub struct RegisteredToolchain {
     pub is_root: bool,
 }
 
-/// Bzlmod facts produced by startup resolution. This remains the legacy Plan
-/// 61 resolver payload while the actual DICE graph is split into narrower
-/// projection keys.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct BzlmodSessionData {
-    pub module_versions: BzlmodModuleVersionsDataValue,
-    pub registered_toolchains: RegisteredToolchainsDataValue,
-    pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
-    pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
-    pub lockfile_inputs: BzlmodLockfileInputsValue,
-    pub repo_env: BzlmodRepoEnvDataValue,
-    pub resolution_facts: BzlmodResolutionFactsValue,
-    pub repo_mappings: BzlmodRepoMappingsDataValue,
-    pub cell_graph: BzlmodCellGraphValue,
-}
-
-impl BzlmodSessionData {
-    pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
-        BzlmodProjectionData::for_workspace(workspace_id).into()
-    }
-}
-
-/// Narrow payload used only to update the transitional injected DICE
-/// projections for the current command. The legacy resolver may still build a
-/// `BzlmodSessionData`, but DICE injection should operate on this projection
-/// shape instead of treating the legacy session as graph authority.
+/// Transitional bzlmod payload used to update the injected DICE projections for
+/// the current command while the legacy resolver is being decomposed into
+/// DICE-owned graph keys.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodProjectionData {
     pub module_versions: BzlmodModuleVersionsDataValue,
@@ -357,38 +334,6 @@ impl BzlmodProjectionData {
     #[cfg(test)]
     pub fn empty_for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace(WorkspaceId::for_project_root(project_root))
-    }
-}
-
-impl From<BzlmodProjectionData> for BzlmodSessionData {
-    fn from(data: BzlmodProjectionData) -> Self {
-        Self {
-            module_versions: data.module_versions,
-            registered_toolchains: data.registered_toolchains,
-            registered_execution_platforms: data.registered_execution_platforms,
-            extension_aggregations: data.extension_aggregations,
-            lockfile_inputs: data.lockfile_inputs,
-            repo_env: data.repo_env,
-            resolution_facts: data.resolution_facts,
-            repo_mappings: data.repo_mappings,
-            cell_graph: data.cell_graph,
-        }
-    }
-}
-
-impl From<BzlmodSessionData> for BzlmodProjectionData {
-    fn from(data: BzlmodSessionData) -> Self {
-        Self {
-            module_versions: data.module_versions,
-            registered_toolchains: data.registered_toolchains,
-            registered_execution_platforms: data.registered_execution_platforms,
-            extension_aggregations: data.extension_aggregations,
-            lockfile_inputs: data.lockfile_inputs,
-            repo_env: data.repo_env,
-            resolution_facts: data.resolution_facts,
-            repo_mappings: data.repo_mappings,
-            cell_graph: data.cell_graph,
-        }
     }
 }
 
