@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`136 passed in 105.87s`) after rebuilding `target/debug/slug`.
+  (`137 passed in 106.19s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -399,6 +399,21 @@ Observed SDK result at the checkpoint:
   (`1 passed`), and the explicit-binary Plan 61 selector
   `-k 'invalid_module_names_fail_at_module_parse'` (`1 passed, 135
   deselected`).
+  User-provided repo-name validation now runs for `module(repo_name = ...)`,
+  `bazel_dep(repo_name = ...)`, `use_repo()` imports, and
+  `use_repo_rule(...)(name = ...)`, matching the Bazel parse points that do
+  not depend on root/`--ignore_dev_dependency` filtering. Bazel source anchors:
+  `RepositoryName.java:57-58`, `:201-207`,
+  `ModuleFileGlobals.java:179`, `:301-307`, `:853-867`,
+  `ModuleThreadContext.java:221-229`, and
+  `ModuleFileFunctionTest.java:1360-1406`. Root-policy-sensitive
+  `override_repo()`/`inject_repo()` repo-name validation remains tied to the
+  remaining directive-semantics migration instead of being forced into the
+  parser. Validation passed with `cargo test -p slug_bzlmod
+  user_provided_repo_names -- --nocapture` (`1 passed`) and the
+  explicit-binary Plan 61 selector
+  `-k 'invalid_user_provided_repo_names_fail_at_module_parse'` (`1 passed,
+  136 deselected`).
 - Root `register_toolchains(..., dev_dependency = True)` and
   `register_execution_platforms(..., dev_dependency = True)` are now filtered
   under `--ignore_dev_dependency`, while non-root dev registrations remain

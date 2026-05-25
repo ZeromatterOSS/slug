@@ -28,3 +28,20 @@ pub(crate) fn invalid_bazel_module_name_message(name: &str) -> String {
         "invalid module name '{name}': valid names must 1) only contain lowercase letters (a-z), digits (0-9), dots (.), hyphens (-), and underscores (_); 2) begin with a lowercase letter; 3) end with a lowercase letter or digit."
     )
 }
+
+pub(crate) fn is_valid_user_provided_repo_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_alphanumeric() {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+}
+
+pub(crate) fn invalid_user_provided_repo_name_message(name: &str) -> String {
+    format!(
+        "invalid user-provided repo name '{name}': valid names may contain only A-Z, a-z, 0-9, '-', '_', '.', and must start with a letter or a number"
+    )
+}

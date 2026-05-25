@@ -46,7 +46,9 @@ use starlark::values::starlark_value;
 use starlark::values::tuple::UnpackTuple;
 
 use crate::module_names::invalid_bazel_module_name_message;
+use crate::module_names::invalid_user_provided_repo_name_message;
 use crate::module_names::is_valid_bazel_module_name;
+use crate::module_names::is_valid_user_provided_repo_name;
 use crate::types::ArchiveOverride;
 use crate::types::BazelDep;
 use crate::types::ExtensionTag;
@@ -148,6 +150,24 @@ fn validate_optional_bazel_module_name(raw_name: &str) -> starlark::Result<()> {
         return Ok(());
     }
     validate_bazel_module_name(raw_name)
+}
+
+fn validate_user_provided_repo_name(raw_name: &str) -> starlark::Result<()> {
+    if is_valid_user_provided_repo_name(raw_name) {
+        return Ok(());
+    }
+
+    Err(starlark::Error::new_other(anyhow::anyhow!(
+        "{}",
+        invalid_user_provided_repo_name_message(raw_name)
+    )))
+}
+
+fn validate_optional_user_provided_repo_name(raw_name: &str) -> starlark::Result<()> {
+    if raw_name.is_empty() {
+        return Ok(());
+    }
+    validate_user_provided_repo_name(raw_name)
 }
 
 /// Context for MODULE.bazel evaluation.
@@ -529,6 +549,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             )));
         }
         validate_optional_bazel_module_name(name)?;
+        validate_optional_user_provided_repo_name(repo_name)?;
 
         let parsed_version = if version.is_empty() {
             Version::empty()
@@ -595,7 +616,10 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let repo_name_str = match repo_name {
             NoneOr::None => None,
             NoneOr::Other(s) if s.is_empty() => None,
-            NoneOr::Other(s) => Some(s.to_owned()),
+            NoneOr::Other(s) => {
+                validate_user_provided_repo_name(s)?;
+                Some(s.to_owned())
+            }
         };
 
         let dep = BazelDep {
@@ -956,12 +980,15 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         // Add positional repo names
         for repo in repos.items {
+            validate_user_provided_repo_name(repo)?;
             use_repo.repos.push(repo.to_string());
         }
 
         // Add keyword repo-mapping: apparent_name = "actual_name"
         for (apparent_name, actual_value) in kwargs.iter() {
             if let Some(actual_name) = actual_value.unpack_str() {
+                validate_user_provided_repo_name(apparent_name)?;
+                validate_user_provided_repo_name(actual_name)?;
                 use_repo
                     .repo_mapping
                     .push((apparent_name.clone(), actual_name.to_owned()));
@@ -1188,6 +1215,9 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
             .get("name")
             .and_then(|v| v.unpack_str())
             .unwrap_or("");
+        if !name.is_empty() {
+            validate_user_provided_repo_name(name)?;
+        }
 
         if !name.is_empty() {
             // Record in the module context so it can be processed as a cell

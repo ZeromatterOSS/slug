@@ -4786,6 +4786,46 @@ git_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_invalid_user_provided_repo_names_fail_at_module_parse(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: RepositoryName.validateUserProvidedRepoName."""
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    cases = [
+        """module(name = "plan61_bad_module_repo_name", repo_name = "_foo")
+""",
+        """module(name = "plan61_bad_bazel_dep_repo_name")
+bazel_dep(name = "dep", version = "1.0.0", repo_name = "_foo")
+""",
+        """module(name = "plan61_bad_use_repo_positional")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "_foo")
+""",
+        """module(name = "plan61_bad_use_repo_key")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, _foo = "foo")
+""",
+        """module(name = "plan61_bad_use_repo_value")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, foo = "_foo")
+""",
+        """module(name = "plan61_bad_use_repo_rule_name")
+repo = use_repo_rule("//:repo.bzl", "repo")
+repo(name = "_foo")
+""",
+    ]
+
+    for content in cases:
+        _write(buck.cwd / "MODULE.bazel", content)
+
+        with pytest.raises(BuckException) as exc:
+            await buck.build("//:x")
+
+        assert "invalid user-provided repo name" in str(exc.value)
+        assert "must start with a letter or a number" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_isolated_extension_usage_fails_until_supported(
     buck: Buck,
 ) -> None:

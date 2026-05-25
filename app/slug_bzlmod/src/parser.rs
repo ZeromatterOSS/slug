@@ -744,6 +744,50 @@ git_override(
     }
 
     #[test]
+    fn test_parse_invalid_user_provided_repo_names_follow_bazel() {
+        let cases = [
+            r#"
+module(name = "test", repo_name = "_foo", version = "1.0.0")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+bazel_dep(name = "dep", version = "1.0.0", repo_name = "_foo")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "_foo")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, _foo = "foo")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, foo = "_foo")
+"#,
+            r#"
+module(name = "test", version = "1.0.0")
+repo = use_repo_rule("//:repo.bzl", "repo")
+repo(name = "_foo")
+"#,
+        ];
+
+        for content in cases {
+            let err = parse_module_bazel_content(content, "MODULE.bazel")
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("invalid user-provided repo name"), "{err}");
+            assert!(
+                err.contains("must start with a letter or a number"),
+                "{err}"
+            );
+        }
+    }
+
+    #[test]
     fn test_parse_local_path_override() {
         let content = r#"
 module(name = "test", version = "1.0.0")
