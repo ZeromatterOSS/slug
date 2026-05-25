@@ -17,6 +17,7 @@
 use std::fmt;
 
 use allocative::Allocative;
+use slug_core::cells::CellAliasResolver;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -31,10 +32,19 @@ use starlark::values::ValueLike;
 use starlark::values::starlark_value;
 
 pub(crate) fn bazel_label_from_configured(label: &ConfiguredProvidersLabel) -> BazelLabel {
+    bazel_label_from_configured_with_alias_resolver(label, None)
+}
+
+pub(crate) fn bazel_label_from_configured_with_alias_resolver(
+    label: &ConfiguredProvidersLabel,
+    cell_alias_resolver: Option<&CellAliasResolver>,
+) -> BazelLabel {
     let target = label.target().unconfigured();
     let cell = target.pkg().cell_name().as_str();
     let workspace_name = if slug_core::cells::is_root_cell_name(cell) {
         String::new()
+    } else if let Some(resolver) = cell_alias_resolver {
+        resolver.canonical_bzlmod_repo_name_for_cell(cell)
     } else {
         slug_core::cells::canonical_bazel_repo_name_for_cell(cell)
     };
@@ -273,6 +283,12 @@ impl BazelLabel {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::name::CellName;
     use slug_core::configuration::data::ConfigurationData;
     use slug_core::provider::label::ProvidersName;
     use slug_core::target::label::label::TargetLabel;
@@ -316,5 +332,65 @@ mod tests {
             bazel_label.full(),
             "@@rules_rs++crate+crates__serde_core-1.0.228//:_bs"
         );
+    }
+
+    #[test]
+    fn configured_label_uses_runtime_alias_snapshot_before_globals() -> slug_error::Result<()> {
+        let apparent = "analysis_ctx_label_runtime_alias";
+        let canonical = "owner++ext+analysis_ctx_label_runtime_alias";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let target = TargetLabel::testing_parse(&format!("{apparent}//pkg:flag"))
+            .configure(ConfigurationData::testing_new());
+        let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
+
+        let bazel_label = bazel_label_from_configured_with_alias_resolver(&label, Some(&resolver));
+
+        assert_eq!(bazel_label.workspace_name(), canonical);
+        assert_eq!(bazel_label.full(), format!("@@{canonical}//pkg:flag"));
+        Ok(())
+    }
+
+    #[test]
+    fn configured_label_runtime_miss_is_authoritative() -> slug_error::Result<()> {
+        let apparent = "analysis_ctx_label_runtime_miss";
+        let wrong_global = "wrong_owner++ext+analysis_ctx_label_runtime_miss";
+        let tmp =
+            std::env::temp_dir().join(format!("slug-build-api-bazel-label-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp)?;
+        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp);
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &BzlmodRuntimeCellInstallSnapshot::default(),
+        )?;
+        let target = TargetLabel::testing_parse(&format!("{apparent}//pkg:flag"))
+            .configure(ConfigurationData::testing_new());
+        let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
+
+        let bazel_label = bazel_label_from_configured_with_alias_resolver(&label, Some(&resolver));
+
+        assert_eq!(bazel_label.workspace_name(), apparent);
+        assert_eq!(bazel_label.full(), format!("@@{apparent}//pkg:flag"));
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
     }
 }

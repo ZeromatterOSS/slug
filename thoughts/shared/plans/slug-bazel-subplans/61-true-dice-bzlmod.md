@@ -3223,16 +3223,25 @@ What did not work or remains risky:
   bzlmod cell graph DICE-owned.
 - Bazel-visible analysis repository strings now carry the active
   `CellAliasResolver` into `AnalysisContext` when normal rule analysis prepares
-  `ctx`. `ctx.workspace_name`, runfiles workspace names, `ctx.bin_dir`,
-  `ctx.genfiles_dir`, and the `workspace_root_from_label` helper use
+  `ctx`. `ctx.label`, `ctx.workspace_name`, runfiles workspace names,
+  `ctx.bin_dir`, `ctx.genfiles_dir`, and the `workspace_root_from_label` helper use
   resolver-owned bzlmod runtime aliases/cells before the legacy
   process-global canonical-name helper; contexts without a resolver snapshot
-  keep the old fallback. Focused validation passed with
+  keep the old fallback. A follow-up found that `ctx.label` was still built
+  before the resolver-owned helper ran; `BazelLabel` construction now accepts
+  the same resolver and has focused runtime-alias and runtime-miss coverage.
+  Focused validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/tmp/slug-plan61-worker-analysis-context-target
   cargo test -p slug_build_api analysis_context_repo_name_ -- --nocapture`
   (`2 passed`) and `TMPDIR=/var/mnt/dev/.slug-tmp
   CARGO_TARGET_DIR=/tmp/slug-plan61-worker-analysis-context-target cargo check
   -p slug_build_api -p slug_analysis -p slug_action_impl -p slug_anon_target`.
+  Follow-up validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-analysis-context
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-analysis-context-target
+  cargo test -p slug_build_api runtime_alias_snapshot -- --nocapture` and
+  `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-analysis-context
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-analysis-context-target
+  cargo test -p slug_build_api runtime_miss_is_authoritative -- --nocapture`.
   The requested `/tmp/slug-plan61-worker-analysis-context-target` target path
   was a symlink to `/var/mnt/dev/slug-plan61-worker-analysis-context-target`
   because `/tmp` was full before validation.
