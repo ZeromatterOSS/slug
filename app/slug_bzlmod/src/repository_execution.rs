@@ -143,6 +143,7 @@ impl RepositoryRuleResult {
 ///
 /// When this key is computed, it executes the repository rule and materializes
 /// the repository content to disk.
+#[cfg(test)]
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
 #[display("RepositoryRuleKey({}, {})", name, rule_name)]
 pub struct RepositoryRuleExecutionKey {
@@ -156,6 +157,7 @@ pub struct RepositoryRuleExecutionKey {
     pub attrs_hash: Arc<str>,
 }
 
+#[cfg(test)]
 impl RepositoryRuleExecutionKey {
     /// Create a new execution key from an invocation.
     pub fn from_invocation(invocation: &RepositoryInvocation) -> Self {
@@ -165,17 +167,9 @@ impl RepositoryRuleExecutionKey {
             attrs_hash: Arc::from(invocation.compute_hash().as_str()),
         }
     }
-
-    /// Create a new execution key directly.
-    pub fn new(name: String, rule_name: String, attrs_hash: String) -> Self {
-        Self {
-            name: Arc::from(name.as_str()),
-            rule_name: Arc::from(rule_name.as_str()),
-            attrs_hash: Arc::from(attrs_hash.as_str()),
-        }
-    }
 }
 
+#[cfg(test)]
 #[async_trait]
 impl Key for RepositoryRuleExecutionKey {
     type Value = slug_error::Result<Arc<RepositoryRuleResult>>;
@@ -207,7 +201,8 @@ impl Key for RepositoryRuleExecutionKey {
 }
 
 /// Explain why direct `RepositoryRuleExecutionKey` computation is disabled.
-pub fn repository_rule_execution_key_unimplemented_error(
+#[cfg(test)]
+fn repository_rule_execution_key_unimplemented_error(
     repository_name: &str,
     rule_name: &str,
 ) -> RepositoryExecutionError {

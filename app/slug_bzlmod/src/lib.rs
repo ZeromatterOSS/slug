@@ -199,7 +199,6 @@ pub use repo_spec::in_extension_context;
 pub use repo_spec::record_repo_spec;
 pub use repo_spec::with_repo_spec_registry;
 pub use repository_execution::ExtensionRepoExecutionKey;
-pub use repository_execution::RepositoryRuleExecutionKey;
 pub use repository_execution::RepositoryRuleResult;
 pub use repository_execution::repo_execution_spec_hash;
 pub use repository_executor::repository_output_digest;

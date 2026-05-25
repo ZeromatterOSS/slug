@@ -2290,6 +2290,15 @@ What did not work or remains risky:
   fresh_repository_execution_bypasses_marker_shortcut -- --nocapture` (`1
   passed, 331 filtered out`), `cargo check -p slug_interpreter_for_build`,
   `cargo fmt --check`, and `git diff --check`.
+- The disabled direct `RepositoryRuleExecutionKey` is no longer a public
+  `slug_bzlmod` crate-root API and is compiled only for the unit tests that
+  document the disabled path. Production repository execution remains routed
+  through captured repository invocations and `ExtensionRepoExecutionKey`
+  materialization instead of exposing a caller-built attrs-hash key. Focused
+  validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-direct-key-target cargo check -p
+  slug_bzlmod` and `cargo test -p slug_bzlmod execution_key -- --nocapture`
+  (`3 passed, 329 filtered out`).
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
