@@ -274,19 +274,24 @@ impl Key for ExtensionBzlTransitiveDigestKey {
             })
             .await??;
         if let Some(aggregation) = aggregation {
-            if let Ok(executor) = MODULE_EXTENSION_EXECUTOR_IMPL.get() {
-                if let Some(digest) = executor
-                    .extension_bzl_transitive_digest(
-                        ctx,
-                        self.extension_id.as_ref(),
-                        aggregation.aggregated.as_ref(),
-                    )
-                    .await?
-                {
-                    return Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
-                        digest, true,
-                    )));
-                }
+            let executor = MODULE_EXTENSION_EXECUTOR_IMPL.get().map_err(|e| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "ExtensionBzlTransitiveDigestKey requires the module extension executor: {}",
+                    e
+                )
+            })?;
+            if let Some(digest) = executor
+                .extension_bzl_transitive_digest(
+                    ctx,
+                    self.extension_id.as_ref(),
+                    aggregation.aggregated.as_ref(),
+                )
+                .await?
+            {
+                return Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
+                    digest, true,
+                )));
             }
         }
 
@@ -2637,6 +2642,50 @@ mod tests {
         let err = dice.compute(&key).await?.unwrap_err();
 
         assert!(err.to_string().contains("aggregation data root"), "{err:?}");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn extension_bzl_digest_key_requires_executor_when_aggregation_exists()
+    -> slug_error::Result<()> {
+        let workspace_id = crate::WorkspaceId::for_project_root(PathBuf::from(
+            "/tmp/slug-plan61-extension-digest-requires-executor",
+        ));
+        let mut target = AggregatedExtension::new("@root//:ext.bzl", "ext");
+        target.extension_id = "@root//:ext.bzl%ext".to_owned();
+        let extension_id = target.extension_id.clone();
+        let mut extension_aggregations = std::collections::HashMap::new();
+        extension_aggregations.insert(extension_id.clone(), target);
+        let key = ExtensionBzlTransitiveDigestKey {
+            workspace_id: workspace_id.clone(),
+            extension_id: Arc::from(extension_id.as_str()),
+        };
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            Arc::new(BzlmodExtensionAggregationsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(extension_aggregations),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            crate::BzlmodCellGraphDataKey,
+            cell_graph_with_root(workspace_id),
+        )])?;
+        let mut dice = updater.commit().await;
+        let err = dice.compute(&key).await?.unwrap_err();
+
+        assert!(
+            err.to_string()
+                .contains("requires the module extension executor"),
+            "{err:?}"
+        );
         Ok(())
     }
 

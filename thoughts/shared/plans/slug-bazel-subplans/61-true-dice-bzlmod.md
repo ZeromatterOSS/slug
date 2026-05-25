@@ -2148,6 +2148,21 @@ What did not work or remains risky:
   --nocapture`, `cargo check -p slug_bzlmod -p slug_interpreter_for_build`,
   `cargo build -p slug`, focused Plan 61 replay/warm-noop guardrails (`4
   passed`), and the full Plan 61 Python guardrail (`119 passed in 129.83s`).
+- `ExtensionBzlTransitiveDigestKey` no longer silently uses the transitional
+  literal scanner when the interpreter-side module extension executor is not
+  registered. With an aggregation present, the DICE key now requires the
+  executor-owned loaded-graph path and errors if that executor is unavailable;
+  the remaining scanner fallback is limited to the real executor's explicit
+  `Ok(None)` cases such as missing-load replay/bootstrap. Validation passed
+  with `cargo test -p slug_bzlmod
+  extension_bzl_digest_key_requires_executor_when_aggregation_exists --
+  --nocapture`, `cargo test -p slug_bzlmod bzl_transitive_digest --
+  --nocapture`, and `cargo test -p slug_bzlmod
+  extension_spokes_lookup_keys_cache_after_digest_dependency -- --nocapture`,
+  `cargo check -p slug_bzlmod -p slug_interpreter_for_build`, `cargo build -p
+  slug`, and the focused Plan 61 replay subset for warm replay, transitive
+  loaded `.bzl` edits, missing-load creation, and mapped external
+  edit/create/delete replay rejection (`6 passed, 117 deselected`).
 - Out-of-project bzlmod text reads used by module-file inputs, includes,
   registry-cache files, and hidden lockfiles now flow through a named
   `AbsoluteTextFileInputKey` child when the parent DICE computation reads the
@@ -2682,8 +2697,10 @@ using Rust DICE keys and values:
    - Lockfile spoke pre-seeding uses the tracked project-file digest producer
      when DICE inputs are available, including deterministic project-local
      missing-file digest state without a direct filesystem read;
-     `ExtensionBzlTransitiveDigestKey` and non-DICE bootstrap/preseed callers
-     still use the transitional direct literal-load scanner.
+     `ExtensionBzlTransitiveDigestKey` still uses the transitional direct
+     literal-load scanner only when the registered executor reports an explicit
+     fallback case, while non-DICE bootstrap/preseed callers still use the
+     scanner directly.
    - Reject replay when any loaded implementation file changes, not only
      literal loads that the transitional scanner can find.
 
