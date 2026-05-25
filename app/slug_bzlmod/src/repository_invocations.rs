@@ -8,11 +8,13 @@
  * above-listed licenses.
  */
 
-//! Repository rule invocation registry for bzlmod.
+//! Repository rule invocation data for bzlmod.
 //!
-//! When repository rules (like `http_archive`) are invoked during MODULE.bazel
-//! parsing or extension execution, the invocations are recorded here. The actual
-//! repository fetching happens later via DICE.
+//! `RepositoryInvocation` is the serializable representation of repository rule
+//! calls that MODULE.bazel parsing can carry forward. The old thread-local
+//! capture registry is test-only; production module parsing records directives
+//! through `ModuleFileContext`, and extension execution captures `RepoSpec`
+//! values instead.
 //!
 //! ## Architecture
 //!
@@ -20,10 +22,12 @@
 //! 1. Direct calls in MODULE.bazel or WORKSPACE
 //! 2. From module extension implementations
 //!
-//! Both paths record invocations to this registry, which is then processed
-//! by the DICE-based repository execution system.
+//! DICE repository execution consumes explicit invocation/spec keys rather than
+//! exposing the thread-local registry as a caller-managed API.
 
+#[cfg(test)]
 use std::cell::RefCell;
+#[cfg(test)]
 use std::sync::Mutex;
 
 use allocative::Allocative;
@@ -187,11 +191,13 @@ impl AttrValue {
 /// This uses thread-local storage so that multiple parsings can happen
 /// concurrently without interference.
 #[derive(Debug, Default)]
-pub struct RepositoryInvocationRegistry {
+#[cfg(test)]
+struct RepositoryInvocationRegistry {
     /// Invocations collected during parsing.
     invocations: Mutex<Vec<RepositoryInvocation>>,
 }
 
+#[cfg(test)]
 impl RepositoryInvocationRegistry {
     /// Create a new empty registry.
     pub fn new() -> Self {
@@ -211,11 +217,6 @@ impl RepositoryInvocationRegistry {
         self.invocations.lock().unwrap().clone()
     }
 
-    /// Clear all recorded invocations.
-    pub fn clear(&self) {
-        self.invocations.lock().unwrap().clear();
-    }
-
     /// Take all invocations, leaving the registry empty.
     pub fn take(&self) -> Vec<RepositoryInvocation> {
         std::mem::take(&mut *self.invocations.lock().unwrap())
@@ -223,24 +224,13 @@ impl RepositoryInvocationRegistry {
 }
 
 // Thread-local registry for current parsing context
+#[cfg(test)]
 thread_local! {
     static CURRENT_REGISTRY: RefCell<Option<RepositoryInvocationRegistry>> = const { RefCell::new(None) };
 }
 
-/// Set up a registry for the current thread's parsing context.
-///
-/// Returns a guard that will clear the registry when dropped.
-pub fn with_registry<R>(f: impl FnOnce(&RepositoryInvocationRegistry) -> R) -> R {
-    CURRENT_REGISTRY.with(|cell| {
-        let mut borrow = cell.borrow_mut();
-        if borrow.is_none() {
-            *borrow = Some(RepositoryInvocationRegistry::new());
-        }
-        f(borrow.as_ref().unwrap())
-    })
-}
-
-/// Record a repository invocation in the current thread's registry.
+/// Record a repository invocation in the current thread's test registry.
+#[cfg(test)]
 pub fn record_invocation(invocation: RepositoryInvocation) {
     CURRENT_REGISTRY.with(|cell| {
         if let Some(registry) = cell.borrow().as_ref() {
@@ -249,28 +239,30 @@ pub fn record_invocation(invocation: RepositoryInvocation) {
     });
 }
 
+/// Production MODULE.bazel parsing records repository-rule directives directly
+/// in `ModuleFileContext`; there is no caller-managed registry to update here.
+#[cfg(not(test))]
+pub fn record_invocation(_invocation: RepositoryInvocation) {}
+
 /// Check if there's an active registry for the current thread.
-pub fn has_active_registry() -> bool {
+#[cfg(test)]
+fn has_active_registry() -> bool {
     CURRENT_REGISTRY.with(|cell| cell.borrow().is_some())
 }
 
 /// Take all invocations from the current thread's registry.
-pub fn take_invocations() -> Vec<RepositoryInvocation> {
+#[cfg(test)]
+fn take_invocations() -> Vec<RepositoryInvocation> {
     CURRENT_REGISTRY.with(|cell| cell.borrow().as_ref().map(|r| r.take()).unwrap_or_default())
 }
 
-/// Clear the current thread's registry.
-pub fn clear_registry() {
-    CURRENT_REGISTRY.with(|cell| {
-        *cell.borrow_mut() = None;
-    });
-}
-
 /// A guard that manages the lifecycle of the repository invocation registry.
-pub struct RegistryGuard {
+#[cfg(test)]
+struct RegistryGuard {
     previous: Option<RepositoryInvocationRegistry>,
 }
 
+#[cfg(test)]
 impl RegistryGuard {
     /// Create a new registry guard, setting up the thread-local registry.
     pub fn new() -> Self {
@@ -287,6 +279,7 @@ impl RegistryGuard {
     }
 }
 
+#[cfg(test)]
 impl Drop for RegistryGuard {
     fn drop(&mut self) {
         let previous = self.previous.take();
@@ -296,6 +289,7 @@ impl Drop for RegistryGuard {
     }
 }
 
+#[cfg(test)]
 impl Default for RegistryGuard {
     fn default() -> Self {
         Self::new()

@@ -2238,6 +2238,15 @@ What did not work or remains risky:
   cargo test -p slug_bzlmod test_repository_registry -- --nocapture` (`1
   passed, 331 filtered out`), `cargo check -p slug_bzlmod`,
   `cargo fmt --check`, and `git diff --check`.
+- The thread-local repository-invocation registry facade is also no longer a
+  public `slug_bzlmod` API. `RegistryGuard`, `RepositoryInvocationRegistry`,
+  and their registry lifecycle helpers are test-only; production keeps the
+  repository-rule hook `record_invocation` exported but no longer exposes the
+  transitional capture mechanism as a caller-managed API. Focused validation
+  passed with `TMPDIR=/var/mnt/dev/.slug-tmp CARGO_TARGET_DIR=/var/mnt/dev/.slug-plan61-api-target
+  cargo test -p slug_bzlmod repository_invocations -- --nocapture` (`6
+  passed, 326 filtered out`), `cargo check -p slug_bzlmod`,
+  `cargo fmt --check`, and `git diff --check`.
 - The external `+` repo fix only tightens the transitional literal-load scanner.
   It still does not replace the required Starlark loader graph with repo
   mappings, load failures, and delete transitions.
