@@ -109,19 +109,12 @@ fn resolve_bzlmod_build_setting_repo(
     repo: &str,
     cell_alias_resolver: Option<&cells::CellAliasResolver>,
 ) -> Option<String> {
-    let resolver_has_runtime_snapshot =
-        cell_alias_resolver.is_some_and(|resolver| resolver.has_bzlmod_runtime_alias_snapshot());
-    cell_alias_resolver
-        .and_then(|resolver| {
-            resolver
-                .resolve_declared_or_runtime_alias(repo)
-                .map(|cell| cell.as_str().to_owned())
-        })
-        .or_else(|| {
-            (!resolver_has_runtime_snapshot)
-                .then(|| cells::resolve_dynamic_extension_cell_alias(repo))
-                .flatten()
-        })
+    if let Some(resolver) = cell_alias_resolver {
+        let canonical = resolver.canonical_bzlmod_repo_name_for_cell(repo);
+        return (canonical != repo).then_some(canonical);
+    }
+
+    cells::resolve_dynamic_extension_cell_alias(repo)
 }
 
 #[cfg(test)]
@@ -157,6 +150,11 @@ mod tests {
 
     #[test]
     fn build_setting_labels_prefer_runtime_aliases_before_globals() -> slug_error::Result<()> {
+        let _guard = crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK
+            .lock()
+            .unwrap();
+        let tmp = tempfile::tempdir()?;
+        crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         let apparent = "plan61_build_setting_runtime_alias";
         let canonical = "plan61_owner++settings+generated";
         let wrong_global = "plan61_wrong_owner++settings+generated";
@@ -184,6 +182,43 @@ mod tests {
         )?;
 
         assert_eq!(label.target().pkg().cell_name().as_str(), canonical);
+        assert_eq!(
+            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn build_setting_labels_runtime_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let _guard = crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK
+            .lock()
+            .unwrap();
+        let tmp = tempfile::tempdir()?;
+        crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let apparent = "plan61_build_setting_runtime_miss";
+        let wrong_global = "plan61_wrong_owner++settings+generated";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        crate::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        let label = BuildSettingLabel::from_bazel_label_with_alias_resolver(
+            &format!("@@{apparent}//pkg:flag"),
+            Some(&resolver),
+        )?;
+
+        let unresolved_canonical_repo = format!("@@{apparent}");
+        assert_eq!(
+            label.target().pkg().cell_name().as_str(),
+            unresolved_canonical_repo.as_str()
+        );
         assert_eq!(
             crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)

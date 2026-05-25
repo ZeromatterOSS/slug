@@ -1017,19 +1017,9 @@ fn normalized_bzlmod_repo_name_with_alias_resolver(
     repo: &str,
     cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> String {
-    let resolver_has_runtime_snapshot =
-        cell_alias_resolver.is_some_and(|resolver| resolver.has_bzlmod_runtime_alias_snapshot());
     let repo = cell_alias_resolver
-        .and_then(|resolver| {
-            resolver
-                .resolve_declared_or_runtime_alias(repo)
-                .map(|cell| cell.as_str().to_owned())
-        })
-        .or_else(|| {
-            (!resolver_has_runtime_snapshot)
-                .then(|| slug_core::cells::resolve_dynamic_extension_cell_alias(repo))
-                .flatten()
-        })
+        .map(|resolver| resolver.canonical_bzlmod_repo_name_for_cell(repo))
+        .or_else(|| slug_core::cells::resolve_dynamic_extension_cell_alias(repo))
         .unwrap_or_else(|| repo.to_owned());
     let repo = if let Some((_, rest)) = repo.split_once("++") {
         rest.rsplit_once('+')

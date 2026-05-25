@@ -324,8 +324,7 @@ fn are_bzlmod_alias_equivalent(
         || (!resolver_has_runtime_snapshot
             && slug_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
                 == Some(apparent))
-        || extension_repo_internal_name(apparent) == Some(canonical)
-        || extension_repo_internal_name(canonical) == Some(apparent)
+        || extension_repo_internal_names_equivalent(alias_resolver, apparent, canonical)
 }
 
 fn extension_repo_internal_name(canonical: &str) -> Option<&str> {
@@ -334,17 +333,53 @@ fn extension_repo_internal_name(canonical: &str) -> Option<&str> {
         .filter(|internal_name| !internal_name.is_empty())
 }
 
+fn extension_repo_internal_names_equivalent(
+    alias_resolver: &CellAliasResolver,
+    apparent: &str,
+    canonical: &str,
+) -> bool {
+    let resolver_has_runtime_snapshot = alias_resolver.has_bzlmod_runtime_alias_snapshot();
+    let owns_repo = |repo: &str| {
+        !resolver_has_runtime_snapshot
+            || alias_resolver
+                .resolve_declared_or_runtime_alias(repo)
+                .is_some_and(|cell| cell.as_str() == repo)
+    };
+
+    (extension_repo_internal_name(apparent) == Some(canonical) && owns_repo(apparent))
+        || (extension_repo_internal_name(canonical) == Some(apparent) && owns_repo(canonical))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::BzlmodRuntimeExtensionCell;
 
     use super::*;
 
     fn test_alias_resolver() -> CellAliasResolver {
         CellAliasResolver::new(CellName::testing_new("root"), HashMap::new()).unwrap()
+    }
+
+    fn test_extension_cell(canonical: &str, internal_name: &str) -> BzlmodRuntimeExtensionCell {
+        BzlmodRuntimeExtensionCell {
+            canonical_name: canonical.to_owned(),
+            internal_name: internal_name.to_owned(),
+            path: format!("bazel-external/{canonical}"),
+            setup: slug_core::cells::external::ExtensionRepoCellSetup {
+                canonical_name: Arc::from(canonical),
+                extension_id: Arc::from("@owner//:ext.bzl%ext"),
+                internal_name: Arc::from(internal_name),
+                spec_hash: Arc::from("sha256-test"),
+                repo_spec_json: Arc::from("{}"),
+                repo_env_json: Arc::from("{}"),
+                materialized: false,
+            },
+        }
     }
 
     #[test]
@@ -416,6 +451,51 @@ mod tests {
         assert_eq!(
             slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
             Some(wrong_global.to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn load_cell_equivalence_with_runtime_aliases_accepts_owned_internal_repo_name()
+    -> slug_error::Result<()> {
+        let apparent = "runtime_owned_internal";
+        let canonical = "runtime_owner++ext+runtime_owned_internal";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![test_extension_cell(canonical, apparent)],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: Vec::new(),
+        };
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert!(are_bzlmod_alias_equivalent(&resolver, apparent, canonical));
+        assert!(are_bzlmod_alias_equivalent(&resolver, canonical, apparent));
+        Ok(())
+    }
+
+    #[test]
+    fn load_cell_equivalence_with_runtime_aliases_rejects_unowned_internal_repo_name()
+    -> slug_error::Result<()> {
+        let apparent = "runtime_unowned_internal";
+        let canonical = "runtime_owner++ext+runtime_unowned_internal";
+        let canonical_path = format!("bazel-external/{canonical}");
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        slug_core::cells::register_dynamic_extension_cell(canonical.to_owned(), canonical_path);
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert!(!are_bzlmod_alias_equivalent(&resolver, apparent, canonical));
+        assert!(!are_bzlmod_alias_equivalent(&resolver, canonical, apparent));
+        let expected_path = format!("bazel-external/{canonical}");
+        assert_eq!(
+            slug_core::cells::get_dynamic_extension_cell(canonical).as_deref(),
+            Some(expected_path.as_str())
         );
         Ok(())
     }

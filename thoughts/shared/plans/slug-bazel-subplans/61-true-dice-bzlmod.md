@@ -107,7 +107,7 @@ Observed SDK result at the checkpoint:
   `cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - Extension-generated repository symlink replay now also writes
   `external_cells/extension_repo` under the current bzlmod workspace output
-  base read from `BzlmodCellGraphDataKey` instead of hard-coding
+  base read from the named bzlmod cell-graph projection instead of hard-coding
   `<project>/buck-out/v2`. Focused coverage verifies a custom output base gets
   the symlink and the default path is untouched. Validation passed with focused
   `cargo test -p slug_external_cells
@@ -2284,15 +2284,29 @@ Observed SDK result at the checkpoint:
   and misses do not fall back to stale process-global dynamic aliases; legacy
   resolvers without a runtime snapshot keep the old directory/global fallback.
   Both `InterpreterForDir` load resolution and DICE eval-import key
-  canonicalization use the helper. Validation passed with `cargo fmt`, `cargo
-  test -p slug_core canonical_bzlmod_repo_name_for_cell -- --nocapture`, `cargo
-  test -p slug_interpreter_for_build bzlmod_load_path -- --nocapture`, `cargo
-  test -p slug_interpreter_for_build
+  canonicalization use the helper. A clean-review follow-up found that
+  wrong-cell equivalence still accepted extension internal-name equivalence for
+  repos absent from the runtime snapshot; that path now accepts internal-name
+  equivalence only when there is no runtime snapshot or the snapshot owns the
+  canonical extension repo. Validation passed with `cargo fmt`, `cargo test -p
+  slug_core canonical_bzlmod_repo_name_for_cell -- --nocapture`, `cargo test -p
+  slug_interpreter_for_build bzlmod_load_path -- --nocapture`, `cargo test -p
+  slug_interpreter_for_build load_cell_equivalence_with_runtime_aliases --
+  --nocapture`, `cargo test -p slug_interpreter_for_build
   load_import_resolution_with_runtime_aliases_rejects_global_miss --
   --nocapture`, `cargo test -p slug_interpreter_for_build
   bzlmod_eval_import_cell_path -- --nocapture`, and `cargo check -p slug_core
-  -p slug_interpreter_for_build`; `cargo fmt --check` and `git diff --check`
-  also passed before commit.
+  -p slug_interpreter_for_build -p slug_analysis`; `cargo fmt --check` and
+  `git diff --check` also passed before commit.
+- Bazel-style build-setting repo normalization now uses the same
+  `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper in both
+  target-setting preprocessing and `config_setting(flag_values = ...)` matching.
+  Runtime-snapshot misses stay authoritative and do not fall back to stale
+  process-global aliases. Validation passed with `cargo test -p slug_core
+  build_setting_labels -- --nocapture`, `cargo test -p slug_analysis
+  build_setting_lookup_normalization -- --nocapture`, `cargo check -p
+  slug_core -p slug_interpreter_for_build -p slug_analysis`, `cargo fmt
+  --check`, and `git diff --check`.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
