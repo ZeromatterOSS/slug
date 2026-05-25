@@ -346,6 +346,7 @@ pub struct RuleAnalysisAttrResolutionContext<'v> {
     pub dep_analysis_results: HashMap<ConfiguredTargetLabel, DepAnalysisValue>,
     pub query_results: HashMap<String, Arc<AnalysisQueryResult>>,
     pub execution_platform_resolution: ExecutionPlatformResolution,
+    pub cell_alias_resolver: Option<slug_core::cells::CellAliasResolver>,
 }
 
 impl<'v> AttrResolutionContext<'v> for &'_ RuleAnalysisAttrResolutionContext<'v> {
@@ -377,6 +378,10 @@ impl<'v> AttrResolutionContext<'v> for &'_ RuleAnalysisAttrResolutionContext<'v>
 
     fn execution_platform_resolution(&self) -> &ExecutionPlatformResolution {
         &self.execution_platform_resolution
+    }
+
+    fn cell_alias_resolver(&self) -> Option<&slug_core::cells::CellAliasResolver> {
+        self.cell_alias_resolver.as_ref()
     }
 }
 
@@ -3743,6 +3748,10 @@ async fn run_analysis_with_env_underlying(
             "attr_eval_start",
             evaluate_rule_started,
         );
+        let analysis_cell_alias_resolver = Some(
+            dice.get_cell_alias_resolver(analysis_env.label.pkg().cell_name())
+                .await?,
+        );
         // Plan 16.6: attr_eval sub-span — attribute coercion + plugin resolution.
         let (attributes, plugins) = dispatch_span_simple::<
             _,
@@ -3784,6 +3793,7 @@ async fn run_analysis_with_env_underlying(
                     dep_analysis_results,
                     query_results: analysis_env.query_results,
                     execution_platform_resolution: node.execution_platform_resolution().clone(),
+                    cell_alias_resolver: analysis_cell_alias_resolver.clone(),
                 };
 
                 Ok((
@@ -4299,10 +4309,6 @@ async fn run_analysis_with_env_underlying(
             12,
             "rule_impl_evaluator_start",
             evaluate_rule_started,
-        );
-        let analysis_cell_alias_resolver = Some(
-            dice.get_cell_alias_resolver(analysis_env.label.pkg().cell_name())
-                .await?,
         );
         let (ctx, list_res) = reentrant_eval.with_evaluator(|mut eval| {
             eval.set_print_handler(&print);

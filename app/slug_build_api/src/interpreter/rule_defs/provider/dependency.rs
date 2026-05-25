@@ -15,6 +15,7 @@ use std::mem;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use slug_core::cells::CellAliasResolver;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProviderName;
@@ -144,6 +145,22 @@ impl<'v> Dependency<'v> {
         provider_collection: FrozenValueTyped<'v, FrozenProviderCollection>,
         execution_platform: Option<&ExecutionPlatformResolution>,
     ) -> Self {
+        Self::new_with_cell_alias_resolver(
+            heap,
+            label,
+            provider_collection,
+            execution_platform,
+            None,
+        )
+    }
+
+    pub fn new_with_cell_alias_resolver(
+        heap: Heap<'v>,
+        label: ConfiguredProvidersLabel,
+        provider_collection: FrozenValueTyped<'v, FrozenProviderCollection>,
+        execution_platform: Option<&ExecutionPlatformResolution>,
+        cell_alias_resolver: Option<CellAliasResolver>,
+    ) -> Self {
         let execution_platform: ValueOfUnchecked<NoneOr<StarlarkExecutionPlatformResolution>> =
             match execution_platform {
                 Some(e) => ValueOfUnchecked::new(
@@ -152,7 +169,12 @@ impl<'v> Dependency<'v> {
                 None => ValueOfUnchecked::new(Value::new_none()),
             };
         Dependency {
-            label: heap.alloc_typed_unchecked(StarlarkConfiguredProvidersLabel::new(label)),
+            label: heap.alloc_typed_unchecked(
+                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                    label,
+                    cell_alias_resolver,
+                ),
+            ),
             provider_collection: unsafe {
                 mem::transmute::<
                     FrozenValueTyped<'_, FrozenProviderCollection>,

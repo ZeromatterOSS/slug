@@ -14,6 +14,7 @@ use allocative::Allocative;
 use slug_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
+use slug_core::cells::CellAliasResolver;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
@@ -76,4 +77,8 @@ pub trait AttrResolutionContext<'v> {
     fn resolve_query(&mut self, query: &str) -> slug_error::Result<Arc<AnalysisQueryResult>>;
 
     fn execution_platform_resolution(&self) -> &ExecutionPlatformResolution;
+
+    fn cell_alias_resolver(&self) -> Option<&CellAliasResolver> {
+        None
+    }
 }

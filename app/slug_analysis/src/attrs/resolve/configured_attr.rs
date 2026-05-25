@@ -226,7 +226,10 @@ fn resolve_single_impl<'v>(
         ConfiguredAttr::Dep(d) => DepAttrType::resolve_single(ctx, d),
         ConfiguredAttr::SourceLabel(s) => SourceAttrType::resolve_single_label(ctx, s),
         ConfiguredAttr::Label(label) => {
-            let label = StarlarkConfiguredProvidersLabel::new(label.dupe());
+            let label = StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                label.dupe(),
+                ctx.cell_alias_resolver().cloned(),
+            );
             Ok(ctx.heap().alloc(label))
         }
         ConfiguredAttr::Arg(arg) => arg.resolve(ctx, pkg),

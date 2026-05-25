@@ -3242,9 +3242,24 @@ What did not work or remains risky:
   `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-analysis-context
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-analysis-context-target
   cargo test -p slug_build_api runtime_miss_is_authoritative -- --nocapture`.
+  Clean review of `aecd85f8..c257fab9` found no issues and reran focused
+  `slug_build_api` analysis-context/configured-label tests in an isolated
+  target dir (`2 passed` and `3 passed`).
   The requested `/tmp/slug-plan61-worker-analysis-context-target` target path
   was a symlink to `/var/mnt/dev/slug-plan61-worker-analysis-context-target`
   because `/tmp` was full before validation.
+- Starlark `Label` values produced from configured provider labels can now
+  carry the same active `CellAliasResolver` used by analysis. This covers
+  `ctx.label`, dependency labels, query-result dependencies, and direct
+  configured-label attrs for Bazel-visible `workspace_name`, `repo_name`, and
+  `workspace_root` strings while preserving the old resolverless fallback for
+  dynamic/aspect/legacy callers. Focused validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-configured-label
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-configured-label-target
+  cargo test -p slug_interpreter configured_label_ -- --nocapture`
+  (`3 passed`) and `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-configured-label
+  CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-configured-label-target
+  cargo check -p slug_interpreter -p slug_build_api -p slug_analysis`.
 - Some Bazel 9 semantics are explicitly rejected until fully modeled, including
   override patch materialization and isolated extension usages. Remaining
   command policy around non-root dev dependencies still needs migration out of
@@ -3496,6 +3511,10 @@ using Rust DICE keys and values:
   the active cell alias resolver, so transition-produced settings no longer
   need process-global generated-repo aliases when a runtime snapshot is
   available.
+- Configured provider `Label` values exposed through normal analysis `ctx.attr`,
+  dependency objects, query-result dependencies, and `ctx.label` now carry the
+  active cell alias resolver for Bazel-visible workspace/repo strings before
+  falling back to process-global dynamic aliases.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
   cells, but the final cell graph is still injected from legacy-produced data.

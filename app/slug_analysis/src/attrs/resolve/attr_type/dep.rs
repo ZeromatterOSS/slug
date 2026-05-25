@@ -10,6 +10,7 @@
 
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use slug_build_api::interpreter::rule_defs::provider::dependency::Dependency;
+use slug_core::cells::CellAliasResolver;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_node::attrs::attr_type::configured_dep::ConfiguredExplicitConfiguredDep;
@@ -49,6 +50,7 @@ pub trait DepAttrTypeExt {
         target: &ConfiguredProvidersLabel,
         v: FrozenValueTyped<'v, FrozenProviderCollection>,
         execution_platform_resolution: Option<&ExecutionPlatformResolution>,
+        cell_alias_resolver: Option<CellAliasResolver>,
     ) -> Value<'v>;
 
     fn resolve_single_impl<'v>(
@@ -88,12 +90,14 @@ impl DepAttrTypeExt for DepAttrType {
         target: &ConfiguredProvidersLabel,
         v: FrozenValueTyped<'v, FrozenProviderCollection>,
         execution_platform_resolution: Option<&ExecutionPlatformResolution>,
+        cell_alias_resolver: Option<CellAliasResolver>,
     ) -> Value<'v> {
-        env.heap().alloc(Dependency::new(
+        env.heap().alloc(Dependency::new_with_cell_alias_resolver(
             env.heap(),
             target.clone(),
             v,
             execution_platform_resolution,
+            cell_alias_resolver,
         ))
     }
 
@@ -116,6 +120,7 @@ impl DepAttrTypeExt for DepAttrType {
             &dep.label,
             dep.providers,
             execution_platform_resolution,
+            ctx.cell_alias_resolver().cloned(),
         ))
     }
 

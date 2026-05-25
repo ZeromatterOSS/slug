@@ -325,9 +325,12 @@ impl<'v> AnalysisContext<'v> {
         rule_outputs: Vec<(String, String)>,
     ) -> ValueTyped<'v, AnalysisContext<'v>> {
         let configured_label = label.map(|label| {
-            heap.alloc_typed(StarlarkConfiguredProvidersLabel::new(
-                ConfiguredProvidersLabel::new(label, ProvidersName::Default),
-            ))
+            heap.alloc_typed(
+                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                    ConfiguredProvidersLabel::new(label, ProvidersName::Default),
+                    cell_alias_resolver.clone(),
+                ),
+            )
         });
         let bazel_label = configured_label.map(|label| {
             heap.alloc_typed(bazel_label_from_configured_with_alias_resolver(
