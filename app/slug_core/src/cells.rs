@@ -607,7 +607,10 @@ pub fn action_external_cell_name(
     cell_name: &str,
     cell_path: &str,
 ) -> String {
-    canonical_external_name_from_symlink(project_root, cell_name)
+    let filesystem_fallback_allowed = dynamic_bzlmod_directory_scan_allowed();
+    filesystem_fallback_allowed
+        .then(|| canonical_external_name_from_symlink(project_root, cell_name))
+        .flatten()
         .or_else(|| canonical_dynamic_extension_cell_name(cell_name))
         .or_else(|| canonical_bzlmod_module_cell_name(cell_name))
         .or_else(|| {
@@ -618,6 +621,9 @@ pub fn action_external_cell_name(
                 .map(str::to_owned)
         })
         .or_else(|| {
+            if !filesystem_fallback_allowed {
+                return None;
+            }
             let suffix = format!("+{cell_name}");
             let bazel_external = project_root.join("bazel-external");
             let mut candidates = Vec::new();
@@ -3732,6 +3738,37 @@ mod tests {
             .unwrap();
         reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
 
+        assert_eq!(
+            canonical,
+            action_external_cell_name(tmp.path(), apparent, &format!("bazel-external/{apparent}"))
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn workspace_scoped_action_external_cell_name_ignores_physical_fallbacks() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("out");
+        let apparent = "rustc_linux_x86_64_1_95_0";
+        let canonical = "rules_rs++toolchains+rustc_linux_x86_64_1_95_0";
+        let canonical_path = tmp.path().join("bazel-external").join(canonical);
+        std::fs::create_dir_all(&canonical_path).unwrap();
+        std::fs::create_dir(tmp.path().join("external")).unwrap();
+        std::os::unix::fs::symlink(&canonical_path, tmp.path().join("external").join(apparent))
+            .unwrap();
+        reset_dynamic_bzlmod_state_for_workspace(tmp.path().to_path_buf(), output);
+
+        assert_eq!(
+            apparent,
+            action_external_cell_name(tmp.path(), apparent, &format!("bazel-external/{apparent}"))
+        );
+
+        register_dynamic_extension_cell(
+            canonical.to_owned(),
+            format!("bazel-external/{canonical}"),
+        );
+        register_dynamic_extension_cell_alias(apparent.to_owned(), canonical.to_owned());
         assert_eq!(
             canonical,
             action_external_cell_name(tmp.path(), apparent, &format!("bazel-external/{apparent}"))
