@@ -3965,6 +3965,31 @@ async def test_root_module_deletion_invalidates_bzlmod_graph(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_module_creation_invalidates_empty_bzlmod_projection(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root MODULE.bazel missing-to-present changes are inputs."""
+    _write(buck.cwd / ".buckconfig", "[repositories]\nroot = .\n")
+    root_module = buck.cwd / "MODULE.bazel"
+    root_module.unlink()
+
+    with pytest.raises(BuckException) as exc:
+        await buck.audit("cell")
+    assert "No cell name for the root path" in exc.value.stderr
+
+    _write(root_module, 'module(name = "plan61_root_module_creation")\n')
+    output, created = await _audit_cells_and_counters(buck)
+    assert "plan61_root_module_creation" in output
+    assert created["module_file_parse"] > 0
+    assert created["bzlmod_resolution_compute"] > 0
+
+    output, warm = await _audit_cells_and_counters(buck)
+    assert "plan61_root_module_creation" in output
+    assert warm["module_file_parse"] == created["module_file_parse"]
+    assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_non_root_included_module_segment_edit_invalidates_extension_graph(
     buck: Buck,
 ) -> None:

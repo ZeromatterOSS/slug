@@ -96,7 +96,7 @@ Observed SDK result at the checkpoint:
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
-  (`126 passed in 90.46s`) after rebuilding `target/debug/slug`.
+  (`127 passed in 92.85s`) after rebuilding `target/debug/slug`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -848,6 +848,12 @@ Observed SDK result at the checkpoint:
   segment and checking the missing-include failure. Validation passed with the
   focused subset selected by `-k 'root_module_deletion or
   included_module_segment_create_delete'` (`2 passed, 109 deselected`).
+- Root `MODULE.bazel` missing-to-present creation is now covered as an observable
+  same-daemon transition: the first no-module `audit cell` fails during cell
+  resolver creation, creating `MODULE.bazel` in the same daemon produces a
+  bzlmod root graph, and a follow-up warm audit reuses the created graph.
+  Validation passed with the focused subset selected by `-k
+  'root_module_creation'` (`1 passed, 126 deselected`).
 - Project-local `local_path_override` module files now have same-daemon
   parse-error, invalid UTF-8, and included-segment cycle guardrails matching the
   out-of-project local override cases. Validation passed with the focused
@@ -2919,9 +2925,9 @@ using Rust DICE keys and values:
      includes create/delete, parse/UTF-8 failures, and include cycles. Root
      included segments now have parse/UTF-8 failure, include-cycle, and
      create/delete coverage. Root `MODULE.bazel` has parse/UTF-8 failure and
-     deletion coverage, while registry `MODULE.bazel` has parse/UTF-8 failure
-     and deletion coverage; remaining source classes still need full matrix
-     coverage.
+     create/delete coverage, while registry `MODULE.bazel` has parse/UTF-8
+     failure and deletion coverage; remaining source classes still need full
+     matrix coverage.
    - Model registry selection and source metadata for overrides. Single-version
      override registry source metadata has same-daemon parse-failure and
      deletion/UTF-8 coverage; multiple-version override registry source
