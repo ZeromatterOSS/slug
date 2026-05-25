@@ -481,8 +481,19 @@ Observed SDK result at the checkpoint:
   slug_server`, followed by `cargo build -p slug` and the full Plan 61 Python
   guardrail file (`125 passed in 151.47s`). No stale `slugd` process remained
   after post-run cleanup. This still leaves the legacy resolver payload and
-  `SetBzlmodSessionData` projection API in place until the resolved graph is
+  projection API in place until the resolved graph is
   produced directly by DICE keys.
+- The transitional DICE injection API now accepts `BzlmodProjectionData`
+  instead of `BzlmodSessionData`. The legacy resolver still returns
+  `BzlmodSessionData`, but the persisted config-load path converts it before
+  touching DICE, and test/bootstrap helpers now seed only the projection
+  payload. Validation passed with focused `cargo test -p slug_bzlmod
+  set_bzlmod_projection_data -- --nocapture`, focused `cargo test -p
+  slug_common explicit_output_base -- --nocapture`, affected-crate `cargo
+  check -p slug_bzlmod -p slug_common -p slug_interpreter_for_build -p
+  slug_external_cells -p slug_analysis`, `cargo build -p slug`, and the full
+  Plan 61 Python guardrail file (`125 passed in 147.72s`). No stale `slugd`
+  process remained after post-run cleanup.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository
@@ -2891,7 +2902,8 @@ using Rust DICE keys and values:
    - Remove `BzlmodSessionData` fields as the authority for graph semantics.
      `BuckConfigBasedCells` no longer stores the payload or returns it to the
      server updater, but the legacy resolver still builds a `BzlmodSessionData`
-     value to populate the narrower injected projections.
+     value before converting it to `BzlmodProjectionData` for the narrower
+     injected projections.
    - `BzlmodSessionData::default()` is removed; remaining empty session
      construction must explicitly name the project-root sentinel while the
      session bridge is still being unwound. The generic project-root empty

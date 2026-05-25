@@ -270,9 +270,9 @@ pub struct RegisteredToolchain {
     pub is_root: bool,
 }
 
-/// Bzlmod facts produced by startup resolution and injected into DICE for the
-/// current command. This is the transitional Plan 61 boundary between legacy
-/// cell parsing and DICE-owned bzlmod values.
+/// Bzlmod facts produced by startup resolution. This remains the legacy Plan
+/// 61 resolver payload while the actual DICE graph is split into narrower
+/// projection keys.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodSessionData {
     pub module_versions: BzlmodModuleVersionsDataValue,
@@ -287,6 +287,29 @@ pub struct BzlmodSessionData {
 }
 
 impl BzlmodSessionData {
+    pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
+        BzlmodProjectionData::for_workspace(workspace_id).into()
+    }
+}
+
+/// Narrow payload used only to update the transitional injected DICE
+/// projections for the current command. The legacy resolver may still build a
+/// `BzlmodSessionData`, but DICE injection should operate on this projection
+/// shape instead of treating the legacy session as graph authority.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct BzlmodProjectionData {
+    pub module_versions: BzlmodModuleVersionsDataValue,
+    pub registered_toolchains: RegisteredToolchainsDataValue,
+    pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+    pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
+    pub lockfile_inputs: BzlmodLockfileInputsValue,
+    pub repo_env: BzlmodRepoEnvDataValue,
+    pub resolution_facts: BzlmodResolutionFactsValue,
+    pub repo_mappings: BzlmodRepoMappingsDataValue,
+    pub cell_graph: BzlmodCellGraphValue,
+}
+
+impl BzlmodProjectionData {
     pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
         Self {
             module_versions: BzlmodModuleVersionsDataValue::for_workspace(
@@ -337,12 +360,44 @@ impl BzlmodSessionData {
     }
 }
 
-pub trait SetBzlmodSessionData {
-    fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()>;
+impl From<BzlmodProjectionData> for BzlmodSessionData {
+    fn from(data: BzlmodProjectionData) -> Self {
+        Self {
+            module_versions: data.module_versions,
+            registered_toolchains: data.registered_toolchains,
+            registered_execution_platforms: data.registered_execution_platforms,
+            extension_aggregations: data.extension_aggregations,
+            lockfile_inputs: data.lockfile_inputs,
+            repo_env: data.repo_env,
+            resolution_facts: data.resolution_facts,
+            repo_mappings: data.repo_mappings,
+            cell_graph: data.cell_graph,
+        }
+    }
 }
 
-impl SetBzlmodSessionData for dice::DiceTransactionUpdater {
-    fn set_bzlmod_session_data(&mut self, data: BzlmodSessionData) -> slug_error::Result<()> {
+impl From<BzlmodSessionData> for BzlmodProjectionData {
+    fn from(data: BzlmodSessionData) -> Self {
+        Self {
+            module_versions: data.module_versions,
+            registered_toolchains: data.registered_toolchains,
+            registered_execution_platforms: data.registered_execution_platforms,
+            extension_aggregations: data.extension_aggregations,
+            lockfile_inputs: data.lockfile_inputs,
+            repo_env: data.repo_env,
+            resolution_facts: data.resolution_facts,
+            repo_mappings: data.repo_mappings,
+            cell_graph: data.cell_graph,
+        }
+    }
+}
+
+pub trait SetBzlmodProjectionData {
+    fn set_bzlmod_projection_data(&mut self, data: BzlmodProjectionData) -> slug_error::Result<()>;
+}
+
+impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
+    fn set_bzlmod_projection_data(&mut self, data: BzlmodProjectionData) -> slug_error::Result<()> {
         let lockfile_inputs = Arc::new(data.lockfile_inputs.clone());
         let lockfile_inputs_data = Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
             data.cell_graph.workspace_id.clone(),
@@ -409,12 +464,12 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn set_bzlmod_session_data_uses_session_workspace_id() -> slug_error::Result<()> {
+    async fn set_bzlmod_projection_data_uses_projection_workspace_id() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-session-workspace"),
             PathBuf::from("/tmp/slug-plan61-custom-output-base"),
         );
-        let mut data = BzlmodSessionData::for_workspace(workspace_id.clone());
+        let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
         data.cell_graph = BzlmodCellGraphValue {
             workspace_id: workspace_id.clone(),
             root_module_name: "root_mod".to_owned(),
@@ -440,7 +495,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_session_data(data)?;
+        updater.set_bzlmod_projection_data(data)?;
         let mut dice = updater.commit().await;
 
         let repo_mappings = dice
@@ -465,13 +520,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_session_data_derives_lockfile_digests_from_values() -> slug_error::Result<()>
-    {
+    async fn set_bzlmod_projection_data_derives_lockfile_digests_from_values()
+    -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-session-lockfile-digest"),
             PathBuf::from("/tmp/slug-plan61-session-lockfile-output-base"),
         );
-        let mut data = BzlmodSessionData::for_workspace(workspace_id.clone());
+        let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
         let visible_lockfile = Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from(
                 "/tmp/slug-plan61-session-lockfile-digest/MODULE.bazel.lock",
@@ -517,7 +572,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_session_data(data)?;
+        updater.set_bzlmod_projection_data(data)?;
         let mut dice = updater.commit().await;
 
         let lockfile_inputs = dice
@@ -871,7 +926,9 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_session_data(BzlmodSessionData::for_workspace(workspace_id.clone()))?;
+        updater.set_bzlmod_projection_data(BzlmodProjectionData::for_workspace(
+            workspace_id.clone(),
+        ))?;
         let dice = updater.commit().await;
 
         let mut updater = dice.into_updater();
@@ -974,7 +1031,7 @@ mod tests {
             project_root.clone(),
             PathBuf::from("/tmp/slug-plan61-current-workspace-output-base"),
         );
-        let data = BzlmodSessionData::for_workspace(workspace_id.clone());
+        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -982,7 +1039,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_session_data(data)?;
+        updater.set_bzlmod_projection_data(data)?;
         let mut dice = updater.commit().await;
 
         let module_versions = module_versions_for_current_workspace(&mut dice).await?;

@@ -6207,7 +6207,7 @@ mod tests {
         runtime.enable_all();
         let runtime = runtime.build().unwrap();
         runtime.block_on(async {
-            use slug_bzlmod::SetBzlmodSessionData;
+            use slug_bzlmod::SetBzlmodProjectionData;
 
             reset_toolchain_loading();
 
@@ -6234,9 +6234,9 @@ mod tests {
                 .commit()
                 .await;
             let mut updater = dice.into_updater();
-            updater.set_bzlmod_session_data(slug_bzlmod::BzlmodSessionData::for_workspace(
-                workspace_id,
-            ))?;
+            updater.set_bzlmod_projection_data(
+                slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id),
+            )?;
             let mut dice = updater.commit().await;
 
             ensure_registered_toolchains_loaded(&mut dice).await;

@@ -2723,9 +2723,15 @@ impl BuckConfigBasedCells {
                 .buck_error_context("Computing bzlmod resolution through DICE")?;
             (key, bzlmod_resolution)
         };
-        let session_data_for_dice = bzlmod_resolution.as_ref().clone().unwrap_or_else(|| {
-            slug_bzlmod::BzlmodSessionData::for_workspace(key.resolution_key.workspace_id.clone())
-        });
+        let projection_data_for_dice = bzlmod_resolution
+            .as_ref()
+            .clone()
+            .map(slug_bzlmod::BzlmodProjectionData::from)
+            .unwrap_or_else(|| {
+                slug_bzlmod::BzlmodProjectionData::for_workspace(
+                    key.resolution_key.workspace_id.clone(),
+                )
+            });
 
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
@@ -2737,7 +2743,10 @@ impl BuckConfigBasedCells {
         )
         .await
         .buck_error_context("Parsing cells")?;
-        slug_bzlmod::SetBzlmodSessionData::set_bzlmod_session_data(updater, session_data_for_dice)?;
+        slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data(
+            updater,
+            projection_data_for_dice,
+        )?;
         Ok(configs)
     }
 
@@ -4716,7 +4725,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn persisted_empty_bzlmod_session_preserves_explicit_output_base()
+    async fn persisted_empty_bzlmod_projection_preserves_explicit_output_base()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         let output_base = fs
@@ -4753,7 +4762,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn direct_bzlmod_parse_preserves_explicit_output_base() -> slug_error::Result<()> {
+    async fn direct_bzlmod_resolution_preserves_explicit_output_base() -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
         let output_base = fs

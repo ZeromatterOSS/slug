@@ -1063,7 +1063,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_spec_complete_marker_does_not_skip_dice_execution() -> slug_error::Result<()> {
-        use slug_bzlmod::SetBzlmodSessionData;
+        use slug_bzlmod::SetBzlmodProjectionData;
         use slug_common::dice::data::testing::SetTestingIoProvider;
         use slug_core::fs::project::ProjectRootTemp;
         use slug_execute::digest_config::SetDigestConfig;
@@ -1093,8 +1093,9 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater
-            .set_bzlmod_session_data(slug_bzlmod::BzlmodSessionData::for_workspace(workspace_id))?;
+        updater.set_bzlmod_projection_data(slug_bzlmod::BzlmodProjectionData::for_workspace(
+            workspace_id,
+        ))?;
         let mut dice = updater.commit().await;
 
         let setup = ExtensionRepoCellSetup {
