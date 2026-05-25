@@ -2249,8 +2249,12 @@ Observed SDK result at the checkpoint:
   need bzlmod state injection use full `BzlmodProjectionData` through
   `SetBzlmodProjectionData` instead of writing the injected cell-graph key
   directly. The underlying graph is still legacy-produced, but the direct
-  injected-data key is now crate-internal transitional plumbing. Validation
-  passed with `cargo fmt --check`, `cargo test -p slug_bzlmod
+  injected-data key is now crate-private transitional plumbing rather than a
+  downstream-reachable key through either the crate root or `dice_graph` module
+  path. A clean-review follow-up caught that `pub mod dice_graph` still made the
+  key reachable by module path while the struct itself was public; making the
+  key `pub(crate)` closes that surface. Validation passed with `cargo fmt
+  --check`, `cargo test -p slug_bzlmod
   current_workspace_helpers_use_projection_workspace_id -- --nocapture`,
   `cargo test -p slug_common
   persisted_empty_bzlmod_projection_preserves_explicit_output_base --
@@ -2262,8 +2266,14 @@ Observed SDK result at the checkpoint:
   test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback
   -- --nocapture`, `cargo check -p slug_bzlmod -p slug_common -p
   slug_external_cells -p slug_analysis -p slug_interpreter_for_build`, and
-  `git diff --check`. A scoped search found no remaining downstream
-  `slug_bzlmod::BzlmodCellGraphDataKey` references.
+  `git diff --check`. The `pub(crate)` follow-up also passed the same scoped
+  multi-crate `cargo check`, plus `cargo test -p slug_bzlmod
+  current_workspace_helpers_use_projection_workspace_id -- --nocapture` and
+  `cargo test -p slug_external_cells
+  extension_spoke_lookup_uses_injected_workspace_identity -- --nocapture`. A
+  scoped search found no remaining downstream
+  `slug_bzlmod::BzlmodCellGraphDataKey` or
+  `slug_bzlmod::dice_graph::BzlmodCellGraphDataKey` references.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the

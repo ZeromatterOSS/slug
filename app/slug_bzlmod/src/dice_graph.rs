@@ -426,7 +426,7 @@ impl BzlmodCellGraphValue {
     Allocative
 )]
 #[display("BzlmodCellGraphDataKey")]
-pub struct BzlmodCellGraphDataKey;
+pub(crate) struct BzlmodCellGraphDataKey;
 
 impl dice::InjectedKey for BzlmodCellGraphDataKey {
     type Value = Arc<BzlmodCellGraphValue>;
