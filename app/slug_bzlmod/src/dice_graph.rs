@@ -1549,6 +1549,7 @@ pub struct RepoMaterializationManifestKey {
 }
 
 impl RepoMaterializationManifestKey {
+    #[cfg(test)]
     pub fn for_workspace_id(
         workspace_id: WorkspaceId,
         canonical_repo: &str,
@@ -1576,7 +1577,8 @@ impl RepoMaterializationManifestKey {
         )
     }
 
-    pub fn for_workspace_id_with_repo_spec_digest(
+    #[cfg(test)]
+    fn for_workspace_id_with_repo_spec_digest(
         workspace_id: WorkspaceId,
         canonical_repo: &str,
         repo_spec: Arc<RepoSpec>,

@@ -343,6 +343,7 @@ impl ExtensionRepoExecutionKey {
     }
 
     /// Create a new extension repo execution key with explicit workspace identity.
+    #[cfg(test)]
     pub fn new_with_workspace_id(
         canonical_name: String,
         extension_id: String,

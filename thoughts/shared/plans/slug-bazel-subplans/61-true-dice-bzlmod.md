@@ -2129,6 +2129,14 @@ Observed SDK result at the checkpoint:
   replay_input_data -- --nocapture`, `cargo test -p slug_bzlmod
   data_only_projection -- --nocapture`, and `cargo check -p slug_bzlmod -p
   slug_common`.
+- Extension-repo execution and materialization-manifest constructors that
+  default command repo-env to empty are now test-only unless they are already
+  an internal test helper. Production callers compile only through constructors
+  that carry both explicit workspace identity and explicit repo-env. Validation
+  passed with `cargo fmt --check`, `cargo test -p slug_bzlmod
+  extension_repo_key -- --nocapture`, `cargo test -p slug_bzlmod
+  materialization_manifest -- --nocapture`, `cargo check -p slug_bzlmod -p
+  slug_external_cells -p slug_common`, and `git diff --check`.
 - Resolver-local runtime snapshots no longer make generated repo internal names
   root-visible aliases just because the generated repo cell exists in the
   snapshot. Alias resolution now treats the snapshot's extension-cell existence
@@ -3354,7 +3362,8 @@ using Rust DICE keys and values:
      from project root are test-only; production code must pass explicit
      workspace identity and repo-env. Bzlmod projection-key and
      materialization-manifest helpers that derive workspace identity from only a
-     project root are also test-only.
+     project root are also test-only. Zero-repo-env convenience constructors
+     for extension execution and materialization manifests are test-only too.
    - The config-load command repo-env global readback and module/repository
      runtime repo-env adapters are removed; keep repo-env wired through explicit
      DICE/key/context inputs as the graph migrates.
