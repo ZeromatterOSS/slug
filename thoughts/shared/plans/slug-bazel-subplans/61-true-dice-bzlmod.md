@@ -531,6 +531,15 @@ Observed SDK result at the checkpoint:
   slug_bzlmod projection -- --nocapture`, `cargo check -p slug_bzlmod -p
   slug_common -p slug_server`, touched-file `rustfmt --edition 2024`, and
   `git diff --check`.
+- The transitional DICE projection keys no longer use the stale
+  `injected-bzlmod-session` sentinel string. Their default
+  `resolution_digest` now uses a single `injected-bzlmod-projection` constant,
+  so key display/equality output matches the actual bridge payload while still
+  making clear these are not true resolution-derived graph keys. Validation
+  passed with focused `cargo test -p slug_bzlmod dice_graph::tests --
+  --nocapture`, focused `cargo test -p slug_bzlmod projection --
+  --nocapture`, `cargo check -p slug_bzlmod -p slug_common -p slug_server`,
+  touched-file `rustfmt --edition 2024`, and `git diff --check`.
 - `use_repo_rule()` materialization is no longer replayed as a legacy
   resolution side effect. The existing precomputed `RepoSpec` extension-cell
   path now owns both builtin and Starlark repo-rule invocations, so repository

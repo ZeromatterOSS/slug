@@ -181,6 +181,8 @@ pub fn repo_env_policy_digest(repo_env: &BTreeMap<String, String>) -> String {
     hex::encode(hasher.finalize())
 }
 
+const INJECTED_BZLMOD_PROJECTION_DIGEST: &str = "injected-bzlmod-projection";
+
 /// DICE-owned root `MODULE.bazel` read/parse result.
 #[derive(Clone, Debug, Allocative)]
 pub struct RootModuleFileValue {
@@ -318,7 +320,7 @@ impl BzlmodCellGraphKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
@@ -490,7 +492,7 @@ impl ModuleVersionsKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
@@ -524,7 +526,7 @@ impl BzlmodLockfileInputsKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
@@ -567,7 +569,7 @@ impl BzlmodRepoEnvKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
@@ -610,7 +612,7 @@ impl BzlmodRepoMappingsKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
@@ -667,7 +669,7 @@ impl BzlmodResolutionFactsKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
@@ -865,7 +867,7 @@ impl dice::InjectedKey for BzlmodModuleVersionsDataKey {
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         // Transitional bridge: this narrow value replaces the former direct
-        // monolithic session dependency, but it still carries a conservative
+        // monolithic projection dependency, but it still carries a conservative
         // invalidation identity until the interpreter dependencies are fully
         // explicit.
         x == y
@@ -1100,7 +1102,7 @@ impl RegisteredToolchainsKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
@@ -1210,7 +1212,7 @@ impl RegisteredExecutionPlatformsKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from("injected-bzlmod-session"),
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
         }
     }
 
