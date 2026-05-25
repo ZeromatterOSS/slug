@@ -157,6 +157,9 @@ impl BzlmodRepoMapping {
     pub fn for_module(parsed: &ParsedModuleFile, root_module_name: &str) -> Self {
         let mut entries = HashMap::new();
         let module_name = parsed_module_name(parsed, root_module_name);
+        let use_usage_overrides = parsed.module.name.is_empty()
+            || module_name == root_module_name
+            || module_name == "_main";
 
         for dep in &parsed.module.bazel_deps {
             entries.insert(
@@ -178,11 +181,12 @@ impl BzlmodRepoMapping {
                 for repo_name in &import.repos {
                     entries.insert(
                         repo_name.clone(),
-                        canonical_repo_for_extension_import(
+                        canonical_repo_for_extension_import_with_usage_overrides(
                             usage,
                             &owner_module,
                             &ext_name,
                             repo_name,
+                            use_usage_overrides,
                         )
                         .canonical_name,
                     );
@@ -190,23 +194,27 @@ impl BzlmodRepoMapping {
                 for (apparent_name, actual_name) in &import.repo_mapping {
                     entries.insert(
                         apparent_name.clone(),
-                        canonical_repo_for_extension_import(
+                        canonical_repo_for_extension_import_with_usage_overrides(
                             usage,
                             &owner_module,
                             &ext_name,
                             actual_name,
+                            use_usage_overrides,
                         )
                         .canonical_name,
                     );
                 }
             }
 
-            for (repo_name, actual_name) in &usage.repo_overrides {
-                let generated_canonical = format!("{}+{}+{}", owner_module, ext_name, repo_name);
-                entries.insert(
-                    generated_canonical,
-                    CanonicalRepoName::new(actual_name.clone()),
-                );
+            if use_usage_overrides {
+                for (repo_name, actual_name) in &usage.repo_overrides {
+                    let generated_canonical =
+                        format!("{}+{}+{}", owner_module, ext_name, repo_name);
+                    entries.insert(
+                        generated_canonical,
+                        CanonicalRepoName::new(actual_name.clone()),
+                    );
+                }
             }
         }
 
@@ -312,17 +320,37 @@ pub fn canonical_repo_for_extension_import(
     ext_name: &str,
     internal_name: &str,
 ) -> ExtensionImportCanonicalization {
-    if let Some(dep_repo) = usage
-        .repo_overrides
-        .iter()
-        .find_map(|(repo_in_extension, dep_repo)| {
-            (repo_in_extension == internal_name).then_some(dep_repo.as_str())
-        })
-    {
-        return ExtensionImportCanonicalization {
-            canonical_name: CanonicalRepoName::new(dep_repo),
-            is_override: true,
-        };
+    canonical_repo_for_extension_import_with_usage_overrides(
+        usage,
+        owner_module,
+        ext_name,
+        internal_name,
+        true,
+    )
+}
+
+/// Canonical repository name for one repo imported from a module extension.
+pub fn canonical_repo_for_extension_import_with_usage_overrides(
+    usage: &ExtensionUsage,
+    owner_module: &str,
+    ext_name: &str,
+    internal_name: &str,
+    use_usage_overrides: bool,
+) -> ExtensionImportCanonicalization {
+    if use_usage_overrides {
+        if let Some(dep_repo) =
+            usage
+                .repo_overrides
+                .iter()
+                .find_map(|(repo_in_extension, dep_repo)| {
+                    (repo_in_extension == internal_name).then_some(dep_repo.as_str())
+                })
+        {
+            return ExtensionImportCanonicalization {
+                canonical_name: CanonicalRepoName::new(dep_repo),
+                is_override: true,
+            };
+        }
     }
 
     ExtensionImportCanonicalization {
@@ -581,7 +609,7 @@ mod tests {
 
     #[test]
     fn canonicalizes_keyword_use_repo_and_override_repo() {
-        let mut module = parsed_module("rules_owner");
+        let mut module = parsed_module("root");
         let mut usage =
             ExtensionUsage::new("@rules_owner//:extensions.bzl".to_owned(), "ext".to_owned());
         usage.imports.push(
@@ -604,8 +632,38 @@ mod tests {
     }
 
     #[test]
+    fn non_root_override_repo_is_ignored_for_module_mapping() {
+        let mut module = parsed_module("rules_owner");
+        let mut usage = ExtensionUsage::new("//:extensions.bzl".to_owned(), "ext".to_owned());
+        usage.imports.push(
+            UseRepo::new().add_mapping("public_name".to_owned(), "generated_name".to_owned()),
+        );
+        usage
+            .repo_overrides
+            .push(("generated_name".to_owned(), "actual_dep".to_owned()));
+        module.extension_usages.push(usage);
+
+        let mapping = BzlmodRepoMapping::for_module(&module, "root");
+
+        assert_eq!(
+            mapping
+                .canonicalize_label("@public_name//pkg:target")
+                .unwrap()
+                .to_storage_string(),
+            "@rules_owner++ext+generated_name//pkg:target"
+        );
+        assert_eq!(
+            mapping
+                .canonicalize_label("@rules_owner++ext+generated_name//pkg:target")
+                .unwrap()
+                .to_storage_string(),
+            "@rules_owner++ext+generated_name//pkg:target"
+        );
+    }
+
+    #[test]
     fn canonicalizes_override_generated_repo_name_to_selected_dep() {
-        let mut module = parsed_module("rules_rs");
+        let mut module = parsed_module("root");
         let mut usage = ExtensionUsage::new(
             "@rules_rs//rs:extensions.bzl".to_owned(),
             "rules_rust".to_owned(),

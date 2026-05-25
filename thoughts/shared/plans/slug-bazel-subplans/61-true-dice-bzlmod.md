@@ -276,6 +276,16 @@ Observed SDK result at the checkpoint:
   shorthand in addition to keyword mappings. A focused guardrail verifies that a
   generated repo's sibling mapping resolves `@repo` to the same-named root
   module replacement.
+- Non-root `override_repo()` usages are now ignored when constructing module
+  repo mappings and precomputed extension repo aliases, matching Bazel's
+  `ModuleFileGlobals.overrideRepo` docs and early return before `addOverride`
+  when the current module is not allowed to contribute dev-dependency-scoped
+  directives. A same-daemon Plan 61 guardrail proves a dependency module's
+  `override_repo(ext, generated = "helper")` does not redirect its
+  `use_repo(ext, "generated")` import to `@helper`; the generated repo remains
+  visible. Validation passed with focused `slug_bzlmod` repo-mapping and
+  pending-cell tests, `cargo build -p slug`, and the Plan 61 guardrail selected
+  by `-k 'non_root_override_repo_is_ignored'` (`1 passed, 123 deselected`).
 - `use_extension(..., isolate = True)` has been Bazel-grounded as a larger
   blocker, not a safe small patch. Bazel 9.0.1 rejects it unless
   `--experimental_isolated_extension_usages` is set; with the flag, each
@@ -2780,8 +2790,8 @@ using Rust DICE keys and values:
    - Implement or explicitly Bazel-ground the behavior for
      remaining `dev_dependency` surfaces, `single_version_override(registry/patches)`,
      `multiple_version_override(registry)`, `archive_override`, `git_override`,
-     `override_repo`, remaining `inject_repo` validation, and isolated
-     extension usages.
+     remaining `override_repo` validation, remaining `inject_repo` validation,
+     and isolated extension usages.
    - Preserve root `bazel_dep(dev_dependency=True)` default inclusion and
      `--ignore_dev_dependency` exclusion while moving command policy out of the
      transitional resolver.

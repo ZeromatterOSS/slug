@@ -130,6 +130,7 @@ fn canonical_repo_for_extension_import_with_root_overrides(
     ext_name: &str,
     internal_name: &str,
     root_override: Option<&String>,
+    use_usage_overrides: bool,
 ) -> crate::repo_mapping::ExtensionImportCanonicalization {
     if let Some(dep_repo) = root_override {
         return crate::repo_mapping::ExtensionImportCanonicalization {
@@ -138,11 +139,12 @@ fn canonical_repo_for_extension_import_with_root_overrides(
         };
     }
 
-    crate::repo_mapping::canonical_repo_for_extension_import(
+    crate::repo_mapping::canonical_repo_for_extension_import_with_usage_overrides(
         usage,
         owner_module,
         ext_name,
         internal_name,
+        use_usage_overrides,
     )
 }
 
@@ -275,7 +277,7 @@ pub fn pre_compute_extension_repo_cells(
                 extracted_owner
             };
 
-            if !ignore_dev_dependency {
+            if is_root && !ignore_dev_dependency {
                 // `override_repo(ext, generated = "actual_dep")` replaces the
                 // extension's repo named `generated` with the selected bzlmod
                 // dependency `actual_dep`. That replacement is visible from
@@ -316,6 +318,7 @@ pub fn pre_compute_extension_repo_cells(
                         &ext_name,
                         repo_name,
                         root_repo_overrides.get(&(ext_id.clone(), repo_name.clone())),
+                        is_root,
                     );
                     let is_override = canonical.is_override;
                     let canonical = canonical.canonical_name.into_string();
@@ -350,6 +353,7 @@ pub fn pre_compute_extension_repo_cells(
                         &ext_name,
                         actual_name,
                         root_repo_overrides.get(&(ext_id.clone(), actual_name.clone())),
+                        is_root,
                     );
                     let is_override = canonical.is_override;
                     let canonical = canonical.canonical_name.into_string();
@@ -1380,7 +1384,7 @@ mod tests {
 
     #[test]
     fn test_precompute_use_repo_honors_override_repo() {
-        let mut module = parsed_module("rules_owner");
+        let mut module = parsed_module("root");
         let mut usage =
             ExtensionUsage::new("@rules_owner//:extensions.bzl".to_owned(), "ext".to_owned());
         usage
@@ -1405,7 +1409,31 @@ mod tests {
         assert_eq!(aliases[1].declaring_module, None);
         assert_eq!(aliases[2].apparent_name, "public");
         assert_eq!(aliases[2].canonical_name, "actual_dep");
-        assert_eq!(aliases[2].declaring_module.as_deref(), Some("rules_owner"));
+        assert_eq!(aliases[2].declaring_module.as_deref(), Some("root"));
+    }
+
+    #[test]
+    fn test_precompute_use_repo_ignores_non_root_override_repo() {
+        let mut module = parsed_module("rules_owner");
+        let mut usage = ExtensionUsage::new("//:extensions.bzl".to_owned(), "ext".to_owned());
+        usage
+            .imports
+            .push(UseRepo::new().add_mapping("public".to_owned(), "generated".to_owned()));
+        usage
+            .repo_overrides
+            .push(("generated".to_owned(), "actual_dep".to_owned()));
+        module.extension_usages.push(usage);
+
+        let (cells, aliases) =
+            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false)
+                .unwrap();
+
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].canonical_name, "rules_owner++ext+generated");
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].apparent_name, "public");
+        assert_eq!(aliases[0].canonical_name, "rules_owner++ext+generated");
+        assert_eq!(aliases[0].declaring_module.as_deref(), Some("rules_owner"));
     }
 
     #[test]
