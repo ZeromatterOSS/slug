@@ -3313,9 +3313,13 @@ impl BuckConfigBasedCells {
         )
         .await
         .buck_error_context("Parsing cells")?;
-        slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data(
+        slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data_with_lockfile_inputs(
             updater,
             projection_data_for_dice,
+            slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
+                key.resolution_key.workspace_id.clone(),
+                key.lockfile_inputs.clone(),
+            ),
         )?;
         Ok(configs)
     }
@@ -4305,7 +4309,6 @@ impl BuckConfigBasedCells {
                 &repo_mapping_overrides,
             );
         }
-        let hidden_lockfile_path = options.hidden_lockfile_path.clone();
         if let Some(lockfile) = hidden_lockfile.as_ref() {
             let tracked_bzl_transitive_digests = if let Some(ctx) = dice_ctx.as_deref_mut() {
                 Some(
@@ -4357,16 +4360,6 @@ impl BuckConfigBasedCells {
             slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
                 bzlmod_projection_data.cell_graph.workspace_id.clone(),
                 Arc::new(aggregated),
-            );
-        bzlmod_projection_data.lockfile_inputs =
-            slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
-                bzlmod_projection_data.cell_graph.workspace_id.clone(),
-                Arc::new(slug_bzlmod::BzlmodLockfileInputsValue::from_values(
-                    hidden_lockfile_path,
-                    visible_lockfile_value,
-                    hidden_lockfile_value,
-                    options.lockfile_mode,
-                )),
             );
 
         // Collect toolchain and execution platform registrations from all modules.

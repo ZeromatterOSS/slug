@@ -2394,14 +2394,14 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_bzlmod set_bzlmod_projection_data -- --nocapture`,
   focused `cargo test -p slug_bzlmod data_only_projection -- --nocapture`, and
   `cargo check -p slug_bzlmod -p slug_common`.
-- Lockfile-input projection payloads now carry source workspace provenance too:
-  `BzlmodProjectionData.lockfile_inputs` stores
-  `BzlmodLockfileInputsDataValue`, `SetBzlmodProjectionData` validates it
-  against the cell graph before injection, and the legacy bridge wraps tracked
-  visible/hidden lockfile inputs with the keyed workspace identity. Validation
-  passed with `cargo fmt --check`, focused `cargo test -p slug_bzlmod
-  set_bzlmod_projection_data -- --nocapture`, focused `cargo test -p
-  slug_bzlmod replay_input_data -- --nocapture`, focused `cargo test -p
+- Lockfile-input projection payloads first gained source workspace provenance:
+  `BzlmodProjectionData.lockfile_inputs` stored
+  `BzlmodLockfileInputsDataValue`, `SetBzlmodProjectionData` validated it
+  against the cell graph before injection, and the legacy bridge wrapped
+  tracked visible/hidden lockfile inputs with the keyed workspace identity.
+  Validation passed with `cargo fmt --check`, focused `cargo test -p
+  slug_bzlmod set_bzlmod_projection_data -- --nocapture`, focused `cargo test
+  -p slug_bzlmod replay_input_data -- --nocapture`, focused `cargo test -p
   slug_bzlmod data_only_projection -- --nocapture`, `cargo check -p
   slug_bzlmod -p slug_common`, `cargo test -p slug_common
   bzlmod_projection_bridge -- --nocapture`, and `cargo test -p slug_common
@@ -2414,6 +2414,24 @@ Observed SDK result at the checkpoint:
   replay_input_data -- --nocapture`, `cargo test -p slug_bzlmod
   data_only_projection -- --nocapture`, and `cargo check -p slug_bzlmod -p
   slug_common`.
+- `BzlmodProjectionData` no longer carries lockfile inputs at all. Production
+  config-load now injects the value computed by `BzlmodLockfileInputsBridgeKey`
+  alongside the remaining transitional projection payload through
+  `set_bzlmod_projection_data_with_lockfile_inputs`, which accepts and validates
+  separate `BzlmodLockfileInputsDataValue` workspace provenance. Visible/hidden
+  lockfile content is owned by the named lockfile-input bridge rather than the
+  monolithic legacy projection data. Focused validation passed with `cargo
+  fmt`, `cargo test -p slug_bzlmod set_bzlmod_projection_data --
+  --nocapture`, `cargo test -p slug_common bzlmod_projection_bridge --
+  --nocapture`, `cargo fmt --check`, `cargo check -p slug_bzlmod -p
+  slug_common`, `cargo test -p slug_common bzlmod_lockfile_inputs_bridge --
+  --nocapture`, `cargo test -p slug_bzlmod replay_input_data -- --nocapture`,
+  `cargo test -p slug_bzlmod data_only_projection -- --nocapture`, and `cargo
+  test -p slug_bzlmod current_workspace_helpers_use_projection_workspace_id --
+  --nocapture`. Review found no missing production lockfile-injection path and
+  identified that the split setter needed the same workspace-provenance
+  validation as the old payload field; the final API accepts
+  `BzlmodLockfileInputsDataValue` and validates it before injection.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors
@@ -4158,7 +4176,9 @@ hardening behavior around it.
    - The projection bridge now gets visible/hidden lockfile values from a named
      lockfile-input bridge key instead of producing those reads inline, but the
      resulting `BzlmodLockfileInputsValue` still feeds the legacy resolver until
-     the true lockfile policy/value graph replaces the projection bridge.
+     the true lockfile policy/value graph replaces the projection bridge. The
+     value is injected separately from `BzlmodProjectionData`, so the monolithic
+     projection payload no longer carries lockfile-input facts.
    - DICE-backed bzlmod resolution now requires the tracked visible and hidden
      lockfile values when lockfile mode/path policy says those inputs are
      active, instead of silently falling back to a direct lockfile read inside
@@ -4481,8 +4501,9 @@ hardening behavior around it.
    - `BzlmodSessionData` and `BzlmodSessionDataKey` are removed, and
      `BuckConfigBasedCells` no longer stores a bzlmod payload or returns it to
      the server updater. `BzlmodProjectionData` remains as a transitional
-     bridge payload assembled by the legacy resolver; delete that projection
-     API only after module graph, repo mapping, lockfile, repo-env,
+     bridge payload assembled by the legacy resolver, but lockfile inputs have
+     been split out to the named lockfile-input bridge injection; delete the
+     remaining projection API only after module graph, repo mapping, repo-env,
      registration, and cell-graph facts have true DICE producers.
    - Generic empty session construction is removed from production paths.
      Remaining empty projection construction must explicitly carry workspace
