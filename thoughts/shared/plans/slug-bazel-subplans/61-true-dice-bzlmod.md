@@ -2514,14 +2514,19 @@ Observed SDK result at the checkpoint:
   aliases are authoritative and misses do not fall back to stale process-global
   dynamic aliases; no-runtime-snapshot resolver misses now stay on the apparent
   repo name too. Both `InterpreterForDir` load resolution and DICE eval-import
-  key canonicalization use this owner-only path. Bridge burn-down before/after
-  evidence: before, `rg -n
+  key canonicalization use this owner-only path, and `InterpreterForDir`
+  explicit `load("@repo//...")` parsing now uses
+  `parse_import_with_declared_or_runtime_aliases` so alias parsing cannot
+  rewrite the repo through `CellAliasResolver::resolve(...)` before
+  canonicalization. Bridge burn-down before/after evidence: before, `rg -n
   "canonical_bzlmod_repo_name_for_cell\\(path\\.cell|bzlmod_eval_import_cell_path_keeps_legacy_global_fallback|bzlmod_load_path_uses_empty_version_module_suffix" app/slug_interpreter_for_build/src/interpreter`
   found both production bridge calls plus tests preserving legacy
   directory/global fallback behavior; after it returns no hits, and `rg -n
-  "resolve_declared_or_runtime_alias\\(path\\.cell|no_snapshot_miss_ignores_global_alias|uses_declared_empty_version_module_alias" app/slug_interpreter_for_build/src/interpreter`
-  shows the owner-only calls and stale-global miss coverage. A clean-review
-  follow-up found that
+  "parse_import_with_declared_or_runtime_aliases|resolve_declared_or_runtime_alias\\(path\\.cell|load_import_resolution_no_snapshot_rejects_global_miss|no_snapshot_miss_ignores_global_alias|uses_declared_empty_version_module_alias" app/slug_interpreter app/slug_interpreter_for_build/src/interpreter`
+  shows the owner-only parse/canonicalization calls and stale-global miss
+  coverage. A clean-review follow-up found that explicit `load("@repo//...")`
+  parsing still reached process-global aliases before canonicalization, so this
+  owner-only parse path was added. An earlier clean-review follow-up found that
   wrong-cell equivalence still accepted extension internal-name equivalence for
   repos absent from the runtime snapshot; that path now accepts internal-name
   equivalence only when there is no runtime snapshot or the snapshot owns the
@@ -2531,11 +2536,11 @@ Observed SDK result at the checkpoint:
   passed`) and `cargo test -p slug_interpreter_for_build
   bzlmod_eval_import_cell_path -- --nocapture` (`3 passed`), `cargo test -p
   slug_interpreter_for_build load_cell_equivalence_with_runtime_aliases --
-  --nocapture`, `cargo test -p slug_interpreter_for_build
-  load_import_resolution_with_runtime_aliases_rejects_global_miss --
-  --nocapture`, and `cargo check -p slug_core -p slug_interpreter_for_build -p
-  slug_analysis`; reran `cargo check -p slug_interpreter_for_build`, `cargo
-  build -p slug`, `cargo fmt --check`, `git diff --check`, and
+  --nocapture`, reran `cargo test -p slug_interpreter_for_build
+  load_import_resolution -- --nocapture` (`2 passed`), and `cargo check -p
+  slug_interpreter -p slug_interpreter_for_build -p slug_analysis`; reran
+  `cargo check -p slug_interpreter_for_build`, `cargo build -p slug`, `cargo
+  fmt --check`, `git diff --check`, the before/after `rg` evidence above, and
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -k
   'mapped_external_extension_bzl_load_edit_rejects_replay or
@@ -2546,19 +2551,28 @@ Observed SDK result at the checkpoint:
   missing_mapped_external_extension_bzl_load_creation_rejects_audit_cell_replay
   or mapped_external_extension_bzl_load_deletion_rejects_audit_cell_replay' -rx
   --tb=short` (`7 passed, 148 deselected`) before commit.
-- Bazel-style build-setting repo normalization now uses the same
-  `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper in both
-  target-setting preprocessing and `config_setting(flag_values = ...)` matching.
-  Runtime-snapshot misses stay authoritative and do not fall back to stale
-  process-global aliases. A clean-review follow-up found that already-canonical
-  `@@owner++extension+repo` build-setting labels could keep the `@@` sigil when
-  the runtime snapshot owned that repo; canonical-sigil stripping now runs even
-  when no repo rewrite is needed, and the runtime-miss guardrail now proves the
-  label stays on the unresolved repo rather than a stale global alias.
-  Earlier validation passed with `cargo test -p slug_analysis
-  build_setting_lookup_normalization -- --nocapture`, `cargo check -p
-  slug_core -p slug_interpreter_for_build -p slug_analysis`, `cargo fmt
-  --check`, and `git diff --check`; the clean-review follow-up passed with
+- Bazel-style build-setting repo normalization now uses resolver-owned declared
+  aliases and runtime snapshot aliases directly instead of the fallback-bearing
+  `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper and
+  process-global `resolve_dynamic_extension_cell_alias(repo)` fallback in
+  `config_setting(flag_values = ...)` matching. Runtime-snapshot and
+  no-runtime-snapshot resolver misses stay authoritative and do not fall back to
+  stale process-global aliases. Bridge burn-down before/after evidence: before,
+  `rg -n
+  "canonical_bzlmod_repo_name_for_cell\\(repo\\)|resolve_dynamic_extension_cell_alias\\(repo\\)" app/slug_analysis/src/analysis/calculation.rs`
+  found the production bridge; after it returns no hits, and `rg -n
+  "resolve_declared_or_runtime_alias\\(repo\\)|no_snapshot_miss_ignores_global_alias" app/slug_analysis/src/analysis/calculation.rs`
+  shows the owner-only helper and stale-global miss coverage. A clean-review
+  follow-up found that already-canonical `@@owner++extension+repo`
+  build-setting labels could keep the `@@` sigil when the runtime snapshot owned
+  that repo; canonical-sigil stripping now runs even when no repo rewrite is
+  needed, and the runtime-miss guardrail now proves the label stays on the
+  unresolved repo rather than a stale global alias. Earlier validation passed
+  with `cargo test -p slug_analysis build_setting_lookup_normalization --
+  --nocapture`, reran as `cargo test -p slug_analysis build_setting_lookup_ --
+  --nocapture` (`4 passed`), `cargo check -p slug_analysis`, `cargo build -p
+  slug`, `cargo fmt --check`, and `git diff --check`; the clean-review
+  follow-up passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-build-setting
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-build-setting-target
   cargo test -p slug_core build_setting_labels -- --nocapture`.

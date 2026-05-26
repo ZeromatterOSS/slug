@@ -43,6 +43,7 @@ use slug_interpreter::import_paths::ImplicitImportPaths;
 use slug_interpreter::package_imports::ImplicitImport;
 use slug_interpreter::parse_import::RelativeImports;
 use slug_interpreter::parse_import::parse_import;
+use slug_interpreter::parse_import::parse_import_with_declared_or_runtime_aliases;
 use slug_interpreter::paths::module::OwnedStarlarkModulePath;
 use slug_interpreter::paths::module::StarlarkModulePath;
 use slug_interpreter::paths::package::PackageFilePath;
@@ -207,11 +208,19 @@ impl LoadResolver for InterpreterLoadResolver {
             current_dir_with_allowed_relative: &self.config.current_dir_with_allowed_relative_dirs,
             package_dir: self.config.package_dir.as_ref(),
         };
-        let mut path = parse_import(
-            &self.config.cell_info.cell_alias_resolver(),
-            relative_import_option,
-            path,
-        )?;
+        let mut path = if self.config.bzlmod_mode {
+            parse_import_with_declared_or_runtime_aliases(
+                &self.config.cell_info.cell_alias_resolver(),
+                relative_import_option,
+                path,
+            )?
+        } else {
+            parse_import(
+                &self.config.cell_info.cell_alias_resolver(),
+                relative_import_option,
+                path,
+            )?
+        };
 
         // check for bxl files first before checking for prelude.
         // All bxl imports are parsed the same regardless of prelude or not.
@@ -516,7 +525,36 @@ mod tests {
         let current_dir =
             CellPathWithAllowedRelativeDir::new(CellPath::testing_new("root//pkg"), None);
 
-        let parsed = parse_import(
+        let parsed = parse_import_with_declared_or_runtime_aliases(
+            &resolver,
+            RelativeImports::Allow {
+                current_dir_with_allowed_relative: &current_dir,
+                package_dir: None,
+            },
+            &format!("@{apparent}//pkg:defs.bzl"),
+        );
+
+        assert!(parsed.is_err());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
+            Some(wrong_global.to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn load_import_resolution_no_snapshot_rejects_global_miss() -> slug_error::Result<()> {
+        let apparent = "legacy_load_parse_missing_alias";
+        let wrong_global = "wrong_owner++ext+legacy_parse_generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = test_alias_resolver();
+        let current_dir =
+            CellPathWithAllowedRelativeDir::new(CellPath::testing_new("root//pkg"), None);
+
+        let parsed = parse_import_with_declared_or_runtime_aliases(
             &resolver,
             RelativeImports::Allow {
                 current_dir_with_allowed_relative: &current_dir,

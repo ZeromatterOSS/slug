@@ -15,6 +15,7 @@ use slug_core::cells::CellAliasResolver;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
+use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePath;
 use slug_core::cells::paths::CellRelativePathBuf;
 use slug_fs::paths::RelativePath;
@@ -37,6 +38,14 @@ enum ImportParseError {
         "Unable to parse import spec. Expected format `(@<cell>)//package/name:filename.bzl` or `:filename.bzl`, but got a path. Got `{0}`"
     )]
     NotAFileName(String),
+    #[error("unknown cell alias in import: `{0}`")]
+    UnknownCellAlias(String),
+}
+
+#[derive(Clone, Copy)]
+enum ImportAliasResolution {
+    Legacy,
+    DeclaredOrRuntimeOnly,
 }
 
 pub enum RelativeImports<'a> {
@@ -88,6 +97,23 @@ pub fn parse_import(
     parse_import_with_config(cell_resolver, import, &opts)
 }
 
+pub fn parse_import_with_declared_or_runtime_aliases(
+    cell_resolver: &CellAliasResolver,
+    relative_import_option: RelativeImports,
+    import: &str,
+) -> slug_error::Result<CellPath> {
+    let opts: ParseImportOptions = ParseImportOptions {
+        allow_missing_at_symbol: false,
+        relative_import_option,
+    };
+    parse_import_with_config_and_alias_resolution(
+        cell_resolver,
+        import,
+        &opts,
+        ImportAliasResolution::DeclaredOrRuntimeOnly,
+    )
+}
+
 /// Parse import string into a BuckPath, but potentially be more or less flexible with what is
 /// accepted.
 ///
@@ -101,9 +127,23 @@ pub fn parse_import_with_config(
     import: &str,
     opts: &ParseImportOptions,
 ) -> slug_error::Result<CellPath> {
+    parse_import_with_config_and_alias_resolution(
+        cell_resolver,
+        import,
+        opts,
+        ImportAliasResolution::Legacy,
+    )
+}
+
+fn parse_import_with_config_and_alias_resolution(
+    cell_resolver: &CellAliasResolver,
+    import: &str,
+    opts: &ParseImportOptions,
+    alias_resolution: ImportAliasResolution,
+) -> slug_error::Result<CellPath> {
     if let Some(alias) = import.strip_prefix('@') {
         if !alias.is_empty() && !alias.contains("//") && !alias.contains(':') {
-            let cell = cell_resolver.resolve(alias)?;
+            let cell = resolve_import_cell(cell_resolver, alias, alias_resolution)?;
             let filename = FileName::new(alias)
                 .map_err(|_| ImportParseError::NotAFileName(import.to_owned()))?;
             return Ok(CellPath::new(
@@ -131,7 +171,7 @@ pub fn parse_import_with_config(
                     }
                 }
                 Some((alias, cell_relative_path)) => {
-                    let cell = cell_resolver.resolve(alias)?;
+                    let cell = resolve_import_cell(cell_resolver, alias, alias_resolution)?;
                     Ok(CellPath::new(
                         cell,
                         CellRelativePathBuf::try_from(cell_relative_path.to_owned())?,
@@ -174,7 +214,7 @@ pub fn parse_import_with_config(
                     let (alias, cell_relative_path) =
                         parse_import_cell_path_parts(path, opts.allow_missing_at_symbol)
                             .ok_or_else(|| ImportParseError::MatchFailed(import.to_owned()))?;
-                    let cell = cell_resolver.resolve(alias)?;
+                    let cell = resolve_import_cell(cell_resolver, alias, alias_resolution)?;
                     // Join package path with the full target path (including subdirs)
                     let combined = if cell_relative_path.is_empty() {
                         full_target_path.to_owned()
@@ -204,7 +244,7 @@ pub fn parse_import_with_config(
                     let (alias, cell_relative_path) =
                         parse_import_cell_path_parts(path, opts.allow_missing_at_symbol)
                             .ok_or_else(|| ImportParseError::MatchFailed(import.to_owned()))?;
-                    let cell = cell_resolver.resolve(alias)?;
+                    let cell = resolve_import_cell(cell_resolver, alias, alias_resolution)?;
                     Ok(CellPath::new(
                         cell,
                         <&CellRelativePath>::try_from(cell_relative_path)?.join(filename),
@@ -212,6 +252,19 @@ pub fn parse_import_with_config(
                 }
             }
         }
+    }
+}
+
+fn resolve_import_cell(
+    cell_resolver: &CellAliasResolver,
+    alias: &str,
+    alias_resolution: ImportAliasResolution,
+) -> slug_error::Result<CellName> {
+    match alias_resolution {
+        ImportAliasResolution::Legacy => cell_resolver.resolve(alias),
+        ImportAliasResolution::DeclaredOrRuntimeOnly => cell_resolver
+            .resolve_declared_or_runtime_alias(alias)
+            .ok_or_else(|| ImportParseError::UnknownCellAlias(alias.to_owned()).into()),
     }
 }
 

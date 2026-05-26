@@ -1018,8 +1018,8 @@ fn normalized_bzlmod_repo_name_with_alias_resolver(
     cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> String {
     let repo = cell_alias_resolver
-        .map(|resolver| resolver.canonical_bzlmod_repo_name_for_cell(repo))
-        .or_else(|| slug_core::cells::resolve_dynamic_extension_cell_alias(repo))
+        .and_then(|resolver| resolver.resolve_declared_or_runtime_alias(repo))
+        .map(|cell| cell.as_str().to_owned())
         .unwrap_or_else(|| repo.to_owned());
     let repo = if let Some((_, rest)) = repo.split_once("++") {
         rest.rsplit_once('+')
@@ -1707,11 +1707,6 @@ mod tests {
 
     #[test]
     fn build_setting_lookup_normalizes_bzlmod_repo_spellings() {
-        slug_core::cells::register_dynamic_extension_cell_alias(
-            "rules_rs++rules_rust+rules_rust".to_owned(),
-            "rules_rust+".to_owned(),
-        );
-
         assert_eq!(
             normalized_bzlmod_repo_name_with_alias_resolver(
                 "rules_rs++rules_rust+rules_rust",
@@ -1727,6 +1722,32 @@ mod tests {
             normalized_bzlmod_repo_name_with_alias_resolver("rules_rust", None),
             "rules_rust"
         );
+    }
+
+    #[test]
+    fn build_setting_lookup_normalization_no_snapshot_miss_ignores_global_alias()
+    -> slug_error::Result<()> {
+        let apparent = "plan61_build_setting_legacy_alias";
+        let wrong_global = "plan61_wrong_owner++settings+legacy_generated";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
+
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        assert_eq!(
+            normalized_bzlmod_repo_name_with_alias_resolver(apparent, Some(&resolver)),
+            apparent
+        );
+        assert_eq!(
+            normalized_bzlmod_repo_name_with_alias_resolver(apparent, None),
+            apparent
+        );
+        Ok(())
     }
 
     #[test]
