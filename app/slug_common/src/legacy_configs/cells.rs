@@ -1641,7 +1641,6 @@ struct TrackedExtensionBzlDigestKey {
     project_root: AbsNormPathBuf,
     extension_id: Arc<str>,
     repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
-    poll_digest: String,
 }
 
 #[async_trait]
@@ -1653,7 +1652,14 @@ impl Key for TrackedExtensionBzlDigestKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Ok(Arc::from(self.poll_digest.as_str()))
+        Ok(Arc::from(
+            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                self.extension_id.as_ref(),
+                self.project_root.as_path(),
+                Some(self.repo_mappings.as_ref()),
+            )
+            .as_str(),
+        ))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1663,11 +1669,10 @@ impl Key for TrackedExtensionBzlDigestKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        // The transitive .bzl digest is polled into the key before compute.
-        // The same key is valid; edit/create/delete transitions produce a new
-        // digest and therefore a different key.
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // This transitional digest still scans files directly inside compute
+        // until the Starlark loaded-module graph is exposed here.
+        false
     }
 }
 
@@ -1684,28 +1689,11 @@ async fn tracked_extension_bzl_digests_for_lockfile_preseed(
             project_root: project_root.clone(),
             extension_id: Arc::from(extension_id.as_str()),
             repo_mappings: repo_mappings.clone(),
-            poll_digest: extension_bzl_digest_poll_digest(
-                project_root.as_path(),
-                extension_id,
-                repo_mappings.as_ref(),
-            ),
         };
         let digest = ctx.compute(&key).await??;
         digests.insert(extension_id.clone(), digest.to_string());
     }
     Ok(digests)
-}
-
-fn extension_bzl_digest_poll_digest(
-    project_root: &Path,
-    extension_id: &str,
-    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
-) -> String {
-    slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
-        extension_id,
-        project_root,
-        Some(repo_mappings),
-    )
 }
 
 async fn root_extension_replay_summary_digest(
@@ -1778,11 +1766,6 @@ async fn root_extension_replay_summary_digest(
                 project_root: AbsNormPathBuf::try_from(project_fs.root().as_path().to_path_buf())?,
                 extension_id: Arc::from(extension_id.as_str()),
                 repo_mappings: repo_mappings.clone(),
-                poll_digest: extension_bzl_digest_poll_digest(
-                    project_fs.root().as_path(),
-                    &extension_id,
-                    repo_mappings.as_ref(),
-                ),
             })
             .await??;
         let usages_digest = slug_bzlmod::compute_extension_input_hash(extension);
@@ -6254,12 +6237,11 @@ ext = module_extension(implementation = _impl)
                 project_root: AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?,
                 extension_id: Arc::from(extension_id),
                 repo_mappings: Arc::new(repo_mappings.clone()),
-                poll_digest: direct.clone(),
             })
             .await??;
 
         assert_eq!(tracked.as_ref(), direct);
-        assert!(<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
+        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
             tracked
         )));
         Ok(())
@@ -6294,7 +6276,6 @@ ext = module_extension(implementation = _impl)
             project_root: project_root.clone(),
             extension_id: Arc::from(extension_id),
             repo_mappings: Arc::new(repo_mappings.clone()),
-            poll_digest: direct_missing.clone(),
         };
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
@@ -6307,11 +6288,12 @@ ext = module_extension(implementation = _impl)
 
         let tracked_missing = dice.compute(&key).await??;
         assert_eq!(tracked_missing.as_ref(), direct_missing);
-        assert!(<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
+        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
             tracked_missing.clone()
         )));
 
         fs.write_file("helper.bzl", "HELPER = 'created'\n");
+        let mut dice = dice.into_updater().commit().await;
         let direct_created =
             slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
                 extension_id,
@@ -6323,13 +6305,12 @@ ext = module_extension(implementation = _impl)
                 project_root,
                 extension_id: Arc::from(extension_id),
                 repo_mappings: Arc::new(repo_mappings),
-                poll_digest: direct_created.clone(),
             })
             .await??;
 
         assert_ne!(tracked_missing, tracked_created);
         assert_eq!(tracked_created.as_ref(), direct_created);
-        assert!(<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
+        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
             tracked_created
         )));
         Ok(())

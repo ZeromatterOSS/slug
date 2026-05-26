@@ -293,6 +293,14 @@ Observed SDK result at the checkpoint:
   61 extension replay selector for local/transitive/mapped `.bzl` edits,
   creations, and deletions (`6 passed, 149 deselected`), `cargo fmt --check`,
   and `git diff --check`.
+  Preseed digest follow-up: the remaining explicit lockfile preseed scanner now
+  runs inside `TrackedExtensionBzlDigestKey::compute` instead of being polled
+  before key construction and injected as `poll_digest`. Bridge surface
+  reduced: extension `.bzl` digest preseed no longer hides a direct scanner read
+  in key identity; the named DICE key owns the transitional scan and is invalid
+  across transactions until the Starlark loaded-module graph replaces it.
+  Focused validation passed with `cargo test -p slug_common
+  tracked_extension_bzl_digest -- --nocapture`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
