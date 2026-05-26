@@ -1103,6 +1103,10 @@ mod tests {
                 workspace_id.clone(),
                 Vec::new(),
             ),
+            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(std::collections::HashMap::new()),
+            ),
             slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
                 workspace_id.clone(),
                 Default::default(),

@@ -3198,6 +3198,7 @@ struct BzlmodProjectionBridgeValue {
     projection_data: slug_bzlmod::BzlmodProjectionData,
     registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
     registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
+    extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
     resolution_facts: slug_bzlmod::BzlmodResolutionFactsValue,
     repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
 }
@@ -3312,6 +3313,7 @@ impl BuckConfigBasedCells {
             projection_data_for_dice,
             registered_toolchains_for_dice,
             registered_execution_platforms_for_dice,
+            extension_aggregations_for_dice,
             resolution_facts_for_dice,
             repo_mappings_for_dice,
         ) = bzlmod_projection.as_ref().as_ref().map_or_else(
@@ -3327,6 +3329,10 @@ impl BuckConfigBasedCells {
                     slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
                         key.resolution_key.workspace_id.clone(),
                         Vec::new(),
+                    ),
+                    slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                        Arc::new(HashMap::new()),
                     ),
                     slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
                         key.resolution_key.workspace_id.clone(),
@@ -3345,6 +3351,7 @@ impl BuckConfigBasedCells {
                     value.projection_data.clone(),
                     value.registered_toolchains.clone(),
                     value.registered_execution_platforms.clone(),
+                    value.extension_aggregations.clone(),
                     value.resolution_facts.clone(),
                     value.repo_mappings.clone(),
                 )
@@ -3377,6 +3384,7 @@ impl BuckConfigBasedCells {
             ),
             registered_toolchains_for_dice,
             registered_execution_platforms_for_dice,
+            extension_aggregations_for_dice,
             resolution_facts_for_dice,
             repo_mappings_for_dice,
         )?;
@@ -3848,6 +3856,7 @@ impl BuckConfigBasedCells {
             slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id);
         let registered_toolchains;
         let registered_execution_platforms;
+        let extension_aggregations;
         let mut resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
             bzlmod_projection_data.cell_graph.workspace_id.clone(),
             indexmap::IndexMap::new(),
@@ -4415,13 +4424,12 @@ impl BuckConfigBasedCells {
         );
 
         // Aggregate extension usages from all modules and carry them into the
-        // DICE-injected bzlmod projection state. This data is needed when
+        // DICE-injected extension aggregation value. This data is needed when
         // extension repos are lazily executed inside DICE.
-        bzlmod_projection_data.extension_aggregations =
-            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
-                bzlmod_projection_data.cell_graph.workspace_id.clone(),
-                Arc::new(aggregated),
-            );
+        extension_aggregations = slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
+            bzlmod_projection_data.cell_graph.workspace_id.clone(),
+            Arc::new(aggregated),
+        );
 
         // Collect toolchain and execution platform registrations from all modules.
         // Priority order: root module first, then BFS order of dep graph.
@@ -4748,6 +4756,7 @@ impl BuckConfigBasedCells {
             projection_data: bzlmod_projection_data,
             registered_toolchains,
             registered_execution_platforms,
+            extension_aggregations,
             resolution_facts,
             repo_mappings,
         }))
