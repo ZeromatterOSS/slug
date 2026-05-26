@@ -3863,10 +3863,17 @@ impl BuckConfigBasedCells {
         let mut resolved_graph_for_aliases = None;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let mut cell_graph = slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(workspace_id);
-        let mut module_versions = slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
-            cell_graph.workspace_id.clone(),
-            Arc::new(HashMap::new()),
-        );
+        let bzlmod_root_module_name = if parsed.module.name.is_empty() {
+            "_main".to_owned()
+        } else {
+            parsed.module.name.clone()
+        };
+        let mut module_versions =
+            slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                cell_graph.workspace_id.clone(),
+                bzlmod_root_module_name.clone(),
+                Arc::new(HashMap::new()),
+            );
         let registered_toolchains;
         let registered_execution_platforms;
         let extension_aggregations;
@@ -4236,10 +4243,12 @@ impl BuckConfigBasedCells {
             for (name, info) in &resolved_graph.modules {
                 version_map.insert(name.clone(), info.version.clone());
             }
-            module_versions = slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
-                cell_graph.workspace_id.clone(),
-                Arc::new(version_map),
-            );
+            module_versions =
+                slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                    cell_graph.workspace_id.clone(),
+                    bzlmod_root_module_name.clone(),
+                    Arc::new(version_map),
+                );
         }
 
         // Build parsed_modules list for extension resolution

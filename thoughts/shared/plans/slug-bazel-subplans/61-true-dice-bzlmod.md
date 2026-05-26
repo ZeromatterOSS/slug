@@ -2198,26 +2198,21 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo test -p slug_common bzlmod -- --nocapture`, `cargo
   build -p slug`, the focused Plan 61 Python replay subset, the full Plan 61
   Python guardrail with 72 tests, `cargo fmt --check`, and `git diff --check`.
-- `ModuleVersionsKey` now reads the root module name from
+- Earlier, `ModuleVersionsKey` moved the root module name into
   `BzlmodCellGraphKey` when composing its conservative invalidation identity,
   instead of carrying a duplicate root-name copy in the injected
-  module-version data. The cell graph is still legacy-produced, but the
-  module-version consumer now depends on the named cell-graph projection for
-  root module identity. Validation passed with `cargo check -p slug_bzlmod -p
-  slug_common`, focused `slug_bzlmod` coverage proving the session cell graph
-  root name feeds module-version invalidation, full `cargo test -p
-  slug_bzlmod -- --nocapture`, `cargo test -p slug_common bzlmod --
-  --nocapture`, `cargo build -p slug`, the focused Plan 61 Python replay
-  subset, the full Plan 61 Python guardrail with 72 tests, `cargo fmt
-  --check`, and `git diff --check`.
+  module-version data. That narrowed session data at the time, but it left a
+  module-version dependency on the named cell graph until the later
+  module-version-root-name split below.
 - Registry-file hashes and selected yanked-version facts now flow through a
   workspace-checked `BzlmodResolutionFactsKey`, leaving
   `BzlmodModuleVersionsDataValue` as the injected module-version map rather
   than a carrier for unrelated conservative invalidation facts.
-  `ModuleVersionsKey` composes its invalidation identity from the named cell
-  graph, lockfile, repo-env, repo-mapping, and resolution-facts projections.
-  This remains transitional because the facts are still produced by the legacy
-  resolver. Validation passed with `cargo check -p slug_bzlmod -p
+  At that checkpoint, `ModuleVersionsKey` composed its invalidation identity
+  from the named cell graph, lockfile, repo-env, repo-mapping, and
+  resolution-facts projections. A later slice below moved the root module name
+  off the cell graph again; the facts remain transitional because they are
+  still produced by the legacy resolver. Validation passed with `cargo check -p slug_bzlmod -p
   slug_common`, focused `slug_bzlmod` coverage for lockfile/repo-env/facts
   session injection, full `cargo test -p slug_bzlmod -- --nocapture`, `cargo
   test -p slug_common bzlmod -- --nocapture`, `cargo build -p slug`, the
@@ -2534,6 +2529,21 @@ Observed SDK result at the checkpoint:
   slug_external_cells`, and `git diff --check`. Clean review found no
   actionable issues and confirmed the slice does not claim true cell-graph
   producers or Plan 61 closure.
+- `ModuleVersionsKey` no longer computes `BzlmodCellGraphKey` only to borrow
+  the root module name for conservative invalidation. The injected
+  `BzlmodModuleVersionsDataValue` now carries the root module name alongside
+  the selected module-version map, and the legacy resolver sets it from the
+  parsed root module before injecting the value. This removes a module-version
+  consumer dependency on the cell graph while leaving the module-version facts
+  legacy-produced until true module/resolution graph producers exist. Focused
+  validation passed with `cargo fmt`, `cargo test -p slug_bzlmod
+  module_versions_key_uses_module_data_root_name_without_cell_graph --
+  --nocapture`, `cargo test -p slug_bzlmod set_bzlmod_projection_data --
+  --nocapture`, `cargo test -p slug_bzlmod
+  current_workspace_helpers_use_projection_workspace_id -- --nocapture`,
+  `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`,
+  `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
+  slug_external_cells`, and `git diff --check`.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors
@@ -3063,10 +3073,11 @@ What did not work or remains risky:
   replay-input consumers, repo-mapping consumers, and module-version consumers
   now read narrower injected DICE values. Data-only projections carry their own
   source workspace provenance and no longer force an unrelated cell-graph
-  compute; module-version and extension-aggregation consumers still read the
-  named cell graph where they need root module or graph facts. The
-  module-version value still carries a conservative projection invalidation
-  identity until the remaining
+  compute; module-version consumers now get the root module name from
+  module-version data instead of computing the cell graph, while
+  extension-aggregation consumers still read the named cell graph where they
+  need root module or graph facts. The module-version value still carries a
+  conservative projection invalidation identity until the remaining
   interpreter/materialization inputs are explicit. `BzlmodSessionData` and
   `BzlmodSessionDataKey` have been removed, and the bridge value now carries
   the legacy-produced cell graph directly; `BzlmodProjectionData` remains only
@@ -4211,9 +4222,10 @@ hardening behavior around it.
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
-   - Module-version consumers and current-workspace helpers still read the
-     named cell graph where they need root or graph facts, and the persisted
-     config-load key carries the daemon output base, including
+   - Current-workspace helpers still read the named cell graph where they need
+     root or graph facts; module-version consumers now get the root module name
+     from injected module-version data instead of computing the cell graph. The
+     persisted config-load key carries the daemon output base, including
      no-`MODULE.bazel` empty projections. Data-only projection keys now rely on
      their own source workspace provenance instead of deriving identity through
      the cell graph, but their data payloads are still injected from the legacy

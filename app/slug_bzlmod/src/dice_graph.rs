@@ -686,6 +686,7 @@ impl BzlmodResolutionFactsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsDataValue {
     pub workspace_id: WorkspaceId,
+    pub root_module_name: String,
     pub module_versions: Arc<HashMap<String, String>>,
 }
 
@@ -694,8 +695,17 @@ impl BzlmodModuleVersionsDataValue {
         workspace_id: WorkspaceId,
         module_versions: Arc<HashMap<String, String>>,
     ) -> Self {
+        Self::for_workspace_with_root_module_name(workspace_id, String::new(), module_versions)
+    }
+
+    pub fn for_workspace_with_root_module_name(
+        workspace_id: WorkspaceId,
+        root_module_name: String,
+        module_versions: Arc<HashMap<String, String>>,
+    ) -> Self {
         Self {
             workspace_id,
+            root_module_name,
             module_versions,
         }
     }
@@ -1032,21 +1042,16 @@ impl Key for ModuleVersionsKey {
                 self.workspace_id.clone(),
             ))
             .await??;
-        let cell_graph = ctx
-            .compute(&BzlmodCellGraphKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
         let resolution_facts = ctx
             .compute(&BzlmodResolutionFactsKey::for_workspace_id(
                 self.workspace_id.clone(),
             ))
             .await??;
         Ok(Arc::new(ModuleVersionsValue {
-            workspace_id: cell_graph.workspace_id.clone(),
+            workspace_id: data.workspace_id.clone(),
             module_versions: data.module_versions.clone(),
             invalidation: Arc::new(BzlmodModuleVersionsInvalidation {
-                root_module_name: cell_graph.root_module_name.clone(),
+                root_module_name: data.root_module_name.clone(),
                 lockfile_inputs,
                 repo_env: repo_env.as_ref().clone(),
                 registry_file_hashes: resolution_facts.registry_file_hashes.clone(),
