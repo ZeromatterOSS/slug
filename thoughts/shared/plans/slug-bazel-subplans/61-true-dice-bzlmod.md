@@ -3174,11 +3174,16 @@ What did not work or remains risky:
   compatibility callers that intentionally lack resolver-owned paths. Before/
   after evidence:
   `rg -n "resolve_label_to_path|Fallback to legacy resolution if cell paths not available" app/slug_interpreter_for_build/src/module_ctx app/slug_interpreter_for_build/src/repository_ctx.rs`
-  now returns no hits. Validation passed with `cargo test -p
-  slug_interpreter_for_build module_ctx -- --nocapture`, `cargo check -p
-  slug_interpreter_for_build`, `cargo build -p slug`, the explicit-binary Plan
-  61 selector for module_ctx Label read/materialization/extract/wasm paths (`4
-  passed, 151 deselected`), `cargo fmt --check`, and `git diff --check`.
+  now returns no hits. Clean-review follow-up found that `module_ctx.execute`
+  still converted unresolved Label arguments to raw label strings; that
+  fallback is now gone too, and unresolved execute Labels use the same
+  resolver-owned cell-path error as other `module_ctx` Label-taking methods.
+  Validation passed with `cargo test -p slug_interpreter_for_build module_ctx
+  -- --nocapture` (`30 passed`), `cargo check -p slug_interpreter_for_build`,
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo build -p slug`, the
+  explicit-binary Plan 61 selector for module_ctx Label
+  read/materialization/extract/wasm paths (`4 passed, 151 deselected`),
+  `cargo fmt --check`, and `git diff --check`.
 - `repository_ctx` Label path and lazy-materialization ownership now matches
   the same resolver-owned shape. `RepositoryContext` no longer carries a
   `resolver_owned_label_paths` mode bit: all path-like label resolution uses

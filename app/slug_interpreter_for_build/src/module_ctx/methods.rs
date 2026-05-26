@@ -301,26 +301,23 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         let args: Vec<String> = arguments
             .items
             .iter()
-            .map(|v| {
+            .map(|v| -> starlark::Result<String> {
                 if v.get_type() == "Label" {
                     // Resolve Labels via cell path map (Bazel's getPathFromLabel)
                     let label_str = v.to_str();
-                    if let Some(path) = this.resolve_label_to_filesystem_path(&label_str) {
-                        ensure_label_path_materialized(&path);
-                        path.to_string_lossy().to_string()
-                    } else {
-                        label_str
-                    }
+                    let path = resolve_module_ctx_label(this, &label_str, "module_ctx.execute()")?;
+                    ensure_label_path_materialized(&path);
+                    Ok(path.to_string_lossy().to_string())
                 } else if let Some(rp) = v.downcast_ref::<crate::repository_ctx::RepositoryPath>() {
                     // RepositoryPath objects (from mctx.path()) → extract path string
-                    rp.path_str().to_owned()
+                    Ok(rp.path_str().to_owned())
                 } else {
-                    v.unpack_str()
+                    Ok(v.unpack_str()
                         .map(|s| s.to_owned())
-                        .unwrap_or_else(|| v.to_str())
+                        .unwrap_or_else(|| v.to_str()))
                 }
             })
-            .collect();
+            .collect::<starlark::Result<_>>()?;
 
         if args.is_empty() {
             return Err(slug_error::slug_error!(

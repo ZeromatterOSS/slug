@@ -418,6 +418,47 @@ fn test_module_context_path_label_requires_resolver_owned_paths() {
     );
 }
 
+#[test]
+fn test_module_context_execute_label_requires_resolver_owned_paths() {
+    use starlark::environment::GlobalsBuilder;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    use crate::interpreter::natives::register_bzl_module_globals;
+
+    let temp_dir = TempDir::new().unwrap();
+    let working_dir = temp_dir.path().join("work");
+    let legacy_repo = temp_dir.path().join("bazel-external").join("legacy_repo");
+    std::fs::create_dir_all(&working_dir).unwrap();
+    std::fs::create_dir_all(&legacy_repo).unwrap();
+    std::fs::write(legacy_repo.join("tool"), "#!/bin/sh\nexit 0\n").unwrap();
+    let ctx = ModuleContext::empty().with_temp_working_dir(working_dir);
+
+    let module = Module::new();
+    let heap = module.heap();
+    module.set("mctx", heap.alloc(ctx));
+
+    let ast = AstModule::parse(
+        "execute.star",
+        "mctx.execute([Label('@legacy_repo//:tool')])".to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    let globals = GlobalsBuilder::standard()
+        .with(register_bzl_module_globals)
+        .build();
+    let mut eval = Evaluator::new(&module);
+    let err = eval.eval_module(ast, &globals).unwrap_err();
+
+    assert!(
+        err.to_string()
+            .contains("requires resolver-owned bzlmod cell paths"),
+        "{err:?}"
+    );
+}
+
 fn create_module_ctx_test_tar_gz() -> Vec<u8> {
     use std::io::Write;
 
