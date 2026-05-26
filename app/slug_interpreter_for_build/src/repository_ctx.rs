@@ -70,6 +70,7 @@ use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
+use starlark::values::dict::DictRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
@@ -1554,6 +1555,7 @@ pub(crate) fn perform_download_and_extract_to_dir(
     integrity: &str,
     canonical_id: &str,
     strip_prefix: Option<&str>,
+    rename_files: &BTreeMap<String, String>,
 ) -> slug_error::Result<DownloadInfo> {
     if let Some(data) = read_cached_repository_download(sha256, integrity, canonical_id) {
         std::fs::create_dir_all(output_dir).map_err(|e| {
@@ -1563,7 +1565,7 @@ pub(crate) fn perform_download_and_extract_to_dir(
                 e
             )
         })?;
-        extract_archive(&data, output_dir, strip_prefix)
+        extract_archive(&data, output_dir, strip_prefix, rename_files)
             .map_err(|e| slug_error::slug_error!(slug_error::ErrorTag::Input, "{}", e))?;
         return Ok(DownloadInfo::new(true, &data));
     }
@@ -1592,7 +1594,7 @@ pub(crate) fn perform_download_and_extract_to_dir(
                     )
                 })?;
 
-                extract_archive(&data, output_dir, strip_prefix)
+                extract_archive(&data, output_dir, strip_prefix, rename_files)
                     .map_err(|e| slug_error::slug_error!(slug_error::ErrorTag::Input, "{}", e))?;
 
                 return Ok(DownloadInfo::new(true, &data));
@@ -1610,8 +1612,91 @@ pub(crate) fn perform_download_and_extract_to_dir(
     ))
 }
 
+pub(crate) fn parse_rename_files<'v>(
+    rename_files: Option<Value<'v>>,
+    api_name: &str,
+) -> starlark::Result<BTreeMap<String, String>> {
+    let Some(value) = rename_files else {
+        return Ok(BTreeMap::new());
+    };
+    if value.is_none() {
+        return Ok(BTreeMap::new());
+    }
+    let Some(dict) = DictRef::from_value(value) else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "{} rename_files must be a dict of string to string, got {}",
+            api_name,
+            value.get_type(),
+        )
+        .into());
+    };
+
+    let mut parsed = BTreeMap::new();
+    for (key, value) in dict.iter() {
+        let Some(key) = key.unpack_str() else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "{} rename_files keys must be strings, got {}",
+                api_name,
+                key.get_type(),
+            )
+            .into());
+        };
+        let Some(value) = value.unpack_str() else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "{} rename_files values must be strings, got {}",
+                api_name,
+                value.get_type(),
+            )
+            .into());
+        };
+        parsed.insert(key.to_owned(), value.to_owned());
+    }
+
+    Ok(parsed)
+}
+
+fn archive_entry_path_after_rename(
+    path: &Path,
+    rename_files: &BTreeMap<String, String>,
+) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    rename_files
+        .get(path_str.as_ref())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| path.to_owned())
+}
+
+fn archive_entry_destination(
+    path: &Path,
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> Option<PathBuf> {
+    let Some(prefix) = strip_prefix else {
+        return Some(dest_dir.join(path));
+    };
+
+    let prefix = prefix.trim_end_matches('/');
+    if prefix.is_empty() {
+        return Some(dest_dir.join(path));
+    }
+
+    let stripped = path.strip_prefix(prefix).ok()?;
+    if stripped.as_os_str().is_empty() {
+        return None;
+    }
+    Some(dest_dir.join(stripped))
+}
+
 /// Extract a tar.gz archive to a destination directory.
-fn extract_tar_gz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
+fn extract_tar_gz(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+    rename_files: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let decoder = GzDecoder::new(data);
     let mut archive = Archive::new(decoder);
 
@@ -1619,31 +1704,10 @@ fn extract_tar_gz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> R
         let mut entry = entry_result.map_err(|e| e.to_string())?;
 
         let path = entry.path().map_err(|e| e.to_string())?;
-
-        // Apply strip_prefix if specified
-        let dest_path = if let Some(prefix) = strip_prefix {
-            let path_str = path.to_string_lossy();
-            if let Some(stripped) = path_str.strip_prefix(prefix) {
-                let stripped = stripped.trim_start_matches('/');
-                if stripped.is_empty() {
-                    continue;
-                }
-                dest_dir.join(stripped)
-            } else if path_str.starts_with(prefix.trim_end_matches('/')) {
-                let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
-                if let Some(stripped) = path_str.strip_prefix(&prefix_with_slash) {
-                    if stripped.is_empty() {
-                        continue;
-                    }
-                    dest_dir.join(stripped)
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-        } else {
-            dest_dir.join(&*path)
+        let renamed_path = archive_entry_path_after_rename(path.as_ref(), rename_files);
+        let Some(dest_path) = archive_entry_destination(&renamed_path, dest_dir, strip_prefix)
+        else {
+            continue;
         };
 
         // Create parent directories
@@ -1682,7 +1746,12 @@ fn extract_tar_gz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> R
 }
 
 /// Extract a zip archive to a destination directory.
-fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
+fn extract_zip(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+    rename_files: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let cursor = Cursor::new(data);
     let mut archive = ZipArchive::new(cursor).map_err(|e| e.to_string())?;
 
@@ -1694,12 +1763,10 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Resu
             None => continue,
         };
 
-        // Apply strip_prefix if specified
-        let dest_path = if let Some(prefix) = strip_prefix {
-            let stripped = file_path.strip_prefix(prefix).unwrap_or(&file_path);
-            dest_dir.join(stripped)
-        } else {
-            dest_dir.join(&file_path)
+        let renamed_path = archive_entry_path_after_rename(&file_path, rename_files);
+        let Some(dest_path) = archive_entry_destination(&renamed_path, dest_dir, strip_prefix)
+        else {
+            continue;
         };
 
         // Skip if path is empty after stripping
@@ -1733,37 +1800,22 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Resu
 
 /// Extract an archive, detecting format automatically.
 /// Extract a tar.xz archive to a destination directory.
-fn extract_tar_xz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
+fn extract_tar_xz(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+    rename_files: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let decoder = xz2::read::XzDecoder::new(data);
     let mut archive = Archive::new(decoder);
 
     for entry_result in archive.entries().map_err(|e| e.to_string())? {
         let mut entry = entry_result.map_err(|e| e.to_string())?;
         let path = entry.path().map_err(|e| e.to_string())?;
-
-        let dest_path = if let Some(prefix) = strip_prefix {
-            let path_str = path.to_string_lossy();
-            if let Some(stripped) = path_str.strip_prefix(prefix) {
-                let stripped = stripped.trim_start_matches('/');
-                if stripped.is_empty() {
-                    continue;
-                }
-                dest_dir.join(stripped)
-            } else if path_str.starts_with(prefix.trim_end_matches('/')) {
-                let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
-                if let Some(stripped) = path_str.strip_prefix(&prefix_with_slash) {
-                    if stripped.is_empty() {
-                        continue;
-                    }
-                    dest_dir.join(stripped)
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-        } else {
-            dest_dir.join(&*path)
+        let renamed_path = archive_entry_path_after_rename(path.as_ref(), rename_files);
+        let Some(dest_path) = archive_entry_destination(&renamed_path, dest_dir, strip_prefix)
+        else {
+            continue;
         };
 
         if let Some(parent) = dest_path.parent() {
@@ -1799,37 +1851,22 @@ fn extract_tar_xz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> R
 }
 
 /// Extract a tar.zst (Zstandard-compressed) archive to a destination directory.
-fn extract_tar_zst(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
+fn extract_tar_zst(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+    rename_files: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let decoder = zstd::stream::read::Decoder::new(data).map_err(|e| e.to_string())?;
     let mut archive = Archive::new(decoder);
 
     for entry_result in archive.entries().map_err(|e| e.to_string())? {
         let mut entry = entry_result.map_err(|e| e.to_string())?;
         let path = entry.path().map_err(|e| e.to_string())?;
-
-        let dest_path = if let Some(prefix) = strip_prefix {
-            let path_str = path.to_string_lossy();
-            if let Some(stripped) = path_str.strip_prefix(prefix) {
-                let stripped = stripped.trim_start_matches('/');
-                if stripped.is_empty() {
-                    continue;
-                }
-                dest_dir.join(stripped)
-            } else if path_str.starts_with(prefix.trim_end_matches('/')) {
-                let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
-                if let Some(stripped) = path_str.strip_prefix(&prefix_with_slash) {
-                    if stripped.is_empty() {
-                        continue;
-                    }
-                    dest_dir.join(stripped)
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-        } else {
-            dest_dir.join(&*path)
+        let renamed_path = archive_entry_path_after_rename(path.as_ref(), rename_files);
+        let Some(dest_path) = archive_entry_destination(&renamed_path, dest_dir, strip_prefix)
+        else {
+            continue;
         };
 
         if let Some(parent) = dest_path.parent() {
@@ -1868,24 +1905,25 @@ pub(crate) fn extract_archive(
     data: &[u8],
     dest_dir: &Path,
     strip_prefix: Option<&str>,
+    rename_files: &BTreeMap<String, String>,
 ) -> Result<(), String> {
     // Try tar.gz first
-    if extract_tar_gz(data, dest_dir, strip_prefix).is_ok() {
+    if extract_tar_gz(data, dest_dir, strip_prefix, rename_files).is_ok() {
         return Ok(());
     }
 
     // Try tar.xz
-    if extract_tar_xz(data, dest_dir, strip_prefix).is_ok() {
+    if extract_tar_xz(data, dest_dir, strip_prefix, rename_files).is_ok() {
         return Ok(());
     }
 
     // Try tar.zst
-    if extract_tar_zst(data, dest_dir, strip_prefix).is_ok() {
+    if extract_tar_zst(data, dest_dir, strip_prefix, rename_files).is_ok() {
         return Ok(());
     }
 
     // Try zip
-    if extract_zip(data, dest_dir, strip_prefix).is_ok() {
+    if extract_zip(data, dest_dir, strip_prefix, rename_files).is_ok() {
         return Ok(());
     }
 
@@ -2131,6 +2169,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             Some(effective_strip)
         };
+        let rename_files =
+            parse_rename_files(rename_files, "repository_ctx.download_and_extract()")?;
+
         match perform_download_and_extract_to_dir(
             &urls,
             &output_dir,
@@ -2138,6 +2179,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             integrity,
             canonical_id,
             strip,
+            &rename_files,
         ) {
             Ok(info) => Ok(heap.alloc(info)),
             Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
@@ -2695,7 +2737,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] archive: Value<'v>,
         #[starlark(require = named, default = "")] output: &str,
         #[starlark(require = named, default = "")] strip_prefix: &str,
-        #[starlark(require = named)] _rename_files: Option<Value<'v>>,
+        #[starlark(require = named)] rename_files: Option<Value<'v>>,
         #[starlark(require = named, default = "auto")] watch_archive: &str,
     ) -> starlark::Result<Value<'v>> {
         let archive_path = if let Some(s) = archive.unpack_str() {
@@ -2740,6 +2782,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             Some(strip_prefix)
         };
+        let rename_files = parse_rename_files(rename_files, "repository_ctx.extract()")?;
 
         std::fs::create_dir_all(&output_dir).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
@@ -2749,7 +2792,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             ))
         })?;
 
-        extract_archive(&data, &output_dir, strip).map_err(|e| {
+        extract_archive(&data, &output_dir, strip, &rename_files).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
                 "{}",

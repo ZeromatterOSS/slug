@@ -7755,6 +7755,139 @@ use_repo(extract_watch, "extract_watch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_download_and_extract_rename_files_before_strip(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkBaseExternalContext.downloadAndExtract and ZipDecompressor."""
+    archive_path = buck.cwd / "repo_download_archive.zip"
+    _write_zip(
+        archive_path,
+        {
+            "pkg/data.txt": "repo download rename\n",
+            "outside/ignored.txt": "ignored\n",
+            "renamedness/false-prefix.txt": "false prefix\n",
+        },
+    )
+    _write(
+        buck.cwd / "repo_download_extract_ext.bzl",
+        f"""def _repo_impl(repository_ctx):
+    repository_ctx.download_and_extract(
+        url = "{archive_path.as_uri()}",
+        output = "",
+        strip_prefix = "renamed",
+        rename_files = {{"pkg/data.txt": "renamed/data.txt"}},
+    )
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+repo_download_extract_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_download_extract_ext_impl(module_ctx):
+    repo_download_extract_rule(name = "repo_download_extract_repo")
+
+repo_download_extract_ext = module_extension(
+    implementation = _repo_download_extract_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_download_extract_rename_files")
+
+repo_download_extract = use_extension("//:repo_download_extract_ext.bzl", "repo_download_extract_ext")
+use_repo(repo_download_extract, "repo_download_extract_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_repo_download_extract",
+    srcs = ["@repo_download_extract_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_repo_download_extract")
+
+    repo_dir = (
+        buck.cwd
+        / "bazel-external"
+        / "_main+repo_download_extract_ext+repo_download_extract_repo"
+    )
+    assert (repo_dir / "data.txt").read_text() == "repo download rename\n"
+    assert not (repo_dir / "pkg" / "data.txt").exists()
+    assert not (repo_dir / "outside" / "ignored.txt").exists()
+    assert not (repo_dir / "ness" / "false-prefix.txt").exists()
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_extract_rename_files_before_strip(buck: Buck) -> None:
+    """Bazel anchors: StarlarkBaseExternalContext.extract and ZipDecompressor."""
+    _write_zip(
+        buck.cwd / "module_extract_archive.zip",
+        {
+            "pkg/module.txt": "module extract rename\n",
+            "outside/ignored.txt": "ignored\n",
+            "renamedness/false-prefix.txt": "false prefix\n",
+        },
+    )
+    _write(
+        buck.cwd / "module_extract_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.content)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+module_extract_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"content": attr.string()},
+)
+
+def _module_extract_ext_impl(module_ctx):
+    module_ctx.extract(
+        Label("//:module_extract_archive.zip"),
+        output = "module_extract_out",
+        strip_prefix = "renamed",
+        rename_files = {"pkg/module.txt": "renamed/module.txt"},
+    )
+    if module_ctx.is_dir("module_extract_out/ness"):
+        fail("PLAN61_RENAME_FALSE_PREFIX_EXTRACTED")
+    module_extract_repo_rule(
+        name = "module_extract_repo",
+        content = module_ctx.read("module_extract_out/module.txt"),
+    )
+
+module_extract_ext = module_extension(
+    implementation = _module_extract_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_extract_rename_files")
+
+module_extract = use_extension("//:module_extract_ext.bzl", "module_extract_ext")
+use_repo(module_extract, "module_extract_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_module_extract",
+    srcs = ["@module_extract_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_module_extract")
+
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_extract_ext+module_extract_repo"
+    assert (repo_dir / "data.txt").read_text() == "module extract rename\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_watch_tree_nested_edit_reexecutes_materialized_repo(
     buck: Buck,
 ) -> None:

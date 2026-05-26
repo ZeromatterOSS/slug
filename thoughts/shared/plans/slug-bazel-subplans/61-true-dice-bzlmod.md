@@ -3069,6 +3069,18 @@ What did not work or remains risky:
   new extract guardrail (`1 passed`), and the adjacent
   repository watch/read/template/patch/extract/watch-tree subset (`6 passed,
   144 deselected`).
+- Archive extraction `rename_files` is now parsed as a string-to-string dict
+  and applied before `strip_prefix` for `repository_ctx.extract`,
+  `repository_ctx.download_and_extract`, `module_ctx.extract`, and
+  `module_ctx.download_and_extract`, matching Bazel's decompressor ordering in
+  `StarlarkBaseExternalContext` plus `ZipDecompressor`/`CompressedTarFunction`.
+  Focused guardrails cover `repository_ctx.download_and_extract` and
+  `module_ctx.extract` with rename-before-strip zip entries and false
+  prefix-match entries. Validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-rename-files cargo check -p
+  slug_interpreter_for_build`, `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-rename-files
+  cargo build -p slug`, and explicit-binary pytest `-k
+  'rename_files_before_strip'` (`2 passed, 152 deselected`).
 - `repository_ctx.watch_tree(Label(...))` DICE watch tracking is now binary-safe:
   file leaves in watched trees depend on path metadata/digest instead of the
   UTF-8 source read path. The new guardrail

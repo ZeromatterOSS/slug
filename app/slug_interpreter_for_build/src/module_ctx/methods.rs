@@ -35,6 +35,7 @@ use crate::repository_ctx::apply_unified_patch;
 use crate::repository_ctx::ensure_label_path_materialized;
 use crate::repository_ctx::extract_archive;
 use crate::repository_ctx::get_urls_from_value;
+use crate::repository_ctx::parse_rename_files;
 use crate::repository_ctx::resolve_label_to_path;
 use crate::repository_ctx::try_ensure_label_path_materialized;
 
@@ -238,7 +239,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = "")] integrity: &str,
         #[starlark(require = named, default = "")] strip_prefix: &str,
         #[starlark(require = named, default = "")] _type: &str,
-        #[starlark(require = named)] _rename_files: Option<Value<'v>>,
+        #[starlark(require = named)] rename_files: Option<Value<'v>>,
         #[starlark(require = named)] _auth: Option<Value<'v>>,
         #[starlark(require = named)] _headers: Option<Value<'v>>,
         #[starlark(require = named, default = "")] canonical_id: &str,
@@ -273,6 +274,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             Some(strip_prefix)
         };
+        let rename_files = parse_rename_files(rename_files, "module_ctx.download_and_extract()")?;
         match crate::repository_ctx::perform_download_and_extract_to_dir(
             &urls,
             &output_dir,
@@ -280,6 +282,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             integrity,
             canonical_id,
             strip,
+            &rename_files,
         ) {
             Ok(info) => Ok(heap.alloc(info)),
             Err(e) => Err(e.into()),
@@ -517,7 +520,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] archive: Value<'v>,
         #[starlark(require = named, default = "")] output: &str,
         #[starlark(require = named, default = "")] strip_prefix: &str,
-        #[starlark(require = named)] _rename_files: Option<Value<'v>>,
+        #[starlark(require = named)] rename_files: Option<Value<'v>>,
         #[starlark(require = named, default = "auto")] watch_archive: &str,
     ) -> starlark::Result<Value<'v>> {
         let should_watch = ShouldWatch::parse(watch_archive)?;
@@ -560,7 +563,8 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             Some(strip_prefix)
         };
-        extract_archive(&data, &output_dir, strip).map_err(|e| {
+        let rename_files = parse_rename_files(rename_files, "module_ctx.extract()")?;
+        extract_archive(&data, &output_dir, strip, &rename_files).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
                 "{}",
