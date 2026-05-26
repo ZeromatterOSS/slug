@@ -3147,64 +3147,61 @@ What did not work or remains risky:
   `git diff --check`. The slugd processes left by the full guardrail were
   cleaned up afterward.
 - `module_ctx` and `repository_ctx` label filesystem resolution now treat an
-  explicit resolver-owned cell path map as authoritative: missing repos no longer
-  fall through to process-global dynamic aliases, process-global project-root
-  state, or `bazel-external` directory scans. Legacy callers that do not provide
-  a resolver-owned map keep the old compatibility fallbacks. Validation passed
-  with focused `slug_interpreter_for_build` tests for missing resolver-owned
-  label paths and conflicting globals, `cargo test -p slug_interpreter_for_build
-  label_filesystem -- --nocapture` (`5 passed`), `cargo test -p
-  slug_interpreter_for_build repository_context_ -- --nocapture` (`5 passed`),
-  `cargo test -p slug_interpreter_for_build -- --nocapture --test-threads=1`
-  (`91 passed`), `cargo check -p slug_interpreter_for_build -p slug_server`,
-  `cargo build -p slug`, the full Plan 61 Python guardrail with `75 passed in
-  41.29s`, `cargo fmt --check`, and `git diff --check`. The slugd processes left
-  by the full guardrail were cleaned up afterward.
+  explicit resolver-owned cell path map as authoritative: missing external repos
+  no longer fall through to process-global dynamic aliases, process-global
+  project-root state, `bazel-external` directory scans, or a synthetic
+  `repo/pkg/target` workspace path. Root labels still resolve from the active
+  project root. Validation passed with focused `slug_interpreter_for_build`
+  tests for missing resolver-owned label paths and conflicting globals, `cargo
+  test -p slug_interpreter_for_build label_filesystem -- --nocapture` (`5
+  passed`), `cargo test -p slug_interpreter_for_build module_ctx --
+  --nocapture` (`30 passed`), and `cargo test -p slug_interpreter_for_build
+  repository_context_ -- --nocapture` (`5 passed`), `cargo check -p
+  slug_interpreter_for_build`, `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build
+  cargo build -p slug`, the explicit-binary Plan 61 selector for module_ctx and
+  repository_ctx Label paths (`15 passed, 140 deselected`), `cargo fmt
+  --check`, and `git diff --check`.
 - `module_ctx` Label-taking methods no longer fall back to the legacy
-  repository-label resolver when a `ModuleContext` was not seeded with
-  resolver-owned label paths. Production module-extension execution already
-  seeds those paths from the active `CellResolver`; callers missing that owner
-  now fail with a resolver-owned bzlmod cell-path error instead of consulting
-  process-global aliases or `bazel-external` scans. Bridge burn-down note: the
-  production surface reduced is the `module_ctx` fallback through
-  `resolve_label_to_path` plus the helper itself; the intended owner is
-  `ModuleExtensionExecutionKey` constructing `ModuleContext` from the active
-  cell resolver backed by `BzlmodCellGraphKey`/`BzlmodCellGraphDataKey`. The
-  remaining bridge is still the legacy-produced cell graph and repository_ctx
-  compatibility callers that intentionally lack resolver-owned paths. Before/
-  after evidence:
+  repository-label resolver or a raw/synthetic Label string path when a
+  `ModuleContext` was not seeded with resolver-owned label paths. Production
+  module-extension execution already seeds those paths from the active
+  `CellResolver`; callers missing that owner now fail with a resolver-owned
+  bzlmod cell-path error instead of consulting process-global aliases,
+  `bazel-external` scans, or extension-working-directory relative fallbacks.
+  Bridge burn-down note: the production surface reduced is the `module_ctx`
+  fallback through `resolve_label_to_path`, the `module_ctx.execute` raw-label
+  fallback, and the shared `LabelFilesystemResolver` synthetic-miss path; the
+  intended owner is `ModuleExtensionExecutionKey` constructing `ModuleContext`
+  from the active cell resolver backed by
+  `BzlmodCellGraphKey`/`BzlmodCellGraphDataKey`. The remaining bridge is still
+  the legacy-produced cell graph. Before/after evidence:
   `rg -n "resolve_label_to_path|Fallback to legacy resolution if cell paths not available" app/slug_interpreter_for_build/src/module_ctx app/slug_interpreter_for_build/src/repository_ctx.rs`
-  now returns no hits. Clean-review follow-up found that `module_ctx.execute`
-  still converted unresolved Label arguments to raw label strings; that
-  fallback is now gone too, and unresolved execute Labels use the same
-  resolver-owned cell-path error as other `module_ctx` Label-taking methods.
-  Validation passed with `cargo test -p slug_interpreter_for_build module_ctx
-  -- --nocapture` (`30 passed`), `cargo check -p slug_interpreter_for_build`,
-  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo build -p slug`, the
-  explicit-binary Plan 61 selector for module_ctx Label
-  read/materialization/extract/wasm paths (`4 passed, 151 deselected`),
-  `cargo fmt --check`, and `git diff --check`.
+  now returns no hits; the production resolver fallback search
+  `rg -n "allow_legacy_fallbacks|without_legacy_fallbacks|scan_bazel_external_fallback|bazel_external_scan_dirs|PathBuf::from\\(repo\\)" app/slug_interpreter_for_build/src/label_filesystem.rs app/slug_interpreter_for_build/src/module_ctx app/slug_interpreter_for_build/src/repository_ctx.rs`
+  now returns no hits. Validation passed with `cargo test -p
+  slug_interpreter_for_build module_ctx -- --nocapture` (`30 passed`) and the
+  explicit-binary Plan 61 selector for module_ctx and repository_ctx Label paths
+  (`15 passed, 140 deselected`).
 - `repository_ctx` Label path and lazy-materialization ownership now matches
   the same resolver-owned shape. `RepositoryContext` no longer carries a
   `resolver_owned_label_paths` mode bit: all path-like label resolution uses
-  the context's explicit cell-path map with legacy fallbacks disabled, and
-  missing canonical materialization names now stay as the apparent repo name
-  instead of consulting process-global dynamic aliases/cells. Bridge burn-down
-  note: the production surface reduced is the `RepositoryContext` branch that
-  resolved unseeded contexts through process-global aliases and
-  `bazel-external` scans; the intended owner is `StarlarkRepoRuleExecution`
+  the context's explicit cell-path map, and resolver-owned misses fail instead
+  of synthesizing workspace paths from the raw repo spelling. Missing canonical
+  materialization names now stay as the apparent repo name instead of consulting
+  process-global dynamic aliases/cells. Bridge burn-down note: the production
+  surface reduced is the `RepositoryContext` branch that resolved unseeded or
+  missing contexts through process-global aliases, `bazel-external` scans, and
+  raw repo-name workspace paths; the intended owner is `StarlarkRepoRuleExecution`
   constructing `RepositoryContext` from the active `CellResolver` backed by
   `BzlmodCellGraphKey`/`BzlmodCellGraphDataKey`. The remaining bridge is still
-  the legacy-produced cell graph plus the explicit test-only legacy resolver
-  coverage in `LabelFilesystemResolver`. Before/after evidence:
+  the legacy-produced cell graph. Before/after evidence:
   `rg -n "resolver_owned_label_paths|if self\\.resolver_owned_label_paths|resolve_dynamic_extension_cell_alias\\(repo\\)|get_dynamic_extension_cell\\(&resolved_repo\\)|resolver\\.resolve_label_string\\(label_str\\)" app/slug_interpreter_for_build/src/repository_ctx.rs`
-  now returns no hits. Validation passed with `cargo test -p
-  slug_interpreter_for_build repository_context_ -- --nocapture`, `cargo check
-  -p slug_interpreter_for_build`, `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build
-  cargo build -p slug` after `/tmp` exhausted during the first build attempt,
-  the explicit-binary Plan 61 selector for repository_ctx Label read, watch,
-  template, patch, extract, watch_tree, and custom use_repo_rule paths (`11
-  passed, 144 deselected`), `cargo fmt --check`, and `git diff --check`.
+  now returns no hits, and the old assertions that `@llvm-raw` or a missing
+  apparent alias produced `workspace_root/<repo>/...` now assert the
+  resolver-owned-path error. Validation passed with `cargo test -p
+  slug_interpreter_for_build repository_context_ -- --nocapture` (`5 passed`),
+  `cargo check -p slug_interpreter_for_build`, `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build
+  cargo build -p slug`, `cargo fmt --check`, and `git diff --check`.
 - Native repository-rule `build_file` and `patches` label resolution can now use
   resolver-owned bzlmod cell paths from the DICE cell graph during extension
   repository execution. That path prefers graph-owned aliases and cells over
@@ -3959,13 +3956,12 @@ hardening behavior around it.
   authoritative when present. `module_ctx.path(Label(...))`,
   `repository_ctx.path(Label(...))`, repository path-like APIs, and the
   `repository_ctx.path(Label(...))` lazy materialization trigger no longer fill a
-  resolver-owned miss from process-global dynamic aliases or directory scans.
-  `module_ctx` Label-taking methods now require that resolver-owned map rather
-  than falling back when it is absent, and `repository_ctx` path-like label
-  resolution always uses the context's explicit cell-path map with legacy
-  fallbacks disabled. The remaining `LabelFilesystemResolver` legacy fallback
-  scan is retained only as explicit test coverage/short-window plumbing, not as
-  the module or repository context production owner.
+  resolver-owned miss from process-global dynamic aliases, directory scans, or a
+  synthetic workspace-root path. `module_ctx` Label-taking methods now require
+  that resolver-owned map rather than falling back when it is absent, and
+  `repository_ctx` path-like label resolution always uses the context's explicit
+  cell-path map. The remaining bridge is the producer: the map is still derived
+  from a legacy-produced cell graph rather than a true `BzlmodCellGraphKey`.
 - Native repository-rule `build_file`/`patches` label resolution can now receive
   a resolver-owned cell path map from the bzlmod cell graph, and the normal
   executor path now requires that map instead of retaining a

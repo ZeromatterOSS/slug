@@ -747,31 +747,26 @@ impl RepositoryContext {
         }
     }
 
-    fn resolve_label_to_filesystem_path(&self, label_str: &str) -> PathBuf {
+    fn resolve_label_to_filesystem_path(&self, label_str: &str) -> starlark::Result<PathBuf> {
         let workspace_root = self.workspace_root.as_ref().as_path();
         let resolver = LabelFilesystemResolver::new(workspace_root)
             .with_project_root(Some(workspace_root))
             .with_root_label_resolution(RootLabelResolution::ProjectAbsolute);
         let path = resolver
             .with_cell_paths(&self.cell_paths)
-            .without_legacy_fallbacks()
             .resolve_label_string(label_str)
-            .unwrap_or_else(|| PathBuf::from(label_str));
-        if path.is_absolute() {
+            .ok_or_else(|| {
+                starlark::Error::from(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "repository_ctx requires resolver-owned bzlmod cell paths to resolve Label '{}'",
+                    label_str
+                ))
+            })?;
+        Ok(if path.is_absolute() {
             path
         } else {
             workspace_root.join(path)
-        }
-    }
-
-    fn canonical_repo_for_label_materialization(&self, repo: &str) -> String {
-        if let Some(canonical) = self.cell_paths.get(repo).and_then(|path| {
-            let name = path.file_name()?.to_str()?;
-            slug_bzlmod::parse_canonical_name(name).map(|_| name.to_owned())
-        }) {
-            return canonical;
-        }
-        repo.to_owned()
+        })
     }
 
     /// Return recorded inputs collected during repository rule execution.
@@ -895,7 +890,7 @@ fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> P
         .with_project_root(Some(workspace_root))
         .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
         .resolve_label_string(label_str)
-        .unwrap_or_else(|| PathBuf::from(label_str));
+        .expect("test helper only resolves root labels");
     if path.is_absolute() {
         path
     } else {
@@ -1926,47 +1921,14 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         path_arg: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Helper: when a label points at an extension-generated repo (spoke
-        // or extension hub), arrange for it to be on disk before we hand
-        // back the path. Bazel's `rctx.path(label)` is fetch-triggering;
-        // ours wasn't. Reuse Plan 36's sync→async bridge.
-        //
-        // The label may reference the repo by either canonical name
-        // (`rules_rs+crate+foo`) or apparent name (`foo`). The dynamic
-        // extension-cell registry maps both to the same `bazel-external/<canonical>`
-        // path; we recover the canonical from the path's last segment so
-        // the spoke-materialization registry — which is keyed strictly by
-        // canonical name when the repo lives at `bazel-external/<canonical>` —
-        // sees the right key.
-        let trigger_materialization = |label_str: &str| {
-            let Some(label) =
-                slug_bzlmod::canonicalize_label_with_package_context(label_str, "", "", None)
-            else {
-                return;
-            };
-            let repo = label.repo().as_str();
-            if repo.is_empty() {
-                return;
-            }
-            let canonical = this.canonical_repo_for_label_materialization(repo);
-            if let Err(e) = slug_bzlmod::materialize_spoke_sync(&canonical) {
-                tracing::debug!(
-                    "rctx.path: lazy materialization of '{}' failed (continuing): {}",
-                    canonical,
-                    e
-                );
-            }
-        };
-
         let path_str = if let Some(s) = path_arg.unpack_str() {
             // Treat anything starting with `@` (with or without `//`) and any
             // `//pkg:target` as a label. The shared label resolver handles the
             // `@repo` shorthand for `@repo//:repo`.
             if is_bazel_label_string(s) {
-                trigger_materialization(s);
-                this.resolve_label_to_filesystem_path(s)
-                    .to_string_lossy()
-                    .to_string()
+                let path = this.resolve_label_to_filesystem_path(s)?;
+                ensure_label_path_materialized(&path);
+                path.to_string_lossy().to_string()
             } else {
                 s.to_owned()
             }
@@ -1975,10 +1937,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else if path_arg.get_type() == "Label" {
             // Handle Label objects: resolve to the project-root filesystem path.
             let label_str = format!("{}", path_arg);
-            trigger_materialization(&label_str);
-            this.resolve_label_to_filesystem_path(&label_str)
-                .to_string_lossy()
-                .to_string()
+            let path = this.resolve_label_to_filesystem_path(&label_str)?;
+            ensure_label_path_materialized(&path);
+            path.to_string_lossy().to_string()
         } else {
             path_arg.to_repr()
         };
@@ -2239,24 +2200,24 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let args: Vec<String> = arguments
             .items
             .iter()
-            .map(|v| {
+            .map(|v| -> starlark::Result<String> {
                 if let Some(s) = v.unpack_str() {
-                    s.to_owned()
+                    Ok(s.to_owned())
                 } else if let Some(repo_path) = v.downcast_ref::<RepositoryPath>() {
                     // RepositoryPath: use absolute path
-                    repo_path.absolute_path().to_string_lossy().to_string()
+                    Ok(repo_path.absolute_path().to_string_lossy().to_string())
                 } else if v.get_type() == "Label" {
                     // Label: resolve to filesystem path via cell paths
                     let label_str = v.to_str();
-                    let path = this.resolve_label_to_filesystem_path(&label_str);
+                    let path = this.resolve_label_to_filesystem_path(&label_str)?;
                     ensure_label_path_materialized(&path);
-                    path.to_string_lossy().to_string()
+                    Ok(path.to_string_lossy().to_string())
                 } else {
                     // Other: convert to string
-                    v.to_str()
+                    Ok(v.to_str())
                 }
             })
-            .collect();
+            .collect::<starlark::Result<_>>()?;
 
         if args.is_empty() {
             return Err(slug_error::slug_error!(
@@ -2340,7 +2301,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // string form (which would stringify as
             // `@@cell//templates:foo.bzl` and be a dangling link).
             let label_str = format!("{target}");
-            let path = this.resolve_label_to_filesystem_path(&label_str);
+            let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
             path.to_string_lossy().to_string()
         } else {
@@ -2472,7 +2433,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
         let template_path = if let Some(s) = template.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = this.resolve_label_to_filesystem_path(s);
+                let path = this.resolve_label_to_filesystem_path(s)?;
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2488,7 +2449,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // form ("@@cell//templates:foo.tpl") as if it were the
             // template body, corrupting every generated file.
             let label_str = format!("{template}");
-            let path = this.resolve_label_to_filesystem_path(&label_str);
+            let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
             path
         } else {
@@ -2575,7 +2536,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<String> {
         let file_path = if let Some(s) = path.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = this.resolve_label_to_filesystem_path(s);
+                let path = this.resolve_label_to_filesystem_path(s)?;
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2585,7 +2546,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             repo_path.absolute_path()
         } else if path.get_type() == "Label" {
             let label_str = path.to_str();
-            let path = this.resolve_label_to_filesystem_path(&label_str);
+            let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
             path
         } else {
@@ -2665,12 +2626,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let patch_path = if let Some(repo_path) = patch_file.downcast_ref::<RepositoryPath>() {
             repo_path.absolute_path().to_path_buf()
         } else if patch_file.get_type() == "Label" {
-            let path = this.resolve_label_to_filesystem_path(&format!("{patch_file}"));
+            let path = this.resolve_label_to_filesystem_path(&format!("{patch_file}"))?;
             ensure_label_path_materialized(&path);
             path
         } else if let Some(s) = patch_file.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = this.resolve_label_to_filesystem_path(s);
+                let path = this.resolve_label_to_filesystem_path(s)?;
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2679,7 +2640,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             let repr = patch_file.to_repr();
             if is_bazel_label_string(&repr) {
-                let path = this.resolve_label_to_filesystem_path(&repr);
+                let path = this.resolve_label_to_filesystem_path(&repr)?;
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2710,7 +2671,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let archive_path = if let Some(s) = archive.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = this.resolve_label_to_filesystem_path(s);
+                let path = this.resolve_label_to_filesystem_path(s)?;
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2720,7 +2681,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             repo_path.absolute_path()
         } else if archive.get_type() == "Label" {
             let label_str = format!("{archive}");
-            let path = this.resolve_label_to_filesystem_path(&label_str);
+            let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
             path
         } else {
@@ -2944,7 +2905,7 @@ fn repository_ctx_resolve_watch_path(
 ) -> starlark::Result<PathBuf> {
     if let Some(s) = path.unpack_str() {
         if is_bazel_label_string(s) {
-            return Ok(this.resolve_label_to_filesystem_path(s));
+            return this.resolve_label_to_filesystem_path(s);
         }
         return Ok(this.resolve_path(s));
     }
@@ -2952,7 +2913,7 @@ fn repository_ctx_resolve_watch_path(
         return Ok(repo_path.absolute_path());
     }
     if path.get_type() == "Label" {
-        return Ok(this.resolve_label_to_filesystem_path(&format!("{}", path)));
+        return this.resolve_label_to_filesystem_path(&format!("{}", path));
     }
     Err(slug_error::slug_error!(
         slug_error::ErrorTag::Input,
@@ -3296,21 +3257,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_external_label_to_filesystem_path_scans_project_root() {
-        let temp_dir = TempDir::new().unwrap();
-        let workspace_root = temp_dir.path();
-        let raw_repo = workspace_root
-            .join("bazel-external")
-            .join("llvm++llvm_source+llvm-raw");
-        std::fs::create_dir_all(&raw_repo).unwrap();
-
-        assert_eq!(
-            resolve_label_to_filesystem_path("@llvm-raw//:WORKSPACE", workspace_root),
-            raw_repo.join("WORKSPACE")
-        );
-    }
-
-    #[test]
     fn repository_context_label_paths_do_not_scan_project_root_without_resolver_owned_cell_paths() {
         let temp_dir = TempDir::new().unwrap();
         let workspace_root = temp_dir.path();
@@ -3326,9 +3272,13 @@ mod tests {
             workspace_root.to_path_buf(),
         );
 
-        assert_eq!(
-            ctx.resolve_label_to_filesystem_path("@llvm-raw//:WORKSPACE"),
-            workspace_root.join("llvm-raw").join("WORKSPACE")
+        let err = ctx
+            .resolve_label_to_filesystem_path("@llvm-raw//:WORKSPACE")
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("requires resolver-owned bzlmod cell paths"),
+            "{err:?}"
         );
     }
 
@@ -3353,42 +3303,13 @@ mod tests {
         .with_label_resolution(cell_paths);
 
         assert_eq!(
-            ctx.resolve_label_to_filesystem_path(&format!("@{apparent}//pkg:file.txt")),
+            ctx.resolve_label_to_filesystem_path(&format!("@{apparent}//pkg:file.txt"))
+                .unwrap(),
             workspace_root
                 .join("bazel-external")
                 .join(canonical)
                 .join("pkg")
                 .join("file.txt")
-        );
-        assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
-            None
-        );
-    }
-
-    #[test]
-    fn repository_context_materialization_uses_resolver_owned_generated_repo_path_before_globals() {
-        let temp_dir = TempDir::new().unwrap();
-        let workspace_root = temp_dir.path();
-        let working_dir = workspace_root.join("repo_work");
-        let canonical = "repo_ctx_materialize_owner++ext+generated";
-        let apparent = "repo_ctx_materialize_alias";
-        let mut cell_paths = HashMap::new();
-        cell_paths.insert(
-            apparent.to_owned(),
-            workspace_root.join("bazel-external").join(canonical),
-        );
-        let ctx = RepositoryContext::new_with_workspace_root(
-            "ctx".to_owned(),
-            RepositoryAttr::empty(),
-            working_dir,
-            workspace_root.to_path_buf(),
-        )
-        .with_label_resolution(cell_paths);
-
-        assert_eq!(
-            ctx.canonical_repo_for_label_materialization(apparent),
-            canonical
         );
         assert_eq!(
             slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
@@ -3419,13 +3340,13 @@ mod tests {
         )
         .with_label_resolution(HashMap::new());
 
-        assert_eq!(
-            ctx.resolve_label_to_filesystem_path(&format!("@{apparent}//pkg:file.txt")),
-            workspace_root.join(apparent).join("pkg").join("file.txt")
-        );
-        assert_eq!(
-            ctx.canonical_repo_for_label_materialization(apparent),
-            apparent
+        let err = ctx
+            .resolve_label_to_filesystem_path(&format!("@{apparent}//pkg:file.txt"))
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("requires resolver-owned bzlmod cell paths"),
+            "{err:?}"
         );
         assert_eq!(
             slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),

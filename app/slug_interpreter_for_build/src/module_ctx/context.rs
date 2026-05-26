@@ -310,7 +310,6 @@ impl ModuleContext {
             .with_project_root(Some(project_root))
             .with_cell_paths(&self.cell_paths)
             .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
-            .without_legacy_fallbacks()
             .resolve_label_string(label_str)
     }
 

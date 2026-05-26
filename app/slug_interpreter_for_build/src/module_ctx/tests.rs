@@ -393,7 +393,9 @@ fn test_module_context_path_label_requires_resolver_owned_paths() {
     std::fs::create_dir_all(&working_dir).unwrap();
     std::fs::create_dir_all(&legacy_repo).unwrap();
     std::fs::write(legacy_repo.join("file.txt"), "legacy\n").unwrap();
-    let ctx = ModuleContext::empty().with_temp_working_dir(working_dir);
+    let ctx = ModuleContext::empty()
+        .with_temp_working_dir(working_dir)
+        .with_label_resolution(temp_dir.path().to_path_buf(), HashMap::new());
 
     let module = Module::new();
     let heap = module.heap();
@@ -434,7 +436,9 @@ fn test_module_context_execute_label_requires_resolver_owned_paths() {
     std::fs::create_dir_all(&working_dir).unwrap();
     std::fs::create_dir_all(&legacy_repo).unwrap();
     std::fs::write(legacy_repo.join("tool"), "#!/bin/sh\nexit 0\n").unwrap();
-    let ctx = ModuleContext::empty().with_temp_working_dir(working_dir);
+    let ctx = ModuleContext::empty()
+        .with_temp_working_dir(working_dir)
+        .with_label_resolution(temp_dir.path().to_path_buf(), HashMap::new());
 
     let module = Module::new();
     let heap = module.heap();
