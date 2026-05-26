@@ -95,7 +95,6 @@ fn create_extension_execution_key_from_aggregation(
             .canonical_project_root
             .as_ref()
             .clone(),
-        lockfile_inputs.hidden_lockfile_path.clone(),
         lockfile_inputs.visible_lockfile_digest.clone(),
         lockfile_inputs.hidden_lockfile_digest.clone(),
         lockfile_inputs.visible_lockfile.clone(),
@@ -920,12 +919,6 @@ pub struct ModuleExtensionExecutionKey {
     /// the parent DICE key instead of re-deriving it from project root.
     pub workspace_id: crate::WorkspaceId,
 
-    /// Hidden lockfile path used as a fallback for replay data and prior facts.
-    ///
-    /// Bazel reads the workspace lockfile first, then the hidden lockfile.
-    /// In ERROR mode, facts are still validated only against workspace facts.
-    pub hidden_lockfile_path: Option<Arc<PathBuf>>,
-
     /// Digest of the visible workspace lockfile as observed during command
     /// startup. This keeps successful extension evaluations reusable inside
     /// DICE while still changing key identity when the lockfile changes.
@@ -965,7 +958,6 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
         self.root_module_name.hash(state);
         self.project_root.hash(state);
         self.workspace_id.hash(state);
-        self.hidden_lockfile_path.hash(state);
         self.visible_lockfile_digest.hash(state);
         self.hidden_lockfile_digest.hash(state);
         hash_lockfile_content_identity(&self.visible_lockfile, state);
@@ -986,7 +978,6 @@ impl PartialEq for ModuleExtensionExecutionKey {
             && self.root_module_name == other.root_module_name
             && self.project_root == other.project_root
             && self.workspace_id == other.workspace_id
-            && self.hidden_lockfile_path == other.hidden_lockfile_path
             && self.visible_lockfile_digest == other.visible_lockfile_digest
             && self.hidden_lockfile_digest == other.hidden_lockfile_digest
             && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
@@ -1007,7 +998,7 @@ fn lockfile_content_identity_eq(
     match (left, right) {
         (Some(left), Some(right)) => match (&left.digest, &right.digest) {
             (Some(_), Some(_)) => left.path == right.path && left.digest == right.digest,
-            (None, None) => true,
+            (None, None) => left.path == right.path,
             _ => false,
         },
         (None, None) => true,
@@ -1022,9 +1013,7 @@ fn hash_lockfile_content_identity<H: std::hash::Hasher>(
     match value {
         Some(value) => {
             true.hash(state);
-            if value.digest.is_some() {
-                value.path.hash(state);
-            }
+            value.path.hash(state);
             value.digest.hash(state);
         }
         None => false.hash(state),
@@ -1042,7 +1031,6 @@ impl Dupe for ModuleExtensionExecutionKey {
             root_module_name: self.root_module_name.dupe(),
             project_root: self.project_root.clone(),
             workspace_id: self.workspace_id.clone(),
-            hidden_lockfile_path: self.hidden_lockfile_path.clone(),
             visible_lockfile_digest: self.visible_lockfile_digest.clone(),
             hidden_lockfile_digest: self.hidden_lockfile_digest.clone(),
             visible_lockfile: self.visible_lockfile.clone(),
@@ -1071,7 +1059,6 @@ impl ModuleExtensionExecutionKey {
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: None,
             workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
-            hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
             visible_lockfile: None,
@@ -1097,15 +1084,22 @@ impl ModuleExtensionExecutionKey {
         repo_mappings: RepoMappingSnapshot,
         repo_mapping_overrides: RepoMappingOverrides,
     ) -> Self {
+        let hidden_lockfile = hidden_lockfile_path.as_ref().map(|path| {
+            Arc::new(LockfileContentValue {
+                path: Arc::new(path.clone()),
+                digest: hidden_lockfile_digest.clone(),
+                tracked_by_dice: true,
+                lockfile: None,
+            })
+        });
         Self::new_with_tracked_lockfiles(
             aggregated,
             root_module_name,
             project_root,
-            hidden_lockfile_path,
             visible_lockfile_digest,
             hidden_lockfile_digest,
             None,
-            None,
+            hidden_lockfile,
             lockfile_mode,
             repo_env,
             repo_mappings,
@@ -1119,7 +1113,6 @@ impl ModuleExtensionExecutionKey {
         aggregated: AggregatedExtension,
         root_module_name: String,
         project_root: PathBuf,
-        hidden_lockfile_path: Option<PathBuf>,
         visible_lockfile_digest: Option<String>,
         hidden_lockfile_digest: Option<String>,
         visible_lockfile: Option<Arc<LockfileContentValue>>,
@@ -1143,7 +1136,6 @@ impl ModuleExtensionExecutionKey {
             aggregated,
             root_module_name,
             project_root,
-            hidden_lockfile_path,
             visible_lockfile_digest,
             hidden_lockfile_digest,
             visible_lockfile,
@@ -1161,7 +1153,6 @@ impl ModuleExtensionExecutionKey {
         aggregated: AggregatedExtension,
         root_module_name: String,
         project_root: PathBuf,
-        hidden_lockfile_path: Option<PathBuf>,
         visible_lockfile_digest: Option<String>,
         hidden_lockfile_digest: Option<String>,
         visible_lockfile: Option<Arc<LockfileContentValue>>,
@@ -1183,7 +1174,6 @@ impl ModuleExtensionExecutionKey {
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: Some(Arc::new(project_root)),
             workspace_id,
-            hidden_lockfile_path: hidden_lockfile_path.map(Arc::new),
             visible_lockfile_digest: visible_lockfile_digest.map(Arc::from),
             hidden_lockfile_digest: hidden_lockfile_digest.map(Arc::from),
             visible_lockfile,
@@ -1203,7 +1193,6 @@ impl ModuleExtensionExecutionKey {
         aggregated: Arc<AggregatedExtension>,
         root_module_name: Arc<str>,
         project_root: Arc<PathBuf>,
-        hidden_lockfile_path: Option<Arc<PathBuf>>,
         visible_lockfile_digest: Option<Arc<str>>,
         hidden_lockfile_digest: Option<Arc<str>>,
         lockfile_mode: LockfileMode,
@@ -1228,7 +1217,6 @@ impl ModuleExtensionExecutionKey {
             root_module_name,
             project_root: Some(project_root),
             workspace_id,
-            hidden_lockfile_path,
             visible_lockfile_digest,
             hidden_lockfile_digest,
             visible_lockfile: None,
@@ -1253,7 +1241,6 @@ impl ModuleExtensionExecutionKey {
             root_module_name: Arc::from("_main"),
             project_root: None,
             workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
-            hidden_lockfile_path: None,
             visible_lockfile_digest: None,
             hidden_lockfile_digest: None,
             visible_lockfile: None,
@@ -2817,7 +2804,12 @@ mod tests {
             visible_lockfile_digest: Some("visible-digest".to_owned()),
             hidden_lockfile_digest: Some("hidden-digest".to_owned()),
             visible_lockfile: None,
-            hidden_lockfile: None,
+            hidden_lockfile: Some(Arc::new(LockfileContentValue {
+                path: Arc::new(hidden_lockfile_path.clone()),
+                digest: Some("hidden-digest".to_owned()),
+                tracked_by_dice: true,
+                lockfile: None,
+            })),
             lockfile_mode: LockfileMode::Error,
         };
         let repo_mappings = BzlmodRepoMappingsDataValue::for_workspace(
@@ -2841,7 +2833,9 @@ mod tests {
         );
 
         assert_eq!(
-            key.hidden_lockfile_path.as_deref(),
+            key.hidden_lockfile
+                .as_ref()
+                .map(|value| value.path.as_ref()),
             Some(&hidden_lockfile_path)
         );
         assert_eq!(
@@ -3006,7 +3000,6 @@ mod tests {
             aggregated,
             "_main".to_owned(),
             project_root,
-            None,
             Some("visible-lockfile-digest".to_owned()),
             None,
             Some(visible_lockfile),
@@ -3080,7 +3073,6 @@ mod tests {
             aggregated,
             "_main".to_owned(),
             project_root.clone(),
-            Some(project_root.join("buck-out/v2/MODULE.bazel.lock")),
             None,
             Some("hidden-lockfile-digest".to_owned()),
             None,
@@ -3760,7 +3752,6 @@ mod tests {
             project_root,
             None,
             None,
-            None,
             LockfileMode::Update,
             Arc::new(BTreeMap::new()),
             Arc::new(crate::RepoMappingSnapshot::new()),
@@ -3788,7 +3779,6 @@ mod tests {
                 AggregatedExtension::new("@@mod//ext.bzl", "ext"),
                 "_main".to_owned(),
                 project_root,
-                None,
                 Some("visible-digest".to_owned()),
                 None,
                 visible_lockfile,
@@ -3814,22 +3804,45 @@ mod tests {
             tracked_by_dice: true,
             lockfile: Some(Arc::new(crate::lockfile::Lockfile::new())),
         });
+        let missing_at_path = Arc::new(LockfileContentValue {
+            path: Arc::new(PathBuf::from("/project/missing.lock")),
+            digest: None,
+            tracked_by_dice: true,
+            lockfile: None,
+        });
+        let missing_at_other_path = Arc::new(LockfileContentValue {
+            path: Arc::new(PathBuf::from("/other/missing.lock")),
+            digest: None,
+            tracked_by_dice: true,
+            lockfile: None,
+        });
 
         let with_value = key_with_visible_lockfile(Some(tracked_lockfile));
         let missing_value = key_with_visible_lockfile(None);
         let other_path = key_with_visible_lockfile(Some(other_path_same_digest));
+        let missing_path = key_with_visible_lockfile(Some(missing_at_path));
+        let missing_other_path = key_with_visible_lockfile(Some(missing_at_other_path));
 
         assert_ne!(with_value, missing_value);
         assert_ne!(with_value, other_path);
+        assert_ne!(missing_path, missing_other_path);
 
         let mut with_value_hasher = DefaultHasher::new();
         let mut missing_value_hasher = DefaultHasher::new();
         let mut other_path_hasher = DefaultHasher::new();
+        let mut missing_path_hasher = DefaultHasher::new();
+        let mut missing_other_path_hasher = DefaultHasher::new();
         with_value.hash(&mut with_value_hasher);
         missing_value.hash(&mut missing_value_hasher);
         other_path.hash(&mut other_path_hasher);
+        missing_path.hash(&mut missing_path_hasher);
+        missing_other_path.hash(&mut missing_other_path_hasher);
         assert_ne!(with_value_hasher.finish(), missing_value_hasher.finish());
         assert_ne!(with_value_hasher.finish(), other_path_hasher.finish());
+        assert_ne!(
+            missing_path_hasher.finish(),
+            missing_other_path_hasher.finish()
+        );
     }
 
     #[test]

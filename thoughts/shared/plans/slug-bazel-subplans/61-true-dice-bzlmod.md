@@ -436,6 +436,15 @@ Observed SDK result at the checkpoint:
   when the hidden facts are created with the expected value, fails after an
   edit to stale facts, succeeds after restoration, and fails again after the
   hidden lockfile is deleted.
+- Module extension execution no longer carries a separate hidden-lockfile path
+  field alongside the tracked hidden lockfile value. The key now takes hidden
+  path identity from `LockfileContentValue`, and that identity hashes/compares
+  the path even for missing/unreadable lockfiles with no digest. Bridge surface
+  reduced: hidden-lockfile path provenance is owned by the named
+  lockfile-input value instead of duplicated on `ModuleExtensionExecutionKey`.
+  The intended final owner remains the lockfile policy/value graph feeding
+  extension replay. Validation passed with `cargo test -p slug_bzlmod
+  extension_execution -- --nocapture` and `cargo check -p slug_bzlmod`.
 - Unsupported extension replay recorded inputs now have same-daemon coverage:
   a lockfile entry with matching digests/specs but an unsupported recorded
   `FILE` path form is rejected as an extension replay miss and does not count
