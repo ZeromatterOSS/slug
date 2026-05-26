@@ -3205,8 +3205,23 @@ mod tests {
 
         let stale_global = "stale_path_owner++ext+generated";
         let stale_path = format!("bazel-external/{stale_global}");
-        register_dynamic_extension_cell(stale_global.to_owned(), stale_path.clone());
-        resolver.get(CellName::testing_new(stale_global)).ok();
+        let stale_cell = CellName::testing_new(stale_global);
+        let stale_path_buf = CellRootPathBuf::testing_new(&stale_path);
+        let stale_instance = CellInstance::new(
+            stale_cell,
+            stale_path_buf.clone(),
+            None,
+            NestedCells::from_cell_roots(
+                &[(stale_cell, stale_path_buf.as_path())],
+                &stale_path_buf,
+            ),
+        )?;
+        resolver
+            .0
+            .dynamic_cells
+            .write()
+            .unwrap()
+            .insert(stale_cell, DynamicCellInstance::root_scoped(stale_instance));
 
         assert_eq!(
             resolver.get_cell_path(ProjectRelativePath::new(&format!("{stale_path}/defs.bzl"))?),
