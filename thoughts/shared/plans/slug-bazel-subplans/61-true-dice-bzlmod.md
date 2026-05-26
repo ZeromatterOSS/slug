@@ -3634,6 +3634,17 @@ What did not work or remains risky:
   test_archive_repo_manifest_tracks_output_digest_marker_state -- --nocapture`
   (`1 passed, 330 filtered out`), `cargo check -p slug_bzlmod`, `cargo
   fmt --check`, and `git diff --check`.
+- Repository materialization local-rule state is now split out of marker
+  content into `RepoMaterializationRuleLocalStateKey`. Bridge surface reduced:
+  `RepoMaterializationMarkerContentKey` no longer directly probes
+  `.slug_repo_rule_local`; the parent marker state depends on a named child key
+  for the bit that disables reuse for local repository rules. The intended
+  owner remains `RepoMaterializationManifestKey` and, eventually, a watched
+  filesystem-backed repository materialization manifest instead of polling
+  child keys. Focused validation passed with `cargo test -p slug_bzlmod
+  materialization_manifest_key_observes_rule_local_state_dependency --
+  --nocapture` and `cargo test -p slug_bzlmod materialization_manifest --
+  --nocapture`.
 - Repository materialization layout state is now split into named manifest
   child keys too: `RepoMaterializationBuildFilePresenceKey`,
   `RepoMaterializationInvalidEmptyTargetLabelKey`,

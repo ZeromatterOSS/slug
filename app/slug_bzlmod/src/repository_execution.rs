@@ -679,12 +679,20 @@ fn repo_materialization_marker_content_state_for_key(
 ) -> String {
     let repo_spec = key.repo_spec.as_ref();
     let repo_dir = repo_dir_for_materialization_manifest_key(key);
-    repo_materialization_marker_content_state(repo_spec.local, &repo_dir)
+    repo_materialization_marker_content_state(
+        repo_spec.local,
+        repo_materialization_rule_local_state(&repo_dir),
+        &repo_dir,
+    )
 }
 
-fn repo_materialization_marker_content_state(repo_spec_local: bool, repo_dir: &Path) -> String {
+fn repo_materialization_marker_content_state(
+    repo_spec_local: bool,
+    repo_rule_local: bool,
+    repo_dir: &Path,
+) -> String {
     let marker_path = repo_dir.join(".slug_repo_complete");
-    if repo_spec_local || repo_dir.join(REPO_RULE_LOCAL_FILE).exists() {
+    if repo_spec_local || repo_rule_local {
         "local-rule".to_owned()
     } else if marker_path.exists() {
         match std::fs::read_to_string(&marker_path) {
@@ -697,6 +705,10 @@ fn repo_materialization_marker_content_state(repo_spec_local: bool, repo_dir: &P
     } else {
         "marker-absent".to_owned()
     }
+}
+
+fn repo_materialization_rule_local_state(repo_dir: &Path) -> bool {
+    repo_dir.join(REPO_RULE_LOCAL_FILE).exists()
 }
 
 #[cfg(test)]
@@ -843,8 +855,15 @@ impl Key for RepoMaterializationMarkerStateKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
+        let repo_rule_local = ctx
+            .compute(&RepoMaterializationRuleLocalStateKey {
+                repo_dir: Arc::new(repo_dir.clone()),
+            })
+            .await
+            .unwrap_or(false);
         let content_key = RepoMaterializationMarkerContentKey {
             repo_spec_local: self.0.repo_spec.local,
+            repo_rule_local,
             repo_dir: Arc::new(repo_dir.clone()),
         };
         let content_state = match ctx.compute(&content_key).await {
@@ -893,13 +912,43 @@ impl Key for RepoMaterializationMarkerStateKey {
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[display("RepoMaterializationRuleLocalStateKey({})", repo_dir.display())]
+struct RepoMaterializationRuleLocalStateKey {
+    repo_dir: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for RepoMaterializationRuleLocalStateKey {
+    type Value = bool;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        repo_materialization_rule_local_state(&self.repo_dir)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // See RepoMaterializationMarkerStateKey::validity.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
 #[display(
-    "RepoMaterializationMarkerContentKey({}, {})",
+    "RepoMaterializationMarkerContentKey({}, {}, {})",
     repo_spec_local,
+    repo_rule_local,
     repo_dir.display()
 )]
 struct RepoMaterializationMarkerContentKey {
     repo_spec_local: bool,
+    repo_rule_local: bool,
     repo_dir: Arc<PathBuf>,
 }
 
@@ -913,8 +962,12 @@ impl Key for RepoMaterializationMarkerContentKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         Arc::from(
-            repo_materialization_marker_content_state(self.repo_spec_local, &self.repo_dir)
-                .as_str(),
+            repo_materialization_marker_content_state(
+                self.repo_spec_local,
+                self.repo_rule_local,
+                &self.repo_dir,
+            )
+            .as_str(),
         )
     }
 
@@ -2528,6 +2581,48 @@ mod tests {
         let second = dice.compute(&key).await.unwrap().unwrap();
         assert_ne!(first.digest, second.digest);
         assert_eq!(second.marker_state.as_ref(), format!("marker:{marker}"));
+    }
+
+    #[tokio::test]
+    async fn materialization_manifest_key_observes_rule_local_state_dependency() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+local_state_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+
+        let repo_spec = RepoSpec::new("//:repo.bzl%custom_repository".to_owned());
+        let spec_hash = repo_spec.compute_hash();
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        let marker = complete_marker(&spec_hash, &output_digest);
+        std::fs::write(repo_dir.join(".slug_repo_complete"), format!("{marker}\n")).unwrap();
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await.unwrap().unwrap();
+        assert_eq!(first.marker_state.as_ref(), format!("marker:{marker}"));
+
+        write_repository_rule_local_state(&repo_dir, true).unwrap();
+
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await.unwrap().unwrap();
+        assert_ne!(first.digest, second.digest);
+        assert_eq!(second.marker_state.as_ref(), "local-rule");
     }
 
     #[tokio::test]
