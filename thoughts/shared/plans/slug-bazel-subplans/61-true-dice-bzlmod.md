@@ -3069,6 +3069,16 @@ What did not work or remains risky:
   new extract guardrail (`1 passed`), and the adjacent
   repository watch/read/template/patch/extract/watch-tree subset (`6 passed,
   144 deselected`).
+- `repository_ctx.watch_tree(Label(...))` DICE watch tracking is now binary-safe:
+  file leaves in watched trees depend on path metadata/digest instead of the
+  UTF-8 source read path. The new guardrail
+  `test_repository_ctx_watch_tree_binary_nested_edit_reexecutes_materialized_repo`
+  first failed because the watched tree walker attempted
+  `read_to_string_if_exists` on a binary leaf, then passed after the fix.
+  Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-watch-tree-binary
+  cargo build -p slug`, the new binary watch-tree guardrail (`1 passed`), and
+  the adjacent repository watch/read/template/patch/extract/watch-tree subset
+  (`7 passed, 144 deselected`).
 - Repository materialization recorded-input sidecars are now split into named
   manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
   reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
@@ -3716,6 +3726,10 @@ using Rust DICE keys and values:
      now records the archive file as a repository materialization input, so
      editing a binary source archive rematerializes the generated repository in
      the same daemon.
+   - `repository_ctx.watch_tree(Label(...))` now tracks binary file leaves via
+     metadata/digest DICE dependencies instead of UTF-8 source reads, so binary
+     edits inside a watched tree rematerialize the generated repository in the
+     same daemon.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

@@ -566,9 +566,7 @@ async fn track_repository_watch_tree(
         let metadata =
             DiceFileComputations::read_path_metadata_if_exists(ctx, path.as_ref()).await?;
         match metadata {
-            Some(RawPathMetadata::File(_)) => {
-                let _ = DiceFileComputations::read_file_if_exists(ctx, path.as_ref()).await?;
-            }
+            Some(RawPathMetadata::File(_)) => {}
             Some(RawPathMetadata::Directory) => {
                 let entries = DiceFileComputations::read_dir(ctx, path.as_ref()).await?;
                 for entry in entries.included.iter() {

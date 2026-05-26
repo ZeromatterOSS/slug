@@ -7819,6 +7819,71 @@ use_repo(watch_tree, "watch_tree_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_watch_tree_binary_nested_edit_reexecutes_materialized_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepoRecordedInput.DirTree and DirectoryTreeDigestFunction."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+watch_tree_binary_ext+watch_tree_binary_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    watched_tree = buck.cwd / "watched_tree"
+    watched_leaf = watched_tree / "sub" / "blob.bin"
+    watched_leaf.parent.mkdir(parents=True)
+    _write_bytes(watched_leaf, b"\xff\x00first\n")
+    _write(
+        buck.cwd / "watch_tree_binary_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.watch_tree(Label("//:watched_tree"))
+    repository_ctx.file("data.txt", "static\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+watch_tree_binary_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _watch_tree_binary_ext_impl(module_ctx):
+    watch_tree_binary_repo_rule(name = "watch_tree_binary_repo")
+
+watch_tree_binary_ext = module_extension(
+    implementation = _watch_tree_binary_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_watch_tree_binary_input")
+
+watch_tree_binary = use_extension("//:watch_tree_binary_ext.bzl", "watch_tree_binary_ext")
+use_repo(watch_tree_binary, "watch_tree_binary_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_watch_tree_binary_repo",
+    srcs = ["@watch_tree_binary_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_watch_tree_binary_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "static\n"
+    assert recorded_inputs.exists()
+    assert "DIRTREE:" in recorded_inputs.read_text()
+
+    _write_bytes(watched_leaf, b"\xff\x00second\n")
+
+    await buck.build("//:uses_watch_tree_binary_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "static\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_wasm_methods_are_disabled_by_default(
     buck: Buck,
 ) -> None:
