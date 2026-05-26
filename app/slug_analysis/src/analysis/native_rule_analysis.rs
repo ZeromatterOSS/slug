@@ -215,7 +215,6 @@ fn deferred_state_for_signature<'a>(
     signature: &ToolchainLoadingSignature,
 ) -> Option<&'a mut DeferredToolchainState> {
     if state.signature.as_ref() != Some(signature) {
-        *state = DeferredToolchainState::default();
         return None;
     }
     Some(state)

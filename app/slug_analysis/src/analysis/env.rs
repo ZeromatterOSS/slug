@@ -1486,18 +1486,22 @@ pub async fn ensure_deferred_toolchains_loaded(
                 "Registered toolchains unavailable while loading deferred toolchains: {}",
                 e
             );
-            clear_deferred_toolchains();
             return false;
         }
     };
     if !toolchains_loaded_for_signature(&signature)
         || !deferred_toolchain_state_matches_signature(&signature)
     {
-        clear_deferred_toolchains();
         return false;
     }
 
     let _guard = DEFERRED_TOOLCHAIN_LOAD_LOCK.lock().await;
+    if !toolchains_loaded_for_signature(&signature)
+        || !deferred_toolchain_state_matches_signature(&signature)
+    {
+        return false;
+    }
+
     let pool = get_deferred_toolchains(&signature);
     if pool.is_empty() {
         return false;
@@ -6267,8 +6271,17 @@ mod tests {
         assert_eq!(get_deferred_toolchains(&first).len(), 1);
         assert!(deferred_all_loaded(&first));
 
-        assert!(get_deferred_toolchains(&second).is_empty());
-        assert!(!deferred_toolchain_state_matches_signature(&first));
+        set_deferred_toolchains(
+            second.clone(),
+            vec![DeferredToolchain {
+                module: "rules_go".to_owned(),
+                label: "@rules_go//go:all".to_owned(),
+            }],
+        );
+
+        assert!(get_deferred_toolchains(&first).is_empty());
+        assert!(deferred_toolchain_state_matches_signature(&second));
+        assert_eq!(get_deferred_toolchains(&second).len(), 1);
         assert!(!deferred_key_already_loaded(
             &first,
             "rules_rust::@rules_rust//rust:all"

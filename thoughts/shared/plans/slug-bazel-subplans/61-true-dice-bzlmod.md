@@ -2794,8 +2794,8 @@ What did not work or remains risky:
 - Deferred registered-toolchain state now lives in one signature-scoped state
   object instead of three independent process globals. `ensure_deferred_toolchains_loaded`
   recomputes the current DICE registered-toolchain signature, requires it to
-  match the eager loaded registry, and clears stale deferred pool/marker state on
-  mismatch. This is still transitional process state rather than a DICE-owned
+  match the eager loaded registry, and ignores mismatched deferred pool/marker
+  state. This is still transitional process state rather than a DICE-owned
   registry, but it closes the concrete cross-workspace deferred-pool leak.
   Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-toolchain-state
   cargo test -p slug_analysis toolchain_loading -- --nocapture` (`2 passed`),
@@ -2804,6 +2804,14 @@ What did not work or remains risky:
   test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback
   -- --nocapture`, and `cargo test -p slug_analysis
   test_deferred_retry_ignores_optional_miss -- --nocapture`.
+  Clean review of `ae098f62` found a stale-caller race where a request that
+  computed signature A before waiting on the deferred-load lock could clear a
+  newer signature B state after the eager loader installed B. The follow-up fix
+  rechecks the loaded/deferred signature after acquiring the deferred-load lock
+  and makes mismatched helper lookups return empty/false without clearing the
+  current state. Follow-up validation reran the focused signature-scoping,
+  lookup-error, and deferred-retry tests, plus `cargo check -p slug_analysis`,
+  `cargo fmt --check`, and `git diff --check`.
 - Extension repo file-ops no longer accepts a no-spec/no-spoke
   `.slug_repo_complete` marker as semantic authority. If setup and registered
   DICE spokes do not provide a current `RepoSpec`, the path now always enters
