@@ -234,6 +234,24 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo check -p slug_bzlmod`, `cargo check -p slug_common`,
   `cargo build -p slug`, the same explicit-binary Plan 61 selector (`6 passed,
   149 deselected`), `cargo fmt --check`, and `git diff --check`.
+  Constructor follow-up for the same bridge: the production surface reduced is
+  implicit resolver construction without an explicit patch-input owner. Before
+  this slice, `MvsResolver::new` and `MvsResolver::with_registry` installed
+  `OverridePatchInputs::default()` internally, `resolve_with_lockfile` could
+  construct that empty-input resolver shape, and legacy config parsing patched
+  the owner in afterward with `set_override_patch_inputs`. After this slice, the
+  resolver constructors and `resolve_with_lockfile` require an
+  `Arc<OverridePatchInputs>`, the setter is gone, and normal config parsing
+  passes either the DICE-computed `OverridePatchInputsKey` value or the explicit
+  `bootstrap_override_patch_inputs` adapter at construction time. Before/after
+  evidence: `rg -n "MvsResolver::new\\(|MvsResolver::with_registry\\(|set_override_patch_inputs\\(" app/slug_bzlmod/src app/slug_common/src tests -g '*.rs' -g '*.py'`
+  now shows only two explicit constructor calls, both with `override_patch_inputs`
+  arguments. Validation passed with `cargo test -p slug_bzlmod
+  override_patch_helpers_require_tracked_inputs -- --nocapture`, `cargo test -p
+  slug_bzlmod single_version_module_patch_skips_non_module_hunks --
+  --nocapture`, `cargo check -p slug_bzlmod`, `cargo check -p slug_common`,
+  `cargo build -p slug`, the same explicit-binary Plan 61 selector (`6 passed,
+  149 deselected`), `cargo fmt --check`, and `git diff --check`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets

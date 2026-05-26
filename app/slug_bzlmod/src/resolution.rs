@@ -435,7 +435,10 @@ enum YankedVersionStatus {
 
 impl MvsResolver {
     /// Create a new MVS resolver with default BCR registry.
-    pub async fn new(cache: ModuleCache) -> slug_error::Result<Self> {
+    pub async fn new(
+        cache: ModuleCache,
+        override_patch_inputs: Arc<crate::OverridePatchInputs>,
+    ) -> slug_error::Result<Self> {
         let registry_client = RegistryClient::bcr(cache.clone()).await?;
         let source_fetcher = SourceFetcher::new(cache.clone()).await?;
 
@@ -453,12 +456,16 @@ impl MvsResolver {
             ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
-            override_patch_inputs: Arc::new(crate::OverridePatchInputs::default()),
+            override_patch_inputs,
         })
     }
 
     /// Create a resolver with a custom registry URL.
-    pub async fn with_registry(registry_url: &str, cache: ModuleCache) -> slug_error::Result<Self> {
+    pub async fn with_registry(
+        registry_url: &str,
+        cache: ModuleCache,
+        override_patch_inputs: Arc<crate::OverridePatchInputs>,
+    ) -> slug_error::Result<Self> {
         let registry_client = RegistryClient::new(registry_url, cache.clone()).await?;
         let source_fetcher = SourceFetcher::new(cache.clone()).await?;
 
@@ -476,7 +483,7 @@ impl MvsResolver {
             ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
-            override_patch_inputs: Arc::new(crate::OverridePatchInputs::default()),
+            override_patch_inputs,
         })
     }
 
@@ -497,11 +504,6 @@ impl MvsResolver {
     /// Configure Bazel's command-level dev-dependency policy.
     pub fn set_ignore_dev_dependency(&mut self, ignore_dev_dependency: bool) {
         self.ignore_dev_dependency = ignore_dev_dependency;
-    }
-
-    /// Configure DICE-tracked root-local override patch inputs for production resolution.
-    pub fn set_override_patch_inputs(&mut self, inputs: Arc<crate::OverridePatchInputs>) {
-        self.override_patch_inputs = inputs;
     }
 
     /// Process overrides from the root module.
@@ -1636,6 +1638,7 @@ pub async fn resolve_with_lockfile(
     workspace_root: &Path,
     _module_bazel_path: &Path,
     mode: LockfileMode,
+    override_patch_inputs: Arc<crate::OverridePatchInputs>,
 ) -> slug_error::Result<ResolvedGraph> {
     // In Bazel 9.0+ format, the lockfile no longer caches the module dependency graph.
     // Module resolution always runs fresh (it's fast - just MODULE.bazel parsing + MVS).
@@ -1646,7 +1649,7 @@ pub async fn resolve_with_lockfile(
 
     // Always resolve fresh
     let cache = ModuleCache::new()?;
-    let mut resolver = MvsResolver::new(cache).await?;
+    let mut resolver = MvsResolver::new(cache, override_patch_inputs).await?;
     let graph = resolver.resolve(root, workspace_root).await?;
 
     Ok(graph)

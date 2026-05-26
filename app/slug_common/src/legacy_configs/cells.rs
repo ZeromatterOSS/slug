@@ -3774,12 +3774,15 @@ impl BuckConfigBasedCells {
                     parsed.module.name
                 )
             })?;
-            let mut resolver = MvsResolver::new(cache).await.with_buck_error_context(|| {
-                format!(
-                    "Failed to create MVS resolver while resolving MODULE.bazel for root module '{}'",
-                    parsed.module.name
-                )
-            })?;
+            let mut resolver =
+                MvsResolver::new(cache, override_patch_inputs).await.with_buck_error_context(
+                    || {
+                        format!(
+                            "Failed to create MVS resolver while resolving MODULE.bazel for root module '{}'",
+                            parsed.module.name
+                        )
+                    },
+                )?;
             if let Some(lockfile) = visible_lockfile.as_ref() {
                 resolver.set_yanked_version_policy(
                     allowed_yanked_versions.clone(),
@@ -3796,7 +3799,6 @@ impl BuckConfigBasedCells {
                 );
             }
             resolver.set_ignore_dev_dependency(options.ignore_dev_dependency);
-            resolver.set_override_patch_inputs(override_patch_inputs);
             let mut resolved_graph = resolver
                 .resolve(&parsed.module, workspace_root)
                 .await
