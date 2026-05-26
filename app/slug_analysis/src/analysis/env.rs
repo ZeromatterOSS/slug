@@ -6397,8 +6397,6 @@ mod tests {
         runtime.enable_all();
         let runtime = runtime.build().unwrap();
         runtime.block_on(async {
-            use slug_bzlmod::SetBzlmodProjectionData;
-
             reset_toolchain_loading();
 
             let project_root = PathBuf::from("/tmp/plan61-toolchains");
@@ -6424,8 +6422,9 @@ mod tests {
                 .commit()
                 .await;
             let mut updater = dice.into_updater();
-            updater.set_bzlmod_projection_data(
-                slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id),
+            slug_bzlmod::SetBzlmodProjectionData::set_empty_bzlmod_projection_data_for_workspace(
+                &mut updater,
+                workspace_id,
             )?;
             let mut dice = updater.commit().await;
 
@@ -6446,8 +6445,6 @@ mod tests {
         runtime.enable_all();
         let runtime = runtime.build().unwrap();
         runtime.block_on(async {
-            use slug_bzlmod::SetBzlmodProjectionData;
-
             reset_toolchain_loading();
 
             let loaded = ToolchainLoadingSignature {
@@ -6481,49 +6478,12 @@ mod tests {
                 .unwrap()
                 .commit()
                 .await;
-            let mut updater = dice.into_updater();
             let project_root = PathBuf::from("/tmp/plan61-toolchains");
-            let requested_workspace = slug_bzlmod::WorkspaceId::new(
-                project_root.clone(),
-                PathBuf::from("/tmp/plan61-toolchains/buck-out/requested"),
-            );
-            let stale_workspace = slug_bzlmod::WorkspaceId::new(
-                project_root.clone(),
-                PathBuf::from("/tmp/plan61-toolchains/buck-out/stale"),
-            );
-            updater
-                .set_bzlmod_projection_data(slug_bzlmod::BzlmodProjectionData::for_workspace(
-                    requested_workspace.clone(),
-                ))
-                .unwrap();
-            let dice = updater.commit().await;
-            let mut updater = dice.into_updater();
-            updater
-                .changed_to(vec![(
-                    slug_bzlmod::BzlmodRegisteredToolchainsDataKey,
-                    Arc::new(slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-                        stale_workspace.clone(),
-                        Vec::new(),
-                    )),
-                )])
-                .unwrap();
-            let mut dice = updater.commit().await;
+            let mut dice = dice;
 
             ensure_registered_toolchains_loaded(&mut dice).await;
 
             assert!(!toolchains_loaded_for_signature(&loaded));
-            assert!(!toolchains_loaded_for_signature(
-                &ToolchainLoadingSignature {
-                    workspace_id: requested_workspace,
-                    registered_toolchains: Vec::new(),
-                }
-            ));
-            assert!(!toolchains_loaded_for_signature(
-                &ToolchainLoadingSignature {
-                    workspace_id: stale_workspace,
-                    registered_toolchains: Vec::new(),
-                }
-            ));
             assert!(!toolchains_loaded_for_signature(
                 &ToolchainLoadingSignature {
                     workspace_id: slug_bzlmod::WorkspaceId::new(

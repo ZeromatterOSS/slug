@@ -1042,15 +1042,13 @@ mod tests {
         let output_base =
             std::env::temp_dir().join(format!("slug-spoke-lookup-output-{}", std::process::id()));
         let workspace_id = slug_bzlmod::WorkspaceId::new(project_root.clone(), output_base);
-        let projection = slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
-
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
             .unwrap()
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data(projection)?;
+        updater.set_empty_bzlmod_projection_data_for_workspace(workspace_id.clone())?;
         let mut dice = updater.commit().await;
 
         let actual = workspace_id_for_extension_spoke_lookup(&mut dice, "_main+ext+tool").await?;
@@ -1286,9 +1284,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data(slug_bzlmod::BzlmodProjectionData::for_workspace(
-            workspace_id,
-        ))?;
+        updater.set_empty_bzlmod_projection_data_for_workspace(workspace_id)?;
         let mut dice = updater.commit().await;
 
         let setup = ExtensionRepoCellSetup {

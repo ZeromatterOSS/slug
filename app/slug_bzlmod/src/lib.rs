@@ -290,26 +290,18 @@ impl BzlmodProjectionData {
             cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
         }
     }
-
-    pub fn empty_no_project_sentinel() -> Self {
-        Self::for_workspace(WorkspaceId::no_project_sentinel())
-    }
-
-    #[cfg(test)]
-    pub fn empty_for_project_root(project_root: PathBuf) -> Self {
-        Self::for_workspace(WorkspaceId::for_project_root(project_root))
-    }
 }
 
 pub trait SetBzlmodProjectionData {
-    fn set_bzlmod_projection_data(&mut self, data: BzlmodProjectionData) -> slug_error::Result<()> {
-        let workspace_id = data.cell_graph.workspace_id.clone();
-        let root_module_name = data.cell_graph.root_module_name.clone();
+    fn set_empty_bzlmod_projection_data_for_workspace(
+        &mut self,
+        workspace_id: WorkspaceId,
+    ) -> slug_error::Result<()> {
         self.set_bzlmod_projection_data_with_inputs(
-            data,
+            BzlmodProjectionData::for_workspace(workspace_id.clone()),
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
-                root_module_name.clone(),
+                String::new(),
                 Arc::new(HashMap::new()),
             ),
             BzlmodLockfileInputsDataValue::for_workspace(
@@ -321,7 +313,7 @@ pub trait SetBzlmodProjectionData {
             RegisteredExecutionPlatformsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
             BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
-                root_module_name,
+                String::new(),
                 Arc::new(HashMap::new()),
             ),
             BzlmodResolutionFactsValue::for_workspace(
@@ -562,7 +554,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_uses_projection_workspace_id() -> slug_error::Result<()> {
+    async fn set_bzlmod_projection_data_with_inputs_uses_projection_workspace_id()
+    -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-projection-workspace"),
             PathBuf::from("/tmp/slug-plan61-custom-output-base"),
@@ -593,7 +586,32 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data(data)?;
+        updater.set_bzlmod_projection_data_with_inputs(
+            data,
+            BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                workspace_id.clone(),
+                "root_mod".to_owned(),
+                Arc::new(HashMap::new()),
+            ),
+            BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            ),
+            BzlmodRepoEnvDataValue::for_workspace(workspace_id.clone(), Arc::new(BTreeMap::new())),
+            empty_registered_toolchains(workspace_id.clone()),
+            empty_registered_execution_platforms(workspace_id.clone()),
+            empty_extension_aggregations_with_root(workspace_id.clone(), "root_mod"),
+            BzlmodResolutionFactsValue::for_workspace(
+                workspace_id.clone(),
+                indexmap::IndexMap::new(),
+                indexmap::IndexMap::new(),
+            ),
+            BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingOverrides::new()),
+            ),
+        )?;
         let mut dice = updater.commit().await;
 
         let repo_mappings = dice
@@ -1760,9 +1778,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data(BzlmodProjectionData::for_workspace(
-            workspace_id.clone(),
-        ))?;
+        updater.set_empty_bzlmod_projection_data_for_workspace(workspace_id.clone())?;
         let dice = updater.commit().await;
 
         let mut updater = dice.into_updater();
@@ -1873,7 +1889,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data(data)?;
+        updater.set_empty_bzlmod_projection_data_for_workspace(data.cell_graph.workspace_id)?;
         let mut dice = updater.commit().await;
 
         let module_versions = module_versions_for_current_workspace(&mut dice).await?;

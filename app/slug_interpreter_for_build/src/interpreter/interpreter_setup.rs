@@ -57,9 +57,9 @@ pub fn setup_interpreter_basic(
     )?;
     // Test-only interpreter setup has no ProjectRoot; keep the empty bzlmod
     // sentinel explicit instead of relying on a semantic-looking Default.
-    slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data(
+    slug_bzlmod::SetBzlmodProjectionData::set_empty_bzlmod_projection_data_for_workspace(
         dice,
-        slug_bzlmod::BzlmodProjectionData::empty_no_project_sentinel(),
+        slug_bzlmod::WorkspaceId::no_project_sentinel(),
     )?;
     Ok(())
 }

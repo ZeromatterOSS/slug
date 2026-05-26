@@ -2649,14 +2649,23 @@ Observed SDK result at the checkpoint:
   `testing_parse` filter matched zero tests and was not counted as evidence.
 - The no-project workspace sentinel is now named directly on `WorkspaceId`, so
   callers that only need identity no longer construct an empty
-  `BzlmodProjectionData` just to extract its cell graph workspace. The empty
-  no-project projection remains available for test-only interpreter setup that
-  still needs a full injected payload. Validation passed with `cargo fmt
-  --check`, `cargo test -p slug_bzlmod
-  workspace_id_names_no_project_sentinel -- --nocapture`, `cargo test -p
-  slug_common bzlmod_projection_bridge -- --nocapture`, `cargo check -p
-  slug_bzlmod -p slug_common -p slug_interpreter_for_build`, and `git diff
-  --check`.
+  `BzlmodProjectionData` just to extract its cell graph workspace. The implicit
+  empty-projection injection helper is now removed too: callers can no longer
+  pass arbitrary `BzlmodProjectionData` through `set_bzlmod_projection_data()`
+  and silently receive empty module-version, lockfile, repo-env, registration,
+  aggregation, resolution-fact, and repo-mapping projections. Non-empty
+  graph-shaped projections must use `set_bzlmod_projection_data_with_inputs`;
+  explicit empty call sites now use
+  `set_empty_bzlmod_projection_data_for_workspace`, and the dead
+  no-project/empty-project projection constructors are gone. Bridge surface
+  reduced: generic empty graph-shaped projection injection is no longer a
+  public semantic-looking API. The intended owner remains true graph/module
+  producers feeding the named projection keys. Validation passed with `cargo
+  test -p slug_bzlmod set_bzlmod_projection_data -- --nocapture`, `cargo test
+  -p slug_analysis test_registered_toolchain -- --nocapture`, focused
+  `slug_external_cells` workspace/materialization tests, `cargo check -p
+  slug_bzlmod -p slug_analysis -p slug_external_cells -p
+  slug_interpreter_for_build`, `cargo fmt --check`, and `git diff --check`.
 - Transitional process-global bzlmod dynamic-cell entries are now scoped by
   workspace identity, including output base, instead of only project root.
   Runtime bzlmod replay sets that scope from the DICE-projected cell graph
