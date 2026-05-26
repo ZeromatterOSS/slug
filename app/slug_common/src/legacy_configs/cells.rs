@@ -1040,14 +1040,15 @@ impl Key for TrackedRootModuleFileKey {
             false,
         )
         .await?;
-        let input_digest = slug_bzlmod::module_file_inputs_digest(&parsed_with_inputs.inputs);
-        let input_count = parsed_with_inputs.inputs.len();
+        let input_digest =
+            slug_bzlmod::module_file_inputs_digest(&parsed_with_inputs.parsed_with_inputs.inputs);
+        let input_count = parsed_with_inputs.parsed_with_inputs.inputs.len();
 
         Ok(Arc::new(slug_bzlmod::RootModuleFileValue {
             path: root_path,
             input_digest: Some(input_digest),
             input_count,
-            parsed: Some(parsed_with_inputs.parsed),
+            parsed: Some(parsed_with_inputs.parsed_with_inputs.parsed),
         }))
     }
 
@@ -1059,13 +1060,18 @@ impl Key for TrackedRootModuleFileKey {
     }
 }
 
+struct ParsedModuleFileWithInputTracking {
+    parsed_with_inputs: slug_bzlmod::ParsedModuleFileWithInputs,
+    has_untracked_inputs: bool,
+}
+
 async fn parse_module_with_tracked_project_includes(
     ctx: &mut DiceComputations<'_>,
     project_fs: &ProjectRoot,
     module_path: &Path,
     module_content: String,
     validate_extension_repo_directives: bool,
-) -> slug_error::Result<slug_bzlmod::ParsedModuleFileWithInputs> {
+) -> slug_error::Result<ParsedModuleFileWithInputTracking> {
     let module_root = module_path
         .parent()
         .unwrap_or_else(|| Path::new(""))
@@ -1079,6 +1085,7 @@ async fn parse_module_with_tracked_project_includes(
     let module_digest = slug_bzlmod::compute_sha256_hex(module_content.as_bytes());
     let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
     let mut pending = Vec::new();
+    let mut has_untracked_inputs = false;
     push_pending_include_labels(&mut pending, include_labels, Vec::new());
 
     while let Some((label, ancestors)) = pending.pop() {
@@ -1094,8 +1101,11 @@ async fn parse_module_with_tracked_project_includes(
             .into());
         }
 
-        let (include_read, _tracking) =
+        let (include_read, tracking) =
             read_bzlmod_file_for_module_inputs(ctx, project_fs, &include_path).await?;
+        if tracking != BzlmodFileInputTracking::Project {
+            has_untracked_inputs = true;
+        }
         let Some((include_content, include_digest)) = include_read else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -1110,9 +1120,13 @@ async fn parse_module_with_tracked_project_includes(
         push_pending_include_labels(&mut pending, nested_labels, nested_ancestors);
     }
 
-    session.finish()
+    Ok(ParsedModuleFileWithInputTracking {
+        parsed_with_inputs: session.finish()?,
+        has_untracked_inputs,
+    })
 }
 
+#[cfg(test)]
 fn parse_module_with_polled_includes(
     module_path: &Path,
     module_content: String,
@@ -1307,6 +1321,7 @@ fn read_absolute_text_file_input(
     Ok((Some(content), Some(digest)))
 }
 
+#[cfg(test)]
 fn absolute_text_file_digest(path: &Path) -> slug_error::Result<Option<String>> {
     match std::fs::read(path) {
         Ok(bytes) => Ok(Some(slug_bzlmod::compute_sha256_hex(&bytes))),
@@ -1806,7 +1821,6 @@ async fn root_extension_replay_summary_digest(
 struct LocalOverrideModuleInputsKey {
     project_root: AbsNormPathBuf,
     overrides: Vec<(String, String)>,
-    poll_digest: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -1825,11 +1839,11 @@ struct LocalOverrideModuleInputsValue {
 struct NonRegistryOverrideModuleInputsKey {
     project_root: AbsNormPathBuf,
     overrides: Vec<(String, PathBuf)>,
-    poll_digest: String,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("LocalOverrideModuleInputsPollKey({})", project_root.display())]
+#[cfg(test)]
 struct LocalOverrideModuleInputsPollKey {
     project_root: AbsNormPathBuf,
     overrides: Vec<(String, String)>,
@@ -1837,12 +1851,14 @@ struct LocalOverrideModuleInputsPollKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("NonRegistryOverrideModuleInputsPollKey({})", project_root.display())]
+#[cfg(test)]
 struct NonRegistryOverrideModuleInputsPollKey {
     project_root: AbsNormPathBuf,
     overrides: Vec<(String, PathBuf)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[cfg(test)]
 struct BzlmodInputsPollValue {
     digest: String,
     has_polled_inputs: bool,
@@ -1860,11 +1876,13 @@ struct NonRegistryOverrideModuleInputsValue {
 struct RegistryFileInputsKey {
     project_root: AbsNormPathBuf,
     registry_file_hashes: Vec<(String, String)>,
-    poll_digest: String,
+    #[cfg(test)]
+    cache_base_dir: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("RegistryFileInputsPollKey({})", project_root.display())]
+#[cfg(test)]
 struct RegistryFileInputsPollKey {
     project_root: AbsNormPathBuf,
     registry_file_hashes: Vec<(String, String)>,
@@ -1898,11 +1916,11 @@ struct NonRootModuleFileInput {
 struct NonRootModuleFilesKey {
     project_root: AbsNormPathBuf,
     inputs: Vec<NonRootModuleFileInput>,
-    poll_digest: String,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("NonRootModuleFilesPollKey({}, {})", project_root.display(), inputs.len())]
+#[cfg(test)]
 struct NonRootModuleFilesPollKey {
     project_root: AbsNormPathBuf,
     inputs: Vec<NonRootModuleFileInput>,
@@ -2062,7 +2080,7 @@ async fn local_override_module_inputs_digest(
     let mut has_extension_usages = false;
     let mut has_repo_rule_invocations = false;
     let mut has_git_overrides = false;
-    let has_untracked_inputs = false;
+    let mut has_untracked_inputs = false;
     let mut parsed_modules = Vec::new();
 
     while let Some((module_name, base, path)) = queue.pop_front() {
@@ -2087,8 +2105,11 @@ async fn local_override_module_inputs_digest(
         }
 
         let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
-        let (module_read, _tracking) =
+        let (module_read, tracking) =
             read_bzlmod_file_for_module_inputs(ctx, &project_fs, &module_bazel_path).await?;
+        if tracking != BzlmodFileInputTracking::Project {
+            has_untracked_inputs = true;
+        }
         match module_read {
             Some((content, _content_digest)) => {
                 hasher.update(b"present");
@@ -2107,14 +2128,15 @@ async fn local_override_module_inputs_digest(
                         module_name, module_bazel_path
                     )
                 })?;
-                for input in &parsed_with_inputs.inputs {
+                has_untracked_inputs |= parsed_with_inputs.has_untracked_inputs;
+                for input in &parsed_with_inputs.parsed_with_inputs.inputs {
                     hasher.update(input.path.to_string_lossy().as_bytes());
                     hasher.update([0]);
                     hasher.update(input.digest.as_bytes());
                     hasher.update([0]);
                 }
 
-                let parsed = parsed_with_inputs.parsed;
+                let parsed = parsed_with_inputs.parsed_with_inputs.parsed;
                 has_bazel_deps |= !parsed.module.bazel_deps.is_empty();
                 has_extension_usages |= !parsed.extension_usages.is_empty();
                 has_repo_rule_invocations |= !parsed.repo_rule_invocations.is_empty();
@@ -2153,6 +2175,7 @@ async fn local_override_module_inputs_digest(
     })
 }
 
+#[cfg(test)]
 fn local_override_inputs_poll_digest(
     project_fs: &ProjectRoot,
     project_root: &AbsNormPathBuf,
@@ -2255,6 +2278,7 @@ async fn non_registry_override_module_inputs_digest(
     let mut hasher = Sha256::new();
     hasher.update(b"non-registry-override-module-inputs-v1");
     hasher.update([0]);
+    let mut has_untracked_inputs = false;
 
     for (module_name, module_dir) in overrides {
         let normalized_module_dir = match module_dir.as_path().canonicalize() {
@@ -2267,8 +2291,11 @@ async fn non_registry_override_module_inputs_digest(
         hasher.update(normalized_module_dir.to_string_lossy().as_bytes());
         hasher.update([0]);
 
-        let (module_read, _tracking) =
+        let (module_read, tracking) =
             read_bzlmod_file_for_module_inputs(ctx, &project_fs, &module_bazel_path).await?;
+        if tracking != BzlmodFileInputTracking::Project {
+            has_untracked_inputs = true;
+        }
         match module_read {
             Some((content, _content_digest)) => {
                 hasher.update(b"present");
@@ -2287,7 +2314,8 @@ async fn non_registry_override_module_inputs_digest(
                         module_name, module_bazel_path
                     )
                 })?;
-                for input in &parsed_with_inputs.inputs {
+                has_untracked_inputs |= parsed_with_inputs.has_untracked_inputs;
+                for input in &parsed_with_inputs.parsed_with_inputs.inputs {
                     hasher.update(input.path.to_string_lossy().as_bytes());
                     hasher.update([0]);
                     hasher.update(input.digest.as_bytes());
@@ -2304,7 +2332,7 @@ async fn non_registry_override_module_inputs_digest(
     Ok(NonRegistryOverrideModuleInputsValue {
         digest: hex::encode(hasher.finalize()),
         has_inputs: !overrides.is_empty(),
-        has_untracked_inputs: false,
+        has_untracked_inputs,
     })
 }
 
@@ -2419,6 +2447,7 @@ fn bootstrap_override_patch_inputs(
     })
 }
 
+#[cfg(test)]
 fn non_registry_override_inputs_poll_digest(
     project_fs: &ProjectRoot,
     overrides: &[(String, PathBuf)],
@@ -2526,6 +2555,7 @@ fn non_root_module_file_inputs(
         .collect()
 }
 
+#[cfg(test)]
 fn non_root_module_files_poll_digest(
     project_fs: &ProjectRoot,
     inputs: &[NonRootModuleFileInput],
@@ -2594,6 +2624,7 @@ async fn parse_non_root_module_files(
     hasher.update(b"non-root-module-files-v1");
     hasher.update([0]);
     let mut parsed_modules = Vec::new();
+    let mut has_untracked_inputs = false;
 
     for input in inputs {
         hasher.update(input.module_key.as_bytes());
@@ -2601,8 +2632,11 @@ async fn parse_non_root_module_files(
         hasher.update(input.module_bazel_path.to_string_lossy().as_bytes());
         hasher.update([0]);
 
-        let (module_read, _tracking) =
+        let (module_read, tracking) =
             read_bzlmod_file_for_module_inputs(ctx, &project_fs, &input.module_bazel_path).await?;
+        if tracking != BzlmodFileInputTracking::Project {
+            has_untracked_inputs = true;
+        }
         let Some((content, _content_digest)) = module_read else {
             hasher.update(b"missing");
             hasher.update([0]);
@@ -2625,14 +2659,15 @@ async fn parse_non_root_module_files(
                 input.module_key, input.module_bazel_path
             )
         })?;
-        for parsed_input in &parsed_with_inputs.inputs {
+        has_untracked_inputs |= parsed_with_inputs.has_untracked_inputs;
+        for parsed_input in &parsed_with_inputs.parsed_with_inputs.inputs {
             hasher.update(parsed_input.path.to_string_lossy().as_bytes());
             hasher.update([0]);
             hasher.update(parsed_input.digest.as_bytes());
             hasher.update([0]);
         }
 
-        let parsed = parsed_with_inputs.parsed;
+        let parsed = parsed_with_inputs.parsed_with_inputs.parsed;
         let module_key = if parsed.module.name.is_empty() {
             input.module_key.clone()
         } else {
@@ -2645,7 +2680,7 @@ async fn parse_non_root_module_files(
     Ok(NonRootModuleFilesValue {
         digest: hex::encode(hasher.finalize()),
         parsed_modules,
-        has_untracked_inputs: false,
+        has_untracked_inputs,
     })
 }
 
@@ -2704,6 +2739,7 @@ fn normalize_path_lexically(path: PathBuf) -> PathBuf {
 }
 
 #[async_trait]
+#[cfg(test)]
 impl Key for LocalOverrideModuleInputsPollKey {
     type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
 
@@ -2733,6 +2769,7 @@ impl Key for LocalOverrideModuleInputsPollKey {
 }
 
 #[async_trait]
+#[cfg(test)]
 impl Key for NonRegistryOverrideModuleInputsPollKey {
     type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
 
@@ -2761,6 +2798,7 @@ impl Key for NonRegistryOverrideModuleInputsPollKey {
 }
 
 #[async_trait]
+#[cfg(test)]
 impl Key for RegistryFileInputsPollKey {
     type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
 
@@ -2801,6 +2839,7 @@ impl Key for RegistryFileInputsPollKey {
 }
 
 #[async_trait]
+#[cfg(test)]
 impl Key for NonRootModuleFilesPollKey {
     type Value = slug_error::Result<Arc<BzlmodInputsPollValue>>;
 
@@ -2906,6 +2945,7 @@ fn cached_registry_file_path(cache: &ModuleCache, url: &str) -> Option<PathBuf> 
     }
 }
 
+#[cfg(test)]
 fn registry_file_inputs_poll_digest(
     project_fs: &ProjectRoot,
     registry_file_hashes: &[(String, String)],
@@ -2914,6 +2954,7 @@ fn registry_file_inputs_poll_digest(
     registry_file_inputs_poll_digest_for_cache(project_fs, &cache, registry_file_hashes)
 }
 
+#[cfg(test)]
 fn registry_file_inputs_poll_digest_for_cache(
     project_fs: &ProjectRoot,
     cache: &ModuleCache,
@@ -3001,9 +3042,22 @@ impl Key for RegistryFileInputsKey {
                 has_untracked_inputs: false,
             }));
         }
-        let cache = ModuleCache::new()?;
+        let cache = {
+            #[cfg(test)]
+            {
+                if let Some(cache_base_dir) = &self.cache_base_dir {
+                    ModuleCache::with_base_dir(cache_base_dir.clone())?
+                } else {
+                    ModuleCache::new()?
+                }
+            }
+            #[cfg(not(test))]
+            {
+                ModuleCache::new()?
+            }
+        };
         let mut cache_safe = true;
-        let has_untracked_inputs = false;
+        let mut has_untracked_inputs = false;
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
         for (url, expected_hash) in &self.registry_file_hashes {
             hasher.update(url.as_bytes());
@@ -3018,8 +3072,11 @@ impl Key for RegistryFileInputsKey {
             };
             hasher.update(path.to_string_lossy().as_bytes());
             hasher.update([0]);
-            let (content, _tracking) =
+            let (content, tracking) =
                 read_text_file_for_project_input(ctx, &project_fs, &path).await?;
+            if tracking != BzlmodFileInputTracking::Project {
+                has_untracked_inputs = true;
+            }
             match content {
                 Some(content) => {
                     hasher.update(b"present");
@@ -3305,20 +3362,10 @@ impl BuckConfigBasedCells {
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
         );
-        let local_override_poll = dice_ctx
-            .compute(&LocalOverrideModuleInputsPollKey {
-                project_root: project_root.clone(),
-                overrides: local_overrides.clone(),
-            })
-            .await?
-            .buck_error_context(
-                "Computing local override MODULE.bazel poll identity for bzlmod resolution",
-            )?;
         let local_override_inputs = dice_ctx
             .compute(&LocalOverrideModuleInputsKey {
                 project_root: project_root.clone(),
                 overrides: local_overrides,
-                poll_digest: local_override_poll.digest.clone(),
             })
             .await?
             .buck_error_context(
@@ -3328,20 +3375,10 @@ impl BuckConfigBasedCells {
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
         )?;
-        let non_registry_override_poll = dice_ctx
-            .compute(&NonRegistryOverrideModuleInputsPollKey {
-                project_root: project_root.clone(),
-                overrides: non_registry_overrides.clone(),
-            })
-            .await?
-            .buck_error_context(
-                "Computing non-registry override MODULE.bazel poll identity for bzlmod resolution",
-            )?;
         let non_registry_override_inputs = dice_ctx
             .compute(&NonRegistryOverrideModuleInputsKey {
                 project_root: project_root.clone(),
                 overrides: non_registry_overrides,
-                poll_digest: non_registry_override_poll.digest.clone(),
             })
             .await?
             .buck_error_context(
@@ -3359,20 +3396,12 @@ impl BuckConfigBasedCells {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        let registry_file_poll = dice_ctx
-            .compute(&RegistryFileInputsPollKey {
-                project_root: project_root.clone(),
-                registry_file_hashes: registry_file_hashes.clone(),
-                #[cfg(test)]
-                cache_base_dir: None,
-            })
-            .await?
-            .buck_error_context("Computing registry file poll identity for bzlmod resolution")?;
         let registry_file_inputs = dice_ctx
             .compute(&RegistryFileInputsKey {
                 project_root: project_root.clone(),
                 registry_file_hashes,
-                poll_digest: registry_file_poll.digest.clone(),
+                #[cfg(test)]
+                cache_base_dir: None,
             })
             .await?
             .buck_error_context("Computing registry file inputs for bzlmod resolution bridge")?;
@@ -4132,19 +4161,9 @@ impl BuckConfigBasedCells {
         parsed_modules.push((parsed.module.name.clone(), parsed.clone()));
         let non_root_inputs = non_root_module_file_inputs(project_root, &cells, &module_symlinks);
         let mut non_root_parsed_modules = if let Some(ctx) = dice_ctx.as_mut() {
-            let poll = ctx
-                .compute(&NonRootModuleFilesPollKey {
-                    project_root: project_root_abs.clone(),
-                    inputs: non_root_inputs.clone(),
-                })
-                .await?
-                .buck_error_context(
-                    "Computing non-root MODULE.bazel poll identity for bzlmod resolution",
-                )?;
             ctx.compute(&NonRootModuleFilesKey {
                 project_root: project_root_abs.clone(),
                 inputs: non_root_inputs,
-                poll_digest: poll.digest.clone(),
             })
             .await?
             .buck_error_context("Computing non-root MODULE.bazel inputs for bzlmod resolution")?
@@ -5208,7 +5227,8 @@ mod tests {
             true,
         )
         .await?;
-        let first_digest = slug_bzlmod::module_file_inputs_digest(&parsed.inputs);
+        let first_digest =
+            slug_bzlmod::module_file_inputs_digest(&parsed.parsed_with_inputs.inputs);
 
         std::fs::write(
             &include_path,
@@ -5228,7 +5248,8 @@ mod tests {
             true,
         )
         .await?;
-        let second_digest = slug_bzlmod::module_file_inputs_digest(&parsed.inputs);
+        let second_digest =
+            slug_bzlmod::module_file_inputs_digest(&parsed.parsed_with_inputs.inputs);
 
         assert_ne!(first_digest, second_digest);
         Ok(())
@@ -5315,6 +5336,95 @@ mod tests {
         let second = dice.compute(&key).await??;
 
         assert!(second.has_polled_inputs);
+        assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn local_override_module_inputs_key_repolls_same_out_of_project_key()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-local-override-parent-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let key = LocalOverrideModuleInputsKey {
+            project_root,
+            overrides: vec![(
+                "dep".to_owned(),
+                external.path().to_string_lossy().into_owned(),
+            )],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_untracked_inputs);
+        assert!(!<LocalOverrideModuleInputsKey as Key>::validity(&Ok(
+            first.clone()
+        )));
+
+        std::fs::write(
+            &module_path,
+            "module(name = \"dep\")\nbazel_dep(name = \"other\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.has_untracked_inputs);
+        assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn non_registry_override_module_inputs_key_repolls_same_out_of_project_key()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-non-registry-parent-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let key = NonRegistryOverrideModuleInputsKey {
+            project_root,
+            overrides: vec![("dep".to_owned(), external.path().to_path_buf())],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_untracked_inputs);
+        assert!(!<NonRegistryOverrideModuleInputsKey as Key>::validity(&Ok(
+            first.clone()
+        )));
+
+        std::fs::write(
+            &module_path,
+            "module(name = \"dep\")\nbazel_dep(name = \"other\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
         Ok(())
     }
@@ -5420,6 +5530,50 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn registry_file_inputs_key_repolls_same_out_of_project_key() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-registry-cache-parent-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let cache_base_dir = external.path().join("cache");
+        let cache = ModuleCache::with_base_dir(cache_base_dir.clone())?;
+        let registry_url = "https://bcr.bazel.build/bazel_registry.json".to_owned();
+        let registry_path = cache
+            .registry_dir("https://bcr.bazel.build")
+            .join("bazel_registry.json");
+        std::fs::create_dir_all(registry_path.parent().unwrap()).unwrap();
+        std::fs::write(&registry_path, "{}\n").unwrap();
+        let registry_hash = slug_bzlmod::compute_sha256_hex("{}\n".as_bytes());
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let key = RegistryFileInputsKey {
+            project_root,
+            registry_file_hashes: vec![(registry_url.clone(), registry_hash)],
+            cache_base_dir: Some(cache_base_dir),
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_untracked_inputs);
+        assert!(!<RegistryFileInputsKey as Key>::validity(&Ok(first)));
+
+        std::fs::write(&registry_path, "{\"mirrors\": []}\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let err = dice.compute(&key).await?.unwrap_err().to_string();
+
+        assert!(err.contains("Registry file checksum mismatch"), "{err}");
+        assert!(err.contains(&registry_url), "{err}");
+        Ok(())
+    }
+
     #[test]
     fn validate_bazel_registry_json_file_rejects_malformed_metadata() -> slug_error::Result<()> {
         let registry_url = "https://bcr.bazel.build/bazel_registry.json";
@@ -5510,6 +5664,47 @@ mod tests {
         let second = dice.compute(&key).await??;
 
         assert!(second.has_polled_inputs);
+        assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn non_root_module_files_key_repolls_same_out_of_project_key() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-non-root-module-parent-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        std::fs::write(&module_path, "module(name = \"dep\", version = \"1.0\")\n").unwrap();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let key = NonRootModuleFilesKey {
+            project_root,
+            inputs: vec![NonRootModuleFileInput {
+                module_key: "dep".to_owned(),
+                module_bazel_path: module_path.clone(),
+            }],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_untracked_inputs);
+        assert!(!<NonRootModuleFilesKey as Key>::validity(
+            &Ok(first.clone())
+        ));
+
+        std::fs::write(&module_path, "module(name = \"dep\", version = \"2.0\")\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
         Ok(())
     }

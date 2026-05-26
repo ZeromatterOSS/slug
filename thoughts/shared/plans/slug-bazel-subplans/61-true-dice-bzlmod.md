@@ -1636,6 +1636,20 @@ Observed SDK result at the checkpoint:
   module_inputs_poll_key_repolls -- --nocapture`, `cargo test -p slug_common
   non_root_module_files_poll -- --nocapture`, and `cargo test -p slug_common
   registry_file_inputs_poll -- --nocapture`.
+- Higher-level local override, non-registry override, registry cache, and
+  non-root module input keys no longer carry poll digests in key identity.
+  Their compute paths now record whether any root module, included segment, or
+  registry cache file came from an out-of-project absolute-file child key and
+  use `has_untracked_inputs` validity to force same-key recompute across DICE
+  transactions. The transitional poll keys are test-only guardrails now; the
+  production bridge surface reduced is poll digest propagation into
+  `LocalOverrideModuleInputsKey`, `NonRegistryOverrideModuleInputsKey`,
+  `RegistryFileInputsKey`, and `NonRootModuleFilesKey`. Focused validation
+  passed with `cargo test -p slug_common same_out_of_project_key --
+  --nocapture`, `cargo test -p slug_common module_inputs -- --nocapture`,
+  `cargo test -p slug_common registry_file_inputs -- --nocapture`, `cargo test
+  -p slug_common non_root_module_files -- --nocapture`, and `cargo check -p
+  slug_common`.
 - Registered toolchain and execution-platform facts now have their own
   injected DICE values. `RegisteredToolchainsKey` and
   `RegisteredExecutionPlatformsKey` no longer compute the whole
@@ -4092,18 +4106,19 @@ hardening behavior around it.
    - Root, included, and project-local local override module segments now use
      tracked project-file DICE inputs; out-of-project local override and
      cached git/archive override `MODULE.bazel` files are observed inside
-     named DICE poll keys and still polled into higher-level key identity. The
-     DICE-backed resolver now rejects missing tracked root module input instead
-     of direct-parsing the root module in the DICE path. Non-root module files
-     discovered from the transitional cell graph now read through the named
-     `NonRootModuleFilesPollKey`; project-root paths are DICE-tracked in the
-     parse key, while out-of-project paths are still directly polled by the
-     named poll key into higher-level key identity.
+     named DICE keys. The DICE-backed resolver now rejects missing tracked root
+     module input instead of direct-parsing the root module in the DICE path.
+     Non-root module files discovered from the transitional cell graph now read
+     through `NonRootModuleFilesKey`; project-root paths are DICE-tracked in the
+     parse key, while out-of-project paths are directly polled by named
+     absolute-file child keys and force same-key recompute through
+     `has_untracked_inputs`.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
-     out-of-root cache paths are directly observed inside the named
-     `RegistryFileInputsPollKey` and still polled into higher-level key
-     identity while the final watched-input graph is still pending. Locked
+     out-of-root cache paths are directly observed inside
+     `RegistryFileInputsKey` and force same-key recompute through
+     `has_untracked_inputs` while the final watched-input graph is still
+     pending. Locked
      registry `source.json`
      checksum, parse/UTF-8 failure, and create/delete transitions now have
      same-daemon guardrails, locked registry `MODULE.bazel` parse/UTF-8
