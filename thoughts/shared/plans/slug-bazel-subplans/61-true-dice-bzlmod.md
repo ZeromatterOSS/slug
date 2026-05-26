@@ -2988,10 +2988,20 @@ What did not work or remains risky:
   canonicalization now carries the active `BuildContext` alias resolver into
   focused helpers, and a resolver with a bzlmod runtime snapshot is
   authoritative on misses before the transitional process-global dynamic/scoped
-  alias maps. Validation passed with `cargo test -p slug_interpreter_for_build
-  label_context_explicit_repo -- --nocapture` (`2 passed`) and `cargo test -p
-  slug_interpreter_for_build label_context_scoped_repo -- --nocapture` (`2
-  passed`).
+  alias maps. The explicit-repo helper no longer falls back to
+  process-global dynamic aliases even when no active resolver snapshot is
+  available, so `Label()` cannot silently canonicalize through stale generated
+  repo state. Bridge burn-down note: the production surface reduced is
+  `Label()` native canonicalization's
+  `resolve_dynamic_extension_cell_alias(apparent_repo_name)` fallback; the
+  intended owner is the active `CellAliasResolver` from `BuildContext`, backed
+  by bzlmod runtime alias snapshots and ultimately `BzlmodCellGraphKey`.
+  Before/after evidence: `rg -n "resolve_dynamic_extension_cell_alias\\(apparent_repo_name\\)" app/slug_interpreter_for_build/src/interpreter/natives.rs`
+  now returns no hits. Validation passed with `cargo test -p
+  slug_interpreter_for_build label_context_explicit_repo -- --nocapture` (`2
+  passed`), `cargo test -p slug_interpreter_for_build label_context_scoped_repo
+  -- --nocapture` (`2 passed`), and `cargo test -p
+  slug_interpreter_for_build label_context_ -- --nocapture` (`9 passed`).
 - Bzlmod non-root `CellAliasResolverKey` now preserves the root resolver's
   runtime alias snapshot while still narrowing static aliases to canonical
   names, so non-root module resolvers can resolve DICE-owned generated-repo
@@ -3975,8 +3985,9 @@ hardening behavior around it.
   metadata/action-path formatting can now use declared aliases and runtime
   aliases/cells from the active cell alias resolver before consulting
   process-global dynamic aliases. Runtime-snapshot load-path misses are now
-  authoritative, but remaining compatibility adapters still retain
-  process-global fallback behavior.
+  authoritative, and `Label()` explicit repo canonicalization no longer consults
+  process-global dynamic aliases on resolverless misses, but remaining
+  compatibility adapters still retain process-global fallback behavior.
 - `config_setting(flag_values = ...)` build-setting lookup now also uses the
   active cell alias resolver for bzlmod repo-spelling normalization before
   consulting process-global dynamic aliases.

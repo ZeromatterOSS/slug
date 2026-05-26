@@ -260,15 +260,6 @@ fn canonical_repo_name_for_label_context_with_alias_resolver(
         return apparent_repo_name.to_owned();
     }
 
-    if let Some(canonical_name) =
-        slug_core::cells::resolve_dynamic_extension_cell_alias(apparent_repo_name)
-    {
-        if slug_core::cells::is_root_cell_name(&canonical_name) {
-            return String::new();
-        }
-        return canonical_name;
-    }
-
     apparent_repo_name.to_owned()
 }
 
@@ -1166,7 +1157,7 @@ mod tests {
         );
         assert_eq!(
             canonical_repo_name_for_label_context_with_alias_resolver(apparent, None),
-            wrong_global
+            apparent
         );
         Ok(())
     }
