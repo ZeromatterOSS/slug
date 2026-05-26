@@ -3196,6 +3196,7 @@ impl Key for OverridePatchInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodProjectionBridgeValue {
     projection_data: slug_bzlmod::BzlmodProjectionData,
+    module_versions: slug_bzlmod::BzlmodModuleVersionsDataValue,
     registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
     registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
     extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
@@ -3311,6 +3312,7 @@ impl BuckConfigBasedCells {
         };
         let (
             projection_data_for_dice,
+            module_versions_for_dice,
             registered_toolchains_for_dice,
             registered_execution_platforms_for_dice,
             extension_aggregations_for_dice,
@@ -3321,6 +3323,10 @@ impl BuckConfigBasedCells {
                 (
                     slug_bzlmod::BzlmodProjectionData::for_workspace(
                         key.resolution_key.workspace_id.clone(),
+                    ),
+                    slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                        Arc::new(HashMap::new()),
                     ),
                     slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
                         key.resolution_key.workspace_id.clone(),
@@ -3349,6 +3355,7 @@ impl BuckConfigBasedCells {
             |value| {
                 (
                     value.projection_data.clone(),
+                    value.module_versions.clone(),
                     value.registered_toolchains.clone(),
                     value.registered_execution_platforms.clone(),
                     value.extension_aggregations.clone(),
@@ -3374,6 +3381,7 @@ impl BuckConfigBasedCells {
         slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data_with_inputs(
             updater,
             projection_data_for_dice,
+            module_versions_for_dice,
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
                 key.resolution_key.workspace_id.clone(),
                 key.lockfile_inputs.clone(),
@@ -3854,6 +3862,10 @@ impl BuckConfigBasedCells {
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let mut bzlmod_projection_data =
             slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id);
+        let mut module_versions = slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
+            bzlmod_projection_data.cell_graph.workspace_id.clone(),
+            Arc::new(HashMap::new()),
+        );
         let registered_toolchains;
         let registered_execution_platforms;
         let extension_aggregations;
@@ -4223,11 +4235,10 @@ impl BuckConfigBasedCells {
             for (name, info) in &resolved_graph.modules {
                 version_map.insert(name.clone(), info.version.clone());
             }
-            bzlmod_projection_data.module_versions =
-                slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
-                    bzlmod_projection_data.cell_graph.workspace_id.clone(),
-                    Arc::new(version_map),
-                );
+            module_versions = slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
+                bzlmod_projection_data.cell_graph.workspace_id.clone(),
+                Arc::new(version_map),
+            );
         }
 
         // Build parsed_modules list for extension resolution
@@ -4493,8 +4504,8 @@ impl BuckConfigBasedCells {
             // materialization path; do not poll `bazel-external` here.
         }
 
-        // Convert pre-computed cells to the format expected by
-        // BzlmodProjectionData. Bazel's identity for extension-generated
+        // Convert pre-computed cells to the format expected by the bzlmod cell
+        // graph. Bazel's identity for extension-generated
         // repositories is the canonical repo name; apparent names from
         // use_repo() are repository-mapping entries that point at that identity.
         let mut ext_cells = Vec::new();
@@ -4754,6 +4765,7 @@ impl BuckConfigBasedCells {
 
         Ok(Some(BzlmodProjectionBridgeValue {
             projection_data: bzlmod_projection_data,
+            module_versions,
             registered_toolchains,
             registered_execution_platforms,
             extension_aggregations,

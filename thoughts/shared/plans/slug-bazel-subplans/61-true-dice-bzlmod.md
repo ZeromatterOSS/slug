@@ -2501,6 +2501,21 @@ Observed SDK result at the checkpoint:
   extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
   `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
   slug_external_cells`, and `git diff --check`.
+- `BzlmodProjectionData` no longer carries module-version data. The projection
+  payload is now cell-graph-shaped, while the legacy resolver returns
+  `BzlmodModuleVersionsDataValue` through `BzlmodProjectionBridgeValue` and
+  the setter injects it separately with workspace-provenance validation. This
+  still does not make module versions true graph-owned data: the value is
+  assembled by the legacy resolver until `ModuleVersionsKey` can derive it from
+  module graph producers and explicit invalidation inputs. Focused validation
+  passed with `cargo fmt`, `cargo test -p slug_bzlmod
+  set_bzlmod_projection_data -- --nocapture`, `cargo test -p slug_bzlmod
+  current_workspace_helpers_use_projection_workspace_id -- --nocapture`,
+  `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo
+  test -p slug_external_cells
+  extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
+  `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
+  slug_external_cells`, and `git diff --check`.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors
@@ -3039,15 +3054,13 @@ What did not work or remains risky:
   Skyframe-shaped DICE producers. The projection payload now carries the
   current workspace identity inside its named cell graph, while module-version
   data, resolution facts, registrations, repo-mapping, and
-  extension-aggregation data also carry source workspace
-  provenance so stale cross-workspace projection data cannot be paired with
-  that graph. Lockfile inputs, repo-env, resolution facts, repo mappings,
-  registered toolchains, registered execution platforms, and extension
-  aggregations have been split out of the projection payload and are injected
-  separately with their own provenance. It still carries module versions as the
-  same value injected into DICE, but the narrower injected values are still
-  populated from the legacy resolver output. The persisted config-load key now
-  receives the
+  extension-aggregation data also carry source workspace provenance so stale
+  cross-workspace projection data cannot be paired with that graph. Lockfile
+  inputs, repo-env, resolution facts, repo mappings, registered toolchains,
+  registered execution platforms, extension aggregations, and module versions
+  have been split out of the projection payload and are injected separately
+  with their own provenance. The narrower injected values are still populated
+  from the legacy resolver output. The persisted config-load key now receives the
   server output base instead of synthesizing the default output base for
   workspace identity, and the no-`MODULE.bazel` empty-session projection now
   preserves that keyed output base. The daemon bootstrap direct parser now also
@@ -4575,10 +4588,11 @@ hardening behavior around it.
      `BuckConfigBasedCells` no longer stores a bzlmod payload or returns it to
      the server updater. `BzlmodProjectionData` remains as a transitional
      bridge payload assembled by the legacy resolver, but lockfile inputs,
-     repo-env, resolution facts, repo mappings, registered toolchains, and
-     registered execution platforms, and extension aggregations have been split
-     out to separate named injections; delete the remaining projection API only
-     after module graph and cell-graph facts have true DICE producers.
+     repo-env, resolution facts, repo mappings, registered toolchains,
+     registered execution platforms, extension aggregations, and module
+     versions have been split out to separate named injections; delete or rename
+     the remaining graph-shaped projection API only after module graph and
+     cell-graph facts have true DICE producers.
    - Generic empty session construction is removed from production paths.
      Remaining empty projection construction must explicitly carry workspace
      identity while the projection bridge is still being unwound. The

@@ -281,17 +281,12 @@ pub struct RegisteredToolchain {
 /// DICE-owned graph keys.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodProjectionData {
-    pub module_versions: BzlmodModuleVersionsDataValue,
     pub cell_graph: BzlmodCellGraphValue,
 }
 
 impl BzlmodProjectionData {
     pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
         Self {
-            module_versions: BzlmodModuleVersionsDataValue::for_workspace(
-                workspace_id.clone(),
-                Arc::new(HashMap::new()),
-            ),
             cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
         }
     }
@@ -311,6 +306,10 @@ pub trait SetBzlmodProjectionData {
         let workspace_id = data.cell_graph.workspace_id.clone();
         self.set_bzlmod_projection_data_with_inputs(
             data,
+            BzlmodModuleVersionsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(HashMap::new()),
+            ),
             BzlmodLockfileInputsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(BzlmodLockfileInputsValue::default()),
@@ -338,6 +337,7 @@ pub trait SetBzlmodProjectionData {
     fn set_bzlmod_projection_data_with_inputs(
         &mut self,
         data: BzlmodProjectionData,
+        module_versions: BzlmodModuleVersionsDataValue,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
         repo_env: BzlmodRepoEnvDataValue,
         registered_toolchains: RegisteredToolchainsDataValue,
@@ -370,6 +370,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_projection_data_with_inputs(
         &mut self,
         data: BzlmodProjectionData,
+        module_versions: BzlmodModuleVersionsDataValue,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
         repo_env: BzlmodRepoEnvDataValue,
         registered_toolchains: RegisteredToolchainsDataValue,
@@ -382,7 +383,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         validate_projection_workspace(
             "module-version data",
             cell_graph_workspace_id,
-            &data.module_versions.workspace_id,
+            &module_versions.workspace_id,
         )?;
         validate_projection_workspace(
             "registered-toolchain data",
@@ -422,7 +423,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
 
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
         let repo_env_data = Arc::new(repo_env);
-        let module_versions = Arc::new(data.module_versions.clone());
+        let module_versions = Arc::new(module_versions);
         let resolution_facts = Arc::new(resolution_facts);
         let repo_mappings = Arc::new(repo_mappings);
         let extension_aggregations = Arc::new(extension_aggregations);
@@ -497,6 +498,10 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+
+    fn empty_module_versions(workspace_id: WorkspaceId) -> BzlmodModuleVersionsDataValue {
+        BzlmodModuleVersionsDataValue::for_workspace(workspace_id, Arc::new(HashMap::new()))
+    }
 
     fn empty_registered_toolchains(workspace_id: WorkspaceId) -> RegisteredToolchainsDataValue {
         RegisteredToolchainsDataValue::for_workspace(workspace_id, Vec::new())
@@ -608,6 +613,7 @@ mod tests {
         let err = updater
             .set_bzlmod_projection_data_with_inputs(
                 data,
+                empty_module_versions(workspace_id.clone()),
                 lockfile_inputs,
                 repo_env,
                 empty_registered_toolchains(workspace_id.clone()),
@@ -624,6 +630,57 @@ mod tests {
             ),
             "{err:?}"
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_bzlmod_projection_data_rejects_mismatched_module_projection_provenance()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-module-provenance-workspace"),
+            PathBuf::from("/tmp/slug-plan61-module-provenance-output-base"),
+        );
+        let other_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-module-provenance-other"),
+            PathBuf::from("/tmp/slug-plan61-module-provenance-other-output"),
+        );
+        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let err = updater
+            .set_bzlmod_projection_data_with_inputs(
+                data,
+                empty_module_versions(other_workspace_id),
+                BzlmodLockfileInputsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BzlmodLockfileInputsValue::default()),
+                ),
+                BzlmodRepoEnvDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BTreeMap::new()),
+                ),
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
+                empty_extension_aggregations(workspace_id.clone()),
+                BzlmodResolutionFactsValue::for_workspace(
+                    workspace_id.clone(),
+                    indexmap::IndexMap::new(),
+                    indexmap::IndexMap::new(),
+                ),
+                BzlmodRepoMappingsDataValue::for_workspace(
+                    workspace_id,
+                    Arc::new(RepoMappingSnapshot::new()),
+                    Arc::new(RepoMappingOverrides::new()),
+                ),
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("module-version data"), "{err:?}");
 
         Ok(())
     }
@@ -668,6 +725,7 @@ mod tests {
         let err = updater
             .set_bzlmod_projection_data_with_inputs(
                 data,
+                empty_module_versions(workspace_id.clone()),
                 lockfile_inputs,
                 repo_env,
                 empty_registered_toolchains(workspace_id.clone()),
@@ -710,6 +768,7 @@ mod tests {
         let err = updater
             .set_bzlmod_projection_data_with_inputs(
                 data,
+                empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
                     workspace_id.clone(),
                     Arc::new(BzlmodLockfileInputsValue::default()),
@@ -742,6 +801,7 @@ mod tests {
         let err = updater
             .set_bzlmod_projection_data_with_inputs(
                 data,
+                empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
                     workspace_id.clone(),
                     Arc::new(BzlmodLockfileInputsValue::default()),
@@ -796,6 +856,7 @@ mod tests {
         let err = updater
             .set_bzlmod_projection_data_with_inputs(
                 data,
+                empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
                     workspace_id.clone(),
                     Arc::new(BzlmodLockfileInputsValue::default()),
@@ -849,6 +910,7 @@ mod tests {
         let err = updater
             .set_bzlmod_projection_data_with_inputs(
                 data,
+                empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
                     workspace_id.clone(),
                     Arc::new(BzlmodLockfileInputsValue::default()),
@@ -878,6 +940,7 @@ mod tests {
         let err = updater
             .set_bzlmod_projection_data_with_inputs(
                 data,
+                empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
                     workspace_id.clone(),
                     Arc::new(BzlmodLockfileInputsValue::default()),
@@ -974,6 +1037,7 @@ mod tests {
         let mut updater = dice.into_updater();
         updater.set_bzlmod_projection_data_with_inputs(
             data,
+            empty_module_versions(workspace_id.clone()),
             lockfile_inputs,
             repo_env,
             empty_registered_toolchains(workspace_id.clone()),

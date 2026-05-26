@@ -1090,6 +1090,10 @@ mod tests {
         let mut updater = dice.into_updater();
         updater.set_bzlmod_projection_data_with_inputs(
             projection,
+            slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(std::collections::HashMap::new()),
+            ),
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(slug_bzlmod::BzlmodLockfileInputsValue::default()),
