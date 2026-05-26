@@ -161,9 +161,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = "")] integrity: &str,
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = true)] allow_fail: bool,
-        #[allow(unused_variables)]
-        #[starlark(require = named, default = "")]
-        canonical_id: &str,
+        #[starlark(require = named, default = "")] canonical_id: &str,
         #[allow(unused_variables)]
         #[starlark(require = named)]
         auth: Option<Value<'v>>,
@@ -212,6 +210,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             &output_path,
             sha256,
             integrity,
+            canonical_id,
             executable,
         ) {
             Ok(info) => {
@@ -242,7 +241,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] _rename_files: Option<Value<'v>>,
         #[starlark(require = named)] _auth: Option<Value<'v>>,
         #[starlark(require = named)] _headers: Option<Value<'v>>,
-        #[starlark(require = named, default = "")] _canonical_id: &str,
+        #[starlark(require = named, default = "")] canonical_id: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let urls = get_urls_from_value(url);
@@ -279,6 +278,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             &output_dir,
             sha256,
             integrity,
+            canonical_id,
             strip,
         ) {
             Ok(info) => Ok(heap.alloc(info)),

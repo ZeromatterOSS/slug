@@ -7884,6 +7884,87 @@ use_repo(watch_tree_binary, "watch_tree_binary_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_download_canonical_id_restricts_cache_hits(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: DownloadManager and DownloadCache canonical_id handling."""
+    cache_home = buck.cwd.parent / f"{buck.cwd.name}_download_canonical_cache_home"
+    first_payload = buck.cwd / "first.bin"
+    second_payload = buck.cwd / "second.bin"
+    _write_bytes(first_payload, b"first payload\n")
+    _write_bytes(second_payload, b"second payload\n")
+    first_sha = _sha256(first_payload)
+    _write(
+        buck.cwd / "download_canonical_ext.bzl",
+        f"""def _repo_impl(repository_ctx):
+    repository_ctx.download(
+        url = repository_ctx.attr.url,
+        output = "data.txt",
+        sha256 = repository_ctx.attr.sha256,
+        canonical_id = repository_ctx.attr.canonical_id,
+    )
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+download_canonical_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {{
+        "url": attr.string(),
+        "sha256": attr.string(),
+        "canonical_id": attr.string(),
+    }},
+)
+
+def _download_canonical_ext_impl(module_ctx):
+    download_canonical_repo_rule(
+        name = "download_canonical_a",
+        url = "{first_payload.as_uri()}",
+        sha256 = "{first_sha}",
+        canonical_id = "repo-a",
+    )
+    download_canonical_repo_rule(
+        name = "download_canonical_b",
+        url = "{second_payload.as_uri()}",
+        sha256 = "{first_sha}",
+        canonical_id = "repo-b",
+    )
+
+download_canonical_ext = module_extension(
+    implementation = _download_canonical_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_download_canonical_id")
+
+download_canonical = use_extension("//:download_canonical_ext.bzl", "download_canonical_ext")
+use_repo(download_canonical, "download_canonical_a", "download_canonical_b")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_download_canonical_a",
+    srcs = ["@download_canonical_a//:data"],
+)
+
+filegroup(
+    name = "uses_download_canonical_b",
+    srcs = ["@download_canonical_b//:data"],
+)
+""",
+    )
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    await buck.build("//:uses_download_canonical_a", env=env)
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_download_canonical_b", env=env)
+    assert "SHA256 mismatch" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_wasm_methods_are_disabled_by_default(
     buck: Buck,
 ) -> None:

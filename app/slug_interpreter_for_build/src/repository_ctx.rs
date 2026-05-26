@@ -1330,10 +1330,16 @@ fn repository_download_cache_key(sha256: &str, integrity: &str) -> Option<String
     }
 }
 
-fn read_cached_repository_download(sha256: &str, integrity: &str) -> Option<Vec<u8>> {
+fn read_cached_repository_download(
+    sha256: &str,
+    integrity: &str,
+    canonical_id: &str,
+) -> Option<Vec<u8>> {
     let key = repository_download_cache_key(sha256, integrity)?;
     let cache = slug_bzlmod::ModuleCache::new().ok()?;
-    let data = cache.read_download(&key).ok()??;
+    let data = cache
+        .read_download_with_canonical_id(&key, canonical_id)
+        .ok()??;
     if !sha256.is_empty() && verify_sha256(&data, sha256).is_err() {
         tracing::warn!("Ignoring repository download cache entry with mismatched sha256");
         return None;
@@ -1345,11 +1351,18 @@ fn read_cached_repository_download(sha256: &str, integrity: &str) -> Option<Vec<
     Some(data)
 }
 
-fn write_cached_repository_download(sha256: &str, integrity: &str, data: &[u8]) {
+fn write_cached_repository_download(
+    sha256: &str,
+    integrity: &str,
+    canonical_id: &str,
+    data: &[u8],
+) {
     let Some(key) = repository_download_cache_key(sha256, integrity) else {
         return;
     };
-    match slug_bzlmod::ModuleCache::new().and_then(|cache| cache.write_download(&key, data)) {
+    match slug_bzlmod::ModuleCache::new()
+        .and_then(|cache| cache.write_download_with_canonical_id(&key, canonical_id, data))
+    {
         Ok(_) => {}
         Err(e) => tracing::debug!("Failed to write repository download cache entry: {}", e),
     }
@@ -1437,9 +1450,10 @@ pub(crate) fn perform_download_to_path(
     output_path: &Path,
     sha256: &str,
     integrity: &str,
+    canonical_id: &str,
     executable: bool,
 ) -> slug_error::Result<DownloadInfo> {
-    if let Some(data) = read_cached_repository_download(sha256, integrity) {
+    if let Some(data) = read_cached_repository_download(sha256, integrity, canonical_id) {
         if let Some(parent) = output_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 slug_error::slug_error!(
@@ -1481,7 +1495,7 @@ pub(crate) fn perform_download_to_path(
                         slug_error::slug_error!(slug_error::ErrorTag::Input, "{}", e)
                     })?;
                 }
-                write_cached_repository_download(sha256, integrity, &data);
+                write_cached_repository_download(sha256, integrity, canonical_id, &data);
 
                 if let Some(parent) = output_path.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| {
@@ -1538,9 +1552,10 @@ pub(crate) fn perform_download_and_extract_to_dir(
     output_dir: &Path,
     sha256: &str,
     integrity: &str,
+    canonical_id: &str,
     strip_prefix: Option<&str>,
 ) -> slug_error::Result<DownloadInfo> {
-    if let Some(data) = read_cached_repository_download(sha256, integrity) {
+    if let Some(data) = read_cached_repository_download(sha256, integrity, canonical_id) {
         std::fs::create_dir_all(output_dir).map_err(|e| {
             slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -1567,7 +1582,7 @@ pub(crate) fn perform_download_and_extract_to_dir(
                         slug_error::slug_error!(slug_error::ErrorTag::Input, "{}", e)
                     })?;
                 }
-                write_cached_repository_download(sha256, integrity, &data);
+                write_cached_repository_download(sha256, integrity, canonical_id, &data);
 
                 std::fs::create_dir_all(output_dir).map_err(|e| {
                     slug_error::slug_error!(
@@ -2026,7 +2041,14 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             this.resolve_path(&output_str)
         };
 
-        match perform_download_to_path(&urls, &output_path, sha256, integrity, executable) {
+        match perform_download_to_path(
+            &urls,
+            &output_path,
+            sha256,
+            integrity,
+            canonical_id,
+            executable,
+        ) {
             Ok(info) => Ok(heap.alloc(info)),
             Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
                 success: false,
@@ -2109,7 +2131,14 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             Some(effective_strip)
         };
-        match perform_download_and_extract_to_dir(&urls, &output_dir, sha256, integrity, strip) {
+        match perform_download_and_extract_to_dir(
+            &urls,
+            &output_dir,
+            sha256,
+            integrity,
+            canonical_id,
+            strip,
+        ) {
             Ok(info) => Ok(heap.alloc(info)),
             Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
                 success: false,

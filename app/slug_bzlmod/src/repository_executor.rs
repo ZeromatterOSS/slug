@@ -534,12 +534,20 @@ fn execute_http_archive(
     // Get integrity verification
     let sha256 = attrs.get_optional_string("sha256");
     let integrity = attrs.get_optional_string("integrity");
+    let canonical_id = attrs.get_optional_string("canonical_id");
     let strip_prefix = attrs.get_optional_string("strip_prefix");
 
     // Try each URL until one succeeds
     let mut last_error = None;
     for url in &urls {
-        match download_and_extract(url, working_dir, sha256, integrity, strip_prefix) {
+        match download_and_extract(
+            url,
+            working_dir,
+            sha256,
+            integrity,
+            canonical_id,
+            strip_prefix,
+        ) {
             Ok(()) => {
                 // Create BUILD.bazel if build_file or build_file_content is specified
                 if let Some(content) = attrs.get_optional_string("build_file_content") {
@@ -833,13 +841,18 @@ fn execute_http_file(
 
     let sha256 = attrs.get_optional_string("sha256");
     let integrity = attrs.get_optional_string("integrity");
+    let canonical_id = attrs.get_optional_string("canonical_id");
     let downloaded_file_path = attrs
         .get_optional_string("downloaded_file_path")
         .unwrap_or("downloaded");
 
     // Download the file
     let mut last_error = None;
-    let mut data = read_cached_repository_download(sha256.as_deref(), integrity.as_deref());
+    let mut data = read_cached_repository_download(
+        sha256.as_deref(),
+        integrity.as_deref(),
+        canonical_id.as_deref(),
+    );
     for url in &urls {
         if data.is_some() {
             break;
@@ -852,7 +865,12 @@ fn execute_http_file(
                 if let Some(expected) = integrity.as_deref() {
                     verify_integrity(&d, expected)?;
                 }
-                write_cached_repository_download(sha256.as_deref(), integrity.as_deref(), &d);
+                write_cached_repository_download(
+                    sha256.as_deref(),
+                    integrity.as_deref(),
+                    canonical_id.as_deref(),
+                    &d,
+                );
                 data = Some(d);
                 break;
             }
@@ -939,10 +957,15 @@ fn execute_http_jar(
 
     let sha256 = attrs.get_optional_string("sha256");
     let integrity = attrs.get_optional_string("integrity");
+    let canonical_id = attrs.get_optional_string("canonical_id");
 
     // Download the jar
     let mut last_error = None;
-    let mut data = read_cached_repository_download(sha256.as_deref(), integrity.as_deref());
+    let mut data = read_cached_repository_download(
+        sha256.as_deref(),
+        integrity.as_deref(),
+        canonical_id.as_deref(),
+    );
     for url in &urls {
         if data.is_some() {
             break;
@@ -955,7 +978,12 @@ fn execute_http_jar(
                 if let Some(expected) = integrity.as_deref() {
                     verify_integrity(&d, expected)?;
                 }
-                write_cached_repository_download(sha256.as_deref(), integrity.as_deref(), &d);
+                write_cached_repository_download(
+                    sha256.as_deref(),
+                    integrity.as_deref(),
+                    canonical_id.as_deref(),
+                    &d,
+                );
                 data = Some(d);
                 break;
             }
@@ -1231,9 +1259,10 @@ fn download_and_extract(
     dest_dir: &Path,
     sha256: Option<&str>,
     integrity: Option<&str>,
+    canonical_id: Option<&str>,
     strip_prefix: Option<&str>,
 ) -> slug_error::Result<()> {
-    if let Some(data) = read_cached_repository_download(sha256, integrity) {
+    if let Some(data) = read_cached_repository_download(sha256, integrity, canonical_id) {
         extract_archive(&data, dest_dir, strip_prefix)?;
         return Ok(());
     }
@@ -1250,7 +1279,7 @@ fn download_and_extract(
     if let Some(expected) = integrity {
         verify_integrity(&data, expected)?;
     }
-    write_cached_repository_download(sha256, integrity, &data);
+    write_cached_repository_download(sha256, integrity, canonical_id, &data);
 
     // Extract
     extract_archive(&data, dest_dir, strip_prefix)?;
@@ -1271,10 +1300,13 @@ fn repository_download_cache_key(sha256: Option<&str>, integrity: Option<&str>) 
 fn read_cached_repository_download(
     sha256: Option<&str>,
     integrity: Option<&str>,
+    canonical_id: Option<&str>,
 ) -> Option<Vec<u8>> {
     let key = repository_download_cache_key(sha256, integrity)?;
     let cache = crate::cache::ModuleCache::new().ok()?;
-    let data = cache.read_download(&key).ok()??;
+    let data = cache
+        .read_download_with_canonical_id(&key, canonical_id.unwrap_or(""))
+        .ok()??;
     if let Some(expected) = sha256.filter(|s| !s.is_empty()) {
         if verify_sha256(&data, expected).is_err() {
             tracing::warn!("Ignoring repository download cache entry with mismatched sha256");
@@ -1290,11 +1322,18 @@ fn read_cached_repository_download(
     Some(data)
 }
 
-fn write_cached_repository_download(sha256: Option<&str>, integrity: Option<&str>, data: &[u8]) {
+fn write_cached_repository_download(
+    sha256: Option<&str>,
+    integrity: Option<&str>,
+    canonical_id: Option<&str>,
+    data: &[u8],
+) {
     let Some(key) = repository_download_cache_key(sha256, integrity) else {
         return;
     };
-    match crate::cache::ModuleCache::new().and_then(|cache| cache.write_download(&key, data)) {
+    match crate::cache::ModuleCache::new().and_then(|cache| {
+        cache.write_download_with_canonical_id(&key, canonical_id.unwrap_or(""), data)
+    }) {
         Ok(_) => {}
         Err(e) => tracing::debug!("Failed to write repository download cache entry: {}", e),
     }

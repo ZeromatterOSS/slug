@@ -3079,6 +3079,23 @@ What did not work or remains risky:
   cargo build -p slug`, the new binary watch-tree guardrail (`1 passed`), and
   the adjacent repository watch/read/template/patch/extract/watch-tree subset
   (`7 passed, 144 deselected`).
+- Repository download cache hits now honor `canonical_id` for
+  `repository_ctx.download`, `repository_ctx.download_and_extract`,
+  `module_ctx.download`, `module_ctx.download_and_extract`, and native
+  `http_archive`/`http_file`/`http_jar` execution. Bazel source anchors:
+  `DownloadManager.downloadInExecutor` passes `canonicalId` into repository
+  cache `get`/`put` (`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/DownloadManager.java:260-261,355-356`),
+  and `DownloadCache.findCacheValue` rejects a hit when the requested
+  non-empty canonical id was not associated with that checksum entry
+  (`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/cache/DownloadCache.java:203-206`).
+  The new guardrail
+  `test_repository_ctx_download_canonical_id_restricts_cache_hits` primes a
+  checksum cache entry with one canonical id, then proves a different canonical
+  id cannot reuse it by expecting the second repository download to fail with a
+  SHA256 mismatch. Validation passed with `cargo test -p slug_bzlmod
+  test_download_canonical_id_restricts_cache_hits -- --nocapture`, `cargo check
+  -p slug_interpreter_for_build`, `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-download-canonical
+  cargo build -p slug`, and the new Python guardrail (`1 passed`).
 - Repository materialization recorded-input sidecars are now split into named
   manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
   reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
@@ -3730,6 +3747,10 @@ using Rust DICE keys and values:
      metadata/digest DICE dependencies instead of UTF-8 source reads, so binary
      edits inside a watched tree rematerialize the generated repository in the
      same daemon.
+   - `repository_ctx.download*`, `module_ctx.download*`, and native
+     `http_archive`/`http_file`/`http_jar` cache lookups now include
+     `canonical_id` restrictions, so checksum-identical cache entries are not
+     reused across distinct non-empty canonical ids.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

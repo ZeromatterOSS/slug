@@ -129,10 +129,17 @@ impl ModuleCache {
 
     /// Get the path for a downloaded file by its integrity hash.
     pub fn download_path(&self, integrity: &str) -> PathBuf {
-        // Integrity format: "sha256-base64hash"
-        // Convert to filename-safe format
-        let safe_name = integrity.replace(['/', '+', '='], "_");
-        self.base_dir.join("downloads").join(safe_name)
+        self.base_dir
+            .join("downloads")
+            .join(download_safe_name(integrity))
+    }
+
+    fn download_canonical_id_path(&self, integrity: &str, canonical_id: &str) -> PathBuf {
+        self.base_dir.join("downloads").join(format!(
+            "{}.canonical-{}",
+            download_safe_name(integrity),
+            canonical_id_digest(canonical_id)
+        ))
     }
 
     /// Get the cache directory for a git override.
@@ -252,6 +259,22 @@ impl ModuleCache {
         }
     }
 
+    /// Read cached download by integrity hash, restricted by canonical id when set.
+    pub fn read_download_with_canonical_id(
+        &self,
+        integrity: &str,
+        canonical_id: &str,
+    ) -> slug_error::Result<Option<Vec<u8>>> {
+        if !canonical_id.is_empty()
+            && !self
+                .download_canonical_id_path(integrity, canonical_id)
+                .exists()
+        {
+            return Ok(None);
+        }
+        self.read_download(integrity)
+    }
+
     /// Write download to cache by integrity hash.
     pub fn write_download(&self, integrity: &str, data: &[u8]) -> slug_error::Result<PathBuf> {
         let path = self.download_path(integrity);
@@ -261,6 +284,22 @@ impl ModuleCache {
             })?;
         }
         std::fs::write(&path, data).buck_error_context("Failed to write download to cache")?;
+        Ok(path)
+    }
+
+    /// Write download to cache by integrity hash and associate a canonical id when set.
+    pub fn write_download_with_canonical_id(
+        &self,
+        integrity: &str,
+        canonical_id: &str,
+        data: &[u8],
+    ) -> slug_error::Result<PathBuf> {
+        let path = self.write_download(integrity, data)?;
+        if !canonical_id.is_empty() {
+            let marker = self.download_canonical_id_path(integrity, canonical_id);
+            std::fs::write(&marker, b"")
+                .buck_error_context("Failed to write download canonical id marker")?;
+        }
         Ok(path)
     }
 
@@ -339,6 +378,18 @@ impl Default for ModuleCache {
     fn default() -> Self {
         Self::new().expect("Failed to create default module cache")
     }
+}
+
+fn download_safe_name(integrity: &str) -> String {
+    // Integrity format often includes base64 punctuation. Keep the current
+    // filename-compatible cache layout while preserving the logical cache key.
+    integrity.replace(['/', '+', '='], "_")
+}
+
+fn canonical_id_digest(canonical_id: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(canonical_id.as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 #[cfg(test)]
@@ -469,6 +520,43 @@ mod tests {
 
         let read_data = cache.read_download("sha256-test123").unwrap();
         assert_eq!(read_data, Some(data.to_vec()));
+    }
+
+    #[test]
+    fn test_download_canonical_id_restricts_cache_hits() {
+        let (_dir, cache) = create_test_cache();
+        let data = b"test archive data";
+
+        cache
+            .write_download_with_canonical_id("sha256-test123", "repo-a", data)
+            .unwrap();
+
+        assert_eq!(
+            cache
+                .read_download_with_canonical_id("sha256-test123", "repo-a")
+                .unwrap(),
+            Some(data.to_vec())
+        );
+        assert_eq!(
+            cache
+                .read_download_with_canonical_id("sha256-test123", "repo-b")
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            cache
+                .read_download_with_canonical_id("sha256-test123", "")
+                .unwrap(),
+            Some(data.to_vec())
+        );
+
+        cache.write_download("sha256-plain", data).unwrap();
+        assert_eq!(
+            cache
+                .read_download_with_canonical_id("sha256-plain", "repo-a")
+                .unwrap(),
+            None
+        );
     }
 
     #[test]
