@@ -57,12 +57,65 @@ use crate::dice_graph::repo_env_policy_digest;
 use crate::lockfile::compute_sha256_hex;
 use crate::lockfile::validate_recorded_inputs_current;
 use crate::repo_spec::RepoSpec;
+use crate::repository_executor::RepositoryLabelResolution;
 use crate::repository_invocations::AttrValue;
 use crate::repository_invocations::RepositoryInvocation;
 
 pub(crate) const REPO_RECORDED_INPUTS_FILE: &str = ".slug_repo_recorded_inputs";
 const REPO_RULE_LOCAL_FILE: &str = ".slug_repo_rule_local";
 const MARKER_CONTENT_PREFIX: &str = "marker-content:";
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "RepositoryLabelResolutionKey({}, {})",
+    workspace_id.stable_hash(),
+    project_root.display()
+)]
+struct RepositoryLabelResolutionKey {
+    workspace_id: crate::WorkspaceId,
+    project_root: Arc<PathBuf>,
+}
+
+impl RepositoryLabelResolutionKey {
+    fn new(workspace_id: crate::WorkspaceId, project_root: Arc<PathBuf>) -> Self {
+        Self {
+            workspace_id,
+            project_root,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryLabelResolutionKey {
+    type Value = slug_error::Result<Arc<RepositoryLabelResolution>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let cell_graph = ctx
+            .compute(&BzlmodCellGraphKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        Ok(Arc::new(RepositoryLabelResolution::from_cell_graph(
+            &self.project_root,
+            &cell_graph,
+        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
+}
 
 /// Errors that can occur during repository rule execution.
 #[derive(Debug, slug_error::Error)]
@@ -1582,21 +1635,17 @@ impl Key for ExtensionRepoExecutionKey {
 
         // Execute the repository rule using the native repository executor
         // This handles http_archive, git_repository, local_repository, etc.
-        let cell_graph = ctx
-            .compute(&BzlmodCellGraphKey::for_workspace_id(
+        let label_resolution = ctx
+            .compute(&RepositoryLabelResolutionKey::new(
                 self.materialization_manifest_key.workspace_id.clone(),
+                self.project_root.clone(),
             ))
             .await??;
-        let label_resolution =
-            crate::repository_executor::RepositoryLabelResolution::from_cell_graph(
-                &self.project_root,
-                &cell_graph,
-            );
         let mut result =
             crate::repository_executor::execute_repository_rule_fresh_with_label_resolution(
                 &invocation,
                 &self.project_root,
-                &label_resolution,
+                label_resolution.as_ref(),
             )?;
         if self.repo_spec.local {
             result = result.non_cacheable();
@@ -1822,6 +1871,69 @@ mod tests {
 
         let foo = registry.get("foo").unwrap();
         assert_eq!(foo.rule_name, "http_archive");
+    }
+
+    #[tokio::test]
+    async fn repository_label_resolution_key_projects_cell_graph_paths() -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-repo-label-resolution");
+        let workspace_id = crate::WorkspaceId::new(
+            project_root.clone(),
+            project_root.join("buck-out/repo-label-resolution"),
+        );
+        let cell_graph = crate::BzlmodCellGraphValue {
+            workspace_id: workspace_id.clone(),
+            root_module_name: "root".to_owned(),
+            cells: Arc::new(vec![crate::BzlmodCellGraphCell {
+                name: "rules_cc+".to_owned(),
+                path: "bazel-external/rules_cc+".to_owned(),
+                module_setup: None,
+                bundled: false,
+            }]),
+            extension_cells: Arc::new(vec![crate::BzlmodCellGraphExtensionCell {
+                canonical_name: "root+ext+tool".to_owned(),
+                internal_name: "tool".to_owned(),
+                path: "bazel-external/root+ext+tool".to_owned(),
+                extension_id: "@@root//:ext.bzl%ext".to_owned(),
+                spec_hash: "tool-hash".to_owned(),
+                repo_spec_json: "{}".to_owned(),
+                repo_env_json: "{}".to_owned(),
+                materialized: true,
+                lazy: false,
+            }]),
+            root_aliases: Arc::new(vec![crate::BzlmodCellGraphAlias {
+                apparent_name: "rules_cc".to_owned(),
+                target_name: "rules_cc+".to_owned(),
+            }]),
+            module_symlinks: Arc::new(Vec::new()),
+            scoped_aliases: Arc::new(Vec::new()),
+            dynamic_aliases: Arc::new(vec![crate::BzlmodCellGraphDynamicAlias {
+                apparent_name: "tool".to_owned(),
+                canonical_name: "root+ext+tool".to_owned(),
+            }]),
+        };
+        let expected = RepositoryLabelResolution::from_cell_graph(&project_root, &cell_graph);
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            crate::dice_graph::BzlmodCellGraphDataKey,
+            Arc::new(cell_graph),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let actual = dice
+            .compute(&RepositoryLabelResolutionKey::new(
+                workspace_id,
+                Arc::new(project_root),
+            ))
+            .await??;
+
+        assert_eq!(actual.as_ref(), &expected);
+        Ok(())
     }
 
     #[test]

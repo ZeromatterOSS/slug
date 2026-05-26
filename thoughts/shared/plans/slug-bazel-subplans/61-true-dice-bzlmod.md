@@ -2584,6 +2584,17 @@ Observed SDK result at the checkpoint:
   extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
   `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
   slug_external_cells`, and `git diff --check`.
+- Native repository execution no longer computes `BzlmodCellGraphKey` directly
+  only to build `RepositoryLabelResolution` for `http_archive` build files and
+  patches. `RepositoryLabelResolutionKey` now owns that narrow projection from
+  workspace/project root to resolver-owned label paths, and
+  `ExtensionRepoExecutionKey` depends on that named value before invoking the
+  native repository executor. The projection still derives from the
+  legacy-produced cell graph until repo mappings and cell graph facts have true
+  DICE producers, but repository execution no longer owns the graph read itself.
+  Focused validation passed with `cargo fmt`, `cargo test -p slug_bzlmod
+  repository_label_resolution_key_projects_cell_graph_paths -- --nocapture`, and
+  `cargo test -p slug_bzlmod repository_execution -- --nocapture`.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors

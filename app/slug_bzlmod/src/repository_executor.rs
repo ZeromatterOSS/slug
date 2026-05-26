@@ -30,6 +30,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use allocative::Allocative;
 use base64::Engine;
 use flate2::read::GzDecoder;
 use sha2::Digest;
@@ -1100,7 +1101,7 @@ fn resolve_build_file_label(
     .into())
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
 pub(crate) struct RepositoryLabelResolution {
     cell_paths: BTreeMap<String, PathBuf>,
 }
