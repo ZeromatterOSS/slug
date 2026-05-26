@@ -4240,6 +4240,22 @@ hardening behavior around it.
   `cargo check`, `cargo build -p slug`, the explicit-binary Plan 61 selector for
   explicit module repo names and scoped/root alias leakage (`3 passed, 152
   deselected`), `cargo fmt --check`, and `git diff --check`.
+- The remaining public `slug_core::cells::canonical_bazel_repo_name_for_cell`
+  process-global helper and the unused resolver method that could still call it
+  on no-runtime-snapshot misses are deleted. Bridge surface reduced: callers
+  can no longer ask `slug_core` to canonicalize arbitrary cell names through
+  process-global dynamic alias/module scans; Starlark-visible output and action
+  path formatting keeps its private resolver-owned helper that only consumes
+  declared/runtime aliases from the active `CellAliasResolver`. The intended
+  owner remains `BzlmodCellGraphKey` plus `RepoMappingKey`; until then the
+  narrow compatibility scanners stay behind explicitly named module/dynamic
+  helpers rather than a generic canonicalization API. Before evidence:
+  `rg -n "canonical_bazel_repo_name_for_cell|canonical_bzlmod_repo_name_for_cell" app/slug_core/src/cells.rs`
+  found the public helper, resolver method, and tests. After evidence: the same
+  search has no hits in `slug_core`; remaining hits are the private
+  `slug_build_api` resolver-owned helper. Validation passed with focused
+  `cargo test -p slug_core canonical_bzlmod_module_cell_name_uses_empty_version_module_suffix -- --nocapture`
+  and `cargo check -p slug_core -p slug_build_api`.
 - `CellResolver::get` root-alias lookup now uses only resolver-owned declared
   aliases and runtime aliases/cells, so no-snapshot misses no longer consult
   process-global generated-repo aliases during ordinary unknown-cell lookup.
