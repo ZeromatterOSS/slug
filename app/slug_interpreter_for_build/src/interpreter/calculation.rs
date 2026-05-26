@@ -33,7 +33,6 @@ use slug_core::bzl::ImportPath;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
-use slug_core::cells::name::CellName;
 use slug_core::package::PackageLabel;
 use slug_events::dispatch::async_record_root_spans;
 use slug_events::span::SpanId;
@@ -117,15 +116,14 @@ fn canonicalize_bzlmod_cell_path(
         return Ok(path);
     }
 
-    let canonical = alias_resolver.canonical_bzlmod_repo_name_for_cell(path.cell().as_str());
-    if canonical == path.cell().as_str() {
-        Ok(path)
-    } else {
-        Ok(CellPath::new(
-            CellName::unchecked_new(&canonical)?,
-            path.path().to_buf(),
-        ))
+    let Some(canonical) = alias_resolver.resolve_declared_or_runtime_alias(path.cell().as_str())
+    else {
+        return Ok(path);
+    };
+    if canonical == path.cell() {
+        return Ok(path);
     }
+    Ok(CellPath::new(canonical, path.path().to_buf()))
 }
 
 fn package_evaluation_concurrency_limit() -> usize {
@@ -461,6 +459,7 @@ mod tests {
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
     use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::name::CellName;
 
     use super::*;
 
@@ -539,12 +538,13 @@ mod tests {
     }
 
     #[test]
-    fn bzlmod_eval_import_cell_path_keeps_legacy_global_fallback() -> slug_error::Result<()> {
+    fn bzlmod_eval_import_cell_path_no_snapshot_miss_ignores_global_alias() -> slug_error::Result<()>
+    {
         let apparent = "eval_import_legacy_alias";
-        let canonical = "eval_owner++ext+legacy_generated";
+        let wrong_global = "eval_owner++ext+legacy_generated";
         slug_core::cells::register_dynamic_extension_cell_alias(
             apparent.to_owned(),
-            canonical.to_owned(),
+            wrong_global.to_owned(),
         );
         let resolver = test_alias_resolver();
 
@@ -556,7 +556,11 @@ mod tests {
             &resolver,
         )?;
 
-        assert_eq!(canonical, path.cell().as_str());
+        assert_eq!(apparent, path.cell().as_str());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
         Ok(())
     }
 }

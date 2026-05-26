@@ -2507,27 +2507,45 @@ Observed SDK result at the checkpoint:
   A clean reviewing subagent later reported no findings over the API-hiding
   slice and independently reran the focused multi-crate check and helper tests
   in a separate target directory.
-- Bzlmod load-path canonicalization now uses a shared
-  `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper before
-  consulting process-global repo-name helpers. When a resolver has a runtime
-  bzlmod alias snapshot, runtime aliases and module aliases are authoritative
-  and misses do not fall back to stale process-global dynamic aliases; legacy
-  resolvers without a runtime snapshot keep the old directory/global fallback.
-  Both `InterpreterForDir` load resolution and DICE eval-import key
-  canonicalization use the helper. A clean-review follow-up found that
+- Bzlmod load-path canonicalization now uses resolver-owned declared aliases and
+  runtime snapshot aliases directly instead of the fallback-bearing
+  `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper. When a
+  resolver has a runtime bzlmod alias snapshot, runtime aliases and module
+  aliases are authoritative and misses do not fall back to stale process-global
+  dynamic aliases; no-runtime-snapshot resolver misses now stay on the apparent
+  repo name too. Both `InterpreterForDir` load resolution and DICE eval-import
+  key canonicalization use this owner-only path. Bridge burn-down before/after
+  evidence: before, `rg -n
+  "canonical_bzlmod_repo_name_for_cell\\(path\\.cell|bzlmod_eval_import_cell_path_keeps_legacy_global_fallback|bzlmod_load_path_uses_empty_version_module_suffix" app/slug_interpreter_for_build/src/interpreter`
+  found both production bridge calls plus tests preserving legacy
+  directory/global fallback behavior; after it returns no hits, and `rg -n
+  "resolve_declared_or_runtime_alias\\(path\\.cell|no_snapshot_miss_ignores_global_alias|uses_declared_empty_version_module_alias" app/slug_interpreter_for_build/src/interpreter`
+  shows the owner-only calls and stale-global miss coverage. A clean-review
+  follow-up found that
   wrong-cell equivalence still accepted extension internal-name equivalence for
   repos absent from the runtime snapshot; that path now accepts internal-name
   equivalence only when there is no runtime snapshot or the snapshot owns the
   canonical extension repo. Validation passed with `cargo fmt`, `cargo test -p
-  slug_core canonical_bzlmod_repo_name_for_cell -- --nocapture`, `cargo test -p
-  slug_interpreter_for_build bzlmod_load_path -- --nocapture`, `cargo test -p
+  slug_core canonical_bzlmod_repo_name_for_cell -- --nocapture`, reran `cargo
+  test -p slug_interpreter_for_build bzlmod_load_path -- --nocapture` (`5
+  passed`) and `cargo test -p slug_interpreter_for_build
+  bzlmod_eval_import_cell_path -- --nocapture` (`3 passed`), `cargo test -p
   slug_interpreter_for_build load_cell_equivalence_with_runtime_aliases --
   --nocapture`, `cargo test -p slug_interpreter_for_build
   load_import_resolution_with_runtime_aliases_rejects_global_miss --
-  --nocapture`, `cargo test -p slug_interpreter_for_build
-  bzlmod_eval_import_cell_path -- --nocapture`, and `cargo check -p slug_core
-  -p slug_interpreter_for_build -p slug_analysis`; `cargo fmt --check` and
-  `git diff --check` also passed before commit.
+  --nocapture`, and `cargo check -p slug_core -p slug_interpreter_for_build -p
+  slug_analysis`; reran `cargo check -p slug_interpreter_for_build`, `cargo
+  build -p slug`, `cargo fmt --check`, `git diff --check`, and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -k
+  'mapped_external_extension_bzl_load_edit_rejects_replay or
+  missing_mapped_external_extension_bzl_load_creation_rejects_replay or
+  mapped_external_extension_bzl_load_deletion_rejects_replay or
+  mapped_external_extension_bzl_load_edit_rejects_audit_cell_replay or
+  mapped_external_extension_bzl_load_edit_with_uncached_extension_rejects_audit_cell_replay or
+  missing_mapped_external_extension_bzl_load_creation_rejects_audit_cell_replay
+  or mapped_external_extension_bzl_load_deletion_rejects_audit_cell_replay' -rx
+  --tb=short` (`7 passed, 148 deselected`) before commit.
 - Bazel-style build-setting repo normalization now uses the same
   `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` helper in both
   target-setting preprocessing and `config_setting(flag_values = ...)` matching.
@@ -3999,11 +4017,11 @@ hardening behavior around it.
   toolchain implementation/metadata label parsing, and C++ toolchain
   metadata/action-path formatting can now use declared aliases and runtime
   aliases/cells from the active cell alias resolver before consulting
-  process-global dynamic aliases. Runtime-snapshot load-path misses are now
-  authoritative, and `Label()` explicit/owner-scoped repo canonicalization no
-  longer consults process-global dynamic aliases on resolverless or
-  no-runtime-snapshot resolver misses, but remaining compatibility adapters
-  still retain process-global fallback behavior.
+  process-global dynamic aliases. Load-path canonicalization and `Label()`
+  explicit/owner-scoped repo canonicalization no longer consult process-global
+  dynamic aliases on resolverless or no-runtime-snapshot resolver misses, but
+  remaining compatibility adapters still retain process-global fallback
+  behavior.
 - `config_setting(flag_values = ...)` build-setting lookup now also uses the
   active cell alias resolver for bzlmod repo-spelling normalization before
   consulting process-global dynamic aliases.

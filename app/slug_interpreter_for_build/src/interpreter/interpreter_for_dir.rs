@@ -28,7 +28,6 @@ use slug_core::cells::CellAliasResolver;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
-use slug_core::cells::name::CellName;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_event_observer::humanized::HumanizedBytes;
@@ -292,15 +291,14 @@ fn canonicalize_bzlmod_load_path(
         return Ok(path);
     }
 
-    let canonical = alias_resolver.canonical_bzlmod_repo_name_for_cell(path.cell().as_str());
-    if canonical == path.cell().as_str() {
-        Ok(path)
-    } else {
-        Ok(CellPath::new(
-            CellName::unchecked_new(&canonical)?,
-            path.path().to_buf(),
-        ))
+    let Some(canonical) = alias_resolver.resolve_declared_or_runtime_alias(path.cell().as_str())
+    else {
+        return Ok(path);
+    };
+    if canonical == path.cell() {
+        return Ok(path);
     }
+    Ok(CellPath::new(canonical, path.path().to_buf()))
 }
 
 fn are_bzlmod_alias_equivalent(
@@ -358,6 +356,7 @@ mod tests {
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
     use slug_core::cells::BzlmodRuntimeExtensionCell;
+    use slug_core::cells::name::CellName;
 
     use super::*;
 
@@ -550,11 +549,13 @@ mod tests {
     }
 
     #[test]
-    fn bzlmod_load_path_uses_empty_version_module_suffix() -> slug_error::Result<()> {
-        let tmp = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(tmp.path().join("bazel-external/rules_rust+"))?;
-        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
-        let resolver = test_alias_resolver();
+    fn bzlmod_load_path_uses_declared_empty_version_module_alias() -> slug_error::Result<()> {
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            slug_core::cells::alias::NonEmptyCellAlias::new("rules_rust".to_owned())?,
+            CellName::testing_new("rules_rust+"),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), aliases)?;
 
         let path = canonicalize_bzlmod_load_path(
             CellPath::new(
@@ -569,6 +570,32 @@ mod tests {
         assert_eq!("rules_rust+", path.cell().as_str());
         assert_eq!("rust/settings/settings.bzl", path.path().as_str());
 
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_load_path_no_snapshot_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let apparent = "legacy_load_path_missing_alias";
+        let wrong_global = "wrong_owner++ext+legacy_missing";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = test_alias_resolver();
+
+        let path = canonicalize_bzlmod_load_path(
+            CellPath::new(
+                CellName::testing_new(apparent),
+                slug_core::cells::paths::CellRelativePathBuf::unchecked_new("defs.bzl".into()),
+            ),
+            &resolver,
+        )?;
+
+        assert_eq!(apparent, path.cell().as_str());
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
         Ok(())
     }
 
