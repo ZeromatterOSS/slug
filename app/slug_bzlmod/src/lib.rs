@@ -520,10 +520,8 @@ pub async fn bzlmod_cell_graph_for_current_workspace(
 pub async fn bzlmod_workspace_id_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<WorkspaceId> {
-    Ok(bzlmod_cell_graph_for_current_workspace(ctx)
-        .await?
-        .workspace_id
-        .clone())
+    let data = ctx.compute(&BzlmodRepoEnvDataKey).await?;
+    Ok(data.workspace_id.clone())
 }
 
 #[cfg(test)]
@@ -1969,10 +1967,12 @@ mod tests {
         let registered_toolchains = registered_toolchains_for_current_workspace(&mut dice).await?;
         let registered_execution_platforms =
             registered_execution_platforms_for_current_workspace(&mut dice).await?;
+        let current_workspace = bzlmod_workspace_id_for_current_workspace(&mut dice).await?;
 
         assert_eq!(module_versions.workspace_id, workspace_id);
         assert_eq!(registered_toolchains.workspace_id, workspace_id);
         assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
+        assert_eq!(current_workspace, workspace_id);
         assert_ne!(
             module_versions.workspace_id,
             WorkspaceId::for_project_root(project_root)

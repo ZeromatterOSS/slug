@@ -2560,6 +2560,15 @@ Observed SDK result at the checkpoint:
   `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
   slug_external_cells -p slug_analysis -p slug_configured -p
   slug_interpreter_for_build`, and `git diff --check`.
+- The current-workspace identity helper no longer computes the injected cell
+  graph only to return `WorkspaceId` for extension-spoke lookup. It now derives
+  the command workspace from workspace-provenance on `BzlmodRepoEnvDataKey`,
+  leaving `bzlmod_cell_graph_for_current_workspace` as the graph-only helper for
+  callers that need graph facts. Focused validation passed with `cargo fmt`,
+  `cargo test -p slug_bzlmod
+  data_only_current_workspace_helpers_do_not_require_cell_graph --
+  --nocapture`, and `cargo test -p slug_external_cells
+  extension_spoke_lookup_uses_injected_workspace_identity -- --nocapture`.
 - Extension aggregation lookup no longer computes `BzlmodCellGraphKey` only to
   borrow the root module name. The injected
   `BzlmodExtensionAggregationsDataValue` now carries root module name alongside
