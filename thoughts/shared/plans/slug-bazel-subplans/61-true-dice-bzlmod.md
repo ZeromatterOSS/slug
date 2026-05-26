@@ -197,6 +197,21 @@ Observed SDK result at the checkpoint:
   resolver rather than stale symlink state. The remaining bridge is still the
   transitional resolver wrapper and the non-DICE patch-read fallback helper,
   not same-daemon replay for root-local override patch edits.
+  Clean-review follow-up for this package replay slice found one remaining
+  production bridge in the Watchman backend: `WatchmanFileWatcher::sync`
+  inferred pre-config commits by rescanning event paths for `MODULE.bazel` /
+  `.MODULE.bazel`, so dynamically registered bzlmod project inputs such as
+  override patch files could still miss the pre-config commit on that backend.
+  After this follow-up, `WatchmanQueryProcessor` returns
+  `FileChangeTracker::requires_pre_config_commit()` in `WatchmanSyncOutput`,
+  `WatchmanFileWatcher::sync` uses that DICE-side project-file invalidation bit
+  just like notify/Eden/fs-hash, and the Watchman-specific suffix scan is gone.
+  The intended owner is `ProjectReadFileKey` invalidation through
+  `FileChangeTracker`, feeding `OverridePatchInputsKey` and the bzlmod cell
+  graph rather than backend-local path heuristics. Validation passed with
+  `cargo check -p slug_file_watcher`, `cargo build -p slug`, the same
+  explicit-binary Plan 61 selector (`6 passed, 149 deselected`),
+  `cargo fmt --check`, and `git diff --check`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets

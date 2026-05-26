@@ -61,13 +61,18 @@ enum ChangeEvent<'a> {
     SyntheticDirectoryChange,
 }
 
+struct WatchmanSyncOutput {
+    stats: slug_data::FileWatcherStats,
+    requires_pre_config_commit: bool,
+}
+
 impl WatchmanQueryProcessor {
     async fn process_events_impl(
         &self,
         mut ctx: DiceTransactionUpdater,
         events: Vec<WatchmanEvent>,
         base_stats: slug_data::FileWatcherStats,
-    ) -> slug_error::Result<(slug_data::FileWatcherStats, DiceTransactionUpdater)> {
+    ) -> slug_error::Result<(WatchmanSyncOutput, DiceTransactionUpdater)> {
         let mut handler = FileChangeTracker::new();
 
         let mut stats = FileWatcherStats::new(base_stats, events.len());
@@ -96,9 +101,16 @@ impl WatchmanQueryProcessor {
         }
 
         let stats = stats.finish();
+        let requires_pre_config_commit = handler.requires_pre_config_commit();
         handler.write_to_dice(&mut ctx)?;
 
-        Ok((stats, ctx))
+        Ok((
+            WatchmanSyncOutput {
+                stats,
+                requires_pre_config_commit,
+            },
+            ctx,
+        ))
     }
 
     fn process_one_change(
@@ -249,7 +261,7 @@ async fn try_fetch_revision_details(hash: &str) -> Option<RevisionDetails> {
 
 #[async_trait]
 impl SyncableQueryProcessor for WatchmanQueryProcessor {
-    type Output = slug_data::FileWatcherStats;
+    type Output = WatchmanSyncOutput;
     type Payload = DiceTransactionUpdater;
 
     async fn process_events(
@@ -337,7 +349,13 @@ impl SyncableQueryProcessor for WatchmanQueryProcessor {
 
         if self.empty_on_fresh_instance {
             base_stats.incomplete_events_reason = Some("Fresh instance".to_owned());
-            Ok((base_stats, ctx))
+            Ok((
+                WatchmanSyncOutput {
+                    stats: base_stats,
+                    requires_pre_config_commit: true,
+                },
+                ctx,
+            ))
         } else {
             self.process_events_impl(ctx, events, base_stats).await
         }
@@ -347,7 +365,7 @@ impl SyncableQueryProcessor for WatchmanQueryProcessor {
 #[derive(Allocative)]
 pub(crate) struct WatchmanFileWatcher {
     #[allocative(skip)]
-    query: SyncableQuery<slug_data::FileWatcherStats, DiceTransactionUpdater>,
+    query: SyncableQuery<WatchmanSyncOutput, DiceTransactionUpdater>,
 }
 
 /// The watchman query is constructed once on daemon startup. It is an unfiltered watchman query
@@ -405,13 +423,10 @@ impl FileWatcher for WatchmanFileWatcher {
             },
             async {
                 let (stats, res) = match self.query.sync(dice).await {
-                    Ok((stats, dice)) => {
+                    Ok((output, dice)) => {
+                        let stats = output.stats;
                         let mergebase = Mergebase(Arc::new(stats.branched_from_revision.clone()));
-                        let has_changes = stats.fresh_instance
-                            || stats.events.iter().any(|event| {
-                                let path = event.path.as_str();
-                                path.ends_with("MODULE.bazel") || path.ends_with(".MODULE.bazel")
-                            });
+                        let has_changes = stats.fresh_instance || output.requires_pre_config_commit;
                         ((Some(stats)), Ok((dice, mergebase, has_changes)))
                     }
                     Err(e) => (None, Err(e)),
