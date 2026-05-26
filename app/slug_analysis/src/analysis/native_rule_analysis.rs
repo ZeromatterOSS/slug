@@ -15,6 +15,7 @@
 //! packages like @platforms.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use dupe::Dupe;
@@ -156,68 +157,124 @@ pub struct DeferredToolchain {
     pub label: String,
 }
 
-/// Pool of toolchain registrations from non-root modules. Populated by
-/// `ensure_registered_toolchains_loaded` instead of being eagerly loaded.
-/// `ensure_deferred_toolchains_loaded` drains relevant entries on demand.
-static DEFERRED_TOOLCHAINS: std::sync::RwLock<Vec<DeferredToolchain>> =
-    std::sync::RwLock::new(Vec::new());
+/// DICE-derived identity for the registered toolchain set currently loaded
+/// into the process-global `DeclaredToolchainInfo` registry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ToolchainLoadingSignature {
+    pub(crate) workspace_id: slug_bzlmod::WorkspaceId,
+    pub(crate) registered_toolchains: Vec<slug_bzlmod::RegisteredToolchain>,
+}
 
-/// Marker set: keys (origin-module) of deferred entries already loaded so
-/// repeated `resolve_toolchains` misses for the same type don't reload.
-static LOADED_DEFERRED_KEYS: std::sync::LazyLock<
-    std::sync::RwLock<std::collections::HashSet<String>>,
-> = std::sync::LazyLock::new(|| std::sync::RwLock::new(std::collections::HashSet::new()));
+/// Deferred toolchain registrations and lazy-load markers scoped to the same
+/// workspace/registered-toolchain signature as the eager global registry.
+#[derive(Debug, Default)]
+struct DeferredToolchainState {
+    signature: Option<ToolchainLoadingSignature>,
+    pool: Vec<DeferredToolchain>,
+    loaded_keys: HashSet<String>,
+    loaded_all: bool,
+}
 
-/// Marker: when the "load-everything-deferred" fallback has fired, set true
-/// so subsequent misses don't re-iterate the full pool.
-static LOADED_ALL_DEFERRED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static DEFERRED_TOOLCHAIN_STATE: std::sync::LazyLock<std::sync::RwLock<DeferredToolchainState>> =
+    std::sync::LazyLock::new(|| std::sync::RwLock::new(DeferredToolchainState::default()));
 
 /// Replace the deferred pool. Called by `ensure_registered_toolchains_loaded`.
-pub fn set_deferred_toolchains(items: Vec<DeferredToolchain>) {
-    *DEFERRED_TOOLCHAINS
+pub(crate) fn set_deferred_toolchains(
+    signature: ToolchainLoadingSignature,
+    items: Vec<DeferredToolchain>,
+) {
+    *DEFERRED_TOOLCHAIN_STATE
         .write()
-        .expect("DEFERRED_TOOLCHAINS poisoned") = items;
-    LOADED_DEFERRED_KEYS
+        .expect("DEFERRED_TOOLCHAIN_STATE poisoned") = DeferredToolchainState {
+        signature: Some(signature),
+        pool: items,
+        loaded_keys: HashSet::new(),
+        loaded_all: false,
+    };
+}
+
+/// Clear all deferred registrations and lazy-load markers.
+pub(crate) fn clear_deferred_toolchains() {
+    *DEFERRED_TOOLCHAIN_STATE
         .write()
-        .expect("LOADED_DEFERRED_KEYS poisoned")
-        .clear();
-    LOADED_ALL_DEFERRED.store(false, std::sync::atomic::Ordering::SeqCst);
+        .expect("DEFERRED_TOOLCHAIN_STATE poisoned") = DeferredToolchainState::default();
+}
+
+/// True iff deferred state is scoped to the given eager-loading signature.
+pub(crate) fn deferred_toolchain_state_matches_signature(
+    signature: &ToolchainLoadingSignature,
+) -> bool {
+    DEFERRED_TOOLCHAIN_STATE
+        .read()
+        .map(|state| state.signature.as_ref() == Some(signature))
+        .unwrap_or(false)
+}
+
+fn deferred_state_for_signature<'a>(
+    state: &'a mut DeferredToolchainState,
+    signature: &ToolchainLoadingSignature,
+) -> Option<&'a mut DeferredToolchainState> {
+    if state.signature.as_ref() != Some(signature) {
+        *state = DeferredToolchainState::default();
+        return None;
+    }
+    Some(state)
 }
 
 /// Snapshot the deferred pool (cheap clone of label strings).
-pub fn get_deferred_toolchains() -> Vec<DeferredToolchain> {
-    DEFERRED_TOOLCHAINS
-        .read()
-        .expect("DEFERRED_TOOLCHAINS poisoned")
-        .clone()
+pub(crate) fn get_deferred_toolchains(
+    signature: &ToolchainLoadingSignature,
+) -> Vec<DeferredToolchain> {
+    let mut state = DEFERRED_TOOLCHAIN_STATE
+        .write()
+        .expect("DEFERRED_TOOLCHAIN_STATE poisoned");
+    deferred_state_for_signature(&mut state, signature)
+        .map(|state| state.pool.clone())
+        .unwrap_or_default()
 }
 
 /// True iff the (module, label) pair was already drained by a previous
 /// lazy-load pass.
-pub fn deferred_key_already_loaded(key: &str) -> bool {
-    LOADED_DEFERRED_KEYS
-        .read()
-        .expect("LOADED_DEFERRED_KEYS poisoned")
-        .contains(key)
+pub(crate) fn deferred_key_already_loaded(
+    signature: &ToolchainLoadingSignature,
+    key: &str,
+) -> bool {
+    let mut state = DEFERRED_TOOLCHAIN_STATE
+        .write()
+        .expect("DEFERRED_TOOLCHAIN_STATE poisoned");
+    deferred_state_for_signature(&mut state, signature)
+        .map(|state| state.loaded_keys.contains(key))
+        .unwrap_or(false)
 }
 
 /// Mark a deferred key as loaded.
-pub fn mark_deferred_key_loaded(key: String) {
-    LOADED_DEFERRED_KEYS
+pub(crate) fn mark_deferred_key_loaded(signature: &ToolchainLoadingSignature, key: String) {
+    let mut state = DEFERRED_TOOLCHAIN_STATE
         .write()
-        .expect("LOADED_DEFERRED_KEYS poisoned")
-        .insert(key);
+        .expect("DEFERRED_TOOLCHAIN_STATE poisoned");
+    if let Some(state) = deferred_state_for_signature(&mut state, signature) {
+        state.loaded_keys.insert(key);
+    }
 }
 
 /// True iff the load-everything fallback has already fired.
-pub fn deferred_all_loaded() -> bool {
-    LOADED_ALL_DEFERRED.load(std::sync::atomic::Ordering::SeqCst)
+pub(crate) fn deferred_all_loaded(signature: &ToolchainLoadingSignature) -> bool {
+    let mut state = DEFERRED_TOOLCHAIN_STATE
+        .write()
+        .expect("DEFERRED_TOOLCHAIN_STATE poisoned");
+    deferred_state_for_signature(&mut state, signature)
+        .map(|state| state.loaded_all)
+        .unwrap_or(false)
 }
 
 /// Mark that the load-everything fallback fired.
-pub fn mark_deferred_all_loaded() {
-    LOADED_ALL_DEFERRED.store(true, std::sync::atomic::Ordering::SeqCst);
+pub(crate) fn mark_deferred_all_loaded(signature: &ToolchainLoadingSignature) {
+    let mut state = DEFERRED_TOOLCHAIN_STATE
+        .write()
+        .expect("DEFERRED_TOOLCHAIN_STATE poisoned");
+    if let Some(state) = deferred_state_for_signature(&mut state, signature) {
+        state.loaded_all = true;
+    }
 }
 
 /// Analyze a native rule target and return the analysis result.

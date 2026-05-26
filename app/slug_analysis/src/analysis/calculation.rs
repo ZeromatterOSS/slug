@@ -1414,7 +1414,7 @@ async fn get_analysis_result_inner(
 
     // Phase 6: Eagerly load registered toolchain packages so the
     // DeclaredToolchainInfo registry is populated before resolution runs.
-    // This runs once per session (guarded by AtomicBool in ensure_registered_toolchains_loaded).
+    // This runs once per registered-toolchain/workspace signature.
     crate::analysis::env::ensure_registered_toolchains_loaded(ctx).await;
 
     // For precision, grab the *actual* rule type and not the *underlying* rule type.

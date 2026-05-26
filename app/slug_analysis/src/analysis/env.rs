@@ -106,9 +106,12 @@ use starlark_map::small_map::SmallMap;
 
 use crate::analysis::native_rule_analysis::DeclaredToolchainInfo;
 use crate::analysis::native_rule_analysis::DeferredToolchain;
+use crate::analysis::native_rule_analysis::ToolchainLoadingSignature;
 use crate::analysis::native_rule_analysis::clear_declared_toolchains;
+use crate::analysis::native_rule_analysis::clear_deferred_toolchains;
 use crate::analysis::native_rule_analysis::deferred_all_loaded;
 use crate::analysis::native_rule_analysis::deferred_key_already_loaded;
+use crate::analysis::native_rule_analysis::deferred_toolchain_state_matches_signature;
 use crate::analysis::native_rule_analysis::get_declared_toolchains;
 use crate::analysis::native_rule_analysis::get_deferred_toolchains;
 use crate::analysis::native_rule_analysis::mark_deferred_all_loaded;
@@ -1046,14 +1049,6 @@ pub fn get_deps_from_analysis_results(
 // Eager Toolchain Loading (Phase 6)
 // ============================================================================
 
-/// DICE-derived identity for the registered toolchain set currently loaded
-/// into the process-global `DeclaredToolchainInfo` registry.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct ToolchainLoadingSignature {
-    workspace_id: slug_bzlmod::WorkspaceId,
-    registered_toolchains: Vec<slug_bzlmod::RegisteredToolchain>,
-}
-
 /// The global toolchain registry is temporary process state. Key the
 /// "already loaded" fast path by the DICE-owned registration value so same
 /// daemon module/workspace changes do not reuse stale registrations.
@@ -1077,7 +1072,7 @@ static DEFERRED_TOOLCHAIN_LOAD_LOCK: LazyLock<futures::lock::Mutex<()>> =
 pub fn reset_toolchain_loading() {
     clear_toolchains_loaded_signature();
     clear_declared_toolchains();
-    set_deferred_toolchains(Vec::new());
+    clear_deferred_toolchains();
 }
 
 fn clear_toolchains_loaded_signature() {
@@ -1101,7 +1096,7 @@ fn mark_toolchains_loaded(signature: ToolchainLoadingSignature) {
 
 fn clear_uncached_toolchain_loading_state_after_lookup_error(started: Instant) {
     clear_declared_toolchains();
-    set_deferred_toolchains(Vec::new());
+    clear_deferred_toolchains();
     clear_toolchains_loaded_signature();
     eager_toolchain_loading_checkpoint(4, "registered_toolchains_unavailable", started, []);
 }
@@ -1164,7 +1159,9 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         registered_toolchains: registered.clone(),
     };
 
-    if toolchains_loaded_for_signature(&signature) {
+    if toolchains_loaded_for_signature(&signature)
+        && deferred_toolchain_state_matches_signature(&signature)
+    {
         return;
     }
 
@@ -1172,7 +1169,9 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
     let _guard = EAGER_TOOLCHAIN_LOAD_LOCK.lock().await;
     eager_toolchain_loading_checkpoint(2, "lock_acquired", started, []);
 
-    if toolchains_loaded_for_signature(&signature) {
+    if toolchains_loaded_for_signature(&signature)
+        && deferred_toolchain_state_matches_signature(&signature)
+    {
         eager_toolchain_loading_checkpoint(3, "already_loaded_after_lock", started, []);
         return;
     }
@@ -1180,7 +1179,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
     clear_declared_toolchains();
 
     if registered.is_empty() {
-        set_deferred_toolchains(Vec::new());
+        set_deferred_toolchains(signature.clone(), Vec::new());
         mark_toolchains_loaded(signature);
         eager_toolchain_loading_checkpoint(4, "no_registered_toolchains", started, []);
         return;
@@ -1201,7 +1200,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             label: tc.label.clone(),
         })
         .collect();
-    set_deferred_toolchains(deferred_pool);
+    set_deferred_toolchains(signature.clone(), deferred_pool);
     eager_toolchain_loading_checkpoint(
         5,
         "registry_split",
@@ -1477,8 +1476,29 @@ pub async fn ensure_deferred_toolchains_loaded(
     dice: &mut DiceComputations<'_>,
     required_types: &[String],
 ) -> bool {
+    let signature = match slug_bzlmod::registered_toolchains_for_current_workspace(dice).await {
+        Ok(data) => ToolchainLoadingSignature {
+            workspace_id: data.workspace_id.clone(),
+            registered_toolchains: data.registered_toolchains.clone(),
+        },
+        Err(e) => {
+            tracing::debug!(
+                "Registered toolchains unavailable while loading deferred toolchains: {}",
+                e
+            );
+            clear_deferred_toolchains();
+            return false;
+        }
+    };
+    if !toolchains_loaded_for_signature(&signature)
+        || !deferred_toolchain_state_matches_signature(&signature)
+    {
+        clear_deferred_toolchains();
+        return false;
+    }
+
     let _guard = DEFERRED_TOOLCHAIN_LOAD_LOCK.lock().await;
-    let pool = get_deferred_toolchains();
+    let pool = get_deferred_toolchains(&signature);
     if pool.is_empty() {
         return false;
     }
@@ -1507,7 +1527,7 @@ pub async fn ensure_deferred_toolchains_loaded(
             .unwrap_or("")
             .to_owned();
         let key = format!("{}::{}", entry.module, entry.label);
-        if deferred_key_already_loaded(&key) {
+        if deferred_key_already_loaded(&signature, &key) {
             continue;
         }
         if needle_repos.contains(&entry.module) || needle_repos.contains(&label_repo) {
@@ -1525,7 +1545,7 @@ pub async fn ensure_deferred_toolchains_loaded(
         let to_load = prepare_toolchain_load_list(dice, &filtered).await;
         load_and_register_toolchain_packages(dice, to_load).await;
         for key in filtered_keys {
-            mark_deferred_key_loaded(key);
+            mark_deferred_key_loaded(&signature, key);
         }
         return true;
     }
@@ -1533,21 +1553,21 @@ pub async fn ensure_deferred_toolchains_loaded(
     // Heuristic missed. As a last-resort fallback (Plan 13 Phase 3 design),
     // load the entire remaining deferred pool once. This guarantees we
     // never silently fail to find a toolchain that was registered.
-    if deferred_all_loaded() {
+    if deferred_all_loaded(&signature) {
         return false;
     }
     let mut all_remaining: Vec<String> = Vec::new();
     let mut all_remaining_keys: Vec<String> = Vec::new();
     for entry in &pool {
         let key = format!("{}::{}", entry.module, entry.label);
-        if deferred_key_already_loaded(&key) {
+        if deferred_key_already_loaded(&signature, &key) {
             continue;
         }
         all_remaining.push(entry.label.clone());
         all_remaining_keys.push(key);
     }
     if all_remaining.is_empty() {
-        mark_deferred_all_loaded();
+        mark_deferred_all_loaded(&signature);
         return false;
     }
     tracing::debug!(
@@ -1558,9 +1578,9 @@ pub async fn ensure_deferred_toolchains_loaded(
     let to_load = prepare_toolchain_load_list(dice, &all_remaining).await;
     load_and_register_toolchain_packages(dice, to_load).await;
     for key in all_remaining_keys {
-        mark_deferred_key_loaded(key);
+        mark_deferred_key_loaded(&signature, key);
     }
-    mark_deferred_all_loaded();
+    mark_deferred_all_loaded(&signature);
     true
 }
 
@@ -6212,6 +6232,53 @@ mod tests {
     }
 
     #[test]
+    fn test_deferred_toolchain_state_is_scoped_by_loading_signature() {
+        reset_toolchain_loading();
+
+        let first = ToolchainLoadingSignature {
+            workspace_id: slug_bzlmod::WorkspaceId::new(
+                PathBuf::from("/tmp/plan61-toolchains"),
+                PathBuf::from("/tmp/plan61-toolchains/buck-out/one"),
+            ),
+            registered_toolchains: vec![slug_bzlmod::RegisteredToolchain {
+                module: "root".to_owned(),
+                label: "@first//:all".to_owned(),
+                is_root: true,
+            }],
+        };
+        let second = ToolchainLoadingSignature {
+            workspace_id: slug_bzlmod::WorkspaceId::new(
+                PathBuf::from("/tmp/plan61-toolchains"),
+                PathBuf::from("/tmp/plan61-toolchains/buck-out/two"),
+            ),
+            registered_toolchains: first.registered_toolchains.clone(),
+        };
+
+        set_deferred_toolchains(
+            first.clone(),
+            vec![DeferredToolchain {
+                module: "rules_rust".to_owned(),
+                label: "@rules_rust//rust:all".to_owned(),
+            }],
+        );
+        mark_deferred_key_loaded(&first, "rules_rust::@rules_rust//rust:all".to_owned());
+        mark_deferred_all_loaded(&first);
+
+        assert_eq!(get_deferred_toolchains(&first).len(), 1);
+        assert!(deferred_all_loaded(&first));
+
+        assert!(get_deferred_toolchains(&second).is_empty());
+        assert!(!deferred_toolchain_state_matches_signature(&first));
+        assert!(!deferred_key_already_loaded(
+            &first,
+            "rules_rust::@rules_rust//rust:all"
+        ));
+        assert!(!deferred_all_loaded(&first));
+
+        reset_toolchain_loading();
+    }
+
+    #[test]
     fn test_registered_toolchain_loading_records_dice_workspace_id() -> slug_error::Result<()> {
         let mut runtime =
             slug_util::tokio_runtime::new_tokio_runtime("plan61-toolchain-loading-workspace-test");
@@ -6283,16 +6350,19 @@ mod tests {
                 }],
             };
             mark_toolchains_loaded(loaded.clone());
-            set_deferred_toolchains(vec![DeferredToolchain {
-                module: "rules_rust".to_owned(),
-                label: "@rules_rust//rust:all".to_owned(),
-            }]);
-            mark_deferred_key_loaded("rules_rust".to_owned());
+            set_deferred_toolchains(
+                loaded.clone(),
+                vec![DeferredToolchain {
+                    module: "rules_rust".to_owned(),
+                    label: "@rules_rust//rust:all".to_owned(),
+                }],
+            );
+            mark_deferred_key_loaded(&loaded, "rules_rust".to_owned());
             register_declared_toolchain(
                 "@first//:all".to_owned(),
                 declared_toolchain_with_target_settings("@first//:type", Vec::new()),
             );
-            mark_deferred_all_loaded();
+            mark_deferred_all_loaded(&loaded);
 
             let dice = dice::testing::DiceBuilder::new()
                 .build(dice::UserComputationData::new())
@@ -6352,9 +6422,9 @@ mod tests {
                 }
             ));
             assert!(get_declared_toolchains().is_empty());
-            assert!(get_deferred_toolchains().is_empty());
-            assert!(!deferred_key_already_loaded("rules_rust"));
-            assert!(!deferred_all_loaded());
+            assert!(get_deferred_toolchains(&loaded).is_empty());
+            assert!(!deferred_key_already_loaded(&loaded, "rules_rust"));
+            assert!(!deferred_all_loaded(&loaded));
 
             reset_toolchain_loading();
         })

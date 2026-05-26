@@ -899,6 +899,11 @@ Observed SDK result at the checkpoint:
   global registry is still process state, but the fast path is now keyed by the
   DICE-derived workspace identity plus registered-toolchain list and clears/reloads
   when that signature changes.
+- Deferred registered-toolchain loading now carries the same workspace/list
+  signature as the eager registry. The temporary deferred pool, per-entry
+  loaded markers, and load-all marker are still process state, but they are
+  ignored and cleared on signature mismatch rather than shared across output
+  bases or registered-toolchain changes.
 - Root and included `MODULE.bazel` reads now run through a `slug_common` DICE
   key backed by `DiceFileComputations::read_project_file_if_exists` for the
   root module and `DiceFileComputations::read_project_file` for included
@@ -2786,6 +2791,19 @@ What did not work or remains risky:
   cleared, no requested/stale/project-root fallback signature is cached, and the
   declared registry, deferred pool, per-key deferred markers, and load-all
   deferred marker are cleared.
+- Deferred registered-toolchain state now lives in one signature-scoped state
+  object instead of three independent process globals. `ensure_deferred_toolchains_loaded`
+  recomputes the current DICE registered-toolchain signature, requires it to
+  match the eager loaded registry, and clears stale deferred pool/marker state on
+  mismatch. This is still transitional process state rather than a DICE-owned
+  registry, but it closes the concrete cross-workspace deferred-pool leak.
+  Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-toolchain-state
+  cargo test -p slug_analysis toolchain_loading -- --nocapture` (`2 passed`),
+  `cargo test -p slug_analysis test_deferred_toolchain_state_is_scoped_by_loading_signature
+  -- --nocapture`, `cargo test -p slug_analysis
+  test_registered_toolchain_lookup_error_clears_loaded_signature_without_caching_fallback
+  -- --nocapture`, and `cargo test -p slug_analysis
+  test_deferred_retry_ignores_optional_miss -- --nocapture`.
 - Extension repo file-ops no longer accepts a no-spec/no-spoke
   `.slug_repo_complete` marker as semantic authority. If setup and registered
   DICE spokes do not provide a current `RepoSpec`, the path now always enters
@@ -3002,7 +3020,10 @@ What did not work or remains risky:
   first failed because no recorded-input sidecar was written, then passed after
   the fix. Validation also reran the adjacent repository watch/watch-tree
   guardrails (`3 passed` total) after `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-read-watch
-  cargo build -p slug`.
+  cargo build -p slug`. Clean review of `06bafd5c` found no correctness issues
+  and reran `git diff --check HEAD~1..HEAD`, the new guardrail (`1 passed`),
+  the adjacent repository watch/read/watch-tree subset (`3 passed`), and
+  `cargo check -p slug_interpreter_for_build`.
 - Repository materialization recorded-input sidecars are now split into named
   manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
   reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
@@ -3572,9 +3593,10 @@ using Rust DICE keys and values:
      projection consume that value. Registered toolchain/platform projection
      keys use their own workspace-checked injected data, while
      current-workspace helpers still use the cell graph to choose the active
-     workspace. Remaining installed lookup state still needs to depend on it
-     instead of
-     process-global maps. Toolchain resolution, target-setting pre-processing,
+  workspace. The deferred registered-toolchain pool and markers now depend on
+     the same workspace/list signature as eager loading before process-global
+     reuse, but this remains transitional until the installed lookup registry is
+     a DICE-owned value. Toolchain resolution, target-setting pre-processing,
      and registered-toolchain package loading now receive caller/resolver-owned
      snapshots before process-global fallback, but the snapshot producers are
      still transitional rather than DICE-owned values. Runtime module-symlink
