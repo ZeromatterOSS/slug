@@ -285,7 +285,6 @@ pub struct BzlmodProjectionData {
     pub registered_toolchains: RegisteredToolchainsDataValue,
     pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
     pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
-    pub repo_env: BzlmodRepoEnvDataValue,
     pub resolution_facts: BzlmodResolutionFactsValue,
     pub repo_mappings: BzlmodRepoMappingsDataValue,
     pub cell_graph: BzlmodCellGraphValue,
@@ -309,10 +308,6 @@ impl BzlmodProjectionData {
             extension_aggregations: BzlmodExtensionAggregationsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(HashMap::new()),
-            ),
-            repo_env: BzlmodRepoEnvDataValue::for_workspace(
-                workspace_id.clone(),
-                Arc::new(BTreeMap::new()),
             ),
             resolution_facts: BzlmodResolutionFactsValue::for_workspace(
                 workspace_id.clone(),
@@ -341,19 +336,21 @@ impl BzlmodProjectionData {
 pub trait SetBzlmodProjectionData {
     fn set_bzlmod_projection_data(&mut self, data: BzlmodProjectionData) -> slug_error::Result<()> {
         let workspace_id = data.cell_graph.workspace_id.clone();
-        self.set_bzlmod_projection_data_with_lockfile_inputs(
+        self.set_bzlmod_projection_data_with_inputs(
             data,
             BzlmodLockfileInputsDataValue::for_workspace(
-                workspace_id,
+                workspace_id.clone(),
                 Arc::new(BzlmodLockfileInputsValue::default()),
             ),
+            BzlmodRepoEnvDataValue::for_workspace(workspace_id, Arc::new(BTreeMap::new())),
         )
     }
 
-    fn set_bzlmod_projection_data_with_lockfile_inputs(
+    fn set_bzlmod_projection_data_with_inputs(
         &mut self,
         data: BzlmodProjectionData,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
+        repo_env: BzlmodRepoEnvDataValue,
     ) -> slug_error::Result<()>;
 }
 
@@ -376,10 +373,11 @@ fn validate_projection_workspace(
 }
 
 impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
-    fn set_bzlmod_projection_data_with_lockfile_inputs(
+    fn set_bzlmod_projection_data_with_inputs(
         &mut self,
         data: BzlmodProjectionData,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
+        repo_env: BzlmodRepoEnvDataValue,
     ) -> slug_error::Result<()> {
         let cell_graph_workspace_id = &data.cell_graph.workspace_id;
         validate_projection_workspace(
@@ -410,7 +408,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         validate_projection_workspace(
             "repo-env data",
             cell_graph_workspace_id,
-            &data.repo_env.workspace_id,
+            &repo_env.workspace_id,
         )?;
         validate_projection_workspace(
             "resolution-facts data",
@@ -424,7 +422,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         )?;
 
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
-        let repo_env_data = Arc::new(data.repo_env.clone());
+        let repo_env_data = Arc::new(repo_env);
         let module_versions = Arc::new(data.module_versions.clone());
         let resolution_facts = Arc::new(data.resolution_facts.clone());
         let repo_mappings = Arc::new(data.repo_mappings.clone());
@@ -568,8 +566,12 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-projection-consistency-other"),
             PathBuf::from("/tmp/slug-plan61-projection-consistency-other-output"),
         );
-        let mut data = BzlmodProjectionData::for_workspace(workspace_id);
-        data.repo_env =
+        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let lockfile_inputs = BzlmodLockfileInputsDataValue::for_workspace(
+            workspace_id,
+            Arc::new(BzlmodLockfileInputsValue::default()),
+        );
+        let repo_env =
             BzlmodRepoEnvDataValue::for_workspace(other_workspace_id, Arc::new(BTreeMap::new()));
 
         let dice = dice::testing::DiceBuilder::new()
@@ -578,7 +580,9 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        let err = updater.set_bzlmod_projection_data(data).unwrap_err();
+        let err = updater
+            .set_bzlmod_projection_data_with_inputs(data, lockfile_inputs, repo_env)
+            .unwrap_err();
         assert!(err.to_string().contains("repo-env data"), "{err:?}");
         assert!(
             err.to_string().contains(
@@ -602,6 +606,10 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-lockfile-provenance-other-output"),
         );
         let data = BzlmodProjectionData::for_workspace(workspace_id);
+        let repo_env = BzlmodRepoEnvDataValue::for_workspace(
+            data.cell_graph.workspace_id.clone(),
+            Arc::new(BTreeMap::new()),
+        );
         let lockfile_inputs = BzlmodLockfileInputsDataValue::for_workspace(
             other_workspace_id,
             Arc::new(BzlmodLockfileInputsValue::default()),
@@ -614,7 +622,7 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         let err = updater
-            .set_bzlmod_projection_data_with_lockfile_inputs(data, lockfile_inputs)
+            .set_bzlmod_projection_data_with_inputs(data, lockfile_inputs, repo_env)
             .unwrap_err();
         assert!(err.to_string().contains("lockfile-input data"), "{err:?}");
         assert!(
@@ -662,7 +670,7 @@ mod tests {
                 LockfileMode::Update,
             )),
         );
-        data.repo_env = BzlmodRepoEnvDataValue::for_workspace(
+        let repo_env = BzlmodRepoEnvDataValue::for_workspace(
             workspace_id.clone(),
             Arc::new(BTreeMap::from([(
                 "TOKEN".to_owned(),
@@ -683,7 +691,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data_with_lockfile_inputs(data, lockfile_inputs)?;
+        updater.set_bzlmod_projection_data_with_inputs(data, lockfile_inputs, repo_env)?;
         let mut dice = updater.commit().await;
 
         let lockfile_inputs = dice

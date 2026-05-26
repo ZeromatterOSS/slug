@@ -3313,12 +3313,16 @@ impl BuckConfigBasedCells {
         )
         .await
         .buck_error_context("Parsing cells")?;
-        slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data_with_lockfile_inputs(
+        slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data_with_inputs(
             updater,
             projection_data_for_dice,
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
                 key.resolution_key.workspace_id.clone(),
                 key.lockfile_inputs.clone(),
+            ),
+            slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
+                key.resolution_key.workspace_id.clone(),
+                Arc::new(key.options.repo_env.clone()),
             ),
         )?;
         Ok(configs)
@@ -3788,10 +3792,7 @@ impl BuckConfigBasedCells {
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let mut bzlmod_projection_data =
             slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id);
-        bzlmod_projection_data.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
-            bzlmod_projection_data.cell_graph.workspace_id.clone(),
-            Arc::new(options.repo_env.clone()),
-        );
+        let repo_env = Arc::new(options.repo_env.clone());
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
             options.allow_yanked_versions_env.as_deref(),
             &options.allow_yanked_versions_flags,
@@ -4295,7 +4296,7 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
-                Some(bzlmod_projection_data.repo_env.repo_env.as_ref()),
+                Some(repo_env.as_ref()),
                 tracked_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
@@ -4329,7 +4330,7 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
-                Some(bzlmod_projection_data.repo_env.repo_env.as_ref()),
+                Some(repo_env.as_ref()),
                 tracked_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
@@ -4439,7 +4440,7 @@ impl BuckConfigBasedCells {
                 internal_name: Arc::from(cell.internal_name.as_str()),
                 spec_hash: Arc::from(cell.spec_hash.as_str()),
                 repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
-                repo_env_json: repo_env_json(bzlmod_projection_data.repo_env.repo_env.as_ref()),
+                repo_env_json: repo_env_json(repo_env.as_ref()),
                 materialized: false,
             };
             ext_cells.push((cell_name, cell_path, setup));
@@ -4584,8 +4585,7 @@ impl BuckConfigBasedCells {
         } else {
             parsed.module.name.clone()
         };
-        let lockfile_repo_env_json =
-            repo_env_json(bzlmod_projection_data.repo_env.repo_env.as_ref());
+        let lockfile_repo_env_json = repo_env_json(repo_env.as_ref());
         let cell_graph = slug_bzlmod::BzlmodCellGraphValue {
             workspace_id: bzlmod_projection_data.cell_graph.workspace_id.clone(),
             root_module_name: root_module_name.clone(),

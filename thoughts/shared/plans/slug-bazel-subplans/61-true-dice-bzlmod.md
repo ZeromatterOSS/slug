@@ -2432,6 +2432,21 @@ Observed SDK result at the checkpoint:
   identified that the split setter needed the same workspace-provenance
   validation as the old payload field; the final API accepts
   `BzlmodLockfileInputsDataValue` and validates it before injection.
+- `BzlmodProjectionData` no longer carries repo-env either. Production
+  config-load injects `BzlmodRepoEnvDataValue` separately from command policy
+  state through `set_bzlmod_projection_data_with_inputs`, and the setter
+  validates its workspace provenance before publishing `BzlmodRepoEnvDataKey`.
+  The legacy resolver still uses the command repo-env locally while building
+  lockfile-seeded extension cells and runtime extension setups, but the
+  monolithic projection payload no longer owns the injected repo-env fact.
+  Focused validation passed with `cargo fmt`, `cargo test -p slug_bzlmod
+  set_bzlmod_projection_data -- --nocapture`, `cargo test -p
+  slug_external_cells extension_repo_setup_repo_env_uses_current_dice_projection
+  -- --nocapture`, and `cargo test -p slug_common bzlmod_projection_bridge --
+  --nocapture`, `cargo fmt --check`, `cargo check -p slug_bzlmod -p
+  slug_common -p slug_external_cells`, `cargo test -p slug_bzlmod
+  data_only_projection -- --nocapture`, and `cargo test -p slug_bzlmod
+  current_workspace_helpers_use_projection_workspace_id -- --nocapture`.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors
@@ -2969,11 +2984,13 @@ What did not work or remains risky:
   a transitional legacy-produced payload rather than a set of true
   Skyframe-shaped DICE producers. The projection payload now carries the
   current workspace identity inside its named cell graph, while module-version
-  data, resolution facts, registrations, repo-env, lockfile-input,
-  repo-mapping, and extension-aggregation data also carry source workspace
+  data, resolution facts, registrations, repo-mapping, and
+  extension-aggregation data also carry source workspace
   provenance so stale cross-workspace projection data cannot be paired with
-  that graph. It carries resolution facts, module versions, repo env, repo
-  mappings, extension aggregations, and registrations as the same values
+  that graph. Lockfile inputs and repo-env have been split out of the
+  projection payload and are injected separately with their own provenance. It
+  carries resolution facts, module versions, repo mappings, extension
+  aggregations, and registrations as the same values
   injected into DICE, but the narrower injected values are still populated from
   the legacy resolver output. The persisted config-load key now receives the
   server output base instead of synthesizing the default output base for
@@ -4501,9 +4518,9 @@ hardening behavior around it.
    - `BzlmodSessionData` and `BzlmodSessionDataKey` are removed, and
      `BuckConfigBasedCells` no longer stores a bzlmod payload or returns it to
      the server updater. `BzlmodProjectionData` remains as a transitional
-     bridge payload assembled by the legacy resolver, but lockfile inputs have
-     been split out to the named lockfile-input bridge injection; delete the
-     remaining projection API only after module graph, repo mapping, repo-env,
+     bridge payload assembled by the legacy resolver, but lockfile inputs and
+     repo-env have been split out to separate named injections; delete the
+     remaining projection API only after module graph, repo mapping,
      registration, and cell-graph facts have true DICE producers.
    - Generic empty session construction is removed from production paths.
      Remaining empty projection construction must explicitly carry workspace

@@ -1076,8 +1076,8 @@ mod tests {
         let workspace_id = slug_bzlmod::WorkspaceId::new(project_root, output_base);
         let mut repo_env = std::collections::BTreeMap::new();
         repo_env.insert("TOKEN".to_owned(), "current".to_owned());
-        let mut projection = slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
-        projection.repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
+        let projection = slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             workspace_id.clone(),
             Arc::new(repo_env),
         );
@@ -1088,7 +1088,14 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data(projection)?;
+        updater.set_bzlmod_projection_data_with_inputs(
+            projection,
+            slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(slug_bzlmod::BzlmodLockfileInputsValue::default()),
+            ),
+            repo_env,
+        )?;
         let mut dice = updater.commit().await;
 
         let setup = ExtensionRepoCellSetup {
