@@ -2323,7 +2323,11 @@ impl CellResolver {
         // "rules_rs+crate+crates__typenum-1.19.0") but is referenced by its
         // apparent name ("crates__typenum-1.19.0").
         if self.0.resolve_root_alias_cell_names {
-            if let Ok(aliased) = self.0.root_cell_alias_resolver.resolve(cell.as_str()) {
+            if let Some(aliased) = self
+                .0
+                .root_cell_alias_resolver
+                .resolve_declared_or_runtime_alias(cell.as_str())
+            {
                 if aliased != cell {
                     if let Some(instance) = self.0.cells.get(&aliased) {
                         return Ok(instance);
@@ -3329,6 +3333,63 @@ mod tests {
             snapshot,
         )?;
         assert!(resolver.get(CellName::testing_new(wrong_global)).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn cell_resolver_get_no_snapshot_alias_miss_ignores_process_global_alias()
+    -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let canonical = CellName::testing_new("plan61_get_canonical_cell");
+        let apparent = CellName::testing_new("plan61_get_apparent_alias");
+        let wrong_global = CellName::testing_new("plan61_wrong_owner++get+alias");
+        register_dynamic_extension_cell_alias(
+            apparent.as_str().to_owned(),
+            wrong_global.as_str().to_owned(),
+        );
+        let root_path = CellRootPathBuf::testing_new("");
+        let canonical_path =
+            CellRootPathBuf::testing_new("bazel-external/plan61_get_canonical_cell");
+        let cell_roots = [
+            (root, root_path.as_path()),
+            (canonical, canonical_path.as_path()),
+        ];
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &root_path),
+        )?;
+        let canonical_instance = CellInstance::new(
+            canonical,
+            canonical_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, cell_roots[1].1),
+        )?;
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            NonEmptyCellAlias::new("declared_alias".to_owned())?,
+            canonical,
+        );
+        let root_aliases = CellAliasResolver::new(root, aliases)?;
+        let resolver = CellResolver::new(vec![root_instance, canonical_instance], root_aliases)?;
+
+        assert_eq!(
+            resolver
+                .get(CellName::testing_new("declared_alias"))?
+                .name(),
+            canonical
+        );
+        assert!(resolver.get(apparent).is_err());
+        assert_eq!(
+            resolve_dynamic_extension_cell_alias(apparent.as_str()).as_deref(),
+            Some(wrong_global.as_str())
+        );
 
         Ok(())
     }

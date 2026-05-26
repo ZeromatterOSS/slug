@@ -2628,6 +2628,29 @@ Observed SDK result at the checkpoint:
   build -p slug`. The first validation attempt exposed `/var/mnt/dev` at 100%
   full; generated temp Cargo target dirs and `target/debug/incremental` were
   removed, freeing about 108G before rerunning the tests.
+- `CellResolver::get` root-alias cell-name lookup now uses only the resolver's
+  declared aliases and runtime snapshot aliases instead of full
+  `CellAliasResolver::resolve`, whose no-snapshot compatibility path can
+  consult process-global dynamic/scoped aliases and directory-derived state.
+  The removed bridge surface is unknown-cell lookup filling a miss from
+  `root_cell_alias_resolver.resolve(cell.as_str())` before dynamic/runtime
+  cell handling. The DICE/Skyframe-shaped owner is the active `CellResolver`'s
+  root alias resolver, backed by the bzlmod runtime cell graph snapshot and
+  ultimately `BzlmodCellGraphKey`; no-snapshot resolver misses now stay misses
+  unless a declared alias owns them. Bridge burn-down before/after evidence:
+  before, `rg -n "root_cell_alias_resolver\\.resolve\\(cell\\.as_str\\(\\)"
+  app/slug_core/src/cells.rs` found the production bridge call; after, it
+  returns no hits, and `rg -n
+  "resolve_declared_or_runtime_alias\\(cell\\.as_str\\(\\)|cell_resolver_get_no_snapshot"
+  app/slug_core/src/cells.rs` shows the owner-only lookup plus stale-global
+  miss coverage. Validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_core
+  cell_resolver_get_no_snapshot -- --nocapture` (`1 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_core
+  cells::tests -- --nocapture --test-threads=1` (`52 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo check -p slug_core -p
+  slug_common`, and `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo build -p
+  slug`.
 - Toolchain implementation label parsing now uses only the active cell
   resolver's declared aliases and runtime snapshot aliases for repo-name
   canonicalization. Resolverless and no-runtime-snapshot resolver misses stay on
@@ -4188,6 +4211,9 @@ hardening behavior around it.
   alias/module canonicalization. The remaining bridge is the producer: those
   labels still ultimately come from the legacy-produced cell graph until
   `BzlmodCellGraphKey` is true graph-owned data.
+- `CellResolver::get` root-alias lookup now uses only resolver-owned declared
+  aliases and runtime aliases/cells, so no-snapshot misses no longer consult
+  process-global generated-repo aliases during ordinary unknown-cell lookup.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
   cells, but the final cell graph is still injected from legacy-produced data.
