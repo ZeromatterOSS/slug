@@ -3196,6 +3196,8 @@ impl Key for OverridePatchInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodProjectionBridgeValue {
     projection_data: slug_bzlmod::BzlmodProjectionData,
+    registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
+    registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
     resolution_facts: slug_bzlmod::BzlmodResolutionFactsValue,
     repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
 }
@@ -3306,33 +3308,48 @@ impl BuckConfigBasedCells {
                 .buck_error_context("Computing bzlmod projection bridge through DICE")?;
             (key, bzlmod_projection)
         };
-        let (projection_data_for_dice, resolution_facts_for_dice, repo_mappings_for_dice) =
-            bzlmod_projection.as_ref().as_ref().map_or_else(
-                || {
-                    (
-                        slug_bzlmod::BzlmodProjectionData::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
-                        ),
-                        slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
-                            indexmap::IndexMap::new(),
-                            indexmap::IndexMap::new(),
-                        ),
-                        slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
-                            Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
-                            Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
-                        ),
-                    )
-                },
-                |value| {
-                    (
-                        value.projection_data.clone(),
-                        value.resolution_facts.clone(),
-                        value.repo_mappings.clone(),
-                    )
-                },
-            );
+        let (
+            projection_data_for_dice,
+            registered_toolchains_for_dice,
+            registered_execution_platforms_for_dice,
+            resolution_facts_for_dice,
+            repo_mappings_for_dice,
+        ) = bzlmod_projection.as_ref().as_ref().map_or_else(
+            || {
+                (
+                    slug_bzlmod::BzlmodProjectionData::for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                    ),
+                    slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                        Vec::new(),
+                    ),
+                    slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                        Vec::new(),
+                    ),
+                    slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                        indexmap::IndexMap::new(),
+                        indexmap::IndexMap::new(),
+                    ),
+                    slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                        Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
+                        Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
+                    ),
+                )
+            },
+            |value| {
+                (
+                    value.projection_data.clone(),
+                    value.registered_toolchains.clone(),
+                    value.registered_execution_platforms.clone(),
+                    value.resolution_facts.clone(),
+                    value.repo_mappings.clone(),
+                )
+            },
+        );
 
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
@@ -3358,6 +3375,8 @@ impl BuckConfigBasedCells {
                 key.resolution_key.workspace_id.clone(),
                 Arc::new(key.options.repo_env.clone()),
             ),
+            registered_toolchains_for_dice,
+            registered_execution_platforms_for_dice,
             resolution_facts_for_dice,
             repo_mappings_for_dice,
         )?;
@@ -3827,6 +3846,8 @@ impl BuckConfigBasedCells {
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let mut bzlmod_projection_data =
             slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id);
+        let registered_toolchains;
+        let registered_execution_platforms;
         let mut resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
             bzlmod_projection_data.cell_graph.workspace_id.clone(),
             indexmap::IndexMap::new(),
@@ -4449,12 +4470,11 @@ impl BuckConfigBasedCells {
                 all_toolchains.len(),
                 all_exec_platforms.len()
             );
-            bzlmod_projection_data.registered_toolchains =
-                slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-                    bzlmod_projection_data.cell_graph.workspace_id.clone(),
-                    all_toolchains,
-                );
-            bzlmod_projection_data.registered_execution_platforms =
+            registered_toolchains = slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
+                bzlmod_projection_data.cell_graph.workspace_id.clone(),
+                all_toolchains,
+            );
+            registered_execution_platforms =
                 slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
                     bzlmod_projection_data.cell_graph.workspace_id.clone(),
                     all_exec_platforms,
@@ -4726,6 +4746,8 @@ impl BuckConfigBasedCells {
 
         Ok(Some(BzlmodProjectionBridgeValue {
             projection_data: bzlmod_projection_data,
+            registered_toolchains,
+            registered_execution_platforms,
             resolution_facts,
             repo_mappings,
         }))

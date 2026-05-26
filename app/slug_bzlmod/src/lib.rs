@@ -282,8 +282,6 @@ pub struct RegisteredToolchain {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BzlmodProjectionData {
     pub module_versions: BzlmodModuleVersionsDataValue,
-    pub registered_toolchains: RegisteredToolchainsDataValue,
-    pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
     pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
     pub cell_graph: BzlmodCellGraphValue,
 }
@@ -294,14 +292,6 @@ impl BzlmodProjectionData {
             module_versions: BzlmodModuleVersionsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(HashMap::new()),
-            ),
-            registered_toolchains: RegisteredToolchainsDataValue::for_workspace(
-                workspace_id.clone(),
-                Vec::new(),
-            ),
-            registered_execution_platforms: RegisteredExecutionPlatformsDataValue::for_workspace(
-                workspace_id.clone(),
-                Vec::new(),
             ),
             extension_aggregations: BzlmodExtensionAggregationsDataValue::for_workspace(
                 workspace_id.clone(),
@@ -331,6 +321,8 @@ pub trait SetBzlmodProjectionData {
                 Arc::new(BzlmodLockfileInputsValue::default()),
             ),
             BzlmodRepoEnvDataValue::for_workspace(workspace_id.clone(), Arc::new(BTreeMap::new())),
+            RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
+            RegisteredExecutionPlatformsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
             BzlmodResolutionFactsValue::for_workspace(
                 workspace_id.clone(),
                 indexmap::IndexMap::new(),
@@ -349,6 +341,8 @@ pub trait SetBzlmodProjectionData {
         data: BzlmodProjectionData,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
         repo_env: BzlmodRepoEnvDataValue,
+        registered_toolchains: RegisteredToolchainsDataValue,
+        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
         resolution_facts: BzlmodResolutionFactsValue,
         repo_mappings: BzlmodRepoMappingsDataValue,
     ) -> slug_error::Result<()>;
@@ -378,6 +372,8 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         data: BzlmodProjectionData,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
         repo_env: BzlmodRepoEnvDataValue,
+        registered_toolchains: RegisteredToolchainsDataValue,
+        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
         resolution_facts: BzlmodResolutionFactsValue,
         repo_mappings: BzlmodRepoMappingsDataValue,
     ) -> slug_error::Result<()> {
@@ -390,12 +386,12 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         validate_projection_workspace(
             "registered-toolchain data",
             cell_graph_workspace_id,
-            &data.registered_toolchains.workspace_id,
+            &registered_toolchains.workspace_id,
         )?;
         validate_projection_workspace(
             "registered-execution-platform data",
             cell_graph_workspace_id,
-            &data.registered_execution_platforms.workspace_id,
+            &registered_execution_platforms.workspace_id,
         )?;
         validate_projection_workspace(
             "extension-aggregation data",
@@ -430,8 +426,8 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         let repo_mappings = Arc::new(repo_mappings);
         let extension_aggregations = Arc::new(data.extension_aggregations.clone());
         let cell_graph = Arc::new(data.cell_graph.clone());
-        let registered_toolchains = Arc::new(data.registered_toolchains.clone());
-        let registered_execution_platforms = Arc::new(data.registered_execution_platforms.clone());
+        let registered_toolchains = Arc::new(registered_toolchains);
+        let registered_execution_platforms = Arc::new(registered_execution_platforms);
         self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
         self.changed_to(vec![(
             BzlmodRegisteredToolchainsDataKey,
@@ -500,6 +496,16 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+
+    fn empty_registered_toolchains(workspace_id: WorkspaceId) -> RegisteredToolchainsDataValue {
+        RegisteredToolchainsDataValue::for_workspace(workspace_id, Vec::new())
+    }
+
+    fn empty_registered_execution_platforms(
+        workspace_id: WorkspaceId,
+    ) -> RegisteredExecutionPlatformsDataValue {
+        RegisteredExecutionPlatformsDataValue::for_workspace(workspace_id, Vec::new())
+    }
 
     #[tokio::test]
     async fn set_bzlmod_projection_data_uses_projection_workspace_id() -> slug_error::Result<()> {
@@ -581,7 +587,7 @@ mod tests {
             indexmap::IndexMap::new(),
         );
         let repo_mappings = BzlmodRepoMappingsDataValue::for_workspace(
-            workspace_id,
+            workspace_id.clone(),
             Arc::new(RepoMappingSnapshot::new()),
             Arc::new(RepoMappingOverrides::new()),
         );
@@ -597,6 +603,8 @@ mod tests {
                 data,
                 lockfile_inputs,
                 repo_env,
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
                 resolution_facts,
                 repo_mappings,
             )
@@ -623,7 +631,7 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-lockfile-provenance-other"),
             PathBuf::from("/tmp/slug-plan61-lockfile-provenance-other-output"),
         );
-        let data = BzlmodProjectionData::for_workspace(workspace_id);
+        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
         let repo_env = BzlmodRepoEnvDataValue::for_workspace(
             data.cell_graph.workspace_id.clone(),
             Arc::new(BTreeMap::new()),
@@ -654,6 +662,8 @@ mod tests {
                 data,
                 lockfile_inputs,
                 repo_env,
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
                 resolution_facts,
                 repo_mappings,
             )
@@ -663,6 +673,90 @@ mod tests {
             err.to_string().contains(
                 "but its cell graph root is '/tmp/slug-plan61-lockfile-provenance-workspace'"
             ),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_bzlmod_projection_data_rejects_mismatched_registration_projection_provenance()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-registration-provenance-workspace"),
+            PathBuf::from("/tmp/slug-plan61-registration-provenance-output-base"),
+        );
+        let other_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-registration-provenance-other"),
+            PathBuf::from("/tmp/slug-plan61-registration-provenance-other-output"),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let err = updater
+            .set_bzlmod_projection_data_with_inputs(
+                data,
+                BzlmodLockfileInputsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BzlmodLockfileInputsValue::default()),
+                ),
+                BzlmodRepoEnvDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BTreeMap::new()),
+                ),
+                empty_registered_toolchains(other_workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
+                BzlmodResolutionFactsValue::for_workspace(
+                    workspace_id.clone(),
+                    indexmap::IndexMap::new(),
+                    indexmap::IndexMap::new(),
+                ),
+                BzlmodRepoMappingsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(RepoMappingSnapshot::new()),
+                    Arc::new(RepoMappingOverrides::new()),
+                ),
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("registered-toolchain data"),
+            "{err:?}"
+        );
+
+        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let err = updater
+            .set_bzlmod_projection_data_with_inputs(
+                data,
+                BzlmodLockfileInputsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BzlmodLockfileInputsValue::default()),
+                ),
+                BzlmodRepoEnvDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BTreeMap::new()),
+                ),
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(other_workspace_id),
+                BzlmodResolutionFactsValue::for_workspace(
+                    workspace_id.clone(),
+                    indexmap::IndexMap::new(),
+                    indexmap::IndexMap::new(),
+                ),
+                BzlmodRepoMappingsDataValue::for_workspace(
+                    workspace_id,
+                    Arc::new(RepoMappingSnapshot::new()),
+                    Arc::new(RepoMappingOverrides::new()),
+                ),
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("registered-execution-platform data"),
             "{err:?}"
         );
 
@@ -699,6 +793,8 @@ mod tests {
                     workspace_id.clone(),
                     Arc::new(BTreeMap::new()),
                 ),
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
                 BzlmodResolutionFactsValue::for_workspace(
                     other_workspace_id.clone(),
                     indexmap::IndexMap::new(),
@@ -725,6 +821,8 @@ mod tests {
                     workspace_id.clone(),
                     Arc::new(BTreeMap::new()),
                 ),
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
                 BzlmodResolutionFactsValue::for_workspace(
                     workspace_id.clone(),
                     indexmap::IndexMap::new(),
@@ -812,6 +910,8 @@ mod tests {
             data,
             lockfile_inputs,
             repo_env,
+            empty_registered_toolchains(workspace_id.clone()),
+            empty_registered_execution_platforms(workspace_id.clone()),
             resolution_facts,
             repo_mappings,
         )?;
