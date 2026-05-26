@@ -1618,15 +1618,19 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display("TrackedExtensionBzlDigestKey({}, {})", project_root.display(), extension_id)]
-struct TrackedExtensionBzlDigestKey {
+#[display(
+    "FallbackScannedExtensionBzlDigestKey({}, {})",
+    project_root.display(),
+    extension_id
+)]
+struct FallbackScannedExtensionBzlDigestKey {
     project_root: AbsNormPathBuf,
     extension_id: Arc<str>,
     repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
 }
 
 #[async_trait]
-impl Key for TrackedExtensionBzlDigestKey {
+impl Key for FallbackScannedExtensionBzlDigestKey {
     type Value = slug_error::Result<Arc<str>>;
 
     async fn compute(
@@ -1652,13 +1656,15 @@ impl Key for TrackedExtensionBzlDigestKey {
     }
 
     fn validity(_x: &Self::Value) -> bool {
-        // This transitional digest still scans files directly inside compute
-        // until the Starlark loaded-module graph is exposed here.
+        // This legacy bridge runs before the current extension aggregation is
+        // injected, so it cannot safely call ExtensionBzlTransitiveDigestKey.
+        // Keep it explicitly non-persistent until the bootstrap/preseed path is
+        // replaced by the Starlark loaded-module graph.
         false
     }
 }
 
-async fn tracked_extension_bzl_digests_for_lockfile_preseed(
+async fn fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
     ctx: &mut DiceComputations<'_>,
     project_root: &AbsNormPathBuf,
     aggregated: &HashMap<String, slug_bzlmod::AggregatedExtension>,
@@ -1667,7 +1673,7 @@ async fn tracked_extension_bzl_digests_for_lockfile_preseed(
     let repo_mappings = Arc::new(repo_mappings.clone());
     let mut digests = HashMap::new();
     for extension_id in aggregated.keys() {
-        let key = TrackedExtensionBzlDigestKey {
+        let key = FallbackScannedExtensionBzlDigestKey {
             project_root: project_root.clone(),
             extension_id: Arc::from(extension_id.as_str()),
             repo_mappings: repo_mappings.clone(),
@@ -1744,7 +1750,7 @@ async fn root_extension_replay_summary_digest(
             return Ok(None);
         };
         let bzl_transitive_digest = ctx
-            .compute(&TrackedExtensionBzlDigestKey {
+            .compute(&FallbackScannedExtensionBzlDigestKey {
                 project_root: AbsNormPathBuf::try_from(project_fs.root().as_path().to_path_buf())?,
                 extension_id: Arc::from(extension_id.as_str()),
                 repo_mappings: repo_mappings.clone(),
@@ -4368,9 +4374,10 @@ impl BuckConfigBasedCells {
         // post-extension-eval loop) is gated on the hub's `.slug_repo_complete`
         // marker.
         if let Some(lockfile) = visible_lockfile.as_ref() {
-            let tracked_bzl_transitive_digests = if let Some(ctx) = dice_ctx.as_deref_mut() {
+            let fallback_scanned_bzl_transitive_digests = if let Some(ctx) = dice_ctx.as_deref_mut()
+            {
                 Some(
-                    tracked_extension_bzl_digests_for_lockfile_preseed(
+                    fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
                         ctx,
                         &project_root_abs,
                         &aggregated,
@@ -4388,7 +4395,7 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
                 Some(repo_env.as_ref()),
-                tracked_bzl_transitive_digests.as_ref(),
+                fallback_scanned_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
             );
@@ -4402,9 +4409,10 @@ impl BuckConfigBasedCells {
             );
         }
         if let Some(lockfile) = hidden_lockfile.as_ref() {
-            let tracked_bzl_transitive_digests = if let Some(ctx) = dice_ctx.as_deref_mut() {
+            let fallback_scanned_bzl_transitive_digests = if let Some(ctx) = dice_ctx.as_deref_mut()
+            {
                 Some(
-                    tracked_extension_bzl_digests_for_lockfile_preseed(
+                    fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
                         ctx,
                         &project_root_abs,
                         &aggregated,
@@ -4422,7 +4430,7 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
                 Some(repo_env.as_ref()),
-                tracked_bzl_transitive_digests.as_ref(),
+                fallback_scanned_bzl_transitive_digests.as_ref(),
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
             );
@@ -6446,7 +6454,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tracked_extension_bzl_digest_matches_legacy_project_load_digest()
+    async fn fallback_scanned_extension_bzl_digest_matches_legacy_project_load_digest()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file(
@@ -6477,23 +6485,23 @@ ext = module_extension(implementation = _impl)
             .unwrap()
             .commit()
             .await;
-        let tracked = dice
-            .compute(&TrackedExtensionBzlDigestKey {
+        let fallback_scanned = dice
+            .compute(&FallbackScannedExtensionBzlDigestKey {
                 project_root: AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?,
                 extension_id: Arc::from(extension_id),
                 repo_mappings: Arc::new(repo_mappings.clone()),
             })
             .await??;
 
-        assert_eq!(tracked.as_ref(), direct);
-        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
-            tracked
-        )));
+        assert_eq!(fallback_scanned.as_ref(), direct);
+        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+            &Ok(fallback_scanned)
+        ));
         Ok(())
     }
 
     #[tokio::test]
-    async fn tracked_extension_bzl_digest_matches_legacy_missing_project_load_digest()
+    async fn fallback_scanned_extension_bzl_digest_matches_legacy_missing_project_load_digest()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file(
@@ -6517,7 +6525,7 @@ ext = module_extension(implementation = _impl)
                 fs.path().root().as_path(),
                 Some(&repo_mappings),
             );
-        let key = TrackedExtensionBzlDigestKey {
+        let key = FallbackScannedExtensionBzlDigestKey {
             project_root: project_root.clone(),
             extension_id: Arc::from(extension_id),
             repo_mappings: Arc::new(repo_mappings.clone()),
@@ -6531,11 +6539,11 @@ ext = module_extension(implementation = _impl)
             .commit()
             .await;
 
-        let tracked_missing = dice.compute(&key).await??;
-        assert_eq!(tracked_missing.as_ref(), direct_missing);
-        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
-            tracked_missing.clone()
-        )));
+        let fallback_scanned_missing = dice.compute(&key).await??;
+        assert_eq!(fallback_scanned_missing.as_ref(), direct_missing);
+        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+            &Ok(fallback_scanned_missing.clone())
+        ));
 
         fs.write_file("helper.bzl", "HELPER = 'created'\n");
         let mut dice = dice.into_updater().commit().await;
@@ -6545,19 +6553,19 @@ ext = module_extension(implementation = _impl)
                 fs.path().root().as_path(),
                 Some(&repo_mappings),
             );
-        let tracked_created = dice
-            .compute(&TrackedExtensionBzlDigestKey {
+        let fallback_scanned_created = dice
+            .compute(&FallbackScannedExtensionBzlDigestKey {
                 project_root,
                 extension_id: Arc::from(extension_id),
                 repo_mappings: Arc::new(repo_mappings),
             })
             .await??;
 
-        assert_ne!(tracked_missing, tracked_created);
-        assert_eq!(tracked_created.as_ref(), direct_created);
-        assert!(!<TrackedExtensionBzlDigestKey as Key>::validity(&Ok(
-            tracked_created
-        )));
+        assert_ne!(fallback_scanned_missing, fallback_scanned_created);
+        assert_eq!(fallback_scanned_created.as_ref(), direct_created);
+        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+            &Ok(fallback_scanned_created)
+        ));
         Ok(())
     }
 

@@ -305,13 +305,13 @@ Observed SDK result at the checkpoint:
   creations, and deletions (`6 passed, 149 deselected`), `cargo fmt --check`,
   and `git diff --check`.
   Preseed digest follow-up: the remaining explicit lockfile preseed scanner now
-  runs inside `TrackedExtensionBzlDigestKey::compute` instead of being polled
-  before key construction and injected as `poll_digest`. Bridge surface
+  runs inside `FallbackScannedExtensionBzlDigestKey::compute` instead of being
+  polled before key construction and injected as `poll_digest`. Bridge surface
   reduced: extension `.bzl` digest preseed no longer hides a direct scanner read
   in key identity; the named DICE key owns the transitional scan and is invalid
   across transactions until the Starlark loaded-module graph replaces it.
   Focused validation passed with `cargo test -p slug_common
-  tracked_extension_bzl_digest -- --nocapture`.
+  fallback_scanned_extension_bzl_digest -- --nocapture`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -1583,13 +1583,13 @@ Observed SDK result at the checkpoint:
   transaction. `AbsoluteTextFileInputKey` covers generic out-of-project text
   inputs, `TrackedLockfileContentKey` carries the observed hidden/output-base
   lockfile input when that file is outside the project root, and
-  `TrackedExtensionBzlDigestKey` carries the direct transitional literal-load
+  `FallbackScannedExtensionBzlDigestKey` carries the direct transitional literal-load
   digest used by lockfile pre-seeding and root extension replay-summary
   formation. This preserves edit/create/delete transitions through a new key
   but lets same-key warm values stay valid, so the replay-summary bridge no
   longer recomputes on every no-op command. Validation
   passed with `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_common
-  tracked_extension_bzl_digest -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
+  fallback_scanned_extension_bzl_digest -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
   cargo test -p slug_common
   absolute_text_file_input_key -- --nocapture`, `cargo build -p slug`, a
   focused Plan 61 replay subset covering warm replay and project/mapped `.bzl`
@@ -1605,7 +1605,7 @@ Observed SDK result at the checkpoint:
   cargo test -p slug_common absolute_text_file_input_key -- --nocapture`,
   `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p slug_interpreter_for_build
   module_context -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp cargo test -p
-  slug_common tracked_extension_bzl_digest -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
+  slug_common fallback_scanned_extension_bzl_digest -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
   cargo test -p slug_common bzlmod -- --nocapture`, `TMPDIR=/var/mnt/dev/.slug-tmp
   cargo check -p slug_common -p slug_bzlmod -p slug_interpreter_for_build -p
   slug_external_cells`, `cargo build -p slug`, and the full Plan 61 Python
@@ -1776,7 +1776,7 @@ Observed SDK result at the checkpoint:
   missing-lockfile extension reuse, and mapped external `.bzl` load edits, and
   the full Plan 61 Python guardrail with 72 tests.
 - Root extension replay-summary `.bzl` digesting now has a
-  `slug_common` DICE key. `TrackedExtensionBzlDigestKey` reuses the
+  `slug_common` DICE key. `FallbackScannedExtensionBzlDigestKey` reuses the
   `slug_bzlmod` literal-load and label-resolution helpers, but reads
   project-root implementation files through `DiceFileComputations` while
   forming the legacy resolution bridge's replay-summary digest. The key remains
@@ -1786,7 +1786,7 @@ Observed SDK result at the checkpoint:
   `missing_transitive_extension_bzl_load_creation_rejects_replay` by counting
   stale replay hits before the refreshed digest was observed. Validation passed
   with `cargo test -p slug_common
-  tracked_extension_bzl_digest_matches_legacy_project_load_digest --
+  fallback_scanned_extension_bzl_digest_matches_legacy_project_load_digest --
   --nocapture`, `cargo test -p slug_bzlmod extension_spokes -- --nocapture`,
   `cargo build -p slug`, a focused Plan 61 Python replay subset covering warm
   replay plus project/mapped `.bzl` create/edit/delete transitions, `cargo test
@@ -3519,7 +3519,7 @@ What did not work or remains risky:
   -p slug_external_cells no_spec_complete_marker_does_not_skip_dice_execution
   -- --nocapture`, `cargo test -p slug_external_cells extension_repo::tests --
   --nocapture`, and `cargo check -p slug_external_cells -p slug_bzlmod`.
-- Lockfile spoke pre-seeding now consumes the `TrackedExtensionBzlDigestKey`
+- Lockfile spoke pre-seeding now consumes the `FallbackScannedExtensionBzlDigestKey`
   digest when bzlmod resolution is running with DICE inputs, so the pre-seed
   path no longer performs its own direct `.bzl` digest scan in that mode.
   Non-DICE bootstrap callers keep the old direct scanner until the remaining
@@ -3532,6 +3532,15 @@ What did not work or remains risky:
   missing-file hash input is the deterministic
   `No such file or directory (os error 2)` state already expected by the
   guardrails. Non-DICE callers remain on the transitional direct scanner.
+- The remaining `slug_common` preseed/replay-summary scanner key is now named
+  `FallbackScannedExtensionBzlDigestKey` and its preseed helper uses the same
+  fallback-scanned naming. This is intentionally not a new DICE owner: the key
+  still runs before current extension aggregations are injected and remains
+  invalid across transactions. Bridge surface clarified: normal extension
+  replay must use `ExtensionBzlTransitiveDigestKey` over the loaded Starlark
+  graph; the fallback scanner is now explicitly limited to the legacy
+  bootstrap/preseed bridge. Validation passed with `cargo test -p slug_common
+  fallback_scanned_extension_bzl_digest -- --nocapture`.
 - `ExtensionBzlTransitiveDigestKey` now asks the interpreter-side module
   extension executor for the actual loaded-module graph digest before falling
   back to the transitional literal-load scanner. The loaded-graph path reads
