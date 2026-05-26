@@ -106,13 +106,19 @@ Observed SDK result at the checkpoint:
   `patch_strip`, and local patch file bytes in the non-registry override cache
   directory identity, and materializes patched BUILD targets from the fetched
   override tree.
-  `single_version_override` patch fields remain intentionally unsupported for
-  this slice because Bazel also threads them into registry MODULE discovery and
-  final RepoSpec materialization. Bazel anchors:
+  `single_version_override` patch fields are also supported for registry
+  modules: discovery-time patches are filtered to `MODULE.bazel` before parsing
+  the registry module, final source materialization applies the same root-local
+  patches plus `patch_cmds`, and patched registry sources use a cache identity
+  that includes patch labels, patch bytes, `patch_strip`, and patch command
+  strings. Bazel anchors:
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java`
   for override kwargs and patch-label validation,
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java`
-  for fetching non-registry overrides before parsing `MODULE.bazel`, and
+  for fetching non-registry overrides before parsing `MODULE.bazel` and for
+  applying SVO patches to registry module discovery,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/InterimModule.java`
+  for appending SVO patch attrs to the final repo spec, and
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepoDefinitionFunction.java`
   for root-repo patch-label conversion. Validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-override-patches cargo check -p
@@ -124,9 +130,30 @@ Observed SDK result at the checkpoint:
   `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-override-root-repo cargo check -p
   slug_bzlmod`, focused cache identity tests, `cargo build -p slug`, and the
   same explicit-binary Plan 61 selector (`5 passed, 149 deselected`). Remaining
-  replay gap: patch file bytes are still read by the transitional resolver
-  rather than a dedicated DICE file key, so the true dependency edge still
-  belongs to the future RepoSpec/override-source key.
+  SVO validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-svo-patches
+  cargo check -p slug_bzlmod`, `cargo check -p slug_common`, focused parser,
+  cache, and single-file patch helper tests, `cargo build -p slug`, and the
+  explicit-binary Plan 61 selector for SVO module/source patching, patch_cmd
+  failure, archive/git patch application, and external patch-label rejection
+  (`5 passed, 149 deselected`). Remaining replay gap: local patch file bytes are
+  still read by the transitional resolver/source fetch path rather than a
+  dedicated DICE file key, so the true dependency edge still belongs to the
+  future ModuleFile/RepoSpec/override-source keys.
+  Bridge burn-down note for this checkpoint: the production bridge surface
+  reduced is marker-trusted registry source materialization for patched
+  registry modules. Before this slice, registry source cache identity was only
+  `registry/modules/<name>/<version>/source`, so enabling
+  `single_version_override(patches = ..., patch_cmds = ...)` would have let
+  patched and unpatched trees share one completion marker. After this slice,
+  `ModuleCache::source_dir_with_identity` and
+  `SourceFetcher::fetch_source_with_identity` materialize patched registry
+  sources under a patch-effect-specific source directory whose identity includes
+  patch labels, patch bytes, `patch_strip`, and `patch_cmds`. The intended final
+  owner is still a DICE-owned `ModuleSourceKey`/`RepoSpecKey` feeding
+  `RepositoryExecutionKey`; this checkpoint protects that deletion path but
+  does not remove the remaining direct patch-file reads. The next slice must
+  reduce that direct-read bridge, not add another directive-only hardening
+  layer.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -391,24 +418,22 @@ Observed SDK result at the checkpoint:
   multiple_version_override_registry_source_json_utf8_failure or
   multiple_version_override_registry_source_json_creation'` (`4 passed, 131
   deselected`).
-  Override patch support remains incomplete: Bazel validates main-repo patch
-  labels, applies `single_version_override` patches to the discovered
-  `MODULE.bazel`, and appends the same patches to the final repo spec;
-  non-registry `archive_override`/`git_override` patches also affect repository
-  materialization. Slug now supports root-main-repo `archive_override` and
-  `git_override` patches, including explicit root `repo_name` labels such as
-  `@root_repo//:fix.patch`, and still fails loudly when
-  `single_version_override(patch_cmds = ...)` or standalone nonzero
-  `patch_strip` would otherwise affect the final repo spec, instead of silently
-  ignoring part of Bazel's behavior. Bazel source anchors:
+  Override patch support now covers Bazel's main-repo patch-label rule,
+  `single_version_override` registry `MODULE.bazel` discovery patches, SVO final
+  source materialization patches and `patch_cmds`, and non-registry
+  `archive_override`/`git_override` patch materialization. Slug supports
+  explicit root `repo_name` labels such as `@root_repo//:fix.patch` and keeps
+  patched registry module sources in a patch-identity-specific cache directory
+  so patched and unpatched sources cannot share the same materialized tree.
+  Bazel source anchors:
   `ModuleFileGlobals.java:522-545` and `:930-995`,
   `ModuleFileFunction.java:823-840`,
   `InterimModule.java:252-269`, and
   `ModuleFileFunctionTest.java:1717-1780` plus `:1803-1928`. Focused Plan 61
   guardrails now cover `archive_override` and `git_override` patch application,
-  `single_version_override` patch rejection, the external-repository
-  patch-label error, and `single_version_override` patch command/strip
-  rejection. Earlier validation passed with
+  `single_version_override` module/source patch application,
+  `single_version_override` patch command failure, and the external-repository
+  patch-label error. Earlier validation passed with
   `cargo test -p slug_bzlmod patches -- --nocapture` (`4 passed`),
   `cargo test -p slug_bzlmod single_version_override_patch -- --nocapture`
   (`2 passed`), and explicit-binary Plan 61 pytest selector
@@ -430,8 +455,19 @@ Observed SDK result at the checkpoint:
   single_version_override_patches_fail_until_supported or
   single_version_override_patch_cmds_and_strip_fail_until_supported'`
   (`5 passed, 149 deselected`).
-  Full support still needs DICE-tracked patch-file inputs plus repository
-  materialization patch identity.
+  Current SVO patch validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-svo-patches cargo check -p
+  slug_bzlmod`, `cargo check -p slug_common`, focused parser, cache, and
+  single-file patch helper tests, `cargo build -p slug`, and explicit-binary
+  Plan 61 selector
+  `-k 'single_version_override_patches_apply_to_module_and_source or
+  single_version_override_patch_cmd_failure_is_reported or
+  archive_override_patches_apply_to_fetched_module or
+  git_override_patches_apply_to_fetched_module or
+  override_patches_external_repo_labels_follow_bazel_main_repo_rule'`
+  (`5 passed, 149 deselected`). Full replay support still needs DICE-tracked
+  patch-file inputs for discovery and materialization instead of direct local
+  patch reads in the transitional resolver/source fetch path.
   Bazel module-name validation now runs while parsing `module(name = ...)`,
   `bazel_dep(name = ...)`, and every override directive's `module_name`,
   instead of only in later command-line yanked-version parsing. Bazel source
@@ -3526,6 +3562,41 @@ using Rust DICE keys and values:
   - visible and hidden lockfile read/parse results, digest identity, error/off/
     update semantics, selected yanked versions, extension cache entries, facts,
     and write intent. Ordinary build/query paths stay read-only.
+
+## Bridge Burn-Down Operating Rule
+
+Plan 61 is large enough that useful cleanup can look like progress while leaving
+the structural bridge intact. Each implementation slice should identify the
+specific remaining bridge surface it reduces and the target DICE/Skyframe-shaped
+value that should own the behavior instead.
+
+Before editing, state which production surface will be removed, made test-only,
+replaced with a named DICE key, or made impossible to reach. Examples include
+`BzlmodProjectionBridgeDiceKey`, `BzlmodProjectionData`, legacy-produced cell
+graph injection, scanner fallback, process-global alias/cell state, direct
+filesystem polling, or marker-trust materialization. Pair that with the intended
+owner from the target shape above, such as `ModuleSourceKey`,
+`BzlmodResolutionKey`, `RepoMappingKey`, `ModuleExtensionReplayInputKey`,
+`RepoSpecKey`, `RepositoryExecutionKey`, `RepoMaterializationManifestKey`,
+`BzlmodCellGraphKey`, or lockfile policy keys.
+
+Cleanups, directive-parity fixes, API hiding, and additional guardrails are valid
+when they directly enable or protect one of those structural deletions. Their
+plan note or commit message should say which fallback or bridge use-site is now
+gone, test-only, or unreachable. If two consecutive verified slices do not
+shrink a bridge surface, stop normal slicing and re-plan from `## Remaining Work`
+before continuing.
+
+Useful before/after checks include targeted searches such as:
+
+```sh
+rg -n "BzlmodProjectionBridgeDiceKey|BzlmodProjectionData|process-global|fallback scanner|std::fs|marker trust" \
+  app/slug_common app/slug_bzlmod app/slug_core app/slug_external_cells app/slug_analysis
+```
+
+The search does not have to reach zero, and not every hit is a bug. It is a
+forcing function to keep the plan reducing legacy ownership rather than only
+hardening behavior around it.
 
 ## Remaining Work
 

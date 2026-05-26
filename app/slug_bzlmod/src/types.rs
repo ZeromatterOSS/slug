@@ -197,6 +197,9 @@ pub struct SingleVersionOverride {
     /// Patches to apply after fetching.
     pub patches: Vec<String>,
 
+    /// Shell commands to run after patches are applied during final repository materialization.
+    pub patch_cmds: Vec<String>,
+
     /// Number of leading path components to strip from patch paths.
     pub patch_strip: u32,
 }

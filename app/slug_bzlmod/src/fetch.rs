@@ -166,6 +166,128 @@ fn patch_file_path(path: &str, strip: u32) -> Option<String> {
     Some(components.collect::<Vec<_>>().join("/"))
 }
 
+struct TempPatchDir {
+    path: PathBuf,
+}
+
+impl TempPatchDir {
+    fn new() -> slug_error::Result<Self> {
+        let base = std::env::temp_dir();
+        for attempt in 0..100_u32 {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or_default();
+            let path = base.join(format!(
+                "slug-svo-module-patch-{}-{}-{}",
+                std::process::id(),
+                nanos,
+                attempt
+            ));
+            match std::fs::create_dir(&path) {
+                Ok(()) => return Ok(Self { path }),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(e) => {
+                    return Err(FetchError::PatchFailed {
+                        patch: format!("failed to create temporary patch directory: {}", e),
+                    }
+                    .into());
+                }
+            }
+        }
+        Err(FetchError::PatchFailed {
+            patch: "failed to create unique temporary patch directory".to_owned(),
+        }
+        .into())
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempPatchDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+fn filter_patch_content_for_single_file(
+    patch_content: &[u8],
+    strip: u32,
+    single_file: &str,
+) -> slug_error::Result<Vec<u8>> {
+    let patch = std::str::from_utf8(patch_content).map_err(|e| FetchError::PatchFailed {
+        patch: format!("override patch is not valid UTF-8: {}", e),
+    })?;
+    let mut filtered = String::new();
+    let mut section = Vec::<&str>::new();
+    let mut section_is_git_diff = false;
+
+    for line in patch.lines() {
+        if line.starts_with("diff --git ") {
+            append_single_file_patch_section(&section, strip, single_file, &mut filtered);
+            section.clear();
+            section_is_git_diff = true;
+        } else if line.starts_with("--- ") && !section.is_empty() && !section_is_git_diff {
+            append_single_file_patch_section(&section, strip, single_file, &mut filtered);
+            section.clear();
+        }
+
+        section.push(line);
+        if section.len() == 1 && !line.starts_with("diff --git ") {
+            section_is_git_diff = false;
+        }
+    }
+    append_single_file_patch_section(&section, strip, single_file, &mut filtered);
+
+    Ok(filtered.into_bytes())
+}
+
+fn append_single_file_patch_section(
+    section: &[&str],
+    strip: u32,
+    single_file: &str,
+    filtered: &mut String,
+) {
+    if !patch_section_targets_single_file(section, strip, single_file) {
+        return;
+    }
+    for line in section {
+        filtered.push_str(line);
+        filtered.push('\n');
+    }
+}
+
+fn patch_section_targets_single_file(section: &[&str], strip: u32, single_file: &str) -> bool {
+    let mut old_path = None;
+    let mut new_path = None;
+
+    for line in section {
+        if let Some(path) = line.strip_prefix("--- ") {
+            old_path = patch_file_path(path, strip);
+        } else if let Some(path) = line.strip_prefix("+++ ") {
+            new_path = patch_file_path(path, strip);
+        } else if let Some(rest) = line.strip_prefix("diff --git ") {
+            let mut parts = rest.split_whitespace();
+            old_path.get_or_insert_with(|| {
+                parts
+                    .next()
+                    .and_then(|path| patch_file_path(path, strip))
+                    .unwrap_or_default()
+            });
+            new_path.get_or_insert_with(|| {
+                parts
+                    .next()
+                    .and_then(|path| patch_file_path(path, strip))
+                    .unwrap_or_default()
+            });
+        }
+    }
+
+    old_path.as_deref() == Some(single_file) && new_path.as_deref() == Some(single_file)
+}
+
 /// Errors that can occur during source fetching.
 #[derive(Debug, slug_error::Error)]
 #[slug(tag = Input)]
@@ -332,6 +454,123 @@ impl SourceFetcher {
         Ok(Some(hex::encode(hasher.finalize())))
     }
 
+    /// Fingerprint root-local override patch inputs plus patch commands for
+    /// repository materialization cache identity.
+    pub fn local_override_patch_effect_digest(
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
+        patches: &[String],
+        patch_strip: u32,
+        patch_cmds: &[String],
+    ) -> slug_error::Result<Option<String>> {
+        if patches.is_empty() && patch_cmds.is_empty() && patch_strip == 0 {
+            return Ok(None);
+        }
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"slug-local-override-patch-effect-v1");
+        hasher.update((patches.len() as u64).to_le_bytes());
+        hasher.update(patch_strip.to_le_bytes());
+        for patch_label in patches {
+            let patch_path =
+                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
+            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
+                format!(
+                    "Failed to read override patch '{}' at {}",
+                    patch_label,
+                    patch_path.display()
+                )
+            })?;
+            hasher.update((patch_label.len() as u64).to_le_bytes());
+            hasher.update(patch_label.as_bytes());
+            hasher.update((patch_content.len() as u64).to_le_bytes());
+            hasher.update(&patch_content);
+        }
+        hasher.update((patch_cmds.len() as u64).to_le_bytes());
+        for cmd in patch_cmds {
+            hasher.update((cmd.len() as u64).to_le_bytes());
+            hasher.update(cmd.as_bytes());
+        }
+        Ok(Some(hex::encode(hasher.finalize())))
+    }
+
+    /// Apply root-local `single_version_override` patches to the registry
+    /// `MODULE.bazel` contents only, matching Bazel's discovery-time behavior.
+    pub fn apply_single_version_module_patches(
+        module_content: &str,
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
+        patches: &[String],
+        patch_strip: u32,
+    ) -> slug_error::Result<String> {
+        if patches.is_empty() {
+            return Ok(module_content.to_owned());
+        }
+
+        let temp = TempPatchDir::new()?;
+        let module_path = temp.path().join("MODULE.bazel");
+        std::fs::write(&module_path, module_content)
+            .buck_error_context("Failed to write temporary MODULE.bazel for override patches")?;
+
+        for patch_label in patches {
+            let patch_path =
+                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
+            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
+                format!(
+                    "Failed to read override patch '{}' at {}",
+                    patch_label,
+                    patch_path.display()
+                )
+            })?;
+            let module_patch =
+                filter_patch_content_for_single_file(&patch_content, patch_strip, "MODULE.bazel")?;
+            if module_patch.is_empty() {
+                continue;
+            }
+            Self::apply_patch_content(temp.path(), patch_label, patch_strip, &module_patch)?;
+        }
+
+        std::fs::read_to_string(&module_path)
+            .buck_error_context("Failed to read patched temporary MODULE.bazel")
+    }
+
+    /// Run root-local override patch commands after source patching.
+    pub fn apply_local_override_patch_cmds(
+        dest_dir: &Path,
+        module_name: &str,
+        patch_cmds: &[String],
+    ) -> slug_error::Result<()> {
+        for cmd_str in patch_cmds {
+            let shell = if cfg!(windows) { "cmd" } else { "sh" };
+            let flag = if cfg!(windows) { "/c" } else { "-c" };
+            let output = Command::new(shell)
+                .arg(flag)
+                .arg(cmd_str)
+                .current_dir(dest_dir)
+                .output()
+                .map_err(|e| FetchError::PatchFailed {
+                    patch: format!(
+                        "failed to run patch_cmd '{}' for '{}': {}",
+                        cmd_str, module_name, e
+                    ),
+                })?;
+
+            if !output.status.success() {
+                return Err(FetchError::PatchFailed {
+                    patch: format!(
+                        "patch_cmd '{}' for '{}' failed: {}{}",
+                        cmd_str,
+                        module_name,
+                        String::from_utf8_lossy(&output.stderr),
+                        String::from_utf8_lossy(&output.stdout)
+                    ),
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+
     /// Fetch and extract source for a module.
     ///
     /// Returns the path to the extracted source directory.
@@ -342,13 +581,37 @@ impl SourceFetcher {
         version: &str,
         source_info: &SourceInfo,
     ) -> slug_error::Result<PathBuf> {
+        self.fetch_source_with_identity(registry_url, name, version, source_info, None)
+            .await
+    }
+
+    /// Fetch and extract source for a module with additional materialization
+    /// identity, such as root override patches.
+    pub async fn fetch_source_with_identity(
+        &self,
+        registry_url: &str,
+        name: &str,
+        version: &str,
+        source_info: &SourceInfo,
+        source_identity: Option<&str>,
+    ) -> slug_error::Result<PathBuf> {
         // Check if already fetched
-        if self.cache.is_source_complete(registry_url, name, version) {
+        if self
+            .cache
+            .is_source_complete_with_identity(registry_url, name, version, source_identity)
+        {
             tracing::debug!("Using cached source for {}@{}", name, version);
-            return Ok(self.cache.source_dir(registry_url, name, version));
+            return Ok(self.cache.source_dir_with_identity(
+                registry_url,
+                name,
+                version,
+                source_identity,
+            ));
         }
 
-        let dest_dir = self.cache.source_dir(registry_url, name, version);
+        let dest_dir =
+            self.cache
+                .source_dir_with_identity(registry_url, name, version, source_identity);
         if dest_dir.exists() {
             tracing::debug!(
                 "Removing incomplete cached source for {}@{} at {:?}",
@@ -366,7 +629,12 @@ impl SourceFetcher {
             })?;
         }
 
-        let dest_dir = self.cache.create_source_dir(registry_url, name, version)?;
+        let dest_dir = self.cache.create_source_dir_with_identity(
+            registry_url,
+            name,
+            version,
+            source_identity,
+        )?;
 
         if source_info.is_git() {
             self.fetch_git(source_info, &dest_dir).await?;
@@ -388,8 +656,12 @@ impl SourceFetcher {
         }
 
         // Mark as complete
-        self.cache
-            .mark_source_complete(registry_url, name, version)?;
+        self.cache.mark_source_complete_with_identity(
+            registry_url,
+            name,
+            version,
+            source_identity,
+        )?;
 
         Ok(dest_dir)
     }
@@ -1335,5 +1607,41 @@ mod tests {
         let content = std::fs::read_to_string(file).unwrap().replace("\r\n", "\n");
         assert!(content.contains("version = \"7.1.0\""));
         assert!(content.contains("protobuf\", version = \"29.1\""));
+    }
+
+    #[test]
+    fn single_version_module_patch_skips_non_module_hunks() {
+        let temp_dir = TempDir::new().unwrap();
+        let patch = temp_dir.path().join("fix.patch");
+        std::fs::write(
+            &patch,
+            concat!(
+                "diff --git a/MODULE.bazel b/MODULE.bazel\n",
+                "--- a/MODULE.bazel\n",
+                "+++ b/MODULE.bazel\n",
+                "@@ -1 +1,2 @@\n",
+                " module(name = \"dep\", version = \"1.0.0\")\n",
+                "+bazel_dep(name = \"extra\", version = \"1.0.0\")\n",
+                "diff --git a/BUILD.bazel b/BUILD.bazel\n",
+                "--- a/BUILD.bazel\n",
+                "+++ b/BUILD.bazel\n",
+                "@@ -1 +1,2 @@\n",
+                " filegroup(name = \"ok\", srcs = [])\n",
+                "+filegroup(name = \"patched\", srcs = [])\n",
+            ),
+        )
+        .unwrap();
+
+        let patched = SourceFetcher::apply_single_version_module_patches(
+            "module(name = \"dep\", version = \"1.0.0\")\n",
+            temp_dir.path(),
+            None,
+            &["//:fix.patch".to_owned()],
+            1,
+        )
+        .unwrap();
+
+        assert!(patched.contains("bazel_dep(name = \"extra\""));
+        assert!(!patched.contains("filegroup"));
     }
 }

@@ -1114,26 +1114,32 @@ multiple_version_override(
     }
 
     #[test]
-    fn test_parse_single_version_override_with_patches_errors() {
+    fn test_parse_single_version_override_with_patches() {
         let content = r#"
 module(name = "test", version = "1.0.0")
 bazel_dep(name = "rules_rust", version = "1.0.0")
 single_version_override(
     module_name = "rules_rust",
     patches = ["//:fix.patch"],
+    patch_cmds = ["echo patched"],
+    patch_strip = 1,
 )
 "#;
 
-        let err = parse_module_bazel_content(content, "MODULE.bazel")
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("single_version_override(patches = ...)"));
-        assert!(err.contains("MODULE.bazel discovery"));
-        assert!(err.contains("repository materialization"));
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        match &parsed.module.overrides[0] {
+            crate::types::Override::SingleVersion(o) => {
+                assert_eq!(o.module_name, "rules_rust");
+                assert_eq!(o.patches, ["//:fix.patch"]);
+                assert_eq!(o.patch_cmds, ["echo patched"]);
+                assert_eq!(o.patch_strip, 1);
+            }
+            _ => panic!("Expected SingleVersion override"),
+        }
     }
 
     #[test]
-    fn test_parse_non_registry_override_with_patches_errors() {
+    fn test_parse_non_registry_override_with_patches() {
         let archive = r#"
 module(name = "test", version = "1.0.0")
 archive_override(
@@ -1143,10 +1149,14 @@ archive_override(
 )
 "#;
 
-        let err = parse_module_bazel_content(archive, "MODULE.bazel")
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("archive_override(patches = ...)"));
+        let parsed = parse_module_bazel_content(archive, "MODULE.bazel").unwrap();
+        match &parsed.module.overrides[0] {
+            crate::types::Override::Archive(o) => {
+                assert_eq!(o.module_name, "dep");
+                assert_eq!(o.patches, ["//:fix.patch"]);
+            }
+            _ => panic!("Expected Archive override"),
+        }
 
         let git = r#"
 module(name = "test", version = "1.0.0")
@@ -1158,10 +1168,14 @@ git_override(
 )
 "#;
 
-        let err = parse_module_bazel_content(git, "MODULE.bazel")
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("git_override(patches = ...)"));
+        let parsed = parse_module_bazel_content(git, "MODULE.bazel").unwrap();
+        match &parsed.module.overrides[0] {
+            crate::types::Override::Git(o) => {
+                assert_eq!(o.module_name, "dep");
+                assert_eq!(o.patches, ["//:fix.patch"]);
+            }
+            _ => panic!("Expected Git override"),
+        }
     }
 
     #[test]
@@ -1219,15 +1233,17 @@ single_version_override(
 )
 "#;
 
-        let err = parse_module_bazel_content(content, "MODULE.bazel")
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("single_version_override(patches = ...)"));
-        assert!(!err.contains("only patches in the main repository can be applied"));
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        match &parsed.module.overrides[0] {
+            crate::types::Override::SingleVersion(o) => {
+                assert_eq!(o.patches, ["@root_repo//:fix.patch"]);
+            }
+            _ => panic!("Expected SingleVersion override"),
+        }
     }
 
     #[test]
-    fn test_parse_single_version_override_patch_cmds_errors() {
+    fn test_parse_single_version_override_patch_cmds() {
         let content = r#"
 module(name = "test", version = "1.0.0")
 single_version_override(
@@ -1236,15 +1252,17 @@ single_version_override(
 )
 "#;
 
-        let err = parse_module_bazel_content(content, "MODULE.bazel")
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("single_version_override(patch_cmds = ...)"));
-        assert!(err.contains("final repo spec"));
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        match &parsed.module.overrides[0] {
+            crate::types::Override::SingleVersion(o) => {
+                assert_eq!(o.patch_cmds, ["echo patched"]);
+            }
+            _ => panic!("Expected SingleVersion override"),
+        }
     }
 
     #[test]
-    fn test_parse_single_version_override_patch_strip_errors() {
+    fn test_parse_single_version_override_patch_strip() {
         let content = r#"
 module(name = "test", version = "1.0.0")
 single_version_override(
@@ -1253,12 +1271,13 @@ single_version_override(
 )
 "#;
 
-        let err = parse_module_bazel_content(content, "MODULE.bazel")
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("single_version_override(patch_strip = ...)"));
-        assert!(err.contains("patch_args"));
-        assert!(err.contains("final repo spec"));
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        match &parsed.module.overrides[0] {
+            crate::types::Override::SingleVersion(o) => {
+                assert_eq!(o.patch_strip, 1);
+            }
+            _ => panic!("Expected SingleVersion override"),
+        }
     }
 
     #[test]

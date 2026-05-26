@@ -5169,72 +5169,202 @@ ext = module_extension(implementation = _ext_impl)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_single_version_override_patches_fail_until_supported(
+async def test_single_version_override_patches_apply_to_module_and_source(
     buck: Buck,
 ) -> None:
     """Bazel anchor: SVO patches affect both MODULE.bazel and final RepoSpec."""
+    cache_home = buck.cwd / "cache_home"
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    registry_cache.mkdir(parents=True)
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+
+    module_name = "svo_patch_lib"
+    module_version = "1.0.0"
+    module_cache = (
+        registry_cache / "modules" / module_name / module_version
+    )
+    module_cache.mkdir(parents=True)
     _write(
-        buck.cwd / "MODULE.bazel",
-        """module(name = "plan61_svo_patches_unsupported")
-bazel_dep(name = "dep", version = "1.0.0")
-single_version_override(
-    module_name = "dep",
-    patches = ["//:fix.patch"],
-)
+        module_cache / "MODULE.bazel",
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    source_archive = buck.cwd / "svo_patch_lib.zip"
+    _write_zip(
+        source_archive,
+        {
+            "MODULE.bazel": f'module(name = "{module_name}", version = "{module_version}")\n',
+            "BUILD.bazel": """filegroup(name = "ok", srcs = [])
+filegroup(name = "cmd", srcs = ["cmd.txt"])
+""",
+        },
+    )
+    _write(module_cache / "source.json", json.dumps({"url": source_archive.as_uri()}) + "\n")
+
+    patched_dep = _write_cached_registry_module(
+        cache_home,
+        "bcr.bazel.build",
+        "patched_dep",
+        "1.0.0",
+        'module(name = "patched_dep", version = "1.0.0")\n',
+    )
+    _write(
+        buck.cwd / "fix.patch",
+        f"""diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -1 +1,2 @@
+ module(name = "{module_name}", version = "{module_version}")
++bazel_dep(name = "patched_dep", version = "1.0.0")
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1,2 +1,3 @@
+ filegroup(name = "ok", srcs = [])
+ filegroup(name = "cmd", srcs = ["cmd.txt"])
++filegroup(name = "patched", srcs = [])
 """,
     )
-    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
-    _write(buck.cwd / "fix.patch", "")
-
-    with pytest.raises(BuckException) as exc:
-        await buck.build("//:x")
-
-    assert "single_version_override(patches = ...)" in str(exc.value)
-    assert "MODULE.bazel discovery" in str(exc.value)
-    assert "repository materialization" in str(exc.value)
-
-
-@buck_test(data_dir="test_plan61_guardrails_data")
-async def test_single_version_override_patch_cmds_and_strip_fail_until_supported(
-    buck: Buck,
-) -> None:
-    """Bazel anchor: SVO patch_cmds/patch_strip are final RepoSpec attrs."""
-    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
-
     _write(
         buck.cwd / "MODULE.bazel",
-        """module(name = "plan61_svo_patch_cmds_unsupported")
-bazel_dep(name = "dep", version = "1.0.0")
+        f"""module(name = "plan61_svo_patches_supported", repo_name = "root_repo")
+bazel_dep(name = "{module_name}", version = "{module_version}")
 single_version_override(
-    module_name = "dep",
-    patch_cmds = ["echo patched"],
-)
-""",
-    )
-
-    with pytest.raises(BuckException) as exc:
-        await buck.build("//:x")
-
-    assert "single_version_override(patch_cmds = ...)" in str(exc.value)
-    assert "final repo spec" in str(exc.value)
-
-    _write(
-        buck.cwd / "MODULE.bazel",
-        """module(name = "plan61_svo_patch_strip_unsupported")
-bazel_dep(name = "dep", version = "1.0.0")
-single_version_override(
-    module_name = "dep",
+    module_name = "{module_name}",
+    patches = ["@root_repo//:fix.patch"],
+    patch_cmds = ["printf cmd-output > cmd.txt"],
     patch_strip = 1,
 )
 """,
     )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        f"""filegroup(
+    name = "uses_svo_patched_module",
+    srcs = [
+        "@{module_name}//:patched",
+        "@{module_name}//:cmd",
+        "@patched_dep//:ok",
+    ],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                        registry_cache / "bazel_registry.json"
+                    ),
+                    f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel": _sha256(
+                        module_cache / "MODULE.bazel"
+                    ),
+                    f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json": _sha256(
+                        module_cache / "source.json"
+                    ),
+                    "https://bcr.bazel.build/modules/patched_dep/1.0.0/MODULE.bazel": _sha256(
+                        patched_dep / "MODULE.bazel"
+                    ),
+                    "https://bcr.bazel.build/modules/patched_dep/1.0.0/source.json": _sha256(
+                        patched_dep / "source.json"
+                    ),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    await buck.build(
+        "//:uses_svo_patched_module",
+        env={"XDG_CACHE_HOME": str(cache_home)},
+    )
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_single_version_override_patch_cmd_failure_is_reported(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: final RepoSpec patch_cmds failures fail repository materialization."""
+    cache_home = buck.cwd / "cache_home"
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    registry_cache.mkdir(parents=True)
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+
+    module_name = "svo_patch_cmd_fail_lib"
+    module_version = "1.0.0"
+    module_cache = registry_cache / "modules" / module_name / module_version
+    module_cache.mkdir(parents=True)
+    _write(
+        module_cache / "MODULE.bazel",
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    source_archive = buck.cwd / "svo_patch_cmd_fail_lib.zip"
+    _write_zip(
+        source_archive,
+        {
+            "MODULE.bazel": f'module(name = "{module_name}", version = "{module_version}")\n',
+            "BUILD.bazel": 'filegroup(name = "ok", srcs = [])\n',
+        },
+    )
+    _write(module_cache / "source.json", json.dumps({"url": source_archive.as_uri()}) + "\n")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_svo_patch_cmd_failure")
+bazel_dep(name = "{module_name}", version = "{module_version}")
+single_version_override(
+    module_name = "{module_name}",
+    patch_cmds = ["exit 7"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        f"""filegroup(
+    name = "uses_svo_patch_cmd_failure",
+    srcs = ["@{module_name}//:ok"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                        registry_cache / "bazel_registry.json"
+                    ),
+                    f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel": _sha256(
+                        module_cache / "MODULE.bazel"
+                    ),
+                    f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json": _sha256(
+                        module_cache / "source.json"
+                    ),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
 
     with pytest.raises(BuckException) as exc:
-        await buck.build("//:x")
+        await buck.build(
+            "//:uses_svo_patch_cmd_failure",
+            env={"XDG_CACHE_HOME": str(cache_home)},
+        )
 
-    assert "single_version_override(patch_strip = ...)" in str(exc.value)
-    assert "patch_args" in str(exc.value)
-    assert "final repo spec" in str(exc.value)
+    assert "patch_cmd" in str(exc.value)
+    assert "exit 7" in str(exc.value)
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

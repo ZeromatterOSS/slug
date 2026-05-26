@@ -3592,7 +3592,15 @@ impl BuckConfigBasedCells {
             // module resolution; registry/source access errors are direct
             // resolution failures, not warnings followed by a broken cell graph.
             resolver
-                .fetch_sources(&mut resolved_graph)
+                .fetch_sources(
+                    &mut resolved_graph,
+                    workspace_root,
+                    parsed
+                        .module
+                        .repo_name
+                        .as_deref()
+                        .or(Some(parsed.module.name.as_str())),
+                )
                 .await
                 .with_buck_error_context(|| {
                     format!(

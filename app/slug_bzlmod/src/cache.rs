@@ -127,6 +127,23 @@ impl ModuleCache {
         self.module_dir(registry_url, name, version).join("source")
     }
 
+    /// Get the path for an extracted source directory with extra repository
+    /// materialization identity, such as root override patches.
+    pub fn source_dir_with_identity(
+        &self,
+        registry_url: &str,
+        name: &str,
+        version: &str,
+        source_identity: Option<&str>,
+    ) -> PathBuf {
+        match source_identity {
+            Some(identity) => self
+                .module_dir(registry_url, name, version)
+                .join(format!("source-{}", download_safe_name(identity))),
+            None => self.source_dir(registry_url, name, version),
+        }
+    }
+
     /// Get the path for a downloaded file by its integrity hash.
     pub fn download_path(&self, integrity: &str) -> PathBuf {
         self.base_dir
@@ -330,7 +347,18 @@ impl ModuleCache {
         name: &str,
         version: &str,
     ) -> slug_error::Result<PathBuf> {
-        let path = self.source_dir(registry_url, name, version);
+        self.create_source_dir_with_identity(registry_url, name, version, None)
+    }
+
+    /// Create the source directory for an optional source identity and return its path.
+    pub fn create_source_dir_with_identity(
+        &self,
+        registry_url: &str,
+        name: &str,
+        version: &str,
+        source_identity: Option<&str>,
+    ) -> slug_error::Result<PathBuf> {
+        let path = self.source_dir_with_identity(registry_url, name, version, source_identity);
         std::fs::create_dir_all(&path).map_err(|_| CacheError::CreateDirFailed {
             path: path.display().to_string(),
         })?;
@@ -344,8 +372,19 @@ impl ModuleCache {
         name: &str,
         version: &str,
     ) -> slug_error::Result<()> {
+        self.mark_source_complete_with_identity(registry_url, name, version, None)
+    }
+
+    /// Mark a source extraction with optional extra identity as complete.
+    pub fn mark_source_complete_with_identity(
+        &self,
+        registry_url: &str,
+        name: &str,
+        version: &str,
+        source_identity: Option<&str>,
+    ) -> slug_error::Result<()> {
         let marker = self
-            .source_dir(registry_url, name, version)
+            .source_dir_with_identity(registry_url, name, version, source_identity)
             .join(".complete");
         std::fs::write(&marker, "").buck_error_context("Failed to write completion marker")?;
         Ok(())
@@ -353,7 +392,18 @@ impl ModuleCache {
 
     /// Check if source extraction is complete.
     pub fn is_source_complete(&self, registry_url: &str, name: &str, version: &str) -> bool {
-        self.source_dir(registry_url, name, version)
+        self.is_source_complete_with_identity(registry_url, name, version, None)
+    }
+
+    /// Check if source extraction with optional extra identity is complete.
+    pub fn is_source_complete_with_identity(
+        &self,
+        registry_url: &str,
+        name: &str,
+        version: &str,
+        source_identity: Option<&str>,
+    ) -> bool {
+        self.source_dir_with_identity(registry_url, name, version, source_identity)
             .join(".complete")
             .exists()
     }

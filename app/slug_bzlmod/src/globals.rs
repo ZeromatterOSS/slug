@@ -80,37 +80,6 @@ fn validate_override_patches(
         .collect())
 }
 
-fn reject_unsupported_single_version_patches(patches: &[String]) -> starlark::Result<()> {
-    if patches.is_empty() {
-        return Ok(());
-    }
-    Err(starlark::Error::new_other(anyhow::anyhow!(
-        "single_version_override(patches = ...) is not yet supported by Slug; Bazel applies override patches during MODULE.bazel discovery and repository materialization"
-    )))
-}
-
-fn reject_unsupported_single_version_patch_cmds(
-    patch_cmds: &UnpackList<&str>,
-) -> starlark::Result<()> {
-    if patch_cmds.items.is_empty() {
-        return Ok(());
-    }
-
-    Err(starlark::Error::new_other(anyhow::anyhow!(
-        "single_version_override(patch_cmds = ...) is not yet supported by Slug; Bazel appends patch_cmds to the final repo spec"
-    )))
-}
-
-fn reject_unsupported_single_version_patch_strip(patch_strip: i32) -> starlark::Result<()> {
-    if patch_strip == 0 {
-        return Ok(());
-    }
-
-    Err(starlark::Error::new_other(anyhow::anyhow!(
-        "single_version_override(patch_strip = ...) is not yet supported by Slug; Bazel appends patch_args to the final repo spec"
-    )))
-}
-
 fn validate_override_patch_label(
     module: Option<&ModuleDecl>,
     raw_label: &str,
@@ -836,9 +805,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                 .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
         let patches = validate_override_patches(ctx.module.as_ref(), &patches)?;
-        reject_unsupported_single_version_patches(&patches)?;
-        reject_unsupported_single_version_patch_cmds(&patch_cmds)?;
-        reject_unsupported_single_version_patch_strip(patch_strip)?;
+        let patch_cmds = patch_cmds.items.iter().map(|cmd| cmd.to_string()).collect();
 
         ctx.overrides
             .push(Override::SingleVersion(SingleVersionOverride {
@@ -850,7 +817,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                     Some(registry.to_owned())
                 },
                 patches,
-                patch_strip: 0,
+                patch_cmds,
+                patch_strip: patch_strip as u32,
             }));
 
         Ok(NoneType)

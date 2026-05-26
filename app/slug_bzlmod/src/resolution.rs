@@ -570,6 +570,7 @@ impl MvsResolver {
     ) -> slug_error::Result<()> {
         let mut queue: VecDeque<(BazelDep, Option<PathBuf>)> = VecDeque::new();
         let mut visited: HashSet<ModuleKey> = HashSet::new();
+        let main_repo_name = root.repo_name.as_deref().unwrap_or(&root.name);
 
         // Process overrides first
         self.process_overrides(&root.overrides);
@@ -659,7 +660,9 @@ impl MvsResolver {
             }
 
             // Fetch module from registry
-            let discovered = self.fetch_and_discover_module(&dep).await?;
+            let discovered = self
+                .fetch_and_discover_module(&dep, workspace_root, Some(main_repo_name))
+                .await?;
 
             // Add transitive dependencies to queue
             for transitive_dep in &discovered.module.bazel_deps {
@@ -695,6 +698,8 @@ impl MvsResolver {
     async fn fetch_and_discover_module(
         &mut self,
         dep: &BazelDep,
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
     ) -> slug_error::Result<DiscoveredModule> {
         let version_str = dep.version.as_str();
         let key = ModuleKey::from_dep(dep);
@@ -730,9 +735,28 @@ impl MvsResolver {
             module_bazel_file.hash.clone(),
         );
 
+        let module_bazel_content =
+            if let Some(override_) = self.single_version_overrides.get(&dep.name) {
+                crate::fetch::SourceFetcher::apply_single_version_module_patches(
+                    &module_bazel_file.content,
+                    workspace_root,
+                    main_repo_name,
+                    &override_.patches,
+                    override_.patch_strip,
+                )
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to apply single_version_override patches for {}@{}",
+                        dep.name, version_str
+                    )
+                })?
+            } else {
+                module_bazel_file.content.clone()
+            };
+
         // Parse MODULE.bazel
         let filename = format!("{}@{}/MODULE.bazel", dep.name, version_str);
-        let parsed = parse_non_root_module_bazel_content(&module_bazel_file.content, &filename)
+        let parsed = parse_non_root_module_bazel_content(&module_bazel_content, &filename)
             .map_err(|e| MvsResolutionError::DependencyResolutionFailed {
                 name: dep.name.clone(),
                 version: version_str.to_string(),
@@ -1359,7 +1383,12 @@ impl MvsResolver {
     /// Fetch sources for all resolved modules.
     ///
     /// This downloads and extracts sources for modules that don't have local overrides.
-    pub async fn fetch_sources(&self, graph: &mut ResolvedGraph) -> slug_error::Result<()> {
+    pub async fn fetch_sources(
+        &self,
+        graph: &mut ResolvedGraph,
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
+    ) -> slug_error::Result<()> {
         let mut first_error = None;
 
         for (name, info) in &mut graph.modules {
@@ -1386,15 +1415,87 @@ impl MvsResolver {
                             Some(&source_info_file.file.hash),
                         )?;
 
+                        let single_version_override = self.single_version_overrides.get(name);
+                        let source_identity = match single_version_override {
+                            Some(override_) => {
+                                crate::fetch::SourceFetcher::local_override_patch_effect_digest(
+                                    workspace_root,
+                                    main_repo_name,
+                                    &override_.patches,
+                                    override_.patch_strip,
+                                    &override_.patch_cmds,
+                                )?
+                            }
+                            None => None,
+                        };
+                        let source_was_complete = source_identity.as_deref().is_some_and(|identity| {
+                            self.cache.is_source_complete_with_identity(
+                                registry_client.base_url(),
+                                name,
+                                &info.version,
+                                Some(identity),
+                            )
+                        });
+
                         let source_path = self
                             .source_fetcher
-                            .fetch_source(
+                            .fetch_source_with_identity(
                                 registry_client.base_url(),
                                 name,
                                 &info.version,
                                 &source_info_file.source_info,
+                                source_identity.as_deref(),
                             )
                             .await?;
+                        if let (Some(override_), Some(identity)) =
+                            (single_version_override, source_identity.as_deref())
+                        {
+                            if !source_was_complete {
+                                let complete_marker = source_path.join(".complete");
+                                match std::fs::remove_file(&complete_marker) {
+                                    Ok(()) => {}
+                                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                                    Err(e) => {
+                                        return Err(e).with_buck_error_context(|| {
+                                            format!(
+                                                "Failed to clear completion marker for patched source {}@{}",
+                                                name, info.version
+                                            )
+                                        });
+                                    }
+                                }
+                                crate::fetch::SourceFetcher::apply_local_override_patches(
+                                    &source_path,
+                                    workspace_root,
+                                    main_repo_name,
+                                    &override_.patches,
+                                    override_.patch_strip,
+                                )
+                                .with_buck_error_context(|| {
+                                    format!(
+                                        "Failed to apply single_version_override patches to {}@{} source",
+                                        name, info.version
+                                    )
+                                })?;
+                                crate::fetch::SourceFetcher::apply_local_override_patch_cmds(
+                                    &source_path,
+                                    name,
+                                    &override_.patch_cmds,
+                                )
+                                .with_buck_error_context(|| {
+                                    format!(
+                                        "Failed to run single_version_override patch_cmds for {}@{} source",
+                                        name, info.version
+                                    )
+                                })?;
+                                self.cache.mark_source_complete_with_identity(
+                                    registry_client.base_url(),
+                                    name,
+                                    &info.version,
+                                    Some(identity),
+                                )?;
+                            }
+                        }
 
                         Ok::<_, slug_error::Error>((source_path, source_info_file.file))
                     }
