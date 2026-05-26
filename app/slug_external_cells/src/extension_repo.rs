@@ -1107,8 +1107,9 @@ mod tests {
                 workspace_id.clone(),
                 Vec::new(),
             ),
-            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
+            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
+                String::new(),
                 Arc::new(std::collections::HashMap::new()),
             ),
             slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(

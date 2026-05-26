@@ -309,7 +309,7 @@ pub trait SetBzlmodProjectionData {
             data,
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
-                root_module_name,
+                root_module_name.clone(),
                 Arc::new(HashMap::new()),
             ),
             BzlmodLockfileInputsDataValue::for_workspace(
@@ -319,8 +319,9 @@ pub trait SetBzlmodProjectionData {
             BzlmodRepoEnvDataValue::for_workspace(workspace_id.clone(), Arc::new(BTreeMap::new())),
             RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
             RegisteredExecutionPlatformsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
-            BzlmodExtensionAggregationsDataValue::for_workspace(
+            BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
+                root_module_name,
                 Arc::new(HashMap::new()),
             ),
             BzlmodResolutionFactsValue::for_workspace(
@@ -368,6 +369,24 @@ fn validate_projection_workspace(
     Ok(())
 }
 
+fn validate_projection_root_module_name(
+    field: &str,
+    cell_graph_root_module_name: &str,
+    data_root_module_name: &str,
+) -> slug_error::Result<()> {
+    if data_root_module_name != cell_graph_root_module_name {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "BzlmodProjectionData carries {} root module name '{}', \
+             but its cell graph root module name is '{}'",
+            field,
+            data_root_module_name,
+            cell_graph_root_module_name
+        ));
+    }
+    Ok(())
+}
+
 impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
     fn set_bzlmod_projection_data_with_inputs(
         &mut self,
@@ -387,6 +406,11 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
             cell_graph_workspace_id,
             &module_versions.workspace_id,
         )?;
+        validate_projection_root_module_name(
+            "module-version data",
+            &data.cell_graph.root_module_name,
+            &module_versions.root_module_name,
+        )?;
         validate_projection_workspace(
             "registered-toolchain data",
             cell_graph_workspace_id,
@@ -401,6 +425,11 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
             "extension-aggregation data",
             cell_graph_workspace_id,
             &extension_aggregations.workspace_id,
+        )?;
+        validate_projection_root_module_name(
+            "extension-aggregation data",
+            &data.cell_graph.root_module_name,
+            &extension_aggregations.root_module_name,
         )?;
         validate_projection_workspace(
             "lockfile-input data",
@@ -520,7 +549,18 @@ mod tests {
     fn empty_extension_aggregations(
         workspace_id: WorkspaceId,
     ) -> BzlmodExtensionAggregationsDataValue {
-        BzlmodExtensionAggregationsDataValue::for_workspace(workspace_id, Arc::new(HashMap::new()))
+        empty_extension_aggregations_with_root(workspace_id, "")
+    }
+
+    fn empty_extension_aggregations_with_root(
+        workspace_id: WorkspaceId,
+        root_module_name: &str,
+    ) -> BzlmodExtensionAggregationsDataValue {
+        BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+            workspace_id,
+            root_module_name.to_owned(),
+            Arc::new(HashMap::new()),
+        )
     }
 
     #[tokio::test]
@@ -572,9 +612,12 @@ mod tests {
         assert_eq!(cell_graph.cells[0].name, "root_mod");
         assert_eq!(cell_graph.root_aliases[0].apparent_name, "dep");
         let module_versions = dice
-            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id))
+            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id.clone()))
             .await??;
         assert_eq!(module_versions.invalidation.root_module_name, "root_mod");
+        let extension_aggregations = dice.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        assert_eq!(extension_aggregations.workspace_id, workspace_id);
+        assert_eq!(extension_aggregations.root_module_name, "root_mod");
 
         Ok(())
     }
@@ -889,6 +932,118 @@ mod tests {
             "{err:?}"
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_bzlmod_projection_data_rejects_mismatched_extension_root_name()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-extension-root-provenance-workspace"),
+            PathBuf::from("/tmp/slug-plan61-extension-root-provenance-output-base"),
+        );
+        let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        data.cell_graph.root_module_name = "root_mod".to_owned();
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let err = updater
+            .set_bzlmod_projection_data_with_inputs(
+                data,
+                BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                    workspace_id.clone(),
+                    "root_mod".to_owned(),
+                    Arc::new(HashMap::new()),
+                ),
+                BzlmodLockfileInputsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BzlmodLockfileInputsValue::default()),
+                ),
+                BzlmodRepoEnvDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BTreeMap::new()),
+                ),
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
+                empty_extension_aggregations_with_root(workspace_id.clone(), "stale_root"),
+                BzlmodResolutionFactsValue::for_workspace(
+                    workspace_id.clone(),
+                    indexmap::IndexMap::new(),
+                    indexmap::IndexMap::new(),
+                ),
+                BzlmodRepoMappingsDataValue::for_workspace(
+                    workspace_id,
+                    Arc::new(RepoMappingSnapshot::new()),
+                    Arc::new(RepoMappingOverrides::new()),
+                ),
+            )
+            .unwrap_err();
+
+        assert!(
+            err.to_string()
+                .contains("extension-aggregation data root module name"),
+            "{err:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_bzlmod_projection_data_rejects_mismatched_module_root_name()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-module-root-provenance-workspace"),
+            PathBuf::from("/tmp/slug-plan61-module-root-provenance-output-base"),
+        );
+        let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        data.cell_graph.root_module_name = "root_mod".to_owned();
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let err = updater
+            .set_bzlmod_projection_data_with_inputs(
+                data,
+                BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                    workspace_id.clone(),
+                    "stale_root".to_owned(),
+                    Arc::new(HashMap::new()),
+                ),
+                BzlmodLockfileInputsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BzlmodLockfileInputsValue::default()),
+                ),
+                BzlmodRepoEnvDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BTreeMap::new()),
+                ),
+                empty_registered_toolchains(workspace_id.clone()),
+                empty_registered_execution_platforms(workspace_id.clone()),
+                empty_extension_aggregations_with_root(workspace_id.clone(), "root_mod"),
+                BzlmodResolutionFactsValue::for_workspace(
+                    workspace_id.clone(),
+                    indexmap::IndexMap::new(),
+                    indexmap::IndexMap::new(),
+                ),
+                BzlmodRepoMappingsDataValue::for_workspace(
+                    workspace_id,
+                    Arc::new(RepoMappingSnapshot::new()),
+                    Arc::new(RepoMappingOverrides::new()),
+                ),
+            )
+            .unwrap_err();
+
+        assert!(
+            err.to_string()
+                .contains("module-version data root module name"),
+            "{err:?}"
+        );
         Ok(())
     }
 

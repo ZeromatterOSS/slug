@@ -2560,6 +2560,30 @@ Observed SDK result at the checkpoint:
   `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
   slug_external_cells -p slug_analysis -p slug_configured -p
   slug_interpreter_for_build`, and `git diff --check`.
+- Extension aggregation lookup no longer computes `BzlmodCellGraphKey` only to
+  borrow the root module name. The injected
+  `BzlmodExtensionAggregationsDataValue` now carries root module name alongside
+  the aggregation map, and both `BzlmodExtensionAggregationKey` and
+  `ExtensionIdByCanonicalRepoKey` derive workspace/root facts from the
+  workspace- and root-checked aggregation data. Transitional projection
+  injection now also rejects stale same-workspace root-module names for both
+  module-version data and extension-aggregation data, and extension aggregation
+  data no longer has an implicit empty-root constructor. This removes another
+  incidental cell-graph dependency while leaving extension aggregation facts
+  legacy-produced until true module-extension aggregation producers exist.
+  Focused validation passed with `cargo fmt`, `cargo test -p slug_bzlmod
+  set_bzlmod_projection_data -- --nocapture`, `cargo test -p slug_bzlmod
+  extension_aggregation -- --nocapture`, `cargo test -p slug_bzlmod
+  extension_id_for_canonical_repo_matches_owner_module -- --nocapture`, `cargo
+  test -p slug_bzlmod
+  extension_id_by_canonical_repo_key_projects_owner_extension -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  extension_bzl_digest_key_requires_executor_when_aggregation_exists --
+  --nocapture`, `cargo test -p slug_common bzlmod_projection_bridge --
+  --nocapture`, `cargo test -p slug_external_cells
+  extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
+  `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
+  slug_external_cells`, and `git diff --check`.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors

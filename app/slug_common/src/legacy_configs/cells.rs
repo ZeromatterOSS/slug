@@ -3336,8 +3336,9 @@ impl BuckConfigBasedCells {
                         key.resolution_key.workspace_id.clone(),
                         Vec::new(),
                     ),
-                    slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
+                    slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
                         key.resolution_key.workspace_id.clone(),
+                        String::new(),
                         Arc::new(HashMap::new()),
                     ),
                     slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
@@ -4447,10 +4448,12 @@ impl BuckConfigBasedCells {
         // Aggregate extension usages from all modules and carry them into the
         // DICE-injected extension aggregation value. This data is needed when
         // extension repos are lazily executed inside DICE.
-        extension_aggregations = slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace(
-            cell_graph.workspace_id.clone(),
-            Arc::new(aggregated),
-        );
+        extension_aggregations =
+            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+                cell_graph.workspace_id.clone(),
+                bzlmod_root_module_name.clone(),
+                Arc::new(aggregated),
+            );
 
         // Collect toolchain and execution platform registrations from all modules.
         // Priority order: root module first, then BFS order of dep graph.
