@@ -2604,6 +2604,20 @@ Observed SDK result at the checkpoint:
   slug_analysis metadata_ -- --nocapture` (`15 passed`), `cargo check -p
   slug_analysis`, `cargo build -p slug`, `cargo fmt --check`, and `git diff
   --check`.
+- Starlark `Label("//...")` lexical current-repo canonicalization now uses the
+  active build context's cell alias resolver declared aliases and runtime
+  snapshot instead of process-global module/dynamic canonical-name helpers.
+  Resolverless and no-runtime-snapshot resolver misses keep the lexical file
+  cell, while runtime-owned aliases still canonicalize through the owner
+  snapshot. Bridge burn-down before/after evidence: before, `rg -n
+  "canonical_bzlmod_module_cell_name\\(file_cell\\)|canonical_dynamic_extension_cell_name\\(file_cell\\)" app/slug_interpreter_for_build/src/interpreter/natives.rs`
+  found the production current-repo bridge; after it returns no hits, and `rg
+  -n
+  "lexical_current_repo_name_for_label_context\\(|label_context_current_repo_no_snapshot_miss_ignores_global_alias|label_context_current_repo_prefers_runtime_aliases_before_globals" app/slug_interpreter_for_build/src/interpreter/natives.rs`
+  shows the resolver-owned current-repo path and stale-global miss coverage.
+  Validation passed with `cargo test -p slug_interpreter_for_build
+  label_context_ -- --nocapture` (`11 passed`) and `cargo check -p
+  slug_interpreter_for_build`.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
