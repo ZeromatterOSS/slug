@@ -7558,6 +7558,67 @@ use_repo(read_watch, "read_watch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_template_label_auto_watch_reexecutes_materialized_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkRepositoryContext.createFileFromTemplate."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+template_watch_ext+template_watch_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    _write(buck.cwd / "watched.tpl", "value = first\n")
+    _write(
+        buck.cwd / "template_watch_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.template("data.txt", Label("//:watched.tpl"), substitutions = {})
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+template_watch_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _template_watch_ext_impl(module_ctx):
+    template_watch_repo_rule(name = "template_watch_repo")
+
+template_watch_ext = module_extension(
+    implementation = _template_watch_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_template_auto_watch_input")
+
+template_watch = use_extension("//:template_watch_ext.bzl", "template_watch_ext")
+use_repo(template_watch, "template_watch_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_template_watch_repo",
+    srcs = ["@template_watch_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_template_watch_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "value = first\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write(buck.cwd / "watched.tpl", "value = second\n")
+
+    await buck.build("//:uses_template_watch_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "value = second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_watch_tree_nested_edit_reexecutes_materialized_repo(
     buck: Buck,
 ) -> None:

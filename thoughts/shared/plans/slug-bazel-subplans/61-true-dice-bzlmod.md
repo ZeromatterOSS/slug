@@ -3024,6 +3024,16 @@ What did not work or remains risky:
   and reran `git diff --check HEAD~1..HEAD`, the new guardrail (`1 passed`),
   the adjacent repository watch/read/watch-tree subset (`3 passed`), and
   `cargo check -p slug_interpreter_for_build`.
+- `repository_ctx.template(..., watch_template = "auto")` now follows the same
+  Bazel recorded-input path as `StarlarkRepositoryContext.createFileFromTemplate`:
+  template labels and path objects resolve to filesystem paths, the template
+  file is recorded before reading when the watch mode permits it, and generated
+  repository working-directory templates remain skipped for `auto`. The new
+  guardrail `test_repository_ctx_template_label_auto_watch_reexecutes_materialized_repo`
+  first failed because no sidecar was written, then passed after the fix.
+  Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-template-watch
+  cargo build -p slug`, the new guardrail (`1 passed`), and the adjacent
+  repository watch/read/template/watch-tree subset (`4 passed, 144 deselected`).
 - Repository materialization recorded-input sidecars are now split into named
   manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
   reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
@@ -3660,6 +3670,10 @@ using Rust DICE keys and values:
      label file rematerializes the generated repository in the same daemon. This
      closes the implicit-read half of Bazel's `readFile`/`RepoRecordedInput.File`
      behavior for workspace-label reads.
+   - `repository_ctx.template(..., Label(...))` with default
+     `watch_template = "auto"` now records the template file as a repository
+     materialization input, so editing the source template rematerializes the
+     generated repository in the same daemon.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

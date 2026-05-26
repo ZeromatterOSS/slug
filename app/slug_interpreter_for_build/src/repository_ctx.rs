@@ -2421,6 +2421,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] template: Value<'v>,
         substitutions: Option<Value<'v>>,
         #[starlark(require = named, default = false)] executable: bool,
+        #[starlark(require = named, default = "auto")] watch_template: &str,
     ) -> starlark::Result<Value<'v>> {
         let path_str = if let Some(s) = path.unpack_str() {
             s.to_owned()
@@ -2430,18 +2431,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             path.to_repr()
         };
 
-        let template_str = if let Some(s) = template.unpack_str() {
-            s.to_owned()
+        let template_path = if let Some(s) = template.unpack_str() {
+            if is_bazel_label_string(s) {
+                let path = this.resolve_label_to_filesystem_path(s);
+                ensure_label_path_materialized(&path);
+                path
+            } else {
+                this.resolve_path(s)
+            }
         } else if let Some(repo_path) = template.downcast_ref::<RepositoryPath>() {
-            let template_path = repo_path.absolute_path();
-            std::fs::read_to_string(&template_path).map_err(|e| {
-                starlark::Error::from(slug_error::slug_error!(
-                    slug_error::ErrorTag::Input,
-                    "Failed to read template '{}': {}",
-                    template_path.display(),
-                    e
-                ))
-            })?
+            repo_path.absolute_path()
         } else if template.get_type() == "Label" {
             // `rctx.template(out, Label("//templates:foo.tpl"), subs)` is the
             // canonical Bazel usage. Resolve the Label to a workspace path
@@ -2450,18 +2449,22 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // form ("@@cell//templates:foo.tpl") as if it were the
             // template body, corrupting every generated file.
             let label_str = format!("{template}");
-            let template_path = this.resolve_label_to_filesystem_path(&label_str);
-            ensure_label_path_materialized(&template_path);
-            std::fs::read_to_string(&template_path).map_err(|e| {
-                starlark::Error::from(slug_error::slug_error!(
-                    slug_error::ErrorTag::Input,
-                    "Failed to read template label '{label_str}' at '{}': {e}",
-                    template_path.display(),
-                ))
-            })?
+            let path = this.resolve_label_to_filesystem_path(&label_str);
+            ensure_label_path_materialized(&path);
+            path
         } else {
-            template.to_repr()
+            this.resolve_path(&template.to_str())
         };
+
+        repository_ctx_maybe_record_file_input(this, &template_path, watch_template)?;
+        let template_str = std::fs::read_to_string(&template_path).map_err(|e| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to read template '{}': {}",
+                template_path.display(),
+                e
+            ))
+        })?;
 
         // Apply substitutions
         let mut content = template_str;
@@ -2549,7 +2552,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             this.resolve_path(&path.to_str())
         };
-        repository_ctx_maybe_record_read_input(this, &file_path, watch)?;
+        repository_ctx_maybe_record_file_input(this, &file_path, watch)?;
         std::fs::read_to_string(&file_path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -2925,7 +2928,7 @@ fn parse_repository_ctx_watch_mode(watch: &str) -> starlark::Result<RepositoryCt
     }
 }
 
-fn repository_ctx_maybe_record_read_input(
+fn repository_ctx_maybe_record_file_input(
     this: &RepositoryContext,
     path: &Path,
     watch: &str,
