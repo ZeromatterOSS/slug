@@ -1639,7 +1639,7 @@ impl Key for FallbackScannedExtensionBzlDigestKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         Ok(Arc::from(
-            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                 self.extension_id.as_ref(),
                 self.project_root.as_path(),
                 Some(self.repo_mappings.as_ref()),
@@ -6472,7 +6472,7 @@ ext = module_extension(implementation = _impl)
 
         let extension_id = "@@root//:ext.bzl%ext";
         let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
-        let direct = slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+        let direct = slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
             extension_id,
             fs.path().root().as_path(),
             Some(&repo_mappings),
@@ -6520,7 +6520,7 @@ ext = module_extension(implementation = _impl)
         let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
         let project_root = AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?;
         let direct_missing =
-            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                 extension_id,
                 fs.path().root().as_path(),
                 Some(&repo_mappings),
@@ -6548,7 +6548,7 @@ ext = module_extension(implementation = _impl)
         fs.write_file("helper.bzl", "HELPER = 'created'\n");
         let mut dice = dice.into_updater().commit().await;
         let direct_created =
-            slug_bzlmod::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                 extension_id,
                 fs.path().root().as_path(),
                 Some(&repo_mappings),

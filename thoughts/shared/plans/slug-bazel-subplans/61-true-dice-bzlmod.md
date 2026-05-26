@@ -3981,6 +3981,16 @@ What did not work or remains risky:
   cargo test -p slug_bzlmod project_bzl_digest -- --nocapture` (`6 passed,
   326 filtered out`), `cargo check -p slug_bzlmod`, `cargo fmt --check`, and
   `git diff --check`.
+- The remaining exported mapped project `.bzl` scanner is now named
+  `compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings`,
+  and its doc comment explicitly says it is not the normal DICE extension
+  replay digest. Bridge surface clarified: bootstrap/preseed callers may still
+  request the fallback scanner when they run before current extension
+  aggregation injection, while loaded-graph replay remains owned by
+  `ExtensionBzlTransitiveDigestKey`. Validation passed with `cargo test -p
+  slug_bzlmod project_bzl_digest -- --nocapture`, `cargo test -p slug_common
+  fallback_scanned_extension_bzl_digest -- --nocapture`, `cargo check -p
+  slug_bzlmod -p slug_common`, `cargo fmt --check`, and `git diff --check`.
 - Two more unused public wrappers were removed from `slug_bzlmod`'s crate
   root: the root-default extension aggregation wrapper and the explicit
   lockfile-path reader wrapper. Production callers still use the policy-aware

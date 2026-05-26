@@ -572,7 +572,7 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
         let bzl_transitive_digest = bzl_transitive_digests
             .and_then(|digests| digests.get(current_ext_id).cloned())
             .unwrap_or_else(|| {
-                crate::compute_bzl_transitive_digest_for_project_with_repo_mappings(
+                crate::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                     current_ext_id,
                     project_root,
                     repo_mappings,

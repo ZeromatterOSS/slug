@@ -1125,7 +1125,7 @@ impl ModuleExtensionExecutionKey {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let workspace_id = crate::WorkspaceId::for_project_root(project_root.clone());
         let bzl_transitive_digest = Arc::from(
-            compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                 &extension_id,
                 project_root.as_path(),
                 Some(&repo_mappings),
@@ -1202,7 +1202,7 @@ impl ModuleExtensionExecutionKey {
     ) -> Self {
         let workspace_id = crate::WorkspaceId::for_project_root(project_root.as_ref().clone());
         let bzl_transitive_digest = Arc::from(
-            compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                 &extension_id,
                 project_root.as_ref(),
                 Some(repo_mappings.as_ref()),
@@ -1870,21 +1870,28 @@ pub fn compute_bzl_transitive_digest_from_file_contents(
     base64::engine::general_purpose::STANDARD.encode(hash)
 }
 
-/// Compute a best-effort Bazel-shaped transitive digest for workspace-local
-/// extension `.bzl` files.
+/// Compute the fallback best-effort Bazel-shaped transitive digest for
+/// workspace-local extension `.bzl` files.
 ///
 /// Bazel computes this from the loaded module graph. Slug does not yet expose
-/// that graph at this layer, so this function hashes files that can be resolved
-/// under `project_root` from literal `load()` statements. If the extension file
-/// cannot be resolved locally, it falls back to the old extension-id digest so
-/// external/registry cases keep their existing behavior until 61.6 owns the
-/// full Starlark load graph.
+/// This is not the normal DICE extension replay digest. Bazel computes that
+/// digest from the loaded module graph; Slug's DICE path uses the loaded graph
+/// through `ExtensionBzlTransitiveDigestKey`. This fallback remains only for
+/// bootstrap/preseed callers that run before current extension aggregation is
+/// injected. It hashes files that can be resolved under `project_root` from
+/// literal `load()` statements. If the extension file cannot be resolved
+/// locally, it falls back to the old extension-id digest so external/registry
+/// cases keep their existing behavior until the remaining bridge is removed.
 #[cfg(test)]
 fn compute_bzl_transitive_digest_for_project(extension_id: &str, project_root: &Path) -> String {
-    compute_bzl_transitive_digest_for_project_with_repo_mappings(extension_id, project_root, None)
+    compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
+        extension_id,
+        project_root,
+        None,
+    )
 }
 
-pub fn compute_bzl_transitive_digest_for_project_with_repo_mappings(
+pub fn compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
     extension_id: &str,
     project_root: &Path,
     repo_mappings: Option<&RepoMappingSnapshot>,
@@ -3665,23 +3672,24 @@ mod tests {
         repo_mappings.insert("rules_owner+".to_owned(), source_mapping);
         repo_mappings.insert("rules_owner".to_owned(), fallback_source_mapping);
 
-        let first = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+        let first = compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
             "@@rules_owner+//:ext.bzl%ext",
             temp_dir.path(),
             Some(&repo_mappings),
         );
 
         std::fs::write(&apparent_helper, "HELPER = \"still wrong repo\"\n").unwrap();
-        let after_apparent_edit = compute_bzl_transitive_digest_for_project_with_repo_mappings(
-            "@@rules_owner+//:ext.bzl%ext",
-            temp_dir.path(),
-            Some(&repo_mappings),
-        );
+        let after_apparent_edit =
+            compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
+                "@@rules_owner+//:ext.bzl%ext",
+                temp_dir.path(),
+                Some(&repo_mappings),
+            );
         assert_eq!(first, after_apparent_edit);
 
         std::fs::write(&wrong_helper, "HELPER = \"still wrong mapped repo\"\n").unwrap();
         let after_unsuffixed_mapping_edit =
-            compute_bzl_transitive_digest_for_project_with_repo_mappings(
+            compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                 "@@rules_owner+//:ext.bzl%ext",
                 temp_dir.path(),
                 Some(&repo_mappings),
@@ -3689,11 +3697,12 @@ mod tests {
         assert_eq!(first, after_unsuffixed_mapping_edit);
 
         std::fs::write(&real_helper, "HELPER = \"second\"\n").unwrap();
-        let after_real_edit = compute_bzl_transitive_digest_for_project_with_repo_mappings(
-            "@@rules_owner+//:ext.bzl%ext",
-            temp_dir.path(),
-            Some(&repo_mappings),
-        );
+        let after_real_edit =
+            compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
+                "@@rules_owner+//:ext.bzl%ext",
+                temp_dir.path(),
+                Some(&repo_mappings),
+            );
 
         assert_ne!(first, after_real_edit);
     }
@@ -3718,14 +3727,14 @@ mod tests {
         let mut repo_mappings = crate::RepoMappingSnapshot::new();
         repo_mappings.insert("rules_owner+".to_owned(), source_mapping);
 
-        let missing = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+        let missing = compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
             "@@rules_owner+//:ext.bzl%ext",
             temp_dir.path(),
             Some(&repo_mappings),
         );
 
         std::fs::write(&real_helper, "HELPER = \"created\"\n").unwrap();
-        let created = compute_bzl_transitive_digest_for_project_with_repo_mappings(
+        let created = compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
             "@@rules_owner+//:ext.bzl%ext",
             temp_dir.path(),
             Some(&repo_mappings),
