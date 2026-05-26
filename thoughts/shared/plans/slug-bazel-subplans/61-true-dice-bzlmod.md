@@ -3187,6 +3187,25 @@ What did not work or remains risky:
   slug_server`, `cargo build -p slug`, the full Plan 61 Python guardrail with
   `75 passed in 45.34s`, `cargo fmt --check`, and `git diff --check`. The four
   slugd processes left by the full guardrail were cleaned up afterward.
+- Native repository-rule label resolution no longer carries the production
+  `bazel-external` directory-scan compatibility fallback. The remaining normal
+  executor entrypoint requires a `RepositoryLabelResolution` value supplied from
+  the bzlmod cell graph, while the test-only marker-shortcut helpers pass an
+  explicit empty resolver map. Missing repositories now fail as
+  resolver-owned graph misses instead of probing project-root or
+  `bazel-external` collision paths. Bridge burn-down note: the production
+  surface reduced is `scan_bazel_external_for_repository_executor` plus optional
+  label-resolution entry into `execute_repository_rule_impl`; the intended
+  owner is `RepositoryExecutionKey` consuming `RepositoryLabelResolution` from
+  `BzlmodCellGraphKey`/`BzlmodCellGraphDataKey`. The remaining bridge is that
+  the cell graph is still legacy-produced rather than a true DICE-derived
+  value. Before/after evidence:
+  `rg -n "scan_bazel_external_for_repository_executor|label_resolution: Option<&RepositoryLabelResolution>|execute_repository_rule_impl\\([^\\n]*(None|Some)|Falling back to bazel-external directory scanning for repository executor label|resolve_build_file_label\\([^\\n]*None|Some\\(&label_resolution\\)" app/slug_bzlmod/src/repository_executor.rs`
+  now returns no hits. Validation passed with `cargo test -p slug_bzlmod
+  resolve_build_file_label -- --nocapture`, `cargo test -p slug_bzlmod
+  http_archive_build_file_uses_resolver_owned_label_path -- --nocapture`,
+  `cargo check -p slug_bzlmod`, `cargo build -p slug`, `cargo fmt --check`,
+  and `git diff --check`.
 - Built-in `use_repo_rule()` materializations for Bazel's
   `local_repository` and `new_local_repository` now carry `RepoSpec.local =
   true`, matching Bazel's `tools/build_defs/repo/local.bzl` definitions, and
@@ -3899,10 +3918,13 @@ hardening behavior around it.
   Fallback helpers and callers that do not receive a resolver-owned path map
   still use legacy process-global compatibility lookups.
 - Native repository-rule `build_file`/`patches` label resolution can now receive
-  a resolver-owned cell path map from the bzlmod cell graph. With that map
-  present, a missing repository is an error instead of a synthetic source-tree
-  or `bazel-external` read. Patch resolution preserves the existing non-fatal
-  repository-rule behavior by warning and continuing after resolution errors.
+  a resolver-owned cell path map from the bzlmod cell graph, and the normal
+  executor path now requires that map instead of retaining a
+  `bazel-external` directory-scan fallback. Patch resolution preserves the
+  existing non-fatal repository-rule behavior by warning and continuing after
+  resolution errors. The remaining bridge is the producer: the cell graph value
+  supplying those paths is still legacy-produced via `BzlmodCellGraphDataKey`
+  instead of derived from true DICE module/repo/spec keys.
 - Bzlmod load-path wrong-cell equivalence and load-path canonicalization,
   toolchain implementation/metadata label parsing, and C++ toolchain
   metadata/action-path formatting can now use declared aliases and runtime

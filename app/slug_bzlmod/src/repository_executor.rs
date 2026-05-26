@@ -57,7 +57,8 @@ pub fn execute_repository_rule(
     invocation: &RepositoryInvocation,
     project_root: &Path,
 ) -> slug_error::Result<RepositoryRuleResult> {
-    execute_repository_rule_impl(invocation, project_root, true, None)
+    let label_resolution = RepositoryLabelResolution::default();
+    execute_repository_rule_impl(invocation, project_root, true, &label_resolution)
 }
 
 /// Execute a repository rule after the caller has already classified
@@ -67,7 +68,8 @@ fn execute_repository_rule_fresh(
     invocation: &RepositoryInvocation,
     project_root: &Path,
 ) -> slug_error::Result<RepositoryRuleResult> {
-    execute_repository_rule_impl(invocation, project_root, false, None)
+    let label_resolution = RepositoryLabelResolution::default();
+    execute_repository_rule_impl(invocation, project_root, false, &label_resolution)
 }
 
 /// Execute a repository rule after the caller has classified materialization
@@ -77,14 +79,14 @@ pub(crate) fn execute_repository_rule_fresh_with_label_resolution(
     project_root: &Path,
     label_resolution: &RepositoryLabelResolution,
 ) -> slug_error::Result<RepositoryRuleResult> {
-    execute_repository_rule_impl(invocation, project_root, false, Some(label_resolution))
+    execute_repository_rule_impl(invocation, project_root, false, label_resolution)
 }
 
 fn execute_repository_rule_impl(
     invocation: &RepositoryInvocation,
     project_root: &Path,
     allow_marker_reuse: bool,
-    label_resolution: Option<&RepositoryLabelResolution>,
+    label_resolution: &RepositoryLabelResolution,
 ) -> slug_error::Result<RepositoryRuleResult> {
     let attrs = InvocationAttrs::new(invocation);
     let working_dir = project_root.join("bazel-external").join(&invocation.name);
@@ -519,7 +521,7 @@ fn execute_http_archive(
     invocation: &RepositoryInvocation,
     attrs: &InvocationAttrs,
     working_dir: &Path,
-    label_resolution: Option<&RepositoryLabelResolution>,
+    label_resolution: &RepositoryLabelResolution,
 ) -> slug_error::Result<()> {
     // Get URLs - can be `url` (single) or `urls` (list)
     let urls = get_urls(attrs)?;
@@ -697,7 +699,7 @@ fn apply_patches(
     invocation: &RepositoryInvocation,
     attrs: &InvocationAttrs,
     working_dir: &Path,
-    label_resolution: Option<&RepositoryLabelResolution>,
+    label_resolution: &RepositoryLabelResolution,
 ) -> slug_error::Result<()> {
     // Apply patch files
     if let Some(patches) = attrs.get_string_list("patches") {
@@ -1059,14 +1061,13 @@ fn get_urls(attrs: &InvocationAttrs) -> slug_error::Result<Vec<String>> {
 /// Resolve a repository-rule file attribute that may be a Bazel label.
 ///
 /// `build_file` and `patches` are executed while materializing
-/// `{project_root}/bazel-external/{repo}`. Keep the bzlmod-side resolver small:
-/// semantic parsing goes through `repo_mapping`, the normal path is exact, and
-/// the old `bazel-external` directory scan remains only as an explicit fallback
-/// for legacy module-version directories that have not been registered here.
+/// `{project_root}/bazel-external/{repo}`. Semantic parsing goes through
+/// `repo_mapping`, and repository paths must come from the resolver-owned
+/// bzlmod cell graph supplied by the caller.
 fn resolve_build_file_label(
     label: &str,
     working_dir: &Path,
-    label_resolution: Option<&RepositoryLabelResolution>,
+    label_resolution: &RepositoryLabelResolution,
 ) -> slug_error::Result<String> {
     let Some(parsed) =
         crate::repo_mapping::canonicalize_label_with_package_context(label, "", "", None)
@@ -1086,37 +1087,17 @@ fn resolve_build_file_label(
     };
 
     let repo = repository_executor_repo_dir_name(parsed.repo().as_str());
-    if let Some(label_resolution) = label_resolution {
-        if let Some(path) = label_resolution.resolve_label(&project_root, &parsed, &repo) {
-            return Ok(path.to_string_lossy().to_string());
-        }
-        return Err(RepositoryExecutionError::ExecutionFailed {
-            name: repo,
-            reason: format!(
-                "label '{}' references a repository that is not present in the resolver-owned bzlmod cell graph",
-                label
-            ),
-        }
-        .into());
+    if let Some(path) = label_resolution.resolve_label(&project_root, &parsed, &repo) {
+        return Ok(path.to_string_lossy().to_string());
     }
-
-    let normal_path = if repo.is_empty() {
-        label_path_under(&project_root, &parsed)
-    } else {
-        label_path_under(project_root.join("bazel-external").join(&repo), &parsed)
-    };
-
-    if normal_path.exists() {
-        return Ok(normal_path.to_string_lossy().to_string());
+    Err(RepositoryExecutionError::ExecutionFailed {
+        name: repo,
+        reason: format!(
+            "label '{}' references a repository that is not present in the resolver-owned bzlmod cell graph",
+            label
+        ),
     }
-
-    let Some(fallback_path) =
-        scan_bazel_external_for_repository_executor(&project_root, &repo, &parsed)
-    else {
-        return Ok(normal_path.to_string_lossy().to_string());
-    };
-
-    Ok(fallback_path.to_string_lossy().to_string())
+    .into())
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -1214,43 +1195,6 @@ fn label_path_under(
 
 fn label_to_relative_fragment(label: &crate::repo_mapping::CanonicalLabel) -> PathBuf {
     label_path_under(label.repo().as_str(), label)
-}
-
-fn scan_bazel_external_for_repository_executor(
-    project_root: &Path,
-    repo: &str,
-    label: &crate::repo_mapping::CanonicalLabel,
-) -> Option<PathBuf> {
-    if repo.is_empty() {
-        return None;
-    }
-
-    let bazel_external = project_root.join("bazel-external");
-    if !bazel_external.exists() {
-        return None;
-    }
-
-    tracing::debug!(
-        repo,
-        "Falling back to bazel-external directory scanning for repository executor label"
-    );
-
-    let entries = std::fs::read_dir(&bazel_external).ok()?;
-    let repo_prefix = format!("{}+", repo);
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if name.as_ref() != repo && !name.starts_with(&repo_prefix) {
-            continue;
-        }
-
-        let path = label_path_under(entry.path(), label);
-        if path.exists() {
-            return Some(path);
-        }
-    }
-
-    None
 }
 
 /// Download and extract an archive.
@@ -2361,9 +2305,24 @@ mod tests {
         std::fs::create_dir_all(repo_root.join("cc")).unwrap();
         std::fs::create_dir_all(&working_dir).unwrap();
         std::fs::write(repo_root.join("cc").join("BUILD.rules"), "").unwrap();
+        let mut cell_graph = BzlmodCellGraphValue::empty_for_workspace(
+            WorkspaceId::for_project_root(project_root.to_path_buf()),
+        );
+        cell_graph.cells = Arc::new(vec![BzlmodCellGraphCell {
+            name: "rules_cc".to_owned(),
+            path: "bazel-external/rules_cc".to_owned(),
+            module_setup: None,
+            bundled: false,
+        }]);
+        let label_resolution =
+            RepositoryLabelResolution::from_cell_graph(project_root, &cell_graph);
 
-        let resolved =
-            resolve_build_file_label("@@rules_cc//cc:BUILD.rules", &working_dir, None).unwrap();
+        let resolved = resolve_build_file_label(
+            "@@rules_cc//cc:BUILD.rules",
+            &working_dir,
+            &label_resolution,
+        )
+        .unwrap();
 
         assert_eq!(
             PathBuf::from(resolved),
@@ -2375,9 +2334,11 @@ mod tests {
     fn resolve_build_file_label_keeps_plain_paths_plain() {
         let temp = TempDir::new().unwrap();
         let working_dir = temp.path().join("bazel-external").join("current_repo");
+        let label_resolution = RepositoryLabelResolution::default();
 
         assert_eq!(
-            resolve_build_file_label("third_party/BUILD.foo", &working_dir, None).unwrap(),
+            resolve_build_file_label("third_party/BUILD.foo", &working_dir, &label_resolution)
+                .unwrap(),
             "third_party/BUILD.foo"
         );
     }
@@ -2390,8 +2351,11 @@ mod tests {
         std::fs::create_dir_all(project_root.join("tools")).unwrap();
         std::fs::create_dir_all(&working_dir).unwrap();
         std::fs::write(project_root.join("tools").join("BUILD.repo"), "").unwrap();
+        let label_resolution = RepositoryLabelResolution::default();
 
-        let resolved = resolve_build_file_label("//tools:BUILD.repo", &working_dir, None).unwrap();
+        let resolved =
+            resolve_build_file_label("//tools:BUILD.repo", &working_dir, &label_resolution)
+                .unwrap();
 
         assert_eq!(
             PathBuf::from(resolved),
@@ -2408,14 +2372,13 @@ mod tests {
         std::fs::create_dir_all(legacy_repo.join("cc")).unwrap();
         std::fs::create_dir_all(&working_dir).unwrap();
         std::fs::write(legacy_repo.join("cc").join("BUILD.rules"), "").unwrap();
+        let label_resolution = RepositoryLabelResolution::default();
 
-        let resolved =
-            resolve_build_file_label("@rules_cc//cc:BUILD.rules", &working_dir, None).unwrap();
+        let err =
+            resolve_build_file_label("@rules_cc//cc:BUILD.rules", &working_dir, &label_resolution)
+                .unwrap_err();
 
-        assert_eq!(
-            PathBuf::from(resolved),
-            legacy_repo.join("cc").join("BUILD.rules")
-        );
+        assert!(format!("{err:#}").contains("resolver-owned bzlmod cell graph"));
     }
 
     #[test]
@@ -2447,12 +2410,9 @@ mod tests {
         let label_resolution =
             RepositoryLabelResolution::from_cell_graph(project_root, &cell_graph);
 
-        let resolved = resolve_build_file_label(
-            "@rules_cc//cc:BUILD.rules",
-            &working_dir,
-            Some(&label_resolution),
-        )
-        .unwrap();
+        let resolved =
+            resolve_build_file_label("@rules_cc//cc:BUILD.rules", &working_dir, &label_resolution)
+                .unwrap();
 
         assert_eq!(
             PathBuf::from(resolved),
@@ -2485,7 +2445,7 @@ mod tests {
         let resolved = resolve_build_file_label(
             "@@rules_cc+//cc:BUILD.rules",
             &working_dir,
-            Some(&label_resolution),
+            &label_resolution,
         )
         .unwrap();
 
@@ -2517,12 +2477,9 @@ mod tests {
         let label_resolution =
             RepositoryLabelResolution::from_cell_graph(project_root, &cell_graph);
 
-        let err = resolve_build_file_label(
-            "@rules_cc//cc:BUILD.rules",
-            &working_dir,
-            Some(&label_resolution),
-        )
-        .unwrap_err();
+        let err =
+            resolve_build_file_label("@rules_cc//cc:BUILD.rules", &working_dir, &label_resolution)
+                .unwrap_err();
 
         assert!(format!("{err:#}").contains("resolver-owned bzlmod cell graph"));
     }
@@ -2549,12 +2506,9 @@ mod tests {
         let label_resolution =
             RepositoryLabelResolution::from_cell_graph(project_root, &cell_graph);
 
-        let err = resolve_build_file_label(
-            "@rules_cc//cc:BUILD.rules",
-            &working_dir,
-            Some(&label_resolution),
-        )
-        .unwrap_err();
+        let err =
+            resolve_build_file_label("@rules_cc//cc:BUILD.rules", &working_dir, &label_resolution)
+                .unwrap_err();
 
         assert!(format!("{err:#}").contains("resolver-owned bzlmod cell graph"));
     }
@@ -2592,14 +2546,14 @@ mod tests {
         let internal_resolved = resolve_build_file_label(
             &format!("@{internal}//:BUILD.repo"),
             &working_dir,
-            Some(&label_resolution),
+            &label_resolution,
         );
         assert!(internal_resolved.is_err());
 
         let canonical_resolved = resolve_build_file_label(
             &format!("@@{canonical}//:BUILD.repo"),
             &working_dir,
-            Some(&label_resolution),
+            &label_resolution,
         )
         .unwrap();
         assert_eq!(
