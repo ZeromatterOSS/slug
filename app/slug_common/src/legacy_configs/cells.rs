@@ -328,16 +328,22 @@ fn canonicalize_repo_mapping_snapshot_targets(
     cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
     resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
 ) {
-    let Some(resolved_graph) = resolved_graph else {
-        return;
-    };
     for mapping in snapshot.values_mut() {
         for target_name in mapping.values_mut() {
-            if let Some(cell_name) =
-                selected_bzlmod_cell_name_for_dep(cells, target_name, resolved_graph)
-            {
-                *target_name = cell_name.to_owned();
-            }
+            *target_name =
+                canonical_repo_mapping_target_name(None, cells, resolved_graph, target_name);
+        }
+    }
+
+    let root_repo_mapping = snapshot.get("").cloned();
+    for mapping in snapshot.values_mut() {
+        for target_name in mapping.values_mut() {
+            *target_name = canonical_repo_mapping_target_name(
+                root_repo_mapping.as_ref(),
+                cells,
+                resolved_graph,
+                target_name,
+            );
         }
     }
 }
@@ -348,15 +354,44 @@ fn canonical_repo_mapping_target_name(
     resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
     target_name: &str,
 ) -> String {
-    root_repo_mapping
-        .and_then(|mapping| mapping.get(target_name))
-        .cloned()
-        .or_else(|| {
-            resolved_graph
-                .and_then(|graph| selected_bzlmod_cell_name_for_dep(cells, target_name, graph))
-                .map(str::to_owned)
-        })
-        .unwrap_or_else(|| target_name.to_owned())
+    let mut current = target_name.to_owned();
+    let mut seen = BTreeSet::new();
+
+    loop {
+        if !seen.insert(current.clone()) {
+            return current;
+        }
+        let next = root_repo_mapping
+            .and_then(|mapping| mapping.get(&current))
+            .cloned()
+            .or_else(|| {
+                resolved_graph
+                    .and_then(|graph| selected_bzlmod_cell_name_for_dep(cells, &current, graph))
+                    .map(str::to_owned)
+            });
+        let Some(next) = next else {
+            return current;
+        };
+        if next == current {
+            return current;
+        }
+        current = next;
+    }
+}
+
+fn canonicalize_repo_mapping_targets(
+    repo_mappings: &mut slug_bzlmod::RepoMappingSnapshot,
+    repo_mapping_overrides: &mut slug_bzlmod::RepoMappingOverrides,
+    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
+) {
+    canonicalize_repo_mapping_snapshot_targets(repo_mappings, cells, resolved_graph);
+    canonicalize_repo_mapping_overrides_targets(
+        repo_mapping_overrides,
+        repo_mappings,
+        cells,
+        resolved_graph,
+    );
 }
 
 fn canonicalize_repo_mapping_overrides_targets(
@@ -376,6 +411,43 @@ fn canonicalize_repo_mapping_overrides_targets(
             );
         }
     }
+}
+
+fn replay_summary_repo_mapping_state(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+    ignore_dev_dependency: bool,
+) -> (
+    slug_bzlmod::RepoMappingSnapshot,
+    slug_bzlmod::RepoMappingOverrides,
+) {
+    let mut repo_mappings = repo_mapping_snapshot_for_modules(parsed_modules, root_module_name);
+    let mut repo_mapping_overrides =
+        repo_mapping_overrides_for_root(parsed_modules, root_module_name, ignore_dev_dependency);
+    canonicalize_repo_mapping_targets(&mut repo_mappings, &mut repo_mapping_overrides, &[], None);
+    (repo_mappings, repo_mapping_overrides)
+}
+
+fn graph_owned_repo_mapping_state(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+    ignore_dev_dependency: bool,
+    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
+) -> (
+    slug_bzlmod::RepoMappingSnapshot,
+    slug_bzlmod::RepoMappingOverrides,
+) {
+    let mut repo_mappings = repo_mapping_snapshot_for_modules(parsed_modules, root_module_name);
+    let mut repo_mapping_overrides =
+        repo_mapping_overrides_for_root(parsed_modules, root_module_name, ignore_dev_dependency);
+    canonicalize_repo_mapping_targets(
+        &mut repo_mappings,
+        &mut repo_mapping_overrides,
+        cells,
+        resolved_graph,
+    );
+    (repo_mappings, repo_mapping_overrides)
 }
 
 fn repo_mapping_overrides_for_root(
@@ -1670,10 +1742,9 @@ async fn root_extension_replay_summary_digest(
         return Ok(None);
     }
 
-    let repo_mappings = repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
+    let (repo_mappings, repo_mapping_overrides) =
+        replay_summary_repo_mapping_state(&parsed_modules, root_module_name, ignore_dev_dependency);
     let repo_mappings = Arc::new(repo_mappings);
-    let repo_mapping_overrides =
-        repo_mapping_overrides_for_root(&parsed_modules, root_module_name, ignore_dev_dependency);
 
     let mut hasher = Sha256::new();
     hasher.update(b"root-extension-replay-summary-v1");
@@ -4192,21 +4263,10 @@ impl BuckConfigBasedCells {
             Some(root_module_name),
             options.ignore_dev_dependency,
         );
-        let mut repo_mappings =
-            repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
-        canonicalize_repo_mapping_snapshot_targets(
-            &mut repo_mappings,
-            &cells,
-            resolved_graph_for_aliases.as_ref(),
-        );
-        let mut repo_mapping_overrides = repo_mapping_overrides_for_root(
+        let (mut repo_mappings, repo_mapping_overrides) = graph_owned_repo_mapping_state(
             &parsed_modules,
             root_module_name,
             options.ignore_dev_dependency,
-        );
-        canonicalize_repo_mapping_overrides_targets(
-            &mut repo_mapping_overrides,
-            &repo_mappings,
             &cells,
             resolved_graph_for_aliases.as_ref(),
         );
@@ -5804,7 +5864,10 @@ mod tests {
         let mut snapshot = slug_bzlmod::RepoMappingSnapshot::new();
         snapshot.insert(
             String::new(),
-            BTreeMap::from([("helper_alias".to_owned(), "dep+".to_owned())]),
+            BTreeMap::from([
+                ("helper_alias".to_owned(), "dep+".to_owned()),
+                ("_main+ext+generated".to_owned(), "helper_alias".to_owned()),
+            ]),
         );
         snapshot.insert("root".to_owned(), snapshot[""].clone());
         let extension_id = slug_bzlmod::canonical_extension_id("//:ext.bzl", "ext", "root");
@@ -5815,11 +5878,18 @@ mod tests {
             BTreeMap::from([("generated".to_owned(), "helper_alias".to_owned())]),
         );
 
-        canonicalize_repo_mapping_overrides_targets(
+        canonicalize_repo_mapping_targets(
+            &mut snapshot,
             &mut overrides,
-            &snapshot,
             &cells,
             Some(&resolved_graph),
+        );
+        assert_eq!(
+            snapshot
+                .get("")
+                .and_then(|mapping| mapping.get("_main+ext+generated"))
+                .map(String::as_str),
+            Some("dep+")
         );
         assert_eq!(
             overrides
@@ -5844,6 +5914,38 @@ mod tests {
             Some("dep+")
         );
         Ok(())
+    }
+
+    #[test]
+    fn replay_summary_repo_mapping_state_removes_root_apparent_override_targets() {
+        let mut root = parsed_module("root");
+        let mut dep = slug_bzlmod::BazelDep::new("dep".to_owned(), Version::empty());
+        dep.repo_name = Some("helper_alias".to_owned());
+        root.module.bazel_deps.push(dep);
+        let mut usage = slug_bzlmod::ExtensionUsage::new("//:ext.bzl".to_owned(), "ext".to_owned());
+        usage
+            .repo_overrides
+            .push(("generated".to_owned(), "helper_alias".to_owned()));
+        root.extension_usages.push(usage);
+
+        let (snapshot, overrides) =
+            replay_summary_repo_mapping_state(&[("root".to_owned(), root)], "root", false);
+        let extension_id = slug_bzlmod::canonical_extension_id("//:ext.bzl", "ext", "root");
+
+        assert_eq!(
+            snapshot
+                .get("")
+                .and_then(|mapping| mapping.get("_main+ext+generated"))
+                .map(String::as_str),
+            Some("dep")
+        );
+        assert_eq!(
+            overrides
+                .get(&extension_id)
+                .and_then(|mapping| mapping.get("generated"))
+                .map(String::as_str),
+            Some("dep")
+        );
     }
 
     #[tokio::test]
