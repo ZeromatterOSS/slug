@@ -3042,6 +3042,18 @@ What did not work or remains risky:
   Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-template-watch
   cargo build -p slug`, the new guardrail (`1 passed`), and the adjacent
   repository watch/read/template/watch-tree subset (`4 passed, 144 deselected`).
+  Clean review of `1cbd6341` found no correctness issues and reran
+  `git diff --check HEAD~1..HEAD`, `cargo check -p slug_interpreter_for_build`,
+  `cargo build -p slug`, and the focused four-test subset (`4 passed`).
+- `repository_ctx.patch(..., watch_patch = "auto")` now mirrors Bazel's
+  `StarlarkRepositoryContext.patch` path by recording the patch file before
+  applying it when the patch path can be watched. The new guardrail
+  `test_repository_ctx_patch_label_auto_watch_reexecutes_materialized_repo`
+  first failed because no sidecar was written for a label patch file, then
+  passed after the fix. Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-patch-watch
+  cargo build -p slug`, the new guardrail (`1 passed`), and the adjacent
+  repository watch/read/template/patch/watch-tree subset (`5 passed, 144
+  deselected`).
 - Repository materialization recorded-input sidecars are now split into named
   manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
   reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
@@ -3682,6 +3694,9 @@ using Rust DICE keys and values:
      `watch_template = "auto"` now records the template file as a repository
      materialization input, so editing the source template rematerializes the
      generated repository in the same daemon.
+   - `repository_ctx.patch(Label(...))` with default `watch_patch = "auto"` now
+     records the patch file as a repository materialization input, so editing
+     the patch rematerializes the generated repository in the same daemon.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

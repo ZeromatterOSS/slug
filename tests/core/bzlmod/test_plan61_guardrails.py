@@ -7619,6 +7619,74 @@ use_repo(template_watch, "template_watch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_patch_label_auto_watch_reexecutes_materialized_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkRepositoryContext.patch and RepoRecordedInput.File."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+patch_watch_ext+patch_watch_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    _write(
+        buck.cwd / "change.patch",
+        "--- a/data.txt\n+++ b/data.txt\n@@ -1 +1 @@\n-first\n+second\n",
+    )
+    _write(
+        buck.cwd / "patch_watch_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", "first\\n")
+    repository_ctx.patch(Label("//:change.patch"), strip = 1)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+patch_watch_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _patch_watch_ext_impl(module_ctx):
+    patch_watch_repo_rule(name = "patch_watch_repo")
+
+patch_watch_ext = module_extension(
+    implementation = _patch_watch_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_patch_auto_watch_input")
+
+patch_watch = use_extension("//:patch_watch_ext.bzl", "patch_watch_ext")
+use_repo(patch_watch, "patch_watch_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_patch_watch_repo",
+    srcs = ["@patch_watch_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_patch_watch_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write(
+        buck.cwd / "change.patch",
+        "--- a/data.txt\n+++ b/data.txt\n@@ -1 +1 @@\n-first\n+third\n",
+    )
+
+    await buck.build("//:uses_patch_watch_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "third\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_watch_tree_nested_edit_reexecutes_materialized_repo(
     buck: Buck,
 ) -> None:

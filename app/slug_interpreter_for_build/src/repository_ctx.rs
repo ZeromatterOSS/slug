@@ -2609,6 +2609,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         this: &RepositoryContext,
         #[starlark(require = pos)] patch_file: Value<'v>,
         #[starlark(default = 0)] strip: i32,
+        #[starlark(require = named, default = "auto")] watch_patch: &str,
     ) -> starlark::Result<Value<'v>> {
         // Resolve the patch_file argument to an absolute on-disk path.
         // Bazel accepts: a `Label`, a `RepositoryPath`, or a string. Strings
@@ -2647,6 +2648,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             }
         };
 
+        repository_ctx_maybe_record_file_input(this, &patch_path, watch_patch)?;
         apply_unified_patch(&patch_path, strip, this.working_dir.as_ref()).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
