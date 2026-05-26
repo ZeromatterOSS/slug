@@ -135,10 +135,19 @@ Observed SDK result at the checkpoint:
   cache, and single-file patch helper tests, `cargo build -p slug`, and the
   explicit-binary Plan 61 selector for SVO module/source patching, patch_cmd
   failure, archive/git patch application, and external patch-label rejection
-  (`5 passed, 149 deselected`). Remaining replay gap: local patch file bytes are
-  still read by the transitional resolver/source fetch path rather than a
-  dedicated DICE file key, so the true dependency edge still belongs to the
-  future ModuleFile/RepoSpec/override-source keys.
+  (`5 passed, 149 deselected`). Follow-up direct-read bridge validation passed
+  with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-patch-inputs cargo check -p
+  slug_bzlmod`, `cargo check -p slug_common`, focused parser and patch helper
+  tests, `cargo build -p slug`, and the explicit-binary Plan 61 selector for
+  same-daemon SVO patch-file edit materialization plus adjacent override patch
+  cases (`6 passed, 149 deselected`). The production DICE bridge now computes
+  root-local override patch label contents through an `OverridePatchInputsKey`
+  and feeds those bytes into the resolver/source-fetch patch digest and apply
+  calls. Remaining replay gap: `SourceFetcher` still keeps direct-read fallback
+  helpers for non-DICE/bootstrap callers, and package analysis can still reuse a
+  stale already-loaded external package after a bzlmod source path changes; that
+  separate package/cache invalidation bridge belongs to the cell graph/package
+  ownership work.
   Bridge burn-down note for this checkpoint: the production bridge surface
   reduced is marker-trusted registry source materialization for patched
   registry modules. Before this slice, registry source cache identity was only
@@ -154,6 +163,19 @@ Observed SDK result at the checkpoint:
   does not remove the remaining direct patch-file reads. The next slice must
   reduce that direct-read bridge, not add another directive-only hardening
   layer.
+  Bridge burn-down note for the direct-read follow-up: the production bridge
+  surface reduced is root-local override patch file reopening inside the
+  transitional resolver/source-fetch path. Before this slice, resolver call
+  sites reached `std::fs::read(&patch_path)` through
+  `apply_local_override_patches`, `local_override_patch_digest`,
+  `local_override_patch_effect_digest`, and
+  `apply_single_version_module_patches`. After this slice, production
+  `MvsResolver` instances created by `BzlmodProjectionBridgeDiceKey` receive
+  DICE-computed `OverridePatchInputs` and call only the `*_with_inputs`
+  variants; the only remaining `std::fs::read(&patch_path)` hit is the
+  non-DICE fallback helper. The intended final owner remains
+  `ModuleSourceKey`/`RepoSpecKey` feeding `RepositoryExecutionKey`, but the
+  patch bytes now have an auditable DICE input edge before that larger split.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -465,9 +487,17 @@ Observed SDK result at the checkpoint:
   archive_override_patches_apply_to_fetched_module or
   git_override_patches_apply_to_fetched_module or
   override_patches_external_repo_labels_follow_bazel_main_repo_rule'`
-  (`5 passed, 149 deselected`). Full replay support still needs DICE-tracked
-  patch-file inputs for discovery and materialization instead of direct local
-  patch reads in the transitional resolver/source fetch path.
+  (`5 passed, 149 deselected`). Current patch-input bridge validation passed
+  with the same check/build base plus explicit-binary selector
+  `-k 'single_version_override_patch_edit_materializes_same_daemon or
+  single_version_override_patches_apply_to_module_and_source or
+  single_version_override_patch_cmd_failure_is_reported or
+  archive_override_patches_apply_to_fetched_module or
+  git_override_patches_apply_to_fetched_module or
+  override_patches_external_repo_labels_follow_bazel_main_repo_rule'`
+  (`6 passed, 149 deselected`). Production resolver patch reads now use
+  DICE-computed root-local patch inputs; direct patch-file reads remain only in
+  non-DICE fallback helpers.
   Bazel module-name validation now runs while parsing `module(name = ...)`,
   `bazel_dep(name = ...)`, and every override directive's `module_name`,
   instead of only in later command-line yanked-version parsing. Bazel source

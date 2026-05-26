@@ -9,6 +9,7 @@
  */
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -1227,6 +1228,7 @@ struct BzlmodProjectionBridgeDiceKey {
     local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
     non_registry_override_inputs: Arc<NonRegistryOverrideModuleInputsValue>,
     registry_file_inputs: Arc<RegistryFileInputsValue>,
+    override_patch_inputs: Arc<slug_bzlmod::OverridePatchInputs>,
     extension_replay_summary_digest: Option<Arc<str>>,
 }
 
@@ -1401,6 +1403,7 @@ impl PartialEq for BzlmodProjectionBridgeDiceKey {
             && self.local_override_inputs.digest == other.local_override_inputs.digest
             && self.non_registry_override_inputs.digest == other.non_registry_override_inputs.digest
             && self.registry_file_inputs.digest == other.registry_file_inputs.digest
+            && self.override_patch_inputs.digest == other.override_patch_inputs.digest
             && self.extension_replay_summary_digest == other.extension_replay_summary_digest
     }
 }
@@ -1418,6 +1421,7 @@ impl std::hash::Hash for BzlmodProjectionBridgeDiceKey {
         self.local_override_inputs.digest.hash(state);
         self.non_registry_override_inputs.digest.hash(state);
         self.registry_file_inputs.digest.hash(state);
+        self.override_patch_inputs.digest.hash(state);
         self.extension_replay_summary_digest.hash(state);
     }
 }
@@ -1836,6 +1840,14 @@ struct NonRootModuleFilesValue {
     has_untracked_inputs: bool,
 }
 
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("OverridePatchInputsKey({}, {})", project_root.display(), patch_labels.len())]
+struct OverridePatchInputsKey {
+    project_root: AbsNormPathBuf,
+    main_repo_name: Option<String>,
+    patch_labels: Vec<String>,
+}
+
 fn local_overrides_from_root_module(
     root_module_file: &slug_bzlmod::RootModuleFileValue,
     ignore_dev_dependency: bool,
@@ -1886,6 +1898,36 @@ fn active_root_overrides(
         })
         .cloned()
         .collect()
+}
+
+fn override_patch_labels_from_root_module(
+    root_module_file: &slug_bzlmod::RootModuleFileValue,
+    ignore_dev_dependency: bool,
+) -> (Option<String>, Vec<String>) {
+    let Some(parsed) = &root_module_file.parsed else {
+        return (None, Vec::new());
+    };
+    let main_repo_name = parsed
+        .module
+        .repo_name
+        .clone()
+        .or_else(|| Some(parsed.module.name.clone()));
+    let mut labels = BTreeSet::new();
+    for override_ in active_root_overrides(&parsed.module, ignore_dev_dependency) {
+        match override_ {
+            slug_bzlmod::Override::SingleVersion(single) => {
+                labels.extend(single.patches);
+            }
+            slug_bzlmod::Override::Git(git) => {
+                labels.extend(git.patches);
+            }
+            slug_bzlmod::Override::Archive(archive) => {
+                labels.extend(archive.patches);
+            }
+            _ => {}
+        }
+    }
+    (main_repo_name, labels.into_iter().collect())
 }
 
 fn non_registry_override_module_dirs_from_root_module(
@@ -2182,6 +2224,61 @@ async fn non_registry_override_module_inputs_digest(
         digest: hex::encode(hasher.finalize()),
         has_inputs: !overrides.is_empty(),
         has_untracked_inputs: false,
+    })
+}
+
+async fn override_patch_inputs(
+    ctx: &mut DiceComputations<'_>,
+    project_root: &AbsNormPathBuf,
+    main_repo_name: Option<&str>,
+    patch_labels: &[String],
+) -> slug_error::Result<slug_bzlmod::OverridePatchInputs> {
+    let project_fs = ProjectRoot::new_unchecked(project_root.clone());
+    let mut hasher = Sha256::new();
+    hasher.update(b"override-patch-inputs-v1");
+    hasher.update([0]);
+    let mut inputs = Vec::new();
+    let mut has_untracked_inputs = false;
+
+    for patch_label in patch_labels {
+        let path = slug_bzlmod::fetch::override_patch_label_path(
+            project_root.as_path(),
+            main_repo_name,
+            patch_label,
+        )?;
+        let (content, tracking) = read_text_file_for_project_input(ctx, &project_fs, &path).await?;
+        let Some(content) = content else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Override patch '{}' was not found at {}",
+                patch_label,
+                path.display()
+            ));
+        };
+        let content = content.into_bytes();
+        let digest = slug_bzlmod::compute_sha256_hex(&content);
+        if tracking != BzlmodFileInputTracking::Project {
+            has_untracked_inputs = true;
+        }
+
+        hasher.update(patch_label.as_bytes());
+        hasher.update([0]);
+        hasher.update(path.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.as_bytes());
+        hasher.update([0]);
+        inputs.push(slug_bzlmod::OverridePatchInput {
+            label: patch_label.clone(),
+            path,
+            digest,
+            content,
+        });
+    }
+
+    Ok(slug_bzlmod::OverridePatchInputs {
+        digest: hex::encode(hasher.finalize()),
+        inputs,
+        has_untracked_inputs,
     })
 }
 
@@ -2840,6 +2937,40 @@ impl Key for NonRootModuleFilesKey {
 }
 
 #[async_trait]
+impl Key for OverridePatchInputsKey {
+    type Value = slug_error::Result<Arc<slug_bzlmod::OverridePatchInputs>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        override_patch_inputs(
+            ctx,
+            &self.project_root,
+            self.main_repo_name.as_deref(),
+            &self.patch_labels,
+        )
+        .await
+        .map(Arc::new)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_untracked_inputs,
+            Err(_) => false,
+        }
+    }
+}
+
+#[async_trait]
 impl Key for BzlmodProjectionBridgeDiceKey {
     type Value = slug_error::Result<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>;
 
@@ -3099,6 +3230,18 @@ impl BuckConfigBasedCells {
             })
             .await?
             .buck_error_context("Computing registry file inputs for bzlmod resolution bridge")?;
+        let (main_repo_name, override_patch_labels) = override_patch_labels_from_root_module(
+            root_module_file.as_ref(),
+            options.ignore_dev_dependency,
+        );
+        let override_patch_inputs = dice_ctx
+            .compute(&OverridePatchInputsKey {
+                project_root: project_root.clone(),
+                main_repo_name,
+                patch_labels: override_patch_labels,
+            })
+            .await?
+            .buck_error_context("Computing override patch inputs for bzlmod resolution bridge")?;
         let extension_replay_summary_digest = match root_module_file.parsed.as_ref() {
             Some(parsed) => {
                 root_extension_replay_summary_digest(
@@ -3130,6 +3273,7 @@ impl BuckConfigBasedCells {
             local_override_inputs,
             non_registry_override_inputs,
             registry_file_inputs,
+            override_patch_inputs,
             extension_replay_summary_digest: extension_replay_summary_digest.map(Arc::from),
         };
         Ok(key)
@@ -3187,6 +3331,7 @@ impl BuckConfigBasedCells {
                     &options,
                     false,
                     empty_workspace_id.clone(),
+                    None,
                     None,
                     None,
                     None,
@@ -3374,6 +3519,7 @@ impl BuckConfigBasedCells {
             Some(root_module_file.as_ref()),
             key.lockfile_inputs.visible_lockfile.clone(),
             key.lockfile_inputs.hidden_lockfile.clone(),
+            Some(key.override_patch_inputs.clone()),
             Some(dice_ctx),
         )
         .await
@@ -3398,6 +3544,7 @@ impl BuckConfigBasedCells {
         root_module_file: Option<&slug_bzlmod::RootModuleFileValue>,
         visible_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
+        override_patch_inputs: Option<Arc<slug_bzlmod::OverridePatchInputs>>,
         mut dice_ctx: Option<&mut DiceComputations<'_>>,
     ) -> slug_error::Result<Option<slug_bzlmod::BzlmodProjectionData>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
@@ -3570,6 +3717,9 @@ impl BuckConfigBasedCells {
                 );
             }
             resolver.set_ignore_dev_dependency(options.ignore_dev_dependency);
+            if let Some(override_patch_inputs) = override_patch_inputs.clone() {
+                resolver.set_override_patch_inputs(override_patch_inputs);
+            }
             let mut resolved_graph = resolver
                 .resolve(&parsed.module, workspace_root)
                 .await
@@ -4657,6 +4807,7 @@ mod tests {
                 cache_safe: true,
                 has_untracked_inputs: false,
             }),
+            override_patch_inputs: Arc::new(slug_bzlmod::OverridePatchInputs::default()),
             extension_replay_summary_digest: Some(Arc::from("extension-replay")),
         }
     }
@@ -5221,6 +5372,7 @@ mod tests {
             Some(&root_module_file),
             None,
             None,
+            None,
             Some(&mut dice),
         )
         .await
@@ -5261,6 +5413,7 @@ mod tests {
             &options,
             true,
             slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2")),
+            None,
             None,
             None,
             None,
@@ -5340,6 +5493,7 @@ mod tests {
             &options,
             true,
             workspace_id,
+            None,
             None,
             None,
             None,

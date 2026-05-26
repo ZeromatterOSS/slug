@@ -13,12 +13,14 @@
 //! This module handles downloading source archives and git repositories,
 //! verifying integrity, and extracting to the cache.
 
+use std::borrow::Cow;
 use std::io::Cursor;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 
+use allocative::Allocative;
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use sha2::Digest;
@@ -35,6 +37,30 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 use crate::cache::ModuleCache;
 use crate::integrity::verify_integrity;
 use crate::registry::SourceInfo;
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct OverridePatchInput {
+    pub label: String,
+    pub path: PathBuf,
+    pub digest: String,
+    pub content: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
+pub struct OverridePatchInputs {
+    pub digest: String,
+    pub inputs: Vec<OverridePatchInput>,
+    pub has_untracked_inputs: bool,
+}
+
+impl OverridePatchInputs {
+    pub fn content_for_label(&self, label: &str) -> Option<&[u8]> {
+        self.inputs
+            .iter()
+            .find(|input| input.label == label)
+            .map(|input| input.content.as_slice())
+    }
+}
 
 #[derive(Debug)]
 enum PatchToolError {
@@ -404,17 +430,32 @@ impl SourceFetcher {
         patches: &[String],
         patch_strip: u32,
     ) -> slug_error::Result<()> {
+        Self::apply_local_override_patches_with_inputs(
+            dest_dir,
+            workspace_root,
+            main_repo_name,
+            patches,
+            patch_strip,
+            None,
+        )
+    }
+
+    pub fn apply_local_override_patches_with_inputs(
+        dest_dir: &Path,
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
+        patches: &[String],
+        patch_strip: u32,
+        patch_inputs: Option<&OverridePatchInputs>,
+    ) -> slug_error::Result<()> {
         for patch_label in patches {
-            let patch_path =
-                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
-            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
-                format!(
-                    "Failed to read override patch '{}' at {}",
-                    patch_label,
-                    patch_path.display()
-                )
-            })?;
-            Self::apply_patch_content(dest_dir, patch_label, patch_strip, &patch_content)?;
+            let patch_content = local_override_patch_content(
+                patch_inputs,
+                workspace_root,
+                main_repo_name,
+                patch_label,
+            )?;
+            Self::apply_patch_content(dest_dir, patch_label, patch_strip, patch_content.as_ref())?;
         }
         Ok(())
     }
@@ -428,6 +469,22 @@ impl SourceFetcher {
         patches: &[String],
         patch_strip: u32,
     ) -> slug_error::Result<Option<String>> {
+        Self::local_override_patch_digest_with_inputs(
+            workspace_root,
+            main_repo_name,
+            patches,
+            patch_strip,
+            None,
+        )
+    }
+
+    pub fn local_override_patch_digest_with_inputs(
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
+        patches: &[String],
+        patch_strip: u32,
+        patch_inputs: Option<&OverridePatchInputs>,
+    ) -> slug_error::Result<Option<String>> {
         if patches.is_empty() {
             return Ok(None);
         }
@@ -437,19 +494,16 @@ impl SourceFetcher {
         hasher.update((patches.len() as u64).to_le_bytes());
         hasher.update(patch_strip.to_le_bytes());
         for patch_label in patches {
-            let patch_path =
-                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
-            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
-                format!(
-                    "Failed to read override patch '{}' at {}",
-                    patch_label,
-                    patch_path.display()
-                )
-            })?;
+            let patch_content = local_override_patch_content(
+                patch_inputs,
+                workspace_root,
+                main_repo_name,
+                patch_label,
+            )?;
             hasher.update((patch_label.len() as u64).to_le_bytes());
             hasher.update(patch_label.as_bytes());
             hasher.update((patch_content.len() as u64).to_le_bytes());
-            hasher.update(&patch_content);
+            hasher.update(patch_content.as_ref());
         }
         Ok(Some(hex::encode(hasher.finalize())))
     }
@@ -463,6 +517,24 @@ impl SourceFetcher {
         patch_strip: u32,
         patch_cmds: &[String],
     ) -> slug_error::Result<Option<String>> {
+        Self::local_override_patch_effect_digest_with_inputs(
+            workspace_root,
+            main_repo_name,
+            patches,
+            patch_strip,
+            patch_cmds,
+            None,
+        )
+    }
+
+    pub fn local_override_patch_effect_digest_with_inputs(
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
+        patches: &[String],
+        patch_strip: u32,
+        patch_cmds: &[String],
+        patch_inputs: Option<&OverridePatchInputs>,
+    ) -> slug_error::Result<Option<String>> {
         if patches.is_empty() && patch_cmds.is_empty() && patch_strip == 0 {
             return Ok(None);
         }
@@ -472,19 +544,16 @@ impl SourceFetcher {
         hasher.update((patches.len() as u64).to_le_bytes());
         hasher.update(patch_strip.to_le_bytes());
         for patch_label in patches {
-            let patch_path =
-                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
-            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
-                format!(
-                    "Failed to read override patch '{}' at {}",
-                    patch_label,
-                    patch_path.display()
-                )
-            })?;
+            let patch_content = local_override_patch_content(
+                patch_inputs,
+                workspace_root,
+                main_repo_name,
+                patch_label,
+            )?;
             hasher.update((patch_label.len() as u64).to_le_bytes());
             hasher.update(patch_label.as_bytes());
             hasher.update((patch_content.len() as u64).to_le_bytes());
-            hasher.update(&patch_content);
+            hasher.update(patch_content.as_ref());
         }
         hasher.update((patch_cmds.len() as u64).to_le_bytes());
         for cmd in patch_cmds {
@@ -503,6 +572,24 @@ impl SourceFetcher {
         patches: &[String],
         patch_strip: u32,
     ) -> slug_error::Result<String> {
+        Self::apply_single_version_module_patches_with_inputs(
+            module_content,
+            workspace_root,
+            main_repo_name,
+            patches,
+            patch_strip,
+            None,
+        )
+    }
+
+    pub fn apply_single_version_module_patches_with_inputs(
+        module_content: &str,
+        workspace_root: &Path,
+        main_repo_name: Option<&str>,
+        patches: &[String],
+        patch_strip: u32,
+        patch_inputs: Option<&OverridePatchInputs>,
+    ) -> slug_error::Result<String> {
         if patches.is_empty() {
             return Ok(module_content.to_owned());
         }
@@ -513,17 +600,17 @@ impl SourceFetcher {
             .buck_error_context("Failed to write temporary MODULE.bazel for override patches")?;
 
         for patch_label in patches {
-            let patch_path =
-                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
-            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
-                format!(
-                    "Failed to read override patch '{}' at {}",
-                    patch_label,
-                    patch_path.display()
-                )
-            })?;
-            let module_patch =
-                filter_patch_content_for_single_file(&patch_content, patch_strip, "MODULE.bazel")?;
+            let patch_content = local_override_patch_content(
+                patch_inputs,
+                workspace_root,
+                main_repo_name,
+                patch_label,
+            )?;
+            let module_patch = filter_patch_content_for_single_file(
+                patch_content.as_ref(),
+                patch_strip,
+                "MODULE.bazel",
+            )?;
             if module_patch.is_empty() {
                 continue;
             }
@@ -1187,7 +1274,39 @@ impl SourceFetcher {
     }
 }
 
-fn override_patch_label_path(
+fn local_override_patch_content<'a>(
+    patch_inputs: Option<&'a OverridePatchInputs>,
+    workspace_root: &Path,
+    main_repo_name: Option<&str>,
+    patch_label: &str,
+) -> slug_error::Result<Cow<'a, [u8]>> {
+    if let Some(patch_inputs) = patch_inputs {
+        return patch_inputs
+            .content_for_label(patch_label)
+            .map(Cow::Borrowed)
+            .ok_or_else(|| {
+                FetchError::PatchFailed {
+                    patch: format!(
+                        "tracked override patch input '{}' was not provided",
+                        patch_label
+                    ),
+                }
+                .into()
+            });
+    }
+
+    let patch_path = override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
+    let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
+        format!(
+            "Failed to read override patch '{}' at {}",
+            patch_label,
+            patch_path.display()
+        )
+    })?;
+    Ok(Cow::Owned(patch_content))
+}
+
+pub fn override_patch_label_path(
     workspace_root: &Path,
     main_repo_name: Option<&str>,
     raw_label: &str,

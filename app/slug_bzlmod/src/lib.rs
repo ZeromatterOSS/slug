@@ -160,6 +160,8 @@ pub use extensions::aggregate_extensions;
 pub use extensions::aggregate_extensions_with_policy;
 pub use extensions::canonical_extension_id;
 pub use extensions::compute_extension_input_hash;
+pub use fetch::OverridePatchInput;
+pub use fetch::OverridePatchInputs;
 pub use fetch::SourceFetcher;
 pub use integrity::verify_integrity;
 pub use lockfile::Lockfile;

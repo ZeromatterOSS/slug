@@ -422,6 +422,8 @@ pub struct MvsResolver {
     known_registry_file_hashes: IndexMap<String, String>,
     /// Selected yanked versions read from the current visible lockfile.
     previously_selected_yanked_versions: IndexMap<String, String>,
+    /// Root-local override patch files read by the DICE projection bridge.
+    override_patch_inputs: Option<Arc<crate::OverridePatchInputs>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -451,6 +453,7 @@ impl MvsResolver {
             ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
+            override_patch_inputs: None,
         })
     }
 
@@ -473,6 +476,7 @@ impl MvsResolver {
             ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
+            override_patch_inputs: None,
         })
     }
 
@@ -493,6 +497,11 @@ impl MvsResolver {
     /// Configure Bazel's command-level dev-dependency policy.
     pub fn set_ignore_dev_dependency(&mut self, ignore_dev_dependency: bool) {
         self.ignore_dev_dependency = ignore_dev_dependency;
+    }
+
+    /// Configure DICE-tracked root-local override patch inputs for production resolution.
+    pub fn set_override_patch_inputs(&mut self, inputs: Arc<crate::OverridePatchInputs>) {
+        self.override_patch_inputs = Some(inputs);
     }
 
     /// Process overrides from the root module.
@@ -737,12 +746,13 @@ impl MvsResolver {
 
         let module_bazel_content =
             if let Some(override_) = self.single_version_overrides.get(&dep.name) {
-                crate::fetch::SourceFetcher::apply_single_version_module_patches(
+                crate::fetch::SourceFetcher::apply_single_version_module_patches_with_inputs(
                     &module_bazel_file.content,
                     workspace_root,
                     main_repo_name,
                     &override_.patches,
                     override_.patch_strip,
+                    self.override_patch_inputs.as_deref(),
                 )
                 .with_buck_error_context(|| {
                     format!(
@@ -797,18 +807,20 @@ impl MvsResolver {
             }
             Override::Git(g) => {
                 // Fetch the git repo to a cache directory and parse its MODULE.bazel
-                let patch_digest = crate::fetch::SourceFetcher::local_override_patch_digest(
-                    workspace_root,
-                    Some(main_repo_name),
-                    &g.patches,
-                    g.patch_strip,
-                )
-                .with_buck_error_context(|| {
-                    format!(
-                        "Failed to fingerprint patches for git override '{}'",
-                        g.module_name
+                let patch_digest =
+                    crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
+                        workspace_root,
+                        Some(main_repo_name),
+                        &g.patches,
+                        g.patch_strip,
+                        self.override_patch_inputs.as_deref(),
                     )
-                })?;
+                    .with_buck_error_context(|| {
+                        format!(
+                            "Failed to fingerprint patches for git override '{}'",
+                            g.module_name
+                        )
+                    })?;
                 let dest_dir = self
                     .cache
                     .git_override_dir_with_patch_digest(g, patch_digest.as_deref());
@@ -844,12 +856,13 @@ impl MvsResolver {
                     self.source_fetcher
                         .fetch_git_direct(&source_info, &dest_dir)
                         .await?;
-                    crate::fetch::SourceFetcher::apply_local_override_patches(
+                    crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
                         &dest_dir,
                         workspace_root,
                         Some(main_repo_name),
                         &g.patches,
                         g.patch_strip,
+                        self.override_patch_inputs.as_deref(),
                     )
                     .with_buck_error_context(|| {
                         format!(
@@ -899,18 +912,20 @@ impl MvsResolver {
             }
             Override::Archive(a) => {
                 // Fetch the archive to a cache directory and parse its MODULE.bazel
-                let patch_digest = crate::fetch::SourceFetcher::local_override_patch_digest(
-                    workspace_root,
-                    Some(main_repo_name),
-                    &a.patches,
-                    a.patch_strip,
-                )
-                .with_buck_error_context(|| {
-                    format!(
-                        "Failed to fingerprint patches for archive override '{}'",
-                        a.module_name
+                let patch_digest =
+                    crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
+                        workspace_root,
+                        Some(main_repo_name),
+                        &a.patches,
+                        a.patch_strip,
+                        self.override_patch_inputs.as_deref(),
                     )
-                })?;
+                    .with_buck_error_context(|| {
+                        format!(
+                            "Failed to fingerprint patches for archive override '{}'",
+                            a.module_name
+                        )
+                    })?;
                 let dest_dir = self
                     .cache
                     .archive_override_dir_with_patch_digest(a, patch_digest.as_deref());
@@ -936,12 +951,13 @@ impl MvsResolver {
                             &dest_dir,
                         )
                         .await?;
-                    crate::fetch::SourceFetcher::apply_local_override_patches(
+                    crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
                         &dest_dir,
                         workspace_root,
                         Some(main_repo_name),
                         &a.patches,
                         a.patch_strip,
+                        self.override_patch_inputs.as_deref(),
                     )
                     .with_buck_error_context(|| {
                         format!(
@@ -1418,12 +1434,13 @@ impl MvsResolver {
                         let single_version_override = self.single_version_overrides.get(name);
                         let source_identity = match single_version_override {
                             Some(override_) => {
-                                crate::fetch::SourceFetcher::local_override_patch_effect_digest(
+                                crate::fetch::SourceFetcher::local_override_patch_effect_digest_with_inputs(
                                     workspace_root,
                                     main_repo_name,
                                     &override_.patches,
                                     override_.patch_strip,
                                     &override_.patch_cmds,
+                                    self.override_patch_inputs.as_deref(),
                                 )?
                             }
                             None => None,
@@ -1464,12 +1481,13 @@ impl MvsResolver {
                                         });
                                     }
                                 }
-                                crate::fetch::SourceFetcher::apply_local_override_patches(
+                                crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
                                     &source_path,
                                     workspace_root,
                                     main_repo_name,
                                     &override_.patches,
                                     override_.patch_strip,
+                                    self.override_patch_inputs.as_deref(),
                                 )
                                 .with_buck_error_context(|| {
                                     format!(

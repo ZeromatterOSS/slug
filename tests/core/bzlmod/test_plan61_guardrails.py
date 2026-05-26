@@ -5287,6 +5287,108 @@ single_version_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_single_version_override_patch_edit_materializes_same_daemon(
+    buck: Buck,
+) -> None:
+    """Root-local SVO patch labels are DICE inputs, not direct-read bridge state."""
+    cache_home = buck.cwd / "cache_home"
+    registry_cache = cache_home / "slug" / "registry" / "bcr.bazel.build"
+    registry_cache.mkdir(parents=True)
+    _write(registry_cache / "bazel_registry.json", "{}\n")
+
+    module_name = "svo_patch_edit_lib"
+    module_version = "1.0.0"
+    module_cache = registry_cache / "modules" / module_name / module_version
+    module_cache.mkdir(parents=True)
+    _write(
+        module_cache / "MODULE.bazel",
+        f'module(name = "{module_name}", version = "{module_version}")\n',
+    )
+    source_archive = buck.cwd / "svo_patch_edit_lib.zip"
+    _write_zip(
+        source_archive,
+        {
+            "MODULE.bazel": f'module(name = "{module_name}", version = "{module_version}")\n',
+            "BUILD.bazel": 'filegroup(name = "base", srcs = [])\n',
+        },
+    )
+    _write(module_cache / "source.json", json.dumps({"url": source_archive.as_uri()}) + "\n")
+
+    def write_patch(target: str) -> None:
+        _write(
+            buck.cwd / "fix.patch",
+            f"""diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1 +1,2 @@
+ filegroup(name = "base", srcs = [])
++filegroup(name = "{target}", srcs = [])
+""",
+        )
+
+    write_patch("first")
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_svo_patch_edit", repo_name = "root_repo")
+bazel_dep(name = "{module_name}", version = "{module_version}")
+single_version_override(
+    module_name = "{module_name}",
+    patches = ["@root_repo//:fix.patch"],
+    patch_strip = 1,
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        f"""filegroup(name = "uses_first", srcs = ["@{module_name}//:first"])
+filegroup(name = "uses_second", srcs = ["@{module_name}//:second"])
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    "https://bcr.bazel.build/bazel_registry.json": _sha256(
+                        registry_cache / "bazel_registry.json"
+                    ),
+                    f"https://bcr.bazel.build/modules/{module_name}/{module_version}/MODULE.bazel": _sha256(
+                        module_cache / "MODULE.bazel"
+                    ),
+                    f"https://bcr.bazel.build/modules/{module_name}/{module_version}/source.json": _sha256(
+                        module_cache / "source.json"
+                    ),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    def patched_source_builds() -> list[str]:
+        return [
+            path.read_text()
+            for path in module_cache.glob("source*/BUILD.bazel")
+        ]
+
+    env = {"XDG_CACHE_HOME": str(cache_home)}
+    _output, first = await _audit_cells_and_counters(buck, env=env)
+    _output, warm = await _audit_cells_and_counters(buck, env=env)
+    assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+    assert any('name = "first"' in content for content in patched_source_builds())
+    assert not any('name = "second"' in content for content in patched_source_builds())
+
+    write_patch("second")
+    await buck.audit("cell", env=env)
+    assert any('name = "second"' in content for content in patched_source_builds())
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_single_version_override_patch_cmd_failure_is_reported(
     buck: Buck,
 ) -> None:
