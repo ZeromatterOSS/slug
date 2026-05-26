@@ -1910,13 +1910,19 @@ fn override_patch_labels_from_root_module(
     let Some(parsed) = &root_module_file.parsed else {
         return (None, Vec::new());
     };
-    let main_repo_name = parsed
-        .module
+    override_patch_labels_from_module(&parsed.module, ignore_dev_dependency)
+}
+
+fn override_patch_labels_from_module(
+    module: &slug_bzlmod::Module,
+    ignore_dev_dependency: bool,
+) -> (Option<String>, Vec<String>) {
+    let main_repo_name = module
         .repo_name
         .clone()
-        .or_else(|| Some(parsed.module.name.clone()));
+        .or_else(|| Some(module.name.clone()));
     let mut labels = BTreeSet::new();
-    for override_ in active_root_overrides(&parsed.module, ignore_dev_dependency) {
+    for override_ in active_root_overrides(module, ignore_dev_dependency) {
         match override_ {
             slug_bzlmod::Override::SingleVersion(single) => {
                 labels.extend(single.patches);
@@ -2282,6 +2288,62 @@ async fn override_patch_inputs(
         digest: hex::encode(hasher.finalize()),
         inputs,
         has_untracked_inputs,
+    })
+}
+
+fn bootstrap_override_patch_inputs(
+    project_root: &AbsNormPathBuf,
+    main_repo_name: Option<&str>,
+    patch_labels: &[String],
+) -> slug_error::Result<slug_bzlmod::OverridePatchInputs> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"override-patch-inputs-v1");
+    hasher.update([0]);
+    let mut inputs = Vec::new();
+
+    for patch_label in patch_labels {
+        let path = slug_bzlmod::fetch::override_patch_label_path(
+            project_root.as_path(),
+            main_repo_name,
+            patch_label,
+        )?;
+        let bytes = std::fs::read(&path).with_buck_error_context(|| {
+            format!(
+                "Failed to read override patch '{}' at {}",
+                patch_label,
+                path.display()
+            )
+        })?;
+        let content = String::from_utf8(bytes).map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to read override patch '{}' at {} as UTF-8: {}",
+                patch_label,
+                path.display(),
+                e
+            )
+        })?;
+        let content = content.into_bytes();
+        let digest = slug_bzlmod::compute_sha256_hex(&content);
+
+        hasher.update(patch_label.as_bytes());
+        hasher.update([0]);
+        hasher.update(path.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.as_bytes());
+        hasher.update([0]);
+        inputs.push(slug_bzlmod::OverridePatchInput {
+            label: patch_label.clone(),
+            path,
+            digest,
+            content,
+        });
+    }
+
+    Ok(slug_bzlmod::OverridePatchInputs {
+        digest: hex::encode(hasher.finalize()),
+        inputs,
+        has_untracked_inputs: !patch_labels.is_empty(),
     })
 }
 
@@ -3683,6 +3745,20 @@ impl BuckConfigBasedCells {
                 "Running MVS resolution for {} direct dependencies",
                 parsed.module.bazel_deps.len()
             );
+            let override_patch_inputs =
+                if let Some(override_patch_inputs) = override_patch_inputs.clone() {
+                    override_patch_inputs
+                } else {
+                    let (main_repo_name, override_patch_labels) = override_patch_labels_from_module(
+                        &parsed.module,
+                        options.ignore_dev_dependency,
+                    );
+                    Arc::new(bootstrap_override_patch_inputs(
+                        &project_root_abs,
+                        main_repo_name.as_deref(),
+                        &override_patch_labels,
+                    )?)
+                };
 
             // Propagate resolver-level errors: a failure here means the
             // bzlmod resolver itself is broken (e.g. cache dir inaccessible,
@@ -3720,9 +3796,7 @@ impl BuckConfigBasedCells {
                 );
             }
             resolver.set_ignore_dev_dependency(options.ignore_dev_dependency);
-            if let Some(override_patch_inputs) = override_patch_inputs.clone() {
-                resolver.set_override_patch_inputs(override_patch_inputs);
-            }
+            resolver.set_override_patch_inputs(override_patch_inputs);
             let mut resolved_graph = resolver
                 .resolve(&parsed.module, workspace_root)
                 .await
@@ -3745,15 +3819,7 @@ impl BuckConfigBasedCells {
             // module resolution; registry/source access errors are direct
             // resolution failures, not warnings followed by a broken cell graph.
             resolver
-                .fetch_sources(
-                    &mut resolved_graph,
-                    workspace_root,
-                    parsed
-                        .module
-                        .repo_name
-                        .as_deref()
-                        .or(Some(parsed.module.name.as_str())),
-                )
+                .fetch_sources(&mut resolved_graph)
                 .await
                 .with_buck_error_context(|| {
                     format!(

@@ -212,6 +212,28 @@ Observed SDK result at the checkpoint:
   `cargo check -p slug_file_watcher`, `cargo build -p slug`, the same
   explicit-binary Plan 61 selector (`6 passed, 149 deselected`),
   `cargo fmt --check`, and `git diff --check`.
+  Bridge burn-down note for the direct-read fallback deletion: the production
+  bridge surface reduced is the implicit patch-file reopening fallback inside
+  `SourceFetcher` itself. Before this slice, `apply_local_override_patches`,
+  `local_override_patch_digest`, `local_override_patch_effect_digest`, and
+  `apply_single_version_module_patches` could all pass `None` through
+  `local_override_patch_content`, which then reopened the root patch file from
+  disk during digesting or application. After this slice, those no-input helpers
+  are gone, every patch digest/apply helper requires an `OverridePatchInputs`
+  value, `MvsResolver` carries an `Arc<OverridePatchInputs>` rather than an
+  optional fallback, and the only normal-command bootstrap caller constructs a
+  named `OverridePatchInputs` value before invoking the resolver. The intended
+  owner is still `OverridePatchInputsKey` over tracked `ProjectReadFileKey`
+  inputs feeding the bzlmod resolver/cell graph; the remaining bridge is now the
+  explicit no-DICE `bootstrap_override_patch_inputs` adapter in legacy config
+  parsing, not a hidden read fallback in source fetching. Before/after evidence:
+  `rg -n "std::fs::read\\(&patch_path\\)|patch_inputs: Option<&.*OverridePatchInputs|apply_local_override_patches\\(|local_override_patch_digest\\(|local_override_patch_effect_digest\\(|apply_single_version_module_patches\\(" app/slug_bzlmod/src app/slug_common/src tests -g '*.rs' -g '*.py'`
+  now returns no hits. Validation passed with `cargo test -p slug_bzlmod
+  override_patch_helpers_require_tracked_inputs -- --nocapture`, `cargo test -p
+  slug_bzlmod single_version_module_patch_skips_non_module_hunks --
+  --nocapture`, `cargo check -p slug_bzlmod`, `cargo check -p slug_common`,
+  `cargo build -p slug`, the same explicit-binary Plan 61 selector (`6 passed,
+  149 deselected`), `cargo fmt --check`, and `git diff --check`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets

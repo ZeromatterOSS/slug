@@ -423,7 +423,7 @@ pub struct MvsResolver {
     /// Selected yanked versions read from the current visible lockfile.
     previously_selected_yanked_versions: IndexMap<String, String>,
     /// Root-local override patch files read by the DICE projection bridge.
-    override_patch_inputs: Option<Arc<crate::OverridePatchInputs>>,
+    override_patch_inputs: Arc<crate::OverridePatchInputs>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -453,7 +453,7 @@ impl MvsResolver {
             ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
-            override_patch_inputs: None,
+            override_patch_inputs: Arc::new(crate::OverridePatchInputs::default()),
         })
     }
 
@@ -476,7 +476,7 @@ impl MvsResolver {
             ignore_dev_dependency: false,
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
-            override_patch_inputs: None,
+            override_patch_inputs: Arc::new(crate::OverridePatchInputs::default()),
         })
     }
 
@@ -501,7 +501,7 @@ impl MvsResolver {
 
     /// Configure DICE-tracked root-local override patch inputs for production resolution.
     pub fn set_override_patch_inputs(&mut self, inputs: Arc<crate::OverridePatchInputs>) {
-        self.override_patch_inputs = Some(inputs);
+        self.override_patch_inputs = inputs;
     }
 
     /// Process overrides from the root module.
@@ -579,8 +579,6 @@ impl MvsResolver {
     ) -> slug_error::Result<()> {
         let mut queue: VecDeque<(BazelDep, Option<PathBuf>)> = VecDeque::new();
         let mut visited: HashSet<ModuleKey> = HashSet::new();
-        let main_repo_name = root.repo_name.as_deref().unwrap_or(&root.name);
-
         // Process overrides first
         self.process_overrides(&root.overrides);
 
@@ -603,7 +601,7 @@ impl MvsResolver {
                 Override::Archive(a) => &a.module_name,
                 _ => "unknown",
             };
-            self.resolve_override_module(override_, root, workspace_root)
+            self.resolve_override_module(override_, workspace_root)
                 .await
                 .with_buck_error_context(|| {
                     format!("Failed to resolve non-registry override module '{name}'")
@@ -669,9 +667,7 @@ impl MvsResolver {
             }
 
             // Fetch module from registry
-            let discovered = self
-                .fetch_and_discover_module(&dep, workspace_root, Some(main_repo_name))
-                .await?;
+            let discovered = self.fetch_and_discover_module(&dep).await?;
 
             // Add transitive dependencies to queue
             for transitive_dep in &discovered.module.bazel_deps {
@@ -707,8 +703,6 @@ impl MvsResolver {
     async fn fetch_and_discover_module(
         &mut self,
         dep: &BazelDep,
-        workspace_root: &Path,
-        main_repo_name: Option<&str>,
     ) -> slug_error::Result<DiscoveredModule> {
         let version_str = dep.version.as_str();
         let key = ModuleKey::from_dep(dep);
@@ -748,11 +742,9 @@ impl MvsResolver {
             if let Some(override_) = self.single_version_overrides.get(&dep.name) {
                 crate::fetch::SourceFetcher::apply_single_version_module_patches_with_inputs(
                     &module_bazel_file.content,
-                    workspace_root,
-                    main_repo_name,
                     &override_.patches,
                     override_.patch_strip,
-                    self.override_patch_inputs.as_deref(),
+                    &self.override_patch_inputs,
                 )
                 .with_buck_error_context(|| {
                     format!(
@@ -787,10 +779,8 @@ impl MvsResolver {
     async fn resolve_override_module(
         &mut self,
         override_: &Override,
-        root: &Module,
         workspace_root: &Path,
     ) -> slug_error::Result<()> {
-        let main_repo_name = root.repo_name.as_deref().unwrap_or(&root.name);
         match override_ {
             Override::LocalPath(lp) => {
                 let resolved = resolve_local_override(lp, workspace_root)?;
@@ -809,11 +799,9 @@ impl MvsResolver {
                 // Fetch the git repo to a cache directory and parse its MODULE.bazel
                 let patch_digest =
                     crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
-                        workspace_root,
-                        Some(main_repo_name),
                         &g.patches,
                         g.patch_strip,
-                        self.override_patch_inputs.as_deref(),
+                        &self.override_patch_inputs,
                     )
                     .with_buck_error_context(|| {
                         format!(
@@ -858,11 +846,9 @@ impl MvsResolver {
                         .await?;
                     crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
                         &dest_dir,
-                        workspace_root,
-                        Some(main_repo_name),
                         &g.patches,
                         g.patch_strip,
-                        self.override_patch_inputs.as_deref(),
+                        &self.override_patch_inputs,
                     )
                     .with_buck_error_context(|| {
                         format!(
@@ -914,11 +900,9 @@ impl MvsResolver {
                 // Fetch the archive to a cache directory and parse its MODULE.bazel
                 let patch_digest =
                     crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
-                        workspace_root,
-                        Some(main_repo_name),
                         &a.patches,
                         a.patch_strip,
-                        self.override_patch_inputs.as_deref(),
+                        &self.override_patch_inputs,
                     )
                     .with_buck_error_context(|| {
                         format!(
@@ -953,11 +937,9 @@ impl MvsResolver {
                         .await?;
                     crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
                         &dest_dir,
-                        workspace_root,
-                        Some(main_repo_name),
                         &a.patches,
                         a.patch_strip,
-                        self.override_patch_inputs.as_deref(),
+                        &self.override_patch_inputs,
                     )
                     .with_buck_error_context(|| {
                         format!(
@@ -1399,12 +1381,7 @@ impl MvsResolver {
     /// Fetch sources for all resolved modules.
     ///
     /// This downloads and extracts sources for modules that don't have local overrides.
-    pub async fn fetch_sources(
-        &self,
-        graph: &mut ResolvedGraph,
-        workspace_root: &Path,
-        main_repo_name: Option<&str>,
-    ) -> slug_error::Result<()> {
+    pub async fn fetch_sources(&self, graph: &mut ResolvedGraph) -> slug_error::Result<()> {
         let mut first_error = None;
 
         for (name, info) in &mut graph.modules {
@@ -1435,12 +1412,10 @@ impl MvsResolver {
                         let source_identity = match single_version_override {
                             Some(override_) => {
                                 crate::fetch::SourceFetcher::local_override_patch_effect_digest_with_inputs(
-                                    workspace_root,
-                                    main_repo_name,
                                     &override_.patches,
                                     override_.patch_strip,
                                     &override_.patch_cmds,
-                                    self.override_patch_inputs.as_deref(),
+                                    &self.override_patch_inputs,
                                 )?
                             }
                             None => None,
@@ -1483,11 +1458,9 @@ impl MvsResolver {
                                 }
                                 crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
                                     &source_path,
-                                    workspace_root,
-                                    main_repo_name,
                                     &override_.patches,
                                     override_.patch_strip,
-                                    self.override_patch_inputs.as_deref(),
+                                    &self.override_patch_inputs,
                                 )
                                 .with_buck_error_context(|| {
                                     format!(
