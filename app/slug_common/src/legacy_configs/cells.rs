@@ -3193,9 +3193,16 @@ impl Key for OverridePatchInputsKey {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct BzlmodProjectionBridgeValue {
+    projection_data: slug_bzlmod::BzlmodProjectionData,
+    resolution_facts: slug_bzlmod::BzlmodResolutionFactsValue,
+    repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
+}
+
 #[async_trait]
 impl Key for BzlmodProjectionBridgeDiceKey {
-    type Value = slug_error::Result<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>;
+    type Value = slug_error::Result<Arc<Option<BzlmodProjectionBridgeValue>>>;
 
     async fn compute(
         &self,
@@ -3299,11 +3306,33 @@ impl BuckConfigBasedCells {
                 .buck_error_context("Computing bzlmod projection bridge through DICE")?;
             (key, bzlmod_projection)
         };
-        let projection_data_for_dice = bzlmod_projection.as_ref().clone().unwrap_or_else(|| {
-            slug_bzlmod::BzlmodProjectionData::for_workspace(
-                key.resolution_key.workspace_id.clone(),
-            )
-        });
+        let (projection_data_for_dice, resolution_facts_for_dice, repo_mappings_for_dice) =
+            bzlmod_projection.as_ref().as_ref().map_or_else(
+                || {
+                    (
+                        slug_bzlmod::BzlmodProjectionData::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                        ),
+                        slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                            indexmap::IndexMap::new(),
+                            indexmap::IndexMap::new(),
+                        ),
+                        slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                            Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
+                            Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
+                        ),
+                    )
+                },
+                |value| {
+                    (
+                        value.projection_data.clone(),
+                        value.resolution_facts.clone(),
+                        value.repo_mappings.clone(),
+                    )
+                },
+            );
 
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
@@ -3312,7 +3341,7 @@ impl BuckConfigBasedCells {
                 bzlmod_projection
                     .as_ref()
                     .as_ref()
-                    .map(|data| data.cell_graph.clone()),
+                    .map(|data| data.projection_data.cell_graph.clone()),
             )),
             key.resolution_key.workspace_id.clone(),
         )
@@ -3329,6 +3358,8 @@ impl BuckConfigBasedCells {
                 key.resolution_key.workspace_id.clone(),
                 Arc::new(key.options.repo_env.clone()),
             ),
+            resolution_facts_for_dice,
+            repo_mappings_for_dice,
         )?;
         Ok(configs)
     }
@@ -3525,7 +3556,7 @@ impl BuckConfigBasedCells {
                 None,
             )
             .await?
-            .map(|data| data.cell_graph)
+            .map(|data| data.projection_data.cell_graph)
         } else {
             None
         } {
@@ -3691,7 +3722,7 @@ impl BuckConfigBasedCells {
     async fn compute_bzlmod_projection_bridge(
         key: &BzlmodProjectionBridgeDiceKey,
         dice_ctx: &mut DiceComputations<'_>,
-    ) -> slug_error::Result<Arc<Option<slug_bzlmod::BzlmodProjectionData>>> {
+    ) -> slug_error::Result<Arc<Option<BzlmodProjectionBridgeValue>>> {
         let root_module_file = key.root_module_file.clone();
         if root_module_file.parsed.is_none() {
             return Ok(Arc::new(None));
@@ -3733,7 +3764,7 @@ impl BuckConfigBasedCells {
         hidden_lockfile: Option<Arc<slug_bzlmod::LockfileContentValue>>,
         override_patch_inputs: Option<Arc<slug_bzlmod::OverridePatchInputs>>,
         mut dice_ctx: Option<&mut DiceComputations<'_>>,
-    ) -> slug_error::Result<Option<slug_bzlmod::BzlmodProjectionData>> {
+    ) -> slug_error::Result<Option<BzlmodProjectionBridgeValue>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
         let using_dice_inputs = dice_ctx.is_some();
@@ -3796,6 +3827,11 @@ impl BuckConfigBasedCells {
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let mut bzlmod_projection_data =
             slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id);
+        let mut resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
+            bzlmod_projection_data.cell_graph.workspace_id.clone(),
+            indexmap::IndexMap::new(),
+            indexmap::IndexMap::new(),
+        );
         let repo_env = Arc::new(options.repo_env.clone());
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
             options.allow_yanked_versions_env.as_deref(),
@@ -3950,12 +3986,11 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
-            bzlmod_projection_data.resolution_facts =
-                slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-                    bzlmod_projection_data.cell_graph.workspace_id.clone(),
-                    resolved_graph.registry_file_hashes.clone(),
-                    resolved_graph.selected_yanked_versions.clone(),
-                );
+            resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
+                bzlmod_projection_data.cell_graph.workspace_id.clone(),
+                resolved_graph.registry_file_hashes.clone(),
+                resolved_graph.selected_yanked_versions.clone(),
+            );
 
             // Build a set of local override names to skip
             let local_override_names: std::collections::HashSet<_> = active_overrides
@@ -4574,12 +4609,11 @@ impl BuckConfigBasedCells {
             &cells,
             resolved_graph_for_aliases.as_ref(),
         );
-        bzlmod_projection_data.repo_mappings =
-            slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-                bzlmod_projection_data.cell_graph.workspace_id.clone(),
-                Arc::new(repo_mappings),
-                Arc::new(repo_mapping_overrides),
-            );
+        let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+            bzlmod_projection_data.cell_graph.workspace_id.clone(),
+            Arc::new(repo_mappings),
+            Arc::new(repo_mapping_overrides),
+        );
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);
@@ -4690,7 +4724,11 @@ impl BuckConfigBasedCells {
         };
         bzlmod_projection_data.cell_graph = cell_graph;
 
-        Ok(Some(bzlmod_projection_data))
+        Ok(Some(BzlmodProjectionBridgeValue {
+            projection_data: bzlmod_projection_data,
+            resolution_facts,
+            repo_mappings,
+        }))
     }
 
     pub(crate) fn get_cell_aliases_from_config(
@@ -5885,6 +5923,7 @@ mod tests {
         assert!(configs.is_bzlmod);
         assert_eq!(
             projection_data
+                .projection_data
                 .cell_graph
                 .workspace_id
                 .output_base

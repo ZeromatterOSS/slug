@@ -1095,6 +1095,16 @@ mod tests {
                 Arc::new(slug_bzlmod::BzlmodLockfileInputsValue::default()),
             ),
             repo_env,
+            slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
+                workspace_id.clone(),
+                Default::default(),
+                Default::default(),
+            ),
+            slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
+                Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
+            ),
         )?;
         let mut dice = updater.commit().await;
 
