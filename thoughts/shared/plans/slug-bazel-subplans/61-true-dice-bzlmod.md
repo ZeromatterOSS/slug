@@ -4240,6 +4240,23 @@ hardening behavior around it.
   `cargo check`, `cargo build -p slug`, the explicit-binary Plan 61 selector for
   explicit module repo names and scoped/root alias leakage (`3 passed, 152
   deselected`), `cargo fmt --check`, and `git diff --check`.
+- Follow-up clean review found that `override_repo()` / `inject_repo()` target
+  values could still be persisted as root-visible apparent aliases in
+  `RepoMappingOverrides`, then copied into extension-generated repo mappings.
+  This slice canonicalizes override target values through the already
+  canonicalized root repo mapping first, falling back to the selected module
+  cell lookup, before the overrides feed `add_extension_generated_repo_mappings`
+  or `BzlmodRepoMappingsDataValue`. Bridge surface reduced: root override/inject
+  mapping rows no longer preserve apparent root aliases such as `helper_alias`
+  when the graph-owned cell is `dep+`. The intended owner is still
+  `RepoMappingKey` plus `BzlmodCellGraphKey`; this keeps the transitional
+  projection's stored repo mappings aligned with that shape. Validation passed
+  with focused `cargo test -p slug_common
+  repo_mapping_override_targets_use_canonical_root_mapping_targets --
+  --nocapture`, `cargo check -p slug_common -p slug_bzlmod`, `cargo build -p
+  slug`, and the explicit-binary Plan 61 selector for inject/override repo
+  mapping and root alias leakage (`4 passed, 151 deselected`), plus `cargo fmt
+  --check` and `git diff --check`.
 - The remaining public `slug_core::cells::canonical_bazel_repo_name_for_cell`
   process-global helper and the unused resolver method that could still call it
   on no-runtime-snapshot misses are deleted. Bridge surface reduced: callers
