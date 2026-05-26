@@ -2602,6 +2602,32 @@ Observed SDK result at the checkpoint:
   `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo check -p slug_core -p
   slug_configured -p slug_analysis -p slug_build_api`, and
   `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo build -p slug`.
+- Target-owned output path cell naming now uses the configured target label's
+  stored package cell directly instead of consulting process-global bzlmod
+  alias/module helpers. The removed bridge surface is
+  `BaseDeferredKey::make_hashed_path` and `make_unhashed_path` reaching
+  `slug_core::cells::canonical_bazel_repo_name_for_cell` through
+  `bazel_output_cell_name` while formatting `buck-out`/Bazel-output paths. The
+  DICE/Skyframe-shaped owner is the configured target label produced from the
+  active cell graph; output path formatting should not reinterpret that cell
+  through mutable process-global alias state. Bridge burn-down before/after
+  evidence: before, `rg -n
+  "canonical_bazel_repo_name_for_cell\\(cell_name\\)|canonical_bazel_repo_name_for_cell\\("
+  app/slug_core/src/deferred/base_deferred_key.rs` found the production bridge
+  call; after, it returns no hits, and `rg -n
+  "bazel_output_cell_name|without_global_alias|output_cell_name_without_owner|target_label_output_path"
+  app/slug_core/src/deferred/base_deferred_key.rs` shows stored-cell formatting
+  plus stale-global miss coverage. Validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_core
+  output_cell -- --nocapture` (`1 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_core
+  target_label_output_path -- --nocapture` (`1 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_core buck_ --
+  --nocapture` (`6 passed`), `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo
+  check -p slug_core`, and `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo
+  build -p slug`. The first validation attempt exposed `/var/mnt/dev` at 100%
+  full; generated temp Cargo target dirs and `target/debug/incremental` were
+  removed, freeing about 108G before rerunning the tests.
 - Toolchain implementation label parsing now uses only the active cell
   resolver's declared aliases and runtime snapshot aliases for repo-name
   canonicalization. Resolverless and no-runtime-snapshot resolver misses stay on
@@ -4157,6 +4183,11 @@ hardening behavior around it.
   instead of consulting process-global dynamic aliases. The remaining bridge is
   the producer: the resolver snapshot is still derived from legacy-produced cell
   graph data rather than a true `BzlmodCellGraphKey`.
+- Target-owned output path formatting now uses the configured target label's
+  stored package cell name directly instead of process-global bzlmod
+  alias/module canonicalization. The remaining bridge is the producer: those
+  labels still ultimately come from the legacy-produced cell graph until
+  `BzlmodCellGraphKey` is true graph-owned data.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
   cells, but the final cell graph is still injected from legacy-produced data.

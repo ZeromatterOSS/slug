@@ -66,11 +66,7 @@ impl PartialEq for BaseDeferredKeyBxl {
 }
 
 fn bazel_output_cell_name(cell_name: &str) -> String {
-    if crate::cells::is_root_cell_name(cell_name) {
-        cell_name.to_owned()
-    } else {
-        crate::cells::canonical_bazel_repo_name_for_cell(cell_name)
-    }
+    cell_name.to_owned()
 }
 
 fn has_bazel_external_prefix(path: &ForwardRelativePath, cell_name: &str) -> bool {
@@ -399,5 +395,84 @@ impl BaseDeferredKey {
             | BaseDeferredKey::BxlLabel(BaseDeferredKeyBxl(d))
             | BaseDeferredKey::Aspect(d) => d.to_proto(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use slug_fs::paths::forward_rel_path::ForwardRelativePath;
+
+    use crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK;
+    use crate::cells::name::CellName;
+    use crate::cells::paths::CellRelativePath;
+    use crate::configuration::data::ConfigurationData;
+    use crate::deferred::base_deferred_key::BaseDeferredKey;
+    use crate::deferred::base_deferred_key::bazel_output_cell_name;
+    use crate::fs::buck_out_path::BuckOutPathKind;
+    use crate::fs::project_rel_path::ProjectRelativePath;
+    use crate::package::PackageLabel;
+    use crate::target::label::label::TargetLabel;
+    use crate::target::name::TargetNameRef;
+
+    #[test]
+    fn bazel_output_cell_name_without_owner_ignores_dynamic_alias() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let apparent = "plan61_output_cell";
+        let wrong_global = "plan61_wrong_owner++output+cell";
+        crate::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+
+        assert_eq!(bazel_output_cell_name(apparent), apparent);
+        assert_eq!(
+            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+    }
+
+    #[test]
+    fn target_label_output_path_uses_stored_cell_name_without_global_alias()
+    -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let apparent = "plan61_output_path_cell";
+        let wrong_global = "plan61_wrong_owner++output+path_cell";
+        crate::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let pkg = PackageLabel::new(
+            CellName::testing_new(apparent),
+            CellRelativePath::unchecked_new("pkg"),
+        )?;
+        let target = TargetLabel::new(pkg, TargetNameRef::unchecked_new("target"))
+            .configure(ConfigurationData::testing_new());
+        let owner = BaseDeferredKey::TargetLabel(target);
+
+        let path = owner.make_hashed_path(
+            ProjectRelativePath::unchecked_new("buck-out"),
+            ForwardRelativePath::unchecked_new("gen"),
+            None,
+            ForwardRelativePath::unchecked_new("out.txt"),
+            false,
+            BuckOutPathKind::Configuration,
+            None,
+        )?;
+
+        assert!(
+            path.as_str()
+                .starts_with(&format!("buck-out/gen/{apparent}/")),
+            "{path}"
+        );
+        assert!(!path.as_str().contains(wrong_global), "{path}");
+        assert_eq!(
+            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
     }
 }
