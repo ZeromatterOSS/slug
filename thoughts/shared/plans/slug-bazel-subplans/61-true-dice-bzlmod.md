@@ -2576,6 +2576,32 @@ Observed SDK result at the checkpoint:
   `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-build-setting
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-build-setting-target
   cargo test -p slug_core build_setting_labels -- --nocapture`.
+- Generic `BuildSettingLabel` repo normalization now uses only the caller's
+  supplied `CellAliasResolver` declared aliases and runtime snapshot aliases.
+  The removed bridge surface is `resolve_bzlmod_build_setting_repo` reaching
+  fallback-bearing `CellAliasResolver::canonical_bzlmod_repo_name_for_cell`
+  and then process-global `resolve_dynamic_extension_cell_alias(repo)`.
+  Resolverless parsing and no-runtime-snapshot resolver misses now keep the
+  apparent repo spelling, while `@@` still strips to Slug's single-`@` internal
+  syntax. The DICE/Skyframe-shaped owner is the build-setting caller's
+  resolver-owned alias view, backed by the runtime cell graph snapshot and
+  ultimately `BzlmodCellGraphKey`; parser calls without that owner are
+  syntactic only. Bridge burn-down before/after evidence: before, `rg -n
+  "canonical_bzlmod_repo_name_for_cell\\(repo\\)|resolve_dynamic_extension_cell_alias\\(repo\\)"
+  app/slug_core/src/configuration/build_setting.rs` found both production
+  bridge calls; after, it returns no hits, and `rg -n
+  "resolve_declared_or_runtime_alias\\(repo\\)|no_snapshot|without_alias_owner|runtime_miss"
+  app/slug_core/src/configuration/build_setting.rs` shows the owner-only helper
+  plus stale-global miss coverage. Validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_core
+  build_setting_labels -- --nocapture` (`5 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_configured
+  target_platform_resolution -- --nocapture` (`7 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_analysis
+  build_setting_lookup_ -- --nocapture` (`4 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo check -p slug_core -p
+  slug_configured -p slug_analysis -p slug_build_api`, and
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo build -p slug`.
 - Toolchain implementation label parsing now uses only the active cell
   resolver's declared aliases and runtime snapshot aliases for repo-name
   canonicalization. Resolverless and no-runtime-snapshot resolver misses stay on
@@ -4118,6 +4144,10 @@ hardening behavior around it.
   the active cell alias resolver, so transition-produced settings no longer
   need process-global generated-repo aliases when a runtime snapshot is
   available.
+- Generic build-setting label parsing now uses only a caller-supplied active
+  cell alias resolver for bzlmod repo-spelling normalization; resolverless and
+  no-runtime-snapshot misses keep the apparent repo spelling instead of
+  consulting process-global generated-repo aliases.
 - Configured provider `Label` values exposed through normal analysis `ctx.attr`,
   dependency objects, query-result dependencies, source-file targets, derived
   same-package/relative labels, subtargets, and `ctx.label` now carry the

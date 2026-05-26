@@ -112,12 +112,9 @@ fn resolve_bzlmod_build_setting_repo(
     repo: &str,
     cell_alias_resolver: Option<&cells::CellAliasResolver>,
 ) -> Option<String> {
-    if let Some(resolver) = cell_alias_resolver {
-        let canonical = resolver.canonical_bzlmod_repo_name_for_cell(repo);
-        return (canonical != repo).then_some(canonical);
-    }
-
-    cells::resolve_dynamic_extension_cell_alias(repo)
+    cell_alias_resolver
+        .and_then(|resolver| resolver.resolve_declared_or_runtime_alias(repo))
+        .map(|cell| cell.as_str().to_owned())
 }
 
 #[cfg(test)]
@@ -133,15 +130,17 @@ mod tests {
     use crate::cells::name::CellName;
 
     #[test]
-    fn build_setting_labels_resolve_dynamic_extension_aliases() {
+    fn build_setting_labels_without_alias_owner_ignore_dynamic_extension_aliases() {
         let _guard = crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK
             .lock()
             .unwrap();
         let tmp = tempfile::tempdir().unwrap();
         crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let apparent = "rules_rs++rules_rust+rules_rust";
+        let wrong_global = "rules_rust+";
         crate::cells::register_dynamic_extension_cell_alias(
-            "rules_rs++rules_rust+rules_rust".to_owned(),
-            "rules_rust+".to_owned(),
+            apparent.to_owned(),
+            wrong_global.to_owned(),
         );
 
         let label = BuildSettingLabel::from_bazel_label(
@@ -149,8 +148,12 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(label.target().pkg().cell_name().as_str(), "rules_rust+");
+        assert_eq!(label.target().pkg().cell_name().as_str(), apparent);
         assert_eq!(label.target().name().as_str(), "bootstrap_setting");
+        assert_eq!(
+            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
     }
 
     #[test]
@@ -213,6 +216,35 @@ mod tests {
             HashMap::new(),
             &snapshot,
         )?;
+
+        let label = BuildSettingLabel::from_bazel_label_with_alias_resolver(
+            &format!("@@{apparent}//pkg:flag"),
+            Some(&resolver),
+        )?;
+
+        assert_eq!(label.target().pkg().cell_name().as_str(), apparent);
+        assert_eq!(
+            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn build_setting_labels_no_snapshot_resolver_miss_ignores_global_alias()
+    -> slug_error::Result<()> {
+        let _guard = crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK
+            .lock()
+            .unwrap();
+        let tmp = tempfile::tempdir()?;
+        crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+        let apparent = "plan61_build_setting_no_snapshot_miss";
+        let wrong_global = "plan61_wrong_owner++settings+no_snapshot";
+        crate::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
 
         let label = BuildSettingLabel::from_bazel_label_with_alias_resolver(
             &format!("@@{apparent}//pkg:flag"),
