@@ -2314,7 +2314,7 @@ impl CellResolver {
         if let Ok(dynamic) = self.0.dynamic_cells.read() {
             if dynamic
                 .get(&cell)
-                .and_then(DynamicCellInstance::instance_for_current_context)
+                .and_then(|entry| self.dynamic_cell_instance_for_lookup(entry))
                 .is_some()
             {
                 // Drop the read lock, get a write lock, and leak a reference
@@ -2427,7 +2427,7 @@ impl CellResolver {
         })?;
         if let Some(instance) = dynamic
             .get(&cell)
-            .and_then(DynamicCellInstance::instance_for_current_context)
+            .and_then(|entry| self.dynamic_cell_instance_for_lookup(entry))
         {
             Ok(instance)
         } else {
@@ -2435,6 +2435,17 @@ impl CellResolver {
                 cell,
                 self.0.cells.keys().copied().collect(),
             )))
+        }
+    }
+
+    fn dynamic_cell_instance_for_lookup(
+        &self,
+        entry: &DynamicCellInstance,
+    ) -> Option<&'static CellInstance> {
+        if self.0.bzlmod_runtime_cell_snapshot.is_some() {
+            entry.graph_owned_instance()
+        } else {
+            entry.instance_for_current_context()
         }
     }
 
@@ -2514,7 +2525,7 @@ impl CellResolver {
             .and_then(|dynamic| {
                 dynamic
                     .get(&cell)
-                    .and_then(DynamicCellInstance::instance_for_current_context)
+                    .and_then(|entry| self.dynamic_cell_instance_for_lookup(entry))
                     .map(|_| ())
             })
             .is_some()
@@ -3230,6 +3241,7 @@ mod tests {
                 ForwardRelativePathBuf::unchecked_new(format!("{stale_path}/defs.bzl")).into()
             )
         );
+        assert!(resolver.get(stale_cell).is_err());
 
         Ok(())
     }

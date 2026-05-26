@@ -4290,6 +4290,18 @@ hardening behavior around it.
   legacy-produced data. Validation passed with focused `cargo test -p slug_core
   get_cell_path_ -- --nocapture`, `cargo check -p slug_core`, `cargo fmt
   --check`, and `git diff --check`.
+- Runtime-snapshot `CellResolver` name lookup now follows the same ownership
+  boundary as path projection: resolver-local graph-owned dynamic cells remain
+  valid, but root-scoped process-global dynamic cells are ignored whenever a
+  resolver-owned runtime snapshot exists. Bridge surface reduced: a stale
+  root-scoped dynamic cell can no longer satisfy either
+  `CellResolver::get(name)` or `get_cell_path(path)` for a resolver whose
+  `BzlmodCellGraphKey`-backed runtime snapshot does not own that generated repo.
+  The remaining bridge is still the producer: the runtime snapshot is injected
+  from legacy-produced cell graph data. Validation passed with focused
+  `cargo test -p slug_core
+  get_cell_path_with_runtime_snapshot_rejects_root_scoped_dynamic_cell_miss --
+  --nocapture`.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.
