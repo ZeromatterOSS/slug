@@ -5243,7 +5243,7 @@ async def test_archive_override_patches_apply_to_fetched_module(
 ) -> None:
     """Bazel anchors: ModuleFileFunction fetches overrides before parsing MODULE.bazel."""
     module_name = "archive_override_patch_lib"
-    patch_label = "//:fix.patch"
+    patch_label = "@root_repo//:fix.patch"
     archive_path = buck.cwd / "archive_override_patch_lib.zip"
     _write_zip(
         archive_path,
@@ -5278,7 +5278,7 @@ diff --git a/BUILD.bazel b/BUILD.bazel
     )
     _write(
         buck.cwd / "MODULE.bazel",
-        f"""module(name = "plan61_archive_patches_supported")
+        f"""module(name = "plan61_archive_patches_supported", repo_name = "root_repo")
 bazel_dep(name = "{module_name}", version = "1.0.0")
 archive_override(
     module_name = "{module_name}",

@@ -593,7 +593,7 @@ impl MvsResolver {
                 Override::Archive(a) => &a.module_name,
                 _ => "unknown",
             };
-            self.resolve_override_module(override_, workspace_root)
+            self.resolve_override_module(override_, root, workspace_root)
                 .await
                 .with_buck_error_context(|| {
                     format!("Failed to resolve non-registry override module '{name}'")
@@ -753,8 +753,10 @@ impl MvsResolver {
     async fn resolve_override_module(
         &mut self,
         override_: &Override,
+        root: &Module,
         workspace_root: &Path,
     ) -> slug_error::Result<()> {
+        let main_repo_name = root.repo_name.as_deref().unwrap_or(&root.name);
         match override_ {
             Override::LocalPath(lp) => {
                 let resolved = resolve_local_override(lp, workspace_root)?;
@@ -773,6 +775,7 @@ impl MvsResolver {
                 // Fetch the git repo to a cache directory and parse its MODULE.bazel
                 let patch_digest = crate::fetch::SourceFetcher::local_override_patch_digest(
                     workspace_root,
+                    Some(main_repo_name),
                     &g.patches,
                     g.patch_strip,
                 )
@@ -820,6 +823,7 @@ impl MvsResolver {
                     crate::fetch::SourceFetcher::apply_local_override_patches(
                         &dest_dir,
                         workspace_root,
+                        Some(main_repo_name),
                         &g.patches,
                         g.patch_strip,
                     )
@@ -873,6 +877,7 @@ impl MvsResolver {
                 // Fetch the archive to a cache directory and parse its MODULE.bazel
                 let patch_digest = crate::fetch::SourceFetcher::local_override_patch_digest(
                     workspace_root,
+                    Some(main_repo_name),
                     &a.patches,
                     a.patch_strip,
                 )
@@ -910,6 +915,7 @@ impl MvsResolver {
                     crate::fetch::SourceFetcher::apply_local_override_patches(
                         &dest_dir,
                         workspace_root,
+                        Some(main_repo_name),
                         &a.patches,
                         a.patch_strip,
                     )

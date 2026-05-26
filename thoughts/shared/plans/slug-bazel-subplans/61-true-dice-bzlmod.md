@@ -100,10 +100,12 @@ Observed SDK result at the checkpoint:
 - Root-main-repo `archive_override(patches = ...)` and
   `git_override(patches = ...)` are now supported for direct non-registry
   override fetches: Slug validates Bazel's main-repository patch-label rule,
-  applies local patch labels after fetch/extract and before reading the
-  override `MODULE.bazel`, includes `patches`, `patch_strip`, and local patch
-  file bytes in the non-registry override cache directory identity, and
-  materializes patched BUILD targets from the fetched override tree.
+  including explicit root `repo_name` spellings such as
+  `@root_repo//:fix.patch`, applies local patch labels after fetch/extract and
+  before reading the override `MODULE.bazel`, includes `patches`,
+  `patch_strip`, and local patch file bytes in the non-registry override cache
+  directory identity, and materializes patched BUILD targets from the fetched
+  override tree.
   `single_version_override` patch fields remain intentionally unsupported for
   this slice because Bazel also threads them into registry MODULE discovery and
   final RepoSpec materialization. Bazel anchors:
@@ -117,9 +119,14 @@ Observed SDK result at the checkpoint:
   slug_bzlmod`, focused cache identity tests, `cargo build -p slug`, and the
   explicit-binary Plan 61 selector for archive/git override patch application,
   SVO patch rejection, and external patch-label rejection (`5 passed, 149
-  deselected`). Remaining replay gap: patch file bytes are still read by the
-  transitional resolver rather than a dedicated DICE file key, so the true
-  dependency edge still belongs to the future RepoSpec/override-source key.
+  deselected`). A clean-review follow-up fixed the explicit root `repo_name`
+  patch-label spelling and revalidated with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-override-root-repo cargo check -p
+  slug_bzlmod`, focused cache identity tests, `cargo build -p slug`, and the
+  same explicit-binary Plan 61 selector (`5 passed, 149 deselected`). Remaining
+  replay gap: patch file bytes are still read by the transitional resolver
+  rather than a dedicated DICE file key, so the true dependency edge still
+  belongs to the future RepoSpec/override-source key.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
@@ -384,23 +391,25 @@ Observed SDK result at the checkpoint:
   multiple_version_override_registry_source_json_utf8_failure or
   multiple_version_override_registry_source_json_creation'` (`4 passed, 131
   deselected`).
-  Override patch fields remain blocked: Bazel validates main-repo patch labels,
-  applies `single_version_override` patches to the discovered `MODULE.bazel`,
-  and appends the same patches to the final repo spec; non-registry
-  `archive_override`/`git_override` patches also affect repository
-  materialization. Slug now validates the Bazel main-repository patch-label rule
-  before failing loudly when supported main-repo override `patches = [...]` are
-  present, and when `single_version_override(patch_cmds = ...)` or standalone
-  nonzero `patch_strip` would otherwise affect the final repo spec, instead of
-  silently ignoring part of Bazel's behavior. Bazel source anchors:
+  Override patch support remains incomplete: Bazel validates main-repo patch
+  labels, applies `single_version_override` patches to the discovered
+  `MODULE.bazel`, and appends the same patches to the final repo spec;
+  non-registry `archive_override`/`git_override` patches also affect repository
+  materialization. Slug now supports root-main-repo `archive_override` and
+  `git_override` patches, including explicit root `repo_name` labels such as
+  `@root_repo//:fix.patch`, and still fails loudly when
+  `single_version_override(patch_cmds = ...)` or standalone nonzero
+  `patch_strip` would otherwise affect the final repo spec, instead of silently
+  ignoring part of Bazel's behavior. Bazel source anchors:
   `ModuleFileGlobals.java:522-545` and `:930-995`,
   `ModuleFileFunction.java:823-840`,
   `InterimModule.java:252-269`, and
   `ModuleFileFunctionTest.java:1717-1780` plus `:1803-1928`. Focused Plan 61
-  guardrails cover `single_version_override`, `archive_override`, and
-  `git_override` patch rejection, the external-repository patch-label error,
-  and `single_version_override` patch command/strip rejection. Validation
-  passed with `cargo test -p slug_bzlmod patches -- --nocapture` (`4 passed`),
+  guardrails now cover `archive_override` and `git_override` patch application,
+  `single_version_override` patch rejection, the external-repository
+  patch-label error, and `single_version_override` patch command/strip
+  rejection. Earlier validation passed with
+  `cargo test -p slug_bzlmod patches -- --nocapture` (`4 passed`),
   `cargo test -p slug_bzlmod single_version_override_patch -- --nocapture`
   (`2 passed`), and explicit-binary Plan 61 pytest selector
   `-k 'override_patches_external_repo_labels or
@@ -411,6 +420,16 @@ Observed SDK result at the checkpoint:
   `-k 'single_version_override_patches_fail_until_supported or
   single_version_override_patch_cmds_and_strip_fail_until_supported'` passed
   (`2 passed, 132 deselected`).
+  Current archive/git patch-application validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-override-root-repo cargo check -p
+  slug_bzlmod`, focused cache identity tests, `cargo build -p slug`, and
+  explicit-binary Plan 61 selector
+  `-k 'archive_override_patches_apply_to_fetched_module or
+  git_override_patches_apply_to_fetched_module or
+  override_patches_external_repo_labels_follow_bazel_main_repo_rule or
+  single_version_override_patches_fail_until_supported or
+  single_version_override_patch_cmds_and_strip_fail_until_supported'`
+  (`5 passed, 149 deselected`).
   Full support still needs DICE-tracked patch-file inputs plus repository
   materialization patch identity.
   Bazel module-name validation now runs while parsing `module(name = ...)`,

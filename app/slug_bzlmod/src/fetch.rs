@@ -278,11 +278,13 @@ impl SourceFetcher {
     pub fn apply_local_override_patches(
         dest_dir: &Path,
         workspace_root: &Path,
+        main_repo_name: Option<&str>,
         patches: &[String],
         patch_strip: u32,
     ) -> slug_error::Result<()> {
         for patch_label in patches {
-            let patch_path = override_patch_label_path(workspace_root, patch_label)?;
+            let patch_path =
+                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
             let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
                 format!(
                     "Failed to read override patch '{}' at {}",
@@ -300,6 +302,7 @@ impl SourceFetcher {
     /// tree patched with older bytes when the root patch file changes.
     pub fn local_override_patch_digest(
         workspace_root: &Path,
+        main_repo_name: Option<&str>,
         patches: &[String],
         patch_strip: u32,
     ) -> slug_error::Result<Option<String>> {
@@ -312,7 +315,8 @@ impl SourceFetcher {
         hasher.update((patches.len() as u64).to_le_bytes());
         hasher.update(patch_strip.to_le_bytes());
         for patch_label in patches {
-            let patch_path = override_patch_label_path(workspace_root, patch_label)?;
+            let patch_path =
+                override_patch_label_path(workspace_root, main_repo_name, patch_label)?;
             let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
                 format!(
                     "Failed to read override patch '{}' at {}",
@@ -913,6 +917,7 @@ impl SourceFetcher {
 
 fn override_patch_label_path(
     workspace_root: &Path,
+    main_repo_name: Option<&str>,
     raw_label: &str,
 ) -> slug_error::Result<PathBuf> {
     let label =
@@ -920,7 +925,8 @@ fn override_patch_label_path(
             .ok_or_else(|| FetchError::PatchFailed {
                 patch: format!("invalid override patch label '{}'", raw_label),
             })?;
-    if !label.repo().as_str().is_empty() {
+    let repo = label.repo().as_str();
+    if !repo.is_empty() && Some(repo) != main_repo_name {
         return Err(FetchError::PatchFailed {
             patch: format!(
                 "invalid override patch label '{}': only patches from the main repository are supported",
