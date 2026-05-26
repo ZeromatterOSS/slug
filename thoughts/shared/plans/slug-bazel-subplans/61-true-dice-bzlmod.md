@@ -2516,6 +2516,24 @@ Observed SDK result at the checkpoint:
   extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
   `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
   slug_external_cells`, and `git diff --check`.
+- The legacy resolver bridge no longer returns `BzlmodProjectionData` just to
+  expose the cell graph. `BzlmodProjectionBridgeValue` carries
+  `BzlmodCellGraphValue` directly, and the persisted config-load path wraps it
+  back into `BzlmodProjectionData` only at the still-transitional DICE
+  injection API. This removes one misleading graph-shaped projection hop from
+  the production bridge without claiming that the cell graph has a true
+  Skyframe-shaped producer yet. Focused validation passed with `cargo fmt`,
+  `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`,
+  `cargo test -p slug_bzlmod set_bzlmod_projection_data -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  current_workspace_helpers_use_projection_workspace_id -- --nocapture`,
+  `cargo test -p slug_common bzlmod_cell_resolver_uses -- --nocapture`, and
+  `cargo test -p slug_external_cells
+  extension_repo_setup_repo_env_uses_current_dice_projection -- --nocapture`,
+  `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
+  slug_external_cells`, and `git diff --check`. Clean review found no
+  actionable issues and confirmed the slice does not claim true cell-graph
+  producers or Plan 61 closure.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors
@@ -3035,8 +3053,9 @@ What did not work or remains risky:
 
 - A single transitional `BzlmodProjectionBridgeDiceKey` still wraps the legacy
   resolver. Its command-policy identity now comes from a DICE key, and its
-  cached value is the narrowed `BzlmodProjectionData` payload, but the wrapped
-  resolver is still not a Skyframe-shaped module graph.
+  cached value carries the legacy-produced `BzlmodCellGraphValue` plus the
+  remaining separately injected facts, but the wrapped resolver is still not a
+  Skyframe-shaped module graph.
 - The resolved graph, repo-mapping snapshots, cell graph, and registered
   toolchain and execution platform facts are still assembled during legacy
   cell setup, then injected as transitional command data. Registered
@@ -3049,23 +3068,23 @@ What did not work or remains risky:
   module-version value still carries a conservative projection invalidation
   identity until the remaining
   interpreter/materialization inputs are explicit. `BzlmodSessionData` and
-  `BzlmodSessionDataKey` have been removed, but `BzlmodProjectionData` remains
-  a transitional legacy-produced payload rather than a set of true
-  Skyframe-shaped DICE producers. The projection payload now carries the
-  current workspace identity inside its named cell graph, while module-version
+  `BzlmodSessionDataKey` have been removed, and the bridge value now carries
+  the legacy-produced cell graph directly; `BzlmodProjectionData` remains only
+  at the transitional injection API rather than as the resolver bridge output.
+  The graph still carries the current workspace identity, while module-version
   data, resolution facts, registrations, repo-mapping, and
   extension-aggregation data also carry source workspace provenance so stale
-  cross-workspace projection data cannot be paired with that graph. Lockfile
+  cross-workspace injected data cannot be paired with that graph. Lockfile
   inputs, repo-env, resolution facts, repo mappings, registered toolchains,
   registered execution platforms, extension aggregations, and module versions
   have been split out of the projection payload and are injected separately
-  with their own provenance. The narrower injected values are still populated
-  from the legacy resolver output. The persisted config-load key now receives the
-  server output base instead of synthesizing the default output base for
-  workspace identity, and the no-`MODULE.bazel` empty-session projection now
-  preserves that keyed output base. The daemon bootstrap direct parser now also
-  accepts an explicit output base. Runtime module-symlink replay now uses the
-  named cell graph's workspace output base for `external_cells/bzlmod` instead
+  with their own provenance. The cell graph and narrower injected values are
+  still populated from the legacy resolver output. The persisted config-load key
+  now receives the server output base instead of synthesizing the default output
+  base for workspace identity, and the no-`MODULE.bazel` empty-session
+  projection now preserves that keyed output base. The daemon bootstrap direct
+  parser now also accepts an explicit output base. Runtime module-symlink replay
+  now uses the named cell graph's workspace output base for `external_cells/bzlmod` instead
   of hard-coding the project default, and extension-generated repo symlink
   replay uses the same output-base identity for
   `external_cells/extension_repo`. These paths still wrap or call the legacy
@@ -4586,13 +4605,14 @@ hardening behavior around it.
 9. Delete transitional APIs.
    - `BzlmodSessionData` and `BzlmodSessionDataKey` are removed, and
      `BuckConfigBasedCells` no longer stores a bzlmod payload or returns it to
-     the server updater. `BzlmodProjectionData` remains as a transitional
-     bridge payload assembled by the legacy resolver, but lockfile inputs,
-     repo-env, resolution facts, repo mappings, registered toolchains,
-     registered execution platforms, extension aggregations, and module
-     versions have been split out to separate named injections; delete or rename
-     the remaining graph-shaped projection API only after module graph and
-     cell-graph facts have true DICE producers.
+     the server updater. The legacy resolver bridge now returns
+     `BzlmodCellGraphValue` directly instead of wrapping it in
+     `BzlmodProjectionData`; `BzlmodProjectionData` remains at the transitional
+     injection API while lockfile inputs, repo-env, resolution facts, repo
+     mappings, registered toolchains, registered execution platforms, extension
+     aggregations, and module versions are passed as separate named injections.
+     Delete or rename the remaining graph-shaped injection API only after
+     module graph and cell-graph facts have true DICE producers.
    - Generic empty session construction is removed from production paths.
      Remaining empty projection construction must explicitly carry workspace
      identity while the projection bridge is still being unwound. The
