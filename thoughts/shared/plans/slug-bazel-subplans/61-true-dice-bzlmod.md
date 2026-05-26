@@ -1603,6 +1603,15 @@ Observed SDK result at the checkpoint:
   guardrails for out-of-project poll-key warm reuse and hidden lockfile warm
   replay, and the full explicit-binary Plan 61 guardrail
   (`125 passed in 89.69s`).
+- Out-of-project text inputs now move their direct filesystem observation
+  inside `AbsoluteTextFileInputKey::compute` instead of reading content before
+  key construction and injecting it as `observed`. Bridge surface reduced:
+  out-of-project MODULE/lockfile-like text reads now have a named child key that
+  owns the poll operation, and the key is invalid across transactions until a
+  lower-level watched filesystem key replaces the direct poll. Focused
+  validation passed with `cargo test -p slug_common
+  absolute_text_file_input_key -- --nocapture` and `cargo test -p slug_common
+  bzlmod_lockfile_inputs_bridge_tracks_visible_lockfile_edits -- --nocapture`.
 - Registered toolchain and execution-platform facts now have their own
   injected DICE values. `RegisteredToolchainsKey` and
   `RegisteredExecutionPlatformsKey` no longer compute the whole

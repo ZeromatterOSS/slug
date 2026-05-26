@@ -1190,8 +1190,6 @@ struct AbsoluteTextFileInputValue {
 #[display("AbsoluteTextFileInputKey({})", path.display())]
 struct AbsoluteTextFileInputKey {
     path: Arc<PathBuf>,
-    poll_digest: String,
-    observed: AbsoluteTextFileInputValue,
 }
 
 #[async_trait]
@@ -1203,7 +1201,7 @@ impl Key for AbsoluteTextFileInputKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Ok(Arc::new(self.observed.clone()))
+        Ok(Arc::new(read_absolute_text_file_input_value(&self.path)?))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1213,11 +1211,10 @@ impl Key for AbsoluteTextFileInputKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        // Out-of-project bzlmod inputs are polled into the key before compute.
-        // The same key is valid; create/edit/delete transitions produce a new
-        // poll digest and therefore a different key.
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // Out-of-project bzlmod inputs still poll disk directly in this child
+        // key until a lower-level watched filesystem key is available.
+        false
     }
 }
 
@@ -1277,21 +1274,10 @@ async fn read_absolute_text_file_input_via_dice(
     ctx: &mut DiceComputations<'_>,
     path: &Path,
 ) -> slug_error::Result<Arc<AbsoluteTextFileInputValue>> {
-    let observed = read_absolute_text_file_input_value(path)?;
-    let poll_digest = absolute_text_file_input_poll_digest_for_value(path, &observed);
     ctx.compute(&AbsoluteTextFileInputKey {
         path: Arc::new(path.to_path_buf()),
-        poll_digest,
-        observed,
     })
     .await?
-}
-
-fn absolute_text_file_input_poll_digest_for_value(
-    path: &Path,
-    observed: &AbsoluteTextFileInputValue,
-) -> String {
-    absolute_text_file_input_poll_digest(path, observed.digest.as_deref())
 }
 
 fn absolute_text_file_input_poll_digest(path: &Path, digest: Option<&str>) -> String {
@@ -5193,15 +5179,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn absolute_text_file_input_key_returns_polled_observation() -> slug_error::Result<()> {
+    async fn absolute_text_file_input_key_reads_current_file_content() -> slug_error::Result<()> {
         let external = tempfile::Builder::new()
             .prefix("slug-plan61-absolute-text-observed-")
             .tempdir_in("/var/mnt/dev")
             .unwrap();
         let path = external.path().join("MODULE.bazel");
         std::fs::write(&path, "module(name = \"first\")\n").unwrap();
-        let observed = read_absolute_text_file_input_value(&path)?;
-        let poll_digest = absolute_text_file_input_poll_digest_for_value(&path, &observed);
         std::fs::write(&path, "module(name = \"second\")\n").unwrap();
 
         let mut dice = DiceBuilder::new()
@@ -5212,12 +5196,14 @@ mod tests {
         let value = dice
             .compute(&AbsoluteTextFileInputKey {
                 path: Arc::new(path),
-                poll_digest,
-                observed,
             })
             .await??;
 
-        assert_eq!(value.content.as_deref(), Some("module(name = \"first\")\n"));
+        assert_eq!(
+            value.content.as_deref(),
+            Some("module(name = \"second\")\n")
+        );
+        assert!(!<AbsoluteTextFileInputKey as Key>::validity(&Ok(value)));
         Ok(())
     }
 
