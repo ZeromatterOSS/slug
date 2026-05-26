@@ -4281,7 +4281,15 @@ hardening behavior around it.
   process-global generated-repo aliases during ordinary unknown-cell lookup.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
-  cells, but the final cell graph is still injected from legacy-produced data.
+  cells; when a resolver-owned bzlmod runtime snapshot is present, root-scoped
+  process-global dynamic cells are no longer consulted for path projection
+  misses. Bridge surface reduced: a stale process-global dynamic cell cannot
+  classify `bazel-external/<repo>/...` paths for a resolver whose graph snapshot
+  does not own that repo. The intended owner is `BzlmodCellGraphKey` via the
+  resolver-owned runtime snapshot; the final cell graph is still injected from
+  legacy-produced data. Validation passed with focused `cargo test -p slug_core
+  get_cell_path_ -- --nocapture`, `cargo check -p slug_core`, `cargo fmt
+  --check`, and `git diff --check`.
 - Lazy extension repository path classification now reads the resolver's
   runtime cell graph snapshot before process-global dynamic discovery, but the
   graph is still injected from legacy-produced data.

@@ -2579,9 +2579,12 @@ impl CellResolver {
         if let Some(cell_path) = self.get_bzlmod_runtime_cell_path(path) {
             return cell_path;
         }
-        if let Some(cell_path) = self.best_dynamic_cell_path(path, DynamicCellPathKind::RootScoped)
-        {
-            return cell_path;
+        if self.0.bzlmod_runtime_cell_snapshot.is_none() {
+            if let Some(cell_path) =
+                self.best_dynamic_cell_path(path, DynamicCellPathKind::RootScoped)
+            {
+                return cell_path;
+            }
         }
         let cell = self.find(path);
         // Both of these unwraps are ok by construction of the `CellResolver`
@@ -3167,6 +3170,49 @@ mod tests {
             CellPath::new(
                 runtime_cell,
                 ForwardRelativePathBuf::unchecked_new("defs.bzl".to_owned()).into()
+            )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_cell_path_with_runtime_snapshot_rejects_root_scoped_dynamic_cell_miss()
+    -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+
+        let stale_global = "stale_path_owner++ext+generated";
+        let stale_path = format!("bazel-external/{stale_global}");
+        register_dynamic_extension_cell(stale_global.to_owned(), stale_path.clone());
+        resolver.get(CellName::testing_new(stale_global)).ok();
+
+        assert_eq!(
+            resolver.get_cell_path(ProjectRelativePath::new(&format!("{stale_path}/defs.bzl"))?),
+            CellPath::new(
+                root,
+                ForwardRelativePathBuf::unchecked_new(format!("{stale_path}/defs.bzl")).into()
             )
         );
 
