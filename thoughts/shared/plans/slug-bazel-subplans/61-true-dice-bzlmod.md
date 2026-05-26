@@ -112,6 +112,17 @@ Observed SDK result at the checkpoint:
   61 hidden-lockfile selector for read observability, fail-open malformed
   hidden lockfiles, and same-daemon hidden-lockfile edit invalidation (`3
   passed, 152 deselected`), `cargo fmt --check`, and `git diff --check`.
+  Hidden-lockfile identity follow-up: the out-of-project hidden lockfile poll
+  digest is no longer computed before `BzlmodLockfileInputsBridgeKey`
+  construction or carried in `TrackedLockfileContentKey` identity.
+  `TrackedLockfileContentKey` now owns the text-file read and reports validity
+  only for project-file DICE-tracked values; out-of-project lockfile values are
+  invalid across committed transactions until a lower-level watched filesystem
+  key replaces the direct poll. Bridge surface reduced: the hidden lockfile
+  path no longer has a pre-key `absolute_text_file_input_poll_digest` /
+  `absolute_text_file_digest` read. Focused validation passed with `cargo test
+  -p slug_common bzlmod_lockfile_inputs_bridge -- --nocapture` and `cargo test
+  -p slug_common tracked_lockfile_content_key -- --nocapture`.
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
@@ -4125,10 +4136,10 @@ hardening behavior around it.
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
      hidden/output-base lockfile content is no longer carried as an observed
-     payload into `TrackedLockfileContentKey`, but out-of-project hidden
-     lockfiles are still directly polled into a digest identity before compute.
-     This remains transitional until the final watched-input graph replaces the
-     direct polling.
+     payload or precomputed poll digest into `TrackedLockfileContentKey`.
+     Out-of-project hidden lockfiles are still directly polled by that named
+     key and invalidated across transactions until the final watched-input graph
+     replaces the direct polling.
    - The projection bridge now gets visible/hidden lockfile values from a named
      lockfile-input bridge key instead of producing those reads inline, but the
      resulting `BzlmodLockfileInputsValue` still feeds the legacy resolver until
