@@ -2667,28 +2667,41 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = "")] output: &str,
         #[starlark(require = named, default = "")] strip_prefix: &str,
         #[starlark(require = named)] _rename_files: Option<Value<'v>>,
+        #[starlark(require = named, default = "auto")] watch_archive: &str,
     ) -> starlark::Result<Value<'v>> {
-        let archive_str = if let Some(s) = archive.unpack_str() {
-            s.to_owned()
+        let archive_path = if let Some(s) = archive.unpack_str() {
+            if is_bazel_label_string(s) {
+                let path = this.resolve_label_to_filesystem_path(s);
+                ensure_label_path_materialized(&path);
+                path
+            } else {
+                this.resolve_path(s)
+            }
         } else if let Some(repo_path) = archive.downcast_ref::<RepositoryPath>() {
-            repo_path.path_str().to_owned()
+            repo_path.absolute_path()
+        } else if archive.get_type() == "Label" {
+            let label_str = format!("{archive}");
+            let path = this.resolve_label_to_filesystem_path(&label_str);
+            ensure_label_path_materialized(&path);
+            path
         } else {
-            archive.to_repr()
+            this.resolve_path(&archive.to_str())
         };
 
-        let archive_path = this.resolve_path(&archive_str);
         let output_dir = if output.is_empty() {
             this.working_dir.as_ref().clone()
         } else {
             this.resolve_path(output)
         };
 
+        repository_ctx_maybe_record_file_input(this, &archive_path, watch_archive)?;
         // Read the archive
         let data = std::fs::read(&archive_path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
-                "Failed to read archive: {}",
-                e
+                "Failed to read archive '{}': {}",
+                archive_path.display(),
+                e,
             ))
         })?;
 

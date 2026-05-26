@@ -14,6 +14,7 @@ import base64
 import hashlib
 import json
 import re
+import zipfile
 from pathlib import Path
 from typing import Protocol
 
@@ -57,6 +58,12 @@ def _write(path: Path, content: str) -> None:
 
 def _write_bytes(path: Path, content: bytes) -> None:
     path.write_bytes(content)
+
+
+def _write_zip(path: Path, files: dict[str, str]) -> None:
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
 
 
 def _write_minimal_lockfile(path: Path) -> None:
@@ -7681,6 +7688,67 @@ use_repo(patch_watch, "patch_watch_repo")
     second = await _bzlmod_counters(buck)
 
     assert (repo_dir / "data.txt").read_text() == "third\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_extract_label_auto_watch_reexecutes_materialized_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkBaseExternalContext.extract and RepoRecordedInput.File."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+extract_watch_ext+extract_watch_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    _write_zip(buck.cwd / "watched.zip", {"data.txt": "first\n"})
+    _write(
+        buck.cwd / "extract_watch_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.extract(Label("//:watched.zip"))
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+extract_watch_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _extract_watch_ext_impl(module_ctx):
+    extract_watch_repo_rule(name = "extract_watch_repo")
+
+extract_watch_ext = module_extension(
+    implementation = _extract_watch_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_extract_auto_watch_input")
+
+extract_watch = use_extension("//:extract_watch_ext.bzl", "extract_watch_ext")
+use_repo(extract_watch, "extract_watch_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_extract_watch_repo",
+    srcs = ["@extract_watch_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_extract_watch_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write_zip(buck.cwd / "watched.zip", {"data.txt": "second\n"})
+
+    await buck.build("//:uses_extract_watch_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
     assert second["repo_materialization_miss_reason"] > first[
         "repo_materialization_miss_reason"
     ]

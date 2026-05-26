@@ -3053,7 +3053,22 @@ What did not work or remains risky:
   passed after the fix. Validation passed with `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-patch-watch
   cargo build -p slug`, the new guardrail (`1 passed`), and the adjacent
   repository watch/read/template/patch/watch-tree subset (`5 passed, 144
-  deselected`).
+  deselected`). Clean review of `df9b5501` found no correctness issues and
+  reran `git diff --check HEAD~1..HEAD`, `cargo check -p
+  slug_interpreter_for_build`, and the focused five-test subset (`5 passed,
+  145 deselected`).
+- `repository_ctx.extract(..., watch_archive = "auto")` now records the archive
+  file before extracting it, resolves label and `RepositoryPath` archive inputs
+  to filesystem paths, and keeps the DICE watch edge binary-safe by tracking
+  source-file metadata/digest rather than UTF-8 file contents. The new guardrail
+  `test_repository_ctx_extract_label_auto_watch_reexecutes_materialized_repo`
+  first failed because `Label("//:watched.zip")` was treated as a repo-relative
+  path, then failed again when single-file watch tracking attempted a UTF-8
+  source read of the zip archive, and now passes. Validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-extract-watch cargo build -p slug`, the
+  new extract guardrail (`1 passed`), and the adjacent
+  repository watch/read/template/patch/extract/watch-tree subset (`6 passed,
+  144 deselected`).
 - Repository materialization recorded-input sidecars are now split into named
   manifest child keys: `RepoMaterializationRecordedInputsManifestContentKey`
   reads the sidecar content and `RepoMaterializationRecordedInputsValidationKey`
@@ -3697,6 +3712,10 @@ using Rust DICE keys and values:
    - `repository_ctx.patch(Label(...))` with default `watch_patch = "auto"` now
      records the patch file as a repository materialization input, so editing
      the patch rematerializes the generated repository in the same daemon.
+   - `repository_ctx.extract(Label(...))` with default `watch_archive = "auto"`
+     now records the archive file as a repository materialization input, so
+     editing a binary source archive rematerializes the generated repository in
+     the same daemon.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

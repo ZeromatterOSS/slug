@@ -539,13 +539,11 @@ async fn track_repository_watch_inputs(
                 else {
                     continue;
                 };
-                let metadata =
-                    DiceFileComputations::read_path_metadata_if_exists(ctx, cell_path.as_ref())
-                        .await?;
-                if matches!(metadata, Some(RawPathMetadata::File(_))) {
-                    let _ =
-                        DiceFileComputations::read_file_if_exists(ctx, cell_path.as_ref()).await?;
-                }
+                // Path metadata includes the file digest, so this is enough to
+                // invalidate on content edits without requiring watched files
+                // to be UTF-8 text.
+                let _ = DiceFileComputations::read_path_metadata_if_exists(ctx, cell_path.as_ref())
+                    .await?;
             }
             RepositoryWatchInput::DirTree(path) => {
                 let Some(cell_path) = cell_path_for_watch_input(cell_resolver, project_root, path)
