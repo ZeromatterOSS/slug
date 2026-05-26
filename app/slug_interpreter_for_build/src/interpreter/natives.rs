@@ -245,19 +245,15 @@ fn canonical_repo_name_for_label_context_with_alias_resolver(
         return String::new();
     }
 
-    let resolver_has_runtime_snapshot =
-        alias_resolver.is_some_and(|resolver| resolver.has_bzlmod_runtime_alias_snapshot());
     if let Some(alias_resolver) = alias_resolver
-        && let Ok(cell_name) = alias_resolver.resolve(apparent_repo_name)
+        && let Some(cell_name) =
+            alias_resolver.resolve_declared_or_runtime_alias(apparent_repo_name)
     {
         let cell_name = cell_name.as_str();
         if slug_core::cells::is_root_cell_name(cell_name) {
             return String::new();
         }
         return cell_name.to_owned();
-    }
-    if resolver_has_runtime_snapshot {
-        return apparent_repo_name.to_owned();
     }
 
     apparent_repo_name.to_owned()
@@ -1141,9 +1137,18 @@ mod tests {
             HashMap::new(),
             &snapshot,
         )?;
+        let no_snapshot_resolver =
+            CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
 
         assert_eq!(
             canonical_repo_name_for_label_context_with_alias_resolver(apparent, Some(&resolver)),
+            apparent
+        );
+        assert_eq!(
+            canonical_repo_name_for_label_context_with_alias_resolver(
+                apparent,
+                Some(&no_snapshot_resolver)
+            ),
             apparent
         );
         assert_eq!(
@@ -1179,6 +1184,8 @@ mod tests {
             HashMap::new(),
             &snapshot,
         )?;
+        let no_snapshot_resolver =
+            CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
 
         assert_eq!(
             scoped_canonical_repo_name_for_label_context_with_alias_resolver(
@@ -1191,6 +1198,14 @@ mod tests {
         assert_eq!(
             scoped_canonical_repo_name_for_label_context_with_alias_resolver(
                 file_cell, apparent, None
+            ),
+            apparent
+        );
+        assert_eq!(
+            scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+                file_cell,
+                apparent,
+                Some(&no_snapshot_resolver)
             ),
             apparent
         );
@@ -1213,12 +1228,22 @@ mod tests {
             HashMap::new(),
             &snapshot,
         )?;
+        let no_snapshot_resolver =
+            CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
 
         assert_eq!(
             scoped_canonical_repo_name_for_label_context_with_alias_resolver(
                 file_cell,
                 apparent,
                 Some(&resolver)
+            ),
+            apparent
+        );
+        assert_eq!(
+            scoped_canonical_repo_name_for_label_context_with_alias_resolver(
+                file_cell,
+                apparent,
+                Some(&no_snapshot_resolver)
             ),
             apparent
         );
