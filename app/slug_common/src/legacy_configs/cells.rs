@@ -3308,7 +3308,12 @@ impl BuckConfigBasedCells {
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
             Some(project_fs),
-            Some(bzlmod_projection),
+            Some(Arc::new(
+                bzlmod_projection
+                    .as_ref()
+                    .as_ref()
+                    .map(|data| data.cell_graph.clone()),
+            )),
             key.resolution_key.workspace_id.clone(),
         )
         .await
@@ -3479,7 +3484,7 @@ impl BuckConfigBasedCells {
     async fn parse_with_file_ops_and_options_inner(
         config_args: &[slug_cli_proto::ConfigOverride],
         project_fs: Option<&ProjectRoot>,
-        bzlmod_projection_bridge: Option<Arc<Option<slug_bzlmod::BzlmodProjectionData>>>,
+        bzlmod_cell_graph_bridge: Option<Arc<Option<slug_bzlmod::BzlmodCellGraphValue>>>,
         empty_workspace_id: slug_bzlmod::WorkspaceId,
     ) -> slug_error::Result<Self> {
         // Q1=B: only CLI -c flag args are processed; no file I/O.
@@ -3504,33 +3509,32 @@ impl BuckConfigBasedCells {
         // The root cell name is derived from module(name = "...") in MODULE.bazel.
         // .buckconfig [cells], [cell_aliases], and [external_cells] sections are skipped.
         let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
-        if let Some(projection_data) =
-            if let Some(bzlmod_projection_bridge) = bzlmod_projection_bridge {
-                bzlmod_projection_bridge.as_ref().clone()
-            } else if let Some(project_fs) = project_fs {
-                let options = BzlmodResolutionOptions::from_config(&root_config)?;
-                Self::resolve_bzlmod_dependencies_with_options(
-                    project_fs,
-                    &options,
-                    false,
-                    empty_workspace_id.clone(),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-                .await?
-            } else {
-                None
-            }
-        {
-            let runtime_cell_snapshot = runtime_cell_install_snapshot(&projection_data.cell_graph);
+        if let Some(cell_graph) = if let Some(bzlmod_cell_graph_bridge) = bzlmod_cell_graph_bridge {
+            bzlmod_cell_graph_bridge.as_ref().clone()
+        } else if let Some(project_fs) = project_fs {
+            let options = BzlmodResolutionOptions::from_config(&root_config)?;
+            Self::resolve_bzlmod_dependencies_with_options(
+                project_fs,
+                &options,
+                false,
+                empty_workspace_id.clone(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await?
+            .map(|data| data.cell_graph)
+        } else {
+            None
+        } {
+            let runtime_cell_snapshot = runtime_cell_install_snapshot(&cell_graph);
             if let Some(project_fs) = project_fs {
-                replay_bzlmod_runtime_state(&projection_data.cell_graph, project_fs);
+                replay_bzlmod_runtime_state(&cell_graph, project_fs);
             }
             has_module_bazel = true;
-            let cell_graph = &projection_data.cell_graph;
+            let cell_graph = &cell_graph;
 
             // Root cell comes from MODULE.bazel module(name = "...")
             let root_cell_name = CellName::unchecked_new(&cell_graph.root_module_name)?;
@@ -6108,7 +6112,7 @@ mod tests {
         let configs = BuckConfigBasedCells::parse_with_file_ops_and_options_inner(
             &[],
             None,
-            Some(Arc::new(Some(projection_data))),
+            Some(Arc::new(Some(projection_data.cell_graph))),
             slug_bzlmod::WorkspaceId::no_project_sentinel(),
         )
         .await?;
@@ -6310,7 +6314,7 @@ mod tests {
         let configs = BuckConfigBasedCells::parse_with_file_ops_and_options_inner(
             &[],
             None,
-            Some(Arc::new(Some(projection_data))),
+            Some(Arc::new(Some(projection_data.cell_graph))),
             slug_bzlmod::WorkspaceId::no_project_sentinel(),
         )
         .await?;

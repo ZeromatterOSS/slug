@@ -2447,6 +2447,16 @@ Observed SDK result at the checkpoint:
   slug_common -p slug_external_cells`, `cargo test -p slug_bzlmod
   data_only_projection -- --nocapture`, and `cargo test -p slug_bzlmod
   current_workspace_helpers_use_projection_workspace_id -- --nocapture`.
+- Legacy cell parsing now consumes only `BzlmodCellGraphValue` instead of the
+  full transitional `BzlmodProjectionData` payload. The persisted bridge still
+  computes the legacy projection so DICE injection can publish the remaining
+  narrow values, but `parse_with_file_ops_and_options_inner` cannot depend on
+  module versions, registrations, extension aggregations, resolution facts, or
+  repo mappings when it only needs cell definitions, aliases, runtime dynamic
+  state, and external-cell setup. Focused validation passed with `cargo fmt`,
+  `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`, `cargo
+  test -p slug_common bzlmod_cell_resolver_uses -- --nocapture`, `cargo fmt
+  --check`, and `cargo check -p slug_common`.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors
@@ -4509,7 +4519,8 @@ hardening behavior around it.
      external symlinks, and bundled repos from DICE values.
    - `BzlmodCellGraphDataKey` currently exposes the legacy-produced graph, but
      the graph is not yet derived from DICE producers and is not the installed
-     lookup authority.
+     lookup authority. Legacy cell parsing now takes only that graph-shaped
+     value rather than the whole `BzlmodProjectionData` payload.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
