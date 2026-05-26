@@ -36,7 +36,6 @@ use crate::repository_ctx::ensure_label_path_materialized;
 use crate::repository_ctx::extract_archive;
 use crate::repository_ctx::get_urls_from_value;
 use crate::repository_ctx::parse_rename_files;
-use crate::repository_ctx::resolve_label_to_path;
 use crate::repository_ctx::try_ensure_label_path_materialized;
 
 /// Module context methods for Bazel module extensions.
@@ -480,21 +479,11 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         } else if path.get_type() == "Label" {
             // Handle Label objects: resolve via cell path map (Bazel's getPathFromLabel).
             let label_str = format!("{}", path);
-            if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
-                // Plan 36: ensure the spoke is on disk before the caller
-                // dereferences the returned path (e.g. with `mctx.execute`).
-                ensure_label_path_materialized(&resolved);
-                return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
-            }
-            // Fallback to legacy resolution if cell paths not available
-            let workspace_root = this
-                .working_dir
-                .as_ref()
-                .map(|wd| wd.as_ref().as_path())
-                .unwrap_or_else(|| Path::new("."));
-            let legacy = resolve_label_to_path(&label_str, workspace_root);
-            ensure_label_path_materialized(Path::new(&legacy));
-            legacy
+            let resolved = resolve_module_ctx_label(this, &label_str, "module_ctx.path()")?;
+            // Plan 36: ensure the spoke is on disk before the caller
+            // dereferences the returned path (e.g. with `mctx.execute`).
+            ensure_label_path_materialized(&resolved);
+            return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
         } else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -839,22 +828,7 @@ fn resolve_module_ctx_input_path(
 
     if value.get_type() == "Label" {
         let label_str = format!("{}", value);
-        let resolved = if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
-            resolved
-        } else {
-            let workspace_root = this
-                .working_dir
-                .as_ref()
-                .map(|wd| wd.as_ref().as_path())
-                .unwrap_or_else(|| Path::new("."));
-            let legacy = resolve_label_to_path(&label_str, workspace_root);
-            let legacy_path = PathBuf::from(legacy);
-            if legacy_path.is_absolute() {
-                legacy_path
-            } else {
-                workspace_root.join(legacy_path)
-            }
-        };
+        let resolved = resolve_module_ctx_label(this, &label_str, method)?;
         let _ = try_ensure_label_path_materialized(&resolved)?;
         return Ok(resolved);
     }
@@ -866,4 +840,21 @@ fn resolve_module_ctx_input_path(
         value.get_type()
     )
     .into())
+}
+
+fn resolve_module_ctx_label(
+    this: &ModuleContext,
+    label_str: &str,
+    method: &str,
+) -> starlark::Result<PathBuf> {
+    this.resolve_label_to_filesystem_path(label_str)
+        .ok_or_else(|| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "{} requires resolver-owned bzlmod cell paths to resolve Label '{}'",
+                method,
+                label_str
+            )
+            .into()
+        })
 }

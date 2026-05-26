@@ -909,18 +909,6 @@ pub(crate) fn prepare_execute_program(program: &str, work_dir: &Path) -> PathBuf
     path.to_path_buf()
 }
 
-/// Resolve a Bazel label string to a file system path.
-///
-/// Given a label like "@repo//pkg:file" or "//pkg:file", returns
-/// a path relative to the workspace root.
-pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> String {
-    LabelFilesystemResolver::new(workspace_root)
-        .with_root_label_resolution(RootLabelResolution::Relative)
-        .resolve_label_string(label_str)
-        .map(|path| path.to_string_lossy().to_string())
-        .unwrap_or_else(|| label_str.to_owned())
-}
-
 #[cfg(test)]
 fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> PathBuf {
     let path = LabelFilesystemResolver::new(workspace_root)
@@ -1992,7 +1980,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
         let path_str = if let Some(s) = path_arg.unpack_str() {
             // Treat anything starting with `@` (with or without `//`) and any
-            // `//pkg:target` as a label — `resolve_label_to_path` handles the
+            // `//pkg:target` as a label. The shared label resolver handles the
             // `@repo` shorthand for `@repo//:repo`.
             if is_bazel_label_string(s) {
                 trigger_materialization(s);
@@ -2689,11 +2677,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         // route through the cell resolver, otherwise the resulting path
         // contains literal `@@//:` segments and `patch(1)` can't open it.
         //
-        // `resolve_label_to_path` returns a project-relative path for root
-        // cell labels and an absolute path for extension-cell labels. Since
-        // we run `patch(1)` with `current_dir = working_dir` (an external
-        // repo dir), root-cell-relative paths would be resolved against the
-        // wrong root — so anchor any non-absolute result at the project root.
+        // Label resolution returns a project-relative path for root cell labels
+        // and an absolute path for extension-cell labels. Since we run
+        // `patch(1)` with `current_dir = working_dir` (an external repo dir),
+        // root-cell-relative paths would be resolved against the wrong root —
+        // so anchor any non-absolute result at the project root.
         let patch_path = if let Some(repo_path) = patch_file.downcast_ref::<RepositoryPath>() {
             repo_path.absolute_path().to_path_buf()
         } else if patch_file.get_type() == "Label" {
@@ -3217,7 +3205,7 @@ mod tests {
         // Extract
         let dest = temp_dir.path().join("extracted");
         std::fs::create_dir(&dest).unwrap();
-        extract_tar_gz(&gz_data, &dest, None).unwrap();
+        extract_tar_gz(&gz_data, &dest, None, &BTreeMap::new()).unwrap();
 
         // Verify
         let extracted_file = dest.join("test.txt");

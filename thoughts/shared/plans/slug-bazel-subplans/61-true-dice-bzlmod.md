@@ -3160,6 +3160,25 @@ What did not work or remains risky:
   `cargo build -p slug`, the full Plan 61 Python guardrail with `75 passed in
   41.29s`, `cargo fmt --check`, and `git diff --check`. The slugd processes left
   by the full guardrail were cleaned up afterward.
+- `module_ctx` Label-taking methods no longer fall back to the legacy
+  repository-label resolver when a `ModuleContext` was not seeded with
+  resolver-owned label paths. Production module-extension execution already
+  seeds those paths from the active `CellResolver`; callers missing that owner
+  now fail with a resolver-owned bzlmod cell-path error instead of consulting
+  process-global aliases or `bazel-external` scans. Bridge burn-down note: the
+  production surface reduced is the `module_ctx` fallback through
+  `resolve_label_to_path` plus the helper itself; the intended owner is
+  `ModuleExtensionExecutionKey` constructing `ModuleContext` from the active
+  cell resolver backed by `BzlmodCellGraphKey`/`BzlmodCellGraphDataKey`. The
+  remaining bridge is still the legacy-produced cell graph and repository_ctx
+  compatibility callers that intentionally lack resolver-owned paths. Before/
+  after evidence:
+  `rg -n "resolve_label_to_path|Fallback to legacy resolution if cell paths not available" app/slug_interpreter_for_build/src/module_ctx app/slug_interpreter_for_build/src/repository_ctx.rs`
+  now returns no hits. Validation passed with `cargo test -p
+  slug_interpreter_for_build module_ctx -- --nocapture`, `cargo check -p
+  slug_interpreter_for_build`, `cargo build -p slug`, the explicit-binary Plan
+  61 selector for module_ctx Label read/materialization/extract/wasm paths (`4
+  passed, 151 deselected`), `cargo fmt --check`, and `git diff --check`.
 - Native repository-rule `build_file` and `patches` label resolution can now use
   resolver-owned bzlmod cell paths from the DICE cell graph during extension
   repository execution. That path prefers graph-owned aliases and cells over
@@ -3915,8 +3934,10 @@ hardening behavior around it.
   `repository_ctx.path(Label(...))`, repository path-like APIs, and the
   `repository_ctx.path(Label(...))` lazy materialization trigger no longer fill a
   resolver-owned miss from process-global dynamic aliases or directory scans.
-  Fallback helpers and callers that do not receive a resolver-owned path map
-  still use legacy process-global compatibility lookups.
+  `module_ctx` Label-taking methods now require that resolver-owned map rather
+  than falling back when it is absent. Repository-context compatibility helpers
+  and callers that intentionally do not receive a resolver-owned path map still
+  use legacy process-global compatibility lookups.
 - Native repository-rule `build_file`/`patches` label resolution can now receive
   a resolver-owned cell path map from the bzlmod cell graph, and the normal
   executor path now requires that map instead of retaining a
