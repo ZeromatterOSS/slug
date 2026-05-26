@@ -2544,6 +2544,22 @@ Observed SDK result at the checkpoint:
   `cargo test -p slug_common bzlmod_projection_bridge -- --nocapture`,
   `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
   slug_external_cells`, and `git diff --check`.
+- Data-only current-workspace helpers no longer compute the injected cell graph
+  just to discover workspace identity. `module_versions_for_current_workspace`,
+  `registered_toolchains_for_current_workspace`, and
+  `registered_execution_platforms_for_current_workspace` now derive the current
+  workspace from their own injected data values before computing the named
+  semantic keys. This removes another cell-graph dependency from module-version
+  and registration consumers while leaving `bzlmod_cell_graph_for_current_workspace`
+  for callers that truly need graph facts. Focused validation passed with
+  `cargo fmt`, `cargo test -p slug_bzlmod
+  data_only_current_workspace_helpers_do_not_require_cell_graph --
+  --nocapture`, `cargo test -p slug_bzlmod
+  current_workspace_helpers_use_projection_workspace_id -- --nocapture`,
+  `cargo test -p slug_bzlmod set_bzlmod_projection_data -- --nocapture`,
+  `cargo fmt --check`, `cargo check -p slug_bzlmod -p slug_common -p
+  slug_external_cells -p slug_analysis -p slug_configured -p
+  slug_interpreter_for_build`, and `git diff --check`.
 - Extension-repo execution and materialization-manifest constructors that
   default command repo-env to empty are now test-only unless they are already
   an internal test helper. Production callers compile only through constructors
@@ -3073,11 +3089,13 @@ What did not work or remains risky:
   replay-input consumers, repo-mapping consumers, and module-version consumers
   now read narrower injected DICE values. Data-only projections carry their own
   source workspace provenance and no longer force an unrelated cell-graph
-  compute; module-version consumers now get the root module name from
-  module-version data instead of computing the cell graph, while
-  extension-aggregation consumers still read the named cell graph where they
-  need root module or graph facts. The module-version value still carries a
-  conservative projection invalidation identity until the remaining
+  compute; module-version and registration current-workspace helpers now derive
+  identity from their injected data rather than computing the cell graph, and
+  module-version consumers get the root module name from module-version data
+  instead of computing the cell graph. Extension-aggregation consumers still
+  read the named cell graph where they need root module or graph facts. The
+  module-version value still carries a conservative projection invalidation
+  identity until the remaining
   interpreter/materialization inputs are explicit. `BzlmodSessionData` and
   `BzlmodSessionDataKey` have been removed, and the bridge value now carries
   the legacy-produced cell graph directly; `BzlmodProjectionData` remains only
@@ -4222,10 +4240,12 @@ hardening behavior around it.
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
-   - Current-workspace helpers still read the named cell graph where they need
-     root or graph facts; module-version consumers now get the root module name
-     from injected module-version data instead of computing the cell graph. The
-     persisted config-load key carries the daemon output base, including
+   - Current-workspace helpers that need graph facts still read the named cell
+     graph, but data-only module-version and registration helpers now derive
+     current workspace identity from their injected data. Module-version
+     consumers now get the root module name from injected module-version data
+     instead of computing the cell graph. The persisted config-load key carries
+     the daemon output base, including
      no-`MODULE.bazel` empty projections. Data-only projection keys now rely on
      their own source workspace provenance instead of deriving identity through
      the cell graph, but their data payloads are still injected from the legacy

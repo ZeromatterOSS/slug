@@ -457,24 +457,26 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
 pub async fn module_versions_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<ModuleVersionsValue>> {
-    let cell_graph = bzlmod_cell_graph_for_current_workspace(ctx).await?;
-    let key = ModuleVersionsKey::for_workspace_id(cell_graph.workspace_id.clone());
+    let data = ctx.compute(&BzlmodModuleVersionsDataKey).await?;
+    let key = ModuleVersionsKey::for_workspace_id(data.workspace_id.clone());
     ctx.compute(&key).await?
 }
 
 pub async fn registered_toolchains_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<RegisteredToolchainsValue>> {
-    let cell_graph = bzlmod_cell_graph_for_current_workspace(ctx).await?;
-    let key = RegisteredToolchainsKey::for_workspace_id(cell_graph.workspace_id.clone());
+    let data = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
+    let key = RegisteredToolchainsKey::for_workspace_id(data.workspace_id.clone());
     ctx.compute(&key).await?
 }
 
 pub async fn registered_execution_platforms_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<RegisteredExecutionPlatformsValue>> {
-    let cell_graph = bzlmod_cell_graph_for_current_workspace(ctx).await?;
-    let key = RegisteredExecutionPlatformsKey::for_workspace_id(cell_graph.workspace_id.clone());
+    let data = ctx
+        .compute(&BzlmodRegisteredExecutionPlatformsDataKey)
+        .await?;
+    let key = RegisteredExecutionPlatformsKey::for_workspace_id(data.workspace_id.clone());
     ctx.compute(&key).await?
 }
 
@@ -1719,6 +1721,93 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         updater.set_bzlmod_projection_data(data)?;
+        let mut dice = updater.commit().await;
+
+        let module_versions = module_versions_for_current_workspace(&mut dice).await?;
+        let registered_toolchains = registered_toolchains_for_current_workspace(&mut dice).await?;
+        let registered_execution_platforms =
+            registered_execution_platforms_for_current_workspace(&mut dice).await?;
+
+        assert_eq!(module_versions.workspace_id, workspace_id);
+        assert_eq!(registered_toolchains.workspace_id, workspace_id);
+        assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
+        assert_ne!(
+            module_versions.workspace_id,
+            WorkspaceId::for_project_root(project_root)
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn data_only_current_workspace_helpers_do_not_require_cell_graph()
+    -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-data-current-workspace-helper");
+        let workspace_id = WorkspaceId::new(
+            project_root.clone(),
+            PathBuf::from("/tmp/slug-plan61-data-current-workspace-output-base"),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodModuleVersionsDataKey,
+            Arc::new(
+                BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                    workspace_id.clone(),
+                    "root".to_owned(),
+                    Arc::new(HashMap::new()),
+                ),
+            ),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoEnvDataKey,
+            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoMappingsDataKey,
+            Arc::new(BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingOverrides::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodResolutionFactsDataKey,
+            Arc::new(BzlmodResolutionFactsValue::for_workspace(
+                workspace_id.clone(),
+                indexmap::IndexMap::new(),
+                indexmap::IndexMap::new(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRegisteredToolchainsDataKey,
+            Arc::new(RegisteredToolchainsDataValue::for_workspace(
+                workspace_id.clone(),
+                Vec::new(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRegisteredExecutionPlatformsDataKey,
+            Arc::new(RegisteredExecutionPlatformsDataValue::for_workspace(
+                workspace_id.clone(),
+                Vec::new(),
+            )),
+        )])?;
         let mut dice = updater.commit().await;
 
         let module_versions = module_versions_for_current_workspace(&mut dice).await?;
