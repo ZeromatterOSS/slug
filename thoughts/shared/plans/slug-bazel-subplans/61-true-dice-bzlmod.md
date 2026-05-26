@@ -1612,6 +1612,19 @@ Observed SDK result at the checkpoint:
   validation passed with `cargo test -p slug_common
   absolute_text_file_input_key -- --nocapture` and `cargo test -p slug_common
   bzlmod_lockfile_inputs_bridge_tracks_visible_lockfile_edits -- --nocapture`.
+- Out-of-project local override, non-registry override, registry cache, and
+  non-root module poll keys now move their direct filesystem observations
+  inside `LocalOverrideModuleInputsPollKey`,
+  `NonRegistryOverrideModuleInputsPollKey`, `RegistryFileInputsPollKey`, and
+  `NonRootModuleFilesPollKey::compute` instead of reading before key
+  construction and injecting an `observed` payload. Bridge surface reduced:
+  these transitional poll identities are now named DICE key computations; when
+  they poll outside the project root, key validity is false across committed
+  transactions until lower-level watched filesystem keys replace the direct
+  polls. Focused validation passed with `cargo test -p slug_common
+  module_inputs_poll_key_repolls -- --nocapture`, `cargo test -p slug_common
+  non_root_module_files_poll -- --nocapture`, and `cargo test -p slug_common
+  registry_file_inputs_poll -- --nocapture`.
 - Registered toolchain and execution-platform facts now have their own
   injected DICE values. `RegisteredToolchainsKey` and
   `RegisteredExecutionPlatformsKey` no longer compute the whole
@@ -4067,19 +4080,18 @@ hardening behavior around it.
    override/registry-cache sources.
    - Root, included, and project-local local override module segments now use
      tracked project-file DICE inputs; out-of-project local override and
-     cached git/archive override `MODULE.bazel` files are observed before
-     constructing named DICE poll keys and still polled into higher-level key
-     identity. The
+     cached git/archive override `MODULE.bazel` files are observed inside
+     named DICE poll keys and still polled into higher-level key identity. The
      DICE-backed resolver now rejects missing tracked root module input instead
      of direct-parsing the root module in the DICE path. Non-root module files
      discovered from the transitional cell graph now read through the named
      `NonRootModuleFilesPollKey`; project-root paths are DICE-tracked in the
-     parse key, while out-of-project paths are still directly observed into
-     higher-level key identity.
+     parse key, while out-of-project paths are still directly polled by the
+     named poll key into higher-level key identity.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
-     out-of-root cache paths are directly observed before constructing the
-     named `RegistryFileInputsPollKey` and still polled into higher-level key
+     out-of-root cache paths are directly observed inside the named
+     `RegistryFileInputsPollKey` and still polled into higher-level key
      identity while the final watched-input graph is still pending. Locked
      registry `source.json`
      checksum, parse/UTF-8 failure, and create/delete transitions now have
