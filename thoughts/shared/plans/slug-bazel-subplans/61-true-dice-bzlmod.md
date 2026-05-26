@@ -143,11 +143,9 @@ Observed SDK result at the checkpoint:
   cases (`6 passed, 149 deselected`). The production DICE bridge now computes
   root-local override patch label contents through an `OverridePatchInputsKey`
   and feeds those bytes into the resolver/source-fetch patch digest and apply
-  calls. Remaining replay gap: `SourceFetcher` still keeps direct-read fallback
-  helpers for non-DICE/bootstrap callers, and package analysis can still reuse a
-  stale already-loaded external package after a bzlmod source path changes; that
-  separate package/cache invalidation bridge belongs to the cell graph/package
-  ownership work.
+  calls. This checkpoint still left `SourceFetcher` direct-read fallback
+  helpers for non-DICE/bootstrap callers and exposed a separate
+  package/cache invalidation bridge after bzlmod source paths changed.
   Bridge burn-down note for this checkpoint: the production bridge surface
   reduced is marker-trusted registry source materialization for patched
   registry modules. Before this slice, registry source cache identity was only
@@ -176,6 +174,29 @@ Observed SDK result at the checkpoint:
   non-DICE fallback helper. The intended final owner remains
   `ModuleSourceKey`/`RepoSpecKey` feeding `RepositoryExecutionKey`, but the
   patch bytes now have an auditable DICE input edge before that larger split.
+  Same-daemon package/cache follow-up passed with
+  `cargo check -p slug_common`, `cargo build -p slug`, and the explicit-binary
+  Plan 61 selector for SVO module/source patching, same-daemon SVO patch-file
+  edit package invalidation, patch_cmd failure, archive/git patch application,
+  and external patch-label rejection (`6 passed, 149 deselected`). Bridge
+  burn-down note for this package replay follow-up: the production bridge
+  surface reduced is daemon bootstrap project-file invalidation plus bzlmod
+  cell/package replay under stable external cell names. Before this slice,
+  `OverridePatchInputsKey` read root-local patch labels through
+  `ProjectReadFileKey`, but the daemon's pre-config project-file invalidation
+  only recognized MODULE/lock/registry files; a patch edit could create the new
+  `source-<patch-effect-digest>` directory while the daemon replayed the old
+  `bazel-external/<module>+` symlink and package target list. In the same path,
+  `CellResolverKey` was marked `InvalidationSourcePriority::Ignored`, so a
+  changed `BzlmodCellSetup.source_path` did not have to invalidate file-op and
+  package dependents. After this slice, bzlmod project-file bootstrap reads
+  register their exact `ProjectReadFileKey` paths for pre-config invalidation,
+  and `CellResolverKey` uses normal injected-key invalidation. The intended
+  owner is `OverridePatchInputsKey` feeding `BzlmodProjectionBridgeDiceKey` /
+  `BzlmodCellGraphKey`, with package and file-op keys depending on the active
+  resolver rather than stale symlink state. The remaining bridge is still the
+  transitional resolver wrapper and the non-DICE patch-read fallback helper,
+  not same-daemon replay for root-local override patch edits.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets

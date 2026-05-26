@@ -45,6 +45,19 @@ use crate::io::ReadDirError;
 
 pub struct DiceFileComputations;
 
+// Project-root bzlmod bootstrap inputs are read before the current command's
+// cell resolver exists. Register exact project paths here so later watcher
+// events can dirty their `ProjectReadFileKey`s before config recomputation.
+static BZLMOD_CONFIG_PROJECT_FILE_INPUTS: std::sync::LazyLock<
+    std::sync::RwLock<HashSet<ProjectRelativePathBuf>>,
+> = std::sync::LazyLock::new(|| std::sync::RwLock::new(HashSet::new()));
+
+pub fn register_bzlmod_config_project_file(path: ProjectRelativePathBuf) {
+    if let Ok(mut paths) = BZLMOD_CONFIG_PROJECT_FILE_INPUTS.write() {
+        paths.insert(path);
+    }
+}
+
 /// Functions for accessing files with keys on the dice graph.
 impl DiceFileComputations {
     /// Filters out ignored paths
@@ -339,13 +352,20 @@ impl FileChangeTracker {
 
 fn is_bzlmod_config_project_file(path: &ProjectRelativePath) -> bool {
     let path = path.as_str();
-    path == "MODULE.bazel"
+    if path == "MODULE.bazel"
         || path == "MODULE.bazel.lock"
         || path.ends_with("/MODULE.bazel")
         || path.ends_with("/MODULE.bazel.lock")
         || path.ends_with(".MODULE.bazel")
         || (path.contains("slug/registry/")
             && (path.ends_with("/source.json") || path.ends_with("/bazel_registry.json")))
+    {
+        return true;
+    }
+
+    BZLMOD_CONFIG_PROJECT_FILE_INPUTS
+        .read()
+        .is_ok_and(|paths| paths.iter().any(|registered| registered.as_str() == path))
 }
 
 /// The return value of a `ReadFileKey` computation.

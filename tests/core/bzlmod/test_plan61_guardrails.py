@@ -5287,7 +5287,7 @@ single_version_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_single_version_override_patch_edit_materializes_same_daemon(
+async def test_single_version_override_patch_edit_invalidates_package_same_daemon(
     buck: Buck,
 ) -> None:
     """Root-local SVO patch labels are DICE inputs, not direct-read bridge state."""
@@ -5384,7 +5384,7 @@ filegroup(name = "uses_second", srcs = ["@{module_name}//:second"])
     assert not any('name = "second"' in content for content in patched_source_builds())
 
     write_patch("second")
-    await buck.audit("cell", env=env)
+    await buck.build("//:uses_second", env=env)
     assert any('name = "second"' in content for content in patched_source_builds())
 
 

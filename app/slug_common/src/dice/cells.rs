@@ -73,10 +73,6 @@ impl InjectedKey for CellResolverKey {
             (_, _) => false,
         }
     }
-
-    fn invalidation_source_priority() -> InvalidationSourcePriority {
-        InvalidationSourcePriority::Ignored
-    }
 }
 
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]

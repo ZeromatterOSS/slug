@@ -60,6 +60,7 @@ use slug_fs::paths::abs_path::AbsPath;
 
 use crate::external_cells::EXTERNAL_CELLS_IMPL;
 use crate::file_ops::dice::DiceFileComputations;
+use crate::file_ops::dice::register_bzlmod_config_project_file;
 use crate::legacy_configs::aggregator::CellsAggregator;
 use crate::legacy_configs::args::ResolvedLegacyConfigArg;
 use crate::legacy_configs::args::resolve_config_args;
@@ -1099,6 +1100,7 @@ async fn read_bzlmod_file_for_module_inputs(
     path: &Path,
 ) -> slug_error::Result<(Option<(String, String)>, BzlmodFileInputTracking)> {
     if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
+        register_bzlmod_config_project_file(project_path.clone());
         let Some(content) =
             DiceFileComputations::read_project_file_if_exists(ctx, &project_path).await?
         else {
@@ -1133,6 +1135,7 @@ async fn read_text_file_for_project_input(
     path: &Path,
 ) -> slug_error::Result<(Option<String>, BzlmodFileInputTracking)> {
     if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
+        register_bzlmod_config_project_file(project_path.clone());
         return Ok((
             DiceFileComputations::read_project_file_if_exists(ctx, &project_path).await?,
             BzlmodFileInputTracking::Project,
