@@ -1164,12 +1164,16 @@ fn absolute_text_file_input_poll_digest_for_value(
     path: &Path,
     observed: &AbsoluteTextFileInputValue,
 ) -> String {
+    absolute_text_file_input_poll_digest(path, observed.digest.as_deref())
+}
+
+fn absolute_text_file_input_poll_digest(path: &Path, digest: Option<&str>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"absolute-text-file-input-poll-v1");
     hasher.update([0]);
     hasher.update(path.to_string_lossy().as_bytes());
     hasher.update([0]);
-    match &observed.digest {
+    match digest {
         Some(digest) => {
             hasher.update(b"present");
             hasher.update([0]);
@@ -1241,7 +1245,7 @@ struct TrackedLockfileContentKey {
     project_root: AbsNormPathBuf,
     kind: slug_bzlmod::LockfileContentKind,
     path: Arc<PathBuf>,
-    observed: Option<AbsoluteTextFileInputValue>,
+    poll_digest: Option<String>,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -1255,7 +1259,7 @@ struct BzlmodLockfileInputsBridgeKey {
     workspace_id: slug_bzlmod::WorkspaceId,
     lockfile_mode: slug_bzlmod::LockfileMode,
     hidden_lockfile_path: Option<PathBuf>,
-    hidden_lockfile_observed: Option<AbsoluteTextFileInputValue>,
+    hidden_lockfile_poll_digest: Option<String>,
     root_module_present: bool,
 }
 
@@ -1269,14 +1273,8 @@ impl Key for TrackedLockfileContentKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        let (content, tracking) = if let Some(observed) = &self.observed {
-            (observed.content.clone(), BzlmodFileInputTracking::Polled)
-        } else {
-            read_text_file_for_project_input(ctx, &project_fs, &self.path).await?
-        };
-        // Project-root lockfiles are tracked by DICE file deps. Out-of-project
-        // hidden/output-base lockfiles are polled into this key before compute;
-        // create/edit/delete transitions produce a different key identity.
+        let (content, tracking) =
+            read_text_file_for_project_input(ctx, &project_fs, &self.path).await?;
         let tracked_by_dice = tracking == BzlmodFileInputTracking::Project;
         let path = self.path.clone();
         let Some(content) = content else {
@@ -1353,7 +1351,7 @@ impl Key for BzlmodLockfileInputsBridgeKey {
                 project_root: self.project_root.clone(),
                 kind: slug_bzlmod::LockfileContentKind::Workspace,
                 path: Arc::new(visible_path),
-                observed: None,
+                poll_digest: None,
             })
             .await?
             .buck_error_context("Computing visible MODULE.bazel.lock for bzlmod resolution")?;
@@ -1363,7 +1361,7 @@ impl Key for BzlmodLockfileInputsBridgeKey {
                     project_root: self.project_root.clone(),
                     kind: slug_bzlmod::LockfileContentKind::Hidden,
                     path: Arc::new(path.clone()),
-                    observed: self.hidden_lockfile_observed.clone(),
+                    poll_digest: self.hidden_lockfile_poll_digest.clone(),
                 })
                 .await?
                 .buck_error_context(
@@ -3190,12 +3188,15 @@ impl BuckConfigBasedCells {
             .await?
             .buck_error_context("Computing root MODULE.bazel for bzlmod resolution")?;
         let project_root = AbsNormPathBuf::try_from(project_root_path)?;
-        let hidden_lockfile_observed = if root_module_file.parsed.is_some()
+        let hidden_lockfile_poll_digest = if root_module_file.parsed.is_some()
             && options.lockfile_mode != slug_bzlmod::LockfileMode::Off
         {
             match options.hidden_lockfile_path.as_ref() {
                 Some(path) if project_relative_path_for_abs_path(project_fs, path).is_none() => {
-                    Some(read_absolute_text_file_input_value(path)?)
+                    Some(absolute_text_file_input_poll_digest(
+                        path,
+                        absolute_text_file_digest(path)?.as_deref(),
+                    ))
                 }
                 _ => None,
             }
@@ -3208,7 +3209,7 @@ impl BuckConfigBasedCells {
                 workspace_id: workspace_id.clone(),
                 lockfile_mode: options.lockfile_mode,
                 hidden_lockfile_path: options.hidden_lockfile_path.clone(),
-                hidden_lockfile_observed,
+                hidden_lockfile_poll_digest,
                 root_module_present: root_module_file.parsed.is_some(),
             })
             .await?
@@ -4774,6 +4775,29 @@ mod tests {
         })
     }
 
+    #[test]
+    fn tracked_lockfile_content_key_identity_includes_poll_digest() {
+        let project_root =
+            AbsNormPathBuf::try_from(PathBuf::from("/tmp/slug-plan61-lockfile-key")).unwrap();
+        let base = TrackedLockfileContentKey {
+            project_root: project_root.clone(),
+            kind: slug_bzlmod::LockfileContentKind::Hidden,
+            path: Arc::new(PathBuf::from("/tmp/hidden/MODULE.bazel.lock")),
+            poll_digest: Some("first".to_owned()),
+        };
+        let edited = TrackedLockfileContentKey {
+            project_root,
+            poll_digest: Some("second".to_owned()),
+            ..base.clone()
+        };
+
+        assert_ne!(base, edited);
+
+        let value: slug_error::Result<Arc<slug_bzlmod::LockfileContentValue>> =
+            Ok(lockfile_value("/tmp/hidden/MODULE.bazel.lock", "hidden"));
+        assert!(<TrackedLockfileContentKey as Key>::validity(&value));
+    }
+
     fn minimal_lockfile_json(marker: &str) -> String {
         format!(
             r#"{{
@@ -4794,12 +4818,15 @@ mod tests {
         root_module_present: bool,
     ) -> slug_error::Result<Arc<slug_bzlmod::BzlmodLockfileInputsValue>> {
         let project_root = project_fs.root().to_path_buf();
-        let hidden_lockfile_observed = if root_module_present
+        let hidden_lockfile_poll_digest = if root_module_present
             && lockfile_mode != slug_bzlmod::LockfileMode::Off
         {
             match hidden_lockfile_path.as_ref() {
                 Some(path) if project_relative_path_for_abs_path(project_fs, path).is_none() => {
-                    Some(read_absolute_text_file_input_value(path)?)
+                    Some(absolute_text_file_input_poll_digest(
+                        path,
+                        absolute_text_file_digest(path)?.as_deref(),
+                    ))
                 }
                 _ => None,
             }
@@ -4814,7 +4841,7 @@ mod tests {
             ),
             lockfile_mode,
             hidden_lockfile_path,
-            hidden_lockfile_observed,
+            hidden_lockfile_poll_digest,
             root_module_present,
         })
         .await?

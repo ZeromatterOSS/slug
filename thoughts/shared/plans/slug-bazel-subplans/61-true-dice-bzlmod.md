@@ -93,6 +93,25 @@ Observed SDK result at the checkpoint:
   first replays from the daemon hidden lockfile, then editing that hidden
   lockfile removes the cached extension entry and forces the extension to run
   and fail instead of reusing stale replay state.
+- Hidden/output-base lockfile content is no longer carried as an observed
+  payload through the lockfile bridge key. `TrackedLockfileContentKey` now reads
+  through the normal text-file input path, and out-of-project hidden lockfiles
+  contribute only a poll digest to the key identity so warm no-op reuse is
+  preserved while edits still create a new key. Bridge burn-down note: the
+  production surface reduced is direct hidden lockfile content injection via
+  `hidden_lockfile_observed` / `observed: Option<AbsoluteTextFileInputValue>`.
+  The intended owner is a named lockfile input chain:
+  `BzlmodLockfileInputsBridgeKey` -> `TrackedLockfileContentKey` ->
+  project-file DICE deps or `AbsoluteTextFileInputKey`, with the final owner
+  still a true lockfile policy/value graph. Before/after evidence:
+  `rg -n "hidden_lockfile_observed|observed: Option<AbsoluteTextFileInputValue>|observed: self\\.hidden_lockfile_observed|observed: None" app/slug_common/src/legacy_configs/cells.rs`
+  now returns no hits. Validation passed with `cargo test -p slug_common
+  tracked_lockfile_content_key_identity_includes_poll_digest -- --nocapture`,
+  `cargo test -p slug_common bzlmod_lockfile_inputs_bridge -- --nocapture`,
+  `cargo check -p slug_common`, `cargo build -p slug`, the explicit-binary Plan
+  61 hidden-lockfile selector for read observability, fail-open malformed
+  hidden lockfiles, and same-daemon hidden-lockfile edit invalidation (`3
+  passed, 152 deselected`), `cargo fmt --check`, and `git diff --check`.
 - Latest Plan 61 guardrail validation passed with
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
@@ -3798,11 +3817,11 @@ hardening behavior around it.
 
 3. Make lockfile replay complete.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
-     hidden/output-base lockfile bytes are directly observed into
-     `TrackedLockfileContentKey` identity before compute, so same-key warm
-     values remain valid while create/edit/delete transitions create a new key.
+     hidden/output-base lockfile content is no longer carried as an observed
+     payload into `TrackedLockfileContentKey`, but out-of-project hidden
+     lockfiles are still directly polled into a digest identity before compute.
      This remains transitional until the final watched-input graph replaces the
-     direct observation.
+     direct polling.
    - The projection bridge now gets visible/hidden lockfile values from a named
      lockfile-input bridge key instead of producing those reads inline, but the
      resulting `BzlmodLockfileInputsValue` still feeds the legacy resolver until
