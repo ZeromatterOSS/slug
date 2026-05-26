@@ -1824,23 +1824,15 @@ fn resolve_impl_label_repo_name(
     repo_name: &str,
     cell_resolver: Option<&slug_core::cells::CellResolver>,
 ) -> String {
-    let resolver_has_runtime_snapshot =
-        cell_resolver.is_some_and(cell_resolver_has_runtime_alias_snapshot);
     if let Some(cell_resolver) = cell_resolver {
         if let Some(resolved_cell) = cell_resolver
             .root_cell_cell_alias_resolver()
             .resolve_declared_or_runtime_alias(repo_name)
         {
-            return cell_resolver
-                .get(resolved_cell)
-                .map(|cell_instance| cell_instance.name().as_str().to_owned())
-                .unwrap_or_else(|_| resolved_cell.as_str().to_owned());
+            return resolved_cell.as_str().to_owned();
         }
     }
-    (!resolver_has_runtime_snapshot)
-        .then(|| slug_core::cells::resolve_dynamic_extension_cell_alias(repo_name))
-        .flatten()
-        .unwrap_or_else(|| repo_name.to_owned())
+    repo_name.to_owned()
 }
 
 /// Canonicalize a label in an extension-generated repository that points at a
@@ -5451,6 +5443,19 @@ mod tests {
         )
     }
 
+    fn test_cell_resolver_without_runtime_snapshot() -> slug_error::Result<CellResolver> {
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let root_aliases = CellAliasResolver::new(root, HashMap::new())?;
+        CellResolver::new_without_root_alias_cell_lookup(vec![root_instance], root_aliases)
+    }
+
     #[test]
     fn metadata_select_matches_llvm_runtime_stage_build_setting() {
         let cfg =
@@ -6040,8 +6045,8 @@ mod tests {
         let label = label.unwrap();
         assert_eq!(label.name().as_str(), "cc-compiler-k8");
 
-        // override_repo() replacement labels keep Bazel's generated canonical
-        // name but use the selected repo's cell content.
+        // Without a resolver-owned alias snapshot, parsing is syntactic and does
+        // not consult transitional process-global alias maps.
         slug_core::cells::register_dynamic_extension_cell_alias(
             "rules_rs++rules_rust+rules_rust".to_owned(),
             "rules_rust+".to_owned(),
@@ -6050,7 +6055,10 @@ mod tests {
             "rules_rs++rules_rust+rules_rust//rust/private:bootstrapping",
         )
         .unwrap();
-        assert_eq!(label.pkg().cell_name().as_str(), "rules_rust+");
+        assert_eq!(
+            label.pkg().cell_name().as_str(),
+            "rules_rs++rules_rust+rules_rust"
+        );
         assert_eq!(label.name().as_str(), "bootstrapping");
 
         // Relative label (no repo) - should fail
@@ -6130,11 +6138,11 @@ mod tests {
         assert_eq!(label.pkg().cell_relative_path().as_str(), "pkg");
         assert_eq!(label.name().as_str(), "impl");
 
-        let legacy_label =
+        let no_owner_label =
             parse_impl_label_to_target_label(&format!("@{apparent}//pkg:impl")).unwrap();
         assert_eq!(
-            legacy_label.pkg().cell_name(),
-            CellName::testing_new(wrong_global)
+            no_owner_label.pkg().cell_name(),
+            CellName::testing_new(apparent)
         );
         Ok(())
     }
@@ -6167,12 +6175,42 @@ mod tests {
         assert_eq!(label.pkg().cell_relative_path().as_str(), "pkg");
         assert_eq!(label.name().as_str(), "impl");
 
-        let legacy_label =
+        let no_owner_label =
             parse_impl_label_to_target_label(&format!("@{apparent}//pkg:impl")).unwrap();
         assert_eq!(
-            legacy_label.pkg().cell_name(),
-            CellName::testing_new(wrong_global)
+            no_owner_label.pkg().cell_name(),
+            CellName::testing_new(apparent)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_impl_label_to_target_label_no_snapshot_resolver_miss_ignores_global_alias()
+    -> slug_error::Result<()> {
+        let apparent = "plan61_impl_no_snapshot_alias";
+        let wrong_global = "plan61_wrong_owner++impls+no_snapshot";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        slug_core::cells::register_dynamic_extension_cell(
+            wrong_global.to_owned(),
+            format!("bazel-external/{wrong_global}"),
+        );
+        let resolver = test_cell_resolver_without_runtime_snapshot()?;
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+
+        let label = parse_impl_label_to_target_label_with_cell_resolver(
+            &format!("@{apparent}//pkg:impl"),
+            Some(&resolver),
+        )
+        .unwrap();
+        assert_eq!(label.pkg().cell_name(), CellName::testing_new(apparent));
+        assert_eq!(label.pkg().cell_relative_path().as_str(), "pkg");
+        assert_eq!(label.name().as_str(), "impl");
         Ok(())
     }
 

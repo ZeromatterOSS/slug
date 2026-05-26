@@ -2576,6 +2576,18 @@ Observed SDK result at the checkpoint:
   `TMPDIR=/var/mnt/dev/.slug-tmp/rustc-plan61-build-setting
   CARGO_TARGET_DIR=/var/mnt/dev/.slug-tmp/slug-plan61-build-setting-target
   cargo test -p slug_core build_setting_labels -- --nocapture`.
+- Toolchain implementation label parsing now uses only the active cell
+  resolver's declared aliases and runtime snapshot aliases for repo-name
+  canonicalization. Resolverless and no-runtime-snapshot resolver misses stay on
+  the apparent repo instead of falling back to the process-global dynamic alias
+  map. Bridge burn-down before/after evidence: before, `rg -n
+  "resolve_dynamic_extension_cell_alias\\(repo_name\\)" app/slug_analysis/src/analysis/env.rs`
+  found the production `resolve_impl_label_repo_name` fallback; after it returns
+  no hits, and `rg -n
+  "resolve_declared_or_runtime_alias\\(repo_name\\)|parse_impl_label_to_target_label_no_snapshot_resolver_miss_ignores_global_alias" app/slug_analysis/src/analysis/env.rs`
+  shows the resolver-owned path and stale-global miss coverage. Validation
+  passed with `cargo test -p slug_analysis parse_impl_label_to_target_label --
+  --nocapture` (`4 passed`) and `cargo check -p slug_analysis`.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
@@ -4028,14 +4040,14 @@ hardening behavior around it.
   supplying those paths is still legacy-produced via `BzlmodCellGraphDataKey`
   instead of derived from true DICE module/repo/spec keys.
 - Bzlmod load-path wrong-cell equivalence and load-path canonicalization,
-  toolchain implementation/metadata label parsing, and C++ toolchain
-  metadata/action-path formatting can now use declared aliases and runtime
-  aliases/cells from the active cell alias resolver before consulting
-  process-global dynamic aliases. Load-path canonicalization and `Label()`
-  explicit/owner-scoped repo canonicalization no longer consult process-global
-  dynamic aliases on resolverless or no-runtime-snapshot resolver misses, but
-  remaining compatibility adapters still retain process-global fallback
-  behavior.
+  toolchain implementation label parsing, metadata label parsing, and C++
+  toolchain metadata/action-path formatting can now use declared aliases and
+  runtime aliases/cells from the active cell alias resolver before consulting
+  process-global dynamic aliases. Load-path canonicalization, `Label()`
+  explicit/owner-scoped repo canonicalization, and toolchain implementation
+  label parsing no longer consult process-global dynamic aliases on resolverless
+  or no-runtime-snapshot resolver misses, but remaining metadata/C++
+  compatibility adapters still retain process-global fallback behavior.
 - `config_setting(flag_values = ...)` build-setting lookup now also uses the
   active cell alias resolver for bzlmod repo-spelling normalization before
   consulting process-global dynamic aliases.
