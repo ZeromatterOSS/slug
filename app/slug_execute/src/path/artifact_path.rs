@@ -60,8 +60,8 @@ pub fn get_artifact_path_buck_out_root() -> ProjectRelativePathBuf {
         .to_buf()
 }
 
-fn canonical_external_cell_name(cell_name: &str) -> String {
-    slug_core::cells::canonical_bazel_repo_name_for_cell(cell_name)
+fn stored_external_cell_name(cell_name: &str) -> String {
+    cell_name.to_owned()
 }
 
 fn has_bazel_external_prefix(path: &ForwardRelativePath, cell_name: &str) -> bool {
@@ -160,7 +160,7 @@ impl ArtifactPath<'_> {
                 match cfg_label {
                     Some(label) => {
                         let cell_name = label.pkg().cell_name();
-                        let external_cell_name = canonical_external_cell_name(cell_name.as_str());
+                        let external_cell_name = stored_external_cell_name(cell_name.as_str());
                         let pkg_rel = label.pkg().cell_relative_path().as_str();
                         let rule_local_str = rule_local.as_str();
                         let prefixed = match (
@@ -200,7 +200,7 @@ impl ArtifactPath<'_> {
                     None => ForwardRelativePath::empty(),
                 };
                 let cell_name = source.package().cell_name();
-                let external_cell_name = canonical_external_cell_name(cell_name.as_str());
+                let external_cell_name = stored_external_cell_name(cell_name.as_str());
                 let pkg_path: &ForwardRelativePath = source.package().cell_relative_path().as_ref();
                 let cell_rel = if pkg_path.is_empty() {
                     in_pkg.as_str().to_owned()
@@ -300,7 +300,7 @@ impl ArtifactPath<'_> {
                     let buck_out_root = buck_out_root.as_str();
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
-                    let external_cell_name = canonical_external_cell_name(cell_name);
+                    let external_cell_name = stored_external_cell_name(cell_name);
                     let cell_relative_path = target.pkg().cell_relative_path().as_str();
                     let target_name = target.name().as_str();
                     let artifact_path = buck_out.path();
@@ -415,7 +415,7 @@ impl ArtifactPath<'_> {
                 // For external repos (non-root cells), prefix with "external/<cell>"
                 // to match Bazel's execution-time path convention.
                 let cell_name = buck.package().cell_name().as_str();
-                let external_cell_name = canonical_external_cell_name(cell_name);
+                let external_cell_name = stored_external_cell_name(cell_name);
                 let cell_relative = buck
                     .package()
                     .cell_relative_path()
@@ -458,7 +458,7 @@ impl ArtifactPath<'_> {
                     let buck_out_root = buck_out_root.as_str();
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
-                    let external_cell_name = canonical_external_cell_name(cell_name);
+                    let external_cell_name = stored_external_cell_name(cell_name);
                     let is_root = slug_core::cells::is_root_cell_name(cell_name);
                     let root_path = if is_root {
                         format!("{}/gen/{}/{}", buck_out_root, external_cell_name, cfg_hash)
@@ -542,5 +542,71 @@ impl fmt::Display for ArtifactPath<'_> {
         // NOTE: This produces a representation we tend to use in Starlark for those, which isn't
         // really consistent with what we use when *not* in Starlark.
         self.with_short_path(|p| write!(fmt, "{p}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use either::Either;
+    use gazebo::cell::ARef;
+    use slug_core::cells::name::CellName;
+    use slug_core::cells::paths::CellRelativePath;
+    use slug_core::configuration::data::ConfigurationData;
+    use slug_core::deferred::base_deferred_key::BaseDeferredKey;
+    use slug_core::fs::buck_out_path::BuckOutPathKind;
+    use slug_core::fs::buck_out_path::BuildArtifactPath;
+    use slug_core::package::PackageLabel;
+    use slug_core::target::label::label::TargetLabel;
+    use slug_core::target::name::TargetNameRef;
+    use slug_fs::paths::forward_rel_path::ForwardRelativePath;
+    use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
+
+    use super::ArtifactPath;
+
+    #[test]
+    fn build_artifact_paths_use_stored_cell_name_without_global_alias() -> slug_error::Result<()> {
+        let tmp = std::env::temp_dir().join(format!("slug-artifact-path-{}", std::process::id()));
+        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp);
+        let apparent = "plan61_artifact_path_cell";
+        let wrong_global = "plan61_wrong_owner++artifact+path_cell";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let pkg = PackageLabel::new(
+            CellName::testing_new(apparent),
+            CellRelativePath::unchecked_new("pkg"),
+        )?;
+        let target = TargetLabel::new(pkg, TargetNameRef::unchecked_new("target"))
+            .configure(ConfigurationData::testing_new());
+        let build_path = BuildArtifactPath::new(
+            BaseDeferredKey::TargetLabel(target),
+            ForwardRelativePathBuf::unchecked_new("out.txt".to_owned()),
+            BuckOutPathKind::BazelOutput,
+        );
+        let artifact = ArtifactPath {
+            base_path: Either::Left(ARef::new_ptr(&build_path)),
+            projected_path: ForwardRelativePath::empty(),
+            hidden_components_count: 0,
+        };
+
+        let full_path = artifact.with_full_path(|path| path.as_str().to_owned());
+        let root_path = artifact.with_root_path(|path| path.as_str().to_owned());
+
+        assert!(
+            full_path.contains(&format!("/gen/{apparent}/")),
+            "{full_path}"
+        );
+        assert!(
+            full_path.contains(&format!("/external/{apparent}/")),
+            "{full_path}"
+        );
+        assert!(!full_path.contains(wrong_global), "{full_path}");
+        assert!(
+            root_path.ends_with(&format!("/external/{apparent}")),
+            "{root_path}"
+        );
+        assert!(!root_path.contains(wrong_global), "{root_path}");
+        Ok(())
     }
 }

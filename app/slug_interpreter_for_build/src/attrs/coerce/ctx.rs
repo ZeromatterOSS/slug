@@ -83,7 +83,10 @@ enum BuildAttrCoercionContextError {
 /// The placeholder label will only fail when that specific target is analyzed.
 ///
 /// Returns `None` if the string cannot be parsed as an `@`-prefixed label.
-fn try_make_placeholder_label(value: &str) -> Option<ProvidersLabel> {
+fn try_make_placeholder_label(
+    value: &str,
+    cell_alias_resolver: Option<&CellAliasResolver>,
+) -> Option<ProvidersLabel> {
     let stripped = value
         .strip_prefix("@@")
         .or_else(|| value.strip_prefix('@'))?;
@@ -110,7 +113,9 @@ fn try_make_placeholder_label(value: &str) -> Option<ProvidersLabel> {
         (rest, last)
     };
 
-    let cell_name = CellName::unchecked_new(cell_alias).ok()?;
+    let cell_name = cell_alias_resolver
+        .and_then(|resolver| resolver.resolve_declared_or_runtime_alias(cell_alias))
+        .or_else(|| CellName::unchecked_new(cell_alias).ok())?;
     let pkg = PackageLabel::new(cell_name, CellRelativePath::unchecked_new(package_path)).ok()?;
     let target = TargetLabel::new(pkg, TargetNameRef::unchecked_new(target_name));
     Some(ProvidersLabel::default_for(target))
@@ -337,7 +342,9 @@ impl BuildAttrCoercionContext {
                 // fail at analysis time, but other targets in the same package (e.g.,
                 // python_toolchain) can be analyzed.
                 if value.starts_with('@') && value.contains("//") {
-                    if let Some(placeholder) = try_make_placeholder_label(value) {
+                    if let Some(placeholder) =
+                        try_make_placeholder_label(value, Some(&self.cell_alias_resolver))
+                    {
                         return Ok(placeholder);
                     }
                 }
@@ -583,5 +590,41 @@ impl AttrCoercionContext for BuildAttrCoercionContext {
             .visit_literals(visitor, expr)
             .map_err(|e| QueryError::convert_error(e, query))?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::alias::NonEmptyCellAlias;
+    use slug_core::cells::name::CellName;
+
+    use super::try_make_placeholder_label;
+
+    #[test]
+    fn placeholder_label_uses_active_alias_resolver_before_apparent_name() -> slug_error::Result<()>
+    {
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            NonEmptyCellAlias::new("dep".to_owned())?,
+            CellName::unchecked_new("dep+")?,
+        );
+        let resolver = CellAliasResolver::new(CellName::unchecked_new("root")?, aliases)?;
+
+        let label = try_make_placeholder_label("@dep//pkg:target", Some(&resolver))
+            .expect("placeholder should parse");
+
+        assert_eq!(label.target().pkg().cell_name().as_str(), "dep+");
+        Ok(())
+    }
+
+    #[test]
+    fn placeholder_label_preserves_apparent_name_without_alias_owner() {
+        let label =
+            try_make_placeholder_label("@dep//pkg:target", None).expect("placeholder should parse");
+
+        assert_eq!(label.target().pkg().cell_name().as_str(), "dep");
     }
 }

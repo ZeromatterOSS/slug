@@ -4211,6 +4211,35 @@ hardening behavior around it.
   alias/module canonicalization. The remaining bridge is the producer: those
   labels still ultimately come from the legacy-produced cell graph until
   `BzlmodCellGraphKey` is true graph-owned data.
+- Clean review of the output-path slice found two remaining ownership leaks:
+  `ArtifactPath` still asked process-global bzlmod alias state to canonicalize
+  external repo names, and bzlmod module cells/repo-mapping targets could still
+  be stored under apparent module names such as `b` while Bazel's canonical
+  module repository is `b+`. This slice burns down the output/file-path and
+  repo-mapping bridge surface by making `ArtifactPath` consume the stored label
+  cell name, storing resolved bzlmod module cells under
+  `bazel_canonical_module_repo_name`, canonicalizing repo-mapping target values
+  to selected graph cell names, and resolving placeholder labels through the
+  active alias owner before preserving apparent names as a compatibility
+  fallback. The intended owner is `BzlmodCellGraphKey` plus `RepoMappingKey`;
+  the current owner remains `BzlmodCellGraphValue` /
+  `BzlmodCellGraphDataKey` until the cell graph is derived from true module,
+  resolution, and repo-mapping DICE producers. Before evidence included
+  `ArtifactPath`'s `canonical_external_cell_name` process-global call,
+  `CellName::unchecked_new(name)` / `CellName::unchecked_new(module_name)` for
+  bzlmod module cells, and focused Plan 61 failures on `b//...` dependency keys
+  while the known cell was `b+`. After evidence: targeted searches for
+  `slug_core::cells::canonical_bazel_repo_name_for_cell` /
+  `canonical_external_cell_name` in output-path formatting and
+  `CellName::unchecked_new(name|module_name)` in bzlmod cell creation return no
+  hits; searches show `canonicalize_repo_mapping_snapshot_targets` and
+  placeholder `resolve_declared_or_runtime_alias(cell_alias)` in the owner path.
+  Validation passed with focused `slug_common` canonical-module tests, the
+  focused `slug_execute` artifact-path regression, focused
+  `slug_interpreter_for_build` placeholder-label regressions, affected-crate
+  `cargo check`, `cargo build -p slug`, the explicit-binary Plan 61 selector for
+  explicit module repo names and scoped/root alias leakage (`3 passed, 152
+  deselected`), `cargo fmt --check`, and `git diff --check`.
 - `CellResolver::get` root-alias lookup now uses only resolver-owned declared
   aliases and runtime aliases/cells, so no-snapshot misses no longer consult
   process-global generated-repo aliases during ordinary unknown-cell lookup.

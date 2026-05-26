@@ -323,6 +323,25 @@ fn repo_mapping_snapshot_for_modules(
     snapshot
 }
 
+fn canonicalize_repo_mapping_snapshot_targets(
+    snapshot: &mut slug_bzlmod::RepoMappingSnapshot,
+    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
+) {
+    let Some(resolved_graph) = resolved_graph else {
+        return;
+    };
+    for mapping in snapshot.values_mut() {
+        for target_name in mapping.values_mut() {
+            if let Some(cell_name) =
+                selected_bzlmod_cell_name_for_dep(cells, target_name, resolved_graph)
+            {
+                *target_name = cell_name.to_owned();
+            }
+        }
+    }
+}
+
 fn repo_mapping_overrides_for_root(
     parsed_modules: &[(String, ParsedModuleFile)],
     root_module_name: &str,
@@ -3719,7 +3738,8 @@ impl BuckConfigBasedCells {
         let active_overrides = active_root_overrides(&parsed.module, options.ignore_dev_dependency);
         let local_modules = resolve_local_modules(&active_overrides, workspace_root)?;
         for (name, resolved) in local_modules.iter() {
-            let cell_name = CellName::unchecked_new(name)?;
+            let canonical_repo = bazel_canonical_module_repo_name(name, resolved.version.as_str());
+            let cell_name = CellName::unchecked_new(&canonical_repo)?;
             let (cell_path, symlink) = local_override_cell_path_and_symlink(
                 project_root,
                 &project_root_abs,
@@ -3734,9 +3754,10 @@ impl BuckConfigBasedCells {
             // which is handled separately if needed
             cells.push((cell_name, cell_path, None));
             tracing::info!(
-                "Resolved local module: {} -> {}",
+                "Resolved local module: {} -> {} (cell: {})",
                 name,
-                resolved.relative_path
+                resolved.relative_path,
+                canonical_repo
             );
         }
 
@@ -3879,7 +3900,9 @@ impl BuckConfigBasedCells {
                     continue;
                 }
 
-                let cell_name = CellName::unchecked_new(module_name)?;
+                let canonical_repo =
+                    bazel_canonical_module_repo_name(module_name, &module_info.version);
+                let cell_name = CellName::unchecked_new(&canonical_repo)?;
 
                 // Determine the cell path and setup based on source type
                 match &module_info.source {
@@ -3891,8 +3914,6 @@ impl BuckConfigBasedCells {
                             .unwrap_or_default();
 
                         // Create a project-relative path for this external module
-                        let canonical_repo =
-                            bazel_canonical_module_repo_name(module_name, &module_info.version);
                         let external_path = format!("bazel-external/{canonical_repo}");
                         let cell_path = CellRootPathBuf::new(
                             ProjectRelativePath::new(&external_path)?.to_owned(),
@@ -3937,8 +3958,6 @@ impl BuckConfigBasedCells {
                             .map(|p| p.to_string_lossy().to_string())
                             .unwrap_or_default();
 
-                        let canonical_repo =
-                            bazel_canonical_module_repo_name(module_name, &module_info.version);
                         let external_path = format!("bazel-external/{canonical_repo}");
                         let cell_path = CellRootPathBuf::new(
                             ProjectRelativePath::new(&external_path)?.to_owned(),
@@ -3968,8 +3987,6 @@ impl BuckConfigBasedCells {
                             .map(|p| p.to_string_lossy().to_string())
                             .unwrap_or_default();
 
-                        let canonical_repo =
-                            bazel_canonical_module_repo_name(module_name, &module_info.version);
                         let external_path = format!("bazel-external/{canonical_repo}");
                         let cell_path = CellRootPathBuf::new(
                             ProjectRelativePath::new(&external_path)?.to_owned(),
@@ -4141,6 +4158,11 @@ impl BuckConfigBasedCells {
         );
         let mut repo_mappings =
             repo_mapping_snapshot_for_modules(&parsed_modules, root_module_name);
+        canonicalize_repo_mapping_snapshot_targets(
+            &mut repo_mappings,
+            &cells,
+            resolved_graph_for_aliases.as_ref(),
+        );
         let repo_mapping_overrides = repo_mapping_overrides_for_root(
             &parsed_modules,
             root_module_name,
@@ -4737,7 +4759,24 @@ fn selected_bzlmod_cell_name_for_dep<'a>(
         return Some(name.as_str());
     }
 
-    let selected_version = resolved_graph.selected_versions.get(dep_name)?;
+    let selected_version = resolved_graph
+        .modules
+        .get(dep_name)
+        .map(|module| module.version.as_str())
+        .or_else(|| {
+            resolved_graph
+                .selected_versions
+                .get(dep_name)
+                .map(String::as_str)
+        })?;
+    let canonical_name = bazel_canonical_module_repo_name(dep_name, selected_version);
+    if let Some((name, _, _)) = cells
+        .iter()
+        .find(|(name, _, _)| name.as_str() == canonical_name)
+    {
+        return Some(name.as_str());
+    }
+
     let versioned_name = format!("{}+{}", dep_name, selected_version);
     if let Some((name, _, _)) = cells
         .iter()
@@ -5616,6 +5655,148 @@ mod tests {
                 .as_path(),
             output_base.as_path()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn selected_bzlmod_cell_name_for_dep_prefers_canonical_module_repo() -> slug_error::Result<()> {
+        let cells = vec![(
+            CellName::unchecked_new("dep+")?,
+            CellRootPathBuf::new(ProjectRelativePath::new("bazel-external/dep+")?.to_owned()),
+            None,
+        )];
+        let mut resolved_graph = slug_bzlmod::ResolvedGraph::default();
+        resolved_graph.modules.insert(
+            "dep".to_owned(),
+            slug_bzlmod::ResolvedModuleInfo {
+                name: "dep".to_owned(),
+                version: "1.0".to_owned(),
+                compatibility_level: 0,
+                dependencies: HashMap::new(),
+                source: ModuleSource::Registry {
+                    url: "https://bcr.bazel.build".to_owned(),
+                },
+                source_path: None,
+            },
+        );
+
+        assert_eq!(
+            selected_bzlmod_cell_name_for_dep(&cells, "dep", &resolved_graph),
+            Some("dep+")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn repo_mapping_snapshot_targets_use_canonical_module_cells() -> slug_error::Result<()> {
+        let cells = vec![
+            (
+                CellName::unchecked_new("dep+")?,
+                CellRootPathBuf::new(ProjectRelativePath::new("bazel-external/dep+")?.to_owned()),
+                None,
+            ),
+            (
+                CellName::unchecked_new("other+")?,
+                CellRootPathBuf::new(ProjectRelativePath::new("bazel-external/other+")?.to_owned()),
+                None,
+            ),
+        ];
+        let mut resolved_graph = slug_bzlmod::ResolvedGraph::default();
+        for module_name in ["dep", "other"] {
+            resolved_graph.modules.insert(
+                module_name.to_owned(),
+                slug_bzlmod::ResolvedModuleInfo {
+                    name: module_name.to_owned(),
+                    version: "1.0".to_owned(),
+                    compatibility_level: 0,
+                    dependencies: HashMap::new(),
+                    source: ModuleSource::Registry {
+                        url: "https://bcr.bazel.build".to_owned(),
+                    },
+                    source_path: None,
+                },
+            );
+        }
+        let mut snapshot = slug_bzlmod::RepoMappingSnapshot::new();
+        snapshot.insert(
+            "root".to_owned(),
+            BTreeMap::from([
+                ("dep".to_owned(), "dep".to_owned()),
+                ("already_canonical".to_owned(), "other+".to_owned()),
+            ]),
+        );
+
+        canonicalize_repo_mapping_snapshot_targets(&mut snapshot, &cells, Some(&resolved_graph));
+
+        let mapping = snapshot.get("root").expect("root mapping should exist");
+        assert_eq!(mapping.get("dep").map(String::as_str), Some("dep+"));
+        assert_eq!(
+            mapping.get("already_canonical").map(String::as_str),
+            Some("other+")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_cell_resolver_uses_canonical_module_cells_from_cell_graph()
+    -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-canonical-cell-graph-test");
+        let workspace_id =
+            slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"));
+        let mut projection_data =
+            slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
+        projection_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
+            workspace_id,
+            root_module_name: "root".to_owned(),
+            cells: Arc::new(vec![slug_bzlmod::BzlmodCellGraphCell {
+                name: "dep+".to_owned(),
+                path: "dep".to_owned(),
+                module_setup: None,
+                bundled: false,
+            }]),
+            extension_cells: Arc::new(Vec::new()),
+            root_aliases: Arc::new(vec![slug_bzlmod::BzlmodCellGraphAlias {
+                apparent_name: "dep".to_owned(),
+                target_name: "dep+".to_owned(),
+            }]),
+            module_symlinks: Arc::new(Vec::new()),
+            scoped_aliases: Arc::new(Vec::new()),
+            dynamic_aliases: Arc::new(Vec::new()),
+        };
+        let configs = BuckConfigBasedCells::parse_with_file_ops_and_options_inner(
+            &[],
+            None,
+            Some(Arc::new(Some(projection_data))),
+            slug_bzlmod::WorkspaceId::no_project_sentinel(),
+        )
+        .await?;
+        assert!(
+            configs
+                .cell_resolver
+                .get(CellName::unchecked_new("dep+")?)
+                .is_ok()
+        );
+        assert!(
+            configs
+                .cell_resolver
+                .get(CellName::unchecked_new("dep")?)
+                .is_err()
+        );
+        assert_eq!(
+            configs
+                .cell_resolver
+                .root_cell_cell_alias_resolver()
+                .resolve_declared_or_runtime_alias("dep")
+                .map(|name| name.as_str().to_owned()),
+            Some("dep+".to_owned())
+        );
+        let parsed = slug_core::provider::label::ProvidersLabel::parse(
+            "@dep//:target",
+            CellName::unchecked_new("root")?,
+            &configs.cell_resolver,
+            configs.cell_resolver.root_cell_cell_alias_resolver(),
+        )?;
+        assert_eq!(parsed.target().pkg().cell_name().as_str(), "dep+");
         Ok(())
     }
 
