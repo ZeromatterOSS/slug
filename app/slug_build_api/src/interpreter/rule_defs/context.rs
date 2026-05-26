@@ -1625,9 +1625,14 @@ fn canonical_bazel_repo_name_for_cell(
     cell_name: &str,
     cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> String {
+    if slug_core::cells::is_root_cell_name(cell_name) {
+        return String::new();
+    }
+
     cell_alias_resolver
-        .map(|resolver| resolver.canonical_bzlmod_repo_name_for_cell(cell_name))
-        .unwrap_or_else(|| slug_core::cells::canonical_bazel_repo_name_for_cell(cell_name))
+        .and_then(|resolver| resolver.resolve_declared_or_runtime_alias(cell_name))
+        .map(|cell| cell.as_str().to_owned())
+        .unwrap_or_else(|| cell_name.to_owned())
 }
 
 #[cfg(test)]
@@ -1669,6 +1674,11 @@ mod tests {
     #[test]
     fn analysis_context_repo_name_runtime_miss_is_authoritative() -> slug_error::Result<()> {
         let apparent = "analysis_ctx_runtime_miss";
+        let wrong_global = "wrong_owner++ext+analysis_ctx_runtime_miss";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
         let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
             CellName::testing_new("root"),
             HashMap::new(),
@@ -1679,7 +1689,54 @@ mod tests {
             canonical_bazel_repo_name_for_cell(apparent, Some(&resolver)),
             apparent
         );
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
         Ok(())
+    }
+
+    #[test]
+    fn analysis_context_repo_name_no_snapshot_miss_ignores_global_alias() -> slug_error::Result<()>
+    {
+        let apparent = "analysis_ctx_no_snapshot_miss";
+        let wrong_global = "wrong_owner++ext+analysis_ctx_no_snapshot_miss";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
+
+        assert_eq!(
+            canonical_bazel_repo_name_for_cell(apparent, Some(&resolver)),
+            apparent
+        );
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn analysis_context_repo_name_without_owner_ignores_global_alias() {
+        let apparent = "analysis_ctx_without_owner";
+        let wrong_global = "wrong_owner++ext+analysis_ctx_without_owner";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+
+        assert_eq!(canonical_bazel_repo_name_for_cell(apparent, None), apparent);
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+    }
+
+    #[test]
+    fn analysis_context_repo_name_root_cell_stays_empty() {
+        assert_eq!(canonical_bazel_repo_name_for_cell("root", None), "");
     }
 }
 

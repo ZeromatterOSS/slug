@@ -43,10 +43,11 @@ pub(crate) fn bazel_label_from_configured_with_alias_resolver(
     let cell = target.pkg().cell_name().as_str();
     let workspace_name = if slug_core::cells::is_root_cell_name(cell) {
         String::new()
-    } else if let Some(resolver) = cell_alias_resolver {
-        resolver.canonical_bzlmod_repo_name_for_cell(cell)
     } else {
-        slug_core::cells::canonical_bazel_repo_name_for_cell(cell)
+        cell_alias_resolver
+            .and_then(|resolver| resolver.resolve_declared_or_runtime_alias(cell))
+            .map(|cell| cell.as_str().to_owned())
+            .unwrap_or_else(|| cell.to_owned())
     };
     BazelLabel::new(
         workspace_name,
@@ -316,7 +317,7 @@ mod tests {
     }
 
     #[test]
-    fn configured_label_uses_bazel_canonical_crate_workspace() {
+    fn configured_label_without_alias_owner_uses_apparent_workspace() {
         let target = TargetLabel::testing_parse("crates__serde_core-1.0.228//:_bs")
             .configure(ConfigurationData::testing_new());
         let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
@@ -324,14 +325,8 @@ mod tests {
 
         assert_eq!(bazel_label.package(), "");
         assert_eq!(bazel_label.name(), "_bs");
-        assert_eq!(
-            bazel_label.workspace_name(),
-            "rules_rs++crate+crates__serde_core-1.0.228"
-        );
-        assert_eq!(
-            bazel_label.full(),
-            "@@rules_rs++crate+crates__serde_core-1.0.228//:_bs"
-        );
+        assert_eq!(bazel_label.workspace_name(), "crates__serde_core-1.0.228");
+        assert_eq!(bazel_label.full(), "@@crates__serde_core-1.0.228//:_bs");
     }
 
     #[test]
@@ -379,6 +374,30 @@ mod tests {
             HashMap::new(),
             &BzlmodRuntimeCellInstallSnapshot::default(),
         )?;
+        let target = TargetLabel::testing_parse(&format!("{apparent}//pkg:flag"))
+            .configure(ConfigurationData::testing_new());
+        let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
+
+        let bazel_label = bazel_label_from_configured_with_alias_resolver(&label, Some(&resolver));
+
+        assert_eq!(bazel_label.workspace_name(), apparent);
+        assert_eq!(bazel_label.full(), format!("@@{apparent}//pkg:flag"));
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn configured_label_no_snapshot_resolver_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let apparent = "analysis_ctx_label_no_snapshot_miss";
+        let wrong_global = "wrong_owner++ext+analysis_ctx_label_no_snapshot_miss";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
         let target = TargetLabel::testing_parse(&format!("{apparent}//pkg:flag"))
             .configure(ConfigurationData::testing_new());
         let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);

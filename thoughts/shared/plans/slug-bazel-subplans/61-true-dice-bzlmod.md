@@ -2618,6 +2618,38 @@ Observed SDK result at the checkpoint:
   Validation passed with `cargo test -p slug_interpreter_for_build
   label_context_ -- --nocapture` (`11 passed`) and `cargo check -p
   slug_interpreter_for_build`.
+- Configured provider/Bazel `Label` stringification now uses only the carried
+  analysis-time `CellAliasResolver` declared aliases and runtime snapshot for
+  Bazel-visible workspace/repo names. The bridge surface removed is
+  `StarlarkConfiguredProvidersLabel::bazel_workspace_name`,
+  `bazel_label_from_configured_with_alias_resolver`, and the analysis context
+  repo/output helper reaching fallback-bearing
+  `CellAliasResolver::canonical_bzlmod_repo_name_for_cell` or
+  `slug_core::cells::canonical_bazel_repo_name_for_cell`; resolverless and
+  no-runtime-snapshot misses now keep the apparent cell spelling while the root
+  cell still maps to Bazel's empty repo name. The target owner is the carried
+  `CellAliasResolver` alias view backed by the runtime cell graph snapshot and
+  ultimately `BzlmodCellGraphKey`. Bridge burn-down before/after evidence:
+  before, `rg -n
+  "canonical_bzlmod_repo_name_for_cell\\(|slug_core::cells::canonical_bazel_repo_name_for_cell\\("
+  app/slug_interpreter/src/types/configured_providers_label.rs
+  app/slug_build_api/src/interpreter/rule_defs/bazel_label.rs
+  app/slug_build_api/src/interpreter/rule_defs/context.rs` found production
+  bridge calls; after, it returns no hits, and `rg -n
+  "resolve_declared_or_runtime_alias\\(|no_snapshot|without_owner|without_alias_owner|runtime_miss"
+  app/slug_interpreter/src/types/configured_providers_label.rs
+  app/slug_build_api/src/interpreter/rule_defs/bazel_label.rs
+  app/slug_build_api/src/interpreter/rule_defs/context.rs` shows owner-only
+  calls plus stale-global miss coverage. Validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_interpreter
+  configured_label -- --nocapture` (`5 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_build_api
+  configured_label -- --nocapture` (`4 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo test -p slug_build_api
+  analysis_context_repo_name -- --nocapture` (`5 passed`),
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo check -p slug_interpreter
+  -p slug_build_api`, and
+  `TMPDIR=/var/mnt/dev/.slug-tmp/cargo-build cargo build -p slug`.
 - Extension repo materialization now reads the current command repo-env through
   `BzlmodRepoEnvKey` when no current DICE spoke value is available, instead of
   using the serialized `repo_env_json` on `ExtensionRepoCellSetup` as the
@@ -4088,9 +4120,13 @@ hardening behavior around it.
   available.
 - Configured provider `Label` values exposed through normal analysis `ctx.attr`,
   dependency objects, query-result dependencies, source-file targets, derived
-  same-package/relative labels, subtargets, and `ctx.label` now carry the active
-  cell alias resolver for Bazel-visible workspace/repo strings before falling
-  back to process-global dynamic aliases.
+  same-package/relative labels, subtargets, and `ctx.label` now carry the
+  active cell alias resolver. Their Bazel-visible workspace/repo stringification
+  uses only declared aliases and runtime aliases from that resolver;
+  resolverless and no-runtime-snapshot misses keep the apparent cell spelling
+  instead of consulting process-global dynamic aliases. The remaining bridge is
+  the producer: the resolver snapshot is still derived from legacy-produced cell
+  graph data rather than a true `BzlmodCellGraphKey`.
 - Path-to-cell projection now checks graph-owned dynamic cells and the
   resolver-owned runtime snapshot before root-scoped process-global dynamic
   cells, but the final cell graph is still injected from legacy-produced data.

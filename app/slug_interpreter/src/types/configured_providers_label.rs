@@ -111,10 +111,12 @@ impl StarlarkConfiguredProvidersLabel {
         let cell = self.label.target().pkg().cell_name().as_str();
         if slug_core::cells::is_root_cell_name(cell) {
             String::new()
-        } else if let Some(resolver) = &self.cell_alias_resolver {
-            resolver.canonical_bzlmod_repo_name_for_cell(cell)
         } else {
-            slug_core::cells::canonical_bazel_repo_name_for_cell(cell)
+            self.cell_alias_resolver
+                .as_ref()
+                .and_then(|resolver| resolver.resolve_declared_or_runtime_alias(cell))
+                .map(|cell| cell.as_str().to_owned())
+                .unwrap_or_else(|| cell.to_owned())
         }
     }
 }
@@ -586,16 +588,12 @@ mod tests {
     }
 
     #[test]
-    fn configured_label_uses_canonical_bzlmod_module_workspace() {
-        let tmp = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(tmp.path().join("bazel-external/llvm+")).unwrap();
-        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
-
+    fn configured_label_without_alias_owner_uses_apparent_workspace() {
         let mut a = Assert::new();
         a.globals_add(register_test_providers_label);
-        a.eq("\"llvm+\"", "bzlmod_module_label().workspace_name");
-        a.eq("\"llvm+\"", "bzlmod_module_label().repo_name");
-        a.eq("\"external/llvm+\"", "bzlmod_module_label().workspace_root");
+        a.eq("\"llvm\"", "bzlmod_module_label().workspace_name");
+        a.eq("\"llvm\"", "bzlmod_module_label().repo_name");
+        a.eq("\"external/llvm\"", "bzlmod_module_label().workspace_root");
     }
 
     #[test]
@@ -661,12 +659,43 @@ mod tests {
             ),
             ProvidersName::Default,
         );
-        let legacy_label = StarlarkConfiguredProvidersLabel::new(label.clone());
+        let no_owner_label = StarlarkConfiguredProvidersLabel::new(label.clone());
         let starlark_label =
             StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(label, Some(resolver));
 
         assert_eq!(starlark_label.bazel_workspace_name(), apparent);
-        assert_eq!(legacy_label.bazel_workspace_name(), wrong_global);
+        assert_eq!(no_owner_label.bazel_workspace_name(), apparent);
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn configured_label_no_snapshot_resolver_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let apparent = "plan61_configured_label_no_snapshot_miss";
+        let wrong_global = "plan61_wrong_owner++configured_label+no_snapshot";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            wrong_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
+        let label = ConfiguredProvidersLabel::new(
+            ConfiguredTargetLabel::testing_parse(
+                &format!("{apparent}//pkg:target"),
+                ConfigurationData::testing_new(),
+            ),
+            ProvidersName::Default,
+        );
+        let starlark_label =
+            StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(label, Some(resolver));
+
+        assert_eq!(starlark_label.bazel_workspace_name(), apparent);
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(wrong_global)
+        );
         Ok(())
     }
 
