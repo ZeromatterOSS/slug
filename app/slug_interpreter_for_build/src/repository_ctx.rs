@@ -635,9 +635,6 @@ pub struct RepositoryContext {
     /// execution.
     #[allocative(skip)]
     cell_paths: Arc<HashMap<String, PathBuf>>,
-    /// Whether `cell_paths` came from an active resolver. When set, missing
-    /// repos must not be filled from legacy process-global dynamic state.
-    resolver_owned_label_paths: bool,
 }
 
 starlark_simple_value!(RepositoryContext);
@@ -674,7 +671,6 @@ impl RepositoryContext {
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
             cell_paths: Arc::new(HashMap::new()),
-            resolver_owned_label_paths: false,
         }
     }
 
@@ -697,7 +693,6 @@ impl RepositoryContext {
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
             cell_paths: Arc::new(HashMap::new()),
-            resolver_owned_label_paths: false,
         }
     }
 
@@ -718,14 +713,12 @@ impl RepositoryContext {
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
             cell_paths: Arc::new(HashMap::new()),
-            resolver_owned_label_paths: false,
         }
     }
 
     /// Set resolver-owned label paths for repository_ctx path-like APIs.
     pub fn with_label_resolution(mut self, cell_paths: HashMap<String, PathBuf>) -> Self {
         self.cell_paths = Arc::new(cell_paths);
-        self.resolver_owned_label_paths = true;
         self
     }
 
@@ -759,15 +752,11 @@ impl RepositoryContext {
         let resolver = LabelFilesystemResolver::new(workspace_root)
             .with_project_root(Some(workspace_root))
             .with_root_label_resolution(RootLabelResolution::ProjectAbsolute);
-        let path = if self.resolver_owned_label_paths {
-            resolver
-                .with_cell_paths(&self.cell_paths)
-                .without_legacy_fallbacks()
-                .resolve_label_string(label_str)
-        } else {
-            resolver.resolve_label_string(label_str)
-        }
-        .unwrap_or_else(|| PathBuf::from(label_str));
+        let path = resolver
+            .with_cell_paths(&self.cell_paths)
+            .without_legacy_fallbacks()
+            .resolve_label_string(label_str)
+            .unwrap_or_else(|| PathBuf::from(label_str));
         if path.is_absolute() {
             path
         } else {
@@ -782,16 +771,7 @@ impl RepositoryContext {
         }) {
             return canonical;
         }
-        if self.resolver_owned_label_paths {
-            return repo.to_owned();
-        }
-        let resolved_repo = slug_core::cells::resolve_dynamic_extension_cell_alias(repo)
-            .unwrap_or_else(|| repo.to_owned());
-        if let Some(cell_path) = slug_core::cells::get_dynamic_extension_cell(&resolved_repo) {
-            cell_path.rsplit('/').next().unwrap_or(repo).to_owned()
-        } else {
-            resolved_repo
-        }
+        repo.to_owned()
     }
 
     /// Return recorded inputs collected during repository rule execution.
@@ -3327,6 +3307,28 @@ mod tests {
         assert_eq!(
             resolve_label_to_filesystem_path("@llvm-raw//:WORKSPACE", workspace_root),
             raw_repo.join("WORKSPACE")
+        );
+    }
+
+    #[test]
+    fn repository_context_label_paths_do_not_scan_project_root_without_resolver_owned_cell_paths() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let working_dir = workspace_root.join("repo_work");
+        let raw_repo = workspace_root
+            .join("bazel-external")
+            .join("llvm++llvm_source+llvm-raw");
+        std::fs::create_dir_all(&raw_repo).unwrap();
+        let ctx = RepositoryContext::new_with_workspace_root(
+            "ctx".to_owned(),
+            RepositoryAttr::empty(),
+            working_dir,
+            workspace_root.to_path_buf(),
+        );
+
+        assert_eq!(
+            ctx.resolve_label_to_filesystem_path("@llvm-raw//:WORKSPACE"),
+            workspace_root.join("llvm-raw").join("WORKSPACE")
         );
     }
 
