@@ -317,15 +317,6 @@ fn scoped_canonical_repo_name_for_label_context_with_alias_resolver(
         }
     }
 
-    if let Some(canonical_name) =
-        slug_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
-            file_cell,
-            apparent_repo_name,
-        )
-    {
-        return canonical_name;
-    }
-
     canonical_repo_name_for_label_context_with_alias_resolver(apparent_repo_name, alias_resolver)
 }
 
@@ -1201,7 +1192,7 @@ mod tests {
             scoped_canonical_repo_name_for_label_context_with_alias_resolver(
                 file_cell, apparent, None
             ),
-            wrong_global
+            apparent
         );
         Ok(())
     }
@@ -1235,7 +1226,7 @@ mod tests {
             scoped_canonical_repo_name_for_label_context_with_alias_resolver(
                 file_cell, apparent, None
             ),
-            wrong_global
+            apparent
         );
         Ok(())
     }
