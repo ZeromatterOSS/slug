@@ -252,6 +252,28 @@ Observed SDK result at the checkpoint:
   --nocapture`, `cargo check -p slug_bzlmod`, `cargo check -p slug_common`,
   `cargo build -p slug`, the same explicit-binary Plan 61 selector (`6 passed,
   149 deselected`), `cargo fmt --check`, and `git diff --check`.
+  Extension `.bzl` digest follow-up: the production bridge surface reduced is
+  scanner fallback inside the DICE replay-input digest key. Before this slice,
+  `ExtensionBzlTransitiveDigestKey` returned a `dice_tracked=false` value by
+  calling the literal-load filesystem scanner when no aggregation was available;
+  that kept a fallback-scanner digest path inside the normal DICE key. After
+  this slice, missing aggregation is an error for direct digest-key computation,
+  successful digest values are always executor/loaded-graph values, and the
+  `dice_tracked` split is gone. The intended owner is
+  `ModuleExtensionReplayInputKey` fed by `ExtensionBzlTransitiveDigestKey` over
+  the loaded Starlark graph; the scanner remains only in explicit non-DICE
+  bootstrap/preseed helpers. Before/after evidence:
+  `sed -n '260,307p' app/slug_bzlmod/src/extension_execution_dice.rs | rg -n "compute_bzl_transitive_digest_for_project_with_repo_mappings|BzlmodRepoMappingsKey|dice_tracked"`
+  and
+  `rg -n "dice_tracked|ExtensionBzlTransitiveDigestValue::new\\([^\\n]+,\\s*(true|false)" app/slug_bzlmod/src/extension_execution_dice.rs`
+  now return no hits. Validation passed with `cargo test -p slug_bzlmod
+  extension_bzl_digest_key_rejects_missing_aggregation -- --nocapture`,
+  `cargo test -p slug_bzlmod
+  extension_spokes_lookup_keys_cache_after_digest_dependency -- --nocapture`,
+  `cargo check -p slug_bzlmod`, `cargo build -p slug`, the explicit-binary Plan
+  61 extension replay selector for local/transitive/mapped `.bzl` edits,
+  creations, and deletions (`6 passed, 149 deselected`), `cargo fmt --check`,
+  and `git diff --check`.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets

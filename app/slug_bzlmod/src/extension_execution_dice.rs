@@ -271,39 +271,28 @@ impl Key for ExtensionBzlTransitiveDigestKey {
                 extension_id: self.extension_id.clone(),
             })
             .await??;
-        if let Some(aggregation) = aggregation {
-            let executor = MODULE_EXTENSION_EXECUTOR_IMPL.get().map_err(|e| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Tier0,
-                    "ExtensionBzlTransitiveDigestKey requires the module extension executor: {}",
-                    e
-                )
-            })?;
-            let digest = executor
-                .extension_bzl_transitive_digest(
-                    ctx,
-                    self.extension_id.as_ref(),
-                    aggregation.aggregated.as_ref(),
-                )
-                .await?;
-            return Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
-                digest, true,
-            )));
-        }
-
-        let repo_mappings = ctx
-            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
-        Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
-            compute_bzl_transitive_digest_for_project_with_repo_mappings(
-                &self.extension_id,
-                self.workspace_id.canonical_project_root.as_path(),
-                Some(repo_mappings.repo_mappings.as_ref()),
-            ),
-            false,
-        )))
+        let Some(aggregation) = aggregation else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Extension '{}' not found while computing loaded .bzl digest",
+                self.extension_id
+            ));
+        };
+        let executor = MODULE_EXTENSION_EXECUTOR_IMPL.get().map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "ExtensionBzlTransitiveDigestKey requires the module extension executor: {}",
+                e
+            )
+        })?;
+        let digest = executor
+            .extension_bzl_transitive_digest(
+                ctx,
+                self.extension_id.as_ref(),
+                aggregation.aggregated.as_ref(),
+            )
+            .await?;
+        Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(digest)))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -313,25 +302,20 @@ impl Key for ExtensionBzlTransitiveDigestKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        match _x {
-            Ok(value) => value.dice_tracked,
-            Err(_) => false,
-        }
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct ExtensionBzlTransitiveDigestValue {
     digest: Arc<str>,
-    dice_tracked: bool,
 }
 
 impl ExtensionBzlTransitiveDigestValue {
-    fn new(digest: String, dice_tracked: bool) -> Self {
+    fn new(digest: String) -> Self {
         Self {
             digest: Arc::from(digest),
-            dice_tracked,
         }
     }
 
@@ -2468,24 +2452,18 @@ mod tests {
         let failed_canonical_owner: slug_error::Result<Option<Arc<str>>> = Err(
             slug_error::slug_error!(slug_error::ErrorTag::Tier0, "canonical owner failed"),
         );
-        let first_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> =
-            Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
-                "first".to_owned(),
-                true,
-            )));
+        let first_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> = Ok(
+            Arc::new(ExtensionBzlTransitiveDigestValue::new("first".to_owned())),
+        );
         let same_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> = Ok(Arc::new(
-            ExtensionBzlTransitiveDigestValue::new("first".to_owned(), true),
+            ExtensionBzlTransitiveDigestValue::new("first".to_owned()),
         ));
-        let changed_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> =
-            Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
-                "second".to_owned(),
-                true,
-            )));
-        let fallback_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> =
-            Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(
-                "first".to_owned(),
-                false,
-            )));
+        let changed_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> = Ok(
+            Arc::new(ExtensionBzlTransitiveDigestValue::new("second".to_owned())),
+        );
+        let failed_digest: slug_error::Result<Arc<ExtensionBzlTransitiveDigestValue>> = Err(
+            slug_error::slug_error!(slug_error::ErrorTag::Tier0, "digest failed"),
+        );
 
         assert!(<BzlmodExtensionAggregationKey as Key>::validity(
             &missing_aggregation
@@ -2524,7 +2502,7 @@ mod tests {
             &first_digest
         ));
         assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
-            &fallback_digest
+            &failed_digest
         ));
     }
 
@@ -2557,6 +2535,38 @@ mod tests {
             ExtensionSpokesByCanonicalRepoKey::for_workspace_id(workspace_id, "_main+missing+repo");
         assert!(dice.compute(&by_canonical).await??.is_none());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn extension_bzl_digest_key_rejects_missing_aggregation() -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-extension-digest-missing-aggregation");
+        let workspace_id = crate::WorkspaceId::for_project_root(project_root);
+        let extension_id = "@root//:missing.bzl%missing";
+        let aggregations = Arc::new(BzlmodExtensionAggregationsDataValue::for_workspace(
+            workspace_id.clone(),
+            Arc::new(std::collections::HashMap::new()),
+        ));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(BzlmodExtensionAggregationsDataKey, aggregations)])?;
+        let mut dice = updater.commit().await;
+        let key = ExtensionBzlTransitiveDigestKey {
+            workspace_id,
+            extension_id: Arc::from(extension_id),
+        };
+        let err = dice.compute(&key).await?.unwrap_err();
+
+        assert!(
+            err.to_string()
+                .contains("not found while computing loaded .bzl digest"),
+            "{err:?}"
+        );
         Ok(())
     }
 
