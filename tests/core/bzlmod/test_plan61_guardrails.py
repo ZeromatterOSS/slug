@@ -14,6 +14,7 @@ import base64
 import hashlib
 import json
 import re
+import subprocess
 import zipfile
 from pathlib import Path
 from typing import Protocol
@@ -143,12 +144,16 @@ def _git_override_cache_dir(
     remote: str,
     commit: str,
     shallow_since: str | None = None,
+    patches: list[str] | None = None,
+    patch_strip: int = 0,
 ) -> Path:
     hasher = hashlib.sha256()
     hasher.update(b"slug-git-override-cache-v1")
     _update_digest_str(hasher, remote)
     _update_digest_str(hasher, commit)
     _update_digest_optional_str(hasher, shallow_since)
+    _update_digest_str_list(hasher, patches or [])
+    _update_digest_u32(hasher, patch_strip)
     source_identity = hasher.hexdigest()[:16]
     return cache_home / "slug" / "overrides" / module_name / f"git-{commit}-{source_identity}"
 
@@ -159,6 +164,8 @@ def _archive_override_cache_dir(
     urls: list[str],
     integrity: str | None = None,
     strip_prefix: str | None = None,
+    patches: list[str] | None = None,
+    patch_strip: int = 0,
 ) -> Path:
     hasher = hashlib.sha256()
     hasher.update(b"slug-archive-override-cache-v1")
@@ -166,6 +173,8 @@ def _archive_override_cache_dir(
         _update_digest_str(hasher, url)
     _update_digest_optional_str(hasher, integrity)
     _update_digest_optional_str(hasher, strip_prefix)
+    _update_digest_str_list(hasher, patches or [])
+    _update_digest_u32(hasher, patch_strip)
     source_identity = hasher.hexdigest()[:16]
     return cache_home / "slug" / "overrides" / module_name / f"archive-{source_identity}"
 
@@ -181,6 +190,16 @@ def _update_digest_optional_str(hasher: _HashLike, value: str | None) -> None:
         return
     hasher.update(b"\1")
     hasher.update(value.encode())
+
+
+def _update_digest_str_list(hasher: _HashLike, values: list[str]) -> None:
+    hasher.update(len(values).to_bytes(8, "little"))
+    for value in values:
+        _update_digest_str(hasher, value)
+
+
+def _update_digest_u32(hasher: _HashLike, value: int) -> None:
+    hasher.update(value.to_bytes(4, "little"))
 
 
 def _protobuf_varint(value: int) -> bytes:
@@ -5219,58 +5238,167 @@ single_version_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_archive_override_patches_fail_until_supported(
+async def test_archive_override_patches_apply_to_fetched_module(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: archive_override patches affect final RepoSpec materialization."""
+    """Bazel anchors: ModuleFileFunction fetches overrides before parsing MODULE.bazel."""
+    module_name = "archive_override_patch_lib"
+    patch_label = "//:fix.patch"
+    archive_path = buck.cwd / "archive_override_patch_lib.zip"
+    _write_zip(
+        archive_path,
+        {
+            "MODULE.bazel": f'module(name = "{module_name}", version = "1.0")\n',
+            "dep_ext.bzl": """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
+)
+""",
+            "BUILD.bazel": 'filegroup(name = "ok", srcs = [])\n',
+        },
+    )
+    _write(
+        buck.cwd / "fix.patch",
+        f"""diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -1 +1,3 @@
+ module(name = "{module_name}", version = "1.0")
++dep = use_extension("//:dep_ext.bzl", "dep_ext")
++use_repo(dep, "patched_repo")
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1 +1,2 @@
+ filegroup(name = "ok", srcs = [])
++filegroup(name = "patched", srcs = [])
+""",
+    )
     _write(
         buck.cwd / "MODULE.bazel",
-        """module(name = "plan61_archive_patches_unsupported")
-bazel_dep(name = "dep", version = "1.0.0")
+        f"""module(name = "plan61_archive_patches_supported")
+bazel_dep(name = "{module_name}", version = "1.0.0")
 archive_override(
-    module_name = "dep",
-    urls = ["file:///does/not/matter.tar.gz"],
-    patches = ["//:fix.patch"],
+    module_name = "{module_name}",
+    urls = ["{archive_path.as_uri()}"],
+    patches = ["{patch_label}"],
+    patch_strip = 1,
 )
 """,
     )
-    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
-    _write(buck.cwd / "fix.patch", "")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        f"""filegroup(
+    name = "uses_patched_archive_module",
+    srcs = ["@{module_name}//:patched"],
+)
+""",
+    )
 
-    with pytest.raises(BuckException) as exc:
-        await buck.build("//:x")
+    await buck.build("//:uses_patched_archive_module")
+    output, _ = await _audit_cells_and_counters(buck)
 
-    assert "archive_override(patches = ...)" in str(exc.value)
-    assert "MODULE.bazel discovery" in str(exc.value)
-    assert "repository materialization" in str(exc.value)
+    assert module_name in output
+    assert "patched_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_git_override_patches_fail_until_supported(
+async def test_git_override_patches_apply_to_fetched_module(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: git_override patches affect final RepoSpec materialization."""
+    """Bazel anchors: RepoDefinitionFunction resolves override patches in the root repo."""
+    module_name = "git_override_patch_lib"
+    repo_dir = buck.cwd / "git_override_patch_lib_repo"
+    repo_dir.mkdir()
+    _write(repo_dir / "MODULE.bazel", f'module(name = "{module_name}", version = "1.0")\n')
     _write(
-        buck.cwd / "MODULE.bazel",
-        """module(name = "plan61_git_patches_unsupported")
-bazel_dep(name = "dep", version = "1.0.0")
-git_override(
-    module_name = "dep",
-    remote = "file:///does/not/matter.git",
-    commit = "0000000000000000000000000000000000000000",
-    patches = ["//:fix.patch"],
+        repo_dir / "dep_ext.bzl",
+        """def _dep_ext_impl(module_ctx):
+    pass
+
+dep_ext = module_extension(
+    implementation = _dep_ext_impl,
 )
 """,
     )
-    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
-    _write(buck.cwd / "fix.patch", "")
+    _write(repo_dir / "BUILD.bazel", 'filegroup(name = "ok", srcs = [])\n')
+    subprocess.run(
+        ["git", "init", "-b", "main"],
+        cwd=repo_dir,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["git", "add", "."],
+        cwd=repo_dir,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Plan 61",
+            "-c",
+            "user.email=plan61@example.invalid",
+            "commit",
+            "-m",
+            "seed",
+        ],
+        cwd=repo_dir,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_dir, text=True).strip()
+    _write(
+        buck.cwd / "fix.patch",
+        f"""diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -1 +1,3 @@
+ module(name = "{module_name}", version = "1.0")
++dep = use_extension("//:dep_ext.bzl", "dep_ext")
++use_repo(dep, "patched_repo")
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1 +1,2 @@
+ filegroup(name = "ok", srcs = [])
++filegroup(name = "patched", srcs = [])
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_git_patches_supported")
+bazel_dep(name = "{module_name}", version = "1.0.0")
+git_override(
+    module_name = "{module_name}",
+    remote = "{repo_dir.as_uri()}",
+    commit = "{commit}",
+    patches = ["//:fix.patch"],
+    patch_strip = 1,
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        f"""filegroup(
+    name = "uses_patched_git_module",
+    srcs = ["@{module_name}//:patched"],
+)
+""",
+    )
 
-    with pytest.raises(BuckException) as exc:
-        await buck.build("//:x")
+    await buck.build("//:uses_patched_git_module")
+    output, _ = await _audit_cells_and_counters(buck)
 
-    assert "git_override(patches = ...)" in str(exc.value)
-    assert "MODULE.bazel discovery" in str(exc.value)
-    assert "repository materialization" in str(exc.value)
+    assert module_name in output
+    assert "patched_repo" in output
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

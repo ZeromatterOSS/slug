@@ -21,6 +21,8 @@ use std::sync::Arc;
 
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
+use sha2::Digest;
+use sha2::Sha256;
 use slug_error::BuckErrorContext;
 use slug_http::HttpClient;
 use slug_http::HttpClientBuilder;
@@ -272,6 +274,60 @@ impl SourceFetcher {
         }))
     }
 
+    /// Apply root-main-repository override patches to a fetched override source.
+    pub fn apply_local_override_patches(
+        dest_dir: &Path,
+        workspace_root: &Path,
+        patches: &[String],
+        patch_strip: u32,
+    ) -> slug_error::Result<()> {
+        for patch_label in patches {
+            let patch_path = override_patch_label_path(workspace_root, patch_label)?;
+            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
+                format!(
+                    "Failed to read override patch '{}' at {}",
+                    patch_label,
+                    patch_path.display()
+                )
+            })?;
+            Self::apply_patch_content(dest_dir, patch_label, patch_strip, &patch_content)?;
+        }
+        Ok(())
+    }
+
+    /// Digest the exact local patch files that affect a non-registry override
+    /// cache directory. This keeps warm override fetches from reusing a source
+    /// tree patched with older bytes when the root patch file changes.
+    pub fn local_override_patch_digest(
+        workspace_root: &Path,
+        patches: &[String],
+        patch_strip: u32,
+    ) -> slug_error::Result<Option<String>> {
+        if patches.is_empty() {
+            return Ok(None);
+        }
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"slug-local-override-patches-v1");
+        hasher.update((patches.len() as u64).to_le_bytes());
+        hasher.update(patch_strip.to_le_bytes());
+        for patch_label in patches {
+            let patch_path = override_patch_label_path(workspace_root, patch_label)?;
+            let patch_content = std::fs::read(&patch_path).with_buck_error_context(|| {
+                format!(
+                    "Failed to read override patch '{}' at {}",
+                    patch_label,
+                    patch_path.display()
+                )
+            })?;
+            hasher.update((patch_label.len() as u64).to_le_bytes());
+            hasher.update(patch_label.as_bytes());
+            hasher.update((patch_content.len() as u64).to_le_bytes());
+            hasher.update(&patch_content);
+        }
+        Ok(Some(hex::encode(hasher.finalize())))
+    }
+
     /// Fetch and extract source for a module.
     ///
     /// Returns the path to the extracted source directory.
@@ -396,6 +452,11 @@ impl SourceFetcher {
     /// Download an archive from a URL.
     async fn download_archive(&self, url: &str) -> slug_error::Result<Vec<u8>> {
         tracing::info!("Downloading archive from {}", url);
+
+        if let Some(path) = url.strip_prefix("file://") {
+            return std::fs::read(path)
+                .with_buck_error_context(|| format!("Failed to read local archive from {}", url));
+        }
 
         let response = self
             .http_client
@@ -848,6 +909,33 @@ impl SourceFetcher {
 
         Ok(())
     }
+}
+
+fn override_patch_label_path(
+    workspace_root: &Path,
+    raw_label: &str,
+) -> slug_error::Result<PathBuf> {
+    let label =
+        crate::repo_mapping::canonicalize_label_with_package_context(raw_label, "", "", None)
+            .ok_or_else(|| FetchError::PatchFailed {
+                patch: format!("invalid override patch label '{}'", raw_label),
+            })?;
+    if !label.repo().as_str().is_empty() {
+        return Err(FetchError::PatchFailed {
+            patch: format!(
+                "invalid override patch label '{}': only patches from the main repository are supported",
+                raw_label
+            ),
+        }
+        .into());
+    }
+
+    let mut path = workspace_root.to_path_buf();
+    if !label.package().is_empty() {
+        path.push(label.package());
+    }
+    path.push(label.target());
+    Ok(path)
 }
 
 /// Extract a gzip-compressed tar archive (standalone function for testing).

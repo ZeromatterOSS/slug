@@ -144,7 +144,17 @@ impl ModuleCache {
 
     /// Get the cache directory for a git override.
     pub fn git_override_dir(&self, git: &crate::types::GitOverride) -> PathBuf {
-        let source_identity = git_override_source_identity(git);
+        self.git_override_dir_with_patch_digest(git, None)
+    }
+
+    /// Get the cache directory for a git override, including local patch bytes
+    /// when override patches are present.
+    pub fn git_override_dir_with_patch_digest(
+        &self,
+        git: &crate::types::GitOverride,
+        patch_digest: Option<&str>,
+    ) -> PathBuf {
+        let source_identity = git_override_source_identity(git, patch_digest);
         self.base_dir
             .join("overrides")
             .join(&git.module_name)
@@ -153,7 +163,17 @@ impl ModuleCache {
 
     /// Get the cache directory for an archive override.
     pub fn archive_override_dir(&self, archive: &crate::types::ArchiveOverride) -> PathBuf {
-        let source_identity = archive_override_source_identity(archive);
+        self.archive_override_dir_with_patch_digest(archive, None)
+    }
+
+    /// Get the cache directory for an archive override, including local patch
+    /// bytes when override patches are present.
+    pub fn archive_override_dir_with_patch_digest(
+        &self,
+        archive: &crate::types::ArchiveOverride,
+        patch_digest: Option<&str>,
+    ) -> PathBuf {
+        let source_identity = archive_override_source_identity(archive, patch_digest);
         self.base_dir
             .join("overrides")
             .join(&archive.module_name)
@@ -339,16 +359,25 @@ impl ModuleCache {
     }
 }
 
-fn git_override_source_identity(git: &crate::types::GitOverride) -> String {
+fn git_override_source_identity(
+    git: &crate::types::GitOverride,
+    patch_digest: Option<&str>,
+) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"slug-git-override-cache-v1");
     update_digest_str(&mut hasher, &git.remote);
     update_digest_str(&mut hasher, &git.commit);
     update_digest_optional_str(&mut hasher, git.shallow_since.as_deref());
+    update_digest_str_list(&mut hasher, &git.patches);
+    update_digest_u32(&mut hasher, git.patch_strip);
+    update_digest_optional_str(&mut hasher, patch_digest);
     hex::encode(hasher.finalize())[..16].to_owned()
 }
 
-fn archive_override_source_identity(archive: &crate::types::ArchiveOverride) -> String {
+fn archive_override_source_identity(
+    archive: &crate::types::ArchiveOverride,
+    patch_digest: Option<&str>,
+) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"slug-archive-override-cache-v1");
     for url in &archive.urls {
@@ -356,6 +385,9 @@ fn archive_override_source_identity(archive: &crate::types::ArchiveOverride) -> 
     }
     update_digest_optional_str(&mut hasher, archive.integrity.as_deref());
     update_digest_optional_str(&mut hasher, archive.strip_prefix.as_deref());
+    update_digest_str_list(&mut hasher, &archive.patches);
+    update_digest_u32(&mut hasher, archive.patch_strip);
+    update_digest_optional_str(&mut hasher, patch_digest);
     hex::encode(hasher.finalize())[..16].to_owned()
 }
 
@@ -372,6 +404,17 @@ fn update_digest_optional_str(hasher: &mut Sha256, value: Option<&str>) {
         }
         None => hasher.update([0]),
     }
+}
+
+fn update_digest_str_list(hasher: &mut Sha256, values: &[String]) {
+    hasher.update((values.len() as u64).to_le_bytes());
+    for value in values {
+        update_digest_str(hasher, value);
+    }
+}
+
+fn update_digest_u32(hasher: &mut Sha256, value: u32) {
+    hasher.update(value.to_le_bytes());
 }
 
 impl Default for ModuleCache {
@@ -473,11 +516,31 @@ mod tests {
             remote: "https://example.invalid/two.git".to_owned(),
             ..base.clone()
         };
+        let different_patches = crate::types::GitOverride {
+            patches: vec!["//:fix.patch".to_owned()],
+            ..base.clone()
+        };
+        let different_patch_strip = crate::types::GitOverride {
+            patch_strip: 1,
+            ..base.clone()
+        };
 
         assert_eq!(cache.git_override_dir(&base), cache.git_override_dir(&same));
         assert_ne!(
             cache.git_override_dir(&base),
             cache.git_override_dir(&different_remote)
+        );
+        assert_ne!(
+            cache.git_override_dir(&base),
+            cache.git_override_dir(&different_patches)
+        );
+        assert_ne!(
+            cache.git_override_dir(&base),
+            cache.git_override_dir(&different_patch_strip)
+        );
+        assert_ne!(
+            cache.git_override_dir_with_patch_digest(&different_patches, Some("digest-one")),
+            cache.git_override_dir_with_patch_digest(&different_patches, Some("digest-two"))
         );
     }
 
@@ -500,6 +563,14 @@ mod tests {
             strip_prefix: Some("two".to_owned()),
             ..base.clone()
         };
+        let different_patches = crate::types::ArchiveOverride {
+            patches: vec!["//:fix.patch".to_owned()],
+            ..base.clone()
+        };
+        let different_patch_strip = crate::types::ArchiveOverride {
+            patch_strip: 1,
+            ..base.clone()
+        };
 
         assert_eq!(
             cache.archive_override_dir(&base),
@@ -508,6 +579,18 @@ mod tests {
         assert_ne!(
             cache.archive_override_dir(&base),
             cache.archive_override_dir(&different_strip_prefix)
+        );
+        assert_ne!(
+            cache.archive_override_dir(&base),
+            cache.archive_override_dir(&different_patches)
+        );
+        assert_ne!(
+            cache.archive_override_dir(&base),
+            cache.archive_override_dir(&different_patch_strip)
+        );
+        assert_ne!(
+            cache.archive_override_dir_with_patch_digest(&different_patches, Some("digest-one")),
+            cache.archive_override_dir_with_patch_digest(&different_patches, Some("digest-two"))
         );
     }
 

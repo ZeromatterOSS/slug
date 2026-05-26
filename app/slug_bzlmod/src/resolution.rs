@@ -771,7 +771,20 @@ impl MvsResolver {
             }
             Override::Git(g) => {
                 // Fetch the git repo to a cache directory and parse its MODULE.bazel
-                let dest_dir = self.cache.git_override_dir(g);
+                let patch_digest = crate::fetch::SourceFetcher::local_override_patch_digest(
+                    workspace_root,
+                    &g.patches,
+                    g.patch_strip,
+                )
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to fingerprint patches for git override '{}'",
+                        g.module_name
+                    )
+                })?;
+                let dest_dir = self
+                    .cache
+                    .git_override_dir_with_patch_digest(g, patch_digest.as_deref());
                 let complete_marker = dest_dir.join(".complete");
 
                 if !complete_marker.exists() {
@@ -804,6 +817,18 @@ impl MvsResolver {
                     self.source_fetcher
                         .fetch_git_direct(&source_info, &dest_dir)
                         .await?;
+                    crate::fetch::SourceFetcher::apply_local_override_patches(
+                        &dest_dir,
+                        workspace_root,
+                        &g.patches,
+                        g.patch_strip,
+                    )
+                    .with_buck_error_context(|| {
+                        format!(
+                            "Failed to apply patches for git override '{}'",
+                            g.module_name
+                        )
+                    })?;
                     std::fs::write(&complete_marker, "")
                         .buck_error_context("Failed to write git override marker")?;
                 } else {
@@ -846,7 +871,20 @@ impl MvsResolver {
             }
             Override::Archive(a) => {
                 // Fetch the archive to a cache directory and parse its MODULE.bazel
-                let dest_dir = self.cache.archive_override_dir(a);
+                let patch_digest = crate::fetch::SourceFetcher::local_override_patch_digest(
+                    workspace_root,
+                    &a.patches,
+                    a.patch_strip,
+                )
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to fingerprint patches for archive override '{}'",
+                        a.module_name
+                    )
+                })?;
+                let dest_dir = self
+                    .cache
+                    .archive_override_dir_with_patch_digest(a, patch_digest.as_deref());
                 let complete_marker = dest_dir.join(".complete");
 
                 if !complete_marker.exists() {
@@ -869,6 +907,18 @@ impl MvsResolver {
                             &dest_dir,
                         )
                         .await?;
+                    crate::fetch::SourceFetcher::apply_local_override_patches(
+                        &dest_dir,
+                        workspace_root,
+                        &a.patches,
+                        a.patch_strip,
+                    )
+                    .with_buck_error_context(|| {
+                        format!(
+                            "Failed to apply patches for archive override '{}'",
+                            a.module_name
+                        )
+                    })?;
                     std::fs::write(&complete_marker, "")
                         .buck_error_context("Failed to write archive override marker")?;
                 } else {

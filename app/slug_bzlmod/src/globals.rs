@@ -65,8 +65,7 @@ use crate::version::Version;
 
 const SLUG_BAZEL_COMPATIBILITY_VERSION: &str = "9.0.1";
 
-fn validate_and_reject_unsupported_override_patches(
-    directive: &str,
+fn validate_override_patches(
     module: Option<&ModuleDecl>,
     patches: &UnpackList<&str>,
 ) -> starlark::Result<Vec<String>> {
@@ -74,12 +73,19 @@ fn validate_and_reject_unsupported_override_patches(
         validate_override_patch_label(module, patch)?;
     }
 
-    if patches.items.is_empty() {
-        return Ok(Vec::new());
-    }
+    Ok(patches
+        .items
+        .iter()
+        .map(|patch| patch.to_string())
+        .collect())
+}
 
+fn reject_unsupported_single_version_patches(patches: &[String]) -> starlark::Result<()> {
+    if patches.is_empty() {
+        return Ok(());
+    }
     Err(starlark::Error::new_other(anyhow::anyhow!(
-        "{directive}(patches = ...) is not yet supported by Slug; Bazel applies override patches during MODULE.bazel discovery and repository materialization"
+        "single_version_override(patches = ...) is not yet supported by Slug; Bazel applies override patches during MODULE.bazel discovery and repository materialization"
     )))
 }
 
@@ -829,11 +835,8 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             Version::parse(version)
                 .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
-        let patches = validate_and_reject_unsupported_override_patches(
-            "single_version_override",
-            ctx.module.as_ref(),
-            &patches,
-        )?;
+        let patches = validate_override_patches(ctx.module.as_ref(), &patches)?;
+        reject_unsupported_single_version_patches(&patches)?;
         reject_unsupported_single_version_patch_cmds(&patch_cmds)?;
         reject_unsupported_single_version_patch_strip(patch_strip)?;
 
@@ -939,11 +942,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let mut ctx = ctx.borrow_mut();
         mark_non_module_called(&mut ctx);
         validate_bazel_module_name(module_name)?;
-        let patches = validate_and_reject_unsupported_override_patches(
-            "archive_override",
-            ctx.module.as_ref(),
-            &patches,
-        )?;
+        let patches = validate_override_patches(ctx.module.as_ref(), &patches)?;
 
         ctx.overrides.push(Override::Archive(ArchiveOverride {
             module_name: module_name.to_owned(),
@@ -998,11 +997,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let mut ctx = ctx.borrow_mut();
         mark_non_module_called(&mut ctx);
         validate_bazel_module_name(module_name)?;
-        let patches = validate_and_reject_unsupported_override_patches(
-            "git_override",
-            ctx.module.as_ref(),
-            &patches,
-        )?;
+        let patches = validate_override_patches(ctx.module.as_ref(), &patches)?;
 
         ctx.overrides.push(Override::Git(GitOverride {
             module_name: module_name.to_owned(),

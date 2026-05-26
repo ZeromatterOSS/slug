@@ -97,6 +97,29 @@ Observed SDK result at the checkpoint:
   `TMPDIR=/var/mnt/dev/.slug-tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short`
   (`146 passed in 106.22s`) after rebuilding `target/debug/slug`.
+- Root-main-repo `archive_override(patches = ...)` and
+  `git_override(patches = ...)` are now supported for direct non-registry
+  override fetches: Slug validates Bazel's main-repository patch-label rule,
+  applies local patch labels after fetch/extract and before reading the
+  override `MODULE.bazel`, includes `patches`, `patch_strip`, and local patch
+  file bytes in the non-registry override cache directory identity, and
+  materializes patched BUILD targets from the fetched override tree.
+  `single_version_override` patch fields remain intentionally unsupported for
+  this slice because Bazel also threads them into registry MODULE discovery and
+  final RepoSpec materialization. Bazel anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java`
+  for override kwargs and patch-label validation,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java`
+  for fetching non-registry overrides before parsing `MODULE.bazel`, and
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/RepoDefinitionFunction.java`
+  for root-repo patch-label conversion. Validation passed with
+  `TMPDIR=/var/mnt/dev/.slug-tmp/plan61-override-patches cargo check -p
+  slug_bzlmod`, focused cache identity tests, `cargo build -p slug`, and the
+  explicit-binary Plan 61 selector for archive/git override patch application,
+  SVO patch rejection, and external patch-label rejection (`5 passed, 149
+  deselected`). Remaining replay gap: patch file bytes are still read by the
+  transitional resolver rather than a dedicated DICE file key, so the true
+  dependency edge still belongs to the future RepoSpec/override-source key.
 - Runtime bzlmod module symlink replay now writes `external_cells/bzlmod` under
   `BzlmodCellGraphValue.workspace_id.output_base` rather than hard-coding
   `<project>/buck-out/v2`; focused coverage verifies a custom output base gets
