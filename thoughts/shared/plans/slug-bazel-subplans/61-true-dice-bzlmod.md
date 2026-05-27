@@ -212,6 +212,9 @@ hardening behavior around it.
      `cargo test -p slug_common persisted_projection_injects_clean_root_module_version_data -- --nocapture`,
      and
      `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts -- --nocapture`.
+     The same producer now also owns registered toolchain and execution
+     platform injection; the legacy projection bridge no longer carries those
+     output classes.
    - Migrate output classes in this order:
      1. source/module-file input producers for root, registry, project-local
         and out-of-project local overrides, git/archive overrides, and patch

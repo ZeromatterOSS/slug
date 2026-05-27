@@ -3202,8 +3202,6 @@ impl Key for OverridePatchInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodProjectionBridgeValue {
     cell_graph: slug_bzlmod::BzlmodCellGraphValue,
-    registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
-    registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
     extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
     repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
 }
@@ -3233,6 +3231,8 @@ struct BzlmodResolvedModuleGraphValue {
     graph_digest: Arc<str>,
     module_versions: slug_bzlmod::BzlmodModuleVersionsDataValue,
     resolution_facts: slug_bzlmod::BzlmodResolutionFactsValue,
+    registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
+    registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
 }
 
 impl PartialEq for BzlmodResolvedModuleGraphKey {
@@ -3353,6 +3353,8 @@ impl Key for BzlmodResolvedModuleGraphKey {
                     x.graph_digest == y.graph_digest
                         && x.module_versions == y.module_versions
                         && x.resolution_facts == y.resolution_facts
+                        && x.registered_toolchains == y.registered_toolchains
+                        && x.registered_execution_platforms == y.registered_execution_platforms
                 }
                 (None, None) => true,
                 _ => false,
@@ -3493,8 +3495,6 @@ impl BuckConfigBasedCells {
         }
         let (
             cell_graph_for_dice,
-            registered_toolchains_for_dice,
-            registered_execution_platforms_for_dice,
             extension_aggregations_for_dice,
             repo_mappings_for_dice,
         ) = bzlmod_projection.as_ref().as_ref().map_or_else(
@@ -3502,14 +3502,6 @@ impl BuckConfigBasedCells {
                 (
                     slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
                         key.resolution_key.workspace_id.clone(),
-                    ),
-                    slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-                        key.resolution_key.workspace_id.clone(),
-                        Vec::new(),
-                    ),
-                    slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
-                        key.resolution_key.workspace_id.clone(),
-                        Vec::new(),
                     ),
                     slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
                         key.resolution_key.workspace_id.clone(),
@@ -3526,8 +3518,6 @@ impl BuckConfigBasedCells {
             |value| {
                 (
                     value.cell_graph.clone(),
-                    value.registered_toolchains.clone(),
-                    value.registered_execution_platforms.clone(),
                     value.extension_aggregations.clone(),
                     value.repo_mappings.clone(),
                 )
@@ -3552,6 +3542,27 @@ impl BuckConfigBasedCells {
                     (
                         value.module_versions.clone(),
                         value.resolution_facts.clone(),
+                    )
+                },
+            );
+        let (registered_toolchains_for_dice, registered_execution_platforms_for_dice) =
+            clean_resolved_module_graph.as_ref().as_ref().map_or_else(
+                || {
+                    (
+                        slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                            Vec::new(),
+                        ),
+                        slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                            Vec::new(),
+                        ),
+                    )
+                },
+                |value| {
+                    (
+                        value.registered_toolchains.clone(),
+                        value.registered_execution_platforms.clone(),
                     )
                 },
             );
@@ -4058,7 +4069,7 @@ impl BuckConfigBasedCells {
 
     async fn compute_bzlmod_resolved_module_graph(
         key: &BzlmodResolvedModuleGraphKey,
-        _dice_ctx: &mut DiceComputations<'_>,
+        dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<Arc<Option<BzlmodResolvedModuleGraphValue>>> {
         let Some(parsed) = key.root_module_file.parsed.clone() else {
             return Ok(Arc::new(None));
@@ -4093,6 +4104,7 @@ impl BuckConfigBasedCells {
         drop(hidden_lockfile);
 
         let workspace_root = key.project_root.as_path();
+        let project_fs = ProjectRoot::new_unchecked(key.project_root.clone());
         let root_module_name = if parsed.module.name.is_empty() {
             "_main".to_owned()
         } else {
@@ -4109,6 +4121,7 @@ impl BuckConfigBasedCells {
             parsed.module.name.clone(),
             parsed.module.version.to_string(),
         );
+        let mut parsed_modules = vec![(root_module_name.clone(), parsed.clone())];
 
         if !parsed.module.bazel_deps.is_empty() {
             let active_deps: Vec<_> = parsed
@@ -4151,6 +4164,7 @@ impl BuckConfigBasedCells {
                     let parsed_override = local_override_modules
                         .get(dep.name.as_str())
                         .expect("local override module checked above");
+                    parsed_modules.push((dep.name.clone(), (*parsed_override).clone()));
                     let version = parsed_override.module.version.to_string();
                     selected_versions.insert(dep.name.clone(), version.clone());
                     resolution_order.push(dep.name.clone());
@@ -4227,6 +4241,49 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
+                for module_name in &graph.resolution_order {
+                    let Some(module_info) = graph.modules.get(module_name) else {
+                        continue;
+                    };
+                    let Some(source_path) = module_info.source_path.as_ref() else {
+                        continue;
+                    };
+                    let module_dir = if source_path.is_absolute() {
+                        source_path.clone()
+                    } else {
+                        workspace_root.join(source_path)
+                    };
+                    let module_bazel_path = module_dir.join("MODULE.bazel");
+                    let Some((content, _content_digest)) = read_bzlmod_file_for_module_inputs(
+                        dice_ctx,
+                        &project_fs,
+                        &module_bazel_path,
+                    )
+                    .await?
+                    .0
+                    else {
+                        continue;
+                    };
+                    let parsed_with_inputs = parse_module_with_tracked_project_includes(
+                        dice_ctx,
+                        &project_fs,
+                        &module_bazel_path,
+                        content,
+                        false,
+                    )
+                    .await
+                    .with_buck_error_context(|| {
+                        format!(
+                            "Failed to parse selected module '{}' at {} while computing clean graph",
+                            module_name,
+                            module_bazel_path.display()
+                        )
+                    })?;
+                    parsed_modules.push((
+                        module_name.clone(),
+                        parsed_with_inputs.parsed_with_inputs.parsed,
+                    ));
+                }
             }
 
             resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
@@ -4245,12 +4302,39 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 Arc::new(version_map),
             );
+        let (mut all_toolchains, all_exec_platforms) = collect_bzlmod_registered_items(
+            &parsed_modules,
+            &module_versions.root_module_name,
+            key.options.ignore_dev_dependency,
+        );
+        if module_depends_on_rules_python(&parsed_modules)
+            && !toolchains_include_bundled_python(&all_toolchains)
+        {
+            for label in BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS {
+                all_toolchains.push(slug_bzlmod::RegisteredToolchain {
+                    module: RULES_PYTHON_MODULE_NAME.to_owned(),
+                    label: (*label).to_owned(),
+                    is_root: true,
+                });
+            }
+        }
+        let registered_toolchains = slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
+            key.resolution_key.workspace_id.clone(),
+            all_toolchains,
+        );
+        let registered_execution_platforms =
+            slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
+                key.resolution_key.workspace_id.clone(),
+                all_exec_platforms,
+            );
         let graph_digest = bzlmod_resolved_graph_digest(&graph);
         Ok(Arc::new(Some(BzlmodResolvedModuleGraphValue {
             graph: Arc::new(graph),
             graph_digest: Arc::from(graph_digest.as_str()),
             module_versions,
             resolution_facts,
+            registered_toolchains,
+            registered_execution_platforms,
         })))
     }
 
@@ -4366,8 +4450,6 @@ impl BuckConfigBasedCells {
         } else {
             parsed.module.name.clone()
         };
-        let registered_toolchains;
-        let registered_execution_platforms;
         let extension_aggregations;
         let repo_env = Arc::new(options.repo_env.clone());
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
@@ -4918,68 +5000,6 @@ impl BuckConfigBasedCells {
                 Arc::new(aggregated),
             );
 
-        // Collect toolchain and execution platform registrations from all modules.
-        // Priority order: root module first, then BFS order of dep graph.
-        // parsed_modules is already in BFS order (root first from resolution).
-        // dev_dependency items from non-root modules are skipped (Bazel 9.0 behavior).
-        {
-            let (mut all_toolchains, all_exec_platforms) = collect_bzlmod_registered_items(
-                &parsed_modules,
-                root_module_name,
-                options.ignore_dev_dependency,
-            );
-            // If the module graph depends on rules_python but never registers
-            // a py3 toolchain, auto-inject BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS
-            // at lowest priority so ctx.toolchains[@rules_python//python:toolchain_type]
-            // resolves to a host py_runtime. Users can override by registering
-            // their own toolchain earlier in MODULE.bazel.
-            //
-            // WHY string match on the module name: ParsedModuleFile currently has no
-            // typed "is rules_python" flag, and adding one would require threading a
-            // new field through slug_bzlmod::types + the MVS resolver + every caller
-            // that constructs ParsedModuleFile — well out of scope for an error-
-            // handling fix. The constants below keep the magic strings grep-able so a
-            // future typed flag can replace them in one place.
-            if module_depends_on_rules_python(&parsed_modules)
-                && !toolchains_include_bundled_python(&all_toolchains)
-            {
-                for label in BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS {
-                    all_toolchains.push(slug_bzlmod::RegisteredToolchain {
-                        module: RULES_PYTHON_MODULE_NAME.to_owned(),
-                        label: (*label).to_owned(),
-                        // Auto-injected bundled toolchains must always be
-                        // eagerly loaded — they back the bundled
-                        // `@local_config_python` cell that callers expect to
-                        // be available without bzlmod fetch.
-                        is_root: true,
-                    });
-                }
-                tracing::info!(
-                    "Auto-registered bundled rules_python toolchains (rules_python in deps): {:?}",
-                    BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS
-                );
-            }
-
-            tracing::info!(
-                "Collected {} toolchain registration(s) and {} execution platform registration(s)",
-                all_toolchains.len(),
-                all_exec_platforms.len()
-            );
-            registered_toolchains = slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-                cell_graph.workspace_id.clone(),
-                all_toolchains,
-            );
-            registered_execution_platforms =
-                slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
-                    cell_graph.workspace_id.clone(),
-                    all_exec_platforms,
-                );
-
-            // Toolchain repo materialization is intentionally lazy. Label
-            // resolution and the external-cell delegates own the semantic
-            // materialization path; do not poll `bazel-external` here.
-        }
-
         // Convert pre-computed cells to the format expected by the bzlmod cell
         // graph. Bazel's identity for extension-generated
         // repositories is the canonical repo name; apparent names from
@@ -5240,8 +5260,6 @@ impl BuckConfigBasedCells {
 
         Ok(Some(BzlmodProjectionBridgeValue {
             cell_graph,
-            registered_toolchains,
-            registered_execution_platforms,
             extension_aggregations,
             repo_mappings,
         }))
@@ -5734,6 +5752,8 @@ module(name = "dep", version = "1.0")
             "MODULE.bazel",
             r#"
 module(name = "root", version = "1.0")
+register_toolchains("@root_toolchains//:all")
+register_execution_platforms("@root_platforms//:all")
 "#,
         );
         let config_args = [slug_cli_proto::ConfigOverride::flag_no_cell(
@@ -5773,6 +5793,21 @@ module(name = "root", version = "1.0")
             .await??;
         assert!(resolution_facts.registry_file_hashes.is_empty());
         assert!(resolution_facts.selected_yanked_versions.is_empty());
+
+        let registered_toolchains =
+            slug_bzlmod::registered_toolchains_for_current_workspace(&mut dice).await?;
+        assert_eq!(registered_toolchains.registered_toolchains.len(), 1);
+        assert_eq!(
+            registered_toolchains.registered_toolchains[0].label,
+            "@root_toolchains//:all"
+        );
+
+        let registered_execution_platforms =
+            slug_bzlmod::registered_execution_platforms_for_current_workspace(&mut dice).await?;
+        assert_eq!(
+            registered_execution_platforms.registered_execution_platforms,
+            ["@root_platforms//:all".to_owned()]
+        );
         Ok(())
     }
 
