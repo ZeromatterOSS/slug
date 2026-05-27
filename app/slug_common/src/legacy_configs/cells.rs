@@ -4007,7 +4007,7 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 workspace_root,
                 Some(repo_env.as_ref()),
-                Some(&fallback_scanned_bzl_transitive_digests),
+                &fallback_scanned_bzl_transitive_digests,
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
             );
@@ -4036,7 +4036,7 @@ impl BuckConfigBasedCells {
                 &mut pre_computed_cells,
                 workspace_root,
                 Some(repo_env.as_ref()),
-                Some(&fallback_scanned_bzl_transitive_digests),
+                &fallback_scanned_bzl_transitive_digests,
                 Some(&repo_mappings),
                 Some(&repo_mapping_overrides),
             );

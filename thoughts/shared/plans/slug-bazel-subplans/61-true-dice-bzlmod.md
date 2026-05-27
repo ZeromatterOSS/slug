@@ -57,6 +57,17 @@ projection wrapper. Validated with `cargo test -p slug_bzlmod --lib`,
 `cargo test -p slug_common bzlmod`, `cargo test -p slug_external_cells
 extension_repo`, and `cargo check -p slug_server`.
 
+**Bridge surface reduced**: lockfile spoke preseed no longer computes a hidden
+fallback `.bzl` transitive digest inside
+`pre_compute_extension_repo_cells_from_lockfile(...)`. The helper now requires
+callers to pass an explicit digest map and skips cache preseed for extensions
+whose current digest is unavailable. Production still supplies that map from
+the named `FallbackScannedExtensionBzlDigestKey` bridge in `slug_common`, so
+the scanner has not been eliminated yet, but it is now localized at the
+remaining bridge key instead of being an implicit fallback inside
+`slug_bzlmod`. Validated with `cargo test -p slug_bzlmod lockfile_preseed`
+and `cargo test -p slug_common bzlmod`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -83,7 +94,9 @@ Current state to preserve:
 - Recent cleanup clarified that fallback `.bzl` scanners are explicitly named
   fallback paths. Normal extension replay must use
   `ExtensionBzlTransitiveDigestKey` over the loaded Starlark graph; bootstrap
-  and lockfile preseed paths still have a legacy fallback-scanner bridge.
+  and lockfile preseed paths still have a legacy fallback-scanner bridge in
+  `FallbackScannedExtensionBzlDigestKey`. Lockfile preseed no longer computes a
+  secondary implicit fallback when the bridge digest map is absent.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.

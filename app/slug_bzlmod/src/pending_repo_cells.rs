@@ -540,7 +540,7 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     existing: &mut [PendingRepoCell],
     project_root: &std::path::Path,
     repo_env: Option<&std::collections::BTreeMap<String, String>>,
-    bzl_transitive_digests: Option<&std::collections::HashMap<String, String>>,
+    bzl_transitive_digests: &std::collections::HashMap<String, String>,
     repo_mappings: Option<&crate::RepoMappingSnapshot>,
     repo_mapping_overrides: Option<&crate::RepoMappingOverrides>,
 ) -> Vec<PendingRepoCell> {
@@ -569,15 +569,13 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             );
             continue;
         };
-        let bzl_transitive_digest = bzl_transitive_digests
-            .and_then(|digests| digests.get(current_ext_id).cloned())
-            .unwrap_or_else(|| {
-                crate::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
-                    current_ext_id,
-                    project_root,
-                    repo_mappings,
-                )
-            });
+        let Some(bzl_transitive_digest) = bzl_transitive_digests.get(current_ext_id) else {
+            tracing::debug!(
+                "Skipping lockfile spoke pre-seed for '{}': current .bzl transitive digest is unavailable",
+                ext_id
+            );
+            continue;
+        };
         let usages_digest = compute_extension_input_hash(current_extension);
         // Spoke pre-seeding runs while constructing bootstrap cell data, before
         // this helper has a `DiceComputations` handle. Keep it on the sync
@@ -585,7 +583,7 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
         // `ModuleExtensionRecordedInputsKey`.
         let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
             current_ext_id,
-            &bzl_transitive_digest,
+            bzl_transitive_digest,
             &usages_digest,
             Some(project_root),
             repo_env,
@@ -1506,6 +1504,8 @@ mod tests {
         let extension_id = extension.extension_id.clone();
         let bzl_digest = compute_bzl_transitive_digest(&extension_id);
         let usages_digest = compute_extension_input_hash(&extension);
+        let mut bzl_digests = HashMap::new();
+        bzl_digests.insert(extension_id.clone(), bzl_digest.clone());
         current_extensions.insert(extension_id.clone(), extension);
 
         let mut specs = fxhash::FxHashMap::default();
@@ -1534,7 +1534,7 @@ mod tests {
             &mut existing,
             &temp,
             None,
-            None,
+            &bzl_digests,
             None,
             None,
         );
@@ -1551,6 +1551,8 @@ mod tests {
         let current_extension = AggregatedExtension::new("@@rules_rs//rs:extensions.bzl", "crate");
         let extension_id = current_extension.extension_id.clone();
         current_extensions.insert(extension_id.clone(), current_extension);
+        let mut bzl_digests = HashMap::new();
+        bzl_digests.insert(extension_id.clone(), "current-bzl-digest".to_owned());
 
         let mut specs = fxhash::FxHashMap::default();
         specs.insert(
@@ -1579,7 +1581,54 @@ mod tests {
             &mut existing,
             &temp,
             None,
+            &bzl_digests,
             None,
+            None,
+        );
+
+        assert!(cells.is_empty());
+        assert!(existing.is_empty());
+        let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn lockfile_preseed_skips_when_current_bzl_digest_is_unavailable() {
+        let mut lockfile = crate::lockfile::Lockfile::new();
+        let mut current_extensions = HashMap::new();
+        let current_extension = AggregatedExtension::new("@@rules_rs//rs:extensions.bzl", "crate");
+        let extension_id = current_extension.extension_id.clone();
+        let usages_digest = compute_extension_input_hash(&current_extension);
+        current_extensions.insert(extension_id.clone(), current_extension);
+
+        let mut specs = fxhash::FxHashMap::default();
+        specs.insert(
+            "crates__aho-corasick-1.1.3".to_owned(),
+            RepoSpec::new("rules_rs//rs/private/crate_repository.bzl%crate_repository".to_owned()),
+        );
+        lockfile.set_extension_cache(
+            extension_id,
+            "tracked-bzl-digest".to_owned(),
+            usages_digest,
+            &specs,
+        );
+
+        let temp = std::env::temp_dir().join(format!(
+            "slug-lockfile-missing-bzl-digest-preseed-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+        let mut existing = Vec::new();
+        let bzl_digests = HashMap::new();
+
+        let cells = pre_compute_extension_repo_cells_from_lockfile(
+            &lockfile,
+            &current_extensions,
+            "_main",
+            &mut existing,
+            &temp,
+            None,
+            &bzl_digests,
             None,
             None,
         );
@@ -1627,7 +1676,7 @@ mod tests {
             &mut existing,
             &temp,
             None,
-            Some(&tracked_digests),
+            &tracked_digests,
             None,
             None,
         );
