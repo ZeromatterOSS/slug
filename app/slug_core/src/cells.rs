@@ -2222,6 +2222,7 @@ struct CellResolverInternals {
 enum DynamicCellInstance {
     /// Cells discovered from the transitional process-global registries must
     /// stay scoped to the root that published those registries.
+    #[cfg(test)]
     RootScoped(DynamicBzlmodEntry<&'static CellInstance>),
     /// Cells created directly from this resolver's bzlmod graph snapshot are
     /// owned by the resolver and should not depend on process-global root
@@ -2236,6 +2237,7 @@ enum DynamicCellPathKind {
 }
 
 impl DynamicCellInstance {
+    #[cfg(test)]
     fn root_scoped(instance: CellInstance) -> Self {
         Self::RootScoped(dynamic_bzlmod_entry(Box::leak(Box::new(instance))))
     }
@@ -2247,12 +2249,14 @@ impl DynamicCellInstance {
     fn graph_owned_instance(&self) -> Option<&'static CellInstance> {
         match self {
             Self::GraphOwned(instance) => Some(*instance),
+            #[cfg(test)]
             Self::RootScoped(_) => None,
         }
     }
 
     fn root_scoped_instance_for_current_context(&self) -> Option<&'static CellInstance> {
         match self {
+            #[cfg(test)]
             Self::RootScoped(entry) => dynamic_bzlmod_value_for_current_scope(entry),
             Self::GraphOwned(_) => None,
         }
@@ -2418,51 +2422,28 @@ impl CellResolver {
             )));
         }
 
-        // Check global dynamic registry (populated by extension execution).
-        // Resolve through the canonical helper so apparent-name/suffix fallback is
-        // deterministic and respects known module-cell collisions.
-        let dynamic_lookup =
-            canonical_dynamic_extension_cell_name(cell.as_str()).and_then(|canonical| {
-                get_dynamic_extension_cell(&canonical).map(|path| (canonical, path))
-            });
-        if let Some((canonical, path)) = dynamic_lookup {
-            // Auto-register this cell
-            if let Ok(rel_path) = ProjectRelativePath::new(&path) {
-                let cell_path = CellRootPathBuf::new(rel_path.to_owned());
-                let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
-                // Plan 36: if the canonical name has a registered
-                // ExtensionRepoCellSetup, attach it as the external origin
-                // so file ops route through the lazy-materialization path.
-                let external = get_dynamic_extension_cell_setup(&canonical)
-                    .map(crate::cells::external::ExternalCellOrigin::ExtensionRepo);
-                if let Ok(instance) = CellInstance::new(cell, cell_path, external, nested) {
-                    // Create external/ symlink for action execution
-                    ensure_external_symlink(cell.as_str(), &path);
-                    if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                        dynamic.insert(cell, DynamicCellInstance::root_scoped(instance));
-                    }
-                    return self.get_or_create_dynamic_cell(cell);
-                }
-            }
-        }
-
-        // Last resort: scan bazel-external/ for a directory matching *+{cell_name}
-        // This handles spoke repos from extensions that may not be in the dynamic
-        // registry yet (e.g., the first time an extension is triggered).
-        // Use the root cell's path to determine the project root directory.
-        if dynamic_bzlmod_directory_scan_allowed() {
-            let cell_str = cell.as_str();
-            let bazel_ext_dir = dynamic_project_root()
-                .map(|root| root.join("bazel-external"))
-                .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
-            let exact_path = bazel_ext_dir.join(cell_str);
-            if exact_path.is_dir() {
-                let path = format!("bazel-external/{cell_str}");
+        #[cfg(test)]
+        {
+            // Check global dynamic registry (populated by extension execution).
+            // Resolve through the canonical helper so apparent-name/suffix fallback is
+            // deterministic and respects known module-cell collisions.
+            let dynamic_lookup =
+                canonical_dynamic_extension_cell_name(cell.as_str()).and_then(|canonical| {
+                    get_dynamic_extension_cell(&canonical).map(|path| (canonical, path))
+                });
+            if let Some((canonical, path)) = dynamic_lookup {
+                // Auto-register this cell
                 if let Ok(rel_path) = ProjectRelativePath::new(&path) {
                     let cell_path = CellRootPathBuf::new(rel_path.to_owned());
                     let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
-                    if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
-                        register_dynamic_extension_cell(cell_str.to_owned(), path);
+                    // Plan 36: if the canonical name has a registered
+                    // ExtensionRepoCellSetup, attach it as the external origin
+                    // so file ops route through the lazy-materialization path.
+                    let external = get_dynamic_extension_cell_setup(&canonical)
+                        .map(crate::cells::external::ExternalCellOrigin::ExtensionRepo);
+                    if let Ok(instance) = CellInstance::new(cell, cell_path, external, nested) {
+                        // Create external/ symlink for action execution
+                        ensure_external_symlink(cell.as_str(), &path);
                         if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
                             dynamic.insert(cell, DynamicCellInstance::root_scoped(instance));
                         }
@@ -2471,20 +2452,46 @@ impl CellResolver {
                 }
             }
 
-            if let Some(canonical) =
-                scan_dynamic_extension_suffix_from_external_dir_uncached(cell_str)
-            {
-                let path = format!("bazel-external/{canonical}");
-                if let Ok(rel_path) = ProjectRelativePath::new(&path) {
-                    let cell_path = CellRootPathBuf::new(rel_path.to_owned());
-                    let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
-                    if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
-                        // Also register in dynamic registry for future lookups
-                        register_dynamic_extension_cell(canonical, path);
-                        if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                            dynamic.insert(cell, DynamicCellInstance::root_scoped(instance));
+            // Last resort: scan bazel-external/ for a directory matching *+{cell_name}
+            // This handles spoke repos from extensions that may not be in the dynamic
+            // registry yet (e.g., the first time an extension is triggered).
+            // Use the root cell's path to determine the project root directory.
+            if dynamic_bzlmod_directory_scan_allowed() {
+                let cell_str = cell.as_str();
+                let bazel_ext_dir = dynamic_project_root()
+                    .map(|root| root.join("bazel-external"))
+                    .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
+                let exact_path = bazel_ext_dir.join(cell_str);
+                if exact_path.is_dir() {
+                    let path = format!("bazel-external/{cell_str}");
+                    if let Ok(rel_path) = ProjectRelativePath::new(&path) {
+                        let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+                        let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+                        if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                            register_dynamic_extension_cell(cell_str.to_owned(), path);
+                            if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
+                                dynamic.insert(cell, DynamicCellInstance::root_scoped(instance));
+                            }
+                            return self.get_or_create_dynamic_cell(cell);
                         }
-                        return self.get_or_create_dynamic_cell(cell);
+                    }
+                }
+
+                if let Some(canonical) =
+                    scan_dynamic_extension_suffix_from_external_dir_uncached(cell_str)
+                {
+                    let path = format!("bazel-external/{canonical}");
+                    if let Ok(rel_path) = ProjectRelativePath::new(&path) {
+                        let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+                        let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+                        if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                            // Also register in dynamic registry for future lookups
+                            register_dynamic_extension_cell(canonical, path);
+                            if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
+                                dynamic.insert(cell, DynamicCellInstance::root_scoped(instance));
+                            }
+                            return self.get_or_create_dynamic_cell(cell);
+                        }
                     }
                 }
             }

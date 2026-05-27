@@ -94,6 +94,14 @@ or known bundled cells. Validated with `cargo check -p slug_core`, focused
 `slug_core` resolver tests, and `pytest -q
 tests/core/bzlmod/test_plan61_guardrails.py`.
 
+**Bridge surface reduced**: `CellResolver::get(...)` no-runtime-snapshot misses
+no longer auto-create production cells from process-global dynamic extension
+registries or `bazel-external` suffix scans. Resolver-local dynamic cells and
+runtime snapshot cells remain valid; legacy root-scoped dynamic discovery is
+kept only in tests. Validated with `cargo check -p slug_core`, focused
+`slug_core` cell path/resolver tests, and `pytest -q
+tests/core/bzlmod/test_plan61_guardrails.py`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -131,6 +139,9 @@ Current state to preserve:
 - Production `CellAliasResolver::resolve` no-runtime-snapshot misses now ignore
   process-global bzlmod alias/cell maps and directory probing; those fallbacks
   remain only for test compatibility.
+- Production `CellResolver::get` no-runtime-snapshot misses now ignore
+  process-global dynamic extension registries and `bazel-external` suffix
+  scans; root-scoped dynamic cells remain a test-only compatibility path.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.
