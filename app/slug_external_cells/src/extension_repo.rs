@@ -567,7 +567,7 @@ async fn repo_env_for_extension_repo_execution(
         let setup_repo_env = repo_env_from_setup(setup)?;
         if setup_repo_env.as_ref() != repo_env.as_ref() {
             tracing::debug!(
-                "Ignoring stale serialized repo-env for extension repo '{}' in favor of current DICE projection",
+                "Ignoring stale serialized repo-env for extension repo '{}' in favor of current DICE repo-env data",
                 setup.canonical_name
             );
         }
@@ -619,7 +619,7 @@ pub(crate) async fn get_file_ops_delegate(
     .await?;
     // A dynamic cell origin can outlive the command that created it. Prefer
     // the current DICE spoke value when this is a module-extension repo, and
-    // otherwise use the current repo-env projection rather than serialized
+    // otherwise use the current repo-env data rather than serialized
     // setup plumbing.
     let repo_env = repo_env_for_extension_repo_execution(
         ctx,
@@ -1033,7 +1033,7 @@ mod tests {
 
     #[tokio::test]
     async fn extension_spoke_lookup_uses_injected_workspace_identity() -> slug_error::Result<()> {
-        use slug_bzlmod::SetBzlmodProjectionData;
+        use slug_bzlmod::SetBzlmodDiceInputs;
 
         let project_root = std::env::temp_dir().join(format!(
             "slug-spoke-lookup-workspace-{}",
@@ -1048,7 +1048,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_empty_bzlmod_projection_data_for_workspace(workspace_id.clone())?;
+        updater.set_empty_bzlmod_dice_inputs_for_workspace(workspace_id.clone())?;
         let mut dice = updater.commit().await;
 
         let actual = workspace_id_for_extension_spoke_lookup(&mut dice, "_main+ext+tool").await?;
@@ -1063,9 +1063,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn extension_repo_setup_repo_env_uses_current_dice_projection() -> slug_error::Result<()>
-    {
-        use slug_bzlmod::SetBzlmodProjectionData;
+    async fn extension_repo_setup_repo_env_uses_current_dice_repo_env() -> slug_error::Result<()> {
+        use slug_bzlmod::SetBzlmodDiceInputs;
 
         let project_root =
             std::env::temp_dir().join(format!("slug-repo-env-workspace-{}", std::process::id()));
@@ -1074,7 +1073,8 @@ mod tests {
         let workspace_id = slug_bzlmod::WorkspaceId::new(project_root, output_base);
         let mut repo_env = std::collections::BTreeMap::new();
         repo_env.insert("TOKEN".to_owned(), "current".to_owned());
-        let projection = slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let cell_graph =
+            slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             workspace_id.clone(),
             Arc::new(repo_env),
@@ -1086,8 +1086,8 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data_with_inputs(
-            projection,
+        updater.set_bzlmod_cell_graph_data_with_inputs(
+            cell_graph,
             slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(std::collections::HashMap::new()),
@@ -1254,7 +1254,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_spec_complete_marker_does_not_skip_dice_execution() -> slug_error::Result<()> {
-        use slug_bzlmod::SetBzlmodProjectionData;
+        use slug_bzlmod::SetBzlmodDiceInputs;
         use slug_common::dice::data::testing::SetTestingIoProvider;
         use slug_core::fs::project::ProjectRootTemp;
         use slug_execute::digest_config::SetDigestConfig;
@@ -1284,7 +1284,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_empty_bzlmod_projection_data_for_workspace(workspace_id)?;
+        updater.set_empty_bzlmod_dice_inputs_for_workspace(workspace_id)?;
         let mut dice = updater.commit().await;
 
         let setup = ExtensionRepoCellSetup {

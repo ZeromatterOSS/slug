@@ -6422,7 +6422,7 @@ mod tests {
                 .commit()
                 .await;
             let mut updater = dice.into_updater();
-            slug_bzlmod::SetBzlmodProjectionData::set_empty_bzlmod_projection_data_for_workspace(
+            slug_bzlmod::SetBzlmodDiceInputs::set_empty_bzlmod_dice_inputs_for_workspace(
                 &mut updater,
                 workspace_id,
             )?;

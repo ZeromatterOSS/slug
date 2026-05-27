@@ -45,7 +45,17 @@ DICE-owned values with explicit dependencies, invalidation, and guardrails.
 
 **Analysis**: `scan_bzlmod_apparent_alias_from_external_dir` is too deeply interwoven with `BZLMOD_APPARENT_ALIAS_CACHE` and pre-graph cell resolver for one-slice removal. Requires multi-slice plan.
 
-**Analysis**: `BzlmodProjectionData::for_workspace` transitional wrapper is still used across multiple crates. Deletion of the `BzlmodProjectionData` transitional wrapper requires decomposing it into separate named injections (already partially done in the clean graph path); remaining `set_bzlmod_projection_data_with_inputs` call in `cells.rs:3405` is the last production bridge injection of an empty projection, and `set_empty_bzlmod_projection_data_for_workspace` calls in `analysis/env.rs:6425`, `interpreter_for_build:60`, and `extension_repo.rs` tests create an empty-projection baseline for workspaces without a bzlmod graph. These are all valid transitional calls that keep the API alive.
+**Bridge surface reduced**: `BzlmodProjectionData` has been deleted from the
+public bzlmod API. The updater surface is now `SetBzlmodDiceInputs` with
+`set_bzlmod_cell_graph_data_with_inputs(...)`, accepting the
+`BzlmodCellGraphValue` directly plus the separately named module-version,
+lockfile-input, repo-env, registration, extension-aggregation,
+resolution-fact, and repo-mapping injections. Empty non-bzlmod baselines now
+use `set_empty_bzlmod_dice_inputs_for_workspace(...)`, so compatibility callers
+still install explicit empty DICE inputs without preserving a monolithic
+projection wrapper. Validated with `cargo test -p slug_bzlmod --lib`,
+`cargo test -p slug_common bzlmod`, `cargo test -p slug_external_cells
+extension_repo`, and `cargo check -p slug_server`.
 
 ## Current Checkpoint
 
@@ -164,9 +174,9 @@ value that should own the behavior instead.
 
 Before editing, state which production surface will be removed, made test-only,
 replaced with a named DICE key, or made impossible to reach. Examples include
-`BzlmodProjectionBridgeDiceKey`, `BzlmodProjectionData`, legacy-produced cell
-graph injection, scanner fallback, process-global alias/cell state, direct
-filesystem polling, or marker-trust materialization. Pair that with the intended
+legacy-produced cell graph injection, scanner fallback, process-global
+alias/cell state, direct filesystem polling, or marker-trust materialization.
+Pair that with the intended
 owner from the target shape above, such as `ModuleSourceKey`,
 `BzlmodResolutionKey`, `RepoMappingKey`, `ModuleExtensionReplayInputKey`,
 `RepoSpecKey`, `RepositoryExecutionKey`, `RepoMaterializationManifestKey`,
@@ -288,7 +298,7 @@ hardening behavior around it.
      consumers now get the root module name from injected module-version data
      instead of computing the cell graph. The persisted config-load key carries
      the daemon output base, including
-     no-`MODULE.bazel` empty projections. Data-only projection keys now rely on
+     no-`MODULE.bazel` empty DICE inputs. Data-only projection keys now rely on
      their own source workspace provenance instead of deriving identity through
      the cell graph. Their data payloads are injected from the clean resolved
      graph producer. Daemon bootstrap no-updater parsing computes the clean
@@ -356,9 +366,9 @@ hardening behavior around it.
    - The clean bzlmod graph producer gets visible/hidden lockfile values from a
      named lockfile-input bridge key instead of producing those reads inline.
      The resulting `BzlmodLockfileInputsValue` is still a bridge-shaped value
-     until the true lockfile policy/value graph replaces it, but it is injected
-     separately from `BzlmodProjectionData`, so the monolithic projection
-     payload no longer carries lockfile-input facts.
+     until the true lockfile policy/value graph replaces it. It is injected as
+     a named DICE input beside the direct `BzlmodCellGraphValue`, so no
+     monolithic projection payload carries lockfile-input facts.
    - DICE-backed bzlmod resolution now requires the tracked visible and hidden
      lockfile values when lockfile mode/path policy says those inputs are
      active, instead of silently falling back to a direct lockfile read inside
@@ -673,28 +683,29 @@ hardening behavior around it.
    - `BzlmodCellGraphDataKey` currently exposes an injected graph value rather
      than computing the graph itself. The production payload is now derived from
      the clean resolved-graph producer, and legacy cell parsing takes only that
-     graph-shaped value rather than the whole `BzlmodProjectionData` payload.
+     graph-shaped value. The old `BzlmodProjectionData` wrapper has been
+     deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
 
 9. Delete transitional APIs.
-   - `BzlmodSessionData` and `BzlmodSessionDataKey` are removed, and
-     `BuckConfigBasedCells` no longer stores a bzlmod payload or returns it to
-     the server updater. Persisted config-load now gets `BzlmodCellGraphValue`
-     from the clean graph producer instead of a legacy resolver bridge;
-     `BzlmodProjectionData` remains at the transitional injection API while
-     lockfile inputs, repo-env, resolution facts, repo mappings, registered
-     toolchains, registered execution platforms, extension aggregations, and
-     module versions are passed as separate named injections. Direct
-     bootstrap/completion parsing has been narrowed to the clean producer, so
-     the remaining graph-shaped projection API can be deleted or renamed once
-     downstream consumers no longer need the transitional wrapper.
-   - Generic empty session construction is removed from production paths.
-     Remaining empty projection construction must explicitly carry workspace
-     identity while direct bootstrap/completion parsing is being unwound. The
-     no-project sentinel is named on `WorkspaceId`; empty projection
-     construction now remains only where a full transitional payload is needed.
+   - `BzlmodSessionData`, `BzlmodSessionDataKey`, and
+     `BzlmodProjectionData` are removed, and `BuckConfigBasedCells` no longer
+     stores a bzlmod payload or returns it to the server updater. Persisted
+     config-load now gets `BzlmodCellGraphValue` from the clean graph producer
+     instead of a legacy resolver bridge; lockfile inputs, repo-env,
+     resolution facts, repo mappings, registered toolchains, registered
+     execution platforms, extension aggregations, and module versions are
+     passed as separate named injections. The remaining transitional API is the
+     injected `BzlmodCellGraphDataKey` itself: production now injects a clean
+     graph value, but the key does not compute the graph from DICE dependencies
+     yet.
+   - Generic empty session/projection construction is removed from production
+     paths. Remaining empty bzlmod-input construction must explicitly carry
+     workspace identity while direct bootstrap/completion parsing is being
+     unwound. The no-project sentinel is named on `WorkspaceId`; callers now
+     install explicit empty DICE inputs instead of a full transitional payload.
    - Extension repository execution constructors that derive workspace identity
      from project root are test-only; production code must pass explicit
      workspace identity and repo-env. Bzlmod projection-key and

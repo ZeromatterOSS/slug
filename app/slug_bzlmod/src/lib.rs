@@ -276,29 +276,13 @@ pub struct RegisteredToolchain {
     pub is_root: bool,
 }
 
-/// Transitional bzlmod payload used to update the injected DICE projections for
-/// the current command while the legacy resolver is being decomposed into
-/// DICE-owned graph keys.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct BzlmodProjectionData {
-    pub cell_graph: BzlmodCellGraphValue,
-}
-
-impl BzlmodProjectionData {
-    pub fn for_workspace(workspace_id: WorkspaceId) -> Self {
-        Self {
-            cell_graph: BzlmodCellGraphValue::empty_for_workspace(workspace_id),
-        }
-    }
-}
-
-pub trait SetBzlmodProjectionData {
-    fn set_empty_bzlmod_projection_data_for_workspace(
+pub trait SetBzlmodDiceInputs {
+    fn set_empty_bzlmod_dice_inputs_for_workspace(
         &mut self,
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<()> {
-        self.set_bzlmod_projection_data_with_inputs(
-            BzlmodProjectionData::for_workspace(workspace_id.clone()),
+        self.set_bzlmod_cell_graph_data_with_inputs(
+            BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone()),
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
                 String::new(),
@@ -329,9 +313,9 @@ pub trait SetBzlmodProjectionData {
         )
     }
 
-    fn set_bzlmod_projection_data_with_inputs(
+    fn set_bzlmod_cell_graph_data_with_inputs(
         &mut self,
-        data: BzlmodProjectionData,
+        cell_graph: BzlmodCellGraphValue,
         module_versions: BzlmodModuleVersionsDataValue,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
         repo_env: BzlmodRepoEnvDataValue,
@@ -343,7 +327,7 @@ pub trait SetBzlmodProjectionData {
     ) -> slug_error::Result<()>;
 }
 
-fn validate_projection_workspace(
+fn validate_cell_graph_workspace(
     field: &str,
     cell_graph_workspace_id: &WorkspaceId,
     data_workspace_id: &WorkspaceId,
@@ -351,7 +335,7 @@ fn validate_projection_workspace(
     if data_workspace_id != cell_graph_workspace_id {
         return Err(slug_error::slug_error!(
             slug_error::ErrorTag::Tier0,
-            "BzlmodProjectionData carries {} for project root '{}', \
+            "BzlmodCellGraphValue carries {} for project root '{}', \
              but its cell graph root is '{}'",
             field,
             data_workspace_id.canonical_project_root.display(),
@@ -361,7 +345,7 @@ fn validate_projection_workspace(
     Ok(())
 }
 
-fn validate_projection_root_module_name(
+fn validate_cell_graph_root_module_name(
     field: &str,
     cell_graph_root_module_name: &str,
     data_root_module_name: &str,
@@ -369,7 +353,7 @@ fn validate_projection_root_module_name(
     if data_root_module_name != cell_graph_root_module_name {
         return Err(slug_error::slug_error!(
             slug_error::ErrorTag::Tier0,
-            "BzlmodProjectionData carries {} root module name '{}', \
+            "BzlmodCellGraphValue carries {} root module name '{}', \
              but its cell graph root module name is '{}'",
             field,
             data_root_module_name,
@@ -379,10 +363,10 @@ fn validate_projection_root_module_name(
     Ok(())
 }
 
-impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
-    fn set_bzlmod_projection_data_with_inputs(
+impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
+    fn set_bzlmod_cell_graph_data_with_inputs(
         &mut self,
-        data: BzlmodProjectionData,
+        cell_graph: BzlmodCellGraphValue,
         module_versions: BzlmodModuleVersionsDataValue,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
         repo_env: BzlmodRepoEnvDataValue,
@@ -392,53 +376,53 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         resolution_facts: BzlmodResolutionFactsValue,
         repo_mappings: BzlmodRepoMappingsDataValue,
     ) -> slug_error::Result<()> {
-        let cell_graph_workspace_id = &data.cell_graph.workspace_id;
-        validate_projection_workspace(
+        let cell_graph_workspace_id = &cell_graph.workspace_id;
+        validate_cell_graph_workspace(
             "module-version data",
             cell_graph_workspace_id,
             &module_versions.workspace_id,
         )?;
-        validate_projection_root_module_name(
+        validate_cell_graph_root_module_name(
             "module-version data",
-            &data.cell_graph.root_module_name,
+            &cell_graph.root_module_name,
             &module_versions.root_module_name,
         )?;
-        validate_projection_workspace(
+        validate_cell_graph_workspace(
             "registered-toolchain data",
             cell_graph_workspace_id,
             &registered_toolchains.workspace_id,
         )?;
-        validate_projection_workspace(
+        validate_cell_graph_workspace(
             "registered-execution-platform data",
             cell_graph_workspace_id,
             &registered_execution_platforms.workspace_id,
         )?;
-        validate_projection_workspace(
+        validate_cell_graph_workspace(
             "extension-aggregation data",
             cell_graph_workspace_id,
             &extension_aggregations.workspace_id,
         )?;
-        validate_projection_root_module_name(
+        validate_cell_graph_root_module_name(
             "extension-aggregation data",
-            &data.cell_graph.root_module_name,
+            &cell_graph.root_module_name,
             &extension_aggregations.root_module_name,
         )?;
-        validate_projection_workspace(
+        validate_cell_graph_workspace(
             "lockfile-input data",
             cell_graph_workspace_id,
             &lockfile_inputs.workspace_id,
         )?;
-        validate_projection_workspace(
+        validate_cell_graph_workspace(
             "repo-env data",
             cell_graph_workspace_id,
             &repo_env.workspace_id,
         )?;
-        validate_projection_workspace(
+        validate_cell_graph_workspace(
             "resolution-facts data",
             cell_graph_workspace_id,
             &resolution_facts.workspace_id,
         )?;
-        validate_projection_workspace(
+        validate_cell_graph_workspace(
             "repo-mapping data",
             cell_graph_workspace_id,
             &repo_mappings.workspace_id,
@@ -450,7 +434,7 @@ impl SetBzlmodProjectionData for dice::DiceTransactionUpdater {
         let resolution_facts = Arc::new(resolution_facts);
         let repo_mappings = Arc::new(repo_mappings);
         let extension_aggregations = Arc::new(extension_aggregations);
-        let cell_graph = Arc::new(data.cell_graph.clone());
+        let cell_graph = Arc::new(cell_graph);
         let registered_toolchains = Arc::new(registered_toolchains);
         let registered_execution_platforms = Arc::new(registered_execution_platforms);
         self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
@@ -554,14 +538,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_with_inputs_uses_projection_workspace_id()
+    async fn set_bzlmod_cell_graph_data_with_inputs_uses_projection_workspace_id()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-projection-workspace"),
             PathBuf::from("/tmp/slug-plan61-custom-output-base"),
         );
-        let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
-        data.cell_graph = BzlmodCellGraphValue {
+        let data = BzlmodCellGraphValue {
             workspace_id: workspace_id.clone(),
             root_module_name: "root_mod".to_owned(),
             cells: Arc::new(vec![BzlmodCellGraphCell {
@@ -586,7 +569,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data_with_inputs(
+        updater.set_bzlmod_cell_graph_data_with_inputs(
             data,
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
@@ -639,7 +622,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_workspace_provenance()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_workspace_provenance()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-projection-consistency-workspace"),
@@ -649,7 +632,7 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-projection-consistency-other"),
             PathBuf::from("/tmp/slug-plan61-projection-consistency-other-output"),
         );
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let lockfile_inputs = BzlmodLockfileInputsDataValue::for_workspace(
             workspace_id.clone(),
             Arc::new(BzlmodLockfileInputsValue::default()),
@@ -674,7 +657,7 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(workspace_id.clone()),
                 lockfile_inputs,
@@ -698,7 +681,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_module_projection_provenance()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_module_projection_provenance()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-module-provenance-workspace"),
@@ -708,7 +691,7 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-module-provenance-other"),
             PathBuf::from("/tmp/slug-plan61-module-provenance-other-output"),
         );
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -717,7 +700,7 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(other_workspace_id),
                 BzlmodLockfileInputsDataValue::for_workspace(
@@ -749,7 +732,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_lockfile_input_provenance()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_lockfile_input_provenance()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-lockfile-provenance-workspace"),
@@ -759,18 +742,18 @@ mod tests {
             PathBuf::from("/tmp/slug-plan61-lockfile-provenance-other"),
             PathBuf::from("/tmp/slug-plan61-lockfile-provenance-other-output"),
         );
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let repo_env = BzlmodRepoEnvDataValue::for_workspace(
-            data.cell_graph.workspace_id.clone(),
+            data.workspace_id.clone(),
             Arc::new(BTreeMap::new()),
         );
         let resolution_facts = BzlmodResolutionFactsValue::for_workspace(
-            data.cell_graph.workspace_id.clone(),
+            data.workspace_id.clone(),
             indexmap::IndexMap::new(),
             indexmap::IndexMap::new(),
         );
         let repo_mappings = BzlmodRepoMappingsDataValue::for_workspace(
-            data.cell_graph.workspace_id.clone(),
+            data.workspace_id.clone(),
             Arc::new(RepoMappingSnapshot::new()),
             Arc::new(RepoMappingOverrides::new()),
         );
@@ -786,7 +769,7 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(workspace_id.clone()),
                 lockfile_inputs,
@@ -810,7 +793,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_registration_projection_provenance()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_registration_projection_provenance()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-registration-provenance-workspace"),
@@ -827,9 +810,9 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
@@ -860,9 +843,9 @@ mod tests {
             "{err:?}"
         );
 
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
@@ -898,7 +881,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_extension_projection_provenance()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_extension_projection_provenance()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-extension-provenance-workspace"),
@@ -915,9 +898,9 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
@@ -952,14 +935,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_extension_root_name()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_extension_root_name()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-extension-root-provenance-workspace"),
             PathBuf::from("/tmp/slug-plan61-extension-root-provenance-output-base"),
         );
-        let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
-        data.cell_graph.root_module_name = "root_mod".to_owned();
+        let mut data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
+        data.root_module_name = "root_mod".to_owned();
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -968,7 +951,7 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                     workspace_id.clone(),
@@ -1008,14 +991,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_module_root_name()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_module_root_name()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-module-root-provenance-workspace"),
             PathBuf::from("/tmp/slug-plan61-module-root-provenance-output-base"),
         );
-        let mut data = BzlmodProjectionData::for_workspace(workspace_id.clone());
-        data.cell_graph.root_module_name = "root_mod".to_owned();
+        let mut data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
+        data.root_module_name = "root_mod".to_owned();
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -1024,7 +1007,7 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                     workspace_id.clone(),
@@ -1064,7 +1047,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_rejects_mismatched_resolution_projection_provenance()
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_resolution_projection_provenance()
     -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-resolution-provenance-workspace"),
@@ -1081,9 +1064,9 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
@@ -1111,9 +1094,9 @@ mod tests {
             .unwrap_err();
         assert!(err.to_string().contains("resolution-facts data"), "{err:?}");
 
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let err = updater
-            .set_bzlmod_projection_data_with_inputs(
+            .set_bzlmod_cell_graph_data_with_inputs(
                 data,
                 empty_module_versions(workspace_id.clone()),
                 BzlmodLockfileInputsDataValue::for_workspace(
@@ -1145,13 +1128,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bzlmod_projection_data_injects_separate_lockfile_inputs() -> slug_error::Result<()>
+    async fn set_bzlmod_cell_graph_data_injects_separate_lockfile_inputs() -> slug_error::Result<()>
     {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-projection-lockfile-digest"),
             PathBuf::from("/tmp/slug-plan61-projection-lockfile-output-base"),
         );
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let visible_lockfile = Arc::new(LockfileContentValue {
             path: Arc::new(PathBuf::from(
                 "/tmp/slug-plan61-projection-lockfile-digest/MODULE.bazel.lock",
@@ -1210,7 +1193,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_projection_data_with_inputs(
+        updater.set_bzlmod_cell_graph_data_with_inputs(
             data,
             empty_module_versions(workspace_id.clone()),
             lockfile_inputs,
@@ -1312,7 +1295,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn semantic_projection_keys_use_cell_graph_workspace() -> slug_error::Result<()> {
+    async fn semantic_cell_graph_keys_use_cell_graph_workspace() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-registered-cell-graph-workspace"),
             PathBuf::from("/tmp/slug-plan61-registered-cell-graph-output-base"),
@@ -1626,8 +1609,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn data_only_projection_keys_do_not_depend_on_cell_graph_workspace()
-    -> slug_error::Result<()> {
+    async fn data_only_keys_do_not_depend_on_cell_graph_workspace() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-data-projection-workspace"),
             PathBuf::from("/tmp/slug-plan61-data-projection-output-base"),
@@ -1759,7 +1741,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn projection_data_rejects_wrong_workspace() -> slug_error::Result<()> {
+    async fn cell_graph_data_rejects_wrong_workspace() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-projection-workspace"),
             PathBuf::from("/tmp/slug-plan61-projection-output-base"),
@@ -1775,7 +1757,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_empty_bzlmod_projection_data_for_workspace(workspace_id.clone())?;
+        updater.set_empty_bzlmod_dice_inputs_for_workspace(workspace_id.clone())?;
         let dice = updater.commit().await;
 
         let mut updater = dice.into_updater();
@@ -1872,13 +1854,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn current_workspace_helpers_use_projection_workspace_id() -> slug_error::Result<()> {
+    async fn current_workspace_helpers_use_cell_graph_workspace_id() -> slug_error::Result<()> {
         let project_root = PathBuf::from("/tmp/slug-plan61-current-workspace-helper");
         let workspace_id = WorkspaceId::new(
             project_root.clone(),
             PathBuf::from("/tmp/slug-plan61-current-workspace-output-base"),
         );
-        let data = BzlmodProjectionData::for_workspace(workspace_id.clone());
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -1886,7 +1868,7 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_empty_bzlmod_projection_data_for_workspace(data.cell_graph.workspace_id)?;
+        updater.set_empty_bzlmod_dice_inputs_for_workspace(data.workspace_id)?;
         let mut dice = updater.commit().await;
 
         let module_versions = module_versions_for_current_workspace(&mut dice).await?;

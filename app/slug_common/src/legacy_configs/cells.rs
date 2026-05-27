@@ -3286,7 +3286,7 @@ impl BuckConfigBasedCells {
         ))
     }
 
-    pub async fn parse_with_config_args_and_persisted_bzlmod_projection(
+    pub async fn parse_with_config_args_and_persisted_bzlmod_cell_graph(
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
         updater: &mut DiceTransactionUpdater,
@@ -3402,11 +3402,9 @@ impl BuckConfigBasedCells {
         )
         .await
         .buck_error_context("Parsing cells")?;
-        slug_bzlmod::SetBzlmodProjectionData::set_bzlmod_projection_data_with_inputs(
+        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs(
             updater,
-            slug_bzlmod::BzlmodProjectionData {
-                cell_graph: cell_graph_for_dice,
-            },
+            cell_graph_for_dice,
             module_versions_for_dice,
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
                 key.resolution_key.workspace_id.clone(),
@@ -3569,7 +3567,7 @@ impl BuckConfigBasedCells {
         let mut bzlmod_extension_cells: Vec<(CellName, ExtensionRepoCellSetup)> = Vec::new();
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
         let mut has_module_bazel = false;
-        // Non-bzlmod parsing still injects empty bzlmod projections for legacy
+        // Non-bzlmod parsing still injects empty bzlmod DICE inputs for legacy
         // consumers. The caller must choose the workspace identity explicitly.
         let mut bzlmod_runtime_cell_snapshot = None;
 
@@ -5108,7 +5106,7 @@ module(name = "dep", version = "1.0")
     }
 
     #[tokio::test]
-    async fn persisted_projection_injects_clean_root_module_version_data() -> slug_error::Result<()>
+    async fn persisted_cell_graph_injects_clean_root_module_version_data() -> slug_error::Result<()>
     {
         let fs = ProjectRootTemp::new()?;
         fs.write_file(
@@ -5134,7 +5132,7 @@ use_repo(ext, "generated")
             .await;
         let mut updater = dice.into_updater();
 
-        let configs = BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_projection(
+        let configs = BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_cell_graph(
             fs.path(),
             &config_args,
             &mut updater,
@@ -5803,8 +5801,8 @@ use_repo(ext, "generated")
     }
 
     #[tokio::test]
-    async fn persisted_empty_bzlmod_projection_preserves_explicit_output_base()
-    -> slug_error::Result<()> {
+    async fn persisted_empty_bzlmod_inputs_preserves_explicit_output_base() -> slug_error::Result<()>
+    {
         let fs = ProjectRootTemp::new()?;
         let output_base = fs
             .path()
@@ -5820,7 +5818,7 @@ use_repo(ext, "generated")
         let mut updater = dice.into_updater();
         let config_args = [slug_cli_proto::ConfigOverride::flag_no_cell("cells.root=.")];
 
-        let configs = BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_projection(
+        let configs = BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_cell_graph(
             fs.path(),
             &config_args,
             &mut updater,
@@ -6097,9 +6095,7 @@ use_repo(ext, "generated")
         let project_root = PathBuf::from("/tmp/slug-plan61-canonical-cell-graph-test");
         let workspace_id =
             slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"));
-        let mut projection_data =
-            slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
-        projection_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
+        let projection_data = slug_bzlmod::BzlmodCellGraphValue {
             workspace_id,
             root_module_name: "root".to_owned(),
             cells: Arc::new(vec![slug_bzlmod::BzlmodCellGraphCell {
@@ -6120,7 +6116,7 @@ use_repo(ext, "generated")
         let configs = BuckConfigBasedCells::parse_with_file_ops_and_options_inner(
             &[],
             None,
-            Some(Arc::new(Some(projection_data.cell_graph))),
+            Some(Arc::new(Some(projection_data))),
             slug_bzlmod::WorkspaceId::no_project_sentinel(),
         )
         .await?;
@@ -6301,9 +6297,7 @@ use_repo(ext, "generated")
         let project_root = PathBuf::from("/tmp/slug-plan61-bundled-cell-graph-test");
         let workspace_id =
             slug_bzlmod::WorkspaceId::new(project_root.clone(), project_root.join("buck-out/v2"));
-        let mut projection_data =
-            slug_bzlmod::BzlmodProjectionData::for_workspace(workspace_id.clone());
-        projection_data.cell_graph = slug_bzlmod::BzlmodCellGraphValue {
+        let projection_data = slug_bzlmod::BzlmodCellGraphValue {
             workspace_id,
             root_module_name: "root".to_owned(),
             cells: Arc::new(vec![slug_bzlmod::BzlmodCellGraphCell {
@@ -6322,7 +6316,7 @@ use_repo(ext, "generated")
         let configs = BuckConfigBasedCells::parse_with_file_ops_and_options_inner(
             &[],
             None,
-            Some(Arc::new(Some(projection_data.cell_graph))),
+            Some(Arc::new(Some(projection_data))),
             slug_bzlmod::WorkspaceId::no_project_sentinel(),
         )
         .await?;

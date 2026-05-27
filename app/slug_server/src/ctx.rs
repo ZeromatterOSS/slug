@@ -574,7 +574,7 @@ impl ServerCommandContext<'_> {
         });
 
         let new_configs =
-            BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_projection(
+            BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_cell_graph(
                 &self.base_context.project_root,
                 &config_overrides,
                 dice_ctx,
