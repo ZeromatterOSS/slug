@@ -1663,12 +1663,7 @@ impl CellAliasResolver {
             .resolve_scoped_bzlmod_repo_alias_from_runtime(alias)
             .or_else(|| {
                 (!has_runtime_snapshot)
-                    .then(|| {
-                        resolve_scoped_bzlmod_repo_alias_for_current_cell(
-                            self.current.as_str(),
-                            alias,
-                        )
-                    })
+                    .then(|| process_global_scoped_bzlmod_alias_fallback(self.current, alias))
                     .flatten()
             })
         {
@@ -1684,7 +1679,7 @@ impl CellAliasResolver {
             .resolve_dynamic_extension_cell_alias_from_runtime(alias)
             .or_else(|| {
                 (!has_runtime_snapshot)
-                    .then(|| resolve_dynamic_extension_cell_alias(alias))
+                    .then(|| process_global_dynamic_extension_alias_fallback(alias))
                     .flatten()
             })
         {
@@ -1694,7 +1689,7 @@ impl CellAliasResolver {
         }
 
         if self.has_bzlmod_runtime_extension_cell(alias)
-            || (!has_runtime_snapshot && get_dynamic_extension_cell(alias).is_some())
+            || (!has_runtime_snapshot && process_global_dynamic_extension_cell_exists(alias))
         {
             if let Ok(cell_name) = CellName::unchecked_new(alias) {
                 return Ok(cell_name);
@@ -1702,7 +1697,7 @@ impl CellAliasResolver {
         }
 
         if !has_runtime_snapshot {
-            if let Some(cell_name) = resolve_bzlmod_apparent_alias_from_external_dir(alias) {
+            if let Some(cell_name) = process_global_apparent_alias_dir_fallback(alias) {
                 return Ok(cell_name);
             }
         }
@@ -1733,25 +1728,24 @@ impl CellAliasResolver {
                 }
             }
             if !has_runtime_snapshot {
-                // Check the global dynamic registry
-                if get_dynamic_extension_cell(&candidate).is_some() {
+                if process_global_dynamic_extension_cell_exists(&candidate) {
                     if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
-                        // Register the apparent name as an alias for this cell too
-                        register_dynamic_extension_cell(
+                        process_global_register_dynamic_extension_cell_fallback(
                             candidate.clone(),
                             format!("bazel-external/{}", candidate),
                         );
                         return Ok(cell_name);
                     }
                 }
-                if dynamic_bzlmod_directory_scan_allowed() {
-                    // Check if a bazel-external directory exists for this candidate.
-                    let candidate_path = format!("bazel-external/{}", candidate);
-                    if std::path::Path::new(&candidate_path).exists() {
-                        if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
-                            register_dynamic_extension_cell(candidate, candidate_path);
-                            return Ok(cell_name);
-                        }
+                if let Some(candidate_path) =
+                    process_global_dynamic_extension_dir_fallback(&candidate)
+                {
+                    if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                        process_global_register_dynamic_extension_cell_fallback(
+                            candidate,
+                            candidate_path,
+                        );
+                        return Ok(cell_name);
                     }
                 }
             }
@@ -1818,6 +1812,72 @@ impl CellAliasResolver {
     }
 }
 
+#[cfg(test)]
+fn process_global_scoped_bzlmod_alias_fallback(current: CellName, alias: &str) -> Option<String> {
+    resolve_scoped_bzlmod_repo_alias_for_current_cell(current.as_str(), alias)
+}
+
+#[cfg(not(test))]
+fn process_global_scoped_bzlmod_alias_fallback(_current: CellName, _alias: &str) -> Option<String> {
+    None
+}
+
+#[cfg(test)]
+fn process_global_dynamic_extension_alias_fallback(alias: &str) -> Option<String> {
+    resolve_dynamic_extension_cell_alias(alias)
+}
+
+#[cfg(not(test))]
+fn process_global_dynamic_extension_alias_fallback(_alias: &str) -> Option<String> {
+    None
+}
+
+#[cfg(test)]
+fn process_global_dynamic_extension_cell_exists(name: &str) -> bool {
+    get_dynamic_extension_cell(name).is_some()
+}
+
+#[cfg(not(test))]
+fn process_global_dynamic_extension_cell_exists(_name: &str) -> bool {
+    false
+}
+
+#[cfg(test)]
+fn process_global_apparent_alias_dir_fallback(alias: &str) -> Option<CellName> {
+    resolve_bzlmod_apparent_alias_from_external_dir(alias)
+}
+
+#[cfg(not(test))]
+fn process_global_apparent_alias_dir_fallback(_alias: &str) -> Option<CellName> {
+    None
+}
+
+#[cfg(test)]
+fn process_global_dynamic_extension_dir_fallback(candidate: &str) -> Option<String> {
+    if dynamic_bzlmod_directory_scan_allowed() {
+        let candidate_path = format!("bazel-external/{}", candidate);
+        std::path::Path::new(&candidate_path)
+            .exists()
+            .then_some(candidate_path)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(test))]
+fn process_global_dynamic_extension_dir_fallback(_candidate: &str) -> Option<String> {
+    None
+}
+
+#[cfg(test)]
+fn process_global_register_dynamic_extension_cell_fallback(name: String, path: String) {
+    register_dynamic_extension_cell(name, path);
+}
+
+#[cfg(not(test))]
+fn process_global_register_dynamic_extension_cell_fallback(_name: String, _path: String) {}
+
+#[cfg(test)]
 fn resolve_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<CellName> {
     if alias.contains('+') {
         return None;

@@ -85,6 +85,15 @@ process-global dynamic/module alias maps. The legacy symlink/cache fallback is
 kept test-only. Validated with `cargo check -p slug_core` and focused `cargo
 test -p slug_core action_external_cell_name -- --nocapture`.
 
+**Bridge surface reduced**: `CellAliasResolver::resolve(...)` no longer uses
+process-global scoped aliases, dynamic extension aliases/cells, or
+`bazel-external` directory probing on no-runtime-snapshot misses in production.
+Those compatibility fallbacks are now test-only helpers; production alias
+resolution must come from declared aliases, the resolver-owned runtime snapshot,
+or known bundled cells. Validated with `cargo check -p slug_core`, focused
+`slug_core` resolver tests, and `pytest -q
+tests/core/bzlmod/test_plan61_guardrails.py`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -119,6 +128,9 @@ Current state to preserve:
   registrations instead of scanning `bazel-external` for aliases.
 - Action source path external repo names now use the resolver-owned stored cell
   path first and do not consult process-global bzlmod alias maps in production.
+- Production `CellAliasResolver::resolve` no-runtime-snapshot misses now ignore
+  process-global bzlmod alias/cell maps and directory probing; those fallbacks
+  remain only for test compatibility.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.
