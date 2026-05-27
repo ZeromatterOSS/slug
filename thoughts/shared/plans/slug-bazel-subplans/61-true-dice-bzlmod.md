@@ -41,7 +41,11 @@ DICE-owned values with explicit dependencies, invalidation, and guardrails.
 
 **Intended owner**: `NonRootModuleFilesKey` — already exists, just not wired into the clean graph producer. Collects resolved module files as `Vec<NonRootModuleFileInput>` after `fetch_sources()`, computes them through DICE, and folds `NonRootModuleFilesValue.parsed_modules` into the output.
 
-**Bridge surface reduced**: targeted `std::fs::read_to_string` for resolved MODULE.bazel files replaced by `dice_ctx.compute(&NonRootModuleFilesKey{...})`.
+**Bridge surface reduced**: targeted `std::fs::read_to_string` for resolved MODULE.bazel files replaced by `dice_ctx.compute(&NonRootModuleFilesKey{...})`. Validated with `cargo test -p slug_common bzlmod` (14 passed), `cargo test -p slug_bzlmod` (380 passed), `cargo build -p slug`, and `git diff --check`. Commit: `dbfeb5e1`.
+
+**Analysis**: `scan_bzlmod_apparent_alias_from_external_dir` is too deeply interwoven with `BZLMOD_APPARENT_ALIAS_CACHE` and pre-graph cell resolver for one-slice removal. Requires multi-slice plan.
+
+**Analysis**: `BzlmodProjectionData::for_workspace` transitional wrapper is still used across multiple crates. Deletion of the `BzlmodProjectionData` transitional wrapper requires decomposing it into separate named injections (already partially done in the clean graph path); remaining `set_bzlmod_projection_data_with_inputs` call in `cells.rs:3405` is the last production bridge injection of an empty projection, and `set_empty_bzlmod_projection_data_for_workspace` calls in `analysis/env.rs:6425`, `interpreter_for_build:60`, and `extension_repo.rs` tests create an empty-projection baseline for workspaces without a bzlmod graph. These are all valid transitional calls that keep the API alive.
 
 ## Current Checkpoint
 
