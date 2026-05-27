@@ -68,6 +68,15 @@ remaining bridge key instead of being an implicit fallback inside
 `slug_bzlmod`. Validated with `cargo test -p slug_bzlmod lockfile_preseed`
 and `cargo test -p slug_common bzlmod`.
 
+**Bridge surface reduced**: production `slug_core` no longer enables
+`bazel-external` directory-scan fallback through process-global bzlmod state.
+`dynamic_bzlmod_directory_scan_allowed()` is now test-only; normal builds must
+resolve bzlmod repos through the resolver/runtime snapshot or explicit dynamic
+registrations. This preserves existing unit coverage for the legacy scanner
+shape while making the scanner unreachable in non-test production binaries.
+Validated with `cargo check -p slug_core` and focused `cargo test -p slug_core
+dynamic_bzlmod -- --nocapture`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -97,6 +106,9 @@ Current state to preserve:
   and lockfile preseed paths still have a legacy fallback-scanner bridge in
   `FallbackScannedExtensionBzlDigestKey`. Lockfile preseed no longer computes a
   secondary implicit fallback when the bridge digest map is absent.
+- `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
+  production binaries must use resolver/runtime graph data or explicit dynamic
+  registrations instead of scanning `bazel-external` for aliases.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.

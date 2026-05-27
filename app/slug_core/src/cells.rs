@@ -708,7 +708,16 @@ fn dynamic_bzlmod_scope() -> DynamicBzlmodScope {
 }
 
 fn dynamic_bzlmod_directory_scan_allowed() -> bool {
-    dynamic_bzlmod_scope().output_base.is_none()
+    #[cfg(not(test))]
+    {
+        // Production bzlmod resolution must come from the resolver/runtime graph
+        // or explicit dynamic registrations, not best-effort filesystem scans.
+        false
+    }
+    #[cfg(test)]
+    {
+        dynamic_bzlmod_scope().output_base.is_none()
+    }
 }
 
 fn clear_dynamic_bzlmod_state_for_new_root() {
