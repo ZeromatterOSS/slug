@@ -422,7 +422,7 @@ pub struct MvsResolver {
     known_registry_file_hashes: IndexMap<String, String>,
     /// Selected yanked versions read from the current visible lockfile.
     previously_selected_yanked_versions: IndexMap<String, String>,
-    /// Root-local override patch files read by the DICE projection bridge.
+    /// Root-local override patch files read by the DICE bzlmod graph producer.
     override_patch_inputs: Arc<crate::OverridePatchInputs>,
 }
 

@@ -144,9 +144,13 @@ pub(crate) fn parse_bzlmod_bzl_path(
         // name (`rules_nodejs`), while extension repos keep the full
         // `module+extension+repo` name. Try the canonical spelling first, then
         // the apparent module prefix before falling back.
+        let canonical_candidate;
         let mut candidates = vec![cell_part];
         if let Some(stripped) = cell_part.strip_suffix('+') {
             candidates.push(stripped);
+        } else if !cell_part.contains('+') {
+            canonical_candidate = format!("{cell_part}+");
+            candidates.push(&canonical_candidate);
         }
         if let Some((apparent, _)) = cell_part.split_once('+') {
             candidates.push(apparent);

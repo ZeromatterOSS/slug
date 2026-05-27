@@ -8,8 +8,9 @@
 
 ## Status
 
-Open. The prior Plan 61 work produced a useful DICE-assisted bzlmod bridge and
-fixed many SDK-blocking parity bugs, but it is not yet a replay-complete
+Open. The persisted config-load path now gets its resolved module graph,
+projection facts, repo mappings, extension aggregations, registrations, and cell
+graph from the clean bzlmod graph producer. It is still not a replay-complete
 DICE/Skyframe implementation.
 
 Do not mark this plan complete because `//sdk:sdk_contents` passes, because the
@@ -21,11 +22,12 @@ Current classification:
 
 - Slug has DICE keys for selected bzlmod inputs and extension/repository
   execution surfaces.
-- The resolved module graph and cell graph are still primarily produced by
-  legacy startup cell parsing and injected into DICE as command session data.
-- Replay correctness still depends on non-DICE process state, best-effort
-  digests, and transitional bridge behavior in places where Bazel owns explicit
-  Skyframe keys.
+- The production persisted config-load path no longer uses
+  `BzlmodProjectionBridgeDiceKey`; the direct no-updater bootstrap/completion
+  parser remains as a separate non-persisted path.
+- Replay correctness still depends on non-DICE process state, fallback scanner
+  bridges, direct polling, and transitional lockfile/materialization behavior in
+  places where Bazel owns explicit Skyframe keys.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -42,9 +44,10 @@ bridge-burn-down slice.
 
 Current state to preserve:
 
-- Plan 61 is open. Slug has a useful DICE-assisted bzlmod bridge, but the
-  resolved module graph and cell graph are still primarily produced by legacy
-  startup cell parsing and injected into DICE as command session data.
+- Plan 61 is open. The persisted config-load path now uses the clean bzlmod
+  graph producer for resolved graph data and `BzlmodCellGraphValue`; direct
+  no-updater bootstrap/completion parsing, fallback scanners, lockfile policy,
+  and materialization polling remain.
 - SDK frontier evidence is positive but not a closure condition: Slug and Bazel
   9.0.1 have both built `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents`, with
   matching modes and non-ELF hashes. The accepted remaining differences are ELF
@@ -176,9 +179,10 @@ hardening behavior around it.
 ## Remaining Work
 
 1. Replace the legacy resolution bridge.
-   - Replace `BzlmodProjectionBridgeDiceKey` with true graph producers. The
-     old `LegacyBzlmodResolutionDiceKey` name has been demoted away, but the
-     bridge still wraps the legacy resolver.
+   - `BzlmodProjectionBridgeDiceKey` has been replaced by true graph
+     producers for the persisted config-load path. The remaining risk in this
+     item is the direct no-updater bootstrap/completion parser, which still
+     builds a bzlmod cell graph outside the persisted DICE updater.
    - Build the resolved graph from DICE-owned module-file/source keys.
      Do not start by wrapping `BuckConfigBasedCells`' legacy projection
      resolver under a new key name; that preserves the architecture this item
@@ -193,18 +197,14 @@ hardening behavior around it.
      registration, and the final cell graph, so per-dependency production
      cutover is not a safe boundary. Use per-dependency fixtures only to prove
      coverage.
-   - First build clean shadow producers that leave the legacy injection path as
-     production authority. The initial viability slice is a
+   - The clean producer sequence started as a shadow path and has now become
+     production authority for persisted config-load injection. The initial
+     viability slice was a
      `BzlmodResolvedModuleGraphKey`-style producer for the resolved graph plus
      module-version and resolution-fact outputs. It may reuse lower-level
      `slug_bzlmod` primitives such as `MvsResolver`, `ModuleCache`, parsed
-     module values, and lockfile types, but it must not call
-     `BzlmodProjectionBridgeDiceKey`,
-     `parse_with_config_args_and_persisted_bzlmod_projection_bridge`, or
-     `resolve_bzlmod_dependencies_with_options`.
-     The first code path can run as an opt-in diagnostic shadow
-     (`SLUG_BZLMOD_CLEAN_RESOLUTION_SHADOW=1`) while legacy injection remains
-     the production authority.
+     module values, and lockfile types, but it must not call the direct
+     no-updater bootstrap/completion cell-graph parser.
      The follow-up slice promotes `BzlmodModuleVersionsDataValue` and
      `BzlmodResolutionFactsValue` injection to the clean resolved-graph key, so
      the legacy projection bridge no longer carries those output classes.
@@ -221,6 +221,15 @@ hardening behavior around it.
      Repo-mapping injection is now derived from the clean producer's parsed
      modules plus resolved graph identity; the legacy projection bridge no
      longer carries `BzlmodRepoMappingsDataValue`.
+     Persisted config-load now injects `BzlmodCellGraphValue` from the clean
+     resolved-graph key as well. `BzlmodProjectionBridgeDiceKey` and its
+     bridge-specific extension replay summary digest were removed; direct
+     no-updater bootstrap/completion parsing remains a separate non-persisted
+     path.
+     Evidence: `pytest tests/core/bzlmod/test_plan61_guardrails.py` (155
+     passed), `cargo test -p slug_common` (126 passed), `cargo test -p
+     slug_bzlmod` (380 passed plus doctests), `cargo fmt --check`, and
+     `git diff --check`.
    - Migrate output classes in this order:
      1. source/module-file input producers for root, registry, project-local
         and out-of-project local overrides, git/archive overrides, and patch
@@ -239,7 +248,9 @@ hardening behavior around it.
         `use_repo_rule()`, and lockfile-seeded generated repo preseed facts;
      7. final `BzlmodCellGraphValue` authority, including module cells,
         extension cells, bundled cells, root aliases, scoped aliases, dynamic
-        aliases, and external symlink layout.
+        aliases, and external symlink layout. The persisted config-load path is
+        now on this clean authority; remaining work is to retire or narrow the
+        direct no-updater bootstrap/completion path.
    - Shadow equivalence does not need to wait for the final cell graph. Compare
      old and new values by output class, starting with selected versions,
      module source paths, registry hashes, selected yanked versions,
@@ -315,12 +326,12 @@ hardening behavior around it.
      Out-of-project hidden lockfiles are still directly polled by that named
      key and invalidated across transactions until the final watched-input graph
      replaces the direct polling.
-   - The projection bridge now gets visible/hidden lockfile values from a named
-     lockfile-input bridge key instead of producing those reads inline, but the
-     resulting `BzlmodLockfileInputsValue` still feeds the legacy resolver until
-     the true lockfile policy/value graph replaces the projection bridge. The
-     value is injected separately from `BzlmodProjectionData`, so the monolithic
-     projection payload no longer carries lockfile-input facts.
+   - The clean bzlmod graph producer gets visible/hidden lockfile values from a
+     named lockfile-input bridge key instead of producing those reads inline.
+     The resulting `BzlmodLockfileInputsValue` is still a bridge-shaped value
+     until the true lockfile policy/value graph replaces it, but it is injected
+     separately from `BzlmodProjectionData`, so the monolithic projection
+     payload no longer carries lockfile-input facts.
    - DICE-backed bzlmod resolution now requires the tracked visible and hidden
      lockfile values when lockfile mode/path policy says those inputs are
      active, instead of silently falling back to a direct lockfile read inside
@@ -643,17 +654,17 @@ hardening behavior around it.
 9. Delete transitional APIs.
    - `BzlmodSessionData` and `BzlmodSessionDataKey` are removed, and
      `BuckConfigBasedCells` no longer stores a bzlmod payload or returns it to
-     the server updater. The legacy resolver bridge now returns
-     `BzlmodCellGraphValue` directly instead of wrapping it in
-     `BzlmodProjectionData`; `BzlmodProjectionData` remains at the transitional
-     injection API while lockfile inputs, repo-env, resolution facts, repo
-     mappings, registered toolchains, registered execution platforms, extension
-     aggregations, and module versions are passed as separate named injections.
-     Delete or rename the remaining graph-shaped injection API only after
-     module graph and cell-graph facts have true DICE producers.
+     the server updater. Persisted config-load now gets `BzlmodCellGraphValue`
+     from the clean graph producer instead of a legacy resolver bridge;
+     `BzlmodProjectionData` remains at the transitional injection API while
+     lockfile inputs, repo-env, resolution facts, repo mappings, registered
+     toolchains, registered execution platforms, extension aggregations, and
+     module versions are passed as separate named injections. Delete or rename
+     the remaining graph-shaped injection API only after direct
+     bootstrap/completion parsing has been narrowed or retired.
    - Generic empty session construction is removed from production paths.
      Remaining empty projection construction must explicitly carry workspace
-     identity while the projection bridge is still being unwound. The
+     identity while direct bootstrap/completion parsing is being unwound. The
      no-project sentinel is named on `WorkspaceId`; empty projection
      construction now remains only where a full transitional payload is needed.
    - Extension repository execution constructors that derive workspace identity

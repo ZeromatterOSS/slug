@@ -1749,14 +1749,11 @@ mod tests {
             .await??;
         assert_eq!(registered_execution_platforms.workspace_id, workspace_id);
 
-        let err = dice
+        let module_versions = dice
             .compute(&ModuleVersionsKey::for_workspace_id(workspace_id))
-            .await?
-            .unwrap_err();
-        assert!(
-            err.to_string().contains("bzlmod cell graph root"),
-            "{err:?}"
-        );
+            .await??;
+        assert!(module_versions.module_versions.is_empty());
+        assert_eq!(module_versions.invalidation.repo_env, *repo_env.as_ref());
 
         Ok(())
     }

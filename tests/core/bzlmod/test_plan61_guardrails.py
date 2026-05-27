@@ -154,6 +154,7 @@ def _git_override_cache_dir(
     _update_digest_optional_str(hasher, shallow_since)
     _update_digest_str_list(hasher, patches or [])
     _update_digest_u32(hasher, patch_strip)
+    _update_digest_optional_str(hasher, None)
     source_identity = hasher.hexdigest()[:16]
     return cache_home / "slug" / "overrides" / module_name / f"git-{commit}-{source_identity}"
 
@@ -175,6 +176,7 @@ def _archive_override_cache_dir(
     _update_digest_optional_str(hasher, strip_prefix)
     _update_digest_str_list(hasher, patches or [])
     _update_digest_u32(hasher, patch_strip)
+    _update_digest_optional_str(hasher, None)
     source_identity = hasher.hexdigest()[:16]
     return cache_home / "slug" / "overrides" / module_name / f"archive-{source_identity}"
 
@@ -7010,7 +7012,7 @@ use_repo(replay, "replayed_repo")
         module_name=root_module,
         project_root=buck.cwd,
         repo_path=replayed_repo,
-        repo_mappings={owner_module: {helper_alias: helper_module}},
+        repo_mappings={owner_module: {helper_alias: f"{helper_module}+"}},
     )
 
     return helper_path
@@ -7182,7 +7184,7 @@ use_repo(replay, "replayed_repo")
         module_name=root_module,
         project_root=buck.cwd,
         repo_path=replayed_repo,
-        repo_mappings={owner_module: {helper_alias: helper_module}},
+        repo_mappings={owner_module: {helper_alias: f"{helper_module}+"}},
     )
     _write(
         buck.cwd / "BUILD.bazel",
@@ -7275,7 +7277,7 @@ use_repo(replay, "replayed_repo")
         module_name=root_module,
         project_root=buck.cwd,
         repo_path=replayed_repo,
-        repo_mappings={owner_module: {helper_alias: helper_module}},
+        repo_mappings={owner_module: {helper_alias: f"{helper_module}+"}},
     )
     _write(
         buck.cwd / "BUILD.bazel",
@@ -7371,7 +7373,7 @@ use_repo(replay, "replayed_repo")
         module_name=root_module,
         project_root=buck.cwd,
         repo_path=replayed_repo,
-        repo_mappings={owner_module: {helper_alias: helper_module}},
+        repo_mappings={owner_module: {helper_alias: f"{helper_module}+"}},
     )
     _write(
         buck.cwd / "BUILD.bazel",
@@ -8983,7 +8985,7 @@ use_repo(replay, "replayed_repo")
         module_name=module_name,
         project_root=buck.cwd,
         repo_path=replayed_repo,
-        recorded_inputs=[f"REPO_MAPPING:,mapped_dep {dep_module_name}"],
+        recorded_inputs=[f"REPO_MAPPING:,mapped_dep {dep_module_name}+"],
     )
     _write(
         buck.cwd / "BUILD.bazel",
