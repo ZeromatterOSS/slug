@@ -102,6 +102,15 @@ kept only in tests. Validated with `cargo check -p slug_core`, focused
 `slug_core` cell path/resolver tests, and `pytest -q
 tests/core/bzlmod/test_plan61_guardrails.py`.
 
+**Bridge surface reduced**: load-path wrong-cell equivalence no longer accepts
+process-global dynamic extension aliases on no-runtime-snapshot production
+misses. `are_bzlmod_alias_equivalent(...)` now relies on literal equality,
+Bazel canonical module suffix equivalence, declared/runtime resolver aliases,
+and resolver-owned internal repo-name equivalence in production; the old
+process-global alias equivalence is test-only. Validated with `cargo check -p
+slug_interpreter_for_build`, focused `slug_interpreter_for_build` load-path
+tests, and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -142,6 +151,10 @@ Current state to preserve:
 - Production `CellResolver::get` no-runtime-snapshot misses now ignore
   process-global dynamic extension registries and `bazel-external` suffix
   scans; root-scoped dynamic cells remain a test-only compatibility path.
+- Production load-path wrong-cell equivalence now ignores process-global
+  dynamic extension aliases on no-runtime-snapshot misses; resolver-owned
+  declared/runtime aliases and structural canonical/internal-name equivalence
+  remain.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.

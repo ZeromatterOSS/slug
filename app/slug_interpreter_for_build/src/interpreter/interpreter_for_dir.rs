@@ -326,12 +326,20 @@ fn are_bzlmod_alias_equivalent(
             .resolve_declared_or_runtime_alias(canonical)
             .is_some_and(|cell| cell.as_str() == apparent)
         || (!resolver_has_runtime_snapshot
-            && slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref()
-                == Some(canonical))
+            && process_global_dynamic_alias_equivalent(apparent, canonical))
         || (!resolver_has_runtime_snapshot
-            && slug_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
-                == Some(apparent))
+            && process_global_dynamic_alias_equivalent(canonical, apparent))
         || extension_repo_internal_names_equivalent(alias_resolver, apparent, canonical)
+}
+
+#[cfg(test)]
+fn process_global_dynamic_alias_equivalent(apparent: &str, canonical: &str) -> bool {
+    slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref() == Some(canonical)
+}
+
+#[cfg(not(test))]
+fn process_global_dynamic_alias_equivalent(_apparent: &str, _canonical: &str) -> bool {
+    false
 }
 
 fn extension_repo_internal_name(canonical: &str) -> Option<&str> {
