@@ -3202,7 +3202,6 @@ impl Key for OverridePatchInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodProjectionBridgeValue {
     cell_graph: slug_bzlmod::BzlmodCellGraphValue,
-    repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
 }
 
 #[derive(Clone, Debug, Display, Allocative)]
@@ -3233,6 +3232,7 @@ struct BzlmodResolvedModuleGraphValue {
     registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
     registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
     extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
+    repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
 }
 
 impl PartialEq for BzlmodResolvedModuleGraphKey {
@@ -3356,6 +3356,7 @@ impl Key for BzlmodResolvedModuleGraphKey {
                         && x.registered_toolchains == y.registered_toolchains
                         && x.registered_execution_platforms == y.registered_execution_platforms
                         && x.extension_aggregations == y.extension_aggregations
+                        && x.repo_mappings == y.repo_mappings
                 }
                 (None, None) => true,
                 _ => false,
@@ -3494,22 +3495,14 @@ impl BuckConfigBasedCells {
                 "Using clean bzlmod resolved graph data for DICE injections"
             );
         }
-        let (cell_graph_for_dice, repo_mappings_for_dice) =
-            bzlmod_projection.as_ref().as_ref().map_or_else(
-                || {
-                    (
-                        slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-                            key.resolution_key.workspace_id.clone(),
-                        ),
-                        slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
-                            Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
-                            Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
-                        ),
-                    )
-                },
-                |value| (value.cell_graph.clone(), value.repo_mappings.clone()),
-            );
+        let cell_graph_for_dice = bzlmod_projection.as_ref().as_ref().map_or_else(
+            || {
+                slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
+                    key.resolution_key.workspace_id.clone(),
+                )
+            },
+            |value| value.cell_graph.clone(),
+        );
         let (module_versions_for_dice, resolution_facts_for_dice) =
             clean_resolved_module_graph.as_ref().as_ref().map_or_else(
                 || {
@@ -3564,6 +3557,16 @@ impl BuckConfigBasedCells {
                 },
                 |value| value.extension_aggregations.clone(),
             );
+        let repo_mappings_for_dice = clean_resolved_module_graph.as_ref().as_ref().map_or_else(
+            || {
+                slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+                    key.resolution_key.workspace_id.clone(),
+                    Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
+                    Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
+                )
+            },
+            |value| value.repo_mappings.clone(),
+        );
 
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
@@ -4294,6 +4297,20 @@ impl BuckConfigBasedCells {
             }
         }
 
+        let mut clean_cells = Vec::new();
+        let mut sorted_graph_modules: Vec<_> = graph.modules.iter().collect();
+        sorted_graph_modules.sort_by(|left, right| left.0.cmp(right.0));
+        for (module_name, module_info) in sorted_graph_modules {
+            let canonical_repo =
+                bazel_canonical_module_repo_name(module_name, &module_info.version);
+            let external_path = format!("bazel-external/{canonical_repo}");
+            clean_cells.push((
+                CellName::unchecked_new(&canonical_repo)?,
+                CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned()),
+                None,
+            ));
+        }
+
         let module_versions =
             slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 key.resolution_key.workspace_id.clone(),
@@ -4344,6 +4361,18 @@ impl BuckConfigBasedCells {
                     key.options.ignore_dev_dependency,
                 )),
             );
+        let (repo_mapping_snapshot, repo_mapping_overrides) = graph_owned_repo_mapping_state(
+            &parsed_modules,
+            &module_versions.root_module_name,
+            key.options.ignore_dev_dependency,
+            &clean_cells,
+            Some(&graph),
+        );
+        let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+            key.resolution_key.workspace_id.clone(),
+            Arc::new(repo_mapping_snapshot),
+            Arc::new(repo_mapping_overrides),
+        );
         let graph_digest = bzlmod_resolved_graph_digest(&graph);
         Ok(Arc::new(Some(BzlmodResolvedModuleGraphValue {
             graph: Arc::new(graph),
@@ -4353,6 +4382,7 @@ impl BuckConfigBasedCells {
             registered_toolchains,
             registered_execution_platforms,
             extension_aggregations,
+            repo_mappings,
         })))
     }
 
@@ -5146,11 +5176,6 @@ impl BuckConfigBasedCells {
             &cells,
             resolved_graph_for_aliases.as_ref(),
         );
-        let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-            cell_graph.workspace_id.clone(),
-            Arc::new(repo_mappings),
-            Arc::new(repo_mapping_overrides),
-        );
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);
@@ -5260,10 +5285,7 @@ impl BuckConfigBasedCells {
             ),
         };
 
-        Ok(Some(BzlmodProjectionBridgeValue {
-            cell_graph,
-            repo_mappings,
-        }))
+        Ok(Some(BzlmodProjectionBridgeValue { cell_graph }))
     }
 
     pub(crate) fn get_cell_aliases_from_config(
@@ -5756,6 +5778,7 @@ module(name = "root", version = "1.0")
 register_toolchains("@root_toolchains//:all")
 register_execution_platforms("@root_platforms//:all")
 ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "generated")
 "#,
         );
         let config_args = [slug_cli_proto::ConfigOverride::flag_no_cell(
@@ -5816,6 +5839,20 @@ ext = use_extension("//:ext.bzl", "ext")
             .await?;
         assert_eq!(extension_aggregations.root_module_name, "root");
         assert_eq!(extension_aggregations.extension_aggregations.len(), 1);
+
+        let repo_mappings = dice
+            .compute(&slug_bzlmod::BzlmodRepoMappingsKey::for_workspace_id(
+                module_versions.workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(
+            repo_mappings
+                .repo_mappings
+                .get("")
+                .and_then(|mapping| mapping.get("generated"))
+                .map(String::as_str),
+            Some("_main+ext+generated")
+        );
         Ok(())
     }
 
