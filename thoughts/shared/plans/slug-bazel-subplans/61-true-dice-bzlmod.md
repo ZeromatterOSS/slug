@@ -119,6 +119,81 @@ uses the active cell resolver or preserves the label's stored cell spelling.
 Validated with `cargo check -p slug_analysis`, focused `slug_analysis` metadata
 tests, and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py`.
 
+**Bridge surface reduced**: locked remote registry files now have real producers
+instead of requiring a manually prewarmed legacy cache. `ModuleCache` owns the
+`bazel_registry.json` cache path/read/write API, `RegistryClient` fetches the
+top-level metadata with a lockfile-style registry hash identity, and
+`RegistryFileInputsKey` hydrates missing supported non-file registry lockfile
+entries (`bazel_registry.json`, `MODULE.bazel`, and `source.json`) before
+enforcing checksum and metadata validation. `file:` registries and unsupported
+paths remain strict tracked-file inputs. Bazel source reference:
+`IndexRegistry.getBazelRegistryJson(... useChecksum = true)` fetches
+`bazel_registry.json`, `ModuleFileFunction` carries registry file hashes for
+fetched module files, and `RegistryFunction` constructs registries from lockfile
+`registryFileHashes`. Validated with `cargo check -p slug_common`, `cargo test
+-p slug_common registry_file_inputs`, and `pytest -q
+tests/core/bzlmod/test_plan61_guardrails.py`.
+
+**Bridge surface reduced**: extension-generated repositories now resolve their
+owning module's self alias from the runtime snapshot path instead of depending
+on process-global scoped alias fallback. For a generated repo such as
+`rules_cc++compatibility_proxy+cc_compatibility_proxy`, the alias resolver maps
+`@rules_cc` to the canonical owner repo `rules_cc+`, matching Bazel lockfile
+recorded inputs like
+`REPO_MAPPING:rules_cc++compatibility_proxy+cc_compatibility_proxy,rules_cc rules_cc+`.
+Validated with focused `cargo test -p slug_core bzlmod_runtime_snapshot`.
+
+**Bridge surface reduced**: `module_ctx.path(Label(...))` label-path resolution
+now enumerates resolver-owned runtime extension cells registered after the
+initial graph snapshot. The path map used by extension execution includes
+graph-owned dynamic cells from the active `CellResolver`, so labels such as
+`@@cargo_linux_x86_64_1_95_0//:bin/cargo` can resolve without falling back to
+process-global dynamic cell maps. Validated with focused `cargo test -p
+slug_core bzlmod_label_cell_paths`.
+
+**Bridge surface reduced**: module extension execution now builds its
+`module_ctx.path()` label map with the extension owner module's scoped aliases
+from the active `CellResolver`. Non-root `use_repo_rule()` repos such as
+`toml2json_linux_amd64`, declared by `rules_rs`, are visible to
+`@rules_rs//rs:extensions.bzl%crate` without a process-global apparent-name
+lookup. Validated with focused `cargo test -p slug_core
+bzlmod_label_cell_paths` and `cargo check -p slug_interpreter_for_build`.
+
+**Bridge surface reduced**: Starlark repository rule execution now builds
+`repository_ctx.path(Label(...))` cell paths from the active resolver plus the
+owning module's scoped aliases. Repository rules such as
+`@rules_rs`-owned `toml2json_*` repos can resolve Label paths without consulting
+process-global apparent-name maps. Validated with focused
+`slug_interpreter_for_build` checks and SDK smoke frontier movement past
+`@@toml2json_linux_amd64`.
+
+**Bridge surface reduced**: runtime alias resolution now derives owner self
+aliases, apparent/internal generated repo names, same-extension sibling repo
+aliases, and bundled-tool root repo aliases from resolver-owned graph data. The
+replacement covers:
+`rules_cc++compatibility_proxy+cc_compatibility_proxy` loading `@rules_cc`;
+`crates__clap-4.5.60` loading `@rules_rs`;
+canonical module cells like `rules_license+` loading `@rules_license`;
+`rules_rs++crate+crates__github...` loading sibling
+`@crates__ts-rs-12.0.1`; target labels such as `zstd//:zstd` resolving to
+`zstd+`; and `bazel_tools` loading `@rules_cc`. These are all backed by
+`BzlmodRuntimeCellInstallSnapshot`, graph-owned dynamic cells registered on the
+active `CellResolver`, or root aliases explicitly exposed only to bundled tool
+cells. Focused coverage includes `cargo test -p slug_core owner_self_alias`,
+`cargo test -p slug_core same_extension_internal_sibling_alias`,
+`cargo test -p slug_core apparent_module_name_to_canonical_module_cell`,
+`cargo test -p slug_common bzlmod_non_root_alias_resolver_preserves_runtime_snapshot`,
+and `cargo test -p slug_common
+bzlmod_bundled_tool_alias_resolver_can_see_root_repo_aliases`.
+
+**Current frontier**: `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` now gets
+past the legacy alias/label resolution bridge and fails later in analysis for
+`linux_kernel_headers_x86.4.19.325//:kernel_headers_directory`: `bazel_skylib`
+sees `external/linux_kernel_headers_x86.4.19.325/...` where its accepted
+prefixes include canonical `external/llvm++kernel_headers+linux_kernel_headers_x86.4.19.325/`
+and the generated `buck-out/v2/gen/...` prefix. Latest smoke log:
+`/tmp/slug-plan61-sdk-smoke-20260527T2035-bazel-tools-root-alias.log`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -166,9 +241,36 @@ Current state to preserve:
 - Production metadata label canonicalization no longer compiles process-global
   bzlmod alias/module fallback calls; the remaining compatibility behavior is
   test-only.
+- Locked remote registry files no longer require a manually prewarmed cache:
+  `RegistryFileInputsKey` can fetch missing supported non-file registry entries
+  through `RegistryClient`, then still validates the exact lockfile hash and
+  metadata/source shape. `file:` registries and unsupported paths remain strict.
+- Extension-generated repositories resolve their owning module self-alias
+  structurally from the runtime snapshot path, so generated repo loads like
+  `@rules_cc` from `rules_cc++compatibility_proxy+cc_compatibility_proxy` no
+  longer need process-global scoped alias fallback.
+- `module_ctx.path(Label(...))` now sees resolver-owned runtime extension cells
+  registered after the initial graph snapshot via `bzlmod_label_cell_paths()`,
+  keeping label path resolution on the active `CellResolver` instead of
+  process-global dynamic cell maps.
+- Module extension execution also uses the owner module's scoped aliases when
+  constructing its `module_ctx.path()` label map, so non-root
+  `use_repo_rule()` repos are visible to that module's extensions without
+  global apparent-name lookup.
+- Repository rule execution also uses owner-scoped resolver paths for
+  `repository_ctx.path(Label(...))`; labels for non-root `use_repo_rule()` repos
+  are no longer dependent on global apparent-name lookup.
+- Runtime alias and cell lookup for generated repos, canonical module cells,
+  same-extension sibling repos, bundled tool repos, and module-name target
+  labels is now resolver-owned. The SDK smoke progressed past the prior
+  `rules_cc`, `rules_rs`, `rules_license`, `crates__*`, `zstd`, and
+  `bazel_tools` alias/cell failures.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.
+- The current SDK frontier is no longer the legacy resolution bridge: it is an
+  analysis path canonicalization mismatch for generated kernel-header files
+  under `linux_kernel_headers_x86.4.19.325`.
 
 What future workers should keep in this file:
 
@@ -404,8 +506,12 @@ hardening behavior around it.
       `std::fs::read_to_string`. The `parse_module_with_polled_includes` path
       in the clean graph compute has been replaced.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
-     files are tracked when the cache lives under the project root, and
-     out-of-root cache paths are directly observed inside
+     files are tracked when the cache lives under the project root. Missing
+     locked supported non-file registry entries are now fetched through the
+     registry client before checksum validation, matching Bazel's registry fetch
+     shape while preserving strict behavior for `file:` registries and
+     unsupported paths. Out-of-root cache paths are
+     directly observed inside
      `RegistryFileInputsKey` and force same-key recompute through
      `has_untracked_inputs` while the final watched-input graph is still
      pending. Locked

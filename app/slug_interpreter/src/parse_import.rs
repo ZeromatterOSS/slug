@@ -38,8 +38,8 @@ enum ImportParseError {
         "Unable to parse import spec. Expected format `(@<cell>)//package/name:filename.bzl` or `:filename.bzl`, but got a path. Got `{0}`"
     )]
     NotAFileName(String),
-    #[error("unknown cell alias in import: `{0}`")]
-    UnknownCellAlias(String),
+    #[error("unknown cell alias in import: `{0}` from cell `{1}`")]
+    UnknownCellAlias(String, CellName),
 }
 
 #[derive(Clone, Copy)]
@@ -264,7 +264,10 @@ fn resolve_import_cell(
         ImportAliasResolution::Legacy => cell_resolver.resolve(alias),
         ImportAliasResolution::DeclaredOrRuntimeOnly => cell_resolver
             .resolve_declared_or_runtime_alias(alias)
-            .ok_or_else(|| ImportParseError::UnknownCellAlias(alias.to_owned()).into()),
+            .ok_or_else(|| {
+                ImportParseError::UnknownCellAlias(alias.to_owned(), cell_resolver.resolve_self())
+                    .into()
+            }),
     }
 }
 

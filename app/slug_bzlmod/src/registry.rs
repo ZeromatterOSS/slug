@@ -376,6 +376,36 @@ impl RegistryClient {
         })
     }
 
+    /// Fetch top-level bazel_registry.json content and registry file identity.
+    pub async fn fetch_bazel_registry_json_file(&self) -> slug_error::Result<RegistryFileContent> {
+        let url = format!("{}/bazel_registry.json", self.base_url);
+
+        if let Some(cached) = self.cache.read_bazel_registry_json(&self.base_url)? {
+            tracing::debug!("Using cached bazel_registry.json for {}", self.base_url);
+            return Ok(RegistryFileContent::new(url, cached));
+        }
+
+        tracing::debug!("Fetching bazel_registry.json from {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .await
+            .buck_error_context("Failed to fetch bazel_registry.json")?;
+
+        let body = to_bytes(response.into_body()).await?;
+        let content =
+            String::from_utf8(body.to_vec()).map_err(|_| RegistryError::InvalidResponse {
+                url: url.clone(),
+                reason: "bazel_registry.json is not valid UTF-8".to_string(),
+            })?;
+
+        self.cache
+            .write_bazel_registry_json(&self.base_url, &content)?;
+
+        Ok(RegistryFileContent::new(url, content))
+    }
+
     /// Check if a module version exists in the registry.
     pub async fn has_version(&self, name: &str, version: &str) -> slug_error::Result<bool> {
         // Check cache first

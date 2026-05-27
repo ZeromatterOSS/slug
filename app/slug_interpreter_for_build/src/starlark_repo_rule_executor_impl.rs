@@ -172,6 +172,34 @@ struct RootLocalBzlModule {
     package: String,
 }
 
+fn repository_rule_label_cell_paths(
+    cell_resolver: &CellResolver,
+    workspace_root_path: &Path,
+    repository_name: &str,
+) -> HashMap<String, std::path::PathBuf> {
+    let mut cell_paths = HashMap::new();
+    for (cell_name, cell_instance) in cell_resolver.cells() {
+        let rel_path = cell_instance.path().as_project_relative_path();
+        cell_paths.insert(
+            cell_name.as_str().to_owned(),
+            workspace_root_path.join(rel_path.as_str()),
+        );
+    }
+    for (cell_name, rel_path) in cell_resolver.bzlmod_label_cell_paths() {
+        cell_paths
+            .entry(cell_name)
+            .or_insert_with(|| workspace_root_path.join(rel_path));
+    }
+    let owner_module =
+        slug_bzlmod::parse_canonical_name(repository_name).map(|(owner, _, _)| owner);
+    for (cell_name, rel_path) in cell_resolver.bzlmod_label_cell_paths_for_owner(owner_module) {
+        cell_paths
+            .entry(cell_name)
+            .or_insert_with(|| workspace_root_path.join(rel_path));
+    }
+    cell_paths
+}
+
 fn root_local_bzl_path(
     bzl_path: &str,
     current_package: Option<&str>,
@@ -453,19 +481,11 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         let io = ctx.global_data().get_io_provider();
         let workspace_root = io.project_root();
         let workspace_root_path = workspace_root.root().to_path_buf();
-        let mut cell_paths = HashMap::new();
-        for (cell_name, cell_instance) in cell_resolver.cells() {
-            let rel_path = cell_instance.path().as_project_relative_path();
-            cell_paths.insert(
-                cell_name.as_str().to_owned(),
-                workspace_root_path.join(rel_path.as_str()),
-            );
-        }
-        for (cell_name, rel_path) in cell_resolver.bzlmod_label_cell_paths() {
-            cell_paths
-                .entry(cell_name)
-                .or_insert_with(|| workspace_root_path.join(rel_path));
-        }
+        let cell_paths = repository_rule_label_cell_paths(
+            &cell_resolver,
+            &workspace_root_path,
+            &invocation.name,
+        );
         let repo_ctx = RepositoryContext::new_with_workspace_root(
             invocation.name.clone(),
             repo_attr,

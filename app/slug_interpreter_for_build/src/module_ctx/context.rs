@@ -380,13 +380,17 @@ impl ModuleContext {
         path: &Path,
         should_watch: ShouldWatch,
     ) -> starlark::Result<Option<PathBuf>> {
-        let mut cell_paths: Vec<_> = self
-            .cell_paths
-            .iter()
-            .filter(|(cell_name, _)| {
-                !cell_name.is_empty() && !slug_core::cells::is_root_cell_name(cell_name)
-            })
-            .collect();
+        let mut cell_paths: Vec<_> =
+            self.cell_paths
+                .iter()
+                .filter(|(cell_name, cell_path)| {
+                    !cell_name.is_empty()
+                        && !slug_core::cells::is_root_cell_name(cell_name)
+                        && !self.project_root.as_ref().is_some_and(|project_root| {
+                            project_root.as_path() == cell_path.as_path()
+                        })
+                })
+                .collect();
         cell_paths.sort_by(|(_, left), (_, right)| {
             right
                 .components()

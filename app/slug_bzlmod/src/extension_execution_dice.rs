@@ -2882,9 +2882,12 @@ mod tests {
         std::fs::write(&watched, "second\n").unwrap();
         let mut dice = dice.into_updater().commit().await;
         let validation = dice.compute(&key).await?;
-        assert_eq!(
-            validation.as_ref().err().map(|s| s.as_ref()),
-            Some("recorded_input_changed")
+        assert!(
+            validation
+                .as_ref()
+                .err()
+                .is_some_and(|reason| reason.starts_with("recorded_input_changed:FILE:")),
+            "{validation:?}"
         );
 
         Ok(())

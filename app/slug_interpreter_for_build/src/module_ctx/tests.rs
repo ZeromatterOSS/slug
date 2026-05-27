@@ -265,6 +265,33 @@ fn test_module_context_records_external_repo_friendly_watch_path() {
 }
 
 #[test]
+fn test_module_context_records_workspace_path_when_named_root_cell_matches_project_root() {
+    let temp_dir = TempDir::new().unwrap();
+    let working_dir = temp_dir.path().join("work");
+    let watched = temp_dir.path().join("MODULE.bazel");
+    std::fs::create_dir_all(&working_dir).unwrap();
+    std::fs::write(&watched, "module(name = 'reactor')\n").unwrap();
+    let mut cell_paths = HashMap::new();
+    cell_paths.insert("reactor".to_owned(), temp_dir.path().to_path_buf());
+    let ctx = ModuleContext::empty()
+        .with_temp_working_dir(working_dir)
+        .with_label_resolution(temp_dir.path().to_path_buf(), cell_paths);
+
+    ctx.record_file_input(&watched).unwrap();
+
+    assert_eq!(
+        ctx.recorded_inputs().unwrap(),
+        vec![
+            slug_bzlmod::recorded_file_input_with_recorded_path(
+                PathBuf::from("@@//MODULE.bazel").as_path(),
+                &watched,
+            )
+            .unwrap()
+        ]
+    );
+}
+
+#[test]
 fn test_module_context_read_watch_parameter_records_workspace_inputs() {
     use starlark::environment::Globals;
     use starlark::environment::Module;

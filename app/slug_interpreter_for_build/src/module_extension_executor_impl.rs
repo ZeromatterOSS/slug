@@ -498,6 +498,15 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                 .entry(cell_name)
                 .or_insert_with(|| project_root.join(rel_path));
         }
+        let owning_module =
+            slug_bzlmod::extract_owning_module(&aggregated.extension_id, root_module_name);
+        for (cell_name, rel_path) in
+            cell_resolver.bzlmod_label_cell_paths_for_owner(Some(&owning_module))
+        {
+            cell_paths
+                .entry(cell_name)
+                .or_insert_with(|| project_root.join(rel_path));
+        }
 
         // Build the module_ctx from aggregated extension data
         let module_ctx = build_module_context(aggregated, root_module_name)
@@ -563,8 +572,6 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
             // Pass `root_module_name` so the root module's declared name (e.g.
             // `llvm-project-overlay`) is canonicalized to `_main`, matching
             // what `pending_repo_cells.rs` registers for the same repo.
-            let owning_module =
-                slug_bzlmod::extract_owning_module(&aggregated.extension_id, root_module_name);
             let repo_env_json =
                 serde_json::to_string(repo_env.as_ref()).unwrap_or_else(|_| "{}".to_owned());
 

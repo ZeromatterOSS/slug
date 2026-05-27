@@ -477,7 +477,9 @@ fn validate_recorded_inputs_for_replay(
                 let current = recorded_file_marker_value(&path)
                     .map_err(|_| "recorded_input_stat_failed".to_owned())?;
                 if current != old_value {
-                    return Err("recorded_input_changed".to_owned());
+                    return Err(recorded_input_changed_reason_with_values(
+                        raw, &old_value, &current,
+                    ));
                 }
             }
             RecordedInput::Dirents(path) => {
@@ -488,7 +490,7 @@ fn validate_recorded_inputs_for_replay(
                 let current = recorded_dirents_marker_value(&path)
                     .map_err(|_| "recorded_input_stat_failed".to_owned())?;
                 if current != old_value {
-                    return Err("recorded_input_changed".to_owned());
+                    return Err(recorded_input_changed_reason(raw));
                 }
             }
             RecordedInput::DirTree(path) => {
@@ -499,7 +501,7 @@ fn validate_recorded_inputs_for_replay(
                 let current = recorded_dirtree_marker_value(&path)
                     .map_err(|_| "recorded_input_stat_failed".to_owned())?;
                 if current != old_value {
-                    return Err("recorded_input_changed".to_owned());
+                    return Err(recorded_input_changed_reason(raw));
                 }
             }
             RecordedInput::Env(name) => {
@@ -508,7 +510,7 @@ fn validate_recorded_inputs_for_replay(
                 };
                 let current = repo_env.get(&name).cloned();
                 if current != old_value {
-                    return Err("recorded_input_changed".to_owned());
+                    return Err(recorded_input_changed_reason(raw));
                 }
             }
             RecordedInput::RepoMapping {
@@ -519,14 +521,14 @@ fn validate_recorded_inputs_for_replay(
                     return Err("recorded_input_unsupported".to_owned());
                 };
                 let Some(source_mapping) = repo_mappings.get(&source_repo) else {
-                    return Err("recorded_input_changed".to_owned());
+                    return Err(recorded_input_changed_reason(raw));
                 };
                 let current = source_mapping
                     .get(&apparent)
                     .cloned()
                     .or_else(|| Some(apparent.clone()));
                 if current != old_value {
-                    return Err("recorded_input_changed".to_owned());
+                    return Err(recorded_input_changed_reason(raw));
                 }
             }
             RecordedInput::Unsupported => {
@@ -535,6 +537,23 @@ fn validate_recorded_inputs_for_replay(
         }
     }
     Ok(())
+}
+
+fn recorded_input_changed_reason(raw: &str) -> String {
+    let identity = raw
+        .split_once(' ')
+        .map(|(identity, _)| identity)
+        .unwrap_or(raw);
+    format!("recorded_input_changed:{identity}")
+}
+
+fn recorded_input_changed_reason_with_values(raw: &str, old: &str, current: &str) -> String {
+    format!(
+        "{}:old={}:current={}",
+        recorded_input_changed_reason(raw),
+        old,
+        current
+    )
 }
 
 fn resolve_recorded_path(path: &Path, workspace_root: Option<&Path>) -> Result<PathBuf, String> {
@@ -556,15 +575,34 @@ fn resolve_recorded_path(path: &Path, workspace_root: Option<&Path>) -> Result<P
         let Some(workspace_root) = workspace_root else {
             return Err("recorded_input_unsupported".to_owned());
         };
-        let repo = &rest[..separator];
+        let legacy_repo = &rest[..separator];
         let repo_relative = &rest[separator + 3..];
-        if repo.is_empty() {
+        if legacy_repo.is_empty() {
             return Err("recorded_input_unsupported".to_owned());
         }
-        return Ok(workspace_root
-            .join("bazel-external")
-            .join(repo)
-            .join(repo_relative));
+        let exact_repo = rest
+            .find("//")
+            .map(|exact_separator| &rest[..exact_separator])
+            .filter(|repo| !repo.is_empty());
+        let mut fallback = None;
+        for repo in exact_repo.into_iter().chain(std::iter::once(legacy_repo)) {
+            let external_path = workspace_root
+                .join("bazel-external")
+                .join(repo)
+                .join(repo_relative);
+            if external_path.exists() {
+                return Ok(external_path);
+            }
+            fallback.get_or_insert_with(|| external_path.clone());
+            let bzlmod_cell_path = workspace_root
+                .join("buck-out/v2/external_cells/bzlmod")
+                .join(repo)
+                .join(repo_relative);
+            if bzlmod_cell_path.exists() {
+                return Ok(bzlmod_cell_path);
+            }
+        }
+        return Ok(fallback.expect("non-empty repo fallback"));
     }
     Err("recorded_input_unsupported".to_owned())
 }
@@ -2160,6 +2198,28 @@ mod tests {
             None,
         );
         assert!(cached.is_some());
+    }
+
+    #[test]
+    fn recorded_module_repo_file_input_uses_bzlmod_cell_path_before_symlink_exists() {
+        let dir = TempDir::new().unwrap();
+        let watched = dir
+            .path()
+            .join("buck-out/v2/external_cells/bzlmod")
+            .join("rules_rs+")
+            .join("tools/rust_analyzer/Cargo.lock");
+        fs::create_dir_all(watched.parent().unwrap()).unwrap();
+        fs::write(&watched, "first\n").unwrap();
+        let digest = hex::encode(Sha256::digest(fs::read(&watched).unwrap()));
+
+        let recorded_inputs = vec![format!(
+            "FILE:@@rules_rs+//tools/rust_analyzer/Cargo.lock {digest}"
+        )];
+
+        assert!(
+            validate_recorded_inputs_current(&recorded_inputs, Some(dir.path()), None, None)
+                .is_ok()
+        );
     }
 
     #[test]

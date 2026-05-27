@@ -2737,7 +2737,7 @@ impl Key for NonRegistryOverrideModuleInputsKey {
 
 fn cached_registry_file_path(cache: &ModuleCache, url: &str) -> Option<PathBuf> {
     if let Some(registry_url) = url.strip_suffix("/bazel_registry.json") {
-        return Some(cache.registry_dir(registry_url).join("bazel_registry.json"));
+        return Some(cache.bazel_registry_json_path(registry_url));
     }
 
     let (registry_url, module_path) = url.split_once("/modules/")?;
@@ -2752,6 +2752,53 @@ fn cached_registry_file_path(cache: &ModuleCache, url: &str) -> Option<PathBuf> 
         "MODULE.bazel" => Some(cache.module_bazel_path(registry_url, name, version)),
         "source.json" => Some(cache.source_json_path(registry_url, name, version)),
         _ => None,
+    }
+}
+
+fn registry_module_file_parts(url: &str) -> Option<(&str, &str, &str, &str)> {
+    let (registry_url, module_path) = url.split_once("/modules/")?;
+    let mut parts = module_path.split('/');
+    let name = parts.next()?;
+    let version = parts.next()?;
+    let file_name = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((registry_url, name, version, file_name))
+}
+
+async fn fetch_missing_registry_file(
+    cache: &ModuleCache,
+    url: &str,
+) -> slug_error::Result<Option<String>> {
+    if let Some(registry_url) = url.strip_suffix("/bazel_registry.json") {
+        if registry_url.starts_with("file:") {
+            return Ok(None);
+        }
+        let client = slug_bzlmod::RegistryClient::new(registry_url, cache.clone()).await?;
+        let file = client.fetch_bazel_registry_json_file().await?;
+        return Ok(Some(file.content));
+    }
+
+    let Some((registry_url, name, version, file_name)) = registry_module_file_parts(url) else {
+        return Ok(None);
+    };
+    if registry_url.starts_with("file:") {
+        return Ok(None);
+    }
+    let client = slug_bzlmod::RegistryClient::new(registry_url, cache.clone()).await?;
+    match file_name {
+        "MODULE.bazel" => Ok(Some(
+            client.fetch_module_bazel_file(name, version).await?.content,
+        )),
+        "source.json" => Ok(Some(
+            client
+                .fetch_source_info_file(name, version)
+                .await?
+                .file
+                .content,
+        )),
+        _ => Ok(None),
     }
 }
 
@@ -2904,15 +2951,33 @@ impl Key for RegistryFileInputsKey {
                     validate_bazel_registry_json_file(url, &content)?;
                     hasher.update(actual_hash);
                 }
-                None => {
-                    hasher.update(b"missing");
-                    return Err(slug_error::slug_error!(
-                        slug_error::ErrorTag::Input,
-                        "Registry file checksum mismatch for {}: expected {}, got missing file",
-                        url,
-                        expected_hash
-                    ));
-                }
+                None => match fetch_missing_registry_file(&cache, url).await? {
+                    Some(content) => {
+                        hasher.update(b"present");
+                        hasher.update([0]);
+                        let actual_hash = slug_bzlmod::compute_sha256_hex(content.as_bytes());
+                        if &actual_hash != expected_hash {
+                            return Err(slug_error::slug_error!(
+                                slug_error::ErrorTag::Input,
+                                "Registry file checksum mismatch for {}: expected {}, got {}",
+                                url,
+                                expected_hash,
+                                actual_hash
+                            ));
+                        }
+                        validate_bazel_registry_json_file(url, &content)?;
+                        hasher.update(actual_hash);
+                    }
+                    None => {
+                        hasher.update(b"missing");
+                        return Err(slug_error::slug_error!(
+                            slug_error::ErrorTag::Input,
+                            "Registry file checksum mismatch for {}: expected {}, got missing file",
+                            url,
+                            expected_hash
+                        ));
+                    }
+                },
             }
             hasher.update([0]);
         }

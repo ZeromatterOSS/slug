@@ -149,12 +149,27 @@ impl Key for CellAliasResolverKey {
             if self.0 == root_aliases.resolve_self() {
                 return Ok(root_aliases.dupe());
             }
-            let canonical_aliases: HashMap<_, _> = root_aliases
-                .mappings()
-                .filter(|(alias, name)| alias.as_str() == name.as_str())
-                .collect();
+            let current = resolver
+                .get(self.0)
+                .map(|cell| cell.name())
+                .ok()
+                .or_else(|| root_aliases.resolve_declared_or_runtime_alias(self.0.as_str()))
+                .unwrap_or(self.0);
+            let mut canonical_aliases: HashMap<_, _> = if matches!(
+                current.as_str(),
+                "bazel_tools" | "slug_builtins" | "local_config_platform" | "local_config_python"
+            ) {
+                root_aliases.mappings().collect()
+            } else {
+                root_aliases
+                    .mappings()
+                    .filter(|(alias, name)| alias.as_str() == name.as_str())
+                    .collect()
+            };
+            canonical_aliases
+                .extend(resolver.bzlmod_same_extension_internal_aliases(current.as_str()));
             return CellAliasResolver::new_bzlmod_for_non_root_cell(
-                self.0,
+                current,
                 root_aliases,
                 canonical_aliases,
             )
@@ -284,6 +299,21 @@ mod tests {
             root_alias_resolver,
             snapshot,
         )?;
+        let sibling_canonical = "owner++ext+sibling";
+        let sibling_setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(sibling_canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("sibling"),
+            spec_hash: Arc::from("sha256-sibling"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            materialized: false,
+        };
+        resolver.register_bzlmod_runtime_extension_cell(
+            sibling_canonical,
+            &format!("bazel-external/{sibling_canonical}"),
+            sibling_setup,
+        )?;
 
         let dice = DiceBuilder::new()
             .build(UserComputationData::new())
@@ -305,6 +335,84 @@ mod tests {
         assert!(aliases.resolve("stale_alias").is_err());
         assert!(aliases.resolve("root_dep").is_err());
         assert_eq!(aliases.resolve(dep.as_str())?, dep);
+
+        let apparent_aliases = dice
+            .get_cell_alias_resolver(CellName::testing_new("runtime_alias"))
+            .await?;
+        assert_eq!(
+            apparent_aliases.resolve_self(),
+            CellName::testing_new(canonical)
+        );
+        assert_eq!(
+            apparent_aliases.resolve("owner")?,
+            CellName::testing_new("owner+")
+        );
+        assert_eq!(
+            apparent_aliases.resolve("sibling")?,
+            CellName::testing_new(sibling_canonical)
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_bundled_tool_alias_resolver_can_see_root_repo_aliases() -> slug_error::Result<()>
+    {
+        let root = CellName::testing_new("root");
+        let bazel_tools = CellName::testing_new("bazel_tools");
+        let rules_cc = CellName::testing_new("rules_cc+");
+        let root_path = CellRootPathBuf::testing_new("");
+        let bazel_tools_path = CellRootPathBuf::testing_new("bazel_tools");
+        let rules_cc_path = CellRootPathBuf::testing_new("bazel-external/rules_cc+");
+        let cell_roots = [
+            (root, root_path.as_path()),
+            (bazel_tools, bazel_tools_path.as_path()),
+            (rules_cc, rules_cc_path.as_path()),
+        ];
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &root_path),
+        )?;
+        let bazel_tools_instance = CellInstance::new(
+            bazel_tools,
+            bazel_tools_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &bazel_tools_path),
+        )?;
+        let rules_cc_instance = CellInstance::new(
+            rules_cc,
+            rules_cc_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &rules_cc_path),
+        )?;
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        let mut root_aliases = HashMap::new();
+        root_aliases.insert(NonEmptyCellAlias::new("rules_cc".to_owned())?, rules_cc);
+        let root_alias_resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            root_aliases,
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance, bazel_tools_instance, rules_cc_instance],
+            root_alias_resolver,
+            snapshot,
+        )?;
+
+        let dice = DiceBuilder::new()
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_cell_resolver(resolver)?;
+        updater.set_is_bzlmod(true)?;
+        let mut dice = updater.commit().await;
+
+        let aliases = dice.get_cell_alias_resolver(bazel_tools).await?;
+        assert_eq!(aliases.resolve("rules_cc")?, rules_cc);
+
         Ok(())
     }
 }

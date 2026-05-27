@@ -122,6 +122,11 @@ impl ModuleCache {
             .join("source.json")
     }
 
+    /// Get the path for the cached top-level bazel_registry.json file.
+    pub fn bazel_registry_json_path(&self, registry_url: &str) -> PathBuf {
+        self.registry_dir(registry_url).join("bazel_registry.json")
+    }
+
     /// Get the path for the extracted source directory.
     pub fn source_dir(&self, registry_url: &str, name: &str, version: &str) -> PathBuf {
         self.module_dir(registry_url, name, version).join("source")
@@ -281,6 +286,38 @@ impl ModuleCache {
         }
         std::fs::write(&path, content)
             .buck_error_context("Failed to write source.json to cache")?;
+        Ok(())
+    }
+
+    /// Read cached top-level bazel_registry.json content.
+    pub fn read_bazel_registry_json(
+        &self,
+        registry_url: &str,
+    ) -> slug_error::Result<Option<String>> {
+        let path = self.bazel_registry_json_path(registry_url);
+        if path.exists() {
+            let content = std::fs::read_to_string(&path)
+                .buck_error_context("Failed to read cached bazel_registry.json")?;
+            Ok(Some(content))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Write top-level bazel_registry.json content to cache.
+    pub fn write_bazel_registry_json(
+        &self,
+        registry_url: &str,
+        content: &str,
+    ) -> slug_error::Result<()> {
+        let path = self.bazel_registry_json_path(registry_url);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|_| CacheError::CreateDirFailed {
+                path: parent.display().to_string(),
+            })?;
+        }
+        std::fs::write(&path, content)
+            .buck_error_context("Failed to write bazel_registry.json to cache")?;
         Ok(())
     }
 
