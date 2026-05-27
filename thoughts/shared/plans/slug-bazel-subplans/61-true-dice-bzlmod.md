@@ -77,6 +77,14 @@ shape while making the scanner unreachable in non-test production binaries.
 Validated with `cargo check -p slug_core` and focused `cargo test -p slug_core
 dynamic_bzlmod -- --nocapture`.
 
+**Bridge surface reduced**: `action_external_cell_name(...)` now derives the
+external execution repo name from the stored `bazel-external/<repo>` cell path
+before any compatibility fallback. In production, if the path does not carry a
+canonical bzlmod repo name, it returns the input cell name rather than consulting
+process-global dynamic/module alias maps. The legacy symlink/cache fallback is
+kept test-only. Validated with `cargo check -p slug_core` and focused `cargo
+test -p slug_core action_external_cell_name -- --nocapture`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -109,6 +117,8 @@ Current state to preserve:
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
+- Action source path external repo names now use the resolver-owned stored cell
+  path first and do not consult process-global bzlmod alias maps in production.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.

@@ -596,42 +596,54 @@ pub fn action_external_cell_name(
     cell_name: &str,
     cell_path: &str,
 ) -> String {
-    let filesystem_fallback_allowed = dynamic_bzlmod_directory_scan_allowed();
-    filesystem_fallback_allowed
-        .then(|| canonical_external_name_from_symlink(project_root, cell_name))
-        .flatten()
-        .or_else(|| canonical_dynamic_extension_cell_name(cell_name))
-        .or_else(|| canonical_bzlmod_module_cell_name(cell_name))
-        .or_else(|| {
-            cell_path
-                .strip_prefix("bazel-external/")
-                .and_then(|path| path.split('/').next())
-                .filter(|name| name.contains('+'))
-                .map(str::to_owned)
-        })
-        .or_else(|| {
-            if !filesystem_fallback_allowed {
-                return None;
-            }
-            let suffix = format!("+{cell_name}");
-            let bazel_external = project_root.join("bazel-external");
-            let mut candidates = Vec::new();
-            for entry in std::fs::read_dir(bazel_external).ok()?.flatten() {
-                if !entry.path().is_dir() {
-                    continue;
+    if let Some(name) = cell_path
+        .strip_prefix("bazel-external/")
+        .and_then(|path| path.split('/').next())
+        .filter(|name| name.contains('+'))
+        .map(str::to_owned)
+    {
+        return name;
+    }
+
+    #[cfg(not(test))]
+    {
+        let _ = project_root;
+        return cell_name.to_owned();
+    }
+
+    #[cfg(test)]
+    {
+        let filesystem_fallback_allowed = dynamic_bzlmod_directory_scan_allowed();
+        filesystem_fallback_allowed
+            .then(|| canonical_external_name_from_symlink(project_root, cell_name))
+            .flatten()
+            .or_else(|| canonical_dynamic_extension_cell_name(cell_name))
+            .or_else(|| canonical_bzlmod_module_cell_name(cell_name))
+            .or_else(|| {
+                if !filesystem_fallback_allowed {
+                    return None;
                 }
-                let dir_name = entry.file_name();
-                let dir_name = dir_name.to_string_lossy();
-                if dir_name.ends_with(&suffix) {
-                    candidates.push(dir_name.into_owned());
+                let suffix = format!("+{cell_name}");
+                let bazel_external = project_root.join("bazel-external");
+                let mut candidates = Vec::new();
+                for entry in std::fs::read_dir(bazel_external).ok()?.flatten() {
+                    if !entry.path().is_dir() {
+                        continue;
+                    }
+                    let dir_name = entry.file_name();
+                    let dir_name = dir_name.to_string_lossy();
+                    if dir_name.ends_with(&suffix) {
+                        candidates.push(dir_name.into_owned());
+                    }
                 }
-            }
-            candidates.sort();
-            candidates.into_iter().next()
-        })
-        .unwrap_or_else(|| cell_name.to_owned())
+                candidates.sort();
+                candidates.into_iter().next()
+            })
+            .unwrap_or_else(|| cell_name.to_owned())
+    }
 }
 
+#[cfg(test)]
 fn canonical_external_name_from_symlink(
     project_root: &std::path::Path,
     cell_name: &str,
