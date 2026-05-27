@@ -180,10 +180,56 @@ hardening behavior around it.
      old `LegacyBzlmodResolutionDiceKey` name has been demoted away, but the
      bridge still wraps the legacy resolver.
    - Build the resolved graph from DICE-owned module-file/source keys.
+     Do not start by wrapping `BuckConfigBasedCells`' legacy projection
+     resolver under a new key name; that preserves the architecture this item
+     is meant to delete.
    - Ensure graph identity includes every command policy value that Bazel uses:
      lockfile mode, repo env, nonstrict repo env, registry config, network
      policy, yanked-version allow-list, compatibility policy, and extension
      isolation.
+   - Migration should be by semantic output class, not by named dependency.
+     A single `bazel_dep()` can affect MVS selection, lockfile facts, source
+     paths, apparent repo mappings, extension aggregation, toolchain
+     registration, and the final cell graph, so per-dependency production
+     cutover is not a safe boundary. Use per-dependency fixtures only to prove
+     coverage.
+   - First build clean shadow producers that leave the legacy injection path as
+     production authority. The initial viability slice is a
+     `BzlmodResolvedModuleGraphKey`-style producer for the resolved graph plus
+     module-version and resolution-fact outputs. It may reuse lower-level
+     `slug_bzlmod` primitives such as `MvsResolver`, `ModuleCache`, parsed
+     module values, and lockfile types, but it must not call
+     `BzlmodProjectionBridgeDiceKey`,
+     `parse_with_config_args_and_persisted_bzlmod_projection_bridge`, or
+     `resolve_bzlmod_dependencies_with_options`.
+     The first code path can run as an opt-in diagnostic shadow
+     (`SLUG_BZLMOD_CLEAN_RESOLUTION_SHADOW=1`) while legacy injection remains
+     the production authority.
+   - Migrate output classes in this order:
+     1. source/module-file input producers for root, registry, project-local
+        and out-of-project local overrides, git/archive overrides, and patch
+        files;
+     2. resolved module graph, selected versions, source identities, registry
+        hashes, and selected yanked-version facts;
+     3. simple injected facts: `BzlmodResolutionFactsValue` and
+        `BzlmodModuleVersionsDataValue`;
+     4. `register_toolchains()` and `register_execution_platforms()` facts,
+        including `dev_dependency` policy and the current bundled
+        `rules_python` auto-injection behavior;
+     5. repo mappings and apparent aliases from `module(repo_name=...)`,
+        `bazel_dep(repo_name=...)`, transitive scoped aliases,
+        `override_repo()`, and `inject_repo()`;
+     6. extension aggregation, `use_extension()`, `use_repo()`,
+        `use_repo_rule()`, and lockfile-seeded generated repo preseed facts;
+     7. final `BzlmodCellGraphValue` authority, including module cells,
+        extension cells, bundled cells, root aliases, scoped aliases, dynamic
+        aliases, and external symlink layout.
+   - Shadow equivalence does not need to wait for the final cell graph. Compare
+     old and new values by output class, starting with selected versions,
+     module source paths, registry hashes, selected yanked versions,
+     module-version data, and resolution facts. Swap a production injected
+     output only after same-daemon invalidation proves the new producer changes
+     for an explicit DICE input reason.
    - Current-workspace helpers that need graph facts still read the named cell
      graph, but data-only module-version and registration helpers now derive
      current workspace identity from their injected data. Module-version
