@@ -2321,6 +2321,7 @@ fn metadata_label_key(label: &TargetLabel) -> String {
 #[derive(Clone, Copy)]
 struct MetadataLabelContext<'a> {
     cell_resolver: Option<&'a slug_core::cells::CellResolver>,
+    #[cfg(test)]
     allow_process_global_fallbacks: bool,
 }
 
@@ -2328,6 +2329,7 @@ impl<'a> MetadataLabelContext<'a> {
     fn new(cell_resolver: Option<&'a slug_core::cells::CellResolver>) -> Self {
         Self {
             cell_resolver,
+            #[cfg(test)]
             allow_process_global_fallbacks: false,
         }
     }
@@ -2348,18 +2350,12 @@ impl<'a> MetadataLabelContext<'a> {
                 .map(|resolved| resolved.as_str().to_owned());
         }
 
-        self.allow_process_global_fallbacks
-            .then(|| slug_core::cells::canonical_dynamic_extension_cell_name(cell_name))
-            .flatten()
+        self.process_global_canonical_dynamic_extension_cell_name(cell_name)
     }
 
     fn external_cell_name(&self, cell_name: &str) -> String {
         self.canonical_dynamic_extension_cell_name(cell_name)
-            .or_else(|| {
-                self.allow_process_global_fallbacks
-                    .then(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
-                    .flatten()
-            })
+            .or_else(|| self.process_global_canonical_bzlmod_module_cell_name(cell_name))
             .unwrap_or_else(|| cell_name.to_owned())
     }
 
@@ -2387,10 +2383,48 @@ impl<'a> MetadataLabelContext<'a> {
             return None;
         }
 
+        self.process_global_scoped_dynamic_extension_cell_name(owner_cell, apparent_cell)
+    }
+
+    #[cfg(test)]
+    fn process_global_canonical_dynamic_extension_cell_name(
+        &self,
+        cell_name: &str,
+    ) -> Option<String> {
+        self.allow_process_global_fallbacks
+            .then(|| slug_core::cells::canonical_dynamic_extension_cell_name(cell_name))
+            .flatten()
+    }
+
+    #[cfg(not(test))]
+    fn process_global_canonical_dynamic_extension_cell_name(
+        &self,
+        _cell_name: &str,
+    ) -> Option<String> {
+        None
+    }
+
+    #[cfg(test)]
+    fn process_global_canonical_bzlmod_module_cell_name(&self, cell_name: &str) -> Option<String> {
+        self.allow_process_global_fallbacks
+            .then(|| slug_core::cells::canonical_bzlmod_module_cell_name(cell_name))
+            .flatten()
+    }
+
+    #[cfg(not(test))]
+    fn process_global_canonical_bzlmod_module_cell_name(&self, _cell_name: &str) -> Option<String> {
+        None
+    }
+
+    #[cfg(test)]
+    fn process_global_scoped_dynamic_extension_cell_name(
+        &self,
+        owner_cell: &str,
+        apparent_cell: &str,
+    ) -> Option<String> {
         if !self.allow_process_global_fallbacks {
             return None;
         }
-
         slug_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
             owner_cell,
             apparent_cell,
@@ -2402,6 +2436,15 @@ impl<'a> MetadataLabelContext<'a> {
                     slug_core::cells::resolve_scoped_bzlmod_repo_alias(&owner_module, apparent_cell)
                 })
         })
+    }
+
+    #[cfg(not(test))]
+    fn process_global_scoped_dynamic_extension_cell_name(
+        &self,
+        _owner_cell: &str,
+        _apparent_cell: &str,
+    ) -> Option<String> {
+        None
     }
 }
 
@@ -2452,6 +2495,7 @@ fn metadata_relabel_with_cell(
     Some(TargetLabel::new(package_label, target_name_ref))
 }
 
+#[cfg(test)]
 fn metadata_owner_scoped_repo_candidates(owner_cell_name: &str) -> Vec<String> {
     let mut candidates = Vec::new();
     candidates.push(owner_cell_name.to_owned());

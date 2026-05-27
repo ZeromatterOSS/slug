@@ -111,6 +111,14 @@ process-global alias equivalence is test-only. Validated with `cargo check -p
 slug_interpreter_for_build`, focused `slug_interpreter_for_build` load-path
 tests, and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py`.
 
+**Bridge surface reduced**: C++ toolchain metadata label canonicalization no
+longer compiles process-global bzlmod alias/module canonicalization into
+production metadata paths. `MetadataLabelContext` now exposes those compatibility
+fallbacks only through `#[cfg(test)]` helpers; production metadata resolution
+uses the active cell resolver or preserves the label's stored cell spelling.
+Validated with `cargo check -p slug_analysis`, focused `slug_analysis` metadata
+tests, and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -155,6 +163,9 @@ Current state to preserve:
   dynamic extension aliases on no-runtime-snapshot misses; resolver-owned
   declared/runtime aliases and structural canonical/internal-name equivalence
   remain.
+- Production metadata label canonicalization no longer compiles process-global
+  bzlmod alias/module fallback calls; the remaining compatibility behavior is
+  test-only.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.
