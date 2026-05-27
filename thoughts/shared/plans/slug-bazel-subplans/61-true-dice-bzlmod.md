@@ -215,6 +215,9 @@ hardening behavior around it.
      The same producer now also owns registered toolchain and execution
      platform injection; the legacy projection bridge no longer carries those
      output classes.
+     Extension aggregation injection is also derived from the clean producer's
+     parsed module set; the legacy projection bridge no longer carries
+     `BzlmodExtensionAggregationsDataValue`.
    - Migrate output classes in this order:
      1. source/module-file input producers for root, registry, project-local
         and out-of-project local overrides, git/archive overrides, and patch

@@ -3202,7 +3202,6 @@ impl Key for OverridePatchInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodProjectionBridgeValue {
     cell_graph: slug_bzlmod::BzlmodCellGraphValue,
-    extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
     repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
 }
 
@@ -3233,6 +3232,7 @@ struct BzlmodResolvedModuleGraphValue {
     resolution_facts: slug_bzlmod::BzlmodResolutionFactsValue,
     registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
     registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
+    extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
 }
 
 impl PartialEq for BzlmodResolvedModuleGraphKey {
@@ -3355,6 +3355,7 @@ impl Key for BzlmodResolvedModuleGraphKey {
                         && x.resolution_facts == y.resolution_facts
                         && x.registered_toolchains == y.registered_toolchains
                         && x.registered_execution_platforms == y.registered_execution_platforms
+                        && x.extension_aggregations == y.extension_aggregations
                 }
                 (None, None) => true,
                 _ => false,
@@ -3493,36 +3494,22 @@ impl BuckConfigBasedCells {
                 "Using clean bzlmod resolved graph data for DICE injections"
             );
         }
-        let (
-            cell_graph_for_dice,
-            extension_aggregations_for_dice,
-            repo_mappings_for_dice,
-        ) = bzlmod_projection.as_ref().as_ref().map_or_else(
-            || {
-                (
-                    slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-                        key.resolution_key.workspace_id.clone(),
-                    ),
-                    slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
-                        key.resolution_key.workspace_id.clone(),
-                        String::new(),
-                        Arc::new(HashMap::new()),
-                    ),
-                    slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-                        key.resolution_key.workspace_id.clone(),
-                        Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
-                        Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
-                    ),
-                )
-            },
-            |value| {
-                (
-                    value.cell_graph.clone(),
-                    value.extension_aggregations.clone(),
-                    value.repo_mappings.clone(),
-                )
-            },
-        );
+        let (cell_graph_for_dice, repo_mappings_for_dice) =
+            bzlmod_projection.as_ref().as_ref().map_or_else(
+                || {
+                    (
+                        slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                        ),
+                        slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                            Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
+                            Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
+                        ),
+                    )
+                },
+                |value| (value.cell_graph.clone(), value.repo_mappings.clone()),
+            );
         let (module_versions_for_dice, resolution_facts_for_dice) =
             clean_resolved_module_graph.as_ref().as_ref().map_or_else(
                 || {
@@ -3565,6 +3552,17 @@ impl BuckConfigBasedCells {
                         value.registered_execution_platforms.clone(),
                     )
                 },
+            );
+        let extension_aggregations_for_dice =
+            clean_resolved_module_graph.as_ref().as_ref().map_or_else(
+                || {
+                    slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+                        key.resolution_key.workspace_id.clone(),
+                        String::new(),
+                        Arc::new(HashMap::new()),
+                    )
+                },
+                |value| value.extension_aggregations.clone(),
             );
 
         let configs = Self::parse_with_file_ops_and_options_inner(
@@ -4327,6 +4325,25 @@ impl BuckConfigBasedCells {
                 key.resolution_key.workspace_id.clone(),
                 all_exec_platforms,
             );
+        let mut module_extensions: std::collections::HashMap<
+            String,
+            Vec<slug_bzlmod::ExtensionUsage>,
+        > = std::collections::HashMap::new();
+        for (module_name, parsed_mod) in &parsed_modules {
+            if !parsed_mod.extension_usages.is_empty() {
+                module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
+            }
+        }
+        let extension_aggregations =
+            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+                key.resolution_key.workspace_id.clone(),
+                module_versions.root_module_name.clone(),
+                Arc::new(slug_bzlmod::aggregate_extensions_with_policy(
+                    &module_extensions,
+                    Some(module_versions.root_module_name.as_str()),
+                    key.options.ignore_dev_dependency,
+                )),
+            );
         let graph_digest = bzlmod_resolved_graph_digest(&graph);
         Ok(Arc::new(Some(BzlmodResolvedModuleGraphValue {
             graph: Arc::new(graph),
@@ -4335,6 +4352,7 @@ impl BuckConfigBasedCells {
             resolution_facts,
             registered_toolchains,
             registered_execution_platforms,
+            extension_aggregations,
         })))
     }
 
@@ -4445,12 +4463,6 @@ impl BuckConfigBasedCells {
         let mut resolved_graph_for_aliases = None;
         let project_root_abs = AbsNormPathBuf::try_from(workspace_root.to_path_buf())?;
         let mut cell_graph = slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(workspace_id);
-        let bzlmod_root_module_name = if parsed.module.name.is_empty() {
-            "_main".to_owned()
-        } else {
-            parsed.module.name.clone()
-        };
-        let extension_aggregations;
         let repo_env = Arc::new(options.repo_env.clone());
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
             options.allow_yanked_versions_env.as_deref(),
@@ -4990,16 +5002,6 @@ impl BuckConfigBasedCells {
             ],
         );
 
-        // Aggregate extension usages from all modules and carry them into the
-        // DICE-injected extension aggregation value. This data is needed when
-        // extension repos are lazily executed inside DICE.
-        extension_aggregations =
-            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
-                cell_graph.workspace_id.clone(),
-                bzlmod_root_module_name.clone(),
-                Arc::new(aggregated),
-            );
-
         // Convert pre-computed cells to the format expected by the bzlmod cell
         // graph. Bazel's identity for extension-generated
         // repositories is the canonical repo name; apparent names from
@@ -5260,7 +5262,6 @@ impl BuckConfigBasedCells {
 
         Ok(Some(BzlmodProjectionBridgeValue {
             cell_graph,
-            extension_aggregations,
             repo_mappings,
         }))
     }
@@ -5754,6 +5755,7 @@ module(name = "dep", version = "1.0")
 module(name = "root", version = "1.0")
 register_toolchains("@root_toolchains//:all")
 register_execution_platforms("@root_platforms//:all")
+ext = use_extension("//:ext.bzl", "ext")
 "#,
         );
         let config_args = [slug_cli_proto::ConfigOverride::flag_no_cell(
@@ -5808,6 +5810,12 @@ register_execution_platforms("@root_platforms//:all")
             registered_execution_platforms.registered_execution_platforms,
             ["@root_platforms//:all".to_owned()]
         );
+
+        let extension_aggregations = dice
+            .compute(&slug_bzlmod::BzlmodExtensionAggregationsDataKey)
+            .await?;
+        assert_eq!(extension_aggregations.root_module_name, "root");
+        assert_eq!(extension_aggregations.extension_aggregations.len(), 1);
         Ok(())
     }
 
