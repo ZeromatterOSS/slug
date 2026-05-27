@@ -35,6 +35,14 @@ repo mapping, extension aggregation, extension replay inputs, repository specs,
 repository materialization manifests, and lockfile policy are represented as
 DICE-owned values with explicit dependencies, invalidation, and guardrails.
 
+## Bridge Burn-Down: Source Input Tracking
+
+**Bridge surface**: `std::fs::read_to_string` + `parse_module_with_polled_includes` in `compute_bzlmod_resolved_module_graph` (cells.rs:4472-4487) reads registry/git/archive MODULE.bazel files during clean graph computation without DICE tracking.
+
+**Intended owner**: `NonRootModuleFilesKey` — already exists, just not wired into the clean graph producer. Collects resolved module files as `Vec<NonRootModuleFileInput>` after `fetch_sources()`, computes them through DICE, and folds `NonRootModuleFilesValue.parsed_modules` into the output.
+
+**Bridge surface reduced**: targeted `std::fs::read_to_string` for resolved MODULE.bazel files replaced by `dice_ctx.compute(&NonRootModuleFilesKey{...})`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -293,12 +301,12 @@ hardening behavior around it.
      cached git/archive override `MODULE.bazel` files are observed inside
      named DICE keys. The DICE-backed resolver now rejects missing tracked root
      module input instead of direct-parsing the root module in the DICE path.
-     `NonRootModuleFilesKey` exists with same-key recompute guardrails, but the
-     clean resolved-graph producer still directly polls selected module
-     `MODULE.bazel` files from registry/git/archive source directories via
-     `std::fs::read_to_string`. The next source-input slice should route those
-     discovered non-root module files through `NonRootModuleFilesKey` or an
-     equivalent tracked DICE input path.
+      `NonRootModuleFilesKey` exists with same-key recompute guardrails, and
+      is now wired into the clean resolved-graph producer. Registry and
+      git/archive override `MODULE.bazel` files discovered during MVS resolution
+      are read through `NonRootModuleFilesKey` instead of direct
+      `std::fs::read_to_string`. The `parse_module_with_polled_includes` path
+      in the clean graph compute has been replaced.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are directly observed inside

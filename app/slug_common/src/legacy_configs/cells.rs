@@ -4450,11 +4450,16 @@ impl BuckConfigBasedCells {
                     .iter()
                     .map(|(name, parsed)| (name.as_str(), parsed))
                     .collect();
+                let non_registry_names: HashSet<&str> =
+                    non_registry_parsed_modules.keys().copied().collect();
+                for (module_name, parsed_module) in &non_registry_parsed_modules {
+                    if graph.resolution_order.contains(&module_name.to_string()) {
+                        parsed_modules.push((module_name.to_string(), (*parsed_module).clone()));
+                    }
+                }
+                let mut non_root_inputs: Vec<NonRootModuleFileInput> = Vec::new();
                 for module_name in &graph.resolution_order {
-                    if let Some(parsed_module) =
-                        non_registry_parsed_modules.get(module_name.as_str())
-                    {
-                        parsed_modules.push((module_name.clone(), (*parsed_module).clone()));
+                    if non_registry_names.contains(module_name.as_str()) {
                         continue;
                     }
                     let Some(module_info) = graph.modules.get(module_name) else {
@@ -4469,22 +4474,33 @@ impl BuckConfigBasedCells {
                         workspace_root.join(source_path)
                     };
                     let module_bazel_path = module_dir.join("MODULE.bazel");
-                    let Ok(content) = std::fs::read_to_string(&module_bazel_path) else {
-                        continue;
-                    };
-                    let parsed_with_inputs = parse_module_with_polled_includes(
-                        &module_bazel_path,
-                        content,
-                        false,
-                    )
-                    .with_buck_error_context(|| {
+                    non_root_inputs.push(NonRootModuleFileInput {
+                        module_key: module_name.clone(),
+                        module_bazel_path,
+                    });
+                }
+                if !non_root_inputs.is_empty() {
+                    let non_root_value = dice_ctx
+                        .compute(&NonRootModuleFilesKey {
+                            project_root: key.project_root.clone(),
+                            inputs: non_root_inputs,
+                        })
+                        .await
+                        .with_buck_error_context(|| {
+                            format!(
+                                "Failed to parse non-root MODULE.bazel files via DICE while computing clean graph for root module '{}'",
+                                parsed.module.name
+                            )
+                        })?;
+                    let non_root_value = non_root_value.with_buck_error_context(|| {
                         format!(
-                            "Failed to parse selected module '{}' at {} while computing clean graph",
-                            module_name,
-                            module_bazel_path.display()
+                            "Failed to parse non-root MODULE.bazel files for '{}'",
+                            parsed.module.name
                         )
                     })?;
-                    parsed_modules.push((module_name.clone(), parsed_with_inputs.parsed));
+                    for (name, parsed) in &non_root_value.parsed_modules {
+                        parsed_modules.push((name.clone(), parsed.clone()));
+                    }
                 }
             }
 
