@@ -4444,7 +4444,7 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
-                let non_registry_parsed_modules: HashMap<_, _> = key
+                let non_registry_parsed_modules: HashMap<&str, &ParsedModuleFile> = key
                     .non_registry_override_inputs
                     .parsed_modules
                     .iter()
@@ -4452,11 +4452,6 @@ impl BuckConfigBasedCells {
                     .collect();
                 let non_registry_names: HashSet<&str> =
                     non_registry_parsed_modules.keys().copied().collect();
-                for (module_name, parsed_module) in &non_registry_parsed_modules {
-                    if graph.resolution_order.contains(&module_name.to_string()) {
-                        parsed_modules.push((module_name.to_string(), (*parsed_module).clone()));
-                    }
-                }
                 let mut non_root_inputs: Vec<NonRootModuleFileInput> = Vec::new();
                 for module_name in &graph.resolution_order {
                     if non_registry_names.contains(module_name.as_str()) {
@@ -4479,27 +4474,39 @@ impl BuckConfigBasedCells {
                         module_bazel_path,
                     });
                 }
-                if !non_root_inputs.is_empty() {
+                let dice_parsed: HashMap<String, ParsedModuleFile> = if !non_root_inputs.is_empty()
+                {
                     let non_root_value = dice_ctx
-                        .compute(&NonRootModuleFilesKey {
-                            project_root: key.project_root.clone(),
-                            inputs: non_root_inputs,
-                        })
-                        .await
-                        .with_buck_error_context(|| {
-                            format!(
-                                "Failed to parse non-root MODULE.bazel files via DICE while computing clean graph for root module '{}'",
-                                parsed.module.name
-                            )
-                        })?;
+                            .compute(&NonRootModuleFilesKey {
+                                project_root: key.project_root.clone(),
+                                inputs: non_root_inputs,
+                            })
+                            .await
+                            .with_buck_error_context(|| {
+                                format!(
+                                    "Failed to parse non-root MODULE.bazel files via DICE while computing clean graph for root module '{}'",
+                                    parsed.module.name
+                                )
+                            })?;
                     let non_root_value = non_root_value.with_buck_error_context(|| {
                         format!(
                             "Failed to parse non-root MODULE.bazel files for '{}'",
                             parsed.module.name
                         )
                     })?;
-                    for (name, parsed) in &non_root_value.parsed_modules {
-                        parsed_modules.push((name.clone(), parsed.clone()));
+                    non_root_value
+                        .parsed_modules
+                        .iter()
+                        .map(|(name, parsed)| (name.clone(), parsed.clone()))
+                        .collect()
+                } else {
+                    HashMap::new()
+                };
+                for module_name in &graph.resolution_order {
+                    if let Some(parsed) = non_registry_parsed_modules.get(module_name.as_str()) {
+                        parsed_modules.push((module_name.clone(), (*parsed).clone()));
+                    } else if let Some(parsed) = dice_parsed.get(module_name) {
+                        parsed_modules.push((module_name.clone(), parsed.clone()));
                     }
                 }
             }
