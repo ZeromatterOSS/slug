@@ -93,15 +93,6 @@ const BZLMOD_ALWAYS_BUNDLED_CELLS: &[&str] = &[
     "local_config_python",
 ];
 
-const BZLMOD_CLEAN_RESOLUTION_SHADOW_ENV: &str = "SLUG_BZLMOD_CLEAN_RESOLUTION_SHADOW";
-
-fn bzlmod_clean_resolution_shadow_enabled() -> bool {
-    match std::env::var(BZLMOD_CLEAN_RESOLUTION_SHADOW_ENV) {
-        Ok(value) => value != "0" && value != "false",
-        Err(_) => false,
-    }
-}
-
 fn repo_env_json(repo_env: &BTreeMap<String, String>) -> Arc<str> {
     Arc::from(
         serde_json::to_string(repo_env)
@@ -3211,11 +3202,9 @@ impl Key for OverridePatchInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 struct BzlmodProjectionBridgeValue {
     cell_graph: slug_bzlmod::BzlmodCellGraphValue,
-    module_versions: slug_bzlmod::BzlmodModuleVersionsDataValue,
     registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
     registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
     extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
-    resolution_facts: slug_bzlmod::BzlmodResolutionFactsValue,
     repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
 }
 
@@ -3464,7 +3453,7 @@ impl BuckConfigBasedCells {
         updater: &mut DiceTransactionUpdater,
         output_base: Option<PathBuf>,
     ) -> slug_error::Result<Self> {
-        let output_base_for_shadow = output_base.clone();
+        let output_base_for_clean_graph = output_base.clone();
         let (key, bzlmod_projection) = {
             let mut dice_ctx = updater.existing_state().await;
             let key = Self::build_bzlmod_projection_bridge_key(
@@ -3480,41 +3469,39 @@ impl BuckConfigBasedCells {
                 .buck_error_context("Computing bzlmod projection bridge through DICE")?;
             (key, bzlmod_projection)
         };
-        if bzlmod_clean_resolution_shadow_enabled() {
+        let clean_resolved_module_graph = {
             let mut dice_ctx = updater.existing_state().await;
-            if let Err(error) = Self::compare_bzlmod_resolved_module_graph_shadow(
+            let clean_key = Self::build_bzlmod_resolved_module_graph_key(
                 project_fs,
                 config_args,
                 &mut dice_ctx,
-                output_base_for_shadow,
-                &bzlmod_projection,
+                output_base_for_clean_graph,
             )
-            .await
-            {
-                tracing::warn!(
-                    ?error,
-                    env = BZLMOD_CLEAN_RESOLUTION_SHADOW_ENV,
-                    "Clean bzlmod resolved graph shadow comparison failed"
-                );
-            }
+            .await?;
+            dice_ctx
+                .compute(&clean_key)
+                .await?
+                .buck_error_context("Computing clean bzlmod resolved graph for DICE injection")?
+        };
+        if let Some(clean_graph) = clean_resolved_module_graph.as_ref().as_ref() {
+            tracing::debug!(
+                graph_digest = clean_graph.graph_digest.as_ref(),
+                module_count = clean_graph.graph.modules.len(),
+                selected_version_count = clean_graph.graph.selected_versions.len(),
+                "Using clean bzlmod resolved graph data for DICE injections"
+            );
         }
         let (
             cell_graph_for_dice,
-            module_versions_for_dice,
             registered_toolchains_for_dice,
             registered_execution_platforms_for_dice,
             extension_aggregations_for_dice,
-            resolution_facts_for_dice,
             repo_mappings_for_dice,
         ) = bzlmod_projection.as_ref().as_ref().map_or_else(
             || {
                 (
                     slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
                         key.resolution_key.workspace_id.clone(),
-                    ),
-                    slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
-                        key.resolution_key.workspace_id.clone(),
-                        Arc::new(HashMap::new()),
                     ),
                     slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
                         key.resolution_key.workspace_id.clone(),
@@ -3529,11 +3516,6 @@ impl BuckConfigBasedCells {
                         String::new(),
                         Arc::new(HashMap::new()),
                     ),
-                    slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-                        key.resolution_key.workspace_id.clone(),
-                        indexmap::IndexMap::new(),
-                        indexmap::IndexMap::new(),
-                    ),
                     slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
                         key.resolution_key.workspace_id.clone(),
                         Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
@@ -3544,15 +3526,35 @@ impl BuckConfigBasedCells {
             |value| {
                 (
                     value.cell_graph.clone(),
-                    value.module_versions.clone(),
                     value.registered_toolchains.clone(),
                     value.registered_execution_platforms.clone(),
                     value.extension_aggregations.clone(),
-                    value.resolution_facts.clone(),
                     value.repo_mappings.clone(),
                 )
             },
         );
+        let (module_versions_for_dice, resolution_facts_for_dice) =
+            clean_resolved_module_graph.as_ref().as_ref().map_or_else(
+                || {
+                    (
+                        slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                            Arc::new(HashMap::new()),
+                        ),
+                        slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
+                            key.resolution_key.workspace_id.clone(),
+                            indexmap::IndexMap::new(),
+                            indexmap::IndexMap::new(),
+                        ),
+                    )
+                },
+                |value| {
+                    (
+                        value.module_versions.clone(),
+                        value.resolution_facts.clone(),
+                    )
+                },
+            );
 
         let configs = Self::parse_with_file_ops_and_options_inner(
             config_args,
@@ -4054,65 +4056,6 @@ impl BuckConfigBasedCells {
         })
     }
 
-    async fn compare_bzlmod_resolved_module_graph_shadow(
-        project_fs: &ProjectRoot,
-        config_args: &[slug_cli_proto::ConfigOverride],
-        dice_ctx: &mut DiceComputations<'_>,
-        output_base: Option<PathBuf>,
-        legacy_projection: &Arc<Option<BzlmodProjectionBridgeValue>>,
-    ) -> slug_error::Result<()> {
-        let key = Self::build_bzlmod_resolved_module_graph_key(
-            project_fs,
-            config_args,
-            dice_ctx,
-            output_base,
-        )
-        .await?;
-        let clean_projection = dice_ctx
-            .compute(&key)
-            .await?
-            .buck_error_context("Computing clean bzlmod resolved graph shadow")?;
-
-        match (
-            clean_projection.as_ref().as_ref(),
-            legacy_projection.as_ref().as_ref(),
-        ) {
-            (Some(clean), Some(legacy)) => {
-                let module_versions_match = clean.module_versions == legacy.module_versions;
-                let resolution_facts_match = clean.resolution_facts == legacy.resolution_facts;
-                if module_versions_match && resolution_facts_match {
-                    tracing::debug!(
-                        graph_digest = clean.graph_digest.as_ref(),
-                        module_count = clean.graph.modules.len(),
-                        selected_version_count = clean.graph.selected_versions.len(),
-                        "Clean bzlmod resolved graph shadow matched legacy data outputs"
-                    );
-                } else {
-                    tracing::warn!(
-                        graph_digest = clean.graph_digest.as_ref(),
-                        module_count = clean.graph.modules.len(),
-                        selected_version_count = clean.graph.selected_versions.len(),
-                        module_versions_match,
-                        resolution_facts_match,
-                        "Clean bzlmod resolved graph shadow diverged from legacy data outputs"
-                    );
-                }
-            }
-            (None, None) => {
-                tracing::debug!("Clean bzlmod resolved graph shadow matched empty legacy output");
-            }
-            (clean, legacy) => {
-                tracing::warn!(
-                    clean_present = clean.is_some(),
-                    legacy_present = legacy.is_some(),
-                    "Clean bzlmod resolved graph shadow presence diverged from legacy output"
-                );
-            }
-        }
-
-        Ok(())
-    }
-
     async fn compute_bzlmod_resolved_module_graph(
         key: &BzlmodResolvedModuleGraphKey,
         _dice_ctx: &mut DiceComputations<'_>,
@@ -4161,12 +4104,11 @@ impl BuckConfigBasedCells {
             indexmap::IndexMap::new(),
             indexmap::IndexMap::new(),
         );
-        let mut module_versions =
-            slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
-                key.resolution_key.workspace_id.clone(),
-                root_module_name.clone(),
-                Arc::new(HashMap::new()),
-            );
+        let mut version_map = HashMap::new();
+        version_map.insert(
+            parsed.module.name.clone(),
+            parsed.module.version.to_string(),
+        );
 
         if !parsed.module.bazel_deps.is_empty() {
             let active_deps: Vec<_> = parsed
@@ -4292,22 +4234,17 @@ impl BuckConfigBasedCells {
                 graph.registry_file_hashes.clone(),
                 graph.selected_yanked_versions.clone(),
             );
-            let mut version_map = HashMap::new();
-            version_map.insert(
-                parsed.module.name.clone(),
-                parsed.module.version.to_string(),
-            );
             for (name, info) in &graph.modules {
                 version_map.insert(name.clone(), info.version.clone());
             }
-            module_versions =
-                slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
-                    key.resolution_key.workspace_id.clone(),
-                    root_module_name,
-                    Arc::new(version_map),
-                );
         }
 
+        let module_versions =
+            slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                key.resolution_key.workspace_id.clone(),
+                root_module_name,
+                Arc::new(version_map),
+            );
         let graph_digest = bzlmod_resolved_graph_digest(&graph);
         Ok(Arc::new(Some(BzlmodResolvedModuleGraphValue {
             graph: Arc::new(graph),
@@ -4429,20 +4366,9 @@ impl BuckConfigBasedCells {
         } else {
             parsed.module.name.clone()
         };
-        let mut module_versions =
-            slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
-                cell_graph.workspace_id.clone(),
-                bzlmod_root_module_name.clone(),
-                Arc::new(HashMap::new()),
-            );
         let registered_toolchains;
         let registered_execution_platforms;
         let extension_aggregations;
-        let mut resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-            cell_graph.workspace_id.clone(),
-            indexmap::IndexMap::new(),
-            indexmap::IndexMap::new(),
-        );
         let repo_env = Arc::new(options.repo_env.clone());
         let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
             options.allow_yanked_versions_env.as_deref(),
@@ -4597,12 +4523,6 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
-            resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-                cell_graph.workspace_id.clone(),
-                resolved_graph.registry_file_hashes.clone(),
-                resolved_graph.selected_yanked_versions.clone(),
-            );
-
             // Build a set of local override names to skip
             let local_override_names: std::collections::HashSet<_> = active_overrides
                 .iter()
@@ -4791,25 +4711,6 @@ impl BuckConfigBasedCells {
                     aliases.push((alias_name, cell_name));
                 }
             }
-
-            // Populate module version facts so module_version() builtin
-            // returns the correct version through DICE-injected command state.
-            let mut version_map = std::collections::HashMap::new();
-            // Add root module
-            version_map.insert(
-                parsed.module.name.clone(),
-                parsed.module.version.to_string(),
-            );
-            // Add all resolved external modules
-            for (name, info) in &resolved_graph.modules {
-                version_map.insert(name.clone(), info.version.clone());
-            }
-            module_versions =
-                slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
-                    cell_graph.workspace_id.clone(),
-                    bzlmod_root_module_name.clone(),
-                    Arc::new(version_map),
-                );
         }
 
         // Build parsed_modules list for extension resolution
@@ -5339,11 +5240,9 @@ impl BuckConfigBasedCells {
 
         Ok(Some(BzlmodProjectionBridgeValue {
             cell_graph,
-            module_versions,
             registered_toolchains,
             registered_execution_platforms,
             extension_aggregations,
-            resolution_facts,
             repo_mappings,
         }))
     }
@@ -5824,6 +5723,56 @@ module(name = "dep", version = "1.0")
             Some("1.0")
         );
         assert!(clean.graph_digest.as_ref().len() >= 64);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn persisted_projection_injects_clean_root_module_version_data() -> slug_error::Result<()>
+    {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file(
+            "MODULE.bazel",
+            r#"
+module(name = "root", version = "1.0")
+"#,
+        );
+        let config_args = [slug_cli_proto::ConfigOverride::flag_no_cell(
+            "bzlmod.lockfile_mode=off",
+        )];
+        let dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+
+        let configs =
+            BuckConfigBasedCells::parse_with_config_args_and_persisted_bzlmod_projection_bridge(
+                fs.path(),
+                &config_args,
+                &mut updater,
+                None,
+            )
+            .await?;
+
+        assert!(configs.is_bzlmod);
+        let mut dice = updater.commit().await;
+        let module_versions = slug_bzlmod::module_versions_for_current_workspace(&mut dice).await?;
+        let mut expected_versions = HashMap::new();
+        expected_versions.insert("root".to_owned(), "1.0".to_owned());
+        assert_eq!(module_versions.module_versions.as_ref(), &expected_versions);
+        assert_eq!(module_versions.invalidation.root_module_name, "root");
+
+        let resolution_facts = dice
+            .compute(&slug_bzlmod::BzlmodResolutionFactsKey::for_workspace_id(
+                module_versions.workspace_id.clone(),
+            ))
+            .await??;
+        assert!(resolution_facts.registry_file_hashes.is_empty());
+        assert!(resolution_facts.selected_yanked_versions.is_empty());
         Ok(())
     }
 

@@ -205,6 +205,13 @@ hardening behavior around it.
      The first code path can run as an opt-in diagnostic shadow
      (`SLUG_BZLMOD_CLEAN_RESOLUTION_SHADOW=1`) while legacy injection remains
      the production authority.
+     The follow-up slice promotes `BzlmodModuleVersionsDataValue` and
+     `BzlmodResolutionFactsValue` injection to the clean resolved-graph key, so
+     the legacy projection bridge no longer carries those output classes.
+     Evidence: `cargo check -p slug_common`,
+     `cargo test -p slug_common persisted_projection_injects_clean_root_module_version_data -- --nocapture`,
+     and
+     `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts -- --nocapture`.
    - Migrate output classes in this order:
      1. source/module-file input producers for root, registry, project-local
         and out-of-project local overrides, git/archive overrides, and patch
