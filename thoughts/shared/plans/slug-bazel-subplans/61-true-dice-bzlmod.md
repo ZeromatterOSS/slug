@@ -22,9 +22,10 @@ Current classification:
 
 - Slug has DICE keys for selected bzlmod inputs and extension/repository
   execution surfaces.
-- The production persisted config-load path no longer uses
-  `BzlmodProjectionBridgeDiceKey`; the direct no-updater bootstrap/completion
-  parser remains as a separate non-persisted path.
+- The production persisted config-load path and direct no-updater
+  bootstrap/completion callers now consume the clean resolved-graph producer;
+  `BzlmodProjectionBridgeDiceKey` and the standalone direct cell-graph parser
+  are removed.
 - Replay correctness still depends on non-DICE process state, fallback scanner
   bridges, direct polling, and transitional lockfile/materialization behavior in
   places where Bazel owns explicit Skyframe keys.
@@ -45,9 +46,10 @@ bridge-burn-down slice.
 Current state to preserve:
 
 - Plan 61 is open. The persisted config-load path now uses the clean bzlmod
-  graph producer for resolved graph data and `BzlmodCellGraphValue`; direct
-  no-updater bootstrap/completion parsing, fallback scanners, lockfile policy,
-  and materialization polling remain.
+  graph producer for resolved graph data and `BzlmodCellGraphValue`. Direct
+  no-updater bootstrap/completion callers build the same clean graph through a
+  temporary DICE instance before parsing cells. Fallback scanners, lockfile
+  policy, and materialization polling remain.
 - SDK frontier evidence is positive but not a closure condition: Slug and Bazel
   9.0.1 have both built `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents`, with
   matching modes and non-ELF hashes. The accepted remaining differences are ELF
@@ -179,10 +181,13 @@ hardening behavior around it.
 ## Remaining Work
 
 1. Replace the legacy resolution bridge.
-   - `BzlmodProjectionBridgeDiceKey` has been replaced by true graph
-     producers for the persisted config-load path. The remaining risk in this
-     item is the direct no-updater bootstrap/completion parser, which still
-     builds a bzlmod cell graph outside the persisted DICE updater.
+   - Production bridge replacement is done. `BzlmodProjectionBridgeDiceKey` has
+     been replaced by true graph producers for the persisted config-load path.
+     Direct no-updater bootstrap/completion callers now create a temporary DICE
+     instance and compute the same clean graph before parsing cells; the
+     internal cell parser errors for project parses that do not supply that
+     clean graph. The standalone direct bzlmod cell-graph parser and its direct
+     filesystem helper path were removed.
    - Build the resolved graph from DICE-owned module-file/source keys.
      Do not start by wrapping `BuckConfigBasedCells`' legacy projection
      resolver under a new key name; that preserves the architecture this item
@@ -223,13 +228,21 @@ hardening behavior around it.
      longer carries `BzlmodRepoMappingsDataValue`.
      Persisted config-load now injects `BzlmodCellGraphValue` from the clean
      resolved-graph key as well. `BzlmodProjectionBridgeDiceKey` and its
-     bridge-specific extension replay summary digest were removed; direct
-     no-updater bootstrap/completion parsing remains a separate non-persisted
-     path.
-     Evidence: `pytest tests/core/bzlmod/test_plan61_guardrails.py` (155
-     passed), `cargo test -p slug_common` (126 passed), `cargo test -p
-     slug_bzlmod` (380 passed plus doctests), `cargo fmt --check`, and
-     `git diff --check`.
+     bridge-specific extension replay summary digest were removed. Direct
+     no-updater bootstrap/completion parsing is separate only in DICE lifetime:
+     it uses a temporary DICE instance, not a separate resolver implementation.
+     Evidence: `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (155
+     passed), `cargo test -p slug_common` (127 passed plus doctests), `cargo
+     test -p slug_bzlmod` (380 passed plus doctests), `cargo build -p slug`,
+     `cargo fmt --check`, and `git diff --check`.
+     Bootstrap/completion follow-up evidence:
+     `cargo test -p slug_common clean_no_updater_bzlmod_cell_graph_preserves_explicit_output_base -- --nocapture`
+     and
+     `cargo test -p slug_common project_bzlmod_parse_requires_clean_graph_input -- --nocapture`.
+     The previously failing bootstrap/error-context subset covering root,
+     local override, git/archive override, include UTF-8/parse/cycle failures,
+     and `--ignore_dev_dependency` early validation passed as 16 focused pytest
+     cases before the full guardrail rerun.
    - Migrate output classes in this order:
      1. source/module-file input producers for root, registry, project-local
         and out-of-project local overrides, git/archive overrides, and patch
@@ -248,9 +261,9 @@ hardening behavior around it.
         `use_repo_rule()`, and lockfile-seeded generated repo preseed facts;
      7. final `BzlmodCellGraphValue` authority, including module cells,
         extension cells, bundled cells, root aliases, scoped aliases, dynamic
-        aliases, and external symlink layout. The persisted config-load path is
-        now on this clean authority; remaining work is to retire or narrow the
-        direct no-updater bootstrap/completion path.
+        aliases, and external symlink layout. The persisted config-load path and
+        direct no-updater bootstrap/completion callers are now on this clean
+        authority.
    - Shadow equivalence does not need to wait for the final cell graph. Compare
      old and new values by output class, starting with selected versions,
      module source paths, registry hashes, selected yanked versions,
@@ -265,12 +278,13 @@ hardening behavior around it.
      the daemon output base, including
      no-`MODULE.bazel` empty projections. Data-only projection keys now rely on
      their own source workspace provenance instead of deriving identity through
-     the cell graph, but their data payloads are still injected from the legacy
-     resolver. Daemon bootstrap direct parsing now passes its isolated buck-out
-     path into the transitional workspace identity too.
+     the cell graph. Their data payloads are injected from the clean resolved
+     graph producer. Daemon bootstrap no-updater parsing computes the clean
+     graph with its isolated buck-out path before parsing cells.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
-     The process-global fast path is removed, but the transitional key still
-     wraps the legacy resolver.
+     The process-global fast path, projection bridge key, and direct cell-graph
+     parser are removed; remaining proof belongs on the named graph, replay,
+     lockfile, and materialization keys.
 
 2. Finish module-file DICE inputs for git, archive, and out-of-project local
    override/registry-cache sources.
@@ -279,11 +293,12 @@ hardening behavior around it.
      cached git/archive override `MODULE.bazel` files are observed inside
      named DICE keys. The DICE-backed resolver now rejects missing tracked root
      module input instead of direct-parsing the root module in the DICE path.
-     Non-root module files discovered from the transitional cell graph now read
-     through `NonRootModuleFilesKey`; project-root paths are DICE-tracked in the
-     parse key, while out-of-project paths are directly polled by named
-     absolute-file child keys and force same-key recompute through
-     `has_untracked_inputs`.
+     `NonRootModuleFilesKey` exists with same-key recompute guardrails, but the
+     clean resolved-graph producer still directly polls selected module
+     `MODULE.bazel` files from registry/git/archive source directories via
+     `std::fs::read_to_string`. The next source-input slice should route those
+     discovered non-root module files through `NonRootModuleFilesKey` or an
+     equivalent tracked DICE input path.
    - Registry cache `MODULE.bazel`, `source.json`, and `bazel_registry.json`
      files are tracked when the cache lives under the project root, and
      out-of-root cache paths are directly observed inside
@@ -643,10 +658,10 @@ hardening behavior around it.
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
      external symlinks, and bundled repos from DICE values.
-   - `BzlmodCellGraphDataKey` currently exposes the legacy-produced graph, but
-     the graph is not yet derived from DICE producers and is not the installed
-     lookup authority. Legacy cell parsing now takes only that graph-shaped
-     value rather than the whole `BzlmodProjectionData` payload.
+   - `BzlmodCellGraphDataKey` currently exposes an injected graph value rather
+     than computing the graph itself. The production payload is now derived from
+     the clean resolved-graph producer, and legacy cell parsing takes only that
+     graph-shaped value rather than the whole `BzlmodProjectionData` payload.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
@@ -659,9 +674,10 @@ hardening behavior around it.
      `BzlmodProjectionData` remains at the transitional injection API while
      lockfile inputs, repo-env, resolution facts, repo mappings, registered
      toolchains, registered execution platforms, extension aggregations, and
-     module versions are passed as separate named injections. Delete or rename
-     the remaining graph-shaped injection API only after direct
-     bootstrap/completion parsing has been narrowed or retired.
+     module versions are passed as separate named injections. Direct
+     bootstrap/completion parsing has been narrowed to the clean producer, so
+     the remaining graph-shaped projection API can be deleted or renamed once
+     downstream consumers no longer need the transitional wrapper.
    - Generic empty session construction is removed from production paths.
      Remaining empty projection construction must explicitly carry workspace
      identity while direct bootstrap/completion parsing is being unwound. The
