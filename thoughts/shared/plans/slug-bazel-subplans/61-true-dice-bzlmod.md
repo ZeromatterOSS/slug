@@ -482,6 +482,14 @@ Current state to preserve:
   `slug_common` still invokes the clean resolved-graph producer, but no longer
   owns this semantic output class of the bzlmod resolution result. Guardrail:
   `cargo test -p slug_bzlmod collect_registered_items --lib && cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo build -p slug`.
+- 2026-05-28 MVS stage boundary reduction:
+  `slug_bzlmod::resolve_graph_with_module_file_inputs` now owns the clean graph
+  MVS/local-override resolution stage and returns explicit
+  `NonRootModuleFileInput` requests for DICE-tracked non-root MODULE.bazel
+  parsing. `slug_common` still hosts the filesystem-backed DICE key and cell
+  graph assembly, but no longer owns the core MVS resolver invocation or the
+  non-root module-file request type. Guardrail:
+  `cargo test -p slug_bzlmod resolve_graph_with_module_file_inputs --lib && cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

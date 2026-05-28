@@ -35,6 +35,7 @@ use dice::Key;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_error::BuckErrorContext;
 
 use crate::BzlmodRepoMapping;
 use crate::RegisteredToolchain;
@@ -46,7 +47,10 @@ use crate::parser::ModuleFileInputDigest;
 use crate::repo_spec::RepoSpec;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
+use crate::resolution::MvsResolver;
 use crate::resolution::ResolvedGraph;
+use crate::resolution::ResolvedModuleInfo;
+use crate::resolution::parse_allowed_yanked_versions;
 use crate::types::Module;
 use crate::types::Override;
 use crate::types::ParsedModuleFile;
@@ -395,6 +399,19 @@ pub struct NonRootModuleFilesValue {
     pub has_untracked_inputs: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+pub struct NonRootModuleFileInput {
+    pub module_key: String,
+    pub module_bazel_path: PathBuf,
+}
+
+#[derive(Debug)]
+pub struct ResolvedGraphWithModuleFileInputs {
+    pub graph: ResolvedGraph,
+    pub parsed_modules: Vec<(String, ParsedModuleFile)>,
+    pub non_root_module_file_inputs: Vec<NonRootModuleFileInput>,
+}
+
 pub fn local_overrides_from_root_module(
     root_module_file: &RootModuleFileValue,
     ignore_dev_dependency: bool,
@@ -598,6 +615,219 @@ fn toolchains_include_bundled_python(toolchains: &[RegisteredToolchain]) -> bool
     toolchains
         .iter()
         .any(|tc| tc.label.contains(LOCAL_CONFIG_PYTHON_CELL))
+}
+
+pub async fn resolve_graph_with_module_file_inputs(
+    parsed: &ParsedModuleFile,
+    workspace_root: &Path,
+    options: &BzlmodResolutionOptions,
+    local_override_inputs: &LocalOverrideModuleInputsValue,
+    non_registry_override_inputs: &NonRegistryOverrideModuleInputsValue,
+    override_patch_inputs: Arc<crate::OverridePatchInputs>,
+    visible_lockfile: Option<&Lockfile>,
+) -> slug_error::Result<ResolvedGraphWithModuleFileInputs> {
+    let root_module_name = if parsed.module.name.is_empty() {
+        "_main".to_owned()
+    } else {
+        parsed.module.name.clone()
+    };
+    let mut parsed_modules = vec![(root_module_name, parsed.clone())];
+    if parsed.module.bazel_deps.is_empty() {
+        return Ok(ResolvedGraphWithModuleFileInputs {
+            graph: ResolvedGraph::default(),
+            parsed_modules,
+            non_root_module_file_inputs: Vec::new(),
+        });
+    }
+
+    let active_deps: Vec<_> = parsed
+        .module
+        .bazel_deps
+        .iter()
+        .filter(|dep| !(options.ignore_dev_dependency && dep.dev_dependency))
+        .collect();
+    let local_override_paths: HashMap<_, _> =
+        active_root_overrides(&parsed.module, options.ignore_dev_dependency)
+            .into_iter()
+            .filter_map(|override_| match override_ {
+                Override::LocalPath(local) => Some((local.module_name, local.path)),
+                _ => None,
+            })
+            .collect();
+    let local_override_modules: HashMap<_, _> = local_override_inputs
+        .parsed_modules
+        .iter()
+        .map(|(name, parsed)| (name.as_str(), parsed))
+        .collect();
+    let can_build_from_tracked_local_overrides = !active_deps.is_empty()
+        && !local_override_inputs.has_bazel_deps
+        && active_deps.iter().all(|dep| {
+            local_override_paths.contains_key(&dep.name)
+                && local_override_modules.contains_key(dep.name.as_str())
+        });
+
+    if can_build_from_tracked_local_overrides {
+        let mut modules = fxhash::FxHashMap::default();
+        let mut selected_versions = HashMap::new();
+        let mut resolution_order = Vec::new();
+        for dep in active_deps {
+            let override_path = local_override_paths
+                .get(&dep.name)
+                .expect("local override path checked above");
+            let parsed_override = local_override_modules
+                .get(dep.name.as_str())
+                .expect("local override module checked above");
+            parsed_modules.push((dep.name.clone(), (*parsed_override).clone()));
+            let version = parsed_override.module.version.to_string();
+            selected_versions.insert(dep.name.clone(), version.clone());
+            resolution_order.push(dep.name.clone());
+            modules.insert(
+                dep.name.clone(),
+                ResolvedModuleInfo {
+                    name: dep.name.clone(),
+                    version,
+                    compatibility_level: parsed_override.module.compatibility_level,
+                    dependencies: HashMap::new(),
+                    source: ModuleSource::LocalPath {
+                        path: override_path.clone(),
+                    },
+                    source_path: Some(PathBuf::from(override_path)),
+                },
+            );
+        }
+        return Ok(ResolvedGraphWithModuleFileInputs {
+            graph: ResolvedGraph {
+                selected_versions,
+                modules,
+                resolution_order,
+                registry_file_hashes: indexmap::IndexMap::new(),
+                selected_yanked_versions: indexmap::IndexMap::new(),
+            },
+            parsed_modules,
+            non_root_module_file_inputs: Vec::new(),
+        });
+    }
+
+    let allowed_yanked_versions = parse_allowed_yanked_versions(
+        options.allow_yanked_versions_env.as_deref(),
+        &options.allow_yanked_versions_flags,
+    )?;
+    let cache = ModuleCache::new().with_buck_error_context(|| {
+        format!(
+            "Failed to initialize bzlmod module cache while computing clean graph for root module '{}'",
+            parsed.module.name
+        )
+    })?;
+    let mut resolver = MvsResolver::new(cache, override_patch_inputs)
+        .await
+        .with_buck_error_context(|| {
+            format!(
+                "Failed to create MVS resolver while computing clean graph for root module '{}'",
+                parsed.module.name
+            )
+        })?;
+    if let Some(lockfile) = visible_lockfile {
+        resolver.set_yanked_version_policy(
+            allowed_yanked_versions,
+            options.lockfile_mode,
+            lockfile.registry_file_hashes.clone(),
+            lockfile.selected_yanked_versions.clone(),
+        );
+    } else {
+        resolver.set_yanked_version_policy(
+            allowed_yanked_versions,
+            options.lockfile_mode,
+            Default::default(),
+            Default::default(),
+        );
+    }
+    resolver.set_ignore_dev_dependency(options.ignore_dev_dependency);
+    let mut graph = resolver
+        .resolve(&parsed.module, workspace_root)
+        .await
+        .with_buck_error_context(|| {
+            format!(
+                "MVS resolution failed while computing clean graph for root module '{}' ({} direct dependencies)",
+                parsed.module.name,
+                parsed.module.bazel_deps.len()
+            )
+        })?;
+    resolver
+        .fetch_sources(&mut graph)
+        .await
+        .with_buck_error_context(|| {
+            format!(
+                "Failed to fetch selected module sources while computing clean graph for root module '{}'",
+                parsed.module.name
+            )
+        })?;
+
+    let non_registry_parsed_modules: HashMap<&str, &ParsedModuleFile> =
+        non_registry_override_inputs
+            .parsed_modules
+            .iter()
+            .map(|(name, parsed)| (name.as_str(), parsed))
+            .collect();
+    let non_registry_names: HashSet<&str> = non_registry_parsed_modules.keys().copied().collect();
+    let mut non_root_module_file_inputs = Vec::new();
+    for module_name in &graph.resolution_order {
+        if non_registry_names.contains(module_name.as_str()) {
+            continue;
+        }
+        let Some(module_info) = graph.modules.get(module_name) else {
+            continue;
+        };
+        let Some(source_path) = module_info.source_path.as_ref() else {
+            continue;
+        };
+        let module_dir = if source_path.is_absolute() {
+            source_path.clone()
+        } else {
+            workspace_root.join(source_path)
+        };
+        let module_bazel_path = module_dir.join("MODULE.bazel");
+        non_root_module_file_inputs.push(NonRootModuleFileInput {
+            module_key: module_name.clone(),
+            module_bazel_path,
+        });
+    }
+
+    Ok(ResolvedGraphWithModuleFileInputs {
+        graph,
+        parsed_modules,
+        non_root_module_file_inputs,
+    })
+}
+
+pub fn append_resolved_non_root_modules(
+    parsed_modules: &mut Vec<(String, ParsedModuleFile)>,
+    graph: &ResolvedGraph,
+    non_registry_override_inputs: &NonRegistryOverrideModuleInputsValue,
+    dice_parsed_modules: &[(String, ParsedModuleFile)],
+) {
+    let non_registry_parsed_modules: HashMap<&str, &ParsedModuleFile> =
+        non_registry_override_inputs
+            .parsed_modules
+            .iter()
+            .map(|(name, parsed)| (name.as_str(), parsed))
+            .collect();
+    let dice_parsed: HashMap<&str, &ParsedModuleFile> = dice_parsed_modules
+        .iter()
+        .map(|(name, parsed)| (name.as_str(), parsed))
+        .collect();
+    for module_name in &graph.resolution_order {
+        if parsed_modules
+            .iter()
+            .any(|(name, _)| name.as_str() == module_name.as_str())
+        {
+            continue;
+        }
+        if let Some(parsed) = non_registry_parsed_modules.get(module_name.as_str()) {
+            parsed_modules.push((module_name.clone(), (*parsed).clone()));
+        } else if let Some(parsed) = dice_parsed.get(module_name.as_str()) {
+            parsed_modules.push((module_name.clone(), (*parsed).clone()));
+        }
+    }
 }
 
 pub fn module_file_inputs_digest(inputs: &[ModuleFileInputDigest]) -> String {
@@ -3126,6 +3356,8 @@ pub fn bzlmod_event_counters() -> BzlmodEventCounters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::BazelDep;
+    use crate::types::LocalPathOverride;
     use crate::types::RegisteredItem;
     use crate::version::Version;
 
@@ -3215,6 +3447,74 @@ mod tests {
 
         assert_eq!(toolchains.len(), 1);
         assert_eq!(toolchains[0].label, "@local_config_python//:custom");
+    }
+
+    #[tokio::test]
+    async fn resolve_graph_with_module_file_inputs_uses_tracked_local_overrides() {
+        let mut root = parsed_module("root");
+        root.module.bazel_deps.push(BazelDep::new(
+            "dep".to_owned(),
+            Version::parse("1.0").unwrap(),
+        ));
+        root.module
+            .overrides
+            .push(Override::LocalPath(LocalPathOverride {
+                module_name: "dep".to_owned(),
+                path: "dep".to_owned(),
+            }));
+        let mut dep = parsed_module("dep");
+        dep.module.version = Version::parse("1.0").unwrap();
+        let local_override_inputs = LocalOverrideModuleInputsValue {
+            digest: "local".to_owned(),
+            parsed_modules: vec![("dep".to_owned(), dep.clone())],
+            has_bazel_deps: false,
+            has_extension_usages: false,
+            has_repo_rule_invocations: false,
+            has_git_overrides: false,
+            has_untracked_inputs: false,
+        };
+        let options = BzlmodResolutionOptions {
+            lockfile_mode: LockfileMode::Off,
+            ignore_dev_dependency: false,
+            allow_yanked_versions_env: None,
+            allow_yanked_versions_flags: Vec::new(),
+            hidden_lockfile_path: None,
+            repo_env: std::collections::BTreeMap::new(),
+            repo_env_digest: "repo-env".to_owned(),
+        };
+
+        let resolved = resolve_graph_with_module_file_inputs(
+            &root,
+            Path::new("/workspace"),
+            &options,
+            &local_override_inputs,
+            &NonRegistryOverrideModuleInputsValue {
+                digest: "non-registry".to_owned(),
+                parsed_modules: Vec::new(),
+                has_inputs: false,
+                has_untracked_inputs: false,
+            },
+            Arc::new(crate::OverridePatchInputs::default()),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(resolved.non_root_module_file_inputs.is_empty());
+        assert_eq!(
+            resolved
+                .parsed_modules
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["root", "dep"]
+        );
+        let dep_info = resolved.graph.modules.get("dep").unwrap();
+        assert_eq!(dep_info.source_path, Some(PathBuf::from("dep")));
+        assert!(matches!(
+            dep_info.source,
+            ModuleSource::LocalPath { ref path } if path == "dep"
+        ));
     }
 
     #[test]

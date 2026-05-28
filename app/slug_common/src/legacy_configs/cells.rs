@@ -40,8 +40,8 @@ use slug_bzlmod::BzlmodResolutionOptions;
 use slug_bzlmod::LocalOverrideModuleInputsValue;
 use slug_bzlmod::ModuleCache;
 use slug_bzlmod::ModuleSource;
-use slug_bzlmod::MvsResolver;
 use slug_bzlmod::NonRegistryOverrideModuleInputsValue;
+use slug_bzlmod::NonRootModuleFileInput;
 use slug_bzlmod::NonRootModuleFilesValue;
 use slug_bzlmod::ParsedModuleFile;
 use slug_bzlmod::RegistryFileInputsValue;
@@ -2248,12 +2248,6 @@ struct BazelRegistryJsonForValidation {
     mirrors: Option<Vec<String>>,
     #[serde(rename = "moduleBasePath")]
     module_base_path: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
-struct NonRootModuleFileInput {
-    module_key: String,
-    module_bazel_path: PathBuf,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -4668,12 +4662,55 @@ impl BuckConfigBasedCells {
 
         let workspace_root = key.project_root.as_path();
         let project_fs = ProjectRoot::new_unchecked(key.project_root.clone());
-        let root_module_name = if parsed.module.name.is_empty() {
-            "_main".to_owned()
+        let graph_inputs = slug_bzlmod::resolve_graph_with_module_file_inputs(
+            &parsed,
+            workspace_root,
+            &key.options,
+            key.local_override_inputs.as_ref(),
+            key.non_registry_override_inputs.as_ref(),
+            key.override_patch_inputs.clone(),
+            visible_lockfile.as_deref(),
+        )
+        .await?;
+        let graph = graph_inputs.graph;
+        let mut parsed_modules = graph_inputs.parsed_modules;
+        if !graph_inputs.non_root_module_file_inputs.is_empty() {
+            let non_root_value = dice_ctx
+                .compute(&NonRootModuleFilesKey {
+                    project_root: key.project_root.clone(),
+                    inputs: graph_inputs.non_root_module_file_inputs,
+                })
+                .await
+                .with_buck_error_context(|| {
+                    format!(
+                        "Failed to parse non-root MODULE.bazel files via DICE while computing clean graph for root module '{}'",
+                        parsed.module.name
+                    )
+                })?;
+            let non_root_value = non_root_value.with_buck_error_context(|| {
+                format!(
+                    "Failed to parse non-root MODULE.bazel files for '{}'",
+                    parsed.module.name
+                )
+            })?;
+            slug_bzlmod::append_resolved_non_root_modules(
+                &mut parsed_modules,
+                &graph,
+                key.non_registry_override_inputs.as_ref(),
+                &non_root_value.parsed_modules,
+            );
         } else {
-            parsed.module.name.clone()
-        };
-        let mut graph = slug_bzlmod::ResolvedGraph::default();
+            slug_bzlmod::append_resolved_non_root_modules(
+                &mut parsed_modules,
+                &graph,
+                key.non_registry_override_inputs.as_ref(),
+                &[],
+            );
+        }
+        let root_module_name = parsed_modules
+            .first()
+            .map(|(name, _)| name.clone())
+            .unwrap_or_else(|| "_main".to_owned());
         let mut resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
             key.resolution_key.workspace_id.clone(),
             indexmap::IndexMap::new(),
@@ -4684,193 +4721,7 @@ impl BuckConfigBasedCells {
             parsed.module.name.clone(),
             parsed.module.version.to_string(),
         );
-        let mut parsed_modules = vec![(root_module_name.clone(), parsed.clone())];
-
         if !parsed.module.bazel_deps.is_empty() {
-            let active_deps: Vec<_> = parsed
-                .module
-                .bazel_deps
-                .iter()
-                .filter(|dep| !(key.options.ignore_dev_dependency && dep.dev_dependency))
-                .collect();
-            let local_override_paths: HashMap<_, _> = slug_bzlmod::active_root_overrides(
-                &parsed.module,
-                key.options.ignore_dev_dependency,
-            )
-            .into_iter()
-            .filter_map(|override_| match override_ {
-                slug_bzlmod::Override::LocalPath(local) => Some((local.module_name, local.path)),
-                _ => None,
-            })
-            .collect();
-            let local_override_modules: HashMap<_, _> = key
-                .local_override_inputs
-                .parsed_modules
-                .iter()
-                .map(|(name, parsed)| (name.as_str(), parsed))
-                .collect();
-            let can_build_from_tracked_local_overrides = !active_deps.is_empty()
-                && !key.local_override_inputs.has_bazel_deps
-                && active_deps.iter().all(|dep| {
-                    local_override_paths.contains_key(&dep.name)
-                        && local_override_modules.contains_key(dep.name.as_str())
-                });
-
-            if can_build_from_tracked_local_overrides {
-                let mut modules = fxhash::FxHashMap::default();
-                let mut selected_versions = HashMap::new();
-                let mut resolution_order = Vec::new();
-                for dep in active_deps {
-                    let override_path = local_override_paths
-                        .get(&dep.name)
-                        .expect("local override path checked above");
-                    let parsed_override = local_override_modules
-                        .get(dep.name.as_str())
-                        .expect("local override module checked above");
-                    parsed_modules.push((dep.name.clone(), (*parsed_override).clone()));
-                    let version = parsed_override.module.version.to_string();
-                    selected_versions.insert(dep.name.clone(), version.clone());
-                    resolution_order.push(dep.name.clone());
-                    modules.insert(
-                        dep.name.clone(),
-                        slug_bzlmod::ResolvedModuleInfo {
-                            name: dep.name.clone(),
-                            version,
-                            compatibility_level: parsed_override.module.compatibility_level,
-                            dependencies: HashMap::new(),
-                            source: ModuleSource::LocalPath {
-                                path: override_path.clone(),
-                            },
-                            source_path: Some(PathBuf::from(override_path)),
-                        },
-                    );
-                }
-                graph = slug_bzlmod::ResolvedGraph {
-                    selected_versions,
-                    modules,
-                    resolution_order,
-                    registry_file_hashes: indexmap::IndexMap::new(),
-                    selected_yanked_versions: indexmap::IndexMap::new(),
-                };
-            } else {
-                let allowed_yanked_versions = slug_bzlmod::parse_allowed_yanked_versions(
-                    key.options.allow_yanked_versions_env.as_deref(),
-                    &key.options.allow_yanked_versions_flags,
-                )?;
-                let cache = ModuleCache::new().with_buck_error_context(|| {
-                    format!(
-                        "Failed to initialize bzlmod module cache while computing clean graph for root module '{}'",
-                        parsed.module.name
-                    )
-                })?;
-                let mut resolver =
-                    MvsResolver::new(cache, key.override_patch_inputs.clone())
-                        .await
-                        .with_buck_error_context(|| {
-                            format!(
-                                "Failed to create MVS resolver while computing clean graph for root module '{}'",
-                                parsed.module.name
-                            )
-                        })?;
-                if let Some(lockfile) = visible_lockfile.as_ref() {
-                    resolver.set_yanked_version_policy(
-                        allowed_yanked_versions,
-                        key.options.lockfile_mode,
-                        lockfile.registry_file_hashes.clone(),
-                        lockfile.selected_yanked_versions.clone(),
-                    );
-                } else {
-                    resolver.set_yanked_version_policy(
-                        allowed_yanked_versions,
-                        key.options.lockfile_mode,
-                        Default::default(),
-                        Default::default(),
-                    );
-                }
-                resolver.set_ignore_dev_dependency(key.options.ignore_dev_dependency);
-                graph = resolver
-                    .resolve(&parsed.module, workspace_root)
-                    .await
-                    .with_buck_error_context(|| {
-                        format!(
-                            "MVS resolution failed while computing clean graph for root module '{}' ({} direct dependencies)",
-                            parsed.module.name,
-                            parsed.module.bazel_deps.len()
-                        )
-                    })?;
-                resolver.fetch_sources(&mut graph).await.with_buck_error_context(|| {
-                    format!(
-                        "Failed to fetch selected module sources while computing clean graph for root module '{}'",
-                        parsed.module.name
-                    )
-                })?;
-                let non_registry_parsed_modules: HashMap<&str, &ParsedModuleFile> = key
-                    .non_registry_override_inputs
-                    .parsed_modules
-                    .iter()
-                    .map(|(name, parsed)| (name.as_str(), parsed))
-                    .collect();
-                let non_registry_names: HashSet<&str> =
-                    non_registry_parsed_modules.keys().copied().collect();
-                let mut non_root_inputs: Vec<NonRootModuleFileInput> = Vec::new();
-                for module_name in &graph.resolution_order {
-                    if non_registry_names.contains(module_name.as_str()) {
-                        continue;
-                    }
-                    let Some(module_info) = graph.modules.get(module_name) else {
-                        continue;
-                    };
-                    let Some(source_path) = module_info.source_path.as_ref() else {
-                        continue;
-                    };
-                    let module_dir = if source_path.is_absolute() {
-                        source_path.clone()
-                    } else {
-                        workspace_root.join(source_path)
-                    };
-                    let module_bazel_path = module_dir.join("MODULE.bazel");
-                    non_root_inputs.push(NonRootModuleFileInput {
-                        module_key: module_name.clone(),
-                        module_bazel_path,
-                    });
-                }
-                let dice_parsed: HashMap<String, ParsedModuleFile> = if !non_root_inputs.is_empty()
-                {
-                    let non_root_value = dice_ctx
-                            .compute(&NonRootModuleFilesKey {
-                                project_root: key.project_root.clone(),
-                                inputs: non_root_inputs,
-                            })
-                            .await
-                            .with_buck_error_context(|| {
-                                format!(
-                                    "Failed to parse non-root MODULE.bazel files via DICE while computing clean graph for root module '{}'",
-                                    parsed.module.name
-                                )
-                            })?;
-                    let non_root_value = non_root_value.with_buck_error_context(|| {
-                        format!(
-                            "Failed to parse non-root MODULE.bazel files for '{}'",
-                            parsed.module.name
-                        )
-                    })?;
-                    non_root_value
-                        .parsed_modules
-                        .iter()
-                        .map(|(name, parsed)| (name.clone(), parsed.clone()))
-                        .collect()
-                } else {
-                    HashMap::new()
-                };
-                for module_name in &graph.resolution_order {
-                    if let Some(parsed) = non_registry_parsed_modules.get(module_name.as_str()) {
-                        parsed_modules.push((module_name.clone(), (*parsed).clone()));
-                    } else if let Some(parsed) = dice_parsed.get(module_name) {
-                        parsed_modules.push((module_name.clone(), parsed.clone()));
-                    }
-                }
-            }
-
             resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
                 key.resolution_key.workspace_id.clone(),
                 graph.registry_file_hashes.clone(),
