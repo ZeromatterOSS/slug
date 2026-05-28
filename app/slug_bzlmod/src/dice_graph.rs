@@ -486,26 +486,8 @@ impl Key for BzlmodCellGraphKey {
             ));
         }
 
-        // Transitional bridge hardening: the cell graph payload is still
-        // injected, but a semantic cell-graph hit must also be explained by
-        // the sibling bzlmod inputs that feed the clean graph producer.
-        let _ = ctx
-            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
-        let _ = ctx
-            .compute(&BzlmodRepoEnvKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
-        let _ = ctx
-            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
-        let _ = ctx
-            .compute(&BzlmodResolutionFactsKey::for_workspace_id(
+        let module_versions = ctx
+            .compute(&ModuleVersionsKey::for_workspace_id(
                 self.workspace_id.clone(),
             ))
             .await??;
@@ -522,7 +504,9 @@ impl Key for BzlmodCellGraphKey {
                     .display()
             ));
         }
-        Ok(data.cell_graph.clone())
+        let mut cell_graph = data.cell_graph.as_ref().clone();
+        cell_graph.root_module_name = module_versions.invalidation.root_module_name.clone();
+        Ok(Arc::new(cell_graph))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

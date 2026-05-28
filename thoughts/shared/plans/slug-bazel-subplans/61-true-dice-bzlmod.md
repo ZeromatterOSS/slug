@@ -325,6 +325,17 @@ Current state to preserve:
   the standard preseed/replay guardrails, `cargo build -p slug`,
   `git diff --check`, and the focused Python replay set also passed after this
   change.
+- 2026-05-28 cell-graph root-name reduction: `BzlmodCellGraphKey` now derives
+  the returned graph's `root_module_name` from `ModuleVersionsKey` instead of
+  trusting the injected graph payload copy. This is intentionally a narrow
+  payload-reduction step: `BzlmodCellGraphDataKey` still carries the cell,
+  extension-cell, alias, symlink, scoped-alias, and dynamic-alias vectors, but
+  the root module identity is owned by the sibling DICE module-version
+  projection. Guardrail:
+  `cargo test -p slug_bzlmod cell_graph_key_uses_module_data_root_name --lib`.
+  Also validated with the focused bzlmod cell-graph and persisted clean-graph
+  tests, `cargo build -p slug`, `git diff --check`, and the focused Python
+  replay set.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -975,9 +986,10 @@ hardening behavior around it.
      external symlinks, and bundled repos from DICE values.
    - `BzlmodCellGraphDataKey` currently exposes injected graph data rather than
      computing the graph itself. The production payload is now derived from the
-     clean resolved-graph producer, carries that producer's graph digest, and
-     legacy cell parsing takes only that graph-shaped value. The old
-     `BzlmodProjectionData` wrapper has been deleted.
+     clean resolved-graph producer and carries that producer's graph digest.
+     The returned graph's root module name is derived from `ModuleVersionsKey`;
+     legacy cell parsing still takes the remaining graph-shaped vectors from
+     this payload. The old `BzlmodProjectionData` wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
