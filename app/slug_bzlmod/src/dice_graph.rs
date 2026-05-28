@@ -491,6 +491,11 @@ impl Key for BzlmodCellGraphKey {
                 self.workspace_id.clone(),
             ))
             .await??;
+        let repo_mappings = ctx
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
         let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
         if extension_aggregations.workspace_id != self.workspace_id {
             return Err(slug_error::slug_error!(
@@ -506,6 +511,10 @@ impl Key for BzlmodCellGraphKey {
         }
         let mut cell_graph = data.cell_graph.as_ref().clone();
         cell_graph.root_module_name = module_versions.invalidation.root_module_name.clone();
+        cell_graph.scoped_aliases = Arc::new(scoped_aliases_from_repo_mappings(
+            &repo_mappings,
+            &cell_graph.root_module_name,
+        ));
         Ok(Arc::new(cell_graph))
     }
 
@@ -1122,6 +1131,46 @@ impl Key for ModuleVersionsKey {
             _ => false,
         }
     }
+}
+
+fn scoped_aliases_from_repo_mappings(
+    repo_mappings: &BzlmodRepoMappingsDataValue,
+    root_module_name: &str,
+) -> Vec<BzlmodCellGraphScopedAlias> {
+    let mut scoped_aliases = Vec::new();
+    for (owner_module, mapping) in repo_mappings.repo_mappings.iter() {
+        if owner_module.is_empty() {
+            continue;
+        }
+        for (apparent_name, target_name) in mapping {
+            scoped_aliases.push(BzlmodCellGraphScopedAlias {
+                owner_module: owner_module.clone(),
+                apparent_name: apparent_name.clone(),
+                target_name: target_name.clone(),
+            });
+        }
+    }
+    for (extension_id, overrides) in repo_mappings.repo_mapping_overrides.iter() {
+        let owner_module = crate::extension_execution_dice::extract_owning_module(
+            extension_id,
+            root_module_name,
+        );
+        for (apparent_name, target_name) in overrides {
+            scoped_aliases.push(BzlmodCellGraphScopedAlias {
+                owner_module: owner_module.clone(),
+                apparent_name: apparent_name.clone(),
+                target_name: target_name.clone(),
+            });
+            if let Some(owner_without_separator) = owner_module.strip_suffix('+') {
+                scoped_aliases.push(BzlmodCellGraphScopedAlias {
+                    owner_module: owner_without_separator.to_owned(),
+                    apparent_name: apparent_name.clone(),
+                    target_name: target_name.clone(),
+                });
+            }
+        }
+    }
+    scoped_aliases
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
