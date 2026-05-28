@@ -202,6 +202,19 @@ source_file_package`, `cargo check -p slug_analysis`, `cargo build -p slug`,
 and `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` reaching `BUILD
 SUCCEEDED` in `/tmp/slug-plan61-sdk-smoke-20260528T0014-native-source-path-long.log`.
 
+**Bridge surface reduced**: `BzlmodCellGraphKey` no longer returns the injected
+cell graph as a standalone semantic cache hit. The key now also depends on the
+named lockfile-input, repo-env, repo-mapping, resolution-fact, and
+extension-aggregation DICE keys for the same workspace before exposing the graph
+to repository label resolution and resolver consumers. This does not remove the
+remaining injected `BzlmodCellGraphDataKey` producer, but it makes the
+transitional cell graph cache hit depend on the same sibling facts that feed the
+clean graph producer instead of trusting the graph-shaped payload alone.
+Intended owner remains `BzlmodCellGraphKey` derived from `BzlmodWorkspaceKey`,
+`BzlmodResolutionKey`, `RepoMappingKey`, extension aggregation/replay keys, and
+lockfile policy keys. Validation passed with focused cell-graph tests and
+`cargo test -p slug_bzlmod`.
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in

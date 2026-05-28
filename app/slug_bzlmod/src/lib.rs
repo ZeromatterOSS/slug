@@ -1368,6 +1368,10 @@ mod tests {
                 Vec::new(),
             )),
         )])?;
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            Arc::new(empty_extension_aggregations(workspace_id.clone())),
+        )])?;
         let mut dice = updater.commit().await;
 
         let module_versions = dice
@@ -1402,6 +1406,10 @@ mod tests {
         assert_eq!(repo_mappings.workspace_id, workspace_id);
         assert_eq!(lockfile_inputs.lockfile_mode, LockfileMode::Update);
         assert!(repo_env.is_empty());
+        let cell_graph = dice
+            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
+            .await??;
+        assert_eq!(cell_graph.workspace_id, workspace_id);
 
         assert!(
             dice.compute(&ModuleVersionsKey::for_workspace_id(
@@ -1447,6 +1455,25 @@ mod tests {
         );
 
         let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            Arc::new(empty_extension_aggregations(other_workspace_id.clone())),
+        )])?;
+        let mut dice = updater.commit().await;
+        let err = dice
+            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("extension aggregation data root"),
+            "{err:?}"
+        );
+
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            Arc::new(empty_extension_aggregations(workspace_id.clone())),
+        )])?;
         updater.changed_to(vec![(
             BzlmodRepoMappingsDataKey,
             Arc::new(BzlmodRepoMappingsDataValue::for_workspace(

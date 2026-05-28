@@ -1835,6 +1835,7 @@ impl<'a> InvocationAttrs<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SetBzlmodDiceInputs;
     use crate::repo_spec::RepoSpec;
     use crate::repository_invocations::AttrValue;
 
@@ -1919,10 +1920,42 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.changed_to(vec![(
-            crate::dice_graph::BzlmodCellGraphDataKey,
-            Arc::new(cell_graph),
-        )])?;
+        updater.set_bzlmod_cell_graph_data_with_inputs(
+            cell_graph,
+            crate::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                workspace_id.clone(),
+                "root".to_owned(),
+                Arc::new(Default::default()),
+            ),
+            crate::BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(crate::BzlmodLockfileInputsValue::default()),
+            ),
+            crate::BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            ),
+            crate::RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
+            crate::RegisteredExecutionPlatformsDataValue::for_workspace(
+                workspace_id.clone(),
+                Vec::new(),
+            ),
+            crate::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+                workspace_id.clone(),
+                "root".to_owned(),
+                Arc::new(Default::default()),
+            ),
+            crate::BzlmodResolutionFactsValue::for_workspace(
+                workspace_id.clone(),
+                indexmap::IndexMap::new(),
+                indexmap::IndexMap::new(),
+            ),
+            crate::BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(Default::default()),
+                Arc::new(Default::default()),
+            ),
+        )?;
         let mut dice = updater.commit().await;
 
         let actual = dice

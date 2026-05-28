@@ -455,6 +455,43 @@ impl Key for BzlmodCellGraphKey {
                 value.workspace_id.canonical_project_root.display()
             ));
         }
+
+        // Transitional bridge hardening: the cell graph payload is still
+        // injected, but a semantic cell-graph hit must also be explained by
+        // the sibling bzlmod inputs that feed the clean graph producer.
+        let _ = ctx
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        let _ = ctx
+            .compute(&BzlmodRepoEnvKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        let _ = ctx
+            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        let _ = ctx
+            .compute(&BzlmodResolutionFactsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        if extension_aggregations.workspace_id != self.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodCellGraphKey was computed with project root '{}', \
+                 but current bzlmod extension aggregation data root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                extension_aggregations
+                    .workspace_id
+                    .canonical_project_root
+                    .display()
+            ));
+        }
         Ok(value)
     }
 
