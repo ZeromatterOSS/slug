@@ -37,6 +37,7 @@ use crate::dice::data::HasIoProvider;
 use crate::file_ops::delegate::get_delegated_file_ops;
 use crate::file_ops::error::FileReadError;
 use crate::file_ops::error::extended_ignore_error;
+use crate::file_ops::metadata::FileType;
 use crate::file_ops::metadata::RawPathMetadata;
 use crate::file_ops::metadata::ReadDirOutput;
 use crate::file_ops::metadata::SimpleDirEntry;
@@ -160,7 +161,22 @@ impl DiceFileComputations {
         ctx: &mut DiceComputations<'_>,
         path: &ProjectRelativePath,
     ) -> slug_error::Result<Arc<Vec<String>>> {
-        ctx.compute(&ProjectReadDirEntryNamesKey(Arc::new(path.to_owned())))
+        Ok(Arc::new(
+            Self::read_project_dir_entries(ctx, path)
+                .await?
+                .iter()
+                .map(|(name, _)| name.clone())
+                .collect(),
+        ))
+    }
+
+    /// Reads sorted project-relative directory entries without going through a
+    /// cell resolver. This intentionally does not apply Buck ignore logic.
+    pub async fn read_project_dir_entries(
+        ctx: &mut DiceComputations<'_>,
+        path: &ProjectRelativePath,
+    ) -> slug_error::Result<Arc<Vec<(String, FileType)>>> {
+        ctx.compute(&ProjectReadDirEntriesKey(Arc::new(path.to_owned())))
             .await?
     }
 
@@ -516,30 +532,30 @@ impl Key for ProjectPathMetadataKey {
 }
 
 #[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
-#[display("ProjectReadDirEntryNamesKey({})", _0)]
-struct ProjectReadDirEntryNamesKey(Arc<ProjectRelativePathBuf>);
+#[display("ProjectReadDirEntriesKey({})", _0)]
+struct ProjectReadDirEntriesKey(Arc<ProjectRelativePathBuf>);
 
-impl Dupe for ProjectReadDirEntryNamesKey {
+impl Dupe for ProjectReadDirEntriesKey {
     fn dupe(&self) -> Self {
         Self(self.0.dupe())
     }
 }
 
 #[async_trait]
-impl Key for ProjectReadDirEntryNamesKey {
-    type Value = slug_error::Result<Arc<Vec<String>>>;
+impl Key for ProjectReadDirEntriesKey {
+    type Value = slug_error::Result<Arc<Vec<(String, FileType)>>>;
     async fn compute(
         &self,
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let mut entries: Vec<String> = ctx
+        let mut entries: Vec<(String, FileType)> = ctx
             .global_data()
             .get_io_provider()
             .read_dir(self.0.as_ref().to_owned())
             .await?
             .into_iter()
-            .map(|entry| entry.file_name.to_string())
+            .map(|entry| (entry.file_name.to_string(), entry.file_type))
             .collect();
         entries.sort();
         Ok(Arc::new(entries))

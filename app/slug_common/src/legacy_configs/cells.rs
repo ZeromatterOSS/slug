@@ -65,6 +65,7 @@ use crate::dice::data::SetIoProvider;
 use crate::external_cells::EXTERNAL_CELLS_IMPL;
 use crate::file_ops::dice::DiceFileComputations;
 use crate::file_ops::dice::register_bzlmod_config_project_file;
+use crate::file_ops::metadata::FileType;
 use crate::file_ops::metadata::RawPathMetadata;
 use crate::io::fs::FsIoProvider;
 use crate::legacy_configs::aggregator::CellsAggregator;
@@ -2129,6 +2130,23 @@ async fn preseed_recorded_inputs_current_through_dice(
                     return Ok(Some(Err(recorded_input_changed_reason(raw))));
                 }
             }
+            PreseedRecordedInput::DirTree(path) => {
+                let Some(old_value) = old_value else {
+                    return Ok(Some(Err("recorded_input_malformed".to_owned())));
+                };
+                let Some(project_path) = preseed_recorded_project_path(&path, workspace_root)
+                else {
+                    return Ok(None);
+                };
+                let Some(current) =
+                    preseed_recorded_dirtree_marker_value(ctx, project_path.as_ref()).await?
+                else {
+                    return Ok(None);
+                };
+                if current != old_value {
+                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
+                }
+            }
             PreseedRecordedInput::Env(name) => {
                 let Some(repo_env) = repo_env else {
                     return Ok(Some(Err("recorded_input_unsupported".to_owned())));
@@ -2165,6 +2183,7 @@ async fn preseed_recorded_inputs_current_through_dice(
 enum PreseedRecordedInput {
     File(PathBuf),
     Dirents(PathBuf),
+    DirTree(PathBuf),
     Env(String),
     RepoMapping {
         source_repo: String,
@@ -2192,6 +2211,7 @@ fn parse_preseed_recorded_input(input: &str) -> PreseedRecordedInput {
     match kind {
         "FILE" => PreseedRecordedInput::File(PathBuf::from(payload)),
         "DIRENTS" => PreseedRecordedInput::Dirents(PathBuf::from(payload)),
+        "DIRTREE" => PreseedRecordedInput::DirTree(PathBuf::from(payload)),
         "ENV" => PreseedRecordedInput::Env(payload.to_owned()),
         "REPO_MAPPING" => payload
             .split_once(',')
@@ -2289,6 +2309,77 @@ async fn preseed_recorded_dirents_marker_value(
     register_bzlmod_config_project_file(path.to_owned());
     let entries = DiceFileComputations::read_project_dir_entry_names(ctx, path).await?;
     Ok(bazel_fingerprint_add_strings_hex(entries.as_slice()))
+}
+
+async fn preseed_recorded_dirtree_marker_value(
+    ctx: &mut DiceComputations<'_>,
+    path: &ProjectRelativePath,
+) -> slug_error::Result<Option<String>> {
+    register_bzlmod_config_project_file(path.to_owned());
+    let entries = match DiceFileComputations::read_project_dir_entries(ctx, path).await {
+        Ok(entries) => entries,
+        Err(_) => return Ok(Some("ENOENT".to_owned())),
+    };
+    let entry_names: Vec<String> = entries.iter().map(|(name, _)| name.clone()).collect();
+    let mut subdir_digests = Vec::new();
+    let mut file_values = Vec::new();
+    for (entry, file_type) in entries.iter() {
+        let Some(entry_path) = project_child_path(path, entry) else {
+            return Ok(None);
+        };
+        match *file_type {
+            FileType::Directory => {
+                let Some(digest) = Box::pin(preseed_recorded_dirtree_marker_value(
+                    ctx,
+                    entry_path.as_ref(),
+                ))
+                .await?
+                else {
+                    return Ok(None);
+                };
+                subdir_digests.push(digest);
+                file_values.push((2, None));
+            }
+            FileType::File => {
+                let content = match DiceFileComputations::read_project_file_if_exists(
+                    ctx,
+                    entry_path.as_ref(),
+                )
+                .await
+                {
+                    Ok(Some(content)) => content,
+                    Ok(None) => {
+                        file_values.push((1, None));
+                        continue;
+                    }
+                    Err(_) => return Ok(None),
+                };
+                file_values.push((0, Some(Sha256::digest(content.as_bytes()).to_vec())));
+            }
+            FileType::Symlink => return Ok(None),
+            FileType::Unknown => file_values.push((1, None)),
+        }
+    }
+
+    let mut bytes = Vec::new();
+    bazel_fingerprint_add_strings(&entry_names, &mut bytes);
+    bazel_fingerprint_add_strings(&subdir_digests, &mut bytes);
+    for (file_state_type_ordinal, digest) in file_values {
+        encode_varint(file_state_type_ordinal, &mut bytes);
+        if let Some(digest) = digest {
+            bytes.extend_from_slice(&digest);
+        }
+    }
+    Ok(Some(hex::encode(Sha256::digest(&bytes))))
+}
+
+fn project_child_path(parent: &ProjectRelativePath, child: &str) -> Option<ProjectRelativePathBuf> {
+    let path = if parent.as_str().is_empty() {
+        child.to_owned()
+    } else {
+        format!("{}/{}", parent.as_str(), child)
+    };
+    ProjectRelativePathBuf::try_from(path).ok()
 }
 
 fn bazel_fingerprint_add_strings_hex(inputs: &[String]) -> String {
@@ -7280,6 +7371,56 @@ ext = module_extension(implementation = _impl)
         );
 
         fs.write_file("watched_dir/second.txt", "second\n");
+        let mut dice = dice.into_updater().commit().await;
+        let result = preseed_recorded_inputs_current_through_dice(
+            &mut dice,
+            &recorded_inputs,
+            Some(fs.path().root().as_path()),
+            Some(&repo_env),
+            Some(&repo_mappings),
+        )
+        .await?;
+        assert!(matches!(result, Some(Err(reason)) if reason.contains("recorded_input_changed")));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn preseed_recorded_inputs_track_workspace_dirtree_through_dice() -> slug_error::Result<()>
+    {
+        let fs = ProjectRootTemp::new()?;
+        std::fs::create_dir(fs.path().root().as_path().join("watched_tree"))?;
+        std::fs::create_dir(fs.path().root().as_path().join("watched_tree/nested"))?;
+        fs.write_file("watched_tree/nested/leaf.txt", "first\n");
+        let recorded =
+            slug_bzlmod::recorded_dirtree_input(&fs.path().root().as_path().join("watched_tree"))?;
+        let (_, digest) = recorded
+            .split_once(' ')
+            .expect("recorded dirtree marker has digest");
+        let recorded_inputs = vec![format!("DIRTREE:@@//watched_tree {digest}")];
+        let repo_env = BTreeMap::new();
+        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        assert_eq!(
+            preseed_recorded_inputs_current_through_dice(
+                &mut dice,
+                &recorded_inputs,
+                Some(fs.path().root().as_path()),
+                Some(&repo_env),
+                Some(&repo_mappings),
+            )
+            .await?,
+            Some(Ok(()))
+        );
+
+        fs.write_file("watched_tree/nested/leaf.txt", "second\n");
         let mut dice = dice.into_updater().commit().await;
         let result = preseed_recorded_inputs_current_through_dice(
             &mut dice,
