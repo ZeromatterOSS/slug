@@ -549,14 +549,16 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             } else {
                 Some(Arc::new(cell_graph))
             };
-        let cell_graph_data = Arc::new(
-            BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
-                cell_graph_workspace_id.clone(),
-                cell_graph_resolution_digest.clone(),
-                resolved_graph.is_some(),
-                fallback_cell_graph,
-            ),
-        );
+        let cell_graph_data = fallback_cell_graph.clone().map(|fallback_cell_graph| {
+            Arc::new(
+                BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
+                    cell_graph_workspace_id.clone(),
+                    cell_graph_resolution_digest.clone(),
+                    resolved_graph.is_some(),
+                    Some(fallback_cell_graph),
+                ),
+            )
+        });
         let resolved_graph_data = Arc::new(BzlmodResolvedGraphDataValue::for_workspace(
             cell_graph_workspace_id.clone(),
             cell_graph_resolution_digest,
@@ -581,7 +583,9 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
         )])?;
-        self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
+        if let Some(cell_graph_data) = cell_graph_data {
+            self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
+        }
         self.changed_to(vec![(BzlmodResolvedGraphDataKey, resolved_graph_data)])?;
         Ok(())
     }
@@ -616,6 +620,11 @@ pub async fn registered_execution_platforms_for_current_workspace(
 pub async fn bzlmod_cell_graph_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
+    let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
+    if resolved_graph_data.graph.is_some() {
+        return bzlmod_cell_graph_for_workspace_id(ctx, resolved_graph_data.workspace_id.clone())
+            .await;
+    }
     let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
     bzlmod_cell_graph_for_workspace_id(ctx, data.workspace_id.clone()).await
 }
@@ -624,6 +633,26 @@ pub async fn bzlmod_cell_graph_for_workspace_id(
     ctx: &mut dice::DiceComputations<'_>,
     workspace_id: WorkspaceId,
 ) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
+    let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
+    if resolved_graph_data.graph.is_some() {
+        if resolved_graph_data.workspace_id != workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "bzlmod cell graph requested for project root '{}', \
+                 but current bzlmod resolved graph root is '{}'",
+                workspace_id.canonical_project_root.display(),
+                resolved_graph_data
+                    .workspace_id
+                    .canonical_project_root
+                    .display()
+            ));
+        }
+        let key = BzlmodCellGraphKey {
+            workspace_id,
+            resolution_digest: resolved_graph_data.resolution_digest.clone(),
+        };
+        return ctx.compute(&key).await?;
+    }
     let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
     if data.workspace_id != workspace_id {
         return Err(slug_error::slug_error!(
@@ -2315,6 +2344,7 @@ mod tests {
             },
         );
         let resolved_graph = Arc::new(resolved_graph);
+        let resolution_digest: Arc<str> = Arc::from("test-resolved-graph-digest");
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -2326,7 +2356,7 @@ mod tests {
             BzlmodCellGraphDataKey,
             Arc::new(BzlmodCellGraphDataValue::for_workspace_with_resolved_graph(
                 workspace_id.clone(),
-                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                resolution_digest.clone(),
                 Arc::new(payload_graph),
                 Some(resolved_graph.clone()),
             )),
@@ -2335,7 +2365,7 @@ mod tests {
             BzlmodResolvedGraphDataKey,
             Arc::new(BzlmodResolvedGraphDataValue::for_workspace(
                 workspace_id.clone(),
-                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                resolution_digest.clone(),
                 Some(resolved_graph),
             )),
         )])?;
@@ -2392,7 +2422,10 @@ mod tests {
         let mut dice = updater.commit().await;
 
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .compute(&BzlmodCellGraphKey {
+                workspace_id,
+                resolution_digest,
+            })
             .await??;
 
         assert!(cell_graph.cells.iter().any(|cell| {

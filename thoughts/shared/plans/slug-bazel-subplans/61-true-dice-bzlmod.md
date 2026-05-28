@@ -421,6 +421,15 @@ Current state to preserve:
   `BzlmodResolvedGraphDataKey` input consumed by module-cell and residual
   symlink projection keys. Guardrail:
   `cargo test -p slug_bzlmod cell_graph_key_ --lib`.
+- 2026-05-28 production cell-graph computation bypasses fallback bridge:
+  clean-digest `BzlmodCellGraphKey` computations derive module cells and
+  residual symlinks from `BzlmodResolvedGraphDataKey` without first reading
+  `BzlmodCellGraphDataKey`; no-extension production graphs return an empty
+  extension-cell vector without consulting fallback graph data. The
+  `BzlmodCellGraphDataKey` injection is now emitted only when a fallback graph
+  exists, which covers injected-digest tests and no-executor bootstrap.
+  Guardrail:
+  `cargo test -p slug_bzlmod cell_graph_key_ --lib && cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1085,8 +1094,10 @@ hardening behavior around it.
     graph identity when that executor is installed, and `BzlmodCellGraphDataValue`
     carries no fallback graph in that production case. The resolved graph has
     been split out to `BzlmodResolvedGraphDataKey`; the cell-graph data payload
-    no longer bundles it. The old `BzlmodProjectionData` wrapper has been
-    deleted.
+    no longer bundles it. Clean-digest production cell graph computation now
+    bypasses `BzlmodCellGraphDataKey`; that key is only a bootstrap/fallback
+    input when an injected fallback graph exists. The old `BzlmodProjectionData`
+    wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
@@ -1100,10 +1111,9 @@ hardening behavior around it.
      resolution facts, repo mappings, registered toolchains, registered
      execution platforms, extension aggregations, and module versions are
      passed as separate named injections. The remaining transitional API is the
-     injected `BzlmodCellGraphDataKey`/`BzlmodResolvedGraphDataKey` pair:
-     production now injects clean graph identity and clean resolved graph
-     addressed by the clean resolved-graph digest, but the key pair does not
-     compute the graph from DICE dependencies yet.
+     injected `BzlmodResolvedGraphDataKey`: production now injects clean
+     resolved graph addressed by the clean resolved-graph digest, but that key
+     does not compute the graph from DICE dependencies yet.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being

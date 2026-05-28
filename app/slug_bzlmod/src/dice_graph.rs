@@ -531,14 +531,7 @@ impl Key for BzlmodCellDefinitionsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        validate_cell_graph_payload(
-            "BzlmodCellDefinitionsKey",
-            &self.workspace_id,
-            &self.resolution_digest,
-            &data,
-        )?;
-        if data.uses_resolved_graph {
+        if should_use_resolved_graph_data(&self.resolution_digest) {
             let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
             validate_resolved_graph_payload(
                 "BzlmodCellDefinitionsKey",
@@ -570,6 +563,13 @@ impl Key for BzlmodCellDefinitionsKey {
                 &repo_mappings,
             )));
         }
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        validate_cell_graph_payload(
+            "BzlmodCellDefinitionsKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
         Ok(data
             .fallback_cell_graph
             .as_ref()
@@ -600,13 +600,6 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        validate_cell_graph_payload(
-            "BzlmodExtensionCellDefinitionsKey",
-            &self.workspace_id,
-            &self.resolution_digest,
-            &data,
-        )?;
         let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
         if extension_aggregations.workspace_id != self.workspace_id {
             return Err(slug_error::slug_error!(
@@ -642,6 +635,13 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             {
                 Ok(cells) => Ok(cells),
                 Err(e) if e.to_string().contains("module extension executor") => {
+                    let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+                    validate_cell_graph_payload(
+                        "BzlmodExtensionCellDefinitionsKey",
+                        &self.workspace_id,
+                        &self.resolution_digest,
+                        &data,
+                    )?;
                     Ok(data.fallback_cell_graph.as_ref().map_or_else(
                         || Arc::new(Vec::new()),
                         |graph| graph.extension_cells.dupe(),
@@ -650,6 +650,16 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
                 Err(e) => Err(e),
             };
         }
+        if should_use_resolved_graph_data(&self.resolution_digest) {
+            return Ok(Arc::new(Vec::new()));
+        }
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        validate_cell_graph_payload(
+            "BzlmodExtensionCellDefinitionsKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
         Ok(data.fallback_cell_graph.as_ref().map_or_else(
             || Arc::new(Vec::new()),
             |graph| graph.extension_cells.dupe(),
@@ -747,14 +757,7 @@ impl Key for BzlmodResidualModuleSymlinksKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        validate_cell_graph_payload(
-            "BzlmodResidualModuleSymlinksKey",
-            &self.workspace_id,
-            &self.resolution_digest,
-            &data,
-        )?;
-        if data.uses_resolved_graph {
+        if should_use_resolved_graph_data(&self.resolution_digest) {
             let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
             validate_resolved_graph_payload(
                 "BzlmodResidualModuleSymlinksKey",
@@ -774,6 +777,13 @@ impl Key for BzlmodResidualModuleSymlinksKey {
                 resolved_graph,
             )));
         }
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        validate_cell_graph_payload(
+            "BzlmodResidualModuleSymlinksKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
         Ok(Arc::new(
             data.fallback_cell_graph
                 .as_ref()
@@ -818,6 +828,10 @@ fn validate_cell_graph_payload(
         ));
     }
     Ok(())
+}
+
+fn should_use_resolved_graph_data(resolution_digest: &str) -> bool {
+    resolution_digest != INJECTED_BZLMOD_PROJECTION_DIGEST
 }
 
 fn validate_resolved_graph_payload(
