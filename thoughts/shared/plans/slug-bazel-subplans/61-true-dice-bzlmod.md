@@ -471,6 +471,11 @@ Current state to preserve:
   but no longer owns the bzlmod AST policy for which root directives are active
   under `ignore_dev_dependency`. Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo build -p slug`.
+- 2026-05-28 lockfile-input identity boundary reduction:
+  `BzlmodLockfileInputsValue` now owns its resolver-key identity equality and
+  hashing in `slug_bzlmod`; `slug_common` no longer defines how visible/hidden
+  lockfile inputs contribute to the clean resolved graph key. Guardrail:
+  `cargo test -p slug_common bzlmod_resolution_policy_includes_hidden_lockfile_path --lib && cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

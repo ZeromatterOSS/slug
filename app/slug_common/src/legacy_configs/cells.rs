@@ -1468,68 +1468,13 @@ impl Key for BzlmodLockfileInputsBridgeKey {
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         match (x, y) {
-            (Ok(x), Ok(y)) => bzlmod_lockfile_inputs_identity_eq(x, y),
+            (Ok(x), Ok(y)) => x.identity_eq(y),
             _ => false,
         }
     }
 
     fn validity(x: &Self::Value) -> bool {
         x.is_ok()
-    }
-}
-
-fn bzlmod_lockfile_inputs_identity_eq(
-    left: &slug_bzlmod::BzlmodLockfileInputsValue,
-    right: &slug_bzlmod::BzlmodLockfileInputsValue,
-) -> bool {
-    left.hidden_lockfile_path == right.hidden_lockfile_path
-        && left.visible_lockfile_digest == right.visible_lockfile_digest
-        && left.hidden_lockfile_digest == right.hidden_lockfile_digest
-        && left.lockfile_mode == right.lockfile_mode
-        && lockfile_content_identity_eq(&left.visible_lockfile, &right.visible_lockfile)
-        && lockfile_content_identity_eq(&left.hidden_lockfile, &right.hidden_lockfile)
-}
-
-fn hash_bzlmod_lockfile_inputs_identity<H: std::hash::Hasher>(
-    value: &slug_bzlmod::BzlmodLockfileInputsValue,
-    state: &mut H,
-) {
-    value.hidden_lockfile_path.hash(state);
-    value.visible_lockfile_digest.hash(state);
-    value.hidden_lockfile_digest.hash(state);
-    value.lockfile_mode.hash(state);
-    hash_lockfile_content_identity(&value.visible_lockfile, state);
-    hash_lockfile_content_identity(&value.hidden_lockfile, state);
-}
-
-fn lockfile_content_identity_eq(
-    left: &Option<Arc<slug_bzlmod::LockfileContentValue>>,
-    right: &Option<Arc<slug_bzlmod::LockfileContentValue>>,
-) -> bool {
-    match (left, right) {
-        (Some(left), Some(right)) => match (&left.digest, &right.digest) {
-            (Some(_), Some(_)) => left.path == right.path && left.digest == right.digest,
-            (None, None) => true,
-            _ => false,
-        },
-        (None, None) => true,
-        _ => false,
-    }
-}
-
-fn hash_lockfile_content_identity<H: std::hash::Hasher>(
-    value: &Option<Arc<slug_bzlmod::LockfileContentValue>>,
-    state: &mut H,
-) {
-    match value {
-        Some(value) => {
-            true.hash(state);
-            if value.digest.is_some() {
-                value.path.hash(state);
-            }
-            value.digest.hash(state);
-        }
-        None => false.hash(state),
     }
 }
 
@@ -3560,7 +3505,7 @@ impl PartialEq for BzlmodResolvedModuleGraphKey {
                 == other.validate_root_extension_repo_directives
             && self.root_module_file.path == other.root_module_file.path
             && self.root_module_file.input_digest == other.root_module_file.input_digest
-            && bzlmod_lockfile_inputs_identity_eq(&self.lockfile_inputs, &other.lockfile_inputs)
+            && self.lockfile_inputs.identity_eq(&other.lockfile_inputs)
             && self.local_override_inputs.digest == other.local_override_inputs.digest
             && self.non_registry_override_inputs.digest == other.non_registry_override_inputs.digest
             && self.registry_file_inputs.digest == other.registry_file_inputs.digest
@@ -3578,7 +3523,7 @@ impl std::hash::Hash for BzlmodResolvedModuleGraphKey {
         self.validate_root_extension_repo_directives.hash(state);
         self.root_module_file.path.hash(state);
         self.root_module_file.input_digest.hash(state);
-        hash_bzlmod_lockfile_inputs_identity(&self.lockfile_inputs, state);
+        self.lockfile_inputs.hash_identity(state);
         self.local_override_inputs.digest.hash(state);
         self.non_registry_override_inputs.digest.hash(state);
         self.registry_file_inputs.digest.hash(state);

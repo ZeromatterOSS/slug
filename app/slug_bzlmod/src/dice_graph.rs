@@ -578,6 +578,24 @@ impl BzlmodLockfileInputsValue {
             lockfile_mode,
         }
     }
+
+    pub fn identity_eq(&self, other: &Self) -> bool {
+        self.hidden_lockfile_path == other.hidden_lockfile_path
+            && self.visible_lockfile_digest == other.visible_lockfile_digest
+            && self.hidden_lockfile_digest == other.hidden_lockfile_digest
+            && self.lockfile_mode == other.lockfile_mode
+            && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
+            && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
+    }
+
+    pub fn hash_identity<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.hidden_lockfile_path.hash(state);
+        self.visible_lockfile_digest.hash(state);
+        self.hidden_lockfile_digest.hash(state);
+        self.lockfile_mode.hash(state);
+        hash_lockfile_content_identity(&self.visible_lockfile, state);
+        hash_lockfile_content_identity(&self.hidden_lockfile, state);
+    }
 }
 
 impl Default for BzlmodLockfileInputsValue {
@@ -588,6 +606,37 @@ impl Default for BzlmodLockfileInputsValue {
 
 fn lockfile_content_digest(value: &Option<Arc<LockfileContentValue>>) -> Option<String> {
     value.as_ref().and_then(|value| value.digest.clone())
+}
+
+fn lockfile_content_identity_eq(
+    left: &Option<Arc<LockfileContentValue>>,
+    right: &Option<Arc<LockfileContentValue>>,
+) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => match (&left.digest, &right.digest) {
+            (Some(_), Some(_)) => left.path == right.path && left.digest == right.digest,
+            (None, None) => true,
+            _ => false,
+        },
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn hash_lockfile_content_identity<H: std::hash::Hasher>(
+    value: &Option<Arc<LockfileContentValue>>,
+    state: &mut H,
+) {
+    match value {
+        Some(value) => {
+            true.hash(state);
+            if value.digest.is_some() {
+                value.path.hash(state);
+            }
+            value.digest.hash(state);
+        }
+        None => false.hash(state),
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
