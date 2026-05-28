@@ -412,6 +412,15 @@ pub struct ResolvedGraphWithModuleFileInputs {
     pub non_root_module_file_inputs: Vec<NonRootModuleFileInput>,
 }
 
+#[derive(Debug)]
+pub struct BzlmodResolvedGraphProjectionValues {
+    pub module_versions: BzlmodModuleVersionsDataValue,
+    pub resolution_facts: BzlmodResolutionFactsValue,
+    pub registered_toolchains: RegisteredToolchainsDataValue,
+    pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+    pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
+}
+
 pub fn local_overrides_from_root_module(
     root_module_file: &RootModuleFileValue,
     ignore_dev_dependency: bool,
@@ -827,6 +836,69 @@ pub fn append_resolved_non_root_modules(
         } else if let Some(parsed) = dice_parsed.get(module_name.as_str()) {
             parsed_modules.push((module_name.clone(), (*parsed).clone()));
         }
+    }
+}
+
+pub fn resolved_graph_projection_values(
+    workspace_id: WorkspaceId,
+    root_module: &ParsedModuleFile,
+    parsed_modules: &[(String, ParsedModuleFile)],
+    graph: &ResolvedGraph,
+    ignore_dev_dependency: bool,
+) -> BzlmodResolvedGraphProjectionValues {
+    let root_module_name = parsed_modules
+        .first()
+        .map(|(name, _)| name.clone())
+        .unwrap_or_else(|| "_main".to_owned());
+    let mut version_map = HashMap::new();
+    version_map.insert(
+        root_module.module.name.clone(),
+        root_module.module.version.to_string(),
+    );
+    for (name, info) in &graph.modules {
+        version_map.insert(name.clone(), info.version.clone());
+    }
+    let module_versions = BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+        workspace_id.clone(),
+        root_module_name.clone(),
+        Arc::new(version_map),
+    );
+    let resolution_facts = BzlmodResolutionFactsValue::for_workspace(
+        workspace_id.clone(),
+        graph.registry_file_hashes.clone(),
+        graph.selected_yanked_versions.clone(),
+    );
+    let (all_toolchains, all_exec_platforms) =
+        collect_bzlmod_registered_items(parsed_modules, &root_module_name, ignore_dev_dependency);
+    let registered_toolchains =
+        RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), all_toolchains);
+    let registered_execution_platforms = RegisteredExecutionPlatformsDataValue::for_workspace(
+        workspace_id.clone(),
+        all_exec_platforms,
+    );
+    let mut module_extensions: HashMap<String, Vec<crate::ExtensionUsage>> = HashMap::new();
+    for (module_name, parsed_mod) in parsed_modules {
+        if !parsed_mod.extension_usages.is_empty() {
+            module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
+        }
+    }
+    let extension_aggregations =
+        BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+            workspace_id,
+            root_module_name.clone(),
+            Arc::new(crate::aggregate_extensions_with_policy(
+                &module_extensions,
+                Some(root_module_name.as_str()),
+                ignore_dev_dependency,
+            )),
+        );
+
+    BzlmodResolvedGraphProjectionValues {
+        module_versions,
+        resolution_facts,
+        registered_toolchains,
+        registered_execution_platforms,
+        extension_aggregations,
     }
 }
 
@@ -3515,6 +3587,55 @@ mod tests {
             dep_info.source,
             ModuleSource::LocalPath { ref path } if path == "dep"
         ));
+    }
+
+    #[test]
+    fn resolved_graph_projection_values_collects_versions_and_facts() {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/project"),
+            PathBuf::from("/tmp/output-base"),
+        );
+        let root = parsed_module("root");
+        let mut graph = ResolvedGraph::default();
+        graph.modules.insert(
+            "dep".to_owned(),
+            ResolvedModuleInfo {
+                name: "dep".to_owned(),
+                version: "1.0".to_owned(),
+                compatibility_level: 0,
+                dependencies: HashMap::new(),
+                source: ModuleSource::Registry {
+                    url: "https://registry.example".to_owned(),
+                },
+                source_path: Some(PathBuf::from("/tmp/dep")),
+            },
+        );
+        graph.registry_file_hashes.insert(
+            "https://registry.example/modules/dep/1.0/MODULE.bazel".to_owned(),
+            "sha256".to_owned(),
+        );
+        let parsed_modules = vec![("root".to_owned(), root.clone())];
+
+        let projections =
+            resolved_graph_projection_values(workspace_id, &root, &parsed_modules, &graph, false);
+
+        assert_eq!(projections.module_versions.root_module_name, "root");
+        assert_eq!(
+            projections
+                .module_versions
+                .module_versions
+                .get("dep")
+                .map(String::as_str),
+            Some("1.0")
+        );
+        assert_eq!(
+            projections
+                .resolution_facts
+                .registry_file_hashes
+                .get("https://registry.example/modules/dep/1.0/MODULE.bazel")
+                .map(String::as_str),
+            Some("sha256")
+        );
     }
 
     #[test]

@@ -4707,31 +4707,6 @@ impl BuckConfigBasedCells {
                 &[],
             );
         }
-        let root_module_name = parsed_modules
-            .first()
-            .map(|(name, _)| name.clone())
-            .unwrap_or_else(|| "_main".to_owned());
-        let mut resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-            key.resolution_key.workspace_id.clone(),
-            indexmap::IndexMap::new(),
-            indexmap::IndexMap::new(),
-        );
-        let mut version_map = HashMap::new();
-        version_map.insert(
-            parsed.module.name.clone(),
-            parsed.module.version.to_string(),
-        );
-        if !parsed.module.bazel_deps.is_empty() {
-            resolution_facts = slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-                key.resolution_key.workspace_id.clone(),
-                graph.registry_file_hashes.clone(),
-                graph.selected_yanked_versions.clone(),
-            );
-            for (name, info) in &graph.modules {
-                version_map.insert(name.clone(), info.version.clone());
-            }
-        }
-
         let mut clean_cells = Vec::new();
         let mut sorted_graph_modules: Vec<_> = graph.modules.iter().collect();
         sorted_graph_modules.sort_by(|left, right| left.0.cmp(right.0));
@@ -4746,48 +4721,16 @@ impl BuckConfigBasedCells {
             ));
         }
 
-        let module_versions =
-            slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
-                key.resolution_key.workspace_id.clone(),
-                root_module_name,
-                Arc::new(version_map),
-            );
-        let (all_toolchains, all_exec_platforms) = slug_bzlmod::collect_bzlmod_registered_items(
+        let projections = slug_bzlmod::resolved_graph_projection_values(
+            key.resolution_key.workspace_id.clone(),
+            &parsed,
             &parsed_modules,
-            &module_versions.root_module_name,
+            &graph,
             key.options.ignore_dev_dependency,
         );
-        let registered_toolchains = slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-            key.resolution_key.workspace_id.clone(),
-            all_toolchains,
-        );
-        let registered_execution_platforms =
-            slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
-                key.resolution_key.workspace_id.clone(),
-                all_exec_platforms,
-            );
-        let mut module_extensions: std::collections::HashMap<
-            String,
-            Vec<slug_bzlmod::ExtensionUsage>,
-        > = std::collections::HashMap::new();
-        for (module_name, parsed_mod) in &parsed_modules {
-            if !parsed_mod.extension_usages.is_empty() {
-                module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
-            }
-        }
-        let extension_aggregations =
-            slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
-                key.resolution_key.workspace_id.clone(),
-                module_versions.root_module_name.clone(),
-                Arc::new(slug_bzlmod::aggregate_extensions_with_policy(
-                    &module_extensions,
-                    Some(module_versions.root_module_name.as_str()),
-                    key.options.ignore_dev_dependency,
-                )),
-            );
         let (repo_mapping_snapshot, repo_mapping_overrides) = graph_owned_repo_mapping_state(
             &parsed_modules,
-            &module_versions.root_module_name,
+            &projections.module_versions.root_module_name,
             key.options.ignore_dev_dependency,
             &clean_cells,
             Some(&graph),
@@ -4816,11 +4759,11 @@ impl BuckConfigBasedCells {
             slug_bzlmod::BzlmodResolvedGraphOutputsValue {
                 graph: Arc::new(graph),
                 graph_digest: Arc::from(graph_digest.as_str()),
-                module_versions,
-                resolution_facts,
-                registered_toolchains,
-                registered_execution_platforms,
-                extension_aggregations,
+                module_versions: projections.module_versions,
+                resolution_facts: projections.resolution_facts,
+                registered_toolchains: projections.registered_toolchains,
+                registered_execution_platforms: projections.registered_execution_platforms,
+                extension_aggregations: projections.extension_aggregations,
                 repo_mappings,
                 cell_graph,
             },

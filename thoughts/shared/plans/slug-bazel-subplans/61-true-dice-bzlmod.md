@@ -490,6 +490,13 @@ Current state to preserve:
   graph assembly, but no longer owns the core MVS resolver invocation or the
   non-root module-file request type. Guardrail:
   `cargo test -p slug_bzlmod resolve_graph_with_module_file_inputs --lib && cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo build -p slug`.
+- 2026-05-28 resolved-graph projection output boundary reduction:
+  `slug_bzlmod::resolved_graph_projection_values` now owns module-version,
+  resolution-fact, registered toolchain/platform, and extension-aggregation
+  output assembly from the resolved graph plus parsed modules. `slug_common`
+  still assembles repo mappings and the legacy/bootstrap cell graph, but no
+  longer owns these semantic resolved-graph projections. Guardrail:
+  `cargo test -p slug_bzlmod resolved_graph_projection_values --lib && cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
