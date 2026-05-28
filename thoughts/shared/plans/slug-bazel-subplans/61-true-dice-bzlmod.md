@@ -415,11 +415,10 @@ Current state to preserve:
   only for no-executor bootstrap/test paths. Guardrail:
   `cargo test -p slug_bzlmod cell_graph_key_ --lib && cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib`.
 - 2026-05-28 resolved graph split from cell-graph data:
-  `BzlmodCellGraphDataValue` now carries only workspace/digest identity,
-  whether production should use a resolved graph, and optional bootstrap
-  fallback graph data. The resolved module graph itself is a separate named
-  `BzlmodResolvedGraphDataKey` input consumed by module-cell and residual
-  symlink projection keys. Guardrail:
+  `BzlmodCellGraphDataValue` now carries only workspace/digest identity and
+  optional bootstrap fallback graph data. The resolved module graph itself is a
+  separate named `BzlmodResolvedGraphDataKey` input consumed by module-cell and
+  residual symlink projection keys. Guardrail:
   `cargo test -p slug_bzlmod cell_graph_key_ --lib`.
 - 2026-05-28 production cell-graph computation bypasses fallback bridge:
   clean-digest `BzlmodCellGraphKey` computations derive module cells and

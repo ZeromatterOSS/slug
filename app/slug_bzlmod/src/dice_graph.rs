@@ -421,7 +421,6 @@ impl BzlmodCellGraphValue {
 pub struct BzlmodCellGraphDataValue {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
-    pub uses_resolved_graph: bool,
     #[allocative(skip)]
     pub fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
 }
@@ -435,7 +434,6 @@ impl BzlmodCellGraphDataValue {
         Self {
             workspace_id,
             resolution_digest,
-            uses_resolved_graph: false,
             fallback_cell_graph: Some(cell_graph),
         }
     }
@@ -444,12 +442,11 @@ impl BzlmodCellGraphDataValue {
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
         cell_graph: Arc<BzlmodCellGraphValue>,
-        resolved_graph: Option<Arc<ResolvedGraph>>,
+        _resolved_graph: Option<Arc<ResolvedGraph>>,
     ) -> Self {
         Self::for_workspace_with_resolved_graph_and_fallback(
             workspace_id,
             resolution_digest,
-            resolved_graph.is_some(),
             Some(cell_graph),
         )
     }
@@ -457,13 +454,11 @@ impl BzlmodCellGraphDataValue {
     pub fn for_workspace_with_resolved_graph_and_fallback(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
-        uses_resolved_graph: bool,
         fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
     ) -> Self {
         Self {
             workspace_id,
             resolution_digest,
-            uses_resolved_graph,
             fallback_cell_graph,
         }
     }

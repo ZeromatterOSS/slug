@@ -554,7 +554,6 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
                 BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
                     cell_graph_workspace_id.clone(),
                     cell_graph_resolution_digest.clone(),
-                    resolved_graph.is_some(),
                     Some(fallback_cell_graph),
                 ),
             )
