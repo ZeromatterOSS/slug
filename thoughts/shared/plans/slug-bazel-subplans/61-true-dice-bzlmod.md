@@ -397,6 +397,12 @@ Current state to preserve:
   Also validated with the focused bzlmod cell-graph, cell-graph-key,
   repository-label-resolution, and persisted clean-graph tests,
   `cargo build -p slug`, `git diff --check`, and the focused Python replay set.
+- 2026-05-28 extension-cell producer moved behind DICE: `BzlmodExtensionCellDefinitionsKey`
+  now derives extension cells from DICE extension spokes when extension
+  aggregation data exists, filtering generated override aliases through repo
+  mappings. The injected extension-cell vector remains as a fallback only for
+  empty/bootstrap paths where the module extension executor is not installed.
+  Guardrail: `cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1055,8 +1061,10 @@ hardening behavior around it.
     the resolved module graph when production graph data is available; empty and
     bootstrap paths still fall back to the injected vector. Residual
     out-of-project local-override symlinks are derived from that same graph when
-    available. The remaining injected payload is split behind a DICE key for
-    extension cells. The old `BzlmodProjectionData` wrapper has been deleted.
+    available. Extension cells are derived from DICE extension spokes when the
+    extension executor is installed; bootstrap no-executor paths still fall back
+    to the injected vector. The old `BzlmodProjectionData` wrapper has been
+    deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.

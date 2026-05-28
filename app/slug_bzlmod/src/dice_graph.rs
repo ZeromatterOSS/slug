@@ -542,6 +542,46 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             &self.resolution_digest,
             &data,
         )?;
+        let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        if extension_aggregations.workspace_id != self.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodExtensionCellDefinitionsKey was computed with project root '{}', \
+                 but current bzlmod extension aggregation data root is '{}'",
+                self.workspace_id.canonical_project_root.display(),
+                extension_aggregations
+                    .workspace_id
+                    .canonical_project_root
+                    .display()
+            ));
+        }
+        if !extension_aggregations.extension_aggregations.is_empty() {
+            let repo_env = ctx
+                .compute(&BzlmodRepoEnvKey::for_workspace_id(
+                    self.workspace_id.clone(),
+                ))
+                .await??;
+            let repo_mappings = ctx
+                .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                    self.workspace_id.clone(),
+                ))
+                .await??;
+            return match extension_cells_from_spokes(
+                ctx,
+                &self.workspace_id,
+                extension_aggregations.as_ref(),
+                repo_env.as_ref(),
+                repo_mappings.as_ref(),
+            )
+            .await
+            {
+                Ok(cells) => Ok(cells),
+                Err(e) if e.to_string().contains("module extension executor") => {
+                    Ok(data.cell_graph.extension_cells.dupe())
+                }
+                Err(e) => Err(e),
+            };
+        }
         Ok(data.cell_graph.extension_cells.dupe())
     }
 
@@ -551,6 +591,73 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             _ => false,
         }
     }
+}
+
+async fn extension_cells_from_spokes(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: &WorkspaceId,
+    extension_aggregations: &BzlmodExtensionAggregationsDataValue,
+    repo_env: &BTreeMap<String, String>,
+    repo_mappings: &BzlmodRepoMappingsDataValue,
+) -> slug_error::Result<Arc<Vec<BzlmodCellGraphExtensionCell>>> {
+    let mut cells = Vec::new();
+    let generated_override_aliases = generated_override_aliases(repo_mappings);
+    let mut extension_ids: Vec<_> = extension_aggregations
+        .extension_aggregations
+        .keys()
+        .collect();
+    extension_ids.sort();
+    let repo_env_json = serde_json::to_string(repo_env).map_err(|e| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "Failed to serialize bzlmod repo_env for extension cells: {}",
+            e
+        )
+    })?;
+    for extension_id in extension_ids {
+        let spokes = ctx
+            .compute(&ExtensionSpokesByExtensionIdKey::for_workspace_id(
+                workspace_id.clone(),
+                extension_id,
+            ))
+            .await??;
+        let Some(spokes) = spokes else {
+            continue;
+        };
+        for spoke in spokes.iter() {
+            if generated_override_aliases.contains(spoke.canonical_name.as_ref())
+                || generated_override_aliases.contains(spoke.internal_name.as_ref())
+            {
+                continue;
+            }
+            cells.push(BzlmodCellGraphExtensionCell {
+                canonical_name: spoke.canonical_name.to_string(),
+                internal_name: spoke.internal_name.to_string(),
+                path: format!("bazel-external/{}", spoke.canonical_name),
+                extension_id: extension_id.clone(),
+                spec_hash: spoke.spec_hash.to_string(),
+                repo_spec_json: spoke.repo_spec_json.to_string(),
+                repo_env_json: repo_env_json.clone(),
+                materialized: false,
+                lazy: false,
+            });
+        }
+    }
+    Ok(Arc::new(cells))
+}
+
+fn generated_override_aliases(repo_mappings: &BzlmodRepoMappingsDataValue) -> BTreeSet<String> {
+    repo_mappings
+        .repo_mappings
+        .get("")
+        .into_iter()
+        .flat_map(|mapping| mapping.iter())
+        .filter_map(|(apparent_name, target_name)| {
+            (apparent_name != target_name
+                && crate::pending_repo_cells::parse_canonical_name(apparent_name).is_some())
+            .then_some(apparent_name.clone())
+        })
+        .collect()
 }
 
 #[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
