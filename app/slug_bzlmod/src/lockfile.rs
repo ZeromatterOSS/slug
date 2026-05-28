@@ -381,6 +381,22 @@ impl SelectedExtensionCache {
     pub fn repo_specs(&self) -> &fxhash::FxHashMap<String, RepoSpec> {
         &self.repo_specs
     }
+
+    pub fn recorded_inputs(&self) -> &[String] {
+        &self.recorded_inputs
+    }
+
+    pub fn workspace_root(&self) -> Option<&Path> {
+        self.workspace_root.as_deref()
+    }
+
+    pub fn repo_env(&self) -> Option<&BTreeMap<String, String>> {
+        self.repo_env.as_ref()
+    }
+
+    pub fn repo_mappings(&self) -> Option<&crate::RepoMappingSnapshot> {
+        self.repo_mappings.as_ref()
+    }
 }
 
 impl LockfileRepoSpec {

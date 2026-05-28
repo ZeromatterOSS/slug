@@ -65,6 +65,7 @@ use crate::dice::data::SetIoProvider;
 use crate::external_cells::EXTERNAL_CELLS_IMPL;
 use crate::file_ops::dice::DiceFileComputations;
 use crate::file_ops::dice::register_bzlmod_config_project_file;
+use crate::file_ops::metadata::RawPathMetadata;
 use crate::io::fs::FsIoProvider;
 use crate::legacy_configs::aggregator::CellsAggregator;
 use crate::legacy_configs::args::ResolvedLegacyConfigArg;
@@ -1973,7 +1974,7 @@ async fn prevalidated_extension_caches_for_lockfile_preseed(
         ) else {
             continue;
         };
-        if slug_bzlmod::selected_cache_recorded_inputs_current(ctx, current_ext_id, &selected)
+        if selected_cache_recorded_inputs_current_for_preseed(ctx, current_ext_id, &selected)
             .await?
         {
             selected.record_hit(current_ext_id);
@@ -1981,6 +1982,298 @@ async fn prevalidated_extension_caches_for_lockfile_preseed(
         }
     }
     Ok(caches)
+}
+
+async fn selected_cache_recorded_inputs_current_for_preseed(
+    ctx: &mut DiceComputations<'_>,
+    extension_id: &str,
+    selected: &slug_bzlmod::SelectedExtensionCache,
+) -> slug_error::Result<bool> {
+    let key = PreseedRecordedInputsKey::from_selected_cache(selected);
+    match ctx.compute(&key).await? {
+        Ok(PreseedRecordedInputsValue::Current) => return Ok(true),
+        Ok(PreseedRecordedInputsValue::Stale(reason)) => {
+            record_bzlmod_event(
+                BzlmodEventKind::ExtensionReplayMissReason,
+                format!("{extension_id}:recorded_inputs:{reason}"),
+            );
+            return Ok(false);
+        }
+        Ok(PreseedRecordedInputsValue::Unsupported) => {}
+        Err(e) => return Err(e),
+    }
+
+    slug_bzlmod::selected_cache_recorded_inputs_current(ctx, extension_id, selected).await
+}
+
+#[derive(Clone, Dupe, Debug, PartialEq, Eq, Allocative)]
+enum PreseedRecordedInputsValue {
+    Current,
+    Stale(Arc<str>),
+    Unsupported,
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("PreseedRecordedInputsKey({})", recorded_inputs.len())]
+struct PreseedRecordedInputsKey {
+    recorded_inputs: Arc<Vec<String>>,
+    workspace_root: Option<Arc<PathBuf>>,
+    repo_env: Option<Arc<BTreeMap<String, String>>>,
+    repo_mappings: Option<Arc<slug_bzlmod::RepoMappingSnapshot>>,
+}
+
+impl PreseedRecordedInputsKey {
+    fn from_selected_cache(selected: &slug_bzlmod::SelectedExtensionCache) -> Self {
+        Self {
+            recorded_inputs: Arc::new(selected.recorded_inputs().to_vec()),
+            workspace_root: selected
+                .workspace_root()
+                .map(|path| Arc::new(path.to_path_buf())),
+            repo_env: selected.repo_env().map(|env| Arc::new(env.clone())),
+            repo_mappings: selected
+                .repo_mappings()
+                .map(|mappings| Arc::new(mappings.clone())),
+        }
+    }
+}
+
+impl Dupe for PreseedRecordedInputsKey {
+    fn dupe(&self) -> Self {
+        Self {
+            recorded_inputs: self.recorded_inputs.dupe(),
+            workspace_root: self.workspace_root.dupe(),
+            repo_env: self.repo_env.dupe(),
+            repo_mappings: self.repo_mappings.dupe(),
+        }
+    }
+}
+
+#[async_trait]
+impl Key for PreseedRecordedInputsKey {
+    type Value = slug_error::Result<PreseedRecordedInputsValue>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match preseed_recorded_inputs_current_through_dice(
+            ctx,
+            self.recorded_inputs.as_slice(),
+            self.workspace_root.as_deref().map(PathBuf::as_path),
+            self.repo_env.as_deref(),
+            self.repo_mappings.as_deref(),
+        )
+        .await?
+        {
+            Some(Ok(())) => Ok(PreseedRecordedInputsValue::Current),
+            Some(Err(reason)) => Ok(PreseedRecordedInputsValue::Stale(Arc::from(reason))),
+            None => Ok(PreseedRecordedInputsValue::Unsupported),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        false
+    }
+}
+
+async fn preseed_recorded_inputs_current_through_dice(
+    ctx: &mut DiceComputations<'_>,
+    recorded_inputs: &[String],
+    workspace_root: Option<&Path>,
+    repo_env: Option<&BTreeMap<String, String>>,
+    repo_mappings: Option<&slug_bzlmod::RepoMappingSnapshot>,
+) -> slug_error::Result<Option<Result<(), String>>> {
+    for raw in recorded_inputs {
+        let Some((input, old_value)) = parse_preseed_recorded_input_with_value(raw) else {
+            return Ok(Some(Err("recorded_input_malformed".to_owned())));
+        };
+        match input {
+            PreseedRecordedInput::File(path) => {
+                let Some(old_value) = old_value else {
+                    return Ok(Some(Err("recorded_input_malformed".to_owned())));
+                };
+                let Some(project_path) = preseed_recorded_file_project_path(&path, workspace_root)
+                else {
+                    return Ok(None);
+                };
+                let Some(current) =
+                    preseed_recorded_file_marker_value(ctx, project_path.as_ref()).await?
+                else {
+                    return Ok(None);
+                };
+                if current != old_value {
+                    return Ok(Some(Err(recorded_input_changed_reason_with_values(
+                        raw, &old_value, &current,
+                    ))));
+                }
+            }
+            PreseedRecordedInput::Env(name) => {
+                let Some(repo_env) = repo_env else {
+                    return Ok(Some(Err("recorded_input_unsupported".to_owned())));
+                };
+                let current = repo_env.get(&name).cloned();
+                if current != old_value {
+                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
+                }
+            }
+            PreseedRecordedInput::RepoMapping {
+                source_repo,
+                apparent,
+            } => {
+                let Some(repo_mappings) = repo_mappings else {
+                    return Ok(Some(Err("recorded_input_unsupported".to_owned())));
+                };
+                let Some(source_mapping) = repo_mappings.get(&source_repo) else {
+                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
+                };
+                let current = source_mapping
+                    .get(&apparent)
+                    .cloned()
+                    .or_else(|| Some(apparent.clone()));
+                if current != old_value {
+                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
+                }
+            }
+            PreseedRecordedInput::Unsupported => return Ok(None),
+        }
+    }
+    Ok(Some(Ok(())))
+}
+
+enum PreseedRecordedInput {
+    File(PathBuf),
+    Env(String),
+    RepoMapping {
+        source_repo: String,
+        apparent: String,
+    },
+    Unsupported,
+}
+
+fn parse_preseed_recorded_input_with_value(
+    raw: &str,
+) -> Option<(PreseedRecordedInput, Option<String>)> {
+    let space = raw.find(' ')?;
+    if space == 0 {
+        return None;
+    }
+    let input = unescape_preseed_recorded_input_part(&raw[..space])?;
+    let value = unescape_preseed_recorded_input_part(&raw[space + 1..]);
+    Some((parse_preseed_recorded_input(&input), value))
+}
+
+fn parse_preseed_recorded_input(input: &str) -> PreseedRecordedInput {
+    let Some((kind, payload)) = input.split_once(':') else {
+        return PreseedRecordedInput::Unsupported;
+    };
+    match kind {
+        "FILE" => PreseedRecordedInput::File(PathBuf::from(payload)),
+        "ENV" => PreseedRecordedInput::Env(payload.to_owned()),
+        "REPO_MAPPING" => payload
+            .split_once(',')
+            .map(
+                |(source_repo, apparent)| PreseedRecordedInput::RepoMapping {
+                    source_repo: source_repo.to_owned(),
+                    apparent: apparent.to_owned(),
+                },
+            )
+            .unwrap_or(PreseedRecordedInput::Unsupported),
+        _ => PreseedRecordedInput::Unsupported,
+    }
+}
+
+fn unescape_preseed_recorded_input_part(input: &str) -> Option<String> {
+    if input == "\\0" {
+        return None;
+    }
+    let mut result = String::with_capacity(input.len());
+    let mut escaped = false;
+    for ch in input.chars() {
+        if escaped {
+            match ch {
+                'n' => result.push('\n'),
+                's' => result.push(' '),
+                other => result.push(other),
+            }
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else {
+            result.push(ch);
+        }
+    }
+    if escaped {
+        result.push('\\');
+    }
+    Some(result)
+}
+
+fn preseed_recorded_file_project_path(
+    path: &Path,
+    workspace_root: Option<&Path>,
+) -> Option<ProjectRelativePathBuf> {
+    let raw = path.to_string_lossy();
+    for prefix in ["@@//", "@//", "//"] {
+        if let Some(rest) = raw.strip_prefix(prefix) {
+            workspace_root?;
+            return ProjectRelativePathBuf::try_from(rest.to_owned()).ok();
+        }
+    }
+    if path.is_absolute() {
+        let workspace_root = workspace_root?;
+        let relative = path.strip_prefix(workspace_root).ok()?;
+        return ProjectRelativePathBuf::try_from(relative.to_path_buf()).ok();
+    }
+    None
+}
+
+async fn preseed_recorded_file_marker_value(
+    ctx: &mut DiceComputations<'_>,
+    path: &ProjectRelativePath,
+) -> slug_error::Result<Option<String>> {
+    register_bzlmod_config_project_file(path.to_owned());
+    let Some(metadata) =
+        DiceFileComputations::read_project_path_metadata_if_exists(ctx, path).await?
+    else {
+        return Ok(Some("ENOENT".to_owned()));
+    };
+    match metadata {
+        RawPathMetadata::Directory => Ok(Some("DIR".to_owned())),
+        RawPathMetadata::File(_) => {
+            let Some(content) =
+                DiceFileComputations::read_project_file_if_exists(ctx, path).await?
+            else {
+                return Ok(Some("ENOENT".to_owned()));
+            };
+            Ok(Some(hex::encode(Sha256::digest(content.as_bytes()))))
+        }
+        RawPathMetadata::Symlink { .. } => Ok(None),
+    }
+}
+
+fn recorded_input_changed_reason(raw: &str) -> String {
+    let identity = raw
+        .split_once(' ')
+        .map(|(identity, _)| identity)
+        .unwrap_or(raw);
+    format!("recorded_input_changed:{identity}")
+}
+
+fn recorded_input_changed_reason_with_values(raw: &str, old: &str, current: &str) -> String {
+    format!(
+        "{}:old={}:current={}",
+        recorded_input_changed_reason(raw),
+        old,
+        current
+    )
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -6838,6 +7131,61 @@ ext = module_extension(implementation = _impl)
         assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_created)
         ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn preseed_recorded_inputs_track_workspace_file_through_dice() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("watched.txt", "first\n");
+        register_bzlmod_config_project_file(ProjectRelativePathBuf::unchecked_new(
+            "watched.txt".to_owned(),
+        ));
+        let recorded_inputs = vec![slug_bzlmod::recorded_file_input_with_recorded_path(
+            Path::new("@@//watched.txt"),
+            &fs.path().root().as_path().join("watched.txt"),
+        )?];
+        let repo_env = BTreeMap::new();
+        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        assert_eq!(
+            preseed_recorded_inputs_current_through_dice(
+                &mut dice,
+                &recorded_inputs,
+                Some(fs.path().root().as_path()),
+                Some(&repo_env),
+                Some(&repo_mappings),
+            )
+            .await?,
+            Some(Ok(()))
+        );
+
+        fs.write_file("watched.txt", "second\n");
+        let mut updater = dice.into_updater();
+        let mut changes = crate::file_ops::dice::FileChangeTracker::new();
+        changes.project_file_contents_changed(ProjectRelativePathBuf::unchecked_new(
+            "watched.txt".to_owned(),
+        ));
+        changes.write_to_dice(&mut updater)?;
+        let mut dice = updater.commit().await;
+
+        let result = preseed_recorded_inputs_current_through_dice(
+            &mut dice,
+            &recorded_inputs,
+            Some(fs.path().root().as_path()),
+            Some(&repo_env),
+            Some(&repo_mappings),
+        )
+        .await?;
+        assert!(matches!(result, Some(Err(reason)) if reason.contains("recorded_input_changed")));
         Ok(())
     }
 

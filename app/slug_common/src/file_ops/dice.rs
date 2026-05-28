@@ -142,6 +142,18 @@ impl DiceFileComputations {
         .await
     }
 
+    /// Reads project-relative path metadata without going through a cell resolver.
+    ///
+    /// This is for bootstrap inputs that define the cell graph itself, such as
+    /// root MODULE.bazel files and bzlmod lockfile recorded inputs.
+    pub async fn read_project_path_metadata_if_exists(
+        ctx: &mut DiceComputations<'_>,
+        path: &ProjectRelativePath,
+    ) -> slug_error::Result<Option<RawPathMetadata<Arc<ProjectRelativePathBuf>>>> {
+        ctx.compute(&ProjectPathMetadataKey(Arc::new(path.to_owned())))
+            .await?
+    }
+
     /// Reads a project-relative file without going through a cell resolver.
     pub async fn read_project_file(
         ctx: &mut DiceComputations<'_>,
@@ -232,6 +244,7 @@ fn read_dir_entry_stats(entries: &[SimpleDirEntry]) -> (usize, usize, usize, usi
 pub struct FileChangeTracker {
     files_to_dirty: HashSet<ReadFileKey>,
     project_files_to_dirty: HashSet<ProjectReadFileKey>,
+    project_paths_to_dirty: HashSet<ProjectPathMetadataKey>,
     project_files_requiring_pre_config_commit: bool,
     dirs_to_dirty: HashSet<ReadDirKey>,
     paths_to_dirty: HashSet<PathMetadataKey>,
@@ -245,6 +258,7 @@ impl FileChangeTracker {
         Self {
             files_to_dirty: Default::default(),
             project_files_to_dirty: Default::default(),
+            project_paths_to_dirty: Default::default(),
             project_files_requiring_pre_config_commit: false,
             dirs_to_dirty: Default::default(),
             paths_to_dirty: Default::default(),
@@ -265,6 +279,7 @@ impl FileChangeTracker {
 
         ctx.changed(self.files_to_dirty)?;
         ctx.changed(self.project_files_to_dirty)?;
+        ctx.changed(self.project_paths_to_dirty)?;
         ctx.changed(self.dirs_to_dirty)?;
         ctx.changed(self.paths_to_dirty)?;
         ctx.changed(self.exists_matching_exact_case_to_dirty)?;
@@ -326,7 +341,9 @@ impl FileChangeTracker {
         }
         self.project_files_requiring_pre_config_commit = true;
         self.project_files_to_dirty
-            .insert(ProjectReadFileKey(Arc::new(path)));
+            .insert(ProjectReadFileKey(Arc::new(path.clone())));
+        self.project_paths_to_dirty
+            .insert(ProjectPathMetadataKey(Arc::new(path)));
     }
 
     /// Normally, buck does not need the file watcher to tell it that a directory's entries have
@@ -446,6 +463,41 @@ impl Key for ProjectReadFileKey {
 
     fn equality(_: &Self::Value, _: &Self::Value) -> bool {
         false
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
+
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("ProjectPathMetadataKey({})", _0)]
+struct ProjectPathMetadataKey(Arc<ProjectRelativePathBuf>);
+
+#[async_trait]
+impl Key for ProjectPathMetadataKey {
+    type Value = slug_error::Result<Option<RawPathMetadata<Arc<ProjectRelativePathBuf>>>>;
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.global_data()
+            .get_io_provider()
+            .read_path_metadata_if_exists(self.0.as_ref().to_owned())
+            .await
+            .map(|metadata| metadata.map(|metadata| metadata.map(Arc::new)))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
