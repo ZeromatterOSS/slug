@@ -512,6 +512,7 @@ impl Key for BzlmodCellGraphKey {
         let mut cell_graph = data.cell_graph.as_ref().clone();
         cell_graph.root_module_name = module_versions.invalidation.root_module_name.clone();
         cell_graph.root_aliases = Arc::new(root_aliases_from_repo_mappings(&repo_mappings));
+        cell_graph.dynamic_aliases = Arc::new(dynamic_aliases_from_repo_mappings(&repo_mappings));
         cell_graph.scoped_aliases = Arc::new(scoped_aliases_from_repo_mappings(
             &repo_mappings,
             &cell_graph.root_module_name,
@@ -1145,6 +1146,29 @@ fn root_aliases_from_repo_mappings(
         .map(|(apparent_name, target_name)| BzlmodCellGraphAlias {
             apparent_name: apparent_name.clone(),
             target_name: target_name.clone(),
+        })
+        .collect()
+}
+
+fn dynamic_aliases_from_repo_mappings(
+    repo_mappings: &BzlmodRepoMappingsDataValue,
+) -> Vec<BzlmodCellGraphDynamicAlias> {
+    repo_mappings
+        .repo_mappings
+        .get("")
+        .into_iter()
+        .flat_map(|mapping| mapping.iter())
+        .filter_map(|(apparent_name, target_name)| {
+            if apparent_name != target_name
+                && crate::pending_repo_cells::parse_canonical_name(apparent_name).is_some()
+            {
+                Some(BzlmodCellGraphDynamicAlias {
+                    apparent_name: apparent_name.clone(),
+                    canonical_name: target_name.clone(),
+                })
+            } else {
+                None
+            }
         })
         .collect()
 }

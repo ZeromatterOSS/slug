@@ -354,6 +354,15 @@ Current state to preserve:
   Also validated with the focused bzlmod cell-graph, cell-graph-key,
   repository-label-resolution, and persisted clean-graph tests,
   `cargo build -p slug`, `git diff --check`, and the focused Python replay set.
+- 2026-05-28 cell-graph dynamic-alias reduction: `BzlmodCellGraphKey` now
+  derives returned `dynamic_aliases` from canonical-looking replacement rows in
+  the root repo mapping instead of trusting the injected graph payload copy.
+  `BzlmodCellGraphDataKey` still carries the cell, extension-cell, and symlink
+  vectors. Guardrail:
+  `cargo test -p slug_bzlmod cell_graph_key_uses_root_repo_mapping_dynamic_aliases --lib`.
+  Also validated with the focused bzlmod cell-graph, cell-graph-key,
+  repository-label-resolution, and persisted clean-graph tests,
+  `cargo build -p slug`, `git diff --check`, and the focused Python replay set.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1006,9 +1015,9 @@ hardening behavior around it.
      computing the graph itself. The production payload is now derived from the
      clean resolved-graph producer and carries that producer's graph digest.
      The returned graph's root module name is derived from `ModuleVersionsKey`;
-     root aliases and scoped aliases are derived from `BzlmodRepoMappingsKey`;
-     legacy cell parsing still takes the remaining cell, extension-cell,
-     symlink, and dynamic-alias vectors from this payload. The old
+     root aliases, scoped aliases, and dynamic aliases are derived from
+     `BzlmodRepoMappingsKey`; legacy cell parsing still takes the remaining
+     cell, extension-cell, and symlink vectors from this payload. The old
      `BzlmodProjectionData` wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.

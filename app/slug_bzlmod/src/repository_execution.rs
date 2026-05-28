@@ -1950,7 +1950,10 @@ mod tests {
                 workspace_id.clone(),
                 Arc::new(BTreeMap::from([(
                     String::new(),
-                    BTreeMap::from([("rules_cc".to_owned(), "rules_cc+".to_owned())]),
+                    BTreeMap::from([
+                        ("rules_cc".to_owned(), "rules_cc+".to_owned()),
+                        ("tool".to_owned(), "root+ext+tool".to_owned()),
+                    ]),
                 )])),
                 Arc::new(Default::default()),
             ),
