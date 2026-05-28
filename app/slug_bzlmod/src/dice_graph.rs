@@ -20,6 +20,7 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -404,6 +405,31 @@ pub struct NonRootModuleFilesValue {
 pub struct NonRootModuleFileInput {
     pub module_key: String,
     pub module_bazel_path: PathBuf,
+}
+
+#[derive(Clone, Debug, Allocative)]
+pub struct BzlmodResolvedGraphSourceInputsValue {
+    pub root_module_file: Arc<RootModuleFileValue>,
+    pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
+    pub local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
+    pub non_registry_override_inputs: Arc<NonRegistryOverrideModuleInputsValue>,
+    pub registry_file_inputs: Arc<RegistryFileInputsValue>,
+    pub override_patch_inputs: Arc<crate::OverridePatchInputs>,
+}
+
+impl BzlmodResolvedGraphSourceInputsValue {
+    pub fn identity_digest_with_key<K: Hash>(&self, key: &K) -> String {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut hasher);
+        self.root_module_file.path.hash(&mut hasher);
+        self.root_module_file.input_digest.hash(&mut hasher);
+        self.lockfile_inputs.hash_identity(&mut hasher);
+        self.local_override_inputs.digest.hash(&mut hasher);
+        self.non_registry_override_inputs.digest.hash(&mut hasher);
+        self.registry_file_inputs.digest.hash(&mut hasher);
+        self.override_patch_inputs.digest.hash(&mut hasher);
+        format!("{:016x}", hasher.finish())
+    }
 }
 
 #[derive(Debug)]
@@ -4590,6 +4616,157 @@ mod tests {
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
         }
+    }
+
+    #[derive(Hash)]
+    struct TestSourceInputsKey {
+        name: &'static str,
+    }
+
+    fn resolved_graph_source_inputs_for_test(
+        root_digest: Option<&str>,
+        hidden_lockfile_digest: Option<&str>,
+        local_digest: &str,
+        registry_digest: &str,
+        patch_digest: &str,
+    ) -> BzlmodResolvedGraphSourceInputsValue {
+        BzlmodResolvedGraphSourceInputsValue {
+            root_module_file: Arc::new(RootModuleFileValue {
+                path: Arc::new(PathBuf::from("/tmp/workspace/MODULE.bazel")),
+                input_digest: root_digest.map(str::to_owned),
+                input_count: usize::from(root_digest.is_some()),
+                parsed: root_digest.map(|_| parsed_module("root")),
+            }),
+            lockfile_inputs: Arc::new(BzlmodLockfileInputsValue {
+                hidden_lockfile_path: None,
+                visible_lockfile_digest: None,
+                hidden_lockfile_digest: hidden_lockfile_digest.map(str::to_owned),
+                visible_lockfile: None,
+                hidden_lockfile: None,
+                lockfile_mode: LockfileMode::Update,
+            }),
+            local_override_inputs: Arc::new(LocalOverrideModuleInputsValue {
+                digest: local_digest.to_owned(),
+                parsed_modules: Vec::new(),
+                has_bazel_deps: false,
+                has_extension_usages: false,
+                has_repo_rule_invocations: false,
+                has_git_overrides: false,
+                has_untracked_inputs: false,
+            }),
+            non_registry_override_inputs: Arc::new(NonRegistryOverrideModuleInputsValue {
+                digest: "non-registry".to_owned(),
+                parsed_modules: Vec::new(),
+                has_inputs: false,
+                has_untracked_inputs: false,
+            }),
+            registry_file_inputs: Arc::new(RegistryFileInputsValue {
+                digest: registry_digest.to_owned(),
+                has_inputs: !registry_digest.is_empty(),
+                cache_safe: true,
+                has_untracked_inputs: false,
+            }),
+            override_patch_inputs: Arc::new(crate::OverridePatchInputs {
+                digest: patch_digest.to_owned(),
+                inputs: Vec::new(),
+                has_untracked_inputs: false,
+            }),
+        }
+    }
+
+    #[test]
+    fn resolved_graph_source_inputs_identity_digest_tracks_source_components() {
+        let key = TestSourceInputsKey { name: "same-key" };
+        let first = resolved_graph_source_inputs_for_test(
+            Some("root-a"),
+            None,
+            "local-a",
+            "reg-a",
+            "patch-a",
+        );
+        let same = resolved_graph_source_inputs_for_test(
+            Some("root-a"),
+            None,
+            "local-a",
+            "reg-a",
+            "patch-a",
+        );
+
+        assert_eq!(
+            first.identity_digest_with_key(&key),
+            same.identity_digest_with_key(&key)
+        );
+        assert_ne!(
+            first.identity_digest_with_key(&key),
+            resolved_graph_source_inputs_for_test(
+                Some("root-b"),
+                None,
+                "local-a",
+                "reg-a",
+                "patch-a"
+            )
+            .identity_digest_with_key(&key)
+        );
+        assert_ne!(
+            first.identity_digest_with_key(&key),
+            resolved_graph_source_inputs_for_test(
+                Some("root-a"),
+                Some("hidden-lock"),
+                "local-a",
+                "reg-a",
+                "patch-a"
+            )
+            .identity_digest_with_key(&key)
+        );
+        assert_ne!(
+            first.identity_digest_with_key(&key),
+            resolved_graph_source_inputs_for_test(
+                Some("root-a"),
+                None,
+                "local-b",
+                "reg-a",
+                "patch-a"
+            )
+            .identity_digest_with_key(&key)
+        );
+        assert_ne!(
+            first.identity_digest_with_key(&key),
+            resolved_graph_source_inputs_for_test(
+                Some("root-a"),
+                None,
+                "local-a",
+                "reg-b",
+                "patch-a"
+            )
+            .identity_digest_with_key(&key)
+        );
+        assert_ne!(
+            first.identity_digest_with_key(&key),
+            resolved_graph_source_inputs_for_test(
+                Some("root-a"),
+                None,
+                "local-a",
+                "reg-a",
+                "patch-b"
+            )
+            .identity_digest_with_key(&key)
+        );
+    }
+
+    #[test]
+    fn resolved_graph_source_inputs_identity_digest_tracks_key_policy() {
+        let inputs = resolved_graph_source_inputs_for_test(
+            Some("root-a"),
+            None,
+            "local-a",
+            "reg-a",
+            "patch-a",
+        );
+
+        assert_ne!(
+            inputs.identity_digest_with_key(&TestSourceInputsKey { name: "first" }),
+            inputs.identity_digest_with_key(&TestSourceInputsKey { name: "second" })
+        );
     }
 
     #[test]

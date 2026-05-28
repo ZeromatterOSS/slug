@@ -106,6 +106,7 @@ pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodResolutionOptions;
 pub use dice_graph::BzlmodResolvedGraphOutputsValue;
 pub use dice_graph::BzlmodResolvedGraphProjectionValues;
+pub use dice_graph::BzlmodResolvedGraphSourceInputsValue;
 pub use dice_graph::BzlmodResolvedModuleSource;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionBzlTransitiveDigestKey;

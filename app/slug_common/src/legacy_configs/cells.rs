@@ -14,7 +14,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::hash::Hash;
-use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -317,33 +316,17 @@ static LAST_RECORDED_POLLED_MODULE_PARSE_DIGEST: OnceLock<Mutex<HashMap<PathBuf,
 static LAST_RECORDED_LOCKFILE_READ_DIGEST: OnceLock<Mutex<HashMap<PathBuf, String>>> =
     OnceLock::new();
 
-fn bzlmod_resolved_module_graph_inputs_identity_digest(
-    key: &BzlmodResolvedModuleGraphKey,
-    inputs: &BzlmodResolvedModuleGraphInputs,
-) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    key.hash(&mut hasher);
-    inputs.root_module_file.path.hash(&mut hasher);
-    inputs.root_module_file.input_digest.hash(&mut hasher);
-    inputs.lockfile_inputs.hash_identity(&mut hasher);
-    inputs.local_override_inputs.digest.hash(&mut hasher);
-    inputs.non_registry_override_inputs.digest.hash(&mut hasher);
-    inputs.registry_file_inputs.digest.hash(&mut hasher);
-    inputs.override_patch_inputs.digest.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
-
 fn record_clean_bzlmod_resolution_compute_if_changed(
     key: &BzlmodResolvedModuleGraphKey,
     resolution_key: &slug_bzlmod::BzlmodResolutionKey,
-    inputs: &BzlmodResolvedModuleGraphInputs,
+    inputs: &slug_bzlmod::BzlmodResolvedGraphSourceInputsValue,
 ) {
     let cache_key = format!(
         "{}:{}",
         resolution_key.workspace_id.stable_hash(),
         resolution_key.command_policy_digest
     );
-    let input_digest = bzlmod_resolved_module_graph_inputs_identity_digest(key, inputs);
+    let input_digest = inputs.identity_digest_with_key(key);
     let mut last = LAST_RECORDED_BZLMOD_RESOLUTION_DIGEST
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
@@ -2946,16 +2929,6 @@ struct BzlmodResolvedModuleGraphKey {
     validate_root_extension_repo_directives: bool,
 }
 
-#[derive(Clone, Debug, Allocative)]
-struct BzlmodResolvedModuleGraphInputs {
-    root_module_file: Arc<slug_bzlmod::RootModuleFileValue>,
-    lockfile_inputs: Arc<slug_bzlmod::BzlmodLockfileInputsValue>,
-    local_override_inputs: Arc<LocalOverrideModuleInputsValue>,
-    non_registry_override_inputs: Arc<NonRegistryOverrideModuleInputsValue>,
-    registry_file_inputs: Arc<RegistryFileInputsValue>,
-    override_patch_inputs: Arc<slug_bzlmod::OverridePatchInputs>,
-}
-
 #[derive(Clone, Debug, PartialEq, Allocative)]
 struct BzlmodResolvedModuleGraphValue {
     lockfile_inputs: Arc<slug_bzlmod::BzlmodLockfileInputsValue>,
@@ -3320,7 +3293,7 @@ fn build_bzlmod_resolved_module_graph_key(
 async fn compute_bzlmod_resolved_module_graph_inputs(
     key: &BzlmodResolvedModuleGraphKey,
     dice_ctx: &mut DiceComputations<'_>,
-) -> slug_error::Result<BzlmodResolvedModuleGraphInputs> {
+) -> slug_error::Result<slug_bzlmod::BzlmodResolvedGraphSourceInputsValue> {
     let workspace_id = key.workspace_id.clone();
     let root_module_file = dice_ctx
         .compute(&TrackedRootModuleFileKey {
@@ -3397,7 +3370,7 @@ async fn compute_bzlmod_resolved_module_graph_inputs(
         .await?
         .buck_error_context("Computing override patch inputs for clean bzlmod graph")?;
 
-    Ok(BzlmodResolvedModuleGraphInputs {
+    Ok(slug_bzlmod::BzlmodResolvedGraphSourceInputsValue {
         root_module_file,
         lockfile_inputs,
         local_override_inputs,

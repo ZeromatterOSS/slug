@@ -574,6 +574,13 @@ Current state to preserve:
   for this policy; the remaining callback-style work is lockfile preseed/file
   validation. Guardrail:
   `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 clean resolved-graph source input value moved to `slug_bzlmod`:
+  `BzlmodResolvedGraphSourceInputsValue` now owns the source-input bundle and
+  identity digest used to decide whether a clean resolved-graph compute is a
+  semantic input change. `slug_common` still computes the filesystem-backed
+  input keys so project-file tracking is preserved, but it returns the
+  bzlmod-owned source-input value instead of a private bridge struct. Guardrail:
+  `cargo test -p slug_bzlmod resolved_graph_source_inputs --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common local_override_module_inputs_key_repolls_same_out_of_project_key --lib && cargo test -p slug_common non_root_module_files_key_repolls_same_out_of_project_key --lib && cargo test -p slug_common registry_file_inputs_key_repolls_same_out_of_project_key --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
