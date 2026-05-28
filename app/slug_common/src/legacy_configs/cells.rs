@@ -856,13 +856,6 @@ fn replay_bzlmod_runtime_state(
     slug_core::cells::repair_external_symlink_targets(project_root.root().as_path());
 }
 
-const BZLMOD_BAZEL_RELEASE_ID: &str = "bazel-9.0.1";
-const BZLMOD_STARLARK_SEMANTICS_DIGEST: &str = "slug-bazel9-starlark-semantics-v1";
-const BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST: &str = "default-registry-config";
-const BZLMOD_DEFAULT_REPOSITORY_CACHE_CONFIG_DIGEST: &str = "default-repository-cache-config";
-const BZLMOD_DEFAULT_NETWORK_POLICY_DIGEST: &str = "default-network-policy";
-const BZLMOD_DEFAULT_NONSTRICT_REPO_ENV_DIGEST: &str = "empty-nonstrict-repo-env";
-const BZLMOD_DEFAULT_BAZEL_COMPATIBILITY_POLICY_DIGEST: &str = "default-bazel-compatibility-policy";
 // Instrumentation-only caches used by Plan 61 guardrails to distinguish a
 // semantic clean-graph input change from no-op validation of polled inputs.
 static LAST_RECORDED_BZLMOD_RESOLUTION_DIGEST: OnceLock<Mutex<HashMap<String, String>>> =
@@ -962,59 +955,6 @@ fn bzlmod_resolution_options_from_config(
     })
 }
 
-fn bzlmod_resolution_options_policy_digest(options: &BzlmodResolutionOptions) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(format!("{:?}", options.lockfile_mode).as_bytes());
-    hasher.update([0]);
-    hasher.update([u8::from(options.ignore_dev_dependency)]);
-    hasher.update([0]);
-    if let Some(value) = &options.allow_yanked_versions_env {
-        hasher.update(value.as_bytes());
-    }
-    hasher.update([0]);
-    for value in &options.allow_yanked_versions_flags {
-        hasher.update(value.as_bytes());
-        hasher.update([0]);
-    }
-    hasher.update(options.repo_env_digest.as_bytes());
-    hasher.update([0]);
-    if let Some(value) = &options.hidden_lockfile_path {
-        hasher.update(value.to_string_lossy().as_bytes());
-    }
-    hasher.update([0]);
-    hex::encode(hasher.finalize())
-}
-
-fn bzlmod_resolution_options_command_policy_key(
-    options: &BzlmodResolutionOptions,
-    workspace_id: slug_bzlmod::WorkspaceId,
-) -> slug_bzlmod::BzlmodCommandPolicyKey {
-    slug_bzlmod::BzlmodCommandPolicyKey {
-        workspace_id,
-        bazel_release_id: Arc::from(BZLMOD_BAZEL_RELEASE_ID),
-        starlark_semantics_digest: Arc::from(BZLMOD_STARLARK_SEMANTICS_DIGEST),
-        bzlmod_flags_digest: Arc::from(bzlmod_resolution_options_policy_digest(options).as_str()),
-        lockfile_mode: Arc::from(format!("{:?}", options.lockfile_mode).as_str()),
-        registry_config_digest: Arc::from(BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST),
-        repository_cache_config_digest: Arc::from(BZLMOD_DEFAULT_REPOSITORY_CACHE_CONFIG_DIGEST),
-        network_policy_digest: Arc::from(BZLMOD_DEFAULT_NETWORK_POLICY_DIGEST),
-        repo_env_digest: Arc::from(options.repo_env_digest.as_str()),
-        nonstrict_repo_env_digest: Arc::from(BZLMOD_DEFAULT_NONSTRICT_REPO_ENV_DIGEST),
-        ignore_dev_dependency: options.ignore_dev_dependency,
-        allow_yanked_versions_digest: Arc::from(
-            allow_yanked_versions_digest(
-                options.allow_yanked_versions_env.as_deref(),
-                &options.allow_yanked_versions_flags,
-            )
-            .as_str(),
-        ),
-        bazel_compatibility_policy_digest: Arc::from(
-            BZLMOD_DEFAULT_BAZEL_COMPATIBILITY_POLICY_DIGEST,
-        ),
-        isolated_extension_usages: false,
-    }
-}
-
 fn parse_bzlmod_bool(key: &str, value: &str) -> slug_error::Result<bool> {
     match value {
         "1" | "true" | "True" | "yes" => Ok(true),
@@ -1024,22 +964,6 @@ fn parse_bzlmod_bool(key: &str, value: &str) -> slug_error::Result<bool> {
             "Invalid bzlmod.{key} value `{value}`; expected true or false"
         )),
     }
-}
-
-fn allow_yanked_versions_digest(from_env: Option<&str>, from_flags: &[String]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(b"allow-yanked-versions-policy-v1");
-    hasher.update([0]);
-    if let Some(value) = from_env {
-        hasher.update(value.as_bytes());
-        hasher.update([0]);
-    }
-    hasher.update([0]);
-    for value in from_flags {
-        hasher.update(value.as_bytes());
-        hasher.update([0]);
-    }
-    hex::encode(hasher.finalize())
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -4202,10 +4126,7 @@ impl BuckConfigBasedCells {
             output_base.unwrap_or_else(|| project_root_path.join("buck-out/v2")),
         );
         let command_policy = dice_ctx
-            .compute(&bzlmod_resolution_options_command_policy_key(
-                &options,
-                workspace_id.clone(),
-            ))
+            .compute(&options.command_policy_key(workspace_id.clone()))
             .await?
             .buck_error_context("Computing bzlmod command policy")?;
         let resolution_key = slug_bzlmod::BzlmodResolutionKey {
@@ -5771,10 +5692,7 @@ mod tests {
         let mut second = first.clone();
         second.hidden_lockfile_path = Some(PathBuf::from("/tmp/hidden-two/MODULE.bazel.lock"));
 
-        assert_ne!(
-            bzlmod_resolution_options_policy_digest(&first),
-            bzlmod_resolution_options_policy_digest(&second)
-        );
+        assert_ne!(first.policy_digest(), second.policy_digest());
         assert!(!bzlmod_resolution_options_policy_eq(&first, &second));
 
         let mut first_hasher = DefaultHasher::new();

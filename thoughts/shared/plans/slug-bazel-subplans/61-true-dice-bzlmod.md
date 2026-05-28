@@ -445,6 +445,12 @@ Current state to preserve:
   `BzlmodResolvedModuleGraphKey`, but the remaining producer-boundary state is
   smaller and closer to the eventual DICE key owner. Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo test -p slug_common bzlmod_resolution_policy_includes_hidden_lockfile_path --lib && cargo build -p slug`.
+- 2026-05-28 command-policy construction boundary reduction:
+  `BzlmodResolutionOptions::policy_digest`, `command_policy_key`, and
+  `allow_yanked_versions_digest` now live in `slug_bzlmod`. `slug_common`
+  still parses legacy config into options, but no longer owns bzlmod command
+  policy key assembly. Guardrail:
+  `cargo test -p slug_common bzlmod_resolution_policy_includes_hidden_lockfile_path --lib && cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1128,9 +1134,9 @@ hardening behavior around it.
      passed as separate named injections. The remaining transitional API is the
      injected `BzlmodResolvedGraphDataKey`: production now injects clean
      resolved graph addressed by the clean resolved-graph digest, and the
-     resolved-graph output value shape plus resolution option identity are
-     owned by `slug_bzlmod`, but that key does not compute the graph from DICE
-     dependencies yet.
+     resolved-graph output value shape plus resolution option and command
+     policy identity are owned by `slug_bzlmod`, but that key does not compute
+     the graph from DICE dependencies yet.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being

@@ -133,6 +133,84 @@ pub struct BzlmodResolutionOptions {
     pub repo_env_digest: String,
 }
 
+const BZLMOD_BAZEL_RELEASE_ID: &str = "bazel-9.0.1";
+const BZLMOD_STARLARK_SEMANTICS_DIGEST: &str = "slug-bazel9-starlark-semantics-v1";
+const BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST: &str = "default-registry-config";
+const BZLMOD_DEFAULT_REPOSITORY_CACHE_CONFIG_DIGEST: &str = "default-repository-cache-config";
+const BZLMOD_DEFAULT_NETWORK_POLICY_DIGEST: &str = "default-network-policy";
+const BZLMOD_DEFAULT_NONSTRICT_REPO_ENV_DIGEST: &str = "empty-nonstrict-repo-env";
+const BZLMOD_DEFAULT_BAZEL_COMPATIBILITY_POLICY_DIGEST: &str = "default-bazel-compatibility-policy";
+
+impl BzlmodResolutionOptions {
+    pub fn policy_digest(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(format!("{:?}", self.lockfile_mode).as_bytes());
+        hasher.update([0]);
+        hasher.update([u8::from(self.ignore_dev_dependency)]);
+        hasher.update([0]);
+        if let Some(value) = &self.allow_yanked_versions_env {
+            hasher.update(value.as_bytes());
+        }
+        hasher.update([0]);
+        for value in &self.allow_yanked_versions_flags {
+            hasher.update(value.as_bytes());
+            hasher.update([0]);
+        }
+        hasher.update(self.repo_env_digest.as_bytes());
+        hasher.update([0]);
+        if let Some(value) = &self.hidden_lockfile_path {
+            hasher.update(value.to_string_lossy().as_bytes());
+        }
+        hasher.update([0]);
+        hex::encode(hasher.finalize())
+    }
+
+    pub fn command_policy_key(&self, workspace_id: WorkspaceId) -> BzlmodCommandPolicyKey {
+        BzlmodCommandPolicyKey {
+            workspace_id,
+            bazel_release_id: Arc::from(BZLMOD_BAZEL_RELEASE_ID),
+            starlark_semantics_digest: Arc::from(BZLMOD_STARLARK_SEMANTICS_DIGEST),
+            bzlmod_flags_digest: Arc::from(self.policy_digest().as_str()),
+            lockfile_mode: Arc::from(format!("{:?}", self.lockfile_mode).as_str()),
+            registry_config_digest: Arc::from(BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST),
+            repository_cache_config_digest: Arc::from(
+                BZLMOD_DEFAULT_REPOSITORY_CACHE_CONFIG_DIGEST,
+            ),
+            network_policy_digest: Arc::from(BZLMOD_DEFAULT_NETWORK_POLICY_DIGEST),
+            repo_env_digest: Arc::from(self.repo_env_digest.as_str()),
+            nonstrict_repo_env_digest: Arc::from(BZLMOD_DEFAULT_NONSTRICT_REPO_ENV_DIGEST),
+            ignore_dev_dependency: self.ignore_dev_dependency,
+            allow_yanked_versions_digest: Arc::from(
+                allow_yanked_versions_digest(
+                    self.allow_yanked_versions_env.as_deref(),
+                    &self.allow_yanked_versions_flags,
+                )
+                .as_str(),
+            ),
+            bazel_compatibility_policy_digest: Arc::from(
+                BZLMOD_DEFAULT_BAZEL_COMPATIBILITY_POLICY_DIGEST,
+            ),
+            isolated_extension_usages: false,
+        }
+    }
+}
+
+pub fn allow_yanked_versions_digest(from_env: Option<&str>, from_flags: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"allow-yanked-versions-policy-v1");
+    hasher.update([0]);
+    if let Some(value) = from_env {
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+    hasher.update([0]);
+    for value in from_flags {
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+    hex::encode(hasher.finalize())
+}
+
 #[async_trait]
 impl Key for BzlmodCommandPolicyKey {
     type Value = slug_error::Result<Arc<BzlmodCommandPolicyValue>>;
