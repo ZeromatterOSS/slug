@@ -63,6 +63,7 @@ use allocative::Allocative;
 pub use cache::ModuleCache;
 pub use dice_graph::BzlmodCellGraphAlias;
 pub use dice_graph::BzlmodCellGraphCell;
+pub use dice_graph::BzlmodCellGraphDataValue;
 use dice_graph::BzlmodCellGraphDataKey;
 pub use dice_graph::BzlmodCellGraphDynamicAlias;
 pub use dice_graph::BzlmodCellGraphExtensionCell;
@@ -329,6 +330,33 @@ pub trait SetBzlmodDiceInputs {
         extension_aggregations: BzlmodExtensionAggregationsDataValue,
         resolution_facts: BzlmodResolutionFactsValue,
         repo_mappings: BzlmodRepoMappingsDataValue,
+    ) -> slug_error::Result<()> {
+        self.set_bzlmod_cell_graph_data_with_inputs_and_digest(
+            Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+            cell_graph,
+            module_versions,
+            lockfile_inputs,
+            repo_env,
+            registered_toolchains,
+            registered_execution_platforms,
+            extension_aggregations,
+            resolution_facts,
+            repo_mappings,
+        )
+    }
+
+    fn set_bzlmod_cell_graph_data_with_inputs_and_digest(
+        &mut self,
+        cell_graph_resolution_digest: Arc<str>,
+        cell_graph: BzlmodCellGraphValue,
+        module_versions: BzlmodModuleVersionsDataValue,
+        lockfile_inputs: BzlmodLockfileInputsDataValue,
+        repo_env: BzlmodRepoEnvDataValue,
+        registered_toolchains: RegisteredToolchainsDataValue,
+        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+        extension_aggregations: BzlmodExtensionAggregationsDataValue,
+        resolution_facts: BzlmodResolutionFactsValue,
+        repo_mappings: BzlmodRepoMappingsDataValue,
     ) -> slug_error::Result<()>;
 }
 
@@ -371,6 +399,33 @@ fn validate_cell_graph_root_module_name(
 impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
     fn set_bzlmod_cell_graph_data_with_inputs(
         &mut self,
+        cell_graph: BzlmodCellGraphValue,
+        module_versions: BzlmodModuleVersionsDataValue,
+        lockfile_inputs: BzlmodLockfileInputsDataValue,
+        repo_env: BzlmodRepoEnvDataValue,
+        registered_toolchains: RegisteredToolchainsDataValue,
+        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+        extension_aggregations: BzlmodExtensionAggregationsDataValue,
+        resolution_facts: BzlmodResolutionFactsValue,
+        repo_mappings: BzlmodRepoMappingsDataValue,
+    ) -> slug_error::Result<()> {
+        self.set_bzlmod_cell_graph_data_with_inputs_and_digest(
+            Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+            cell_graph,
+            module_versions,
+            lockfile_inputs,
+            repo_env,
+            registered_toolchains,
+            registered_execution_platforms,
+            extension_aggregations,
+            resolution_facts,
+            repo_mappings,
+        )
+    }
+
+    fn set_bzlmod_cell_graph_data_with_inputs_and_digest(
+        &mut self,
+        cell_graph_resolution_digest: Arc<str>,
         cell_graph: BzlmodCellGraphValue,
         module_versions: BzlmodModuleVersionsDataValue,
         lockfile_inputs: BzlmodLockfileInputsDataValue,
@@ -439,7 +494,13 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
         let resolution_facts = Arc::new(resolution_facts);
         let repo_mappings = Arc::new(repo_mappings);
         let extension_aggregations = Arc::new(extension_aggregations);
+        let cell_graph_workspace_id = cell_graph_workspace_id.clone();
         let cell_graph = Arc::new(cell_graph);
+        let cell_graph_data = Arc::new(BzlmodCellGraphDataValue::for_workspace(
+            cell_graph_workspace_id,
+            cell_graph_resolution_digest,
+            cell_graph,
+        ));
         let registered_toolchains = Arc::new(registered_toolchains);
         let registered_execution_platforms = Arc::new(registered_execution_platforms);
         self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
@@ -459,7 +520,7 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
         )])?;
-        self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph)])?;
+        self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
         Ok(())
     }
 }
@@ -493,8 +554,28 @@ pub async fn registered_execution_platforms_for_current_workspace(
 pub async fn bzlmod_cell_graph_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
-    let injected = ctx.compute(&BzlmodCellGraphDataKey).await?;
-    let key = BzlmodCellGraphKey::for_workspace_id(injected.workspace_id.clone());
+    let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    bzlmod_cell_graph_for_workspace_id(ctx, data.workspace_id.clone()).await
+}
+
+pub async fn bzlmod_cell_graph_for_workspace_id(
+    ctx: &mut dice::DiceComputations<'_>,
+    workspace_id: WorkspaceId,
+) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
+    let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+    if data.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "bzlmod cell graph requested for project root '{}', \
+             but current bzlmod cell graph root is '{}'",
+            workspace_id.canonical_project_root.display(),
+            data.workspace_id.canonical_project_root.display()
+        ));
+    }
+    let key = BzlmodCellGraphKey {
+        workspace_id,
+        resolution_digest: data.resolution_digest.clone(),
+    };
     ctx.compute(&key).await?
 }
 
@@ -1318,8 +1399,12 @@ mod tests {
         let mut updater = dice.into_updater();
         updater.changed_to(vec![(
             BzlmodCellGraphDataKey,
-            Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+            Arc::new(BzlmodCellGraphDataValue::for_workspace(
                 workspace_id.clone(),
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+                    workspace_id.clone(),
+                )),
             )),
         )])?;
         updater.changed_to(vec![(
@@ -1587,8 +1672,12 @@ mod tests {
         let mut updater = dice.into_updater();
         updater.changed_to(vec![(
             BzlmodCellGraphDataKey,
-            Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+            Arc::new(BzlmodCellGraphDataValue::for_workspace(
                 workspace_id.clone(),
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+                    workspace_id.clone(),
+                )),
             )),
         )])?;
         updater.changed_to(vec![(
@@ -1659,8 +1748,12 @@ mod tests {
         let mut updater = dice.into_updater();
         updater.changed_to(vec![(
             BzlmodCellGraphDataKey,
-            Arc::new(BzlmodCellGraphValue::empty_for_workspace(
-                other_workspace_id,
+            Arc::new(BzlmodCellGraphDataValue::for_workspace(
+                other_workspace_id.clone(),
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+                    other_workspace_id,
+                )),
             )),
         )])?;
         updater.changed_to(vec![(

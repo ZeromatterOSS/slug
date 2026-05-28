@@ -48,7 +48,6 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 
-use crate::dice_graph::BzlmodCellGraphKey;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::RepoMaterializationManifestKey;
 use crate::dice_graph::RepoMaterializationManifestValue;
@@ -94,11 +93,8 @@ impl Key for RepositoryLabelResolutionKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let cell_graph = ctx
-            .compute(&BzlmodCellGraphKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
+        let cell_graph =
+            crate::bzlmod_cell_graph_for_workspace_id(ctx, self.workspace_id.clone()).await?;
         Ok(Arc::new(RepositoryLabelResolution::from_cell_graph(
             &self.project_root,
             &cell_graph,

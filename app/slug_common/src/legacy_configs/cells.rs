@@ -4181,8 +4181,16 @@ impl BuckConfigBasedCells {
         )
         .await
         .buck_error_context("Parsing cells")?;
-        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs(
+        let cell_graph_resolution_digest = clean_resolved_module_graph
+            .as_ref()
+            .as_ref()
+            .map_or_else(
+                || Arc::from("empty-bzlmod-cell-graph"),
+                |value| value.graph_digest.clone(),
+            );
+        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_and_digest(
             updater,
+            cell_graph_resolution_digest,
             cell_graph_for_dice,
             module_versions_for_dice,
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
@@ -6005,6 +6013,16 @@ use_repo(ext, "generated")
                 .extension_cells
                 .iter()
                 .any(|cell| cell.canonical_name == "_main+ext+generated")
+        );
+        let stale_key_error = dice
+            .compute(&slug_bzlmod::BzlmodCellGraphKey::for_workspace_id(
+                module_versions.workspace_id.clone(),
+            ))
+            .await?
+            .unwrap_err();
+        assert!(
+            stale_key_error.to_string().contains("resolution digest"),
+            "{stale_key_error:?}"
         );
         Ok(())
     }

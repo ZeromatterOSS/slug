@@ -185,7 +185,7 @@ pub fn repo_env_policy_digest(repo_env: &BTreeMap<String, String>) -> String {
     hex::encode(hasher.finalize())
 }
 
-const INJECTED_BZLMOD_PROJECTION_DIGEST: &str = "injected-bzlmod-projection";
+pub(crate) const INJECTED_BZLMOD_PROJECTION_DIGEST: &str = "injected-bzlmod-projection";
 
 /// DICE-owned root `MODULE.bazel` read/parse result.
 #[derive(Clone, Debug, Allocative)]
@@ -415,6 +415,27 @@ impl BzlmodCellGraphValue {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodCellGraphDataValue {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+    pub cell_graph: Arc<BzlmodCellGraphValue>,
+}
+
+impl BzlmodCellGraphDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        cell_graph: Arc<BzlmodCellGraphValue>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+            cell_graph,
+        }
+    }
+}
+
 #[derive(
     derive_more::Display,
     Debug,
@@ -429,7 +450,7 @@ impl BzlmodCellGraphValue {
 pub(crate) struct BzlmodCellGraphDataKey;
 
 impl dice::InjectedKey for BzlmodCellGraphDataKey {
-    type Value = Arc<BzlmodCellGraphValue>;
+    type Value = Arc<BzlmodCellGraphDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -445,14 +466,23 @@ impl Key for BzlmodCellGraphKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let value = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        if value.workspace_id != self.workspace_id {
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        if data.workspace_id != self.workspace_id {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
                 "BzlmodCellGraphKey was computed with project root '{}', \
                  but current bzlmod cell graph root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
-                value.workspace_id.canonical_project_root.display()
+                data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodCellGraphKey was computed with resolution digest '{}', \
+                 but current bzlmod cell graph digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
             ));
         }
 
@@ -492,7 +522,7 @@ impl Key for BzlmodCellGraphKey {
                     .display()
             ));
         }
-        Ok(value)
+        Ok(data.cell_graph.clone())
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

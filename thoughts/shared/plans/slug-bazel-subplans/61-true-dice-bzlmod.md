@@ -307,6 +307,24 @@ Current state to preserve:
   `cargo build -p slug`, `git diff --check`, and the focused Python replay
   set covering recorded file edits, repo-mapping changes, extension-repo-source
   mappings, and invalid extension digests.
+- 2026-05-28 cell-graph identity reduction: `BzlmodCellGraphDataKey` now
+  carries a `BzlmodCellGraphDataValue` with the clean resolved-graph digest
+  beside the graph payload. Persisted config-load installs the digest from
+  `BzlmodResolvedModuleGraphValue::graph_digest`, `BzlmodCellGraphKey` rejects
+  stale injected-projection keys whose digest does not match the active clean
+  graph, and repository label resolution now asks for the active workspace graph
+  through the digest-addressed helper. This does not finish the cell-graph
+  producer move: the graph payload is still injected after the clean producer
+  runs in `slug_common`. It removes the anonymous injected-projection identity
+  from real persisted bzlmod graph loads and leaves the remaining bridge as the
+  producer boundary itself. Validated with
+  `cargo test -p slug_bzlmod bzlmod_cell_graph --lib`,
+  `cargo test -p slug_bzlmod repository_label_resolution_key_projects_cell_graph_paths --lib`,
+  and
+  `cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib`;
+  the standard preseed/replay guardrails, `cargo build -p slug`,
+  `git diff --check`, and the focused Python replay set also passed after this
+  change.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -955,11 +973,11 @@ hardening behavior around it.
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
      external symlinks, and bundled repos from DICE values.
-   - `BzlmodCellGraphDataKey` currently exposes an injected graph value rather
-     than computing the graph itself. The production payload is now derived from
-     the clean resolved-graph producer, and legacy cell parsing takes only that
-     graph-shaped value. The old `BzlmodProjectionData` wrapper has been
-     deleted.
+   - `BzlmodCellGraphDataKey` currently exposes injected graph data rather than
+     computing the graph itself. The production payload is now derived from the
+     clean resolved-graph producer, carries that producer's graph digest, and
+     legacy cell parsing takes only that graph-shaped value. The old
+     `BzlmodProjectionData` wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
@@ -973,9 +991,9 @@ hardening behavior around it.
      resolution facts, repo mappings, registered toolchains, registered
      execution platforms, extension aggregations, and module versions are
      passed as separate named injections. The remaining transitional API is the
-     injected `BzlmodCellGraphDataKey` itself: production now injects a clean
-     graph value, but the key does not compute the graph from DICE dependencies
-     yet.
+     injected `BzlmodCellGraphDataKey` itself: production now injects clean graph
+     data addressed by the clean resolved-graph digest, but the key does not
+     compute the graph from DICE dependencies yet.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being
