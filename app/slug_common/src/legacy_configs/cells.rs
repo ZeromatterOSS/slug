@@ -83,21 +83,6 @@ use crate::legacy_configs::configs::LegacyBuckConfig;
 use crate::legacy_configs::dice::HasInjectedLegacyConfigs;
 use crate::legacy_configs::key::BuckconfigKeyRef;
 
-/// Bundled toolchain labels auto-injected when `rules_python` is in the
-/// module graph but the root module didn't register a py3 toolchain.
-///
-/// Ordering matters: `host_toolchain` provides the default py3 runtime; the
-/// launcher_maker stub satisfies rules_python 1.9+'s mandatory
-/// launcher_maker_toolchain_type (only actually invoked on Windows, but
-/// resolution must succeed on Linux/macOS too).
-///
-/// Grep for this constant to find every place that implicitly assumes the
-/// bundled `local_config_python` cell is registered.
-const BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS: &[&str] = &[
-    "@local_config_python//:host_toolchain",
-    "@local_config_python//:host_launcher_maker_toolchain",
-];
-
 const BZLMOD_ALWAYS_BUNDLED_CELLS: &[&str] = &[
     "bazel_tools",
     "local_config_platform",
@@ -300,23 +285,6 @@ fn runtime_cell_install_snapshot(
             }
         }));
     snapshot
-}
-
-/// The module name used by the canonical rules_python Bazel module. Matched
-/// against `ParsedModuleFile::module.name` (the declared `module(name = ...)`
-/// value), not against cell names.
-const RULES_PYTHON_MODULE_NAME: &str = "rules_python";
-
-/// Sentinel substring used to detect whether a user-registered toolchain
-/// label already targets the bundled `@local_config_python` cell. Any label
-/// containing this substring means we should not auto-inject duplicates.
-const LOCAL_CONFIG_PYTHON_CELL: &str = "local_config_python";
-
-/// True iff `parsed_modules` contains the canonical rules_python module.
-fn module_depends_on_rules_python(parsed_modules: &[(String, ParsedModuleFile)]) -> bool {
-    parsed_modules
-        .iter()
-        .any(|(name, _)| name == RULES_PYTHON_MODULE_NAME)
 }
 
 fn repo_mapping_snapshot_for_modules(
@@ -567,58 +535,6 @@ fn add_scoped_repo_aliases_from_root_overrides(
             }
         }
     }
-}
-
-fn collect_bzlmod_registered_items(
-    parsed_modules: &[(String, ParsedModuleFile)],
-    root_module_name: &str,
-    ignore_dev_dependency: bool,
-) -> (Vec<slug_bzlmod::RegisteredToolchain>, Vec<String>) {
-    let mut all_toolchains = Vec::new();
-    let mut all_exec_platforms = Vec::new();
-    for (module_name, parsed_mod) in parsed_modules {
-        let is_root = module_name == root_module_name
-            || module_name == "_main"
-            || parsed_mod.module.name == root_module_name;
-        let repo_mapping = slug_bzlmod::BzlmodRepoMapping::for_module(parsed_mod, root_module_name);
-        for item in &parsed_mod.registered_toolchains {
-            if item.dev_dependency && (!is_root || ignore_dev_dependency) {
-                tracing::debug!(
-                    "Skipping dev_dependency toolchain '{}' from module '{}'",
-                    item.label,
-                    module_name
-                );
-                continue;
-            }
-            let label = repo_mapping.canonicalize_label_to_storage_string(&item.label);
-            all_toolchains.push(slug_bzlmod::RegisteredToolchain {
-                module: module_name.clone(),
-                label,
-                is_root,
-            });
-        }
-        for item in &parsed_mod.registered_execution_platforms {
-            if item.dev_dependency && (!is_root || ignore_dev_dependency) {
-                tracing::debug!(
-                    "Skipping dev_dependency execution platform '{}' from module '{}'",
-                    item.label,
-                    module_name
-                );
-                continue;
-            }
-            all_exec_platforms.push(repo_mapping.canonicalize_label_to_storage_string(&item.label));
-        }
-    }
-    (all_toolchains, all_exec_platforms)
-}
-
-/// True iff any toolchain label already references the bundled
-/// `@local_config_python` cell (meaning the user has already wired up
-/// bundled rules_python toolchains and we should skip auto-injection).
-fn toolchains_include_bundled_python(toolchains: &[slug_bzlmod::RegisteredToolchain]) -> bool {
-    toolchains
-        .iter()
-        .any(|tc| tc.label.contains(LOCAL_CONFIG_PYTHON_CELL))
 }
 
 /// Buckconfigs can partially be loaded from within dice. However, some parts of what makes up the
@@ -4985,22 +4901,11 @@ impl BuckConfigBasedCells {
                 root_module_name,
                 Arc::new(version_map),
             );
-        let (mut all_toolchains, all_exec_platforms) = collect_bzlmod_registered_items(
+        let (all_toolchains, all_exec_platforms) = slug_bzlmod::collect_bzlmod_registered_items(
             &parsed_modules,
             &module_versions.root_module_name,
             key.options.ignore_dev_dependency,
         );
-        if module_depends_on_rules_python(&parsed_modules)
-            && !toolchains_include_bundled_python(&all_toolchains)
-        {
-            for label in BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS {
-                all_toolchains.push(slug_bzlmod::RegisteredToolchain {
-                    module: RULES_PYTHON_MODULE_NAME.to_owned(),
-                    label: (*label).to_owned(),
-                    is_root: true,
-                });
-            }
-        }
         let registered_toolchains = slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
             key.resolution_key.workspace_id.clone(),
             all_toolchains,
@@ -5398,12 +5303,12 @@ mod tests {
 
         let parsed_modules = vec![("root".to_owned(), root)];
         let (toolchains, platforms) =
-            collect_bzlmod_registered_items(&parsed_modules, "root", false);
+            slug_bzlmod::collect_bzlmod_registered_items(&parsed_modules, "root", false);
         assert_eq!(toolchains.len(), 1);
         assert_eq!(platforms.len(), 1);
 
         let (toolchains, platforms) =
-            collect_bzlmod_registered_items(&parsed_modules, "root", true);
+            slug_bzlmod::collect_bzlmod_registered_items(&parsed_modules, "root", true);
         assert!(toolchains.is_empty());
         assert!(platforms.is_empty());
     }

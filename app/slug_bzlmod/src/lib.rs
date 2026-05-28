@@ -149,6 +149,7 @@ pub use dice_graph::active_root_overrides;
 pub use dice_graph::allow_yanked_versions_digest;
 pub use dice_graph::bzlmod_event_counters;
 pub use dice_graph::bzlmod_resolved_graph_digest;
+pub use dice_graph::collect_bzlmod_registered_items;
 pub use dice_graph::local_overrides_from_root_module;
 pub use dice_graph::module_file_inputs_digest;
 pub use dice_graph::non_registry_override_module_dirs_from_root_module;

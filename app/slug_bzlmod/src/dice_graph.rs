@@ -36,6 +36,8 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 
+use crate::BzlmodRepoMapping;
+use crate::RegisteredToolchain;
 use crate::cache::ModuleCache;
 use crate::extensions::AggregatedExtension;
 use crate::lockfile::Lockfile;
@@ -500,6 +502,102 @@ pub fn non_registry_override_module_dirs_from_root_module(
             _ => None,
         })
         .collect::<Vec<_>>())
+}
+
+/// The module name used by the canonical rules_python Bazel module. Matched
+/// against `ParsedModuleFile::module.name` (the declared `module(name = ...)`
+/// value), not against cell names.
+const RULES_PYTHON_MODULE_NAME: &str = "rules_python";
+
+/// Sentinel substring used to detect whether a user-registered toolchain label
+/// already targets the bundled `@local_config_python` cell. Any label
+/// containing this substring means we should not auto-inject duplicates.
+const LOCAL_CONFIG_PYTHON_CELL: &str = "local_config_python";
+
+/// Bundled toolchain labels auto-injected when `rules_python` is in the module
+/// graph but the root module did not register a py3 toolchain.
+///
+/// Ordering matters: `host_toolchain` provides the default py3 runtime; the
+/// launcher_maker stub satisfies rules_python 1.9+'s mandatory
+/// launcher_maker_toolchain_type (only actually invoked on Windows, but
+/// resolution must succeed on Linux/macOS too).
+const BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS: &[&str] = &[
+    "@local_config_python//:host_toolchain",
+    "@local_config_python//:host_launcher_maker_toolchain",
+];
+
+/// Collect registered toolchain and execution platform outputs from parsed
+/// modules using Bazel bzlmod dev-dependency visibility policy.
+pub fn collect_bzlmod_registered_items(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+    ignore_dev_dependency: bool,
+) -> (Vec<RegisteredToolchain>, Vec<String>) {
+    let mut all_toolchains = Vec::new();
+    let mut all_exec_platforms = Vec::new();
+    for (module_name, parsed_mod) in parsed_modules {
+        let is_root = module_name == root_module_name
+            || module_name == "_main"
+            || parsed_mod.module.name == root_module_name;
+        let repo_mapping = BzlmodRepoMapping::for_module(parsed_mod, root_module_name);
+        for item in &parsed_mod.registered_toolchains {
+            if item.dev_dependency && (!is_root || ignore_dev_dependency) {
+                tracing::debug!(
+                    "Skipping dev_dependency toolchain '{}' from module '{}'",
+                    item.label,
+                    module_name
+                );
+                continue;
+            }
+            let label = repo_mapping.canonicalize_label_to_storage_string(&item.label);
+            all_toolchains.push(RegisteredToolchain {
+                module: module_name.clone(),
+                label,
+                is_root,
+            });
+        }
+        for item in &parsed_mod.registered_execution_platforms {
+            if item.dev_dependency && (!is_root || ignore_dev_dependency) {
+                tracing::debug!(
+                    "Skipping dev_dependency execution platform '{}' from module '{}'",
+                    item.label,
+                    module_name
+                );
+                continue;
+            }
+            all_exec_platforms.push(repo_mapping.canonicalize_label_to_storage_string(&item.label));
+        }
+    }
+
+    if module_depends_on_rules_python(parsed_modules)
+        && !toolchains_include_bundled_python(&all_toolchains)
+    {
+        for label in BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS {
+            all_toolchains.push(RegisteredToolchain {
+                module: RULES_PYTHON_MODULE_NAME.to_owned(),
+                label: (*label).to_owned(),
+                is_root: true,
+            });
+        }
+    }
+
+    (all_toolchains, all_exec_platforms)
+}
+
+/// True iff `parsed_modules` contains the canonical rules_python module.
+fn module_depends_on_rules_python(parsed_modules: &[(String, ParsedModuleFile)]) -> bool {
+    parsed_modules
+        .iter()
+        .any(|(name, _)| name == RULES_PYTHON_MODULE_NAME)
+}
+
+/// True iff any toolchain label already references the bundled
+/// `@local_config_python` cell (meaning the user has already wired up bundled
+/// rules_python toolchains and we should skip auto-injection).
+fn toolchains_include_bundled_python(toolchains: &[RegisteredToolchain]) -> bool {
+    toolchains
+        .iter()
+        .any(|tc| tc.label.contains(LOCAL_CONFIG_PYTHON_CELL))
 }
 
 pub fn module_file_inputs_digest(inputs: &[ModuleFileInputDigest]) -> String {
@@ -3028,6 +3126,8 @@ pub fn bzlmod_event_counters() -> BzlmodEventCounters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::RegisteredItem;
+    use crate::version::Version;
 
     #[test]
     fn workspace_id_distinguishes_project_roots() {
@@ -3044,6 +3144,77 @@ mod tests {
 
         assert_eq!(sentinel.canonical_project_root.as_ref(), &PathBuf::new());
         assert_eq!(sentinel.output_base.as_ref(), &PathBuf::from("buck-out/v2"));
+    }
+
+    fn parsed_module(name: &str) -> ParsedModuleFile {
+        ParsedModuleFile {
+            module: Module::new(name.to_owned(), Version::empty()),
+            has_module_directive: true,
+            extension_usages: Vec::new(),
+            repo_rule_invocations: Vec::new(),
+            registered_toolchains: Vec::new(),
+            registered_execution_platforms: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn collect_registered_items_honors_ignore_dev_dependency_for_root() {
+        let mut root = parsed_module("root");
+        root.registered_toolchains.push(RegisteredItem {
+            label: "@root_toolchains//:all".to_owned(),
+            dev_dependency: true,
+        });
+        root.registered_execution_platforms.push(RegisteredItem {
+            label: "@root_platforms//:all".to_owned(),
+            dev_dependency: true,
+        });
+
+        let parsed_modules = vec![("root".to_owned(), root)];
+        let (toolchains, platforms) =
+            collect_bzlmod_registered_items(&parsed_modules, "root", false);
+        assert_eq!(toolchains.len(), 1);
+        assert_eq!(platforms.len(), 1);
+
+        let (toolchains, platforms) =
+            collect_bzlmod_registered_items(&parsed_modules, "root", true);
+        assert!(toolchains.is_empty());
+        assert!(platforms.is_empty());
+    }
+
+    #[test]
+    fn collect_registered_items_auto_injects_rules_python_toolchains() {
+        let parsed_modules = vec![("rules_python".to_owned(), parsed_module("rules_python"))];
+
+        let (toolchains, platforms) =
+            collect_bzlmod_registered_items(&parsed_modules, "root", false);
+
+        assert!(platforms.is_empty());
+        assert_eq!(
+            toolchains
+                .iter()
+                .map(|toolchain| toolchain.label.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "@local_config_python//:host_toolchain",
+                "@local_config_python//:host_launcher_maker_toolchain",
+            ]
+        );
+    }
+
+    #[test]
+    fn collect_registered_items_skips_duplicate_rules_python_toolchains() {
+        let mut rules_python = parsed_module("rules_python");
+        rules_python.registered_toolchains.push(RegisteredItem {
+            label: "@local_config_python//:custom".to_owned(),
+            dev_dependency: false,
+        });
+        let parsed_modules = vec![("rules_python".to_owned(), rules_python)];
+
+        let (toolchains, _platforms) =
+            collect_bzlmod_registered_items(&parsed_modules, "root", false);
+
+        assert_eq!(toolchains.len(), 1);
+        assert_eq!(toolchains[0].label, "@local_config_python//:custom");
     }
 
     #[test]
