@@ -3801,20 +3801,6 @@ struct BzlmodResolvedModuleGraphKey {
     override_patch_inputs: Arc<slug_bzlmod::OverridePatchInputs>,
 }
 
-#[derive(Clone, Debug, Allocative)]
-struct BzlmodResolvedModuleGraphValue {
-    #[allocative(skip)]
-    graph: Arc<slug_bzlmod::ResolvedGraph>,
-    graph_digest: Arc<str>,
-    module_versions: slug_bzlmod::BzlmodModuleVersionsDataValue,
-    resolution_facts: slug_bzlmod::BzlmodResolutionFactsValue,
-    registered_toolchains: slug_bzlmod::RegisteredToolchainsDataValue,
-    registered_execution_platforms: slug_bzlmod::RegisteredExecutionPlatformsDataValue,
-    extension_aggregations: slug_bzlmod::BzlmodExtensionAggregationsDataValue,
-    repo_mappings: slug_bzlmod::BzlmodRepoMappingsDataValue,
-    cell_graph: slug_bzlmod::BzlmodCellGraphValue,
-}
-
 impl PartialEq for BzlmodResolvedModuleGraphKey {
     fn eq(&self, other: &Self) -> bool {
         self.project_root == other.project_root
@@ -3919,7 +3905,7 @@ fn bzlmod_resolved_graph_digest(graph: &slug_bzlmod::ResolvedGraph) -> String {
 
 #[async_trait]
 impl Key for BzlmodResolvedModuleGraphKey {
-    type Value = slug_error::Result<Arc<Option<BzlmodResolvedModuleGraphValue>>>;
+    type Value = slug_error::Result<Arc<Option<slug_bzlmod::BzlmodResolvedGraphOutputsValue>>>;
 
     async fn compute(
         &self,
@@ -5103,7 +5089,7 @@ impl BuckConfigBasedCells {
     async fn compute_bzlmod_resolved_module_graph(
         key: &BzlmodResolvedModuleGraphKey,
         dice_ctx: &mut DiceComputations<'_>,
-    ) -> slug_error::Result<Arc<Option<BzlmodResolvedModuleGraphValue>>> {
+    ) -> slug_error::Result<Arc<Option<slug_bzlmod::BzlmodResolvedGraphOutputsValue>>> {
         let Some(parsed) = key.root_module_file.parsed.clone() else {
             return Ok(Arc::new(None));
         };
@@ -5440,17 +5426,19 @@ impl BuckConfigBasedCells {
         .await?;
         let graph_digest = bzlmod_resolved_graph_digest(&graph);
         record_clean_bzlmod_resolution_compute_if_changed(key);
-        Ok(Arc::new(Some(BzlmodResolvedModuleGraphValue {
-            graph: Arc::new(graph),
-            graph_digest: Arc::from(graph_digest.as_str()),
-            module_versions,
-            resolution_facts,
-            registered_toolchains,
-            registered_execution_platforms,
-            extension_aggregations,
-            repo_mappings,
-            cell_graph,
-        })))
+        Ok(Arc::new(Some(
+            slug_bzlmod::BzlmodResolvedGraphOutputsValue {
+                graph: Arc::new(graph),
+                graph_digest: Arc::from(graph_digest.as_str()),
+                module_versions,
+                resolution_facts,
+                registered_toolchains,
+                registered_execution_platforms,
+                extension_aggregations,
+                repo_mappings,
+                cell_graph,
+            },
+        )))
     }
 
     pub(crate) fn get_cell_aliases_from_config(

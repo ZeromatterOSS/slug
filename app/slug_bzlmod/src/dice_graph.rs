@@ -498,6 +498,20 @@ impl BzlmodResolvedGraphDataValue {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Allocative)]
+pub struct BzlmodResolvedGraphOutputsValue {
+    #[allocative(skip)]
+    pub graph: Arc<ResolvedGraph>,
+    pub graph_digest: Arc<str>,
+    pub module_versions: BzlmodModuleVersionsDataValue,
+    pub resolution_facts: BzlmodResolutionFactsValue,
+    pub registered_toolchains: RegisteredToolchainsDataValue,
+    pub registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+    pub extension_aggregations: BzlmodExtensionAggregationsDataValue,
+    pub repo_mappings: BzlmodRepoMappingsDataValue,
+    pub cell_graph: BzlmodCellGraphValue,
+}
+
 #[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodResolvedGraphDataKey")]
 pub(crate) struct BzlmodResolvedGraphDataKey;

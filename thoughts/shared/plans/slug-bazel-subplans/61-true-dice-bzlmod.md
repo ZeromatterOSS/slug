@@ -429,6 +429,14 @@ Current state to preserve:
   exists, which covers injected-digest tests and no-executor bootstrap.
   Guardrail:
   `cargo test -p slug_bzlmod cell_graph_key_ --lib && cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib && cargo build -p slug`.
+- 2026-05-28 resolved-graph output boundary reduction:
+  `BzlmodResolvedGraphOutputsValue` now lives in `slug_bzlmod`, so the clean
+  resolved graph's semantic output shape is owned beside the DICE graph
+  consumers instead of by `slug_common::legacy_configs::cells`. The producer is
+  still `BzlmodResolvedModuleGraphKey` in `slug_common`, but the remaining
+  crate-boundary bridge is now the producer/key construction rather than the
+  value shape. Guardrail:
+  `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_bzlmod cell_graph_key_ --lib && cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1111,7 +1119,8 @@ hardening behavior around it.
      execution platforms, extension aggregations, and module versions are
      passed as separate named injections. The remaining transitional API is the
      injected `BzlmodResolvedGraphDataKey`: production now injects clean
-     resolved graph addressed by the clean resolved-graph digest, but that key
+     resolved graph addressed by the clean resolved-graph digest, and the
+     resolved-graph output value shape is owned by `slug_bzlmod`, but that key
      does not compute the graph from DICE dependencies yet.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
