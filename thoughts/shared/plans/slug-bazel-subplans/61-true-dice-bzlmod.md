@@ -505,6 +505,15 @@ Current state to preserve:
   strings and builds the legacy/bootstrap cell graph, but it no longer owns the
   semantic repo-mapping output policy. Guardrail:
   `cargo test -p slug_bzlmod repo_mapping --lib && cargo test -p slug_common repo_mapping --lib && cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo build -p slug`.
+- 2026-05-28 clean graph input dependency reduction:
+  `BzlmodResolvedModuleGraphKey` no longer carries precomputed root module,
+  lockfile, local override, non-registry override, registry-file, or patch-file
+  input values inside the key. Its compute function now requests those named
+  DICE inputs directly and returns a wrapper that carries the computed
+  lockfile inputs for subsequent data injection. The key still lives in
+  `slug_common`, but source-input invalidation is no longer modeled by
+  stuffing child-key digests into the parent key. Guardrail:
+  `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -737,6 +746,10 @@ hardening behavior around it.
      local override, git/archive override, include UTF-8/parse/cycle failures,
      and `--ignore_dev_dependency` early validation passed as 16 focused pytest
      cases before the full guardrail rerun.
+     Follow-up reduction: `BzlmodResolvedModuleGraphKey` now computes its root
+     module, lockfile, local override, non-registry override, registry-file,
+     and patch-file inputs as DICE dependencies instead of receiving
+     precomputed child-key payloads during key construction.
    - Migrate output classes in this order:
      1. source/module-file input producers for root, registry, project-local
         and out-of-project local overrides, git/archive overrides, and patch
