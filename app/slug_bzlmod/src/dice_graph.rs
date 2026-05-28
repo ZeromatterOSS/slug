@@ -355,6 +355,40 @@ pub struct RootModuleFileValue {
     pub parsed: Option<ParsedModuleFile>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct LocalOverrideModuleInputsValue {
+    pub digest: String,
+    pub parsed_modules: Vec<(String, ParsedModuleFile)>,
+    pub has_bazel_deps: bool,
+    pub has_extension_usages: bool,
+    pub has_repo_rule_invocations: bool,
+    pub has_git_overrides: bool,
+    pub has_untracked_inputs: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct NonRegistryOverrideModuleInputsValue {
+    pub digest: String,
+    pub parsed_modules: Vec<(String, ParsedModuleFile)>,
+    pub has_inputs: bool,
+    pub has_untracked_inputs: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct RegistryFileInputsValue {
+    pub digest: String,
+    pub has_inputs: bool,
+    pub cache_safe: bool,
+    pub has_untracked_inputs: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct NonRootModuleFilesValue {
+    pub digest: String,
+    pub parsed_modules: Vec<(String, ParsedModuleFile)>,
+    pub has_untracked_inputs: bool,
+}
+
 pub fn module_file_inputs_digest(inputs: &[ModuleFileInputDigest]) -> String {
     let mut hasher = Sha256::new();
     for input in inputs {

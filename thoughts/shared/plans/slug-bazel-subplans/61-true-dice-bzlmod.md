@@ -458,6 +458,12 @@ Current state to preserve:
   graph, but no longer owns the resolved-graph output identity algorithm.
   Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_bzlmod cell_graph_key_ --lib && cargo build -p slug`.
+- 2026-05-28 clean source-input value boundary reduction:
+  local override, non-registry override, registry-file, and non-root module
+  source-input value shapes now live in `slug_bzlmod`. Their filesystem
+  tracking keys still live in `slug_common`, but the semantic inputs carried by
+  `BzlmodResolvedModuleGraphKey` are now owned by the bzlmod crate. Guardrail:
+  `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_common local_override_module_inputs_key_tracks_project_includes --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

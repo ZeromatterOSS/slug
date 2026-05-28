@@ -37,10 +37,14 @@ use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod::BzlmodEventKind;
 use slug_bzlmod::BzlmodResolutionOptions;
+use slug_bzlmod::LocalOverrideModuleInputsValue;
 use slug_bzlmod::ModuleCache;
 use slug_bzlmod::ModuleSource;
 use slug_bzlmod::MvsResolver;
+use slug_bzlmod::NonRegistryOverrideModuleInputsValue;
+use slug_bzlmod::NonRootModuleFilesValue;
 use slug_bzlmod::ParsedModuleFile;
+use slug_bzlmod::RegistryFileInputsValue;
 use slug_bzlmod::record_bzlmod_event;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::CellResolver;
@@ -2329,17 +2333,6 @@ struct LocalOverrideModuleInputsKey {
     overrides: Vec<(String, String)>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-struct LocalOverrideModuleInputsValue {
-    digest: String,
-    parsed_modules: Vec<(String, ParsedModuleFile)>,
-    has_bazel_deps: bool,
-    has_extension_usages: bool,
-    has_repo_rule_invocations: bool,
-    has_git_overrides: bool,
-    has_untracked_inputs: bool,
-}
-
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("NonRegistryOverrideModuleInputsKey({})", project_root.display())]
 struct NonRegistryOverrideModuleInputsKey {
@@ -2370,14 +2363,6 @@ struct BzlmodInputsPollValue {
     has_polled_inputs: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-struct NonRegistryOverrideModuleInputsValue {
-    digest: String,
-    parsed_modules: Vec<(String, ParsedModuleFile)>,
-    has_inputs: bool,
-    has_untracked_inputs: bool,
-}
-
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("RegistryFileInputsKey")]
 struct RegistryFileInputsKey {
@@ -2395,14 +2380,6 @@ struct RegistryFileInputsPollKey {
     registry_file_hashes: Vec<(String, String)>,
     #[cfg(test)]
     cache_base_dir: Option<PathBuf>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-struct RegistryFileInputsValue {
-    digest: String,
-    has_inputs: bool,
-    cache_safe: bool,
-    has_untracked_inputs: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2431,13 +2408,6 @@ struct NonRootModuleFilesKey {
 struct NonRootModuleFilesPollKey {
     project_root: AbsNormPathBuf,
     inputs: Vec<NonRootModuleFileInput>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-struct NonRootModuleFilesValue {
-    digest: String,
-    parsed_modules: Vec<(String, ParsedModuleFile)>,
-    has_untracked_inputs: bool,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
