@@ -421,9 +421,9 @@ impl BzlmodCellGraphValue {
 pub struct BzlmodCellGraphDataValue {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
-    pub cell_graph: Arc<BzlmodCellGraphValue>,
     #[allocative(skip)]
     pub resolved_graph: Option<Arc<ResolvedGraph>>,
+    pub fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
 }
 
 impl BzlmodCellGraphDataValue {
@@ -435,8 +435,8 @@ impl BzlmodCellGraphDataValue {
         Self {
             workspace_id,
             resolution_digest,
-            cell_graph,
             resolved_graph: None,
+            fallback_cell_graph: Some(cell_graph),
         }
     }
 
@@ -446,11 +446,25 @@ impl BzlmodCellGraphDataValue {
         cell_graph: Arc<BzlmodCellGraphValue>,
         resolved_graph: Option<Arc<ResolvedGraph>>,
     ) -> Self {
+        Self::for_workspace_with_resolved_graph_and_fallback(
+            workspace_id,
+            resolution_digest,
+            resolved_graph,
+            Some(cell_graph),
+        )
+    }
+
+    pub fn for_workspace_with_resolved_graph_and_fallback(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        resolved_graph: Option<Arc<ResolvedGraph>>,
+        fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
+    ) -> Self {
         Self {
             workspace_id,
             resolution_digest,
-            cell_graph,
             resolved_graph,
+            fallback_cell_graph,
         }
     }
 }
@@ -508,7 +522,10 @@ impl Key for BzlmodCellDefinitionsKey {
                 &repo_mappings,
             )));
         }
-        Ok(data.cell_graph.cells.dupe())
+        Ok(data
+            .fallback_cell_graph
+            .as_ref()
+            .map_or_else(|| Arc::new(Vec::new()), |graph| graph.cells.dupe()))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -577,12 +594,18 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             {
                 Ok(cells) => Ok(cells),
                 Err(e) if e.to_string().contains("module extension executor") => {
-                    Ok(data.cell_graph.extension_cells.dupe())
+                    Ok(data.fallback_cell_graph.as_ref().map_or_else(
+                        || Arc::new(Vec::new()),
+                        |graph| graph.extension_cells.dupe(),
+                    ))
                 }
                 Err(e) => Err(e),
             };
         }
-        Ok(data.cell_graph.extension_cells.dupe())
+        Ok(data.fallback_cell_graph.as_ref().map_or_else(
+            || Arc::new(Vec::new()),
+            |graph| graph.extension_cells.dupe(),
+        ))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -689,9 +712,13 @@ impl Key for BzlmodResidualModuleSymlinksKey {
                 resolved_graph,
             )));
         }
-        Ok(Arc::new(residual_module_symlinks_from_payload(
-            data.cell_graph.as_ref(),
-        )))
+        Ok(Arc::new(
+            data.fallback_cell_graph
+                .as_ref()
+                .map_or_else(Vec::new, |graph| {
+                    residual_module_symlinks_from_payload(graph.as_ref())
+                }),
+        ))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

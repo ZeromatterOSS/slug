@@ -541,14 +541,20 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
         let repo_mappings = Arc::new(repo_mappings);
         let extension_aggregations = Arc::new(extension_aggregations);
         let cell_graph_workspace_id = cell_graph_workspace_id.clone();
-        let cell_graph = Arc::new(cell_graph);
-        let cell_graph_data =
-            Arc::new(BzlmodCellGraphDataValue::for_workspace_with_resolved_graph(
+        let fallback_cell_graph =
+            if resolved_graph.is_some() && MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok() {
+                None
+            } else {
+                Some(Arc::new(cell_graph))
+            };
+        let cell_graph_data = Arc::new(
+            BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
                 cell_graph_workspace_id,
                 cell_graph_resolution_digest,
-                cell_graph,
                 resolved_graph,
-            ));
+                fallback_cell_graph,
+            ),
+        );
         let registered_toolchains = Arc::new(registered_toolchains);
         let registered_execution_platforms = Arc::new(registered_execution_platforms);
         self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
