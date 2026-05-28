@@ -443,7 +443,6 @@ impl BzlmodCellGraphDataValue {
     Hash,
     Eq,
     Clone,
-    Dupe,
     PartialEq,
     Allocative
 )]
@@ -458,6 +457,163 @@ impl dice::InjectedKey for BzlmodCellGraphDataKey {
     }
 }
 
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodCellDefinitionsKey")]
+struct BzlmodCellDefinitionsKey {
+    workspace_id: WorkspaceId,
+    resolution_digest: Arc<str>,
+}
+
+#[async_trait]
+impl Key for BzlmodCellDefinitionsKey {
+    type Value = slug_error::Result<Arc<Vec<BzlmodCellGraphCell>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        validate_cell_graph_payload(
+            "BzlmodCellDefinitionsKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
+        Ok(data.cell_graph.cells.dupe())
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodExtensionCellDefinitionsKey")]
+struct BzlmodExtensionCellDefinitionsKey {
+    workspace_id: WorkspaceId,
+    resolution_digest: Arc<str>,
+}
+
+#[async_trait]
+impl Key for BzlmodExtensionCellDefinitionsKey {
+    type Value = slug_error::Result<Arc<Vec<BzlmodCellGraphExtensionCell>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        validate_cell_graph_payload(
+            "BzlmodExtensionCellDefinitionsKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
+        Ok(data.cell_graph.extension_cells.dupe())
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodResidualModuleSymlinksKey")]
+struct BzlmodResidualModuleSymlinksKey {
+    workspace_id: WorkspaceId,
+    resolution_digest: Arc<str>,
+}
+
+#[async_trait]
+impl Key for BzlmodResidualModuleSymlinksKey {
+    type Value = slug_error::Result<Arc<Vec<BzlmodCellGraphModuleSymlink>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        validate_cell_graph_payload(
+            "BzlmodResidualModuleSymlinksKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
+        Ok(Arc::new(residual_module_symlinks_from_payload(
+            data.cell_graph.as_ref(),
+        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+fn validate_cell_graph_payload(
+    key_name: &str,
+    workspace_id: &WorkspaceId,
+    resolution_digest: &str,
+    data: &BzlmodCellGraphDataValue,
+) -> slug_error::Result<()> {
+    if data.workspace_id != *workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} was computed with project root '{}', \
+             but current bzlmod cell graph root is '{}'",
+            key_name,
+            workspace_id.canonical_project_root.display(),
+            data.workspace_id.canonical_project_root.display()
+        ));
+    }
+    if data.resolution_digest.as_ref() != resolution_digest {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} was computed with resolution digest '{}', \
+             but current bzlmod cell graph digest is '{}'",
+            key_name,
+            resolution_digest,
+            data.resolution_digest
+        ));
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl Key for BzlmodCellGraphKey {
     type Value = slug_error::Result<Arc<BzlmodCellGraphValue>>;
@@ -467,26 +623,24 @@ impl Key for BzlmodCellGraphKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        if data.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodCellGraphKey was computed with project root '{}', \
-                 but current bzlmod cell graph root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                data.workspace_id.canonical_project_root.display()
-            ));
-        }
-        if data.resolution_digest != self.resolution_digest {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodCellGraphKey was computed with resolution digest '{}', \
-                 but current bzlmod cell graph digest is '{}'",
-                self.resolution_digest,
-                data.resolution_digest
-            ));
-        }
-
+        let cells = ctx
+            .compute(&BzlmodCellDefinitionsKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
+            .await??;
+        let extension_cells = ctx
+            .compute(&BzlmodExtensionCellDefinitionsKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
+            .await??;
+        let residual_module_symlinks = ctx
+            .compute(&BzlmodResidualModuleSymlinksKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
+            .await??;
         let module_versions = ctx
             .compute(&ModuleVersionsKey::for_workspace_id(
                 self.workspace_id.clone(),
@@ -510,16 +664,23 @@ impl Key for BzlmodCellGraphKey {
                     .display()
             ));
         }
-        let mut cell_graph = data.cell_graph.as_ref().clone();
-        cell_graph.root_module_name = module_versions.invalidation.root_module_name.clone();
-        cell_graph.root_aliases = Arc::new(root_aliases_from_repo_mappings(&repo_mappings));
-        cell_graph.dynamic_aliases = Arc::new(dynamic_aliases_from_repo_mappings(&repo_mappings));
-        cell_graph.module_symlinks = Arc::new(module_symlinks_from_cells_and_payload(&cell_graph));
-        cell_graph.scoped_aliases = Arc::new(scoped_aliases_from_repo_mappings(
-            &repo_mappings,
-            &cell_graph.root_module_name,
-        ));
-        Ok(Arc::new(cell_graph))
+        let root_module_name = module_versions.invalidation.root_module_name.clone();
+        Ok(Arc::new(BzlmodCellGraphValue {
+            workspace_id: self.workspace_id.clone(),
+            root_module_name: root_module_name.clone(),
+            cells: cells.dupe(),
+            extension_cells,
+            root_aliases: Arc::new(root_aliases_from_repo_mappings(&repo_mappings)),
+            module_symlinks: Arc::new(module_symlinks_from_cells_and_residuals(
+                cells.as_ref(),
+                residual_module_symlinks.as_ref(),
+            )),
+            scoped_aliases: Arc::new(scoped_aliases_from_repo_mappings(
+                &repo_mappings,
+                &root_module_name,
+            )),
+            dynamic_aliases: Arc::new(dynamic_aliases_from_repo_mappings(&repo_mappings)),
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -528,6 +689,56 @@ impl Key for BzlmodCellGraphKey {
             _ => false,
         }
     }
+}
+
+fn residual_module_symlinks_from_payload(
+    cell_graph: &BzlmodCellGraphValue,
+) -> Vec<BzlmodCellGraphModuleSymlink> {
+    let derived: BTreeSet<_> = cell_graph
+        .cells
+        .iter()
+        .filter_map(|cell| {
+            let setup = cell.module_setup.as_ref()?;
+            if setup.source_path.is_empty() {
+                return None;
+            }
+            Some(cell.name.clone())
+        })
+        .collect();
+    cell_graph
+        .module_symlinks
+        .iter()
+        .filter(|symlink| !derived.contains(&symlink.entry_name))
+        .cloned()
+        .collect()
+}
+
+fn module_symlinks_from_cells_and_residuals(
+    cells: &[BzlmodCellGraphCell],
+    residual_module_symlinks: &[BzlmodCellGraphModuleSymlink],
+) -> Vec<BzlmodCellGraphModuleSymlink> {
+    let mut seen = BTreeSet::new();
+    let mut symlinks = Vec::new();
+    for cell in cells {
+        let Some(setup) = cell.module_setup.as_ref() else {
+            continue;
+        };
+        if setup.source_path.is_empty() {
+            continue;
+        }
+        if seen.insert(cell.name.clone()) {
+            symlinks.push(BzlmodCellGraphModuleSymlink {
+                entry_name: cell.name.clone(),
+                source_path: Arc::new(PathBuf::from(&setup.source_path)),
+            });
+        }
+    }
+    for symlink in residual_module_symlinks {
+        if seen.insert(symlink.entry_name.clone()) {
+            symlinks.push(symlink.clone());
+        }
+    }
+    symlinks
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -1135,33 +1346,6 @@ impl Key for ModuleVersionsKey {
             _ => false,
         }
     }
-}
-
-fn module_symlinks_from_cells_and_payload(
-    cell_graph: &BzlmodCellGraphValue,
-) -> Vec<BzlmodCellGraphModuleSymlink> {
-    let mut seen = BTreeSet::new();
-    let mut symlinks = Vec::new();
-    for cell in cell_graph.cells.iter() {
-        let Some(setup) = cell.module_setup.as_ref() else {
-            continue;
-        };
-        if setup.source_path.is_empty() {
-            continue;
-        }
-        if seen.insert(cell.name.clone()) {
-            symlinks.push(BzlmodCellGraphModuleSymlink {
-                entry_name: cell.name.clone(),
-                source_path: Arc::new(PathBuf::from(&setup.source_path)),
-            });
-        }
-    }
-    for symlink in cell_graph.module_symlinks.iter() {
-        if seen.insert(symlink.entry_name.clone()) {
-            symlinks.push(symlink.clone());
-        }
-    }
-    symlinks
 }
 
 fn root_aliases_from_repo_mappings(
