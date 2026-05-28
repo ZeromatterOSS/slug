@@ -421,8 +421,8 @@ impl BzlmodCellGraphValue {
 pub struct BzlmodCellGraphDataValue {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
+    pub uses_resolved_graph: bool,
     #[allocative(skip)]
-    pub resolved_graph: Option<Arc<ResolvedGraph>>,
     pub fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
 }
 
@@ -435,7 +435,7 @@ impl BzlmodCellGraphDataValue {
         Self {
             workspace_id,
             resolution_digest,
-            resolved_graph: None,
+            uses_resolved_graph: false,
             fallback_cell_graph: Some(cell_graph),
         }
     }
@@ -449,7 +449,7 @@ impl BzlmodCellGraphDataValue {
         Self::for_workspace_with_resolved_graph_and_fallback(
             workspace_id,
             resolution_digest,
-            resolved_graph,
+            resolved_graph.is_some(),
             Some(cell_graph),
         )
     }
@@ -457,13 +457,13 @@ impl BzlmodCellGraphDataValue {
     pub fn for_workspace_with_resolved_graph_and_fallback(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
-        resolved_graph: Option<Arc<ResolvedGraph>>,
+        uses_resolved_graph: bool,
         fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
     ) -> Self {
         Self {
             workspace_id,
             resolution_digest,
-            resolved_graph,
+            uses_resolved_graph,
             fallback_cell_graph,
         }
     }
@@ -475,6 +475,40 @@ pub(crate) struct BzlmodCellGraphDataKey;
 
 impl dice::InjectedKey for BzlmodCellGraphDataKey {
     type Value = Arc<BzlmodCellGraphDataValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodResolvedGraphDataValue {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+    #[allocative(skip)]
+    pub graph: Option<Arc<ResolvedGraph>>,
+}
+
+impl BzlmodResolvedGraphDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        graph: Option<Arc<ResolvedGraph>>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+            graph,
+        }
+    }
+}
+
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
+#[display("BzlmodResolvedGraphDataKey")]
+pub(crate) struct BzlmodResolvedGraphDataKey;
+
+impl dice::InjectedKey for BzlmodResolvedGraphDataKey {
+    type Value = Arc<BzlmodResolvedGraphDataValue>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -504,7 +538,21 @@ impl Key for BzlmodCellDefinitionsKey {
             &self.resolution_digest,
             &data,
         )?;
-        if let Some(resolved_graph) = data.resolved_graph.as_ref() {
+        if data.uses_resolved_graph {
+            let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
+            validate_resolved_graph_payload(
+                "BzlmodCellDefinitionsKey",
+                &self.workspace_id,
+                &self.resolution_digest,
+                &resolved_graph_data,
+            )?;
+            let Some(resolved_graph) = resolved_graph_data.graph.as_ref() else {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodCellDefinitionsKey expected a resolved graph for project root '{}'",
+                    self.workspace_id.canonical_project_root.display()
+                ));
+            };
             let module_versions = ctx
                 .compute(&ModuleVersionsKey::for_workspace_id(
                     self.workspace_id.clone(),
@@ -706,7 +754,21 @@ impl Key for BzlmodResidualModuleSymlinksKey {
             &self.resolution_digest,
             &data,
         )?;
-        if let Some(resolved_graph) = data.resolved_graph.as_ref() {
+        if data.uses_resolved_graph {
+            let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
+            validate_resolved_graph_payload(
+                "BzlmodResidualModuleSymlinksKey",
+                &self.workspace_id,
+                &self.resolution_digest,
+                &resolved_graph_data,
+            )?;
+            let Some(resolved_graph) = resolved_graph_data.graph.as_ref() else {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodResidualModuleSymlinksKey expected a resolved graph for project root '{}'",
+                    self.workspace_id.canonical_project_root.display()
+                ));
+            };
             return Ok(Arc::new(residual_module_symlinks_from_resolved_graph(
                 &self.workspace_id,
                 resolved_graph,
@@ -750,6 +812,35 @@ fn validate_cell_graph_payload(
             slug_error::ErrorTag::Tier0,
             "{} was computed with resolution digest '{}', \
              but current bzlmod cell graph digest is '{}'",
+            key_name,
+            resolution_digest,
+            data.resolution_digest
+        ));
+    }
+    Ok(())
+}
+
+fn validate_resolved_graph_payload(
+    key_name: &str,
+    workspace_id: &WorkspaceId,
+    resolution_digest: &str,
+    data: &BzlmodResolvedGraphDataValue,
+) -> slug_error::Result<()> {
+    if data.workspace_id != *workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} was computed with project root '{}', \
+             but current bzlmod resolved graph root is '{}'",
+            key_name,
+            workspace_id.canonical_project_root.display(),
+            data.workspace_id.canonical_project_root.display()
+        ));
+    }
+    if data.resolution_digest.as_ref() != resolution_digest {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} was computed with resolution digest '{}', \
+             but current bzlmod resolved graph digest is '{}'",
             key_name,
             resolution_digest,
             data.resolution_digest

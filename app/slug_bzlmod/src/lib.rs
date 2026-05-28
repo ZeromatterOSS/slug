@@ -99,6 +99,8 @@ pub use dice_graph::BzlmodResolutionFactsDataKey;
 pub use dice_graph::BzlmodResolutionFactsKey;
 pub use dice_graph::BzlmodResolutionFactsValue;
 pub use dice_graph::BzlmodResolutionKey;
+use dice_graph::BzlmodResolvedGraphDataKey;
+use dice_graph::BzlmodResolvedGraphDataValue;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionBzlTransitiveDigestKey;
 pub use dice_graph::ExtensionIdByCanonicalRepoKey;
@@ -549,12 +551,17 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             };
         let cell_graph_data = Arc::new(
             BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
-                cell_graph_workspace_id,
-                cell_graph_resolution_digest,
-                resolved_graph,
+                cell_graph_workspace_id.clone(),
+                cell_graph_resolution_digest.clone(),
+                resolved_graph.is_some(),
                 fallback_cell_graph,
             ),
         );
+        let resolved_graph_data = Arc::new(BzlmodResolvedGraphDataValue::for_workspace(
+            cell_graph_workspace_id.clone(),
+            cell_graph_resolution_digest,
+            resolved_graph,
+        ));
         let registered_toolchains = Arc::new(registered_toolchains);
         let registered_execution_platforms = Arc::new(registered_execution_platforms);
         self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
@@ -575,6 +582,7 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             extension_aggregations,
         )])?;
         self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
+        self.changed_to(vec![(BzlmodResolvedGraphDataKey, resolved_graph_data)])?;
         Ok(())
     }
 }
@@ -702,7 +710,6 @@ mod tests {
             scoped_aliases: Arc::new(Vec::new()),
             dynamic_aliases: Arc::new(Vec::new()),
         };
-
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
             .unwrap()
@@ -2307,6 +2314,7 @@ mod tests {
                 source_path: None,
             },
         );
+        let resolved_graph = Arc::new(resolved_graph);
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -2320,7 +2328,15 @@ mod tests {
                 workspace_id.clone(),
                 Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
                 Arc::new(payload_graph),
-                Some(Arc::new(resolved_graph)),
+                Some(resolved_graph.clone()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodResolvedGraphDataKey,
+            Arc::new(BzlmodResolvedGraphDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                Some(resolved_graph),
             )),
         )])?;
         updater.changed_to(vec![(
