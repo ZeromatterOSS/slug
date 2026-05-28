@@ -514,6 +514,15 @@ Current state to preserve:
   in `slug_common`, but command/source-input invalidation is no longer modeled
   by stuffing child-key digests into the parent key. Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo build -p slug`.
+- 2026-05-28 clean graph producer boundary reduction:
+  `BzlmodResolvedModuleGraphKey::compute` now calls a module-level clean graph
+  producer instead of dispatching through `BuckConfigBasedCells`. The key
+  builder is also a module-level helper and no longer accepts a DICE context.
+  This removes the legacy resolver impl as the executor for the clean graph
+  key; `slug_common` still hosts the graph key, filesystem-backed input keys,
+  and the large bootstrap cell-graph assembly helper until those can move
+  behind lower-level bzlmod-owned APIs. Guardrail:
+  `cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common persisted_cell_graph --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

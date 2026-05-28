@@ -3293,7 +3293,7 @@ impl Key for BzlmodResolvedModuleGraphKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        BuckConfigBasedCells::compute_bzlmod_resolved_module_graph(self, ctx).await
+        compute_bzlmod_resolved_module_graph(self, ctx).await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3417,14 +3417,8 @@ impl BuckConfigBasedCells {
         let dice = dice.build(DetectCycles::Enabled);
         let updater = dice.updater();
         let mut dice_ctx = updater.existing_state().await;
-        let clean_key = Self::build_bzlmod_resolved_module_graph_key(
-            project_fs,
-            config_args,
-            &mut dice_ctx,
-            output_base,
-            false,
-        )
-        .await?;
+        let clean_key =
+            build_bzlmod_resolved_module_graph_key(project_fs, config_args, output_base, false)?;
         let clean_resolved_module_graph = dice_ctx.compute(&clean_key).await?.buck_error_context(
             "Computing clean bzlmod resolved graph for bootstrap cell parsing",
         )?;
@@ -3446,14 +3440,8 @@ impl BuckConfigBasedCells {
     ) -> slug_error::Result<Self> {
         let (key, clean_resolved_module_graph) = {
             let mut dice_ctx = updater.existing_state().await;
-            let clean_key = Self::build_bzlmod_resolved_module_graph_key(
-                project_fs,
-                config_args,
-                &mut dice_ctx,
-                output_base,
-                true,
-            )
-            .await?;
+            let clean_key =
+                build_bzlmod_resolved_module_graph_key(project_fs, config_args, output_base, true)?;
             let clean_resolved_module_graph = dice_ctx
                 .compute(&clean_key)
                 .await?
@@ -3607,120 +3595,120 @@ impl BuckConfigBasedCells {
         }
         Ok(configs)
     }
+}
 
-    async fn build_bzlmod_resolved_module_graph_key(
-        project_fs: &ProjectRoot,
-        config_args: &[slug_cli_proto::ConfigOverride],
-        _dice_ctx: &mut DiceComputations<'_>,
-        output_base: Option<PathBuf>,
-        validate_root_extension_repo_directives: bool,
-    ) -> slug_error::Result<BzlmodResolvedModuleGraphKey> {
-        let root_config = LegacyBuckConfig::from_overrides_only(config_args)?;
-        let options = bzlmod_resolution_options_from_config(&root_config)?;
-        let project_root_path = project_fs.root().to_path_buf();
-        let workspace_id = slug_bzlmod::WorkspaceId::new(
-            project_root_path.clone(),
-            output_base.unwrap_or_else(|| project_root_path.join("buck-out/v2")),
-        );
-        Ok(BzlmodResolvedModuleGraphKey {
-            project_root: AbsNormPathBuf::try_from(project_root_path)?,
-            workspace_id,
-            options,
-            validate_root_extension_repo_directives,
+fn build_bzlmod_resolved_module_graph_key(
+    project_fs: &ProjectRoot,
+    config_args: &[slug_cli_proto::ConfigOverride],
+    output_base: Option<PathBuf>,
+    validate_root_extension_repo_directives: bool,
+) -> slug_error::Result<BzlmodResolvedModuleGraphKey> {
+    let root_config = LegacyBuckConfig::from_overrides_only(config_args)?;
+    let options = bzlmod_resolution_options_from_config(&root_config)?;
+    let project_root_path = project_fs.root().to_path_buf();
+    let workspace_id = slug_bzlmod::WorkspaceId::new(
+        project_root_path.clone(),
+        output_base.unwrap_or_else(|| project_root_path.join("buck-out/v2")),
+    );
+    Ok(BzlmodResolvedModuleGraphKey {
+        project_root: AbsNormPathBuf::try_from(project_root_path)?,
+        workspace_id,
+        options,
+        validate_root_extension_repo_directives,
+    })
+}
+
+async fn compute_bzlmod_resolved_module_graph_inputs(
+    key: &BzlmodResolvedModuleGraphKey,
+    dice_ctx: &mut DiceComputations<'_>,
+) -> slug_error::Result<BzlmodResolvedModuleGraphInputs> {
+    let workspace_id = key.workspace_id.clone();
+    let root_module_file = dice_ctx
+        .compute(&TrackedRootModuleFileKey {
+            project_root: key.project_root.clone(),
         })
-    }
-
-    async fn compute_bzlmod_resolved_module_graph_inputs(
-        key: &BzlmodResolvedModuleGraphKey,
-        dice_ctx: &mut DiceComputations<'_>,
-    ) -> slug_error::Result<BzlmodResolvedModuleGraphInputs> {
-        let workspace_id = key.workspace_id.clone();
-        let root_module_file = dice_ctx
-            .compute(&TrackedRootModuleFileKey {
-                project_root: key.project_root.clone(),
-            })
-            .await?
-            .buck_error_context("Computing root MODULE.bazel for clean bzlmod graph")?;
-        let lockfile_inputs = dice_ctx
-            .compute(&BzlmodLockfileInputsBridgeKey {
-                project_root: key.project_root.clone(),
-                workspace_id,
-                lockfile_mode: key.options.lockfile_mode,
-                hidden_lockfile_path: key.options.hidden_lockfile_path.clone(),
-                root_module_present: root_module_file.parsed.is_some(),
-            })
-            .await?
-            .buck_error_context("Computing bzlmod lockfile inputs for clean graph")?;
-        let local_overrides = slug_bzlmod::local_overrides_from_root_module(
+        .await?
+        .buck_error_context("Computing root MODULE.bazel for clean bzlmod graph")?;
+    let lockfile_inputs = dice_ctx
+        .compute(&BzlmodLockfileInputsBridgeKey {
+            project_root: key.project_root.clone(),
+            workspace_id,
+            lockfile_mode: key.options.lockfile_mode,
+            hidden_lockfile_path: key.options.hidden_lockfile_path.clone(),
+            root_module_present: root_module_file.parsed.is_some(),
+        })
+        .await?
+        .buck_error_context("Computing bzlmod lockfile inputs for clean graph")?;
+    let local_overrides = slug_bzlmod::local_overrides_from_root_module(
+        root_module_file.as_ref(),
+        key.options.ignore_dev_dependency,
+    );
+    let local_override_inputs = dice_ctx
+        .compute(&LocalOverrideModuleInputsKey {
+            project_root: key.project_root.clone(),
+            overrides: local_overrides,
+        })
+        .await?
+        .buck_error_context("Computing local override MODULE.bazel inputs for clean graph")?;
+    let non_registry_overrides = slug_bzlmod::non_registry_override_module_dirs_from_root_module(
+        root_module_file.as_ref(),
+        key.options.ignore_dev_dependency,
+    )?;
+    let non_registry_override_inputs = dice_ctx
+        .compute(&NonRegistryOverrideModuleInputsKey {
+            project_root: key.project_root.clone(),
+            overrides: non_registry_overrides,
+        })
+        .await?
+        .buck_error_context(
+            "Computing non-registry override MODULE.bazel inputs for clean graph",
+        )?;
+    let registry_file_hashes = lockfile_inputs
+        .visible_lockfile
+        .as_ref()
+        .and_then(|value| value.lockfile.as_deref())
+        .map(|lockfile| {
+            lockfile
+                .registry_file_hashes
+                .iter()
+                .map(|(url, hash)| (url.clone(), hash.clone()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let registry_file_inputs = dice_ctx
+        .compute(&RegistryFileInputsKey {
+            project_root: key.project_root.clone(),
+            registry_file_hashes,
+            #[cfg(test)]
+            cache_base_dir: None,
+        })
+        .await?
+        .buck_error_context("Computing registry file inputs for clean bzlmod graph")?;
+    let (main_repo_name, override_patch_labels) =
+        slug_bzlmod::override_patch_labels_from_root_module(
             root_module_file.as_ref(),
             key.options.ignore_dev_dependency,
         );
-        let local_override_inputs = dice_ctx
-            .compute(&LocalOverrideModuleInputsKey {
-                project_root: key.project_root.clone(),
-                overrides: local_overrides,
-            })
-            .await?
-            .buck_error_context("Computing local override MODULE.bazel inputs for clean graph")?;
-        let non_registry_overrides =
-            slug_bzlmod::non_registry_override_module_dirs_from_root_module(
-                root_module_file.as_ref(),
-                key.options.ignore_dev_dependency,
-            )?;
-        let non_registry_override_inputs = dice_ctx
-            .compute(&NonRegistryOverrideModuleInputsKey {
-                project_root: key.project_root.clone(),
-                overrides: non_registry_overrides,
-            })
-            .await?
-            .buck_error_context(
-                "Computing non-registry override MODULE.bazel inputs for clean graph",
-            )?;
-        let registry_file_hashes = lockfile_inputs
-            .visible_lockfile
-            .as_ref()
-            .and_then(|value| value.lockfile.as_deref())
-            .map(|lockfile| {
-                lockfile
-                    .registry_file_hashes
-                    .iter()
-                    .map(|(url, hash)| (url.clone(), hash.clone()))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-        let registry_file_inputs = dice_ctx
-            .compute(&RegistryFileInputsKey {
-                project_root: key.project_root.clone(),
-                registry_file_hashes,
-                #[cfg(test)]
-                cache_base_dir: None,
-            })
-            .await?
-            .buck_error_context("Computing registry file inputs for clean bzlmod graph")?;
-        let (main_repo_name, override_patch_labels) =
-            slug_bzlmod::override_patch_labels_from_root_module(
-                root_module_file.as_ref(),
-                key.options.ignore_dev_dependency,
-            );
-        let override_patch_inputs = dice_ctx
-            .compute(&OverridePatchInputsKey {
-                project_root: key.project_root.clone(),
-                main_repo_name,
-                patch_labels: override_patch_labels,
-            })
-            .await?
-            .buck_error_context("Computing override patch inputs for clean bzlmod graph")?;
-
-        Ok(BzlmodResolvedModuleGraphInputs {
-            root_module_file,
-            lockfile_inputs,
-            local_override_inputs,
-            non_registry_override_inputs,
-            registry_file_inputs,
-            override_patch_inputs,
+    let override_patch_inputs = dice_ctx
+        .compute(&OverridePatchInputsKey {
+            project_root: key.project_root.clone(),
+            main_repo_name,
+            patch_labels: override_patch_labels,
         })
-    }
+        .await?
+        .buck_error_context("Computing override patch inputs for clean bzlmod graph")?;
 
+    Ok(BzlmodResolvedModuleGraphInputs {
+        root_module_file,
+        lockfile_inputs,
+        local_override_inputs,
+        non_registry_override_inputs,
+        registry_file_inputs,
+        override_patch_inputs,
+    })
+}
+
+impl BuckConfigBasedCells {
     /// Testing entry point: equivalent to `parse_with_config_args` with no project root.
     pub async fn testing_parse(
         config_args: &[slug_cli_proto::ConfigOverride],
@@ -3934,7 +3922,6 @@ impl BuckConfigBasedCells {
             is_bzlmod: has_module_bazel,
         })
     }
-
     async fn build_bzlmod_cell_graph_from_clean_resolution(
         project_root: &ProjectRoot,
         project_root_abs: &AbsNormPathBuf,
@@ -4205,18 +4192,18 @@ impl BuckConfigBasedCells {
             )
             .await?;
             let extra =
-                slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
-                    lockfile,
-                    &aggregated,
-                    root_module_name,
-                    &mut pre_computed_cells,
-                    workspace_root,
-                    Some(repo_env.as_ref()),
-                    &fallback_scanned_bzl_transitive_digests,
-                    Some(&repo_mappings),
-                    Some(&repo_mapping_overrides),
-                    Some(&prevalidated_caches),
-                );
+            slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
+                lockfile,
+                &aggregated,
+                root_module_name,
+                &mut pre_computed_cells,
+                workspace_root,
+                Some(repo_env.as_ref()),
+                &fallback_scanned_bzl_transitive_digests,
+                Some(&repo_mappings),
+                Some(&repo_mapping_overrides),
+                Some(&prevalidated_caches),
+            );
             lockfile_seeded_cells.extend(extra.iter().map(BzlmodPendingRepoCell::from_pending));
             extension_mapping_cells.extend(extra);
             add_extension_repo_mapping_rows_from_cells(
@@ -4248,18 +4235,18 @@ impl BuckConfigBasedCells {
             )
             .await?;
             let extra =
-                slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
-                    lockfile,
-                    &aggregated,
-                    root_module_name,
-                    &mut pre_computed_cells,
-                    workspace_root,
-                    Some(repo_env.as_ref()),
-                    &fallback_scanned_bzl_transitive_digests,
-                    Some(&repo_mappings),
-                    Some(&repo_mapping_overrides),
-                    Some(&prevalidated_caches),
-                );
+            slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
+                lockfile,
+                &aggregated,
+                root_module_name,
+                &mut pre_computed_cells,
+                workspace_root,
+                Some(repo_env.as_ref()),
+                &fallback_scanned_bzl_transitive_digests,
+                Some(&repo_mappings),
+                Some(&repo_mapping_overrides),
+                Some(&prevalidated_caches),
+            );
             lockfile_seeded_cells.extend(extra.iter().map(BzlmodPendingRepoCell::from_pending));
             extension_mapping_cells.extend(extra);
             add_extension_repo_mapping_rows_from_cells(
@@ -4489,69 +4476,70 @@ impl BuckConfigBasedCells {
             ),
         })
     }
+}
 
-    async fn compute_bzlmod_resolved_module_graph(
-        key: &BzlmodResolvedModuleGraphKey,
-        dice_ctx: &mut DiceComputations<'_>,
-    ) -> slug_error::Result<Arc<BzlmodResolvedModuleGraphValue>> {
-        let command_policy = dice_ctx
-            .compute(&key.options.command_policy_key(key.workspace_id.clone()))
-            .await?
-            .buck_error_context("Computing bzlmod command policy")?;
-        let resolution_key = slug_bzlmod::BzlmodResolutionKey {
-            workspace_id: key.workspace_id.clone(),
-            command_policy_digest: command_policy.digest.clone(),
-        };
-        let inputs = Self::compute_bzlmod_resolved_module_graph_inputs(key, dice_ctx).await?;
-        let Some(parsed) = inputs.root_module_file.parsed.clone() else {
-            return Ok(Arc::new(BzlmodResolvedModuleGraphValue {
-                lockfile_inputs: inputs.lockfile_inputs,
-                outputs: Arc::new(None),
-            }));
-        };
-        if key.validate_root_extension_repo_directives && !key.options.ignore_dev_dependency {
-            slug_bzlmod::validate_parsed_root_extension_repo_directives(&parsed)?;
-        }
+async fn compute_bzlmod_resolved_module_graph(
+    key: &BzlmodResolvedModuleGraphKey,
+    dice_ctx: &mut DiceComputations<'_>,
+) -> slug_error::Result<Arc<BzlmodResolvedModuleGraphValue>> {
+    let command_policy = dice_ctx
+        .compute(&key.options.command_policy_key(key.workspace_id.clone()))
+        .await?
+        .buck_error_context("Computing bzlmod command policy")?;
+    let resolution_key = slug_bzlmod::BzlmodResolutionKey {
+        workspace_id: key.workspace_id.clone(),
+        command_policy_digest: command_policy.digest.clone(),
+    };
+    let inputs = compute_bzlmod_resolved_module_graph_inputs(key, dice_ctx).await?;
+    let Some(parsed) = inputs.root_module_file.parsed.clone() else {
+        return Ok(Arc::new(BzlmodResolvedModuleGraphValue {
+            lockfile_inputs: inputs.lockfile_inputs,
+            outputs: Arc::new(None),
+        }));
+    };
+    if key.validate_root_extension_repo_directives && !key.options.ignore_dev_dependency {
+        slug_bzlmod::validate_parsed_root_extension_repo_directives(&parsed)?;
+    }
 
-        let visible_lockfile = if key.options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
-            None
-        } else if let Some(visible_lockfile) = inputs.lockfile_inputs.visible_lockfile.as_ref() {
-            visible_lockfile.lockfile.clone()
-        } else {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "clean DICE bzlmod resolved graph requires tracked visible lockfile input"
-            ));
-        };
-        let hidden_lockfile = if key.options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
-            None
-        } else if let Some(hidden_lockfile) = inputs.lockfile_inputs.hidden_lockfile.as_ref() {
-            hidden_lockfile.lockfile.clone()
-        } else if key.options.hidden_lockfile_path.is_some() {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "clean DICE bzlmod resolved graph requires tracked hidden lockfile input"
-            ));
-        } else {
-            None
-        };
+    let visible_lockfile = if key.options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
+        None
+    } else if let Some(visible_lockfile) = inputs.lockfile_inputs.visible_lockfile.as_ref() {
+        visible_lockfile.lockfile.clone()
+    } else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "clean DICE bzlmod resolved graph requires tracked visible lockfile input"
+        ));
+    };
+    let hidden_lockfile = if key.options.lockfile_mode == slug_bzlmod::LockfileMode::Off {
+        None
+    } else if let Some(hidden_lockfile) = inputs.lockfile_inputs.hidden_lockfile.as_ref() {
+        hidden_lockfile.lockfile.clone()
+    } else if key.options.hidden_lockfile_path.is_some() {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "clean DICE bzlmod resolved graph requires tracked hidden lockfile input"
+        ));
+    } else {
+        None
+    };
 
-        let workspace_root = key.project_root.as_path();
-        let project_fs = ProjectRoot::new_unchecked(key.project_root.clone());
-        let graph_inputs = slug_bzlmod::resolve_graph_with_module_file_inputs(
-            &parsed,
-            workspace_root,
-            &key.options,
-            inputs.local_override_inputs.as_ref(),
-            inputs.non_registry_override_inputs.as_ref(),
-            inputs.override_patch_inputs.clone(),
-            visible_lockfile.as_deref(),
-        )
-        .await?;
-        let graph = graph_inputs.graph;
-        let mut parsed_modules = graph_inputs.parsed_modules;
-        if !graph_inputs.non_root_module_file_inputs.is_empty() {
-            let non_root_value = dice_ctx
+    let workspace_root = key.project_root.as_path();
+    let project_fs = ProjectRoot::new_unchecked(key.project_root.clone());
+    let graph_inputs = slug_bzlmod::resolve_graph_with_module_file_inputs(
+        &parsed,
+        workspace_root,
+        &key.options,
+        inputs.local_override_inputs.as_ref(),
+        inputs.non_registry_override_inputs.as_ref(),
+        inputs.override_patch_inputs.clone(),
+        visible_lockfile.as_deref(),
+    )
+    .await?;
+    let graph = graph_inputs.graph;
+    let mut parsed_modules = graph_inputs.parsed_modules;
+    if !graph_inputs.non_root_module_file_inputs.is_empty() {
+        let non_root_value = dice_ctx
                 .compute(&NonRootModuleFilesKey {
                     project_root: key.project_root.clone(),
                     inputs: graph_inputs.non_root_module_file_inputs,
@@ -4563,92 +4551,93 @@ impl BuckConfigBasedCells {
                         parsed.module.name
                     )
                 })?;
-            let non_root_value = non_root_value.with_buck_error_context(|| {
-                format!(
-                    "Failed to parse non-root MODULE.bazel files for '{}'",
-                    parsed.module.name
-                )
-            })?;
-            slug_bzlmod::append_resolved_non_root_modules(
-                &mut parsed_modules,
-                &graph,
-                inputs.non_registry_override_inputs.as_ref(),
-                &non_root_value.parsed_modules,
-            );
-        } else {
-            slug_bzlmod::append_resolved_non_root_modules(
-                &mut parsed_modules,
-                &graph,
-                inputs.non_registry_override_inputs.as_ref(),
-                &[],
-            );
-        }
-        let mut clean_cells = Vec::new();
-        let mut sorted_graph_modules: Vec<_> = graph.modules.iter().collect();
-        sorted_graph_modules.sort_by(|left, right| left.0.cmp(right.0));
-        for (module_name, module_info) in sorted_graph_modules {
-            let canonical_repo =
-                slug_bzlmod::bazel_canonical_module_repo_name(module_name, &module_info.version);
-            let external_path = format!("bazel-external/{canonical_repo}");
-            clean_cells.push((
-                CellName::unchecked_new(&canonical_repo)?,
-                CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned()),
-                None,
-            ));
-        }
-
-        let projections = slug_bzlmod::resolved_graph_projection_values(
-            key.workspace_id.clone(),
-            &parsed,
-            &parsed_modules,
+        let non_root_value = non_root_value.with_buck_error_context(|| {
+            format!(
+                "Failed to parse non-root MODULE.bazel files for '{}'",
+                parsed.module.name
+            )
+        })?;
+        slug_bzlmod::append_resolved_non_root_modules(
+            &mut parsed_modules,
             &graph,
-            key.options.ignore_dev_dependency,
+            inputs.non_registry_override_inputs.as_ref(),
+            &non_root_value.parsed_modules,
         );
-        let clean_cell_names = cell_name_strs(&clean_cells);
-        let (repo_mapping_snapshot, repo_mapping_overrides) =
-            slug_bzlmod::graph_owned_repo_mapping_state(
-                &parsed_modules,
-                &projections.module_versions.root_module_name,
-                key.options.ignore_dev_dependency,
-                &clean_cell_names,
-                Some(&graph),
-            );
-        let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-            key.workspace_id.clone(),
-            Arc::new(repo_mapping_snapshot),
-            Arc::new(repo_mapping_overrides),
-        );
-        let cell_graph = Self::build_bzlmod_cell_graph_from_clean_resolution(
-            &project_fs,
-            &key.project_root,
-            key.workspace_id.clone(),
-            &key.options,
-            &parsed,
+    } else {
+        slug_bzlmod::append_resolved_non_root_modules(
+            &mut parsed_modules,
             &graph,
-            &parsed_modules,
-            visible_lockfile.as_deref(),
-            hidden_lockfile.as_deref(),
-            dice_ctx,
-        )
-        .await?;
-        let graph_digest = slug_bzlmod::bzlmod_resolved_graph_digest(&graph);
-        record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs);
-        Ok(Arc::new(BzlmodResolvedModuleGraphValue {
-            lockfile_inputs: inputs.lockfile_inputs,
-            outputs: Arc::new(Some(slug_bzlmod::BzlmodResolvedGraphOutputsValue {
-                graph: Arc::new(graph),
-                graph_digest: Arc::from(graph_digest.as_str()),
-                module_versions: projections.module_versions,
-                resolution_facts: projections.resolution_facts,
-                registered_toolchains: projections.registered_toolchains,
-                registered_execution_platforms: projections.registered_execution_platforms,
-                extension_aggregations: projections.extension_aggregations,
-                repo_mappings,
-                cell_graph,
-            })),
-        }))
+            inputs.non_registry_override_inputs.as_ref(),
+            &[],
+        );
+    }
+    let mut clean_cells = Vec::new();
+    let mut sorted_graph_modules: Vec<_> = graph.modules.iter().collect();
+    sorted_graph_modules.sort_by(|left, right| left.0.cmp(right.0));
+    for (module_name, module_info) in sorted_graph_modules {
+        let canonical_repo =
+            slug_bzlmod::bazel_canonical_module_repo_name(module_name, &module_info.version);
+        let external_path = format!("bazel-external/{canonical_repo}");
+        clean_cells.push((
+            CellName::unchecked_new(&canonical_repo)?,
+            CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned()),
+            None,
+        ));
     }
 
+    let projections = slug_bzlmod::resolved_graph_projection_values(
+        key.workspace_id.clone(),
+        &parsed,
+        &parsed_modules,
+        &graph,
+        key.options.ignore_dev_dependency,
+    );
+    let clean_cell_names = cell_name_strs(&clean_cells);
+    let (repo_mapping_snapshot, repo_mapping_overrides) =
+        slug_bzlmod::graph_owned_repo_mapping_state(
+            &parsed_modules,
+            &projections.module_versions.root_module_name,
+            key.options.ignore_dev_dependency,
+            &clean_cell_names,
+            Some(&graph),
+        );
+    let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
+        key.workspace_id.clone(),
+        Arc::new(repo_mapping_snapshot),
+        Arc::new(repo_mapping_overrides),
+    );
+    let cell_graph = BuckConfigBasedCells::build_bzlmod_cell_graph_from_clean_resolution(
+        &project_fs,
+        &key.project_root,
+        key.workspace_id.clone(),
+        &key.options,
+        &parsed,
+        &graph,
+        &parsed_modules,
+        visible_lockfile.as_deref(),
+        hidden_lockfile.as_deref(),
+        dice_ctx,
+    )
+    .await?;
+    let graph_digest = slug_bzlmod::bzlmod_resolved_graph_digest(&graph);
+    record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs);
+    Ok(Arc::new(BzlmodResolvedModuleGraphValue {
+        lockfile_inputs: inputs.lockfile_inputs,
+        outputs: Arc::new(Some(slug_bzlmod::BzlmodResolvedGraphOutputsValue {
+            graph: Arc::new(graph),
+            graph_digest: Arc::from(graph_digest.as_str()),
+            module_versions: projections.module_versions,
+            resolution_facts: projections.resolution_facts,
+            registered_toolchains: projections.registered_toolchains,
+            registered_execution_platforms: projections.registered_execution_platforms,
+            extension_aggregations: projections.extension_aggregations,
+            repo_mappings,
+            cell_graph,
+        })),
+    }))
+}
+
+impl BuckConfigBasedCells {
     pub(crate) fn get_cell_aliases_from_config(
         config: &LegacyBuckConfig,
     ) -> slug_error::Result<impl Iterator<Item = (NonEmptyCellAlias, NonEmptyCellAlias)> + use<>>
@@ -4948,23 +4937,12 @@ mod tests {
         let output_base = fs
             .path()
             .resolve(ProjectRelativePath::new("buck-out/custom-isolation")?);
-        let mut dice = DiceBuilder::new()
-            .set_data(|data| {
-                data.set_testing_io_provider(&fs);
-            })
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-
-        let key = BuckConfigBasedCells::build_bzlmod_resolved_module_graph_key(
+        let key = build_bzlmod_resolved_module_graph_key(
             fs.path(),
             &[],
-            &mut dice,
             Some(output_base.to_path_buf()),
             true,
-        )
-        .await?;
+        )?;
 
         assert_eq!(
             key.workspace_id.output_base.as_ref().as_path(),
@@ -5002,14 +4980,8 @@ module(name = "dep", version = "1.0")
             .commit()
             .await;
 
-        let clean_key = BuckConfigBasedCells::build_bzlmod_resolved_module_graph_key(
-            fs.path(),
-            &config_args,
-            &mut dice,
-            None,
-            true,
-        )
-        .await?;
+        let clean_key =
+            build_bzlmod_resolved_module_graph_key(fs.path(), &config_args, None, true)?;
         let clean = dice
             .compute(&clean_key)
             .await?
