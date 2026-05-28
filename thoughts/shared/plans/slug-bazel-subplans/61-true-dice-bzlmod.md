@@ -403,6 +403,11 @@ Current state to preserve:
   mappings. The injected extension-cell vector remains as a fallback only for
   empty/bootstrap paths where the module extension executor is not installed.
   Guardrail: `cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib`.
+- 2026-05-28 production legacy cell-graph payload disabled: persisted
+  config-load now injects an empty `BzlmodCellGraphValue` whenever the real
+  module extension executor is installed. The old clean graph payload is kept
+  only for no-executor bootstrap/test fallback, so production cell graph data
+  comes from resolved graph, repo mappings, module data, and extension spokes.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1063,8 +1068,9 @@ hardening behavior around it.
     out-of-project local-override symlinks are derived from that same graph when
     available. Extension cells are derived from DICE extension spokes when the
     extension executor is installed; bootstrap no-executor paths still fall back
-    to the injected vector. The old `BzlmodProjectionData` wrapper has been
-    deleted.
+    to the injected vector. Persisted config-load injects an empty legacy cell
+    graph payload when that executor is installed. The old `BzlmodProjectionData`
+    wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.

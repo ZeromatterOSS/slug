@@ -4095,14 +4095,26 @@ impl BuckConfigBasedCells {
                 "Using clean bzlmod resolved graph data for DICE injections"
             );
         }
-        let cell_graph_for_dice = clean_resolved_module_graph.as_ref().as_ref().map_or_else(
-            || {
-                slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-                    key.resolution_key.workspace_id.clone(),
-                )
-            },
-            |value| value.cell_graph.clone(),
+        let empty_cell_graph_for_dice = slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
+            key.resolution_key.workspace_id.clone(),
         );
+        let cell_graph_for_dice = if slug_bzlmod::MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok() {
+            clean_resolved_module_graph.as_ref().as_ref().map_or_else(
+                || empty_cell_graph_for_dice.clone(),
+                |value| {
+                    let mut cell_graph = slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
+                        key.resolution_key.workspace_id.clone(),
+                    );
+                    cell_graph.root_module_name = value.module_versions.root_module_name.clone();
+                    cell_graph
+                },
+            )
+        } else {
+            clean_resolved_module_graph.as_ref().as_ref().map_or_else(
+                || empty_cell_graph_for_dice.clone(),
+                |value| value.cell_graph.clone(),
+            )
+        };
         let (module_versions_for_dice, resolution_facts_for_dice) =
             clean_resolved_module_graph.as_ref().as_ref().map_or_else(
                 || {
