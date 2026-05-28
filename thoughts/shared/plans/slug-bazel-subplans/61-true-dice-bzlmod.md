@@ -519,9 +519,9 @@ Current state to preserve:
   producer instead of dispatching through `BuckConfigBasedCells`. The key
   builder is also a module-level helper and no longer accepts a DICE context.
   This removes the legacy resolver impl as the executor for the clean graph
-  key; `slug_common` still hosts the graph key, filesystem-backed input keys,
-  and the large bootstrap cell-graph assembly helper until those can move
-  behind lower-level bzlmod-owned APIs. Guardrail:
+  key; `slug_common` still hosts the graph key plus filesystem-backed
+  input/preseed callback orchestration until those can move behind lower-level
+  bzlmod-owned APIs. Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common persisted_cell_graph --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo build -p slug && git diff --check`.
 - 2026-05-28 resolved graph consumer boundary reduction:
   Historical intermediate: cell-definition and residual-symlink producers were
@@ -558,6 +558,15 @@ Current state to preserve:
   source/input ownership for that producer rather than another full-graph
   injection. Guardrail:
   `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 clean cell-graph assembly moved to `slug_bzlmod`:
+  The bootstrap/clean `BzlmodCellGraphValue` assembly policy now lives in
+  `BzlmodCleanCellGraphBuilder` in `slug_bzlmod`. `slug_common` still computes
+  `BzlmodResolvedModuleGraphKey`, owns the filesystem-backed source input keys,
+  and calls back for repository-rule local-bit probing plus lockfile preseed
+  validation, but it no longer owns module cell, alias, scoped mapping,
+  dynamic-alias, bundled-cell, or lazy lockfile-seeded extension-cell assembly.
+  Guardrail:
+  `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common persisted_cell_graph --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1233,8 +1242,10 @@ hardening behavior around it.
     is no longer injected into `slug_bzlmod`; the cell-graph data payload no
     longer bundles it. Clean-digest production cell graph computation now
     bypasses `BzlmodCellGraphDataKey`; that key is only a bootstrap/fallback
-    input when an injected fallback graph exists. The old `BzlmodProjectionData`
-    wrapper has been deleted.
+    input when an injected fallback graph exists. Clean/bootstrap cell-graph
+    assembly policy is also in `slug_bzlmod` via `BzlmodCleanCellGraphBuilder`;
+    `slug_common` only provides callback-style source/preseed validation around
+    that builder. The old `BzlmodProjectionData` wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
@@ -1250,10 +1261,11 @@ hardening behavior around it.
      passed as separate named injections. The full resolved graph injection has
      been removed; production now injects the narrower
      `BzlmodModuleSourcesDataKey` projection addressed by the clean
-     resolved-graph digest. The remaining transitional API is that production
-     still computes the full clean resolved graph in `slug_common` and then
-     injects its projections, rather than having `slug_bzlmod` compute the
-     graph directly from DICE source-input dependencies.
+     resolved-graph digest. Clean cell-graph assembly has moved to
+     `slug_bzlmod`, but the remaining transitional API is that production still
+     computes the full clean resolved graph in `slug_common` and then injects
+     its projections, rather than having `slug_bzlmod` compute the graph
+     directly from DICE source-input dependencies.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being

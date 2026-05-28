@@ -41,6 +41,7 @@ use crate::BzlmodRepoMapping;
 use crate::RegisteredToolchain;
 use crate::cache::ModuleCache;
 use crate::extensions::AggregatedExtension;
+use crate::extensions::aggregate_extensions_with_policy;
 use crate::lockfile::Lockfile;
 use crate::lockfile::LockfileMode;
 use crate::parser::ModuleFileInputDigest;
@@ -1377,6 +1378,657 @@ impl BzlmodCellGraphValue {
             scoped_aliases: Arc::new(Vec::new()),
             dynamic_aliases: Arc::new(Vec::new()),
         }
+    }
+}
+
+pub type PrevalidatedExtensionCaches =
+    fxhash::FxHashMap<String, fxhash::FxHashMap<String, RepoSpec>>;
+
+pub struct BzlmodCleanCellGraphBuilder {
+    workspace_id: WorkspaceId,
+    root_module_name: String,
+    cells: Vec<BzlmodCellGraphCell>,
+    root_aliases: Vec<BzlmodCellGraphAlias>,
+    module_symlinks: Vec<BzlmodCellGraphModuleSymlink>,
+    scoped_aliases: Vec<BzlmodCellGraphScopedAlias>,
+    dynamic_aliases: Vec<BzlmodCellGraphDynamicAlias>,
+    selected_module_versions: HashMap<String, String>,
+    aggregated_extensions: HashMap<String, AggregatedExtension>,
+    repo_mappings: crate::RepoMappingSnapshot,
+    repo_mapping_overrides: crate::RepoMappingOverrides,
+    pre_computed_cells: Vec<crate::pending_repo_cells::PendingRepoCell>,
+    pre_computed_aliases: Vec<crate::pending_repo_cells::RepoAlias>,
+    extension_mapping_cells: Vec<crate::pending_repo_cells::PendingRepoCell>,
+    lockfile_seeded_cells: Vec<crate::pending_repo_cells::PendingRepoCell>,
+    repo_env_json: String,
+}
+
+impl BzlmodCleanCellGraphBuilder {
+    pub fn new(
+        workspace_id: WorkspaceId,
+        options: &BzlmodResolutionOptions,
+        parsed: &ParsedModuleFile,
+        graph: &ResolvedGraph,
+        parsed_modules: &[(String, ParsedModuleFile)],
+    ) -> slug_error::Result<Self> {
+        let mut cells = Vec::new();
+        let mut root_aliases = Vec::new();
+        let mut module_symlinks = Vec::new();
+        let workspace_root = workspace_id.canonical_project_root.as_ref();
+        let root_module_name = if parsed.module.name.is_empty() {
+            "_main".to_owned()
+        } else {
+            parsed.module.name.clone()
+        };
+        let selected_module_versions = selected_module_versions_from_graph(graph);
+
+        if !parsed.module.bazel_deps.is_empty() {
+            let mut sorted_modules: Vec<_> = graph.modules.iter().collect();
+            sorted_modules.sort_by(|a, b| a.0.cmp(b.0));
+            for (module_name, module_info) in sorted_modules {
+                if module_name == &parsed.module.name || module_name == &root_module_name {
+                    continue;
+                }
+
+                let canonical_repo =
+                    bazel_canonical_module_repo_name(module_name, &module_info.version);
+                match &module_info.source {
+                    ModuleSource::Registry { url } => {
+                        if let Some(source_path) = &module_info.source_path {
+                            module_symlinks.push(BzlmodCellGraphModuleSymlink {
+                                entry_name: canonical_repo.clone(),
+                                source_path: Arc::new(source_path.clone()),
+                            });
+                        }
+                        let source_path = module_info
+                            .source_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        cells.push(BzlmodCellGraphCell {
+                            name: canonical_repo.clone(),
+                            path: format!("bazel-external/{canonical_repo}"),
+                            module_setup: Some(BzlmodCellGraphModuleSetup {
+                                module_name: module_name.clone(),
+                                version: module_info.version.clone(),
+                                registry_url: url.clone(),
+                                source_path,
+                            }),
+                            bundled: false,
+                        });
+                    }
+                    ModuleSource::LocalPath { path } => {
+                        let (cell_path, symlink) = local_override_cell_path_and_symlink(
+                            workspace_root,
+                            module_name,
+                            &module_info.version,
+                            path,
+                        );
+                        if let Some(symlink) = symlink {
+                            module_symlinks.push(symlink);
+                        }
+                        cells.push(BzlmodCellGraphCell {
+                            name: canonical_repo,
+                            path: cell_path,
+                            module_setup: None,
+                            bundled: false,
+                        });
+                    }
+                    ModuleSource::Git {
+                        remote, commit: _, ..
+                    } => {
+                        if let Some(source_path) = &module_info.source_path {
+                            module_symlinks.push(BzlmodCellGraphModuleSymlink {
+                                entry_name: canonical_repo.clone(),
+                                source_path: Arc::new(source_path.clone()),
+                            });
+                        }
+                        let source_path = module_info
+                            .source_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        cells.push(BzlmodCellGraphCell {
+                            name: canonical_repo.clone(),
+                            path: format!("bazel-external/{canonical_repo}"),
+                            module_setup: Some(BzlmodCellGraphModuleSetup {
+                                module_name: module_name.clone(),
+                                version: module_info.version.clone(),
+                                registry_url: format!("git+{remote}"),
+                                source_path,
+                            }),
+                            bundled: false,
+                        });
+                    }
+                    ModuleSource::Archive { urls, .. } => {
+                        if let Some(source_path) = &module_info.source_path {
+                            module_symlinks.push(BzlmodCellGraphModuleSymlink {
+                                entry_name: canonical_repo.clone(),
+                                source_path: Arc::new(source_path.clone()),
+                            });
+                        }
+                        let source_path = module_info
+                            .source_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        let url = urls
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| "archive".to_owned());
+                        cells.push(BzlmodCellGraphCell {
+                            name: canonical_repo.clone(),
+                            path: format!("bazel-external/{canonical_repo}"),
+                            module_setup: Some(BzlmodCellGraphModuleSetup {
+                                module_name: module_name.clone(),
+                                version: module_info.version.clone(),
+                                registry_url: url,
+                                source_path,
+                            }),
+                            bundled: false,
+                        });
+                    }
+                }
+            }
+
+            if let Some(repo_name) = &parsed.module.repo_name {
+                if repo_name != &parsed.module.name {
+                    root_aliases.push(BzlmodCellGraphAlias {
+                        apparent_name: repo_name.clone(),
+                        target_name: parsed.module.name.clone(),
+                    });
+                }
+            }
+
+            for dep in &parsed.module.bazel_deps {
+                let apparent_name = dep.apparent_name();
+                if let Some(target_name) = selected_bzlmod_cell_name_for_dep_in_graph_cells(
+                    &cells,
+                    &dep.name,
+                    &selected_module_versions,
+                ) {
+                    root_aliases.push(BzlmodCellGraphAlias {
+                        apparent_name: apparent_name.to_owned(),
+                        target_name: target_name.to_owned(),
+                    });
+                }
+            }
+
+            for module_name in graph.modules.keys() {
+                if module_name == &parsed.module.name || module_name == &root_module_name {
+                    continue;
+                }
+                if root_aliases
+                    .iter()
+                    .any(|alias| alias.apparent_name == *module_name)
+                {
+                    continue;
+                }
+                if let Some(target_name) = selected_bzlmod_cell_name_for_dep_in_graph_cells(
+                    &cells,
+                    module_name,
+                    &selected_module_versions,
+                ) {
+                    if module_name == target_name {
+                        continue;
+                    }
+                    root_aliases.push(BzlmodCellGraphAlias {
+                        apparent_name: module_name.clone(),
+                        target_name: target_name.to_owned(),
+                    });
+                }
+            }
+        }
+
+        let mut scoped_aliases = Vec::new();
+        for (module_name, parsed_mod) in parsed_modules {
+            for dep in &parsed_mod.module.bazel_deps {
+                let apparent_name = dep.apparent_name();
+                let Some(target_name) = selected_bzlmod_cell_name_for_dep_in_graph_cells(
+                    &cells,
+                    &dep.name,
+                    &selected_module_versions,
+                ) else {
+                    continue;
+                };
+                if apparent_name == target_name {
+                    continue;
+                }
+                if module_name != &root_module_name {
+                    scoped_aliases.push(BzlmodCellGraphScopedAlias {
+                        owner_module: module_name.clone(),
+                        apparent_name: apparent_name.to_owned(),
+                        target_name: target_name.to_owned(),
+                    });
+                    continue;
+                }
+                if root_aliases
+                    .iter()
+                    .any(|alias| alias.apparent_name == apparent_name)
+                {
+                    continue;
+                }
+                root_aliases.push(BzlmodCellGraphAlias {
+                    apparent_name: apparent_name.to_owned(),
+                    target_name: target_name.to_owned(),
+                });
+            }
+        }
+
+        let mut module_extensions: HashMap<String, Vec<crate::ExtensionUsage>> = HashMap::new();
+        for (module_name, parsed_mod) in parsed_modules {
+            if !parsed_mod.extension_usages.is_empty() {
+                module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
+            }
+        }
+        let aggregated_extensions = aggregate_extensions_with_policy(
+            &module_extensions,
+            Some(&root_module_name),
+            options.ignore_dev_dependency,
+        );
+        let cell_names = cell_name_strs_from_graph_cells(&cells);
+        let (repo_mappings, repo_mapping_overrides) = graph_owned_repo_mapping_state(
+            parsed_modules,
+            &root_module_name,
+            options.ignore_dev_dependency,
+            &cell_names,
+            Some(graph),
+        );
+        let (pre_computed_cells, pre_computed_aliases) =
+            crate::pending_repo_cells::pre_compute_extension_repo_cells(
+                parsed_modules,
+                &root_module_name,
+                options.ignore_dev_dependency,
+            )?;
+        let repo_env_json = serde_json::to_string(&options.repo_env).map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "Failed to serialize bzlmod repo_env for clean cell graph: {}",
+                e
+            )
+        })?;
+
+        Ok(Self {
+            workspace_id,
+            root_module_name,
+            cells,
+            root_aliases,
+            module_symlinks,
+            scoped_aliases,
+            dynamic_aliases: Vec::new(),
+            selected_module_versions,
+            aggregated_extensions,
+            repo_mappings,
+            repo_mapping_overrides,
+            pre_computed_cells,
+            pre_computed_aliases,
+            extension_mapping_cells: Vec::new(),
+            lockfile_seeded_cells: Vec::new(),
+            repo_env_json,
+        })
+    }
+
+    pub fn root_module_name(&self) -> &str {
+        &self.root_module_name
+    }
+
+    pub fn extension_aggregations(&self) -> &HashMap<String, AggregatedExtension> {
+        &self.aggregated_extensions
+    }
+
+    pub fn repo_mappings(&self) -> &crate::RepoMappingSnapshot {
+        &self.repo_mappings
+    }
+
+    pub fn repo_mapping_overrides(&self) -> &crate::RepoMappingOverrides {
+        &self.repo_mapping_overrides
+    }
+
+    pub fn pre_computed_cells_mut(&mut self) -> &mut [crate::pending_repo_cells::PendingRepoCell] {
+        &mut self.pre_computed_cells
+    }
+
+    pub fn install_precomputed_extension_mapping_rows(&mut self) {
+        self.extension_mapping_cells = self.pre_computed_cells.clone();
+        self.add_extension_repo_mapping_rows_from_current_cells();
+    }
+
+    pub fn append_lockfile_seeded_extension_cells(
+        &mut self,
+        lockfile: &Lockfile,
+        workspace_root: &Path,
+        repo_env: Option<&BTreeMap<String, String>>,
+        bzl_transitive_digests: &HashMap<String, String>,
+        prevalidated_caches: Option<&PrevalidatedExtensionCaches>,
+    ) {
+        let extra =
+            crate::pending_repo_cells::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
+                lockfile,
+                &self.aggregated_extensions,
+                &self.root_module_name,
+                &mut self.pre_computed_cells,
+                workspace_root,
+                repo_env,
+                bzl_transitive_digests,
+                Some(&self.repo_mappings),
+                Some(&self.repo_mapping_overrides),
+                prevalidated_caches,
+            );
+        self.lockfile_seeded_cells.extend(extra.iter().cloned());
+        self.extension_mapping_cells.extend(extra);
+        self.add_extension_repo_mapping_rows_from_current_cells();
+    }
+
+    pub fn finish(mut self) -> slug_error::Result<BzlmodCellGraphValue> {
+        add_scoped_repo_aliases_from_mapping_snapshot(
+            &mut self.scoped_aliases,
+            &self.repo_mappings,
+        );
+
+        let mut extension_cells = Vec::new();
+        for cell in self.pre_computed_cells {
+            extension_cells.push(BzlmodCellGraphExtensionCell {
+                canonical_name: cell.canonical_name,
+                internal_name: cell.internal_name,
+                path: cell.path,
+                extension_id: cell.extension_id,
+                spec_hash: cell.spec_hash,
+                repo_spec_json: cell.repo_spec_json,
+                repo_env_json: self.repo_env_json.clone(),
+                materialized: false,
+                lazy: false,
+            });
+        }
+
+        let mut existing_cell_names: HashSet<String> =
+            self.cells.iter().map(|cell| cell.name.clone()).collect();
+        let mut extension_root_aliases = Vec::new();
+        for alias in self.pre_computed_aliases {
+            let target_name = selected_bzlmod_cell_name_for_dep_in_graph_cells(
+                &self.cells,
+                &alias.canonical_name,
+                &self.selected_module_versions,
+            )
+            .unwrap_or(alias.canonical_name.as_str())
+            .to_owned();
+            let is_generated_override_alias = alias.declaring_module.is_none()
+                && alias.apparent_name != target_name
+                && crate::pending_repo_cells::parse_canonical_name(&alias.apparent_name).is_some();
+            let is_root_declared_alias =
+                alias.declaring_module.as_deref() == Some(&self.root_module_name);
+            if let Some(owner_module) = alias.declaring_module.as_deref().or_else(|| {
+                crate::pending_repo_cells::parse_canonical_name(&alias.canonical_name)
+                    .map(|(owner_module, _, _)| owner_module)
+            }) {
+                self.scoped_aliases.push(BzlmodCellGraphScopedAlias {
+                    owner_module: owner_module.to_owned(),
+                    apparent_name: alias.apparent_name.clone(),
+                    target_name: target_name.clone(),
+                });
+            }
+            if is_generated_override_alias {
+                if let Some(dynamic_alias) =
+                    dynamic_alias_for_generated_override(&alias, &target_name)
+                {
+                    self.dynamic_aliases.push(dynamic_alias);
+                }
+                if !existing_cell_names.contains(&alias.apparent_name) {
+                    if let Some(selected_cell) =
+                        self.cells.iter().find(|cell| cell.name == target_name)
+                    {
+                        let selected_source_path = selected_cell
+                            .module_setup
+                            .as_ref()
+                            .map(|setup| PathBuf::from(&setup.source_path))
+                            .unwrap_or_else(|| {
+                                self.workspace_id
+                                    .canonical_project_root
+                                    .join(&selected_cell.path)
+                            });
+                        let selected_setup = selected_cell.module_setup.clone().or_else(|| {
+                            Some(BzlmodCellGraphModuleSetup {
+                                module_name: target_name.clone(),
+                                version: String::new(),
+                                registry_url: "override_repo".to_owned(),
+                                source_path: selected_source_path.to_string_lossy().into_owned(),
+                            })
+                        });
+                        self.cells.push(BzlmodCellGraphCell {
+                            name: alias.apparent_name.clone(),
+                            path: format!("bazel-external/{}", alias.apparent_name.as_str()),
+                            module_setup: selected_setup,
+                            bundled: false,
+                        });
+                        self.module_symlinks.push(BzlmodCellGraphModuleSymlink {
+                            entry_name: alias.apparent_name.clone(),
+                            source_path: Arc::new(selected_source_path),
+                        });
+                        existing_cell_names.insert(alias.apparent_name.clone());
+                    } else {
+                        tracing::warn!(
+                            "override_repo generated repo '{}' targets '{}', but the selected cell was not registered",
+                            alias.apparent_name,
+                            target_name
+                        );
+                    }
+                }
+                extension_cells.retain(|cell| cell.canonical_name != alias.apparent_name);
+                self.lockfile_seeded_cells.retain(|cell| {
+                    cell.canonical_name != alias.apparent_name
+                        && cell.internal_name != alias.apparent_name
+                });
+            }
+            if !is_root_declared_alias {
+                continue;
+            }
+            if existing_cell_names.contains(alias.apparent_name.as_str()) {
+                continue;
+            }
+            extension_root_aliases.push(BzlmodCellGraphAlias {
+                apparent_name: alias.apparent_name,
+                target_name,
+            });
+        }
+        add_scoped_repo_aliases_from_root_overrides(
+            &mut self.scoped_aliases,
+            &self.repo_mapping_overrides,
+            &self.root_module_name,
+            &self.cells,
+            &self.selected_module_versions,
+        );
+        self.root_aliases.extend(extension_root_aliases);
+
+        Ok(BzlmodCellGraphValue {
+            workspace_id: self.workspace_id,
+            root_module_name: self.root_module_name,
+            cells: Arc::new(
+                self.cells
+                    .into_iter()
+                    .chain(
+                        BZLMOD_ALWAYS_BUNDLED_CELLS
+                            .iter()
+                            .map(|name| BzlmodCellGraphCell {
+                                name: (*name).to_owned(),
+                                path: (*name).to_owned(),
+                                module_setup: None,
+                                bundled: true,
+                            }),
+                    )
+                    .collect(),
+            ),
+            extension_cells: Arc::new(
+                extension_cells
+                    .into_iter()
+                    .chain(self.lockfile_seeded_cells.into_iter().map(|cell| {
+                        BzlmodCellGraphExtensionCell {
+                            canonical_name: cell.canonical_name,
+                            internal_name: cell.internal_name,
+                            path: cell.path,
+                            extension_id: cell.extension_id,
+                            spec_hash: cell.spec_hash,
+                            repo_spec_json: cell.repo_spec_json,
+                            repo_env_json: self.repo_env_json.clone(),
+                            materialized: false,
+                            lazy: true,
+                        }
+                    }))
+                    .collect(),
+            ),
+            root_aliases: Arc::new(self.root_aliases),
+            module_symlinks: Arc::new(self.module_symlinks),
+            scoped_aliases: Arc::new(self.scoped_aliases),
+            dynamic_aliases: Arc::new(self.dynamic_aliases),
+        })
+    }
+
+    fn add_extension_repo_mapping_rows_from_current_cells(&mut self) {
+        let mut by_extension: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+        for cell in &self.extension_mapping_cells {
+            by_extension
+                .entry(cell.extension_id.clone())
+                .or_default()
+                .push((cell.internal_name.clone(), cell.canonical_name.clone()));
+        }
+
+        for (extension_id, generated_repos) in by_extension {
+            let overrides = self.repo_mapping_overrides.get(&extension_id);
+            if !crate::repo_mapping::add_extension_generated_repo_mappings(
+                &mut self.repo_mappings,
+                &extension_id,
+                &self.root_module_name,
+                generated_repos,
+                overrides,
+            ) {
+                tracing::debug!(
+                    "Skipping extension repo mapping rows for '{}': owner module mapping is unavailable",
+                    extension_id
+                );
+            }
+        }
+    }
+}
+
+fn local_override_cell_path_and_symlink(
+    project_root: &Path,
+    module_name: &str,
+    module_version: &str,
+    override_path: &str,
+) -> (String, Option<BzlmodCellGraphModuleSymlink>) {
+    let module_dir = local_override_module_dir(project_root, override_path);
+    if let Ok(project_relative) = module_dir.strip_prefix(project_root) {
+        if !project_relative.as_os_str().is_empty() {
+            return (project_relative.to_string_lossy().into_owned(), None);
+        }
+    }
+
+    let canonical_repo = bazel_canonical_module_repo_name(module_name, module_version);
+    let source_path = module_dir
+        .canonicalize()
+        .unwrap_or_else(|_| module_dir.clone());
+    (
+        format!("bazel-external/{canonical_repo}"),
+        Some(BzlmodCellGraphModuleSymlink {
+            entry_name: canonical_repo,
+            source_path: Arc::new(source_path),
+        }),
+    )
+}
+
+fn cell_name_strs_from_graph_cells(cells: &[BzlmodCellGraphCell]) -> Vec<&str> {
+    cells.iter().map(|cell| cell.name.as_str()).collect()
+}
+
+fn selected_module_versions_from_graph(graph: &ResolvedGraph) -> HashMap<String, String> {
+    let mut selected = graph.selected_versions.clone();
+    for (module_name, module_info) in &graph.modules {
+        selected.insert(module_name.clone(), module_info.version.clone());
+    }
+    selected
+}
+
+fn selected_bzlmod_cell_name_for_dep_in_graph_cells<'a>(
+    cells: &'a [BzlmodCellGraphCell],
+    dep_name: &str,
+    selected_module_versions: &HashMap<String, String>,
+) -> Option<&'a str> {
+    if let Some(cell) = cells.iter().find(|cell| cell.name == dep_name) {
+        return Some(cell.name.as_str());
+    }
+
+    let selected_version = selected_module_versions.get(dep_name)?;
+    let canonical_name = bazel_canonical_module_repo_name(dep_name, selected_version);
+    cells
+        .iter()
+        .find(|cell| cell.name == canonical_name)
+        .map(|cell| cell.name.as_str())
+}
+
+fn add_scoped_repo_aliases_from_mapping_snapshot(
+    aliases: &mut Vec<BzlmodCellGraphScopedAlias>,
+    snapshot: &crate::RepoMappingSnapshot,
+) {
+    for (source_repo, mappings) in snapshot {
+        if source_repo.is_empty() {
+            continue;
+        }
+        for (apparent_name, target_name) in mappings {
+            aliases.push(BzlmodCellGraphScopedAlias {
+                owner_module: source_repo.clone(),
+                apparent_name: apparent_name.clone(),
+                target_name: target_name.clone(),
+            });
+        }
+    }
+}
+
+fn add_scoped_repo_aliases_from_root_overrides(
+    aliases: &mut Vec<BzlmodCellGraphScopedAlias>,
+    repo_mapping_overrides: &crate::RepoMappingOverrides,
+    root_module_name: &str,
+    cells: &[BzlmodCellGraphCell],
+    selected_module_versions: &HashMap<String, String>,
+) {
+    for (extension_id, overrides) in repo_mapping_overrides {
+        let owner_module =
+            crate::extension_execution_dice::extract_owning_module(extension_id, root_module_name);
+        for (generated_name, replacement_repo) in overrides {
+            let target_name = selected_bzlmod_cell_name_for_dep_in_graph_cells(
+                cells,
+                replacement_repo,
+                selected_module_versions,
+            )
+            .unwrap_or(replacement_repo.as_str())
+            .to_owned();
+            aliases.push(BzlmodCellGraphScopedAlias {
+                owner_module: owner_module.clone(),
+                apparent_name: generated_name.clone(),
+                target_name: target_name.clone(),
+            });
+            if let Some(owner_without_separator) = owner_module.strip_suffix('+') {
+                aliases.push(BzlmodCellGraphScopedAlias {
+                    owner_module: owner_without_separator.to_owned(),
+                    apparent_name: generated_name.clone(),
+                    target_name,
+                });
+            }
+        }
+    }
+}
+
+fn dynamic_alias_for_generated_override(
+    alias: &crate::pending_repo_cells::RepoAlias,
+    target_name: &str,
+) -> Option<BzlmodCellGraphDynamicAlias> {
+    if alias.declaring_module.is_none()
+        && alias.apparent_name != target_name
+        && crate::pending_repo_cells::parse_canonical_name(&alias.apparent_name).is_some()
+    {
+        Some(BzlmodCellGraphDynamicAlias {
+            apparent_name: alias.apparent_name.clone(),
+            canonical_name: target_name.to_owned(),
+        })
+    } else {
+        None
     }
 }
 
