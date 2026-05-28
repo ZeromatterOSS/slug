@@ -567,6 +567,13 @@ Current state to preserve:
   dynamic-alias, bundled-cell, or lazy lockfile-seeded extension-cell assembly.
   Guardrail:
   `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common persisted_cell_graph --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 repository-rule local-bit callback moved to `slug_bzlmod`:
+  `BzlmodCleanCellGraphBuilder` now resolves `repository_rule(local = True)`
+  precompute bits itself via the bzlmod-owned Starlark repo-rule executor
+  late binding. `slug_common` no longer mutates pending extension cells directly
+  for this policy; the remaining callback-style work is lockfile preseed/file
+  validation. Guardrail:
+  `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

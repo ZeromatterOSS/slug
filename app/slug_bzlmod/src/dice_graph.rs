@@ -1684,8 +1684,18 @@ impl BzlmodCleanCellGraphBuilder {
         &self.repo_mapping_overrides
     }
 
-    pub fn pre_computed_cells_mut(&mut self) -> &mut [crate::pending_repo_cells::PendingRepoCell] {
-        &mut self.pre_computed_cells
+    pub async fn resolve_use_repo_rule_local_bits(
+        &mut self,
+        ctx: &mut DiceComputations<'_>,
+        parsed_modules: &[(String, ParsedModuleFile)],
+    ) -> slug_error::Result<()> {
+        resolve_use_repo_rule_local_bits(
+            ctx,
+            &mut self.pre_computed_cells,
+            parsed_modules,
+            &self.root_module_name,
+        )
+        .await
     }
 
     pub fn install_precomputed_extension_mapping_rows(&mut self) {
@@ -1906,6 +1916,113 @@ impl BzlmodCleanCellGraphBuilder {
             }
         }
     }
+}
+
+async fn resolve_use_repo_rule_local_bits(
+    ctx: &mut DiceComputations<'_>,
+    cells: &mut [crate::pending_repo_cells::PendingRepoCell],
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+) -> slug_error::Result<()> {
+    let Ok(executor) = crate::STARLARK_REPO_RULE_EXECUTOR_IMPL.get() else {
+        return Ok(());
+    };
+
+    let mut declaring_cells = HashMap::new();
+    for (_cell_name, parsed) in parsed_modules {
+        let module_name = if parsed.module.name.is_empty() {
+            root_module_name
+        } else {
+            &parsed.module.name
+        };
+        for invocation in &parsed.repo_rule_invocations {
+            let rule_source = canonicalize_use_repo_rule_source(
+                &invocation.rule_source,
+                module_name,
+                module_name == root_module_name,
+            );
+            declaring_cells.insert(rule_source, module_name.to_owned());
+        }
+    }
+
+    for cell in cells {
+        if cell.repo_spec_json.is_empty() {
+            continue;
+        }
+
+        let mut repo_spec: RepoSpec = serde_json::from_str(&cell.repo_spec_json)
+            .with_buck_error_context(|| {
+                format!(
+                    "Failed to parse precomputed RepoSpec for '{}'",
+                    cell.canonical_name
+                )
+            })?;
+        if repo_spec.local || cell.extension_id != repo_spec.repo_rule_id {
+            continue;
+        }
+
+        let Some((rule_bzl_path, rule_name)) = repo_spec.repo_rule_id.rsplit_once('%') else {
+            continue;
+        };
+        if rule_bzl_path.starts_with('@') {
+            continue;
+        }
+        if !declaring_cells.contains_key(&repo_spec.repo_rule_id) {
+            continue;
+        }
+        let is_local = match executor.rule_is_local(ctx, rule_bzl_path, rule_name).await {
+            Ok(is_local) => is_local,
+            Err(e) => {
+                tracing::debug!(
+                    "Failed to precompute repository rule local bit for '{}' on '{}': {}; \
+                     deferring to normal repository rule execution",
+                    repo_spec.repo_rule_id,
+                    cell.canonical_name,
+                    e
+                );
+                false
+            }
+        };
+        if is_local {
+            repo_spec.local = true;
+            cell.spec_hash = repo_spec.compute_hash();
+            cell.repo_spec_json =
+                serde_json::to_string(&repo_spec).with_buck_error_context(|| {
+                    format!(
+                        "Failed to serialize local RepoSpec for '{}'",
+                        cell.canonical_name
+                    )
+                })?;
+        }
+    }
+
+    Ok(())
+}
+
+fn canonicalize_use_repo_rule_source(
+    rule_source: &str,
+    module_name: &str,
+    is_root: bool,
+) -> String {
+    let Some((bzl_file, rule_name)) = rule_source.rsplit_once('%') else {
+        return rule_source.to_owned();
+    };
+
+    let resolved = if !is_root {
+        if bzl_file.starts_with("//") {
+            format!("@{}{}", module_name, bzl_file)
+        } else if let Some(rest) = bzl_file.strip_prefix(':') {
+            format!("@{}//:{}", module_name, rest)
+        } else {
+            bzl_file.to_owned()
+        }
+    } else if let Some(rest) = bzl_file.strip_prefix(':') {
+        format!("//:{}", rest)
+    } else {
+        bzl_file.to_owned()
+    };
+
+    format!("{resolved}%{rule_name}")
 }
 
 fn local_override_cell_path_and_symlink(
