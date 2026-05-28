@@ -15,6 +15,7 @@ use slug_artifact::artifact::source_artifact::SourceArtifact;
 use slug_build_api::actions::query::CONFIGURED_ATTR_TO_VALUE;
 use slug_build_api::actions::query::PackageLabelOption;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+use slug_core::cells::CellAliasResolver;
 use slug_core::configuration::pair::Configuration;
 use slug_core::package::PackageLabel;
 use slug_core::package::package_relative_path::PackageRelativePath;
@@ -235,6 +236,7 @@ fn resolve_single_impl<'v>(
         ConfiguredAttr::Arg(arg) => arg.resolve(ctx, pkg),
         ConfiguredAttr::Query(query) => query.resolve(ctx),
         ConfiguredAttr::SourceFile(s) => {
+            let pkg = canonical_source_package_for_bzlmod_runtime(pkg, ctx.cell_alias_resolver())?;
             let path = SourcePath::new(pkg, s.path().dupe());
             match source_file_target_cfg {
                 Some(cfg_pair) => SourceAttrType::resolve_single_file_target(ctx, path, cfg_pair),
@@ -244,6 +246,28 @@ fn resolve_single_impl<'v>(
         ConfiguredAttr::Metadata(..) => Ok(ctx.heap().alloc(OpaqueMetadata)),
         ConfiguredAttr::TargetModifiers(..) => Ok(ctx.heap().alloc(OpaqueMetadata)),
     }
+}
+
+pub(crate) fn canonical_source_package_for_bzlmod_runtime(
+    pkg: PackageLabel,
+    cell_alias_resolver: Option<&CellAliasResolver>,
+) -> slug_error::Result<PackageLabel> {
+    let Some(cell_alias_resolver) = cell_alias_resolver else {
+        return Ok(pkg);
+    };
+    let cell_name = pkg.cell_name();
+    if slug_core::cells::is_root_cell_name(cell_name.as_str()) {
+        return Ok(pkg);
+    }
+    let Some(canonical_cell) =
+        cell_alias_resolver.resolve_declared_or_runtime_alias(cell_name.as_str())
+    else {
+        return Ok(pkg);
+    };
+    if canonical_cell == cell_name {
+        return Ok(pkg);
+    }
+    PackageLabel::new(canonical_cell, pkg.cell_relative_path())
 }
 
 fn resolve_for_ctx_attr_impl<'v>(
@@ -516,4 +540,67 @@ fn configured_attr_to_value<'v>(
 
 pub(crate) fn init_configured_attr_to_value() {
     CONFIGURED_ATTR_TO_VALUE.init(configured_attr_to_value);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
+    use slug_core::cells::BzlmodRuntimeDynamicAlias;
+    use slug_core::cells::CellAliasResolver;
+    use slug_core::cells::name::CellName;
+    use slug_core::package::PackageLabel;
+
+    use super::canonical_source_package_for_bzlmod_runtime;
+
+    #[test]
+    fn source_file_package_uses_runtime_canonical_cell() -> slug_error::Result<()> {
+        let apparent = "linux_kernel_headers_x86.4.19.325";
+        let canonical = "llvm++kernel_headers+linux_kernel_headers_x86.4.19.325";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+            ..Default::default()
+        };
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new(canonical),
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let pkg = PackageLabel::testing_parse(&format!("{apparent}//include/asm-generic"));
+
+        let canonical_pkg = canonical_source_package_for_bzlmod_runtime(pkg, Some(&resolver))?;
+
+        assert_eq!(canonical_pkg.cell_name().as_str(), canonical);
+        assert_eq!(
+            canonical_pkg.cell_relative_path().as_str(),
+            "include/asm-generic"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn source_file_package_ignores_process_global_alias_without_runtime_snapshot()
+    -> slug_error::Result<()> {
+        let apparent = "plan61_source_path_apparent";
+        let stale_global = "stale_owner++source_path+apparent";
+        slug_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            stale_global.to_owned(),
+        );
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
+        let pkg = PackageLabel::testing_parse(&format!("{apparent}//pkg"));
+
+        let canonical_pkg = canonical_source_package_for_bzlmod_runtime(pkg, Some(&resolver))?;
+
+        assert_eq!(canonical_pkg.cell_name().as_str(), apparent);
+        assert_eq!(
+            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            Some(stale_global)
+        );
+        Ok(())
+    }
 }

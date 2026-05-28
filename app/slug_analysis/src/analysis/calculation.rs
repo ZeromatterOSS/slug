@@ -1543,6 +1543,9 @@ async fn get_analysis_result_inner(
             // Native rules are built-in rules like constraint_setting and constraint_value
             // that are required for Bazel compatibility with BCR packages like @platforms.
             let dep_analysis = get_dep_analysis(configured_node, ctx).await?;
+            let cell_alias_resolver = ctx
+                .get_cell_alias_resolver(target.pkg().cell_name())
+                .await?;
 
             // For config_setting, pre-compute whether flag_values and values match.
             // This must be done asynchronously (DICE lookup) before the sync analyze_native_rule call.
@@ -1565,6 +1568,7 @@ async fn get_analysis_result_inner(
                     dep_analysis,
                     flag_values_match && define_values_match,
                     values_match,
+                    Some(&cell_alias_resolver),
                 )?;
                 Ok(MaybeCompatible::Compatible(result))
             });

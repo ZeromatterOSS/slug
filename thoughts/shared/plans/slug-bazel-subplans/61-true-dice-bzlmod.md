@@ -186,13 +186,21 @@ cells. Focused coverage includes `cargo test -p slug_core owner_self_alias`,
 and `cargo test -p slug_common
 bzlmod_bundled_tool_alias_resolver_can_see_root_repo_aliases`.
 
-**Current frontier**: `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` now gets
-past the legacy alias/label resolution bridge and fails later in analysis for
-`linux_kernel_headers_x86.4.19.325//:kernel_headers_directory`: `bazel_skylib`
-sees `external/linux_kernel_headers_x86.4.19.325/...` where its accepted
-prefixes include canonical `external/llvm++kernel_headers+linux_kernel_headers_x86.4.19.325/`
-and the generated `buck-out/v2/gen/...` prefix. Latest smoke log:
-`/tmp/slug-plan61-sdk-smoke-20260527T2035-bazel-tools-root-alias.log`.
+**Bridge surface reduced**: configured source-file attrs and native
+filegroup/genrule source-file collection now canonicalize apparent bzlmod
+repository package cells through the active `CellAliasResolver` runtime
+snapshot before constructing `SourcePath`s. This removes a source-artifact
+ownership leak where analysis/runfiles paths could preserve apparent generated
+repo names such as `linux_kernel_headers_x86.4.19.325` or
+`crates__zerocopy-0.8.42` even though the resolver-owned graph knew their
+canonical cells. The helper has no process-global fallback; without a runtime
+snapshot it preserves the stored apparent spelling. Intended owner:
+`BzlmodCellGraphKey` plus `RepoMappingKey`; current producer remains the
+transitional resolver-owned runtime snapshot until the cell graph is fully
+DICE-derived. Validation passed with focused `cargo test -p slug_analysis
+source_file_package`, `cargo check -p slug_analysis`, `cargo build -p slug`,
+and `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` reaching `BUILD
+SUCCEEDED` in `/tmp/slug-plan61-sdk-smoke-20260528T0014-native-source-path-long.log`.
 
 ## Current Checkpoint
 
@@ -268,9 +276,12 @@ Current state to preserve:
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks, but those child reads still poll
   filesystem state until lower-level tracked filesystem keys are available.
-- The current SDK frontier is no longer the legacy resolution bridge: it is an
-  analysis path canonicalization mismatch for generated kernel-header files
-  under `linux_kernel_headers_x86.4.19.325`.
+- The current SDK frontier is no longer the legacy resolution bridge. The
+  generated kernel-header source path mismatch and the later
+  `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
+  fixed by resolver-backed source-artifact package canonicalization. The latest
+  Slug SDK smoke reached `BUILD SUCCEEDED`; this is frontier evidence, not a
+  Plan 61 closure condition.
 
 What future workers should keep in this file:
 

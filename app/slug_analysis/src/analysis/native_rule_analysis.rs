@@ -48,6 +48,7 @@ use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_t
 use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_frozen_sh_test_info;
 use slug_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
+use slug_core::cells::CellAliasResolver;
 use slug_core::configuration::constraints::ConstraintKey;
 use slug_core::configuration::constraints::ConstraintValue;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
@@ -83,6 +84,7 @@ use starlark_map::small_map::SmallMap;
 
 use crate::analysis::genrule_action::GenruleAction;
 use crate::analysis::genrule_action::GenruleShell;
+use crate::attrs::resolve::configured_attr::canonical_source_package_for_bzlmod_runtime;
 
 // ============================================================================
 // Declared Toolchain Registry (for toolchain resolution)
@@ -284,13 +286,16 @@ pub fn analyze_native_rule(
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
     flag_values_match: bool,
     values_match: bool,
+    cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> slug_error::Result<AnalysisResult> {
     match kind {
         NativeRuleKind::ConstraintSetting => analyze_constraint_setting(target, configured_node),
         NativeRuleKind::ConstraintValue => {
             analyze_constraint_value(target, configured_node, dep_analysis)
         }
-        NativeRuleKind::Filegroup => analyze_filegroup(target, configured_node, dep_analysis),
+        NativeRuleKind::Filegroup => {
+            analyze_filegroup(target, configured_node, dep_analysis, cell_alias_resolver)
+        }
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
         NativeRuleKind::ConfigSetting => {
@@ -298,7 +303,9 @@ pub fn analyze_native_rule(
         }
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
         NativeRuleKind::PackageGroup => analyze_package_group(target),
-        NativeRuleKind::Genrule => analyze_genrule(target, configured_node, dep_analysis),
+        NativeRuleKind::Genrule => {
+            analyze_genrule(target, configured_node, dep_analysis, cell_alias_resolver)
+        }
         NativeRuleKind::Platform => analyze_platform(target, configured_node, dep_analysis),
         NativeRuleKind::TestSuite => analyze_test_suite(target, dep_analysis),
         NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
@@ -337,6 +344,7 @@ fn analyze_genrule(
     target: &ConfiguredTargetLabel,
     configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> slug_error::Result<AnalysisResult> {
     let target_node = configured_node.to_owned();
     let target_ref = target_node.target_node().as_ref();
@@ -431,12 +439,22 @@ fn analyze_genrule(
 
     // Use configured node to resolve select() expressions in srcs/tools.
     if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
-        collect_artifact_groups_from_configured_attr(&srcs_attr.value, &pkg, &mut inputs);
+        collect_artifact_groups_from_configured_attr(
+            &srcs_attr.value,
+            &pkg,
+            cell_alias_resolver,
+            &mut inputs,
+        )?;
     }
 
     // Also collect from tools attr (these are executables needed by the command)
     if let Some(tools_attr) = configured_node.get("tools", AttrInspectOptions::All) {
-        collect_artifact_groups_from_configured_attr(&tools_attr.value, &pkg, &mut inputs);
+        collect_artifact_groups_from_configured_attr(
+            &tools_attr.value,
+            &pkg,
+            cell_alias_resolver,
+            &mut inputs,
+        )?;
     }
 
     // Add DefaultInfo outputs from dep_analysis (label deps in srcs/tools)
@@ -458,7 +476,8 @@ fn analyze_genrule(
     // Also build location mappings for source files referenced in $(location ...).
     // Source files (e.g. "defs.bzl" in srcs) can be referenced as $(location :defs.bzl).
     if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
-        let source_mappings = build_source_file_location_mappings(&srcs_attr.value, &pkg);
+        let source_mappings =
+            build_source_file_location_mappings(&srcs_attr.value, &pkg, cell_alias_resolver)?;
         // Add source mappings for labels not already resolved via dep_analysis.
         // If a key exists in location_mappings but with empty artifacts, replace it.
         for (label, artifacts) in source_mappings {
@@ -595,25 +614,32 @@ fn build_location_mappings(
 fn build_source_file_location_mappings(
     attr: &ConfiguredAttr,
     pkg: &slug_core::package::PackageLabel,
-) -> Vec<(String, Vec<ArtifactGroup>)> {
+    cell_alias_resolver: Option<&CellAliasResolver>,
+) -> slug_error::Result<Vec<(String, Vec<ArtifactGroup>)>> {
     let mut result: Vec<(String, Vec<ArtifactGroup>)> = Vec::new();
-    collect_source_file_location_mappings_recursive(attr, pkg, &mut result);
-    result
+    collect_source_file_location_mappings_recursive(attr, pkg, cell_alias_resolver, &mut result)?;
+    Ok(result)
 }
 
 fn collect_source_file_location_mappings_recursive(
     attr: &ConfiguredAttr,
     pkg: &slug_core::package::PackageLabel,
+    cell_alias_resolver: Option<&CellAliasResolver>,
     out: &mut Vec<(String, Vec<ArtifactGroup>)>,
-) {
+) -> slug_error::Result<()> {
     match attr {
         ConfiguredAttr::List(ListLiteral(items)) => {
             for item in items.iter() {
-                collect_source_file_location_mappings_recursive(item, pkg, out);
+                collect_source_file_location_mappings_recursive(
+                    item,
+                    pkg,
+                    cell_alias_resolver,
+                    out,
+                )?;
             }
         }
         ConfiguredAttr::OneOf(inner, _) => {
-            collect_source_file_location_mappings_recursive(inner, pkg, out);
+            collect_source_file_location_mappings_recursive(inner, pkg, cell_alias_resolver, out)?;
         }
         ConfiguredAttr::SourceFile(coerced_path) => {
             // The "label" for a source file is ":filename" (colon + last path component)
@@ -624,8 +650,10 @@ fn collect_source_file_location_mappings_recursive(
                 .next()
                 .unwrap_or(file_path.as_str());
             let label_key = format!(":{}", filename);
+            let source_pkg =
+                canonical_source_package_for_bzlmod_runtime(pkg.dupe(), cell_alias_resolver)?;
             let source_artifact =
-                SourceArtifact::new(SourcePath::new(pkg.dupe(), file_path.clone()));
+                SourceArtifact::new(SourcePath::new(source_pkg, file_path.clone()));
             out.push((
                 label_key,
                 vec![ArtifactGroup::Artifact(Artifact::from(source_artifact))],
@@ -633,32 +661,38 @@ fn collect_source_file_location_mappings_recursive(
         }
         _ => {}
     }
+    Ok(())
 }
 
 /// Collect ArtifactGroups from a CONFIGURED attr (with select() already resolved).
 fn collect_artifact_groups_from_configured_attr(
     attr: &ConfiguredAttr,
     pkg: &slug_core::package::PackageLabel,
+    cell_alias_resolver: Option<&CellAliasResolver>,
     out: &mut Vec<ArtifactGroup>,
-) {
+) -> slug_error::Result<()> {
     match attr {
         ConfiguredAttr::List(ListLiteral(items)) => {
             for item in items.iter() {
-                collect_artifact_groups_from_configured_attr(item, pkg, out);
+                collect_artifact_groups_from_configured_attr(item, pkg, cell_alias_resolver, out)?;
             }
         }
         ConfiguredAttr::OneOf(inner, _) => {
-            collect_artifact_groups_from_configured_attr(inner, pkg, out);
+            collect_artifact_groups_from_configured_attr(inner, pkg, cell_alias_resolver, out)?;
         }
         ConfiguredAttr::SourceFile(coerced_path) => {
+            let source_pkg =
+                canonical_source_package_for_bzlmod_runtime(pkg.dupe(), cell_alias_resolver)?;
             for path in coerced_path.inputs() {
-                let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
+                let source_artifact =
+                    SourceArtifact::new(SourcePath::new(source_pkg.dupe(), path.dupe()));
                 out.push(ArtifactGroup::Artifact(Artifact::from(source_artifact)));
             }
         }
         // Label deps are resolved via dep_analysis, not here
         _ => {}
     }
+    Ok(())
 }
 
 /// Analyze a constraint_setting target.
@@ -925,21 +959,31 @@ fn analyze_alias(
 fn collect_source_files_from_configured_attr(
     attr: &ConfiguredAttr,
     pkg: &slug_core::package::PackageLabel,
+    cell_alias_resolver: Option<&CellAliasResolver>,
     heap: &FrozenHeap,
     out: &mut Vec<FrozenValue>,
-) {
+) -> slug_error::Result<()> {
     match attr {
         ConfiguredAttr::List(ListLiteral(items)) => {
             for item in items.iter() {
-                collect_source_files_from_configured_attr(item, pkg, heap, out);
+                collect_source_files_from_configured_attr(
+                    item,
+                    pkg,
+                    cell_alias_resolver,
+                    heap,
+                    out,
+                )?;
             }
         }
         ConfiguredAttr::OneOf(inner, _) => {
-            collect_source_files_from_configured_attr(inner, pkg, heap, out);
+            collect_source_files_from_configured_attr(inner, pkg, cell_alias_resolver, heap, out)?;
         }
         ConfiguredAttr::SourceFile(coerced_path) => {
+            let source_pkg =
+                canonical_source_package_for_bzlmod_runtime(pkg.dupe(), cell_alias_resolver)?;
             for path in coerced_path.inputs() {
-                let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
+                let source_artifact =
+                    SourceArtifact::new(SourcePath::new(source_pkg.dupe(), path.dupe()));
                 let artifact = Artifact::from(source_artifact);
                 let starlark_artifact = heap.alloc_simple(StarlarkArtifact::new(artifact));
                 out.push(starlark_artifact);
@@ -947,6 +991,7 @@ fn collect_source_files_from_configured_attr(
         }
         _ => {}
     }
+    Ok(())
 }
 
 fn configured_attr_string(attr: &ConfiguredAttr) -> Option<&str> {
@@ -1017,6 +1062,7 @@ fn analyze_filegroup(
     target: &ConfiguredTargetLabel,
     configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> slug_error::Result<AnalysisResult> {
     // Check if this filegroup has source files in its srcs attr (from exports_files).
     // Source files are not deps, so they don't appear in dep_analysis.
@@ -1040,9 +1086,10 @@ fn analyze_filegroup(
         collect_source_files_from_configured_attr(
             &srcs_attr.value,
             &pkg,
+            cell_alias_resolver,
             &heap,
             &mut source_outputs,
-        );
+        )?;
     }
 
     if dep_analysis.is_empty() {
