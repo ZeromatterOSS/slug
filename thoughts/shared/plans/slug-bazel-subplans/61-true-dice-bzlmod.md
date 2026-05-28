@@ -363,6 +363,17 @@ Current state to preserve:
   Also validated with the focused bzlmod cell-graph, cell-graph-key,
   repository-label-resolution, and persisted clean-graph tests,
   `cargo build -p slug`, `git diff --check`, and the focused Python replay set.
+- 2026-05-28 cell-graph module-symlink reduction: `BzlmodCellGraphKey` now
+  derives module symlinks from `BzlmodCellGraphCell::module_setup.source_path`
+  when that data exists, ignoring stale payload symlinks for those cells. It
+  still appends non-derivable payload symlinks, currently needed for
+  out-of-project local overrides whose cell setup is intentionally absent.
+  `BzlmodCellGraphDataKey` still carries the cell, extension-cell, and
+  local-override symlink vectors. Guardrail:
+  `cargo test -p slug_bzlmod cell_graph_key_derives_module_symlinks_from_cell_setup --lib`.
+  Also validated with the focused bzlmod cell-graph, cell-graph-key,
+  repository-label-resolution, and persisted clean-graph tests,
+  `cargo build -p slug`, `git diff --check`, and the focused Python replay set.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1016,9 +1027,10 @@ hardening behavior around it.
      clean resolved-graph producer and carries that producer's graph digest.
      The returned graph's root module name is derived from `ModuleVersionsKey`;
      root aliases, scoped aliases, and dynamic aliases are derived from
-     `BzlmodRepoMappingsKey`; legacy cell parsing still takes the remaining
-     cell, extension-cell, and symlink vectors from this payload. The old
-     `BzlmodProjectionData` wrapper has been deleted.
+     `BzlmodRepoMappingsKey`; module symlinks are derived from module cell setup
+     where possible. Legacy cell parsing still takes the remaining cell,
+     extension-cell, and non-derivable local-override symlink vectors from this
+     payload. The old `BzlmodProjectionData` wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.

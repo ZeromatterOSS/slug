@@ -2058,6 +2058,127 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cell_graph_key_derives_module_symlinks_from_cell_setup() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-cell-graph-module-symlinks"),
+            PathBuf::from("/tmp/slug-plan61-cell-graph-module-symlinks-output"),
+        );
+        let mut graph = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
+        graph.root_module_name = "root".to_owned();
+        graph.cells = Arc::new(vec![
+            BzlmodCellGraphCell {
+                name: "dep+".to_owned(),
+                path: "bazel-external/dep+".to_owned(),
+                module_setup: Some(BzlmodCellGraphModuleSetup {
+                    module_name: "dep".to_owned(),
+                    version: "1.0".to_owned(),
+                    registry_url: "https://registry.example".to_owned(),
+                    source_path: "/tmp/slug-plan61-derived-dep".to_owned(),
+                }),
+                bundled: false,
+            },
+            BzlmodCellGraphCell {
+                name: "local+".to_owned(),
+                path: "bazel-external/local+".to_owned(),
+                module_setup: None,
+                bundled: false,
+            },
+        ]);
+        graph.module_symlinks = Arc::new(vec![
+            BzlmodCellGraphModuleSymlink {
+                entry_name: "dep+".to_owned(),
+                source_path: Arc::new(PathBuf::from("/tmp/slug-plan61-payload-dep")),
+            },
+            BzlmodCellGraphModuleSymlink {
+                entry_name: "local+".to_owned(),
+                source_path: Arc::new(PathBuf::from("/tmp/slug-plan61-local-dep")),
+            },
+        ]);
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodCellGraphDataKey,
+            Arc::new(BzlmodCellGraphDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                Arc::new(graph),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodModuleVersionsDataKey,
+            Arc::new(BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                workspace_id.clone(),
+                "root".to_owned(),
+                Arc::new(HashMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoEnvDataKey,
+            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoMappingsDataKey,
+            Arc::new(BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingOverrides::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodResolutionFactsDataKey,
+            Arc::new(BzlmodResolutionFactsValue::for_workspace(
+                workspace_id.clone(),
+                indexmap::IndexMap::new(),
+                indexmap::IndexMap::new(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            Arc::new(BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+                workspace_id.clone(),
+                "root".to_owned(),
+                Arc::new(HashMap::new()),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let cell_graph = dice
+            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .await??;
+
+        assert_eq!(
+            cell_graph.module_symlinks.as_ref(),
+            &vec![
+                BzlmodCellGraphModuleSymlink {
+                    entry_name: "dep+".to_owned(),
+                    source_path: Arc::new(PathBuf::from("/tmp/slug-plan61-derived-dep")),
+                },
+                BzlmodCellGraphModuleSymlink {
+                    entry_name: "local+".to_owned(),
+                    source_path: Arc::new(PathBuf::from("/tmp/slug-plan61-local-dep")),
+                },
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn replay_input_data_rejects_wrong_workspace() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-replay-input-workspace"),

@@ -16,6 +16,7 @@
 //! prove when legacy paths compute, replay, or materialize bzlmod state.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::path::Path;
@@ -513,6 +514,7 @@ impl Key for BzlmodCellGraphKey {
         cell_graph.root_module_name = module_versions.invalidation.root_module_name.clone();
         cell_graph.root_aliases = Arc::new(root_aliases_from_repo_mappings(&repo_mappings));
         cell_graph.dynamic_aliases = Arc::new(dynamic_aliases_from_repo_mappings(&repo_mappings));
+        cell_graph.module_symlinks = Arc::new(module_symlinks_from_cells_and_payload(&cell_graph));
         cell_graph.scoped_aliases = Arc::new(scoped_aliases_from_repo_mappings(
             &repo_mappings,
             &cell_graph.root_module_name,
@@ -1133,6 +1135,33 @@ impl Key for ModuleVersionsKey {
             _ => false,
         }
     }
+}
+
+fn module_symlinks_from_cells_and_payload(
+    cell_graph: &BzlmodCellGraphValue,
+) -> Vec<BzlmodCellGraphModuleSymlink> {
+    let mut seen = BTreeSet::new();
+    let mut symlinks = Vec::new();
+    for cell in cell_graph.cells.iter() {
+        let Some(setup) = cell.module_setup.as_ref() else {
+            continue;
+        };
+        if setup.source_path.is_empty() {
+            continue;
+        }
+        if seen.insert(cell.name.clone()) {
+            symlinks.push(BzlmodCellGraphModuleSymlink {
+                entry_name: cell.name.clone(),
+                source_path: Arc::new(PathBuf::from(&setup.source_path)),
+            });
+        }
+    }
+    for symlink in cell_graph.module_symlinks.iter() {
+        if seen.insert(symlink.entry_name.clone()) {
+            symlinks.push(symlink.clone());
+        }
+    }
+    symlinks
 }
 
 fn root_aliases_from_repo_mappings(
