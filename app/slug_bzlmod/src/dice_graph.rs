@@ -1440,6 +1440,63 @@ impl dice::InjectedKey for BzlmodCellGraphDataKey {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodResolvedModuleSource {
+    pub module_name: String,
+    pub version: String,
+    pub source: ModuleSource,
+    pub source_path: Option<PathBuf>,
+}
+
+pub fn resolved_module_sources_from_graph(
+    graph: &ResolvedGraph,
+) -> Vec<BzlmodResolvedModuleSource> {
+    let mut modules: Vec<_> = graph.modules.iter().collect();
+    modules.sort_by(|left, right| left.0.cmp(right.0));
+    modules
+        .into_iter()
+        .map(|(module_name, module_info)| BzlmodResolvedModuleSource {
+            module_name: module_name.clone(),
+            version: module_info.version.clone(),
+            source: module_info.source.clone(),
+            source_path: module_info.source_path.clone(),
+        })
+        .collect()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct BzlmodModuleSourcesDataValue {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+    pub modules: Arc<Vec<BzlmodResolvedModuleSource>>,
+}
+
+impl BzlmodModuleSourcesDataValue {
+    pub fn for_workspace(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        modules: Arc<Vec<BzlmodResolvedModuleSource>>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+            modules,
+        }
+    }
+}
+
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
+#[display("BzlmodModuleSourcesDataKey")]
+pub struct BzlmodModuleSourcesDataKey;
+
+impl dice::InjectedKey for BzlmodModuleSourcesDataKey {
+    type Value = Arc<BzlmodModuleSourcesDataValue>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub(crate) struct BzlmodCurrentCellGraphValue {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
@@ -1458,33 +1515,30 @@ impl Key for BzlmodCurrentCellGraphKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
-        if resolved_graph_data.graph.is_some() {
+        let module_sources = ctx.compute(&BzlmodModuleSourcesDataKey).await?;
+        if module_sources.resolution_digest.as_ref() != INJECTED_BZLMOD_PROJECTION_DIGEST {
             return Ok(Arc::new(BzlmodCurrentCellGraphValue {
-                workspace_id: resolved_graph_data.workspace_id.clone(),
-                resolution_digest: resolved_graph_data.resolution_digest.clone(),
+                workspace_id: module_sources.workspace_id.clone(),
+                resolution_digest: module_sources.resolution_digest.clone(),
             }));
         }
 
         let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        if data.workspace_id != resolved_graph_data.workspace_id {
+        if data.workspace_id != module_sources.workspace_id {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
-                "BzlmodCurrentCellGraphKey found resolved graph data for project root '{}', \
+                "BzlmodCurrentCellGraphKey found module-source data for project root '{}', \
                  but fallback cell graph data for project root '{}'",
-                resolved_graph_data
-                    .workspace_id
-                    .canonical_project_root
-                    .display(),
+                module_sources.workspace_id.canonical_project_root.display(),
                 data.workspace_id.canonical_project_root.display()
             ));
         }
-        if data.resolution_digest != resolved_graph_data.resolution_digest {
+        if data.resolution_digest != module_sources.resolution_digest {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
-                "BzlmodCurrentCellGraphKey found resolved graph digest '{}', \
+                "BzlmodCurrentCellGraphKey found module-source digest '{}', \
                  but fallback cell graph digest '{}'",
-                resolved_graph_data.resolution_digest,
+                module_sources.resolution_digest,
                 data.resolution_digest
             ));
         }
@@ -1498,28 +1552,6 @@ impl Key for BzlmodCurrentCellGraphKey {
         match (x, y) {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-pub struct BzlmodResolvedGraphDataValue {
-    pub workspace_id: WorkspaceId,
-    pub resolution_digest: Arc<str>,
-    #[allocative(skip)]
-    pub graph: Option<Arc<ResolvedGraph>>,
-}
-
-impl BzlmodResolvedGraphDataValue {
-    pub fn for_workspace(
-        workspace_id: WorkspaceId,
-        resolution_digest: Arc<str>,
-        graph: Option<Arc<ResolvedGraph>>,
-    ) -> Self {
-        Self {
-            workspace_id,
-            resolution_digest,
-            graph,
         }
     }
 }
@@ -1538,53 +1570,40 @@ pub struct BzlmodResolvedGraphOutputsValue {
     pub cell_graph: BzlmodCellGraphValue,
 }
 
-#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
-#[display("BzlmodResolvedGraphDataKey")]
-pub(crate) struct BzlmodResolvedGraphDataKey;
-
-impl dice::InjectedKey for BzlmodResolvedGraphDataKey {
-    type Value = Arc<BzlmodResolvedGraphDataValue>;
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x == y
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-struct BzlmodResolvedGraphValue {
-    #[allocative(skip)]
-    graph: Option<Arc<ResolvedGraph>>,
+struct BzlmodModuleSourcesValue {
+    modules: Arc<Vec<BzlmodResolvedModuleSource>>,
 }
 
 #[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display(
-    "BzlmodResolvedGraphKey({}, {})",
+    "BzlmodModuleSourcesKey({}, {})",
     workspace_id.stable_hash(),
     resolution_digest
 )]
-struct BzlmodResolvedGraphKey {
+struct BzlmodModuleSourcesKey {
     workspace_id: WorkspaceId,
     resolution_digest: Arc<str>,
 }
 
 #[async_trait]
-impl Key for BzlmodResolvedGraphKey {
-    type Value = slug_error::Result<Arc<BzlmodResolvedGraphValue>>;
+impl Key for BzlmodModuleSourcesKey {
+    type Value = slug_error::Result<Arc<BzlmodModuleSourcesValue>>;
 
     async fn compute(
         &self,
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
-        validate_resolved_graph_payload(
-            "BzlmodResolvedGraphKey",
+        let data = ctx.compute(&BzlmodModuleSourcesDataKey).await?;
+        validate_module_sources_payload(
+            "BzlmodModuleSourcesKey",
             &self.workspace_id,
             &self.resolution_digest,
             &data,
         )?;
-        Ok(Arc::new(BzlmodResolvedGraphValue {
-            graph: data.graph.clone(),
+        Ok(Arc::new(BzlmodModuleSourcesValue {
+            modules: data.modules.dupe(),
         }))
     }
 
@@ -1657,20 +1676,13 @@ impl Key for BzlmodCellDefinitionsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        if should_use_resolved_graph_data(&self.resolution_digest) {
-            let resolved_graph = ctx
-                .compute(&BzlmodResolvedGraphKey {
+        if should_use_clean_resolution_data(&self.resolution_digest) {
+            let module_sources = ctx
+                .compute(&BzlmodModuleSourcesKey {
                     workspace_id: self.workspace_id.clone(),
                     resolution_digest: self.resolution_digest.clone(),
                 })
                 .await??;
-            let Some(resolved_graph) = resolved_graph.graph.as_ref() else {
-                return Err(slug_error::slug_error!(
-                    slug_error::ErrorTag::Tier0,
-                    "BzlmodCellDefinitionsKey expected a resolved graph for project root '{}'",
-                    self.workspace_id.canonical_project_root.display()
-                ));
-            };
             let module_versions = ctx
                 .compute(&ModuleVersionsKey::for_workspace_id(
                     self.workspace_id.clone(),
@@ -1681,10 +1693,10 @@ impl Key for BzlmodCellDefinitionsKey {
                     self.workspace_id.clone(),
                 ))
                 .await??;
-            return Ok(Arc::new(module_cells_from_resolved_graph(
+            return Ok(Arc::new(module_cells_from_module_sources(
                 &self.workspace_id,
                 &module_versions.invalidation.root_module_name,
-                resolved_graph,
+                module_sources.modules.as_ref(),
                 &repo_mappings,
             )));
         }
@@ -1773,7 +1785,7 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
                 Err(e) => Err(e),
             };
         }
-        if should_use_resolved_graph_data(&self.resolution_digest) {
+        if should_use_clean_resolution_data(&self.resolution_digest) {
             return Ok(Arc::new(Vec::new()));
         }
         let data = ctx
@@ -1879,23 +1891,16 @@ impl Key for BzlmodResidualModuleSymlinksKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        if should_use_resolved_graph_data(&self.resolution_digest) {
-            let resolved_graph = ctx
-                .compute(&BzlmodResolvedGraphKey {
+        if should_use_clean_resolution_data(&self.resolution_digest) {
+            let module_sources = ctx
+                .compute(&BzlmodModuleSourcesKey {
                     workspace_id: self.workspace_id.clone(),
                     resolution_digest: self.resolution_digest.clone(),
                 })
                 .await??;
-            let Some(resolved_graph) = resolved_graph.graph.as_ref() else {
-                return Err(slug_error::slug_error!(
-                    slug_error::ErrorTag::Tier0,
-                    "BzlmodResidualModuleSymlinksKey expected a resolved graph for project root '{}'",
-                    self.workspace_id.canonical_project_root.display()
-                ));
-            };
-            return Ok(Arc::new(residual_module_symlinks_from_resolved_graph(
+            return Ok(Arc::new(residual_module_symlinks_from_module_sources(
                 &self.workspace_id,
-                resolved_graph,
+                module_sources.modules.as_ref(),
             )));
         }
         let data = ctx
@@ -1950,21 +1955,21 @@ fn validate_cell_graph_payload(
     Ok(())
 }
 
-fn should_use_resolved_graph_data(resolution_digest: &str) -> bool {
+fn should_use_clean_resolution_data(resolution_digest: &str) -> bool {
     resolution_digest != INJECTED_BZLMOD_PROJECTION_DIGEST
 }
 
-fn validate_resolved_graph_payload(
+fn validate_module_sources_payload(
     key_name: &str,
     workspace_id: &WorkspaceId,
     resolution_digest: &str,
-    data: &BzlmodResolvedGraphDataValue,
+    data: &BzlmodModuleSourcesDataValue,
 ) -> slug_error::Result<()> {
     if data.workspace_id != *workspace_id {
         return Err(slug_error::slug_error!(
             slug_error::ErrorTag::Tier0,
             "{} was computed with project root '{}', \
-             but current bzlmod resolved graph root is '{}'",
+             but current bzlmod module-source root is '{}'",
             key_name,
             workspace_id.canonical_project_root.display(),
             data.workspace_id.canonical_project_root.display()
@@ -1974,7 +1979,7 @@ fn validate_resolved_graph_payload(
         return Err(slug_error::slug_error!(
             slug_error::ErrorTag::Tier0,
             "{} was computed with resolution digest '{}', \
-             but current bzlmod resolved graph digest is '{}'",
+             but current bzlmod module-source digest is '{}'",
             key_name,
             resolution_digest,
             data.resolution_digest
@@ -2082,14 +2087,12 @@ fn residual_module_symlinks_from_payload(
         .collect()
 }
 
-fn residual_module_symlinks_from_resolved_graph(
+fn residual_module_symlinks_from_module_sources(
     workspace_id: &WorkspaceId,
-    resolved_graph: &ResolvedGraph,
+    module_sources: &[BzlmodResolvedModuleSource],
 ) -> Vec<BzlmodCellGraphModuleSymlink> {
     let mut symlinks = Vec::new();
-    let mut sorted_modules: Vec<_> = resolved_graph.modules.iter().collect();
-    sorted_modules.sort_by(|a, b| a.0.cmp(b.0));
-    for (module_name, module_info) in sorted_modules {
+    for module_info in module_sources {
         let ModuleSource::LocalPath { path } = &module_info.source else {
             continue;
         };
@@ -2102,7 +2105,8 @@ fn residual_module_symlinks_from_resolved_graph(
         {
             continue;
         }
-        let canonical_repo = bazel_canonical_module_repo_name(module_name, &module_info.version);
+        let canonical_repo =
+            bazel_canonical_module_repo_name(&module_info.module_name, &module_info.version);
         let source_path = module_dir
             .canonicalize()
             .unwrap_or_else(|_| module_dir.clone());
@@ -2159,16 +2163,15 @@ pub fn bazel_canonical_module_repo_name(module_name: &str, version: &str) -> Str
     }
 }
 
-fn module_cells_from_resolved_graph(
+fn module_cells_from_module_sources(
     workspace_id: &WorkspaceId,
     root_module_name: &str,
-    resolved_graph: &ResolvedGraph,
+    module_sources: &[BzlmodResolvedModuleSource],
     repo_mappings: &BzlmodRepoMappingsDataValue,
 ) -> Vec<BzlmodCellGraphCell> {
     let mut cells = Vec::new();
-    let mut sorted_modules: Vec<_> = resolved_graph.modules.iter().collect();
-    sorted_modules.sort_by(|a, b| a.0.cmp(b.0));
-    for (module_name, module_info) in sorted_modules {
+    for module_info in module_sources {
+        let module_name = module_info.module_name.as_str();
         if module_name.is_empty() || module_name == root_module_name {
             continue;
         }
@@ -2185,7 +2188,7 @@ fn module_cells_from_resolved_graph(
                     name: canonical_repo.clone(),
                     path: format!("bazel-external/{canonical_repo}"),
                     module_setup: Some(BzlmodCellGraphModuleSetup {
-                        module_name: module_name.clone(),
+                        module_name: module_name.to_owned(),
                         version: module_info.version.clone(),
                         registry_url: url.clone(),
                         source_path,
@@ -2215,7 +2218,7 @@ fn module_cells_from_resolved_graph(
                     name: canonical_repo.clone(),
                     path: format!("bazel-external/{canonical_repo}"),
                     module_setup: Some(BzlmodCellGraphModuleSetup {
-                        module_name: module_name.clone(),
+                        module_name: module_name.to_owned(),
                         version: module_info.version.clone(),
                         registry_url: format!("git+{remote}"),
                         source_path,
@@ -2237,7 +2240,7 @@ fn module_cells_from_resolved_graph(
                     name: canonical_repo.clone(),
                     path: format!("bazel-external/{canonical_repo}"),
                     module_setup: Some(BzlmodCellGraphModuleSetup {
-                        module_name: module_name.clone(),
+                        module_name: module_name.to_owned(),
                         version: module_info.version.clone(),
                         registry_url: url,
                         source_path,

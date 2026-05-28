@@ -85,6 +85,8 @@ pub use dice_graph::BzlmodLockfileInputsDataKey;
 pub use dice_graph::BzlmodLockfileInputsDataValue;
 pub use dice_graph::BzlmodLockfileInputsKey;
 pub use dice_graph::BzlmodLockfileInputsValue;
+pub use dice_graph::BzlmodModuleSourcesDataKey;
+pub use dice_graph::BzlmodModuleSourcesDataValue;
 pub use dice_graph::BzlmodModuleVersionsDataKey;
 pub use dice_graph::BzlmodModuleVersionsDataValue;
 pub use dice_graph::BzlmodModuleVersionsInvalidation;
@@ -101,10 +103,9 @@ pub use dice_graph::BzlmodResolutionFactsKey;
 pub use dice_graph::BzlmodResolutionFactsValue;
 pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodResolutionOptions;
-use dice_graph::BzlmodResolvedGraphDataKey;
-use dice_graph::BzlmodResolvedGraphDataValue;
 pub use dice_graph::BzlmodResolvedGraphOutputsValue;
 pub use dice_graph::BzlmodResolvedGraphProjectionValues;
+pub use dice_graph::BzlmodResolvedModuleSource;
 pub use dice_graph::BzlmodWorkspaceKey;
 pub use dice_graph::ExtensionBzlTransitiveDigestKey;
 pub use dice_graph::ExtensionIdByCanonicalRepoKey;
@@ -166,6 +167,7 @@ pub use dice_graph::record_bzlmod_event;
 pub use dice_graph::repo_env_policy_digest;
 pub use dice_graph::resolve_graph_with_module_file_inputs;
 pub use dice_graph::resolved_graph_projection_values;
+pub use dice_graph::resolved_module_sources_from_graph;
 pub use dice_graph::selected_bzlmod_cell_name_for_dep;
 pub use extension_execution_dice::BzlLoadLocation;
 pub use extension_execution_dice::ModuleExtensionError;
@@ -582,10 +584,15 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
                 ),
             )
         });
-        let resolved_graph_data = Arc::new(BzlmodResolvedGraphDataValue::for_workspace(
+        let module_sources = Arc::new(BzlmodModuleSourcesDataValue::for_workspace(
             cell_graph_workspace_id.clone(),
             cell_graph_resolution_digest,
-            resolved_graph,
+            Arc::new(
+                resolved_graph
+                    .as_deref()
+                    .map(resolved_module_sources_from_graph)
+                    .unwrap_or_default(),
+            ),
         ));
         let registered_toolchains = Arc::new(registered_toolchains);
         let registered_execution_platforms = Arc::new(registered_execution_platforms);
@@ -609,7 +616,7 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
         if let Some(cell_graph_data) = cell_graph_data {
             self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
         }
-        self.changed_to(vec![(BzlmodResolvedGraphDataKey, resolved_graph_data)])?;
+        self.changed_to(vec![(BzlmodModuleSourcesDataKey, module_sources)])?;
         Ok(())
     }
 }
@@ -2360,11 +2367,11 @@ mod tests {
             )),
         )])?;
         updater.changed_to(vec![(
-            BzlmodResolvedGraphDataKey,
-            Arc::new(BzlmodResolvedGraphDataValue::for_workspace(
+            BzlmodModuleSourcesDataKey,
+            Arc::new(BzlmodModuleSourcesDataValue::for_workspace(
                 workspace_id.clone(),
                 resolution_digest.clone(),
-                Some(resolved_graph),
+                Arc::new(resolved_module_sources_from_graph(&resolved_graph)),
             )),
         )])?;
         updater.changed_to(vec![(

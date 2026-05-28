@@ -414,15 +414,15 @@ Current state to preserve:
   fallback graph at all; the fallback graph is now explicitly optional and used
   only for no-executor bootstrap/test paths. Guardrail:
   `cargo test -p slug_bzlmod cell_graph_key_ --lib && cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib`.
-- 2026-05-28 resolved graph split from cell-graph data:
+- 2026-05-28 module-source projection split from cell-graph data:
   `BzlmodCellGraphDataValue` now carries only workspace/digest identity and
-  optional bootstrap fallback graph data. The resolved module graph itself is a
-  separate named `BzlmodResolvedGraphDataKey` input consumed by module-cell and
-  residual symlink projection keys. Guardrail:
+  optional bootstrap fallback graph data. Module-cell and residual symlink
+  projection keys consume the separate module-source projection instead of the
+  fallback cell-graph vector. Guardrail:
   `cargo test -p slug_bzlmod cell_graph_key_ --lib`.
 - 2026-05-28 production cell-graph computation bypasses fallback bridge:
   clean-digest `BzlmodCellGraphKey` computations derive module cells and
-  residual symlinks from `BzlmodResolvedGraphDataKey` without first reading
+  residual symlinks from module-source data without first reading
   `BzlmodCellGraphDataKey`; no-extension production graphs return an empty
   extension-cell vector without consulting fallback graph data. The
   `BzlmodCellGraphDataKey` injection is now emitted only when a fallback graph
@@ -524,18 +524,18 @@ Current state to preserve:
   behind lower-level bzlmod-owned APIs. Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common persisted_cell_graph --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo build -p slug && git diff --check`.
 - 2026-05-28 resolved graph consumer boundary reduction:
-  Cell-definition and residual-symlink producers now consume a normal
-  `BzlmodResolvedGraphKey` instead of directly reading the injected
-  `BzlmodResolvedGraphDataKey`. The new key still delegates to the injected
-  payload internally, but it is the single replacement point for making the
-  resolved graph compute from explicit DICE dependencies in `slug_bzlmod`.
+  Historical intermediate: cell-definition and residual-symlink producers were
+  first moved behind a normal `BzlmodResolvedGraphKey` instead of directly
+  reading the injected `BzlmodResolvedGraphDataKey`. This was superseded by the
+  module-source projection slice below, which deletes the full resolved-graph
+  injection.
   Guardrail:
   `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - 2026-05-28 current cell graph boundary reduction:
   Public current-workspace cell graph helpers now compute a normal
   `BzlmodCurrentCellGraphKey` to select the active workspace and resolution
   digest before computing `BzlmodCellGraphKey`. Direct reads of
-  `BzlmodResolvedGraphDataKey`/`BzlmodCellGraphDataKey` for this path are now
+  module-source data and `BzlmodCellGraphDataKey` for this path are now
   hidden behind that key, leaving the injected payloads as a smaller internal
   bridge surface. Guardrail:
   `cargo test -p slug_bzlmod current_workspace_helpers --lib && cargo test -p slug_bzlmod cell_graph --lib && cargo build -p slug && git diff --check`.
@@ -544,10 +544,20 @@ Current state to preserve:
   consume `BzlmodFallbackCellGraphKey` instead of directly validating
   `BzlmodCellGraphDataKey`. The fallback key still delegates to the injected
   payload internally, but non-fallback cell graph producers now depend on named
-  `BzlmodResolvedGraphKey`, `BzlmodCurrentCellGraphKey`, or
+  `BzlmodModuleSourcesKey`, `BzlmodCurrentCellGraphKey`, or
   `BzlmodFallbackCellGraphKey` rather than reading injected graph data
   ad hoc. Guardrail:
   `cargo test -p slug_bzlmod cell_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 resolved graph output injection removed:
+  `BzlmodResolvedGraphDataKey` and its full `ResolvedGraph` payload have been
+  deleted. Persisted config-load now injects the narrower
+  `BzlmodModuleSourcesDataKey` projection, and `BzlmodModuleSourcesKey` derives
+  module cells plus residual local-override symlinks from that projection. The
+  full clean resolved graph still exists as the output of
+  `BzlmodResolvedModuleGraphKey` in `slug_common`, so the next bridge is moving
+  source/input ownership for that producer rather than another full-graph
+  injection. Guardrail:
+  `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1211,16 +1221,17 @@ hardening behavior around it.
     root aliases, scoped aliases, and dynamic aliases are derived from
     `BzlmodRepoMappingsKey`; module symlinks are derived from module cell setup
     where possible. Module cells are derived by `BzlmodCellDefinitionsKey` from
-    the resolved module graph when production graph data is available; empty and
+    `BzlmodModuleSourcesKey` when clean resolution data is available; empty and
     bootstrap paths still fall back to the injected vector. Residual
-    out-of-project local-override symlinks are derived from that same graph when
-    available. Extension cells are derived from DICE extension spokes when the
+    out-of-project local-override symlinks are derived from that same
+    module-source projection when available. Extension cells are derived from
+    DICE extension spokes when the
     extension executor is installed; bootstrap no-executor paths still fall back
     to the injected vector. Persisted config-load injects an empty legacy cell
     graph identity when that executor is installed, and `BzlmodCellGraphDataValue`
-    carries no fallback graph in that production case. The resolved graph has
-    been split out to `BzlmodResolvedGraphDataKey`; the cell-graph data payload
-    no longer bundles it. Clean-digest production cell graph computation now
+    carries no fallback graph in that production case. The full resolved graph
+    is no longer injected into `slug_bzlmod`; the cell-graph data payload no
+    longer bundles it. Clean-digest production cell graph computation now
     bypasses `BzlmodCellGraphDataKey`; that key is only a bootstrap/fallback
     input when an injected fallback graph exists. The old `BzlmodProjectionData`
     wrapper has been deleted.
@@ -1236,12 +1247,13 @@ hardening behavior around it.
      instead of a legacy resolver bridge; lockfile inputs, repo-env,
      resolution facts, repo mappings, registered toolchains, registered
      execution platforms, extension aggregations, and module versions are
-     passed as separate named injections. The remaining transitional API is the
-     injected `BzlmodResolvedGraphDataKey`: production now injects clean
-     resolved graph addressed by the clean resolved-graph digest, and the
-     resolved-graph output value shape plus resolution option and command
-     policy identity are owned by `slug_bzlmod`, but that key does not compute
-     the graph from DICE dependencies yet.
+     passed as separate named injections. The full resolved graph injection has
+     been removed; production now injects the narrower
+     `BzlmodModuleSourcesDataKey` projection addressed by the clean
+     resolved-graph digest. The remaining transitional API is that production
+     still computes the full clean resolved graph in `slug_common` and then
+     injects its projections, rather than having `slug_bzlmod` compute the
+     graph directly from DICE source-input dependencies.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being
