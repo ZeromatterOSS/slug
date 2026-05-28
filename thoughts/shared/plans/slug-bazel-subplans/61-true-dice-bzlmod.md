@@ -523,6 +523,14 @@ Current state to preserve:
   and the large bootstrap cell-graph assembly helper until those can move
   behind lower-level bzlmod-owned APIs. Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common persisted_cell_graph --lib && cargo test -p slug_common persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 resolved graph consumer boundary reduction:
+  Cell-definition and residual-symlink producers now consume a normal
+  `BzlmodResolvedGraphKey` instead of directly reading the injected
+  `BzlmodResolvedGraphDataKey`. The new key still delegates to the injected
+  payload internally, but it is the single replacement point for making the
+  resolved graph compute from explicit DICE dependencies in `slug_bzlmod`.
+  Guardrail:
+  `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

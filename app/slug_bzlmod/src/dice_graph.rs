@@ -1487,6 +1487,52 @@ impl dice::InjectedKey for BzlmodResolvedGraphDataKey {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct BzlmodResolvedGraphValue {
+    #[allocative(skip)]
+    graph: Option<Arc<ResolvedGraph>>,
+}
+
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
+#[display(
+    "BzlmodResolvedGraphKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
+struct BzlmodResolvedGraphKey {
+    workspace_id: WorkspaceId,
+    resolution_digest: Arc<str>,
+}
+
+#[async_trait]
+impl Key for BzlmodResolvedGraphKey {
+    type Value = slug_error::Result<Arc<BzlmodResolvedGraphValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
+        validate_resolved_graph_payload(
+            "BzlmodResolvedGraphKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
+        Ok(Arc::new(BzlmodResolvedGraphValue {
+            graph: data.graph.clone(),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
 #[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodCellDefinitionsKey")]
 struct BzlmodCellDefinitionsKey {
@@ -1504,14 +1550,13 @@ impl Key for BzlmodCellDefinitionsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if should_use_resolved_graph_data(&self.resolution_digest) {
-            let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
-            validate_resolved_graph_payload(
-                "BzlmodCellDefinitionsKey",
-                &self.workspace_id,
-                &self.resolution_digest,
-                &resolved_graph_data,
-            )?;
-            let Some(resolved_graph) = resolved_graph_data.graph.as_ref() else {
+            let resolved_graph = ctx
+                .compute(&BzlmodResolvedGraphKey {
+                    workspace_id: self.workspace_id.clone(),
+                    resolution_digest: self.resolution_digest.clone(),
+                })
+                .await??;
+            let Some(resolved_graph) = resolved_graph.graph.as_ref() else {
                 return Err(slug_error::slug_error!(
                     slug_error::ErrorTag::Tier0,
                     "BzlmodCellDefinitionsKey expected a resolved graph for project root '{}'",
@@ -1730,14 +1775,13 @@ impl Key for BzlmodResidualModuleSymlinksKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if should_use_resolved_graph_data(&self.resolution_digest) {
-            let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
-            validate_resolved_graph_payload(
-                "BzlmodResidualModuleSymlinksKey",
-                &self.workspace_id,
-                &self.resolution_digest,
-                &resolved_graph_data,
-            )?;
-            let Some(resolved_graph) = resolved_graph_data.graph.as_ref() else {
+            let resolved_graph = ctx
+                .compute(&BzlmodResolvedGraphKey {
+                    workspace_id: self.workspace_id.clone(),
+                    resolution_digest: self.resolution_digest.clone(),
+                })
+                .await??;
+            let Some(resolved_graph) = resolved_graph.graph.as_ref() else {
                 return Err(slug_error::slug_error!(
                     slug_error::ErrorTag::Tier0,
                     "BzlmodResidualModuleSymlinksKey expected a resolved graph for project root '{}'",
