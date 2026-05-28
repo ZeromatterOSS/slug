@@ -2418,126 +2418,6 @@ struct OverridePatchInputsKey {
     patch_labels: Vec<String>,
 }
 
-fn local_overrides_from_root_module(
-    root_module_file: &slug_bzlmod::RootModuleFileValue,
-    ignore_dev_dependency: bool,
-) -> Vec<(String, String)> {
-    root_module_file
-        .parsed
-        .as_ref()
-        .map(|parsed| {
-            active_root_overrides(&parsed.module, ignore_dev_dependency)
-                .iter()
-                .filter_map(|override_| match override_ {
-                    slug_bzlmod::Override::LocalPath(local) => {
-                        Some((local.module_name.clone(), local.path.clone()))
-                    }
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default()
-}
-
-fn active_root_overrides(
-    module: &slug_bzlmod::Module,
-    ignore_dev_dependency: bool,
-) -> Vec<slug_bzlmod::Override> {
-    if !ignore_dev_dependency {
-        return module.overrides.clone();
-    }
-
-    let ignored_root_dev_deps: HashSet<_> = module
-        .bazel_deps
-        .iter()
-        .filter(|dep| dep.dev_dependency)
-        .map(|dep| dep.name.clone())
-        .collect();
-    module
-        .overrides
-        .iter()
-        .filter(|override_| match override_ {
-            slug_bzlmod::Override::LocalPath(local) => {
-                !ignored_root_dev_deps.contains(&local.module_name)
-            }
-            slug_bzlmod::Override::Git(git) => !ignored_root_dev_deps.contains(&git.module_name),
-            slug_bzlmod::Override::Archive(archive) => {
-                !ignored_root_dev_deps.contains(&archive.module_name)
-            }
-            _ => true,
-        })
-        .cloned()
-        .collect()
-}
-
-fn override_patch_labels_from_root_module(
-    root_module_file: &slug_bzlmod::RootModuleFileValue,
-    ignore_dev_dependency: bool,
-) -> (Option<String>, Vec<String>) {
-    let Some(parsed) = &root_module_file.parsed else {
-        return (None, Vec::new());
-    };
-    override_patch_labels_from_module(&parsed.module, ignore_dev_dependency)
-}
-
-fn override_patch_labels_from_module(
-    module: &slug_bzlmod::Module,
-    ignore_dev_dependency: bool,
-) -> (Option<String>, Vec<String>) {
-    let main_repo_name = module
-        .repo_name
-        .clone()
-        .or_else(|| Some(module.name.clone()));
-    let mut labels = BTreeSet::new();
-    for override_ in active_root_overrides(module, ignore_dev_dependency) {
-        match override_ {
-            slug_bzlmod::Override::SingleVersion(single) => {
-                labels.extend(single.patches);
-            }
-            slug_bzlmod::Override::Git(git) => {
-                labels.extend(git.patches);
-            }
-            slug_bzlmod::Override::Archive(archive) => {
-                labels.extend(archive.patches);
-            }
-            _ => {}
-        }
-    }
-    (main_repo_name, labels.into_iter().collect())
-}
-
-fn non_registry_override_module_dirs_from_root_module(
-    root_module_file: &slug_bzlmod::RootModuleFileValue,
-    ignore_dev_dependency: bool,
-) -> slug_error::Result<Vec<(String, PathBuf)>> {
-    let Some(parsed) = &root_module_file.parsed else {
-        return Ok(Vec::new());
-    };
-    let active_overrides = active_root_overrides(&parsed.module, ignore_dev_dependency);
-    if !active_overrides.iter().any(|override_| {
-        matches!(
-            override_,
-            slug_bzlmod::Override::Git(_) | slug_bzlmod::Override::Archive(_)
-        )
-    }) {
-        return Ok(Vec::new());
-    }
-    let cache = ModuleCache::new()?;
-    Ok(active_overrides
-        .iter()
-        .filter_map(|override_| match override_ {
-            slug_bzlmod::Override::Git(git) => {
-                Some((git.module_name.clone(), cache.git_override_dir(git)))
-            }
-            slug_bzlmod::Override::Archive(archive) => Some((
-                archive.module_name.clone(),
-                cache.archive_override_dir(archive),
-            )),
-            _ => None,
-        })
-        .collect::<Vec<_>>())
-}
-
 fn non_registry_override_kind(module_dir: &Path) -> &'static str {
     match module_dir.file_name().and_then(|name| name.to_str()) {
         Some(name) if name.starts_with("git-") => "git override",
@@ -4053,7 +3933,7 @@ impl BuckConfigBasedCells {
             })
             .await?
             .buck_error_context("Computing bzlmod lockfile inputs for clean graph")?;
-        let local_overrides = local_overrides_from_root_module(
+        let local_overrides = slug_bzlmod::local_overrides_from_root_module(
             root_module_file.as_ref(),
             options.ignore_dev_dependency,
         );
@@ -4064,10 +3944,11 @@ impl BuckConfigBasedCells {
             })
             .await?
             .buck_error_context("Computing local override MODULE.bazel inputs for clean graph")?;
-        let non_registry_overrides = non_registry_override_module_dirs_from_root_module(
-            root_module_file.as_ref(),
-            options.ignore_dev_dependency,
-        )?;
+        let non_registry_overrides =
+            slug_bzlmod::non_registry_override_module_dirs_from_root_module(
+                root_module_file.as_ref(),
+                options.ignore_dev_dependency,
+            )?;
         let non_registry_override_inputs = dice_ctx
             .compute(&NonRegistryOverrideModuleInputsKey {
                 project_root: project_root.clone(),
@@ -4098,10 +3979,11 @@ impl BuckConfigBasedCells {
             })
             .await?
             .buck_error_context("Computing registry file inputs for clean bzlmod graph")?;
-        let (main_repo_name, override_patch_labels) = override_patch_labels_from_root_module(
-            root_module_file.as_ref(),
-            options.ignore_dev_dependency,
-        );
+        let (main_repo_name, override_patch_labels) =
+            slug_bzlmod::override_patch_labels_from_root_module(
+                root_module_file.as_ref(),
+                options.ignore_dev_dependency,
+            );
         let override_patch_inputs = dice_ctx
             .compute(&OverridePatchInputsKey {
                 project_root: project_root.clone(),
@@ -4950,16 +4832,16 @@ impl BuckConfigBasedCells {
                 .iter()
                 .filter(|dep| !(key.options.ignore_dev_dependency && dep.dev_dependency))
                 .collect();
-            let local_override_paths: HashMap<_, _> =
-                active_root_overrides(&parsed.module, key.options.ignore_dev_dependency)
-                    .into_iter()
-                    .filter_map(|override_| match override_ {
-                        slug_bzlmod::Override::LocalPath(local) => {
-                            Some((local.module_name, local.path))
-                        }
-                        _ => None,
-                    })
-                    .collect();
+            let local_override_paths: HashMap<_, _> = slug_bzlmod::active_root_overrides(
+                &parsed.module,
+                key.options.ignore_dev_dependency,
+            )
+            .into_iter()
+            .filter_map(|override_| match override_ {
+                slug_bzlmod::Override::LocalPath(local) => Some((local.module_name, local.path)),
+                _ => None,
+            })
+            .collect();
             let local_override_modules: HashMap<_, _> = key
                 .local_override_inputs
                 .parsed_modules

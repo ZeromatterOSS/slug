@@ -464,6 +464,13 @@ Current state to preserve:
   tracking keys still live in `slug_common`, but the semantic inputs carried by
   `BzlmodResolvedModuleGraphKey` are now owned by the bzlmod crate. Guardrail:
   `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_common local_override_module_inputs_key_tracks_project_includes --lib && cargo build -p slug`.
+- 2026-05-28 root override selector boundary reduction:
+  root-module selectors for active overrides, local override input requests,
+  non-registry override module directories, and override patch labels now live
+  in `slug_bzlmod`. `slug_common` still requests the filesystem-tracked inputs,
+  but no longer owns the bzlmod AST policy for which root directives are active
+  under `ignore_dev_dependency`. Guardrail:
+  `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

@@ -18,6 +18,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::Path;
 use std::path::PathBuf;
@@ -35,6 +36,7 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 
+use crate::cache::ModuleCache;
 use crate::extensions::AggregatedExtension;
 use crate::lockfile::Lockfile;
 use crate::lockfile::LockfileMode;
@@ -43,6 +45,8 @@ use crate::repo_spec::RepoSpec;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
 use crate::resolution::ResolvedGraph;
+use crate::types::Module;
+use crate::types::Override;
 use crate::types::ParsedModuleFile;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -387,6 +391,115 @@ pub struct NonRootModuleFilesValue {
     pub digest: String,
     pub parsed_modules: Vec<(String, ParsedModuleFile)>,
     pub has_untracked_inputs: bool,
+}
+
+pub fn local_overrides_from_root_module(
+    root_module_file: &RootModuleFileValue,
+    ignore_dev_dependency: bool,
+) -> Vec<(String, String)> {
+    root_module_file
+        .parsed
+        .as_ref()
+        .map(|parsed| {
+            active_root_overrides(&parsed.module, ignore_dev_dependency)
+                .iter()
+                .filter_map(|override_| match override_ {
+                    Override::LocalPath(local) => {
+                        Some((local.module_name.clone(), local.path.clone()))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+pub fn active_root_overrides(module: &Module, ignore_dev_dependency: bool) -> Vec<Override> {
+    if !ignore_dev_dependency {
+        return module.overrides.clone();
+    }
+
+    let ignored_root_dev_deps: HashSet<_> = module
+        .bazel_deps
+        .iter()
+        .filter(|dep| dep.dev_dependency)
+        .map(|dep| dep.name.clone())
+        .collect();
+    module
+        .overrides
+        .iter()
+        .filter(|override_| match override_ {
+            Override::LocalPath(local) => !ignored_root_dev_deps.contains(&local.module_name),
+            Override::Git(git) => !ignored_root_dev_deps.contains(&git.module_name),
+            Override::Archive(archive) => !ignored_root_dev_deps.contains(&archive.module_name),
+            _ => true,
+        })
+        .cloned()
+        .collect()
+}
+
+pub fn override_patch_labels_from_root_module(
+    root_module_file: &RootModuleFileValue,
+    ignore_dev_dependency: bool,
+) -> (Option<String>, Vec<String>) {
+    let Some(parsed) = &root_module_file.parsed else {
+        return (None, Vec::new());
+    };
+    override_patch_labels_from_module(&parsed.module, ignore_dev_dependency)
+}
+
+pub fn override_patch_labels_from_module(
+    module: &Module,
+    ignore_dev_dependency: bool,
+) -> (Option<String>, Vec<String>) {
+    let main_repo_name = module
+        .repo_name
+        .clone()
+        .or_else(|| Some(module.name.clone()));
+    let mut labels = BTreeSet::new();
+    for override_ in active_root_overrides(module, ignore_dev_dependency) {
+        match override_ {
+            Override::SingleVersion(single) => {
+                labels.extend(single.patches);
+            }
+            Override::Git(git) => {
+                labels.extend(git.patches);
+            }
+            Override::Archive(archive) => {
+                labels.extend(archive.patches);
+            }
+            _ => {}
+        }
+    }
+    (main_repo_name, labels.into_iter().collect())
+}
+
+pub fn non_registry_override_module_dirs_from_root_module(
+    root_module_file: &RootModuleFileValue,
+    ignore_dev_dependency: bool,
+) -> slug_error::Result<Vec<(String, PathBuf)>> {
+    let Some(parsed) = &root_module_file.parsed else {
+        return Ok(Vec::new());
+    };
+    let active_overrides = active_root_overrides(&parsed.module, ignore_dev_dependency);
+    if !active_overrides
+        .iter()
+        .any(|override_| matches!(override_, Override::Git(_) | Override::Archive(_)))
+    {
+        return Ok(Vec::new());
+    }
+    let cache = ModuleCache::new()?;
+    Ok(active_overrides
+        .iter()
+        .filter_map(|override_| match override_ {
+            Override::Git(git) => Some((git.module_name.clone(), cache.git_override_dir(git))),
+            Override::Archive(archive) => Some((
+                archive.module_name.clone(),
+                cache.archive_override_dir(archive),
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>())
 }
 
 pub fn module_file_inputs_digest(inputs: &[ModuleFileInputDigest]) -> String {
