@@ -1679,12 +1679,8 @@ impl Key for FallbackScannedExtensionBzlDigestKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // The scanned .bzl digest itself is DICE-tracked, but lockfile preseed
-        // also validates recorded extension inputs while constructing the cell
-        // graph. Keep this key non-persistent until those replay checks are
-        // modeled as separate DICE dependencies.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -1920,6 +1916,71 @@ async fn fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
         digests.insert(extension_id.clone(), digest.to_string());
     }
     Ok(digests)
+}
+
+fn current_extension_for_lockfile_preseed<'a>(
+    aggregated: &'a HashMap<String, slug_bzlmod::AggregatedExtension>,
+    lockfile_ext_id: &'a str,
+) -> Option<(&'a str, &'a slug_bzlmod::AggregatedExtension)> {
+    if let Some(extension) = aggregated.get(lockfile_ext_id) {
+        return Some((lockfile_ext_id, extension));
+    }
+
+    let lockfile_canonical = slug_bzlmod::lockfile_canonical_extension_id(lockfile_ext_id);
+    aggregated
+        .iter()
+        .find(|(current_id, _)| {
+            slug_bzlmod::lockfile_canonical_extension_id(current_id) == lockfile_canonical
+        })
+        .map(|(current_id, extension)| (current_id.as_str(), extension))
+}
+
+async fn prevalidated_extension_caches_for_lockfile_preseed(
+    ctx: &mut DiceComputations<'_>,
+    lockfile: &slug_bzlmod::Lockfile,
+    aggregated: &HashMap<String, slug_bzlmod::AggregatedExtension>,
+    root_module_name: &str,
+    workspace_root: &Path,
+    repo_env: &BTreeMap<String, String>,
+    bzl_transitive_digests: &HashMap<String, String>,
+    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
+    repo_mapping_overrides: &slug_bzlmod::RepoMappingOverrides,
+) -> slug_error::Result<fxhash::FxHashMap<String, fxhash::FxHashMap<String, slug_bzlmod::RepoSpec>>>
+{
+    let mut caches = fxhash::FxHashMap::default();
+    for ext_id in lockfile.extension_ids() {
+        if ext_id.starts_with(':') || ext_id.starts_with("//") {
+            continue;
+        }
+        let Some((current_ext_id, current_extension)) =
+            current_extension_for_lockfile_preseed(aggregated, ext_id)
+        else {
+            continue;
+        };
+        let Some(bzl_transitive_digest) = bzl_transitive_digests.get(current_ext_id) else {
+            continue;
+        };
+        let usages_digest = slug_bzlmod::compute_extension_input_hash(current_extension);
+        let Some(selected) = lockfile.select_extension_cache_for_workspace(
+            current_ext_id,
+            bzl_transitive_digest,
+            &usages_digest,
+            Some(workspace_root),
+            Some(repo_env),
+            Some(repo_mappings),
+            Some(root_module_name),
+            Some(repo_mapping_overrides),
+        ) else {
+            continue;
+        };
+        if slug_bzlmod::selected_cache_recorded_inputs_current(ctx, current_ext_id, &selected)
+            .await?
+        {
+            selected.record_hit(current_ext_id);
+            caches.insert(current_ext_id.to_owned(), selected.repo_specs().clone());
+        }
+    }
+    Ok(caches)
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -4279,17 +4340,31 @@ impl BuckConfigBasedCells {
                     &repo_mappings,
                 )
                 .await?;
-            let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
+            let prevalidated_caches = prevalidated_extension_caches_for_lockfile_preseed(
+                dice_ctx,
                 lockfile,
                 &aggregated,
                 root_module_name,
-                &mut pre_computed_cells,
                 workspace_root,
-                Some(repo_env.as_ref()),
+                repo_env.as_ref(),
                 &fallback_scanned_bzl_transitive_digests,
-                Some(&repo_mappings),
-                Some(&repo_mapping_overrides),
-            );
+                &repo_mappings,
+                &repo_mapping_overrides,
+            )
+            .await?;
+            let extra =
+                slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
+                    lockfile,
+                    &aggregated,
+                    root_module_name,
+                    &mut pre_computed_cells,
+                    workspace_root,
+                    Some(repo_env.as_ref()),
+                    &fallback_scanned_bzl_transitive_digests,
+                    Some(&repo_mappings),
+                    Some(&repo_mapping_overrides),
+                    Some(&prevalidated_caches),
+                );
             lockfile_seeded_cells.extend(extra.iter().map(BzlmodPendingRepoCell::from_pending));
             extension_mapping_cells.extend(extra);
             add_extension_repo_mapping_rows_from_cells(
@@ -4308,17 +4383,31 @@ impl BuckConfigBasedCells {
                     &repo_mappings,
                 )
                 .await?;
-            let extra = slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
+            let prevalidated_caches = prevalidated_extension_caches_for_lockfile_preseed(
+                dice_ctx,
                 lockfile,
                 &aggregated,
                 root_module_name,
-                &mut pre_computed_cells,
                 workspace_root,
-                Some(repo_env.as_ref()),
+                repo_env.as_ref(),
                 &fallback_scanned_bzl_transitive_digests,
-                Some(&repo_mappings),
-                Some(&repo_mapping_overrides),
-            );
+                &repo_mappings,
+                &repo_mapping_overrides,
+            )
+            .await?;
+            let extra =
+                slug_bzlmod::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
+                    lockfile,
+                    &aggregated,
+                    root_module_name,
+                    &mut pre_computed_cells,
+                    workspace_root,
+                    Some(repo_env.as_ref()),
+                    &fallback_scanned_bzl_transitive_digests,
+                    Some(&repo_mappings),
+                    Some(&repo_mapping_overrides),
+                    Some(&prevalidated_caches),
+                );
             lockfile_seeded_cells.extend(extra.iter().map(BzlmodPendingRepoCell::from_pending));
             extension_mapping_cells.extend(extra);
             add_extension_repo_mapping_rows_from_cells(
@@ -6674,7 +6763,7 @@ ext = module_extension(implementation = _impl)
             .await??;
 
         assert_eq!(fallback_scanned.as_ref(), direct);
-        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+        assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned)
         ));
         Ok(())
@@ -6718,7 +6807,7 @@ ext = module_extension(implementation = _impl)
             fallback_scanned_missing.as_ref(),
             slug_bzlmod::compute_bzl_transitive_digest(extension_id)
         );
-        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+        assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_missing.clone())
         ));
 
@@ -6746,7 +6835,7 @@ ext = module_extension(implementation = _impl)
 
         assert_ne!(fallback_scanned_missing, fallback_scanned_created);
         assert_eq!(fallback_scanned_created.as_ref(), direct_created);
-        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+        assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_created)
         ));
         Ok(())

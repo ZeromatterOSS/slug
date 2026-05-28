@@ -544,6 +544,32 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     repo_mappings: Option<&crate::RepoMappingSnapshot>,
     repo_mapping_overrides: Option<&crate::RepoMappingOverrides>,
 ) -> Vec<PendingRepoCell> {
+    pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
+        lockfile,
+        current_extensions,
+        root_module_name,
+        existing,
+        project_root,
+        repo_env,
+        bzl_transitive_digests,
+        repo_mappings,
+        repo_mapping_overrides,
+        None,
+    )
+}
+
+pub fn pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
+    lockfile: &crate::lockfile::Lockfile,
+    current_extensions: &std::collections::HashMap<String, AggregatedExtension>,
+    root_module_name: &str,
+    existing: &mut [PendingRepoCell],
+    project_root: &std::path::Path,
+    repo_env: Option<&std::collections::BTreeMap<String, String>>,
+    bzl_transitive_digests: &std::collections::HashMap<String, String>,
+    repo_mappings: Option<&crate::RepoMappingSnapshot>,
+    repo_mapping_overrides: Option<&crate::RepoMappingOverrides>,
+    prevalidated_caches: Option<&fxhash::FxHashMap<String, fxhash::FxHashMap<String, RepoSpec>>>,
+) -> Vec<PendingRepoCell> {
     let existing_by_canonical: std::collections::HashMap<String, usize> = existing
         .iter()
         .enumerate()
@@ -577,20 +603,25 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             continue;
         };
         let usages_digest = compute_extension_input_hash(current_extension);
-        // Spoke pre-seeding runs while constructing bootstrap cell data, before
-        // this helper has a `DiceComputations` handle. Keep it on the sync
-        // recorded-input API; normal DICE extension replay validates through
-        // `ModuleExtensionRecordedInputsKey`.
-        let Some(cached_specs) = lockfile.get_extension_cache_for_workspace(
-            current_ext_id,
-            bzl_transitive_digest,
-            &usages_digest,
-            Some(project_root),
-            repo_env,
-            repo_mappings,
-            Some(root_module_name),
-            repo_mapping_overrides,
-        ) else {
+        let cached_specs = if let Some(caches) = prevalidated_caches {
+            caches.get(current_ext_id).cloned()
+        } else {
+            // Legacy/bootstrap callers do not have a DiceComputations handle.
+            // Keep them on the sync recorded-input API; persisted config-load
+            // callers pass prevalidated caches computed through
+            // ModuleExtensionRecordedInputsKey.
+            lockfile.get_extension_cache_for_workspace(
+                current_ext_id,
+                bzl_transitive_digest,
+                &usages_digest,
+                Some(project_root),
+                repo_env,
+                repo_mappings,
+                Some(root_module_name),
+                repo_mapping_overrides,
+            )
+        };
+        let Some(cached_specs) = cached_specs else {
             tracing::debug!(
                 "Skipping lockfile spoke pre-seed for '{}': cached extension data is stale",
                 ext_id

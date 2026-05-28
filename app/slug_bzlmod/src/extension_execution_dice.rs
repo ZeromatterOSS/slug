@@ -804,7 +804,7 @@ impl ModuleExtensionResult {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("ModuleExtensionRecordedInputsKey({})", recorded_inputs.len())]
-pub(crate) struct ModuleExtensionRecordedInputsKey {
+pub struct ModuleExtensionRecordedInputsKey {
     recorded_inputs: Arc<Vec<String>>,
     workspace_root: Option<Arc<PathBuf>>,
     repo_env: Option<Arc<BTreeMap<String, String>>>,
@@ -819,6 +819,10 @@ impl ModuleExtensionRecordedInputsKey {
             repo_env: selected.repo_env.clone().map(Arc::new),
             repo_mappings: selected.repo_mappings.clone().map(Arc::new),
         }
+    }
+
+    pub fn for_selected_lockfile_cache(selected: &SelectedExtensionCache) -> Self {
+        Self::from_selected_cache(selected)
     }
 }
 
@@ -1358,7 +1362,7 @@ fn verify_observed_lockfile_digest(
     Ok(())
 }
 
-async fn selected_cache_recorded_inputs_current(
+pub async fn selected_cache_recorded_inputs_current(
     ctx: &mut DiceComputations<'_>,
     extension_id: &str,
     selected: &SelectedExtensionCache,

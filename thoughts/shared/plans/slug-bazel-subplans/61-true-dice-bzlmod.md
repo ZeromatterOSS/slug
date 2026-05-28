@@ -262,10 +262,6 @@ Current state to preserve:
   registers those project paths for watcher invalidation. Present-file digests
   still match the old lockfile digest shape; missing literal loads use a
   deterministic sentinel so create/delete transitions can be tracked by DICE.
-  The key remains non-persistent because lockfile preseed still performs
-  recorded-input/repo-mapping replay validation while constructing the cell
-  graph; making only the digest key persistent skipped the second recorded-file
-  validation in `test_lockfile_replay_recorded_file_input_edit_rejects_cache`.
   Validated with `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
   `cargo build -p slug`, and the focused Python replay set:
   `test_lockfile_replay_recorded_file_input_edit_rejects_cache`,
@@ -275,6 +271,24 @@ Current state to preserve:
   `cargo test -p slug_common bzlmod --lib` still fails the unrelated
   `bzlmod_cell_resolver_uses_canonical_module_cells_from_cell_graph` assertion
   that `CellResolver::get("dep")` should error.
+- 2026-05-28 preseed replay validation reduction: persisted config-load
+  preseed now selects lockfile extension caches with
+  `select_extension_cache_for_workspace(...)`, validates recorded inputs
+  through `selected_cache_recorded_inputs_current(...)` /
+  `ModuleExtensionRecordedInputsKey`, records replay hits only after that DICE
+  child key succeeds, and passes prevalidated repo specs to
+  `pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(...)`.
+  Bootstrap callers without a `DiceComputations` handle stay on the legacy
+  synchronous validation path. This makes `FallbackScannedExtensionBzlDigestKey`
+  transaction-valid (`validity = x.is_ok()`) while preserving recorded-input
+  and repo-mapping lockfile replay invalidation. Validated with
+  `cargo test -p slug_bzlmod lockfile_preseed --lib`,
+  `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
+  `cargo build -p slug`, `git diff --check`, and the focused Python replay set:
+  `test_lockfile_replay_recorded_file_input_edit_rejects_cache`,
+  `test_lockfile_replay_recorded_repo_mapping_change_rejects_cache`,
+  `test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source`, and
+  `test_default_lockfile_mode_rejects_invalid_extension_digest`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

@@ -348,7 +348,7 @@ pub fn validate_recorded_inputs_current(
 /// Recorded-input validation is intentionally left to the caller so DICE replay
 /// paths can route it through a named child key.
 #[derive(Debug, Clone)]
-pub(crate) struct SelectedExtensionCache {
+pub struct SelectedExtensionCache {
     pub(crate) selected_key: String,
     pub(crate) repo_specs: fxhash::FxHashMap<String, RepoSpec>,
     pub(crate) recorded_inputs: Vec<String>,
@@ -367,7 +367,7 @@ impl SelectedExtensionCache {
         )
     }
 
-    pub(crate) fn record_hit(&self, extension_id: &str) {
+    pub fn record_hit(&self, extension_id: &str) {
         record_bzlmod_event(
             BzlmodEventKind::ExtensionReplayHit,
             format!(
@@ -376,6 +376,10 @@ impl SelectedExtensionCache {
                 self.repo_specs.len()
             ),
         );
+    }
+
+    pub fn repo_specs(&self) -> &fxhash::FxHashMap<String, RepoSpec> {
+        &self.repo_specs
     }
 }
 
@@ -1067,7 +1071,7 @@ impl Lockfile {
         Some(selected.repo_specs)
     }
 
-    pub(crate) fn select_extension_cache_for_workspace(
+    pub fn select_extension_cache_for_workspace(
         &self,
         extension_id: &str,
         bzl_transitive_digest: &str,
