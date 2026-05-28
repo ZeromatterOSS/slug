@@ -99,6 +99,7 @@ pub use dice_graph::BzlmodResolutionFactsDataKey;
 pub use dice_graph::BzlmodResolutionFactsKey;
 pub use dice_graph::BzlmodResolutionFactsValue;
 pub use dice_graph::BzlmodResolutionKey;
+pub use dice_graph::BzlmodResolutionOptions;
 use dice_graph::BzlmodResolvedGraphDataKey;
 use dice_graph::BzlmodResolvedGraphDataValue;
 pub use dice_graph::BzlmodResolvedGraphOutputsValue;

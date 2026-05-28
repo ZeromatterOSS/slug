@@ -36,6 +36,7 @@ use serde::Deserialize;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod::BzlmodEventKind;
+use slug_bzlmod::BzlmodResolutionOptions;
 use slug_bzlmod::ModuleCache;
 use slug_bzlmod::ModuleSource;
 use slug_bzlmod::MvsResolver;
@@ -855,17 +856,6 @@ fn replay_bzlmod_runtime_state(
     slug_core::cells::repair_external_symlink_targets(project_root.root().as_path());
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
-struct BzlmodResolutionOptions {
-    lockfile_mode: slug_bzlmod::LockfileMode,
-    ignore_dev_dependency: bool,
-    allow_yanked_versions_env: Option<String>,
-    allow_yanked_versions_flags: Vec<String>,
-    hidden_lockfile_path: Option<PathBuf>,
-    repo_env: BTreeMap<String, String>,
-    repo_env_digest: String,
-}
-
 const BZLMOD_BAZEL_RELEASE_ID: &str = "bazel-9.0.1";
 const BZLMOD_STARLARK_SEMANTICS_DIGEST: &str = "slug-bazel9-starlark-semantics-v1";
 const BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST: &str = "default-registry-config";
@@ -933,97 +923,95 @@ fn record_lockfile_read_if_changed(path: &Path, digest: &str) {
     record_bzlmod_event(BzlmodEventKind::LockfileRead, path.display().to_string());
 }
 
-impl BzlmodResolutionOptions {
-    fn from_config(root_config: &LegacyBuckConfig) -> slug_error::Result<Self> {
-        let bzlmod_section = root_config.get_section("bzlmod");
-        let repo_env = bzlmod_section
-            .and_then(|section| section.get("repo_env_json"))
-            .map(|value| serde_json::from_str::<BTreeMap<String, String>>(value.as_str()))
-            .transpose()
-            .map_err(|e| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Input,
-                    "Invalid bzlmod.repo_env_json value: {}",
-                    e
-                )
-            })?
-            .unwrap_or_default();
-        let repo_env_digest = slug_bzlmod::repo_env_policy_digest(&repo_env);
-        Ok(Self {
-            lockfile_mode: BuckConfigBasedCells::bzlmod_lockfile_mode_from_config(root_config)?,
-            ignore_dev_dependency: bzlmod_section
-                .and_then(|section| section.get("ignore_dev_dependency"))
-                .map(|value| parse_bzlmod_bool("ignore_dev_dependency", value.as_str()))
-                .transpose()?
-                .unwrap_or(false),
-            allow_yanked_versions_env: bzlmod_section
-                .and_then(|section| section.get("allow_yanked_versions_env"))
-                .map(|value| value.as_str().to_owned()),
-            allow_yanked_versions_flags: bzlmod_section
-                .and_then(|section| section.get("allow_yanked_versions"))
-                .map(|value| vec![value.as_str().to_owned()])
-                .unwrap_or_default(),
-            hidden_lockfile_path: bzlmod_section
-                .and_then(|section| section.get("hidden_lockfile_path"))
-                .map(|value| PathBuf::from(value.as_str())),
-            repo_env,
-            repo_env_digest,
-        })
-    }
+fn bzlmod_resolution_options_from_config(
+    root_config: &LegacyBuckConfig,
+) -> slug_error::Result<BzlmodResolutionOptions> {
+    let bzlmod_section = root_config.get_section("bzlmod");
+    let repo_env = bzlmod_section
+        .and_then(|section| section.get("repo_env_json"))
+        .map(|value| serde_json::from_str::<BTreeMap<String, String>>(value.as_str()))
+        .transpose()
+        .map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Invalid bzlmod.repo_env_json value: {}",
+                e
+            )
+        })?
+        .unwrap_or_default();
+    let repo_env_digest = slug_bzlmod::repo_env_policy_digest(&repo_env);
+    Ok(BzlmodResolutionOptions {
+        lockfile_mode: BuckConfigBasedCells::bzlmod_lockfile_mode_from_config(root_config)?,
+        ignore_dev_dependency: bzlmod_section
+            .and_then(|section| section.get("ignore_dev_dependency"))
+            .map(|value| parse_bzlmod_bool("ignore_dev_dependency", value.as_str()))
+            .transpose()?
+            .unwrap_or(false),
+        allow_yanked_versions_env: bzlmod_section
+            .and_then(|section| section.get("allow_yanked_versions_env"))
+            .map(|value| value.as_str().to_owned()),
+        allow_yanked_versions_flags: bzlmod_section
+            .and_then(|section| section.get("allow_yanked_versions"))
+            .map(|value| vec![value.as_str().to_owned()])
+            .unwrap_or_default(),
+        hidden_lockfile_path: bzlmod_section
+            .and_then(|section| section.get("hidden_lockfile_path"))
+            .map(|value| PathBuf::from(value.as_str())),
+        repo_env,
+        repo_env_digest,
+    })
+}
 
-    fn policy_digest(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(format!("{:?}", self.lockfile_mode).as_bytes());
-        hasher.update([0]);
-        hasher.update([u8::from(self.ignore_dev_dependency)]);
-        hasher.update([0]);
-        if let Some(value) = &self.allow_yanked_versions_env {
-            hasher.update(value.as_bytes());
-        }
-        hasher.update([0]);
-        for value in &self.allow_yanked_versions_flags {
-            hasher.update(value.as_bytes());
-            hasher.update([0]);
-        }
-        hasher.update(self.repo_env_digest.as_bytes());
-        hasher.update([0]);
-        if let Some(value) = &self.hidden_lockfile_path {
-            hasher.update(value.to_string_lossy().as_bytes());
-        }
-        hasher.update([0]);
-        hex::encode(hasher.finalize())
+fn bzlmod_resolution_options_policy_digest(options: &BzlmodResolutionOptions) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{:?}", options.lockfile_mode).as_bytes());
+    hasher.update([0]);
+    hasher.update([u8::from(options.ignore_dev_dependency)]);
+    hasher.update([0]);
+    if let Some(value) = &options.allow_yanked_versions_env {
+        hasher.update(value.as_bytes());
     }
+    hasher.update([0]);
+    for value in &options.allow_yanked_versions_flags {
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+    hasher.update(options.repo_env_digest.as_bytes());
+    hasher.update([0]);
+    if let Some(value) = &options.hidden_lockfile_path {
+        hasher.update(value.to_string_lossy().as_bytes());
+    }
+    hasher.update([0]);
+    hex::encode(hasher.finalize())
+}
 
-    fn command_policy_key(
-        &self,
-        workspace_id: slug_bzlmod::WorkspaceId,
-    ) -> slug_bzlmod::BzlmodCommandPolicyKey {
-        slug_bzlmod::BzlmodCommandPolicyKey {
-            workspace_id,
-            bazel_release_id: Arc::from(BZLMOD_BAZEL_RELEASE_ID),
-            starlark_semantics_digest: Arc::from(BZLMOD_STARLARK_SEMANTICS_DIGEST),
-            bzlmod_flags_digest: Arc::from(self.policy_digest().as_str()),
-            lockfile_mode: Arc::from(format!("{:?}", self.lockfile_mode).as_str()),
-            registry_config_digest: Arc::from(BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST),
-            repository_cache_config_digest: Arc::from(
-                BZLMOD_DEFAULT_REPOSITORY_CACHE_CONFIG_DIGEST,
-            ),
-            network_policy_digest: Arc::from(BZLMOD_DEFAULT_NETWORK_POLICY_DIGEST),
-            repo_env_digest: Arc::from(self.repo_env_digest.as_str()),
-            nonstrict_repo_env_digest: Arc::from(BZLMOD_DEFAULT_NONSTRICT_REPO_ENV_DIGEST),
-            ignore_dev_dependency: self.ignore_dev_dependency,
-            allow_yanked_versions_digest: Arc::from(
-                allow_yanked_versions_digest(
-                    self.allow_yanked_versions_env.as_deref(),
-                    &self.allow_yanked_versions_flags,
-                )
-                .as_str(),
-            ),
-            bazel_compatibility_policy_digest: Arc::from(
-                BZLMOD_DEFAULT_BAZEL_COMPATIBILITY_POLICY_DIGEST,
-            ),
-            isolated_extension_usages: false,
-        }
+fn bzlmod_resolution_options_command_policy_key(
+    options: &BzlmodResolutionOptions,
+    workspace_id: slug_bzlmod::WorkspaceId,
+) -> slug_bzlmod::BzlmodCommandPolicyKey {
+    slug_bzlmod::BzlmodCommandPolicyKey {
+        workspace_id,
+        bazel_release_id: Arc::from(BZLMOD_BAZEL_RELEASE_ID),
+        starlark_semantics_digest: Arc::from(BZLMOD_STARLARK_SEMANTICS_DIGEST),
+        bzlmod_flags_digest: Arc::from(bzlmod_resolution_options_policy_digest(options).as_str()),
+        lockfile_mode: Arc::from(format!("{:?}", options.lockfile_mode).as_str()),
+        registry_config_digest: Arc::from(BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST),
+        repository_cache_config_digest: Arc::from(BZLMOD_DEFAULT_REPOSITORY_CACHE_CONFIG_DIGEST),
+        network_policy_digest: Arc::from(BZLMOD_DEFAULT_NETWORK_POLICY_DIGEST),
+        repo_env_digest: Arc::from(options.repo_env_digest.as_str()),
+        nonstrict_repo_env_digest: Arc::from(BZLMOD_DEFAULT_NONSTRICT_REPO_ENV_DIGEST),
+        ignore_dev_dependency: options.ignore_dev_dependency,
+        allow_yanked_versions_digest: Arc::from(
+            allow_yanked_versions_digest(
+                options.allow_yanked_versions_env.as_deref(),
+                &options.allow_yanked_versions_flags,
+            )
+            .as_str(),
+        ),
+        bazel_compatibility_policy_digest: Arc::from(
+            BZLMOD_DEFAULT_BAZEL_COMPATIBILITY_POLICY_DIGEST,
+        ),
+        isolated_extension_usages: false,
     }
 }
 
@@ -1621,26 +1609,14 @@ fn bzlmod_resolution_options_policy_eq(
     left: &BzlmodResolutionOptions,
     right: &BzlmodResolutionOptions,
 ) -> bool {
-    left.lockfile_mode == right.lockfile_mode
-        && left.ignore_dev_dependency == right.ignore_dev_dependency
-        && left.allow_yanked_versions_env == right.allow_yanked_versions_env
-        && left.allow_yanked_versions_flags == right.allow_yanked_versions_flags
-        && left.repo_env == right.repo_env
-        && left.repo_env_digest == right.repo_env_digest
-        && left.hidden_lockfile_path == right.hidden_lockfile_path
+    left == right
 }
 
 fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
     value: &BzlmodResolutionOptions,
     state: &mut H,
 ) {
-    value.lockfile_mode.hash(state);
-    value.ignore_dev_dependency.hash(state);
-    value.allow_yanked_versions_env.hash(state);
-    value.allow_yanked_versions_flags.hash(state);
-    value.repo_env.hash(state);
-    value.repo_env_digest.hash(state);
-    value.hidden_lockfile_path.hash(state);
+    value.hash(state);
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -4219,14 +4195,17 @@ impl BuckConfigBasedCells {
         validate_root_extension_repo_directives: bool,
     ) -> slug_error::Result<BzlmodResolvedModuleGraphKey> {
         let root_config = LegacyBuckConfig::from_overrides_only(config_args)?;
-        let options = BzlmodResolutionOptions::from_config(&root_config)?;
+        let options = bzlmod_resolution_options_from_config(&root_config)?;
         let project_root_path = project_fs.root().to_path_buf();
         let workspace_id = slug_bzlmod::WorkspaceId::new(
             project_root_path.clone(),
             output_base.unwrap_or_else(|| project_root_path.join("buck-out/v2")),
         );
         let command_policy = dice_ctx
-            .compute(&options.command_policy_key(workspace_id.clone()))
+            .compute(&bzlmod_resolution_options_command_policy_key(
+                &options,
+                workspace_id.clone(),
+            ))
             .await?
             .buck_error_context("Computing bzlmod command policy")?;
         let resolution_key = slug_bzlmod::BzlmodResolutionKey {
@@ -5792,7 +5771,10 @@ mod tests {
         let mut second = first.clone();
         second.hidden_lockfile_path = Some(PathBuf::from("/tmp/hidden-two/MODULE.bazel.lock"));
 
-        assert_ne!(first.policy_digest(), second.policy_digest());
+        assert_ne!(
+            bzlmod_resolution_options_policy_digest(&first),
+            bzlmod_resolution_options_policy_digest(&second)
+        );
         assert!(!bzlmod_resolution_options_policy_eq(&first, &second));
 
         let mut first_hasher = DefaultHasher::new();
@@ -5812,7 +5794,7 @@ mod tests {
                 serde_json::to_string(&repo_env)?
             )),
         ])?;
-        let options = BzlmodResolutionOptions::from_config(&config)?;
+        let options = bzlmod_resolution_options_from_config(&config)?;
 
         assert_eq!(options.repo_env, repo_env);
         assert_eq!(

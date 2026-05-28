@@ -37,6 +37,7 @@ use sha2::Sha256;
 
 use crate::extensions::AggregatedExtension;
 use crate::lockfile::Lockfile;
+use crate::lockfile::LockfileMode;
 use crate::parser::ModuleFileInputDigest;
 use crate::repo_spec::RepoSpec;
 use crate::resolution::ModuleKey;
@@ -119,6 +120,17 @@ pub struct BzlmodCommandPolicyValue {
     pub repo_env_digest: Arc<str>,
     pub lockfile_mode: Arc<str>,
     pub ignore_dev_dependency: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+pub struct BzlmodResolutionOptions {
+    pub lockfile_mode: LockfileMode,
+    pub ignore_dev_dependency: bool,
+    pub allow_yanked_versions_env: Option<String>,
+    pub allow_yanked_versions_flags: Vec<String>,
+    pub hidden_lockfile_path: Option<PathBuf>,
+    pub repo_env: BTreeMap<String, String>,
+    pub repo_env_digest: String,
 }
 
 #[async_trait]
