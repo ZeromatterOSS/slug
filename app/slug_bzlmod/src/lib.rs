@@ -2288,6 +2288,19 @@ mod tests {
                 source_path: Some(PathBuf::from("/tmp/slug-plan61-dep-src")),
             },
         );
+        resolved_graph.modules.insert(
+            "local".to_owned(),
+            ResolvedModuleInfo {
+                name: "local".to_owned(),
+                version: String::new(),
+                compatibility_level: 0,
+                dependencies: HashMap::new(),
+                source: ModuleSource::LocalPath {
+                    path: "/tmp/slug-plan61-local-outside".to_owned(),
+                },
+                source_path: None,
+            },
+        );
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -2369,6 +2382,10 @@ mod tests {
                     .is_some_and(|setup| setup.source_path == "/tmp/slug-plan61-dep-src")
         }));
         assert!(!cell_graph.cells.iter().any(|cell| cell.name == "stale+"));
+        assert!(cell_graph.module_symlinks.iter().any(|symlink| {
+            symlink.entry_name == "local+"
+                && symlink.source_path.as_ref() == &PathBuf::from("/tmp/slug-plan61-local-outside")
+        }));
 
         Ok(())
     }

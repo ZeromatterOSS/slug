@@ -389,8 +389,10 @@ Current state to preserve:
   graph injection now passes the resolved module graph into `slug_bzlmod`, and
   `BzlmodCellDefinitionsKey` derives module cells from that graph plus repo
   mappings when graph data exists. The old injected cell vector remains only as
-  a fallback for empty/bootstrap test paths; extension cells and residual
-  local-override symlinks are still projection keys over the legacy payload.
+  a fallback for empty/bootstrap test paths. `BzlmodResidualModuleSymlinksKey`
+  also derives out-of-project local-override symlinks from the resolved graph
+  when graph data exists. Extension cells are now the main remaining projection
+  key over the legacy payload.
   Guardrail: `cargo test -p slug_bzlmod cell_graph_key_derives_module_cells_from_resolved_graph --lib`.
   Also validated with the focused bzlmod cell-graph, cell-graph-key,
   repository-label-resolution, and persisted clean-graph tests,
@@ -1051,10 +1053,10 @@ hardening behavior around it.
     `BzlmodRepoMappingsKey`; module symlinks are derived from module cell setup
     where possible. Module cells are derived by `BzlmodCellDefinitionsKey` from
     the resolved module graph when production graph data is available; empty and
-    bootstrap paths still fall back to the injected vector. The remaining
-    injected payload is split behind DICE keys for extension cells and residual
-    local-override symlinks. The old `BzlmodProjectionData` wrapper has been
-    deleted.
+    bootstrap paths still fall back to the injected vector. Residual
+    out-of-project local-override symlinks are derived from that same graph when
+    available. The remaining injected payload is split behind a DICE key for
+    extension cells. The old `BzlmodProjectionData` wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.

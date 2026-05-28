@@ -576,6 +576,12 @@ impl Key for BzlmodResidualModuleSymlinksKey {
             &self.resolution_digest,
             &data,
         )?;
+        if let Some(resolved_graph) = data.resolved_graph.as_ref() {
+            return Ok(Arc::new(residual_module_symlinks_from_resolved_graph(
+                &self.workspace_id,
+                resolved_graph,
+            )));
+        }
         Ok(Arc::new(residual_module_symlinks_from_payload(
             data.cell_graph.as_ref(),
         )))
@@ -715,6 +721,38 @@ fn residual_module_symlinks_from_payload(
         .filter(|symlink| !derived.contains(&symlink.entry_name))
         .cloned()
         .collect()
+}
+
+fn residual_module_symlinks_from_resolved_graph(
+    workspace_id: &WorkspaceId,
+    resolved_graph: &ResolvedGraph,
+) -> Vec<BzlmodCellGraphModuleSymlink> {
+    let mut symlinks = Vec::new();
+    let mut sorted_modules: Vec<_> = resolved_graph.modules.iter().collect();
+    sorted_modules.sort_by(|a, b| a.0.cmp(b.0));
+    for (module_name, module_info) in sorted_modules {
+        let ModuleSource::LocalPath { path } = &module_info.source else {
+            continue;
+        };
+        let module_dir =
+            local_override_module_dir(workspace_id.canonical_project_root.as_ref(), path);
+        if module_dir
+            .strip_prefix(workspace_id.canonical_project_root.as_ref())
+            .ok()
+            .is_some_and(|relative| !relative.as_os_str().is_empty())
+        {
+            continue;
+        }
+        let canonical_repo = bazel_canonical_module_repo_name(module_name, &module_info.version);
+        let source_path = module_dir
+            .canonicalize()
+            .unwrap_or_else(|_| module_dir.clone());
+        symlinks.push(BzlmodCellGraphModuleSymlink {
+            entry_name: canonical_repo,
+            source_path: Arc::new(source_path),
+        });
+    }
+    symlinks
 }
 
 fn module_symlinks_from_cells_and_residuals(
@@ -914,18 +952,22 @@ fn local_override_cell_path(
     canonical_repo: &str,
     override_path: &str,
 ) -> String {
-    let path = Path::new(override_path);
-    let module_dir = if path.is_absolute() {
-        normalize_path_lexically(path.to_path_buf())
-    } else {
-        normalize_path_lexically(project_root.join(path))
-    };
+    let module_dir = local_override_module_dir(project_root, override_path);
     if let Ok(project_relative) = module_dir.strip_prefix(project_root) {
         if !project_relative.as_os_str().is_empty() {
             return project_relative.to_string_lossy().into_owned();
         }
     }
     format!("bazel-external/{canonical_repo}")
+}
+
+fn local_override_module_dir(project_root: &Path, override_path: &str) -> PathBuf {
+    let path = Path::new(override_path);
+    if path.is_absolute() {
+        normalize_path_lexically(path.to_path_buf())
+    } else {
+        normalize_path_lexically(project_root.join(path))
+    }
 }
 
 fn normalize_path_lexically(path: PathBuf) -> PathBuf {
