@@ -41,6 +41,7 @@ use crate::parser::ModuleFileInputDigest;
 use crate::repo_spec::RepoSpec;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
+use crate::resolution::ResolvedGraph;
 use crate::types::ParsedModuleFile;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -421,6 +422,8 @@ pub struct BzlmodCellGraphDataValue {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,
     pub cell_graph: Arc<BzlmodCellGraphValue>,
+    #[allocative(skip)]
+    pub resolved_graph: Option<Arc<ResolvedGraph>>,
 }
 
 impl BzlmodCellGraphDataValue {
@@ -433,19 +436,26 @@ impl BzlmodCellGraphDataValue {
             workspace_id,
             resolution_digest,
             cell_graph,
+            resolved_graph: None,
+        }
+    }
+
+    pub fn for_workspace_with_resolved_graph(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        cell_graph: Arc<BzlmodCellGraphValue>,
+        resolved_graph: Option<Arc<ResolvedGraph>>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+            cell_graph,
+            resolved_graph,
         }
     }
 }
 
-#[derive(
-    derive_more::Display,
-    Debug,
-    Hash,
-    Eq,
-    Clone,
-    PartialEq,
-    Allocative
-)]
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodCellGraphDataKey")]
 pub(crate) struct BzlmodCellGraphDataKey;
 
@@ -457,15 +467,7 @@ impl dice::InjectedKey for BzlmodCellGraphDataKey {
     }
 }
 
-#[derive(
-    derive_more::Display,
-    Debug,
-    Hash,
-    Eq,
-    Clone,
-    PartialEq,
-    Allocative
-)]
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodCellDefinitionsKey")]
 struct BzlmodCellDefinitionsKey {
     workspace_id: WorkspaceId,
@@ -488,6 +490,24 @@ impl Key for BzlmodCellDefinitionsKey {
             &self.resolution_digest,
             &data,
         )?;
+        if let Some(resolved_graph) = data.resolved_graph.as_ref() {
+            let module_versions = ctx
+                .compute(&ModuleVersionsKey::for_workspace_id(
+                    self.workspace_id.clone(),
+                ))
+                .await??;
+            let repo_mappings = ctx
+                .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+                    self.workspace_id.clone(),
+                ))
+                .await??;
+            return Ok(Arc::new(module_cells_from_resolved_graph(
+                &self.workspace_id,
+                &module_versions.invalidation.root_module_name,
+                resolved_graph,
+                &repo_mappings,
+            )));
+        }
         Ok(data.cell_graph.cells.dupe())
     }
 
@@ -499,15 +519,7 @@ impl Key for BzlmodCellDefinitionsKey {
     }
 }
 
-#[derive(
-    derive_more::Display,
-    Debug,
-    Hash,
-    Eq,
-    Clone,
-    PartialEq,
-    Allocative
-)]
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodExtensionCellDefinitionsKey")]
 struct BzlmodExtensionCellDefinitionsKey {
     workspace_id: WorkspaceId,
@@ -541,15 +553,7 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
     }
 }
 
-#[derive(
-    derive_more::Display,
-    Debug,
-    Hash,
-    Eq,
-    Clone,
-    PartialEq,
-    Allocative
-)]
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodResidualModuleSymlinksKey")]
 struct BzlmodResidualModuleSymlinksKey {
     workspace_id: WorkspaceId,
@@ -739,6 +743,205 @@ fn module_symlinks_from_cells_and_residuals(
         }
     }
     symlinks
+}
+
+const BZLMOD_ALWAYS_BUNDLED_CELLS: &[&str] = &[
+    "bazel_tools",
+    "local_config_platform",
+    "slug_builtins",
+    "local_config_python",
+];
+
+fn bazel_canonical_module_repo_name(module_name: &str, version: &str) -> String {
+    if module_name.contains('+') {
+        module_name.to_owned()
+    } else if version.is_empty() {
+        format!("{module_name}+")
+    } else {
+        format!("{module_name}+")
+    }
+}
+
+fn module_cells_from_resolved_graph(
+    workspace_id: &WorkspaceId,
+    root_module_name: &str,
+    resolved_graph: &ResolvedGraph,
+    repo_mappings: &BzlmodRepoMappingsDataValue,
+) -> Vec<BzlmodCellGraphCell> {
+    let mut cells = Vec::new();
+    let mut sorted_modules: Vec<_> = resolved_graph.modules.iter().collect();
+    sorted_modules.sort_by(|a, b| a.0.cmp(b.0));
+    for (module_name, module_info) in sorted_modules {
+        if module_name.is_empty() || module_name == root_module_name {
+            continue;
+        }
+
+        let canonical_repo = bazel_canonical_module_repo_name(module_name, &module_info.version);
+        match &module_info.source {
+            ModuleSource::Registry { url } => {
+                let source_path = module_info
+                    .source_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                cells.push(BzlmodCellGraphCell {
+                    name: canonical_repo.clone(),
+                    path: format!("bazel-external/{canonical_repo}"),
+                    module_setup: Some(BzlmodCellGraphModuleSetup {
+                        module_name: module_name.clone(),
+                        version: module_info.version.clone(),
+                        registry_url: url.clone(),
+                        source_path,
+                    }),
+                    bundled: false,
+                });
+            }
+            ModuleSource::LocalPath { path } => {
+                cells.push(BzlmodCellGraphCell {
+                    name: canonical_repo.clone(),
+                    path: local_override_cell_path(
+                        workspace_id.canonical_project_root.as_ref(),
+                        &canonical_repo,
+                        path,
+                    ),
+                    module_setup: None,
+                    bundled: false,
+                });
+            }
+            ModuleSource::Git { remote, .. } => {
+                let source_path = module_info
+                    .source_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                cells.push(BzlmodCellGraphCell {
+                    name: canonical_repo.clone(),
+                    path: format!("bazel-external/{canonical_repo}"),
+                    module_setup: Some(BzlmodCellGraphModuleSetup {
+                        module_name: module_name.clone(),
+                        version: module_info.version.clone(),
+                        registry_url: format!("git+{remote}"),
+                        source_path,
+                    }),
+                    bundled: false,
+                });
+            }
+            ModuleSource::Archive { urls, .. } => {
+                let source_path = module_info
+                    .source_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let url = urls
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "archive".to_owned());
+                cells.push(BzlmodCellGraphCell {
+                    name: canonical_repo.clone(),
+                    path: format!("bazel-external/{canonical_repo}"),
+                    module_setup: Some(BzlmodCellGraphModuleSetup {
+                        module_name: module_name.clone(),
+                        version: module_info.version.clone(),
+                        registry_url: url,
+                        source_path,
+                    }),
+                    bundled: false,
+                });
+            }
+        }
+    }
+
+    add_generated_override_identity_cells(&mut cells, workspace_id, repo_mappings);
+
+    cells.extend(
+        BZLMOD_ALWAYS_BUNDLED_CELLS
+            .iter()
+            .map(|name| BzlmodCellGraphCell {
+                name: (*name).to_owned(),
+                path: (*name).to_owned(),
+                module_setup: None,
+                bundled: true,
+            }),
+    );
+    cells
+}
+
+fn add_generated_override_identity_cells(
+    cells: &mut Vec<BzlmodCellGraphCell>,
+    workspace_id: &WorkspaceId,
+    repo_mappings: &BzlmodRepoMappingsDataValue,
+) {
+    let Some(root_mapping) = repo_mappings.repo_mappings.get("") else {
+        return;
+    };
+    let mut existing: BTreeSet<_> = cells.iter().map(|cell| cell.name.clone()).collect();
+    for (apparent_name, target_name) in root_mapping {
+        if apparent_name == target_name
+            || crate::pending_repo_cells::parse_canonical_name(apparent_name).is_none()
+            || existing.contains(apparent_name)
+        {
+            continue;
+        }
+        let Some(target_cell) = cells.iter().find(|cell| cell.name == *target_name).cloned() else {
+            continue;
+        };
+        let selected_source_path = target_cell
+            .module_setup
+            .as_ref()
+            .map(|setup| PathBuf::from(&setup.source_path))
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or_else(|| workspace_id.canonical_project_root.join(&target_cell.path));
+        let module_setup = target_cell.module_setup.clone().or_else(|| {
+            Some(BzlmodCellGraphModuleSetup {
+                module_name: target_name.clone(),
+                version: String::new(),
+                registry_url: "override_repo".to_owned(),
+                source_path: selected_source_path.to_string_lossy().into_owned(),
+            })
+        });
+        cells.push(BzlmodCellGraphCell {
+            name: apparent_name.clone(),
+            path: format!("bazel-external/{apparent_name}"),
+            module_setup,
+            bundled: false,
+        });
+        existing.insert(apparent_name.clone());
+    }
+}
+
+fn local_override_cell_path(
+    project_root: &Path,
+    canonical_repo: &str,
+    override_path: &str,
+) -> String {
+    let path = Path::new(override_path);
+    let module_dir = if path.is_absolute() {
+        normalize_path_lexically(path.to_path_buf())
+    } else {
+        normalize_path_lexically(project_root.join(path))
+    };
+    if let Ok(project_relative) = module_dir.strip_prefix(project_root) {
+        if !project_relative.as_os_str().is_empty() {
+            return project_relative.to_string_lossy().into_owned();
+        }
+    }
+    format!("bazel-external/{canonical_repo}")
+}
+
+fn normalize_path_lexically(path: PathBuf) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                normalized.pop();
+            }
+            std::path::Component::Prefix(_)
+            | std::path::Component::RootDir
+            | std::path::Component::Normal(_) => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -1404,10 +1607,8 @@ fn scoped_aliases_from_repo_mappings(
         }
     }
     for (extension_id, overrides) in repo_mappings.repo_mapping_overrides.iter() {
-        let owner_module = crate::extension_execution_dice::extract_owning_module(
-            extension_id,
-            root_module_name,
-        );
+        let owner_module =
+            crate::extension_execution_dice::extract_owning_module(extension_id, root_module_name);
         for (apparent_name, target_name) in overrides {
             scoped_aliases.push(BzlmodCellGraphScopedAlias {
                 owner_module: owner_module.clone(),

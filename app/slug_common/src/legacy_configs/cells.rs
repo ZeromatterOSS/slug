@@ -4181,17 +4181,20 @@ impl BuckConfigBasedCells {
         )
         .await
         .buck_error_context("Parsing cells")?;
-        let cell_graph_resolution_digest = clean_resolved_module_graph
-            .as_ref()
-            .as_ref()
-            .map_or_else(
+        let cell_graph_resolution_digest =
+            clean_resolved_module_graph.as_ref().as_ref().map_or_else(
                 || Arc::from("empty-bzlmod-cell-graph"),
                 |value| value.graph_digest.clone(),
             );
-        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_and_digest(
+        let resolved_graph_for_dice = clean_resolved_module_graph
+            .as_ref()
+            .as_ref()
+            .map(|value| value.graph.clone());
+        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
             updater,
             cell_graph_resolution_digest,
             cell_graph_for_dice,
+            resolved_graph_for_dice,
             module_versions_for_dice,
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
                 key.resolution_key.workspace_id.clone(),

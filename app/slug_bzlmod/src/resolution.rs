@@ -350,7 +350,7 @@ pub enum ModuleSource {
 }
 
 /// Result of MVS resolution - the final resolved dependency graph.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolvedGraph {
     /// Map from module name to selected version.
     pub selected_versions: HashMap<String, String>,
@@ -376,7 +376,7 @@ pub struct ResolvedGraph {
 }
 
 /// Information about a resolved module in the final graph.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolvedModuleInfo {
     /// The module name.
     pub name: String,

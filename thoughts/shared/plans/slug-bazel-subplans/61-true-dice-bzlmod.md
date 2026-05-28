@@ -385,6 +385,16 @@ Current state to preserve:
   Also validated with the focused bzlmod cell-graph, repository-label-resolution,
   and persisted clean-graph tests, `cargo build -p slug`, `git diff --check`,
   and the focused Python replay set.
+- 2026-05-28 module-cell producer moved behind DICE: the production clean
+  graph injection now passes the resolved module graph into `slug_bzlmod`, and
+  `BzlmodCellDefinitionsKey` derives module cells from that graph plus repo
+  mappings when graph data exists. The old injected cell vector remains only as
+  a fallback for empty/bootstrap test paths; extension cells and residual
+  local-override symlinks are still projection keys over the legacy payload.
+  Guardrail: `cargo test -p slug_bzlmod cell_graph_key_derives_module_cells_from_resolved_graph --lib`.
+  Also validated with the focused bzlmod cell-graph, cell-graph-key,
+  repository-label-resolution, and persisted clean-graph tests,
+  `cargo build -p slug`, `git diff --check`, and the focused Python replay set.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1039,10 +1049,12 @@ hardening behavior around it.
      The returned graph's root module name is derived from `ModuleVersionsKey`;
     root aliases, scoped aliases, and dynamic aliases are derived from
     `BzlmodRepoMappingsKey`; module symlinks are derived from module cell setup
-    where possible. The remaining injected payload is split behind DICE keys for
-    module cells, extension cells, and residual local-override symlinks, but
-    those keys still read from the legacy clean graph builder. The old
-    `BzlmodProjectionData` wrapper has been deleted.
+    where possible. Module cells are derived by `BzlmodCellDefinitionsKey` from
+    the resolved module graph when production graph data is available; empty and
+    bootstrap paths still fall back to the injected vector. The remaining
+    injected payload is split behind DICE keys for extension cells and residual
+    local-override symlinks. The old `BzlmodProjectionData` wrapper has been
+    deleted.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
