@@ -497,6 +497,14 @@ Current state to preserve:
   still assembles repo mappings and the legacy/bootstrap cell graph, but no
   longer owns these semantic resolved-graph projections. Guardrail:
   `cargo test -p slug_bzlmod resolved_graph_projection_values --lib && cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo build -p slug`.
+- 2026-05-28 repo-mapping output boundary reduction:
+  `slug_bzlmod::graph_owned_repo_mapping_state` now owns repo-mapping snapshot
+  assembly, root extension repo override mapping, canonical repo-mapping target
+  resolution, selected bzlmod cell-name policy, and Bazel canonical module repo
+  naming. `slug_common` still adapts assembled `CellName` values into cell-name
+  strings and builds the legacy/bootstrap cell graph, but it no longer owns the
+  semantic repo-mapping output policy. Guardrail:
+  `cargo test -p slug_bzlmod repo_mapping --lib && cargo test -p slug_common repo_mapping --lib && cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -709,6 +717,9 @@ hardening behavior around it.
      Repo-mapping injection is now derived from the clean producer's parsed
      modules plus resolved graph identity; the legacy projection bridge no
      longer carries `BzlmodRepoMappingsDataValue`.
+     The repo-mapping state assembly/canonicalization policy now lives in
+     `slug_bzlmod`; `slug_common` only supplies cell-name strings from its
+     final cell graph assembly context.
      Persisted config-load now injects `BzlmodCellGraphValue` from the clean
      resolved-graph key as well. `BzlmodProjectionBridgeDiceKey` and its
      bridge-specific extension replay summary digest were removed. Direct

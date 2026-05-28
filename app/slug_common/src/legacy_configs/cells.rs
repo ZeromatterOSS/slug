@@ -287,177 +287,6 @@ fn runtime_cell_install_snapshot(
     snapshot
 }
 
-fn repo_mapping_snapshot_for_modules(
-    parsed_modules: &[(String, ParsedModuleFile)],
-    root_module_name: &str,
-) -> slug_bzlmod::RepoMappingSnapshot {
-    let mut snapshot = slug_bzlmod::RepoMappingSnapshot::new();
-    for (module_name, parsed_mod) in parsed_modules {
-        let mapping = slug_bzlmod::BzlmodRepoMapping::for_module(parsed_mod, root_module_name)
-            .entries_as_strings();
-        if module_name == root_module_name {
-            snapshot.insert(String::new(), mapping.clone());
-        }
-        snapshot.insert(module_name.clone(), mapping);
-    }
-    snapshot
-}
-
-fn canonicalize_repo_mapping_snapshot_targets(
-    snapshot: &mut slug_bzlmod::RepoMappingSnapshot,
-    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
-    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
-) {
-    for mapping in snapshot.values_mut() {
-        for target_name in mapping.values_mut() {
-            *target_name =
-                canonical_repo_mapping_target_name(None, cells, resolved_graph, target_name);
-        }
-    }
-
-    let root_repo_mapping = snapshot.get("").cloned();
-    for mapping in snapshot.values_mut() {
-        for target_name in mapping.values_mut() {
-            *target_name = canonical_repo_mapping_target_name(
-                root_repo_mapping.as_ref(),
-                cells,
-                resolved_graph,
-                target_name,
-            );
-        }
-    }
-}
-
-fn canonical_repo_mapping_target_name(
-    root_repo_mapping: Option<&BTreeMap<String, String>>,
-    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
-    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
-    target_name: &str,
-) -> String {
-    let mut current = target_name.to_owned();
-    let mut seen = BTreeSet::new();
-
-    loop {
-        if !seen.insert(current.clone()) {
-            return current;
-        }
-        let next = root_repo_mapping
-            .and_then(|mapping| mapping.get(&current))
-            .cloned()
-            .or_else(|| {
-                resolved_graph
-                    .and_then(|graph| selected_bzlmod_cell_name_for_dep(cells, &current, graph))
-                    .map(str::to_owned)
-            });
-        let Some(next) = next else {
-            return current;
-        };
-        if next == current {
-            return current;
-        }
-        current = next;
-    }
-}
-
-fn canonicalize_repo_mapping_targets(
-    repo_mappings: &mut slug_bzlmod::RepoMappingSnapshot,
-    repo_mapping_overrides: &mut slug_bzlmod::RepoMappingOverrides,
-    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
-    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
-) {
-    canonicalize_repo_mapping_snapshot_targets(repo_mappings, cells, resolved_graph);
-    canonicalize_repo_mapping_overrides_targets(
-        repo_mapping_overrides,
-        repo_mappings,
-        cells,
-        resolved_graph,
-    );
-}
-
-fn canonicalize_repo_mapping_overrides_targets(
-    overrides: &mut slug_bzlmod::RepoMappingOverrides,
-    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
-    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
-    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
-) {
-    let root_repo_mapping = repo_mappings.get("");
-    for overrides in overrides.values_mut() {
-        for target_name in overrides.values_mut() {
-            *target_name = canonical_repo_mapping_target_name(
-                root_repo_mapping,
-                cells,
-                resolved_graph,
-                target_name,
-            );
-        }
-    }
-}
-
-fn graph_owned_repo_mapping_state(
-    parsed_modules: &[(String, ParsedModuleFile)],
-    root_module_name: &str,
-    ignore_dev_dependency: bool,
-    cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
-    resolved_graph: Option<&slug_bzlmod::ResolvedGraph>,
-) -> (
-    slug_bzlmod::RepoMappingSnapshot,
-    slug_bzlmod::RepoMappingOverrides,
-) {
-    let mut repo_mappings = repo_mapping_snapshot_for_modules(parsed_modules, root_module_name);
-    let mut repo_mapping_overrides =
-        repo_mapping_overrides_for_root(parsed_modules, root_module_name, ignore_dev_dependency);
-    canonicalize_repo_mapping_targets(
-        &mut repo_mappings,
-        &mut repo_mapping_overrides,
-        cells,
-        resolved_graph,
-    );
-    (repo_mappings, repo_mapping_overrides)
-}
-
-fn repo_mapping_overrides_for_root(
-    parsed_modules: &[(String, ParsedModuleFile)],
-    root_module_name: &str,
-    ignore_dev_dependency: bool,
-) -> slug_bzlmod::RepoMappingOverrides {
-    let mut overrides = slug_bzlmod::RepoMappingOverrides::new();
-    if ignore_dev_dependency {
-        return overrides;
-    }
-    for (cell_name, parsed_mod) in parsed_modules {
-        let module_name = if parsed_mod.module.name.is_empty() {
-            root_module_name
-        } else {
-            &parsed_mod.module.name
-        };
-        let is_root = cell_name == root_module_name
-            || cell_name == "_main"
-            || parsed_mod.module.name == root_module_name;
-        if !is_root {
-            continue;
-        }
-
-        for usage in &parsed_mod.extension_usages {
-            if usage.repo_overrides.is_empty() && usage.injected_repos.is_empty() {
-                continue;
-            }
-            let ext_id = slug_bzlmod::canonical_extension_id(
-                &usage.extension_bzl_file,
-                &usage.extension_name,
-                module_name,
-            );
-            let entry = overrides.entry(ext_id).or_default();
-            for (generated_name, replacement_repo) in &usage.repo_overrides {
-                entry.insert(generated_name.clone(), replacement_repo.clone());
-            }
-            for (injected_name, source_repo) in &usage.injected_repos {
-                entry.insert(injected_name.clone(), source_repo.clone());
-            }
-        }
-    }
-    overrides
-}
-
 fn add_extension_repo_mapping_rows_from_cells(
     snapshot: &mut slug_bzlmod::RepoMappingSnapshot,
     cells: &[slug_bzlmod::PendingRepoCell],
@@ -518,7 +347,9 @@ fn add_scoped_repo_aliases_from_root_overrides(
         let owner_module = slug_bzlmod::extract_owning_module(extension_id, root_module_name);
         for (generated_name, replacement_repo) in overrides {
             let target_name = resolved_graph
-                .and_then(|graph| selected_bzlmod_cell_name_for_dep(cells, replacement_repo, graph))
+                .and_then(|graph| {
+                    selected_bzlmod_cell_name_for_dep_in_cells(cells, replacement_repo, graph)
+                })
                 .unwrap_or(replacement_repo.as_str())
                 .to_owned();
             aliases.push(BzlmodScopedRepoAlias {
@@ -535,6 +366,21 @@ fn add_scoped_repo_aliases_from_root_overrides(
             }
         }
     }
+}
+
+fn cell_name_strs<'a>(
+    cells: &'a [(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+) -> Vec<&'a str> {
+    cells.iter().map(|(name, _, _)| name.as_str()).collect()
+}
+
+fn selected_bzlmod_cell_name_for_dep_in_cells<'a>(
+    cells: &'a [(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    dep_name: &str,
+    resolved_graph: &slug_bzlmod::ResolvedGraph,
+) -> Option<&'a str> {
+    let cell_names = cell_name_strs(cells);
+    slug_bzlmod::selected_bzlmod_cell_name_for_dep(&cell_names, dep_name, resolved_graph)
 }
 
 /// Buckconfigs can partially be loaded from within dice. However, some parts of what makes up the
@@ -610,19 +456,6 @@ struct BzlmodExternalModuleSymlink {
     source_path: PathBuf,
 }
 
-fn bazel_canonical_module_repo_name(module_name: &str, version: &str) -> String {
-    if module_name.contains('+') {
-        module_name.to_owned()
-    } else if version.is_empty() {
-        format!("{module_name}+")
-    } else {
-        // Bazel 9 canonical module repository names keep an empty version
-        // segment for the selected module repo (`@@llvm+//...`), even when the
-        // selected version is recorded separately in the lockfile.
-        format!("{module_name}+")
-    }
-}
-
 fn local_override_cell_path_and_symlink(
     project_root: &ProjectRoot,
     project_root_abs: &AbsNormPathBuf,
@@ -637,7 +470,7 @@ fn local_override_cell_path_and_symlink(
         return Ok((CellRootPathBuf::new(project_path), None));
     }
 
-    let canonical_repo = bazel_canonical_module_repo_name(module_name, module_version);
+    let canonical_repo = slug_bzlmod::bazel_canonical_module_repo_name(module_name, module_version);
     let external_path = format!("bazel-external/{canonical_repo}");
     let source_path = module_dir
         .as_path()
@@ -4110,8 +3943,10 @@ impl BuckConfigBasedCells {
                     continue;
                 }
 
-                let canonical_repo =
-                    bazel_canonical_module_repo_name(module_name, &module_info.version);
+                let canonical_repo = slug_bzlmod::bazel_canonical_module_repo_name(
+                    module_name,
+                    &module_info.version,
+                );
                 let cell_name = CellName::unchecked_new(&canonical_repo)?;
 
                 match &module_info.source {
@@ -4217,7 +4052,7 @@ impl BuckConfigBasedCells {
             for dep in &parsed.module.bazel_deps {
                 let apparent_name = dep.apparent_name();
                 if let Some(target_name) =
-                    selected_bzlmod_cell_name_for_dep(&cells, &dep.name, graph)
+                    selected_bzlmod_cell_name_for_dep_in_cells(&cells, &dep.name, graph)
                 {
                     let cell_name = CellName::unchecked_new(target_name)?;
                     let alias_name = NonEmptyCellAlias::new(apparent_name.to_owned())?;
@@ -4236,7 +4071,7 @@ impl BuckConfigBasedCells {
                     continue;
                 }
                 if let Some(target_name) =
-                    selected_bzlmod_cell_name_for_dep(&cells, module_name, graph)
+                    selected_bzlmod_cell_name_for_dep_in_cells(&cells, module_name, graph)
                 {
                     if module_name == target_name {
                         continue;
@@ -4251,7 +4086,8 @@ impl BuckConfigBasedCells {
         for (module_name, parsed_mod) in parsed_modules {
             for dep in &parsed_mod.module.bazel_deps {
                 let apparent_name = dep.apparent_name();
-                let Some(target_name) = selected_bzlmod_cell_name_for_dep(&cells, &dep.name, graph)
+                let Some(target_name) =
+                    selected_bzlmod_cell_name_for_dep_in_cells(&cells, &dep.name, graph)
                 else {
                     continue;
                 };
@@ -4290,13 +4126,15 @@ impl BuckConfigBasedCells {
             Some(root_module_name),
             options.ignore_dev_dependency,
         );
-        let (mut repo_mappings, repo_mapping_overrides) = graph_owned_repo_mapping_state(
-            parsed_modules,
-            root_module_name,
-            options.ignore_dev_dependency,
-            &cells,
-            Some(graph),
-        );
+        let cell_names = cell_name_strs(&cells);
+        let (mut repo_mappings, repo_mapping_overrides) =
+            slug_bzlmod::graph_owned_repo_mapping_state(
+                parsed_modules,
+                root_module_name,
+                options.ignore_dev_dependency,
+                &cell_names,
+                Some(graph),
+            );
         let (mut pre_computed_cells, pre_computed_aliases) =
             slug_bzlmod::pre_compute_extension_repo_cells(
                 parsed_modules,
@@ -4431,7 +4269,7 @@ impl BuckConfigBasedCells {
         let mut ext_aliases = Vec::new();
         for alias in pre_computed_aliases {
             let target_name =
-                selected_bzlmod_cell_name_for_dep(&cells, &alias.canonical_name, graph)
+                selected_bzlmod_cell_name_for_dep_in_cells(&cells, &alias.canonical_name, graph)
                     .unwrap_or(alias.canonical_name.as_str())
                     .to_owned();
             let is_generated_override_alias = alias.declaring_module.is_none()
@@ -4712,7 +4550,7 @@ impl BuckConfigBasedCells {
         sorted_graph_modules.sort_by(|left, right| left.0.cmp(right.0));
         for (module_name, module_info) in sorted_graph_modules {
             let canonical_repo =
-                bazel_canonical_module_repo_name(module_name, &module_info.version);
+                slug_bzlmod::bazel_canonical_module_repo_name(module_name, &module_info.version);
             let external_path = format!("bazel-external/{canonical_repo}");
             clean_cells.push((
                 CellName::unchecked_new(&canonical_repo)?,
@@ -4728,13 +4566,15 @@ impl BuckConfigBasedCells {
             &graph,
             key.options.ignore_dev_dependency,
         );
-        let (repo_mapping_snapshot, repo_mapping_overrides) = graph_owned_repo_mapping_state(
-            &parsed_modules,
-            &projections.module_versions.root_module_name,
-            key.options.ignore_dev_dependency,
-            &clean_cells,
-            Some(&graph),
-        );
+        let clean_cell_names = cell_name_strs(&clean_cells);
+        let (repo_mapping_snapshot, repo_mapping_overrides) =
+            slug_bzlmod::graph_owned_repo_mapping_state(
+                &parsed_modules,
+                &projections.module_versions.root_module_name,
+                key.options.ignore_dev_dependency,
+                &clean_cell_names,
+                Some(&graph),
+            );
         let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
             key.resolution_key.workspace_id.clone(),
             Arc::new(repo_mapping_snapshot),
@@ -4895,44 +4735,6 @@ impl BuckConfigBasedCells {
             Err(ExternalCellOriginParseError::Unknown(value.to_owned()).into())
         }
     }
-}
-
-fn selected_bzlmod_cell_name_for_dep<'a>(
-    cells: &'a [(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
-    dep_name: &str,
-    resolved_graph: &slug_bzlmod::ResolvedGraph,
-) -> Option<&'a str> {
-    if let Some((name, _, _)) = cells.iter().find(|(name, _, _)| name.as_str() == dep_name) {
-        return Some(name.as_str());
-    }
-
-    let selected_version = resolved_graph
-        .modules
-        .get(dep_name)
-        .map(|module| module.version.as_str())
-        .or_else(|| {
-            resolved_graph
-                .selected_versions
-                .get(dep_name)
-                .map(String::as_str)
-        })?;
-    let canonical_name = bazel_canonical_module_repo_name(dep_name, selected_version);
-    if let Some((name, _, _)) = cells
-        .iter()
-        .find(|(name, _, _)| name.as_str() == canonical_name)
-    {
-        return Some(name.as_str());
-    }
-
-    let versioned_name = format!("{}+{}", dep_name, selected_version);
-    if let Some((name, _, _)) = cells
-        .iter()
-        .find(|(name, _, _)| name.as_str() == versioned_name)
-    {
-        return Some(name.as_str());
-    }
-
-    None
 }
 
 #[cfg(test)]
@@ -6080,8 +5882,9 @@ use_repo(ext, "generated")
             },
         );
 
+        let cell_names = cell_name_strs(&cells);
         assert_eq!(
-            selected_bzlmod_cell_name_for_dep(&cells, "dep", &resolved_graph),
+            slug_bzlmod::selected_bzlmod_cell_name_for_dep(&cell_names, "dep", &resolved_graph),
             Some("dep+")
         );
         Ok(())
@@ -6126,7 +5929,12 @@ use_repo(ext, "generated")
             ]),
         );
 
-        canonicalize_repo_mapping_snapshot_targets(&mut snapshot, &cells, Some(&resolved_graph));
+        let cell_names = cell_name_strs(&cells);
+        slug_bzlmod::canonicalize_repo_mapping_snapshot_targets(
+            &mut snapshot,
+            &cell_names,
+            Some(&resolved_graph),
+        );
 
         let mapping = snapshot.get("root").expect("root mapping should exist");
         assert_eq!(mapping.get("dep").map(String::as_str), Some("dep+"));
@@ -6176,10 +5984,16 @@ use_repo(ext, "generated")
             BTreeMap::from([("generated".to_owned(), "helper_alias".to_owned())]),
         );
 
-        canonicalize_repo_mapping_targets(
+        let cell_names = cell_name_strs(&cells);
+        slug_bzlmod::canonicalize_repo_mapping_snapshot_targets(
             &mut snapshot,
+            &cell_names,
+            Some(&resolved_graph),
+        );
+        slug_bzlmod::canonicalize_repo_mapping_overrides_targets(
             &mut overrides,
-            &cells,
+            &snapshot,
+            &cell_names,
             Some(&resolved_graph),
         );
         assert_eq!(
@@ -6226,8 +6040,13 @@ use_repo(ext, "generated")
             .push(("generated".to_owned(), "helper_alias".to_owned()));
         root.extension_usages.push(usage);
 
-        let (snapshot, overrides) =
-            graph_owned_repo_mapping_state(&[("root".to_owned(), root)], "root", false, &[], None);
+        let (snapshot, overrides) = slug_bzlmod::graph_owned_repo_mapping_state(
+            &[("root".to_owned(), root)],
+            "root",
+            false,
+            &[],
+            None,
+        );
         let extension_id = slug_bzlmod::canonical_extension_id("//:ext.bzl", "ext", "root");
 
         assert_eq!(
