@@ -511,6 +511,7 @@ impl Key for BzlmodCellGraphKey {
         }
         let mut cell_graph = data.cell_graph.as_ref().clone();
         cell_graph.root_module_name = module_versions.invalidation.root_module_name.clone();
+        cell_graph.root_aliases = Arc::new(root_aliases_from_repo_mappings(&repo_mappings));
         cell_graph.scoped_aliases = Arc::new(scoped_aliases_from_repo_mappings(
             &repo_mappings,
             &cell_graph.root_module_name,
@@ -1131,6 +1132,21 @@ impl Key for ModuleVersionsKey {
             _ => false,
         }
     }
+}
+
+fn root_aliases_from_repo_mappings(
+    repo_mappings: &BzlmodRepoMappingsDataValue,
+) -> Vec<BzlmodCellGraphAlias> {
+    repo_mappings
+        .repo_mappings
+        .get("")
+        .into_iter()
+        .flat_map(|mapping| mapping.iter())
+        .map(|(apparent_name, target_name)| BzlmodCellGraphAlias {
+            apparent_name: apparent_name.clone(),
+            target_name: target_name.clone(),
+        })
+        .collect()
 }
 
 fn scoped_aliases_from_repo_mappings(

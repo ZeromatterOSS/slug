@@ -1948,7 +1948,10 @@ mod tests {
             ),
             crate::BzlmodRepoMappingsDataValue::for_workspace(
                 workspace_id.clone(),
-                Arc::new(Default::default()),
+                Arc::new(BTreeMap::from([(
+                    String::new(),
+                    BTreeMap::from([("rules_cc".to_owned(), "rules_cc+".to_owned())]),
+                )])),
                 Arc::new(Default::default()),
             ),
         )?;

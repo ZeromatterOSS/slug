@@ -677,7 +677,10 @@ mod tests {
             ),
             BzlmodRepoMappingsDataValue::for_workspace(
                 workspace_id.clone(),
-                Arc::new(RepoMappingSnapshot::new()),
+                Arc::new(RepoMappingSnapshot::from([(
+                    String::new(),
+                    BTreeMap::from([("dep".to_owned(), "dep+".to_owned())]),
+                )])),
                 Arc::new(RepoMappingOverrides::new()),
             ),
         )?;
@@ -688,7 +691,14 @@ mod tests {
                 workspace_id.clone(),
             ))
             .await??;
-        assert!(repo_mappings.repo_mappings.is_empty());
+        assert_eq!(
+            repo_mappings
+                .repo_mappings
+                .get("")
+                .and_then(|mapping| mapping.get("dep"))
+                .map(String::as_str),
+            Some("dep+")
+        );
         let cell_graph = dice
             .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
             .await??;
@@ -1836,6 +1846,111 @@ mod tests {
                     owner_module: "_main".to_owned(),
                     apparent_name: "override_tool".to_owned(),
                     target_name: "dep+".to_owned(),
+                },
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cell_graph_key_uses_root_repo_mapping_aliases() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-cell-graph-root-aliases"),
+            PathBuf::from("/tmp/slug-plan61-cell-graph-root-aliases-output"),
+        );
+        let mut graph = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
+        graph.root_module_name = "root".to_owned();
+        graph.root_aliases = Arc::new(vec![BzlmodCellGraphAlias {
+            apparent_name: "payload_alias".to_owned(),
+            target_name: "payload_target".to_owned(),
+        }]);
+
+        let mut repo_mapping_snapshot = RepoMappingSnapshot::new();
+        repo_mapping_snapshot.insert(
+            String::new(),
+            BTreeMap::from([
+                ("dep".to_owned(), "dep+".to_owned()),
+                ("tool".to_owned(), "root+tool".to_owned()),
+            ]),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodCellGraphDataKey,
+            Arc::new(BzlmodCellGraphDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                Arc::new(graph),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodModuleVersionsDataKey,
+            Arc::new(BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
+                workspace_id.clone(),
+                "root".to_owned(),
+                Arc::new(HashMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BzlmodLockfileInputsValue::default()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoEnvDataKey,
+            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(BTreeMap::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodRepoMappingsDataKey,
+            Arc::new(BzlmodRepoMappingsDataValue::for_workspace(
+                workspace_id.clone(),
+                Arc::new(repo_mapping_snapshot),
+                Arc::new(RepoMappingOverrides::new()),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodResolutionFactsDataKey,
+            Arc::new(BzlmodResolutionFactsValue::for_workspace(
+                workspace_id.clone(),
+                indexmap::IndexMap::new(),
+                indexmap::IndexMap::new(),
+            )),
+        )])?;
+        updater.changed_to(vec![(
+            BzlmodExtensionAggregationsDataKey,
+            Arc::new(BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
+                workspace_id.clone(),
+                "root".to_owned(),
+                Arc::new(HashMap::new()),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let cell_graph = dice
+            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .await??;
+
+        assert_eq!(
+            cell_graph.root_aliases.as_ref(),
+            &vec![
+                BzlmodCellGraphAlias {
+                    apparent_name: "dep".to_owned(),
+                    target_name: "dep+".to_owned(),
+                },
+                BzlmodCellGraphAlias {
+                    apparent_name: "tool".to_owned(),
+                    target_name: "root+tool".to_owned(),
                 },
             ]
         );
