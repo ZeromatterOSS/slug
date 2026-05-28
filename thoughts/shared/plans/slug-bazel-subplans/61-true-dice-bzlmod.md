@@ -539,6 +539,15 @@ Current state to preserve:
   hidden behind that key, leaving the injected payloads as a smaller internal
   bridge surface. Guardrail:
   `cargo test -p slug_bzlmod current_workspace_helpers --lib && cargo test -p slug_bzlmod cell_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 fallback cell graph boundary reduction:
+  Fallback cell definitions, extension cells, and residual module symlinks now
+  consume `BzlmodFallbackCellGraphKey` instead of directly validating
+  `BzlmodCellGraphDataKey`. The fallback key still delegates to the injected
+  payload internally, but non-fallback cell graph producers now depend on named
+  `BzlmodResolvedGraphKey`, `BzlmodCurrentCellGraphKey`, or
+  `BzlmodFallbackCellGraphKey` rather than reading injected graph data
+  ad hoc. Guardrail:
+  `cargo test -p slug_bzlmod cell_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

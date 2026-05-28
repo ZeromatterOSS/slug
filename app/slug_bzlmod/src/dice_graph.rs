@@ -1596,6 +1596,51 @@ impl Key for BzlmodResolvedGraphKey {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Allocative)]
+struct BzlmodFallbackCellGraphValue {
+    fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
+}
+
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
+#[display(
+    "BzlmodFallbackCellGraphKey({}, {})",
+    workspace_id.stable_hash(),
+    resolution_digest
+)]
+struct BzlmodFallbackCellGraphKey {
+    workspace_id: WorkspaceId,
+    resolution_digest: Arc<str>,
+}
+
+#[async_trait]
+impl Key for BzlmodFallbackCellGraphKey {
+    type Value = slug_error::Result<Arc<BzlmodFallbackCellGraphValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        validate_cell_graph_payload(
+            "BzlmodFallbackCellGraphKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            &data,
+        )?;
+        Ok(Arc::new(BzlmodFallbackCellGraphValue {
+            fallback_cell_graph: data.fallback_cell_graph.dupe(),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
 #[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodCellDefinitionsKey")]
 struct BzlmodCellDefinitionsKey {
@@ -1643,13 +1688,12 @@ impl Key for BzlmodCellDefinitionsKey {
                 &repo_mappings,
             )));
         }
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        validate_cell_graph_payload(
-            "BzlmodCellDefinitionsKey",
-            &self.workspace_id,
-            &self.resolution_digest,
-            &data,
-        )?;
+        let data = ctx
+            .compute(&BzlmodFallbackCellGraphKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
+            .await??;
         Ok(data
             .fallback_cell_graph
             .as_ref()
@@ -1715,13 +1759,12 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             {
                 Ok(cells) => Ok(cells),
                 Err(e) if e.to_string().contains("module extension executor") => {
-                    let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-                    validate_cell_graph_payload(
-                        "BzlmodExtensionCellDefinitionsKey",
-                        &self.workspace_id,
-                        &self.resolution_digest,
-                        &data,
-                    )?;
+                    let data = ctx
+                        .compute(&BzlmodFallbackCellGraphKey {
+                            workspace_id: self.workspace_id.clone(),
+                            resolution_digest: self.resolution_digest.clone(),
+                        })
+                        .await??;
                     Ok(data.fallback_cell_graph.as_ref().map_or_else(
                         || Arc::new(Vec::new()),
                         |graph| graph.extension_cells.dupe(),
@@ -1733,13 +1776,12 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
         if should_use_resolved_graph_data(&self.resolution_digest) {
             return Ok(Arc::new(Vec::new()));
         }
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        validate_cell_graph_payload(
-            "BzlmodExtensionCellDefinitionsKey",
-            &self.workspace_id,
-            &self.resolution_digest,
-            &data,
-        )?;
+        let data = ctx
+            .compute(&BzlmodFallbackCellGraphKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
+            .await??;
         Ok(data.fallback_cell_graph.as_ref().map_or_else(
             || Arc::new(Vec::new()),
             |graph| graph.extension_cells.dupe(),
@@ -1856,13 +1898,12 @@ impl Key for BzlmodResidualModuleSymlinksKey {
                 resolved_graph,
             )));
         }
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        validate_cell_graph_payload(
-            "BzlmodResidualModuleSymlinksKey",
-            &self.workspace_id,
-            &self.resolution_digest,
-            &data,
-        )?;
+        let data = ctx
+            .compute(&BzlmodFallbackCellGraphKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
+            .await??;
         Ok(Arc::new(
             data.fallback_cell_graph
                 .as_ref()
