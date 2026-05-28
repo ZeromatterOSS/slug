@@ -636,12 +636,13 @@ fn bzlmod_resolved_module_graph_inputs_identity_digest(
 
 fn record_clean_bzlmod_resolution_compute_if_changed(
     key: &BzlmodResolvedModuleGraphKey,
+    resolution_key: &slug_bzlmod::BzlmodResolutionKey,
     inputs: &BzlmodResolvedModuleGraphInputs,
 ) {
     let cache_key = format!(
         "{}:{}",
-        key.resolution_key.workspace_id.stable_hash(),
-        key.resolution_key.command_policy_digest
+        resolution_key.workspace_id.stable_hash(),
+        resolution_key.command_policy_digest
     );
     let input_digest = bzlmod_resolved_module_graph_inputs_identity_digest(key, inputs);
     let mut last = LAST_RECORDED_BZLMOD_RESOLUTION_DIGEST
@@ -3237,11 +3238,11 @@ impl Key for OverridePatchInputsKey {
 #[display(
     "BzlmodResolvedModuleGraphKey({}, {})",
     project_root.display(),
-    resolution_key.command_policy_digest
+    workspace_id.stable_hash()
 )]
 struct BzlmodResolvedModuleGraphKey {
     project_root: AbsNormPathBuf,
-    resolution_key: slug_bzlmod::BzlmodResolutionKey,
+    workspace_id: slug_bzlmod::WorkspaceId,
     options: BzlmodResolutionOptions,
     validate_root_extension_repo_directives: bool,
 }
@@ -3265,7 +3266,7 @@ struct BzlmodResolvedModuleGraphValue {
 impl PartialEq for BzlmodResolvedModuleGraphKey {
     fn eq(&self, other: &Self) -> bool {
         self.project_root == other.project_root
-            && self.resolution_key == other.resolution_key
+            && self.workspace_id == other.workspace_id
             && bzlmod_resolution_options_policy_eq(&self.options, &other.options)
             && self.validate_root_extension_repo_directives
                 == other.validate_root_extension_repo_directives
@@ -3277,7 +3278,7 @@ impl Eq for BzlmodResolvedModuleGraphKey {}
 impl std::hash::Hash for BzlmodResolvedModuleGraphKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.project_root.hash(state);
-        self.resolution_key.hash(state);
+        self.workspace_id.hash(state);
         hash_bzlmod_resolution_options_policy(&self.options, state);
         self.validate_root_extension_repo_directives.hash(state);
     }
@@ -3468,15 +3469,14 @@ impl BuckConfigBasedCells {
                 "Using clean bzlmod resolved graph data for DICE injections"
             );
         }
-        let empty_cell_graph_for_dice = slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-            key.resolution_key.workspace_id.clone(),
-        );
+        let empty_cell_graph_for_dice =
+            slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(key.workspace_id.clone());
         let cell_graph_for_dice = if slug_bzlmod::MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok() {
             clean_outputs.as_ref().map_or_else(
                 || empty_cell_graph_for_dice.clone(),
                 |value| {
                     let mut cell_graph = slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-                        key.resolution_key.workspace_id.clone(),
+                        key.workspace_id.clone(),
                     );
                     cell_graph.root_module_name = value.module_versions.root_module_name.clone();
                     cell_graph
@@ -3493,11 +3493,11 @@ impl BuckConfigBasedCells {
                 || {
                     (
                         slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
+                            key.workspace_id.clone(),
                             Arc::new(HashMap::new()),
                         ),
                         slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
+                            key.workspace_id.clone(),
                             indexmap::IndexMap::new(),
                             indexmap::IndexMap::new(),
                         ),
@@ -3515,11 +3515,11 @@ impl BuckConfigBasedCells {
                 || {
                     (
                         slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
+                            key.workspace_id.clone(),
                             Vec::new(),
                         ),
                         slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
-                            key.resolution_key.workspace_id.clone(),
+                            key.workspace_id.clone(),
                             Vec::new(),
                         ),
                     )
@@ -3535,7 +3535,7 @@ impl BuckConfigBasedCells {
             clean_outputs.as_ref().map_or_else(
                 || {
                     slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
-                        key.resolution_key.workspace_id.clone(),
+                        key.workspace_id.clone(),
                         String::new(),
                         Arc::new(HashMap::new()),
                     )
@@ -3545,7 +3545,7 @@ impl BuckConfigBasedCells {
         let repo_mappings_for_dice = clean_outputs.as_ref().map_or_else(
             || {
                 slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-                    key.resolution_key.workspace_id.clone(),
+                    key.workspace_id.clone(),
                     Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
                     Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
                 )
@@ -3559,7 +3559,7 @@ impl BuckConfigBasedCells {
             Some(Arc::new(
                 clean_outputs.as_ref().map(|data| data.cell_graph.clone()),
             )),
-            key.resolution_key.workspace_id.clone(),
+            key.workspace_id.clone(),
         )
         .await
         .buck_error_context("Parsing cells")?;
@@ -3569,11 +3569,11 @@ impl BuckConfigBasedCells {
         );
         let resolved_graph_for_dice = clean_outputs.as_ref().map(|value| value.graph.clone());
         let lockfile_inputs_for_dice = slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
-            key.resolution_key.workspace_id.clone(),
+            key.workspace_id.clone(),
             clean_resolved_module_graph.lockfile_inputs.clone(),
         );
         let repo_env_for_dice = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
-            key.resolution_key.workspace_id.clone(),
+            key.workspace_id.clone(),
             Arc::new(key.options.repo_env.clone()),
         );
         if clean_outputs.is_some() {
@@ -3611,7 +3611,7 @@ impl BuckConfigBasedCells {
     async fn build_bzlmod_resolved_module_graph_key(
         project_fs: &ProjectRoot,
         config_args: &[slug_cli_proto::ConfigOverride],
-        dice_ctx: &mut DiceComputations<'_>,
+        _dice_ctx: &mut DiceComputations<'_>,
         output_base: Option<PathBuf>,
         validate_root_extension_repo_directives: bool,
     ) -> slug_error::Result<BzlmodResolvedModuleGraphKey> {
@@ -3622,18 +3622,9 @@ impl BuckConfigBasedCells {
             project_root_path.clone(),
             output_base.unwrap_or_else(|| project_root_path.join("buck-out/v2")),
         );
-        let command_policy = dice_ctx
-            .compute(&options.command_policy_key(workspace_id.clone()))
-            .await?
-            .buck_error_context("Computing bzlmod command policy")?;
-        let resolution_key = slug_bzlmod::BzlmodResolutionKey {
-            workspace_id: workspace_id.clone(),
-            command_policy_digest: command_policy.digest.clone(),
-        };
-
         Ok(BzlmodResolvedModuleGraphKey {
             project_root: AbsNormPathBuf::try_from(project_root_path)?,
-            resolution_key,
+            workspace_id,
             options,
             validate_root_extension_repo_directives,
         })
@@ -3643,7 +3634,7 @@ impl BuckConfigBasedCells {
         key: &BzlmodResolvedModuleGraphKey,
         dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<BzlmodResolvedModuleGraphInputs> {
-        let workspace_id = key.resolution_key.workspace_id.clone();
+        let workspace_id = key.workspace_id.clone();
         let root_module_file = dice_ctx
             .compute(&TrackedRootModuleFileKey {
                 project_root: key.project_root.clone(),
@@ -4503,6 +4494,14 @@ impl BuckConfigBasedCells {
         key: &BzlmodResolvedModuleGraphKey,
         dice_ctx: &mut DiceComputations<'_>,
     ) -> slug_error::Result<Arc<BzlmodResolvedModuleGraphValue>> {
+        let command_policy = dice_ctx
+            .compute(&key.options.command_policy_key(key.workspace_id.clone()))
+            .await?
+            .buck_error_context("Computing bzlmod command policy")?;
+        let resolution_key = slug_bzlmod::BzlmodResolutionKey {
+            workspace_id: key.workspace_id.clone(),
+            command_policy_digest: command_policy.digest.clone(),
+        };
         let inputs = Self::compute_bzlmod_resolved_module_graph_inputs(key, dice_ctx).await?;
         let Some(parsed) = inputs.root_module_file.parsed.clone() else {
             return Ok(Arc::new(BzlmodResolvedModuleGraphValue {
@@ -4599,7 +4598,7 @@ impl BuckConfigBasedCells {
         }
 
         let projections = slug_bzlmod::resolved_graph_projection_values(
-            key.resolution_key.workspace_id.clone(),
+            key.workspace_id.clone(),
             &parsed,
             &parsed_modules,
             &graph,
@@ -4615,14 +4614,14 @@ impl BuckConfigBasedCells {
                 Some(&graph),
             );
         let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-            key.resolution_key.workspace_id.clone(),
+            key.workspace_id.clone(),
             Arc::new(repo_mapping_snapshot),
             Arc::new(repo_mapping_overrides),
         );
         let cell_graph = Self::build_bzlmod_cell_graph_from_clean_resolution(
             &project_fs,
             &key.project_root,
-            key.resolution_key.workspace_id.clone(),
+            key.workspace_id.clone(),
             &key.options,
             &parsed,
             &graph,
@@ -4633,7 +4632,7 @@ impl BuckConfigBasedCells {
         )
         .await?;
         let graph_digest = slug_bzlmod::bzlmod_resolved_graph_digest(&graph);
-        record_clean_bzlmod_resolution_compute_if_changed(key, &inputs);
+        record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs);
         Ok(Arc::new(BzlmodResolvedModuleGraphValue {
             lockfile_inputs: inputs.lockfile_inputs,
             outputs: Arc::new(Some(slug_bzlmod::BzlmodResolvedGraphOutputsValue {
@@ -4968,11 +4967,7 @@ mod tests {
         .await?;
 
         assert_eq!(
-            key.resolution_key
-                .workspace_id
-                .output_base
-                .as_ref()
-                .as_path(),
+            key.workspace_id.output_base.as_ref().as_path(),
             output_base.as_path()
         );
         Ok(())
