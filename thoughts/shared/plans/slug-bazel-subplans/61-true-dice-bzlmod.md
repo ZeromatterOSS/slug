@@ -290,17 +290,18 @@ Current state to preserve:
   `test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source`, and
   `test_default_lockfile_mode_rejects_invalid_extension_digest`.
 - 2026-05-28 workspace recorded-file replay reduction: persisted config-load
-  preseed now validates workspace-relative text `FILE` recorded inputs through
-  a named `PreseedRecordedInputsKey` in `slug_common`. The key reads project
-  path metadata and file contents through `DiceFileComputations`, registers the
-  recorded project path for pre-config watcher invalidation, and stays
-  non-persistent so same-daemon lockfile replay rechecks recorded inputs even
-  when the surrounding cell graph is otherwise clean. `ENV` and `REPO_MAPPING`
-  recorded inputs are checked in the same key without filesystem polling.
-  Unsupported recorded input shapes still fall back to the
-  `ModuleExtensionRecordedInputsKey` / synchronous validator path: binary or
-  symlink file reads, external-repo `FILE` paths, `DIRENTS`, and `DIRTREE`.
-  Validated with `cargo test -p slug_common preseed_recorded_inputs_track_workspace_file_through_dice --lib`,
+  preseed now validates workspace-relative text `FILE` and `DIRENTS` recorded
+  inputs through a named `PreseedRecordedInputsKey` in `slug_common`. The key
+  reads project path metadata, file contents, and sorted project directory
+  entry names through `DiceFileComputations`, registers recorded project paths
+  for pre-config watcher invalidation, and stays non-persistent so same-daemon
+  lockfile replay rechecks recorded inputs even when the surrounding cell graph
+  is otherwise clean. `ENV` and `REPO_MAPPING` recorded inputs are checked in
+  the same key without filesystem polling. Unsupported recorded input shapes
+  still fall back to the `ModuleExtensionRecordedInputsKey` / synchronous
+  validator path: binary or symlink file reads, external-repo `FILE` paths, and
+  `DIRTREE`.
+  Validated with `cargo test -p slug_common preseed_recorded_inputs_track_workspace_ --lib`,
   `cargo test -p slug_bzlmod lockfile_preseed --lib`,
   `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
   `cargo build -p slug`, `git diff --check`, and the focused Python replay

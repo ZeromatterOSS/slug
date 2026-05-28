@@ -154,6 +154,16 @@ impl DiceFileComputations {
             .await?
     }
 
+    /// Reads sorted project-relative directory entry names without going through
+    /// a cell resolver. This intentionally does not apply Buck ignore logic.
+    pub async fn read_project_dir_entry_names(
+        ctx: &mut DiceComputations<'_>,
+        path: &ProjectRelativePath,
+    ) -> slug_error::Result<Arc<Vec<String>>> {
+        ctx.compute(&ProjectReadDirEntryNamesKey(Arc::new(path.to_owned())))
+            .await?
+    }
+
     /// Reads a project-relative file without going through a cell resolver.
     pub async fn read_project_file(
         ctx: &mut DiceComputations<'_>,
@@ -496,8 +506,54 @@ impl Key for ProjectPathMetadataKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        false
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
+
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("ProjectReadDirEntryNamesKey({})", _0)]
+struct ProjectReadDirEntryNamesKey(Arc<ProjectRelativePathBuf>);
+
+impl Dupe for ProjectReadDirEntryNamesKey {
+    fn dupe(&self) -> Self {
+        Self(self.0.dupe())
+    }
+}
+
+#[async_trait]
+impl Key for ProjectReadDirEntryNamesKey {
+    type Value = slug_error::Result<Arc<Vec<String>>>;
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let mut entries: Vec<String> = ctx
+            .global_data()
+            .get_io_provider()
+            .read_dir(self.0.as_ref().to_owned())
+            .await?
+            .into_iter()
+            .map(|entry| entry.file_name.to_string())
+            .collect();
+        entries.sort();
+        Ok(Arc::new(entries))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        false
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
