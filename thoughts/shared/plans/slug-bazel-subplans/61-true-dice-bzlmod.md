@@ -531,6 +531,14 @@ Current state to preserve:
   resolved graph compute from explicit DICE dependencies in `slug_bzlmod`.
   Guardrail:
   `cargo test -p slug_bzlmod cell_graph --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 current cell graph boundary reduction:
+  Public current-workspace cell graph helpers now compute a normal
+  `BzlmodCurrentCellGraphKey` to select the active workspace and resolution
+  digest before computing `BzlmodCellGraphKey`. Direct reads of
+  `BzlmodResolvedGraphDataKey`/`BzlmodCellGraphDataKey` for this path are now
+  hidden behind that key, leaving the injected payloads as a smaller internal
+  bridge surface. Guardrail:
+  `cargo test -p slug_bzlmod current_workspace_helpers --lib && cargo test -p slug_bzlmod cell_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

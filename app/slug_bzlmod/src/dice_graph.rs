@@ -1440,6 +1440,69 @@ impl dice::InjectedKey for BzlmodCellGraphDataKey {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub(crate) struct BzlmodCurrentCellGraphValue {
+    pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
+}
+
+#[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
+#[display("BzlmodCurrentCellGraphKey")]
+pub(crate) struct BzlmodCurrentCellGraphKey;
+
+#[async_trait]
+impl Key for BzlmodCurrentCellGraphKey {
+    type Value = slug_error::Result<Arc<BzlmodCurrentCellGraphValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
+        if resolved_graph_data.graph.is_some() {
+            return Ok(Arc::new(BzlmodCurrentCellGraphValue {
+                workspace_id: resolved_graph_data.workspace_id.clone(),
+                resolution_digest: resolved_graph_data.resolution_digest.clone(),
+            }));
+        }
+
+        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+        if data.workspace_id != resolved_graph_data.workspace_id {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodCurrentCellGraphKey found resolved graph data for project root '{}', \
+                 but fallback cell graph data for project root '{}'",
+                resolved_graph_data
+                    .workspace_id
+                    .canonical_project_root
+                    .display(),
+                data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        if data.resolution_digest != resolved_graph_data.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodCurrentCellGraphKey found resolved graph digest '{}', \
+                 but fallback cell graph digest '{}'",
+                resolved_graph_data.resolution_digest,
+                data.resolution_digest
+            ));
+        }
+        Ok(Arc::new(BzlmodCurrentCellGraphValue {
+            workspace_id: data.workspace_id.clone(),
+            resolution_digest: data.resolution_digest.clone(),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodResolvedGraphDataValue {
     pub workspace_id: WorkspaceId,
     pub resolution_digest: Arc<str>,

@@ -74,6 +74,7 @@ pub use dice_graph::BzlmodCellGraphScopedAlias;
 pub use dice_graph::BzlmodCellGraphValue;
 pub use dice_graph::BzlmodCommandPolicyKey;
 pub use dice_graph::BzlmodCommandPolicyValue;
+use dice_graph::BzlmodCurrentCellGraphKey;
 pub use dice_graph::BzlmodEventCounters;
 pub use dice_graph::BzlmodEventKind;
 pub use dice_graph::BzlmodExtensionAggregationKey;
@@ -642,52 +643,27 @@ pub async fn registered_execution_platforms_for_current_workspace(
 pub async fn bzlmod_cell_graph_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
-    let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
-    if resolved_graph_data.graph.is_some() {
-        return bzlmod_cell_graph_for_workspace_id(ctx, resolved_graph_data.workspace_id.clone())
-            .await;
-    }
-    let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-    bzlmod_cell_graph_for_workspace_id(ctx, data.workspace_id.clone()).await
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    bzlmod_cell_graph_for_workspace_id(ctx, current.workspace_id.clone()).await
 }
 
 pub async fn bzlmod_cell_graph_for_workspace_id(
     ctx: &mut dice::DiceComputations<'_>,
     workspace_id: WorkspaceId,
 ) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
-    let resolved_graph_data = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
-    if resolved_graph_data.graph.is_some() {
-        if resolved_graph_data.workspace_id != workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "bzlmod cell graph requested for project root '{}', \
-                 but current bzlmod resolved graph root is '{}'",
-                workspace_id.canonical_project_root.display(),
-                resolved_graph_data
-                    .workspace_id
-                    .canonical_project_root
-                    .display()
-            ));
-        }
-        let key = BzlmodCellGraphKey {
-            workspace_id,
-            resolution_digest: resolved_graph_data.resolution_digest.clone(),
-        };
-        return ctx.compute(&key).await?;
-    }
-    let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-    if data.workspace_id != workspace_id {
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    if current.workspace_id != workspace_id {
         return Err(slug_error::slug_error!(
             slug_error::ErrorTag::Tier0,
             "bzlmod cell graph requested for project root '{}', \
              but current bzlmod cell graph root is '{}'",
             workspace_id.canonical_project_root.display(),
-            data.workspace_id.canonical_project_root.display()
+            current.workspace_id.canonical_project_root.display()
         ));
     }
     let key = BzlmodCellGraphKey {
         workspace_id,
-        resolution_digest: data.resolution_digest.clone(),
+        resolution_digest: current.resolution_digest.clone(),
     };
     ctx.compute(&key).await?
 }
