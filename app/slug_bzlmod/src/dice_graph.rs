@@ -195,6 +195,73 @@ impl BzlmodResolutionOptions {
     }
 }
 
+pub fn bzlmod_resolved_graph_digest(graph: &ResolvedGraph) -> String {
+    fn update(hasher: &mut Sha256, value: &str) {
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+
+    let mut hasher = Sha256::new();
+    update(&mut hasher, "bzlmod-resolved-module-graph-v1");
+
+    let mut selected_versions: Vec<_> = graph.selected_versions.iter().collect();
+    selected_versions.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (name, version) in selected_versions {
+        update(&mut hasher, "selected");
+        update(&mut hasher, name);
+        update(&mut hasher, version);
+    }
+
+    for module_name in &graph.resolution_order {
+        update(&mut hasher, "order");
+        update(&mut hasher, module_name);
+    }
+
+    let mut modules: Vec<_> = graph.modules.iter().collect();
+    modules.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (name, info) in modules {
+        update(&mut hasher, "module");
+        update(&mut hasher, name);
+        update(&mut hasher, &info.name);
+        update(&mut hasher, &info.version);
+        update(&mut hasher, &info.compatibility_level.to_string());
+        let mut deps: Vec<_> = info.dependencies.iter().collect();
+        deps.sort_by(|(left, _), (right, _)| left.cmp(right));
+        for (dep, version) in deps {
+            update(&mut hasher, "dep");
+            update(&mut hasher, dep);
+            update(&mut hasher, version);
+        }
+        update(&mut hasher, &format!("{:?}", info.source));
+        update(
+            &mut hasher,
+            info.source_path
+                .as_ref()
+                .map(|path| path.to_string_lossy())
+                .as_deref()
+                .unwrap_or(""),
+        );
+    }
+
+    let mut registry_hashes: Vec<_> = graph.registry_file_hashes.iter().collect();
+    registry_hashes.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (url, digest) in registry_hashes {
+        update(&mut hasher, "registry");
+        update(&mut hasher, url);
+        update(&mut hasher, digest);
+    }
+
+    let mut yanked_versions: Vec<_> = graph.selected_yanked_versions.iter().collect();
+    yanked_versions.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (module, reason) in yanked_versions {
+        update(&mut hasher, "yanked");
+        update(&mut hasher, module);
+        update(&mut hasher, reason);
+    }
+
+    hex::encode(hasher.finalize())
+}
+
 pub fn allow_yanked_versions_digest(from_env: Option<&str>, from_flags: &[String]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"allow-yanked-versions-policy-v1");

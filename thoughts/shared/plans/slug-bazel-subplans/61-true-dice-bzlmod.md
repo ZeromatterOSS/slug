@@ -451,6 +451,13 @@ Current state to preserve:
   still parses legacy config into options, but no longer owns bzlmod command
   policy key assembly. Guardrail:
   `cargo test -p slug_common bzlmod_resolution_policy_includes_hidden_lockfile_path --lib && cargo test -p slug_common clean_resolved_module_graph_key_uses_explicit_output_base --lib && cargo build -p slug`.
+- 2026-05-28 resolved-graph digest boundary reduction:
+  `bzlmod_resolved_graph_digest` now lives in `slug_bzlmod`, so the digest
+  identity for clean resolved graph outputs is owned beside
+  `BzlmodResolvedGraphOutputsValue`. `slug_common` still computes the clean
+  graph, but no longer owns the resolved-graph output identity algorithm.
+  Guardrail:
+  `cargo test -p slug_common clean_resolved_module_graph_produces_local_override_facts --lib && cargo test -p slug_bzlmod cell_graph_key_ --lib && cargo build -p slug`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

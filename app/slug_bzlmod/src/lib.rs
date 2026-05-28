@@ -143,6 +143,7 @@ pub use dice_graph::RootModuleFileValue;
 pub use dice_graph::WorkspaceId;
 pub use dice_graph::allow_yanked_versions_digest;
 pub use dice_graph::bzlmod_event_counters;
+pub use dice_graph::bzlmod_resolved_graph_digest;
 pub use dice_graph::module_file_inputs_digest;
 pub use dice_graph::record_bzlmod_event;
 pub use dice_graph::repo_env_policy_digest;
