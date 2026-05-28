@@ -244,6 +244,37 @@ Current state to preserve:
   and lockfile preseed paths still have a legacy fallback-scanner bridge in
   `FallbackScannedExtensionBzlDigestKey`. Lockfile preseed no longer computes a
   secondary implicit fallback when the bridge digest map is absent.
+- 2026-05-28 probe: simply passing an empty digest map to lockfile spoke
+  preseed is not viable. `test_valid_lockfile_replay_materializes_generated_repo_without_extension_eval`
+  still passed, but `test_lockfile_replay_recorded_file_input_edit_rejects_cache`
+  and `test_lockfile_replay_recorded_repo_mapping_change_rejects_cache` stopped
+  observing `extension_replay_hit` during `buck audit cell`. The replacement
+  must preserve recorded-input and repo-mapping lockfile replay, not just
+  generated-repo materialization. A direct
+  `ExtensionBzlTransitiveDigestKey` call cannot be used at this point because
+  preseed runs while the bzlmod cell graph is being constructed, before
+  `CellResolverKey` is injected; the loaded-module digest path currently calls
+  `ctx.get_cell_resolver()`.
+- 2026-05-28 preseed digest reduction: `FallbackScannedExtensionBzlDigestKey`
+  no longer calls the direct `std::fs` fallback scanner for file contents. It
+  resolves literal project-local `.bzl` loads without probing the filesystem,
+  reads them through `DiceFileComputations::read_project_file_if_exists`, and
+  registers those project paths for watcher invalidation. Present-file digests
+  still match the old lockfile digest shape; missing literal loads use a
+  deterministic sentinel so create/delete transitions can be tracked by DICE.
+  The key remains non-persistent because lockfile preseed still performs
+  recorded-input/repo-mapping replay validation while constructing the cell
+  graph; making only the digest key persistent skipped the second recorded-file
+  validation in `test_lockfile_replay_recorded_file_input_edit_rejects_cache`.
+  Validated with `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
+  `cargo build -p slug`, and the focused Python replay set:
+  `test_lockfile_replay_recorded_file_input_edit_rejects_cache`,
+  `test_lockfile_replay_recorded_repo_mapping_change_rejects_cache`,
+  `test_lockfile_replay_recorded_repo_mapping_from_extension_repo_source`, and
+  `test_default_lockfile_mode_rejects_invalid_extension_digest`. A broader
+  `cargo test -p slug_common bzlmod --lib` still fails the unrelated
+  `bzlmod_cell_resolver_uses_canonical_module_cells_from_cell_graph` assertion
+  that `CellResolver::get("dep")` should error.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

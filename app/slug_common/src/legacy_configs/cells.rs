@@ -1643,7 +1643,7 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "FallbackScannedExtensionBzlDigestKey({}, {})",
+    "TrackedScannedExtensionBzlDigestKey({}, {})",
     project_root.display(),
     extension_id
 )]
@@ -1659,17 +1659,17 @@ impl Key for FallbackScannedExtensionBzlDigestKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Ok(Arc::from(
-            slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
-                self.extension_id.as_ref(),
-                self.project_root.as_path(),
-                Some(self.repo_mappings.as_ref()),
-            )
-            .as_str(),
-        ))
+        tracked_scanned_extension_bzl_digest(
+            ctx,
+            self.extension_id.as_ref(),
+            self.project_root.as_path(),
+            self.repo_mappings.as_ref(),
+        )
+        .await
+        .map(|digest| Arc::from(digest.as_str()))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1680,12 +1680,226 @@ impl Key for FallbackScannedExtensionBzlDigestKey {
     }
 
     fn validity(_x: &Self::Value) -> bool {
-        // This legacy bridge runs before the current extension aggregation is
-        // injected, so it cannot safely call ExtensionBzlTransitiveDigestKey.
-        // Keep it explicitly non-persistent until the bootstrap/preseed path is
-        // replaced by the Starlark loaded-module graph.
+        // The scanned .bzl digest itself is DICE-tracked, but lockfile preseed
+        // also validates recorded extension inputs while constructing the cell
+        // graph. Keep this key non-persistent until those replay checks are
+        // modeled as separate DICE dependencies.
         false
     }
+}
+
+fn tracked_project_bzl_location(
+    project_root: &Path,
+    repo: &str,
+    package: &str,
+    name: &str,
+) -> slug_bzlmod::BzlLoadLocation {
+    let mut path = if repo.is_empty() || repo == "_main" {
+        project_root.to_path_buf()
+    } else {
+        project_root.join("bazel-external").join(repo)
+    };
+    if !package.is_empty() {
+        path.push(package);
+    }
+    path.push(name);
+    slug_bzlmod::BzlLoadLocation {
+        path,
+        repo: repo.to_owned(),
+        package: package.to_owned(),
+    }
+}
+
+fn tracked_external_repo_candidate(repo: &str) -> String {
+    if repo.ends_with('+') || repo.contains('+') {
+        repo.to_owned()
+    } else {
+        format!("{repo}+")
+    }
+}
+
+fn tracked_mapping_for_source_repo<'a>(
+    repo_mappings: &'a slug_bzlmod::RepoMappingSnapshot,
+    current_repo: &str,
+) -> Option<&'a BTreeMap<String, String>> {
+    let mut candidates = Vec::new();
+    candidates.push(current_repo.to_owned());
+    if current_repo.is_empty() || current_repo == "_main" {
+        candidates.push("_main".to_owned());
+        candidates.push(String::new());
+    } else if current_repo.ends_with('+') {
+        candidates.push(current_repo.trim_end_matches('+').to_owned());
+    } else if !current_repo.contains('+') {
+        candidates.push(format!("{current_repo}+"));
+    }
+    for candidate in candidates {
+        if let Some(mapping) = repo_mappings.get(&candidate) {
+            return Some(mapping);
+        }
+    }
+    None
+}
+
+fn tracked_split_bzl_label_target(target: &str) -> Option<(&str, &str)> {
+    target.split_once(':')
+}
+
+fn tracked_label_bzl_location_under_project(
+    label: &str,
+    project_root: &Path,
+    current: Option<&slug_bzlmod::BzlLoadLocation>,
+    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
+) -> Option<slug_bzlmod::BzlLoadLocation> {
+    if let Some(rest) = label.strip_prefix("@@") {
+        let (repo, target) = rest.split_once("//")?;
+        let (pkg, name) = tracked_split_bzl_label_target(target)?;
+        if !repo.contains('+') {
+            return Some(tracked_project_bzl_location(project_root, "", pkg, name));
+        }
+        return Some(tracked_project_bzl_location(
+            project_root,
+            &tracked_external_repo_candidate(repo),
+            pkg,
+            name,
+        ));
+    }
+    if let Some(rest) = label.strip_prefix('@') {
+        let (repo, target) = rest.split_once("//")?;
+        let (pkg, name) = tracked_split_bzl_label_target(target)?;
+        let repo = if repo.contains('+') {
+            repo.to_owned()
+        } else if let Some(current) = current {
+            tracked_mapping_for_source_repo(repo_mappings, &current.repo)
+                .and_then(|mapping| mapping.get(repo).cloned())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
+    }
+    if let Some(rest) = label.strip_prefix("//") {
+        let current_repo = current.map(|location| location.repo.as_str()).unwrap_or("");
+        let (pkg, name) = tracked_split_bzl_label_target(rest)?;
+        return Some(tracked_project_bzl_location(
+            project_root,
+            current_repo,
+            pkg,
+            name,
+        ));
+    }
+    if let Some(name) = label.strip_prefix(':') {
+        let current = current?;
+        return Some(tracked_project_bzl_location(
+            project_root,
+            &current.repo,
+            &current.package,
+            name,
+        ));
+    }
+    if label.contains("//") {
+        let (repo, target) = label.split_once("//")?;
+        let (pkg, name) = tracked_split_bzl_label_target(target)?;
+        let repo = if repo.contains('+') {
+            repo.to_owned()
+        } else if let Some(current) = current {
+            tracked_mapping_for_source_repo(repo_mappings, &current.repo)
+                .and_then(|mapping| mapping.get(repo).cloned())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
+    }
+    let current = current?;
+    let mut path = current.path.parent()?.to_path_buf();
+    path.push(label);
+    Some(slug_bzlmod::BzlLoadLocation {
+        path,
+        repo: current.repo.clone(),
+        package: current.package.clone(),
+    })
+}
+
+async fn tracked_read_bzl_location(
+    ctx: &mut DiceComputations<'_>,
+    project_root: &Path,
+    location: &slug_bzlmod::BzlLoadLocation,
+) -> slug_error::Result<Option<(String, String)>> {
+    let Ok(rel) = location.path.strip_prefix(project_root) else {
+        return Ok(None);
+    };
+    let rel = rel.to_string_lossy();
+    let project_path = ProjectRelativePath::new(rel.as_ref())?;
+    register_bzlmod_config_project_file(project_path.to_owned());
+    let content = DiceFileComputations::read_project_file_if_exists(ctx, project_path).await?;
+    Ok(Some((
+        rel.into_owned(),
+        content.unwrap_or_else(|| "read_error:missing".to_owned()),
+    )))
+}
+
+async fn tracked_scanned_extension_bzl_digest(
+    ctx: &mut DiceComputations<'_>,
+    extension_id: &str,
+    project_root: &Path,
+    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
+) -> slug_error::Result<String> {
+    let label = extension_id.split('%').next().unwrap_or(extension_id);
+    let Some(root_location) =
+        tracked_label_bzl_location_under_project(label, project_root, None, repo_mappings)
+    else {
+        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    };
+
+    let Some((root_rel, root_content)) =
+        tracked_read_bzl_location(ctx, project_root, &root_location).await?
+    else {
+        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    };
+    if root_content == "read_error:missing" {
+        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    }
+
+    let mut seen_locations = BTreeSet::new();
+    let mut file_contents = BTreeMap::new();
+    let mut queue = VecDeque::from([(root_location, root_rel, root_content)]);
+    while let Some((location, rel, content)) = queue.pop_front() {
+        let key = (
+            location.path.clone(),
+            location.repo.clone(),
+            location.package.clone(),
+        );
+        if !seen_locations.insert(key) {
+            continue;
+        }
+        file_contents.insert(rel, content.clone());
+        if content == "read_error:missing" {
+            continue;
+        }
+        for load in slug_bzlmod::literal_loads(&location.path, &content) {
+            let Some(load_location) = tracked_label_bzl_location_under_project(
+                &load,
+                project_root,
+                Some(&location),
+                repo_mappings,
+            ) else {
+                continue;
+            };
+            if !load_location.path.starts_with(project_root) {
+                continue;
+            }
+            if let Some((load_rel, load_content)) =
+                tracked_read_bzl_location(ctx, project_root, &load_location).await?
+            {
+                queue.push_back((load_location, load_rel, load_content));
+            }
+        }
+    }
+
+    if file_contents.is_empty() {
+        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    }
+    Ok(slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(extension_id, &file_contents))
 }
 
 async fn fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
@@ -6467,7 +6681,7 @@ ext = module_extension(implementation = _impl)
     }
 
     #[tokio::test]
-    async fn fallback_scanned_extension_bzl_digest_matches_legacy_missing_project_load_digest()
+    async fn fallback_scanned_extension_bzl_digest_tracks_missing_project_load_digest()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file(
@@ -6485,12 +6699,6 @@ ext = module_extension(implementation = _impl)
         let extension_id = "@@root//:ext.bzl%ext";
         let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
         let project_root = AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?;
-        let direct_missing =
-            slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
-                extension_id,
-                fs.path().root().as_path(),
-                Some(&repo_mappings),
-            );
         let key = FallbackScannedExtensionBzlDigestKey {
             project_root: project_root.clone(),
             extension_id: Arc::from(extension_id),
@@ -6506,13 +6714,22 @@ ext = module_extension(implementation = _impl)
             .await;
 
         let fallback_scanned_missing = dice.compute(&key).await??;
-        assert_eq!(fallback_scanned_missing.as_ref(), direct_missing);
+        assert_ne!(
+            fallback_scanned_missing.as_ref(),
+            slug_bzlmod::compute_bzl_transitive_digest(extension_id)
+        );
         assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_missing.clone())
         ));
 
         fs.write_file("helper.bzl", "HELPER = 'created'\n");
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        let mut changes = crate::file_ops::dice::FileChangeTracker::new();
+        changes.project_file_added_or_removed(ProjectRelativePathBuf::unchecked_new(
+            "helper.bzl".to_owned(),
+        ));
+        changes.write_to_dice(&mut updater)?;
+        let mut dice = updater.commit().await;
         let direct_created =
             slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
                 extension_id,
