@@ -643,6 +643,14 @@ Current state to preserve:
   remaining fallback payload is burned down. Guardrails: `cargo check -p
   slug_bzlmod`, `cargo test -p slug_bzlmod cell_graph --lib`, `cargo
   fmt --check`, and `git diff --check`.
+- 2026-05-29 cell-graph data fallback fields made crate-private:
+  `BzlmodCellGraphDataValue` still crosses crate boundaries as a named DICE
+  input value, but external callers can no longer inspect or set
+  `workspace_id`, `resolution_digest`, or `fallback_cell_graph` fields
+  directly. The remaining fallback payload must be constructed through the
+  explicit constructor. Guardrails: `cargo check -p slug_bzlmod -p
+  slug_common`, `cargo test -p slug_bzlmod cell_graph --lib`, `cargo
+  fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

@@ -2776,10 +2776,10 @@ fn dynamic_alias_for_generated_override(
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodCellGraphDataValue {
-    pub workspace_id: WorkspaceId,
-    pub resolution_digest: Arc<str>,
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) resolution_digest: Arc<str>,
     #[allocative(skip)]
-    pub fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
+    pub(crate) fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
 }
 
 impl BzlmodCellGraphDataValue {
