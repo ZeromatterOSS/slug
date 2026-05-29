@@ -675,6 +675,15 @@ Current state to preserve:
   constructors are crate-private too. Guardrails: `cargo check -p slug_bzlmod
   -p slug_common`, targeted `rg` for public use-sites, `cargo test -p
   slug_bzlmod cell_graph --lib`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 repository materialization zero-mapping constructors made
+  test-only: production `ExtensionRepoExecutionKey` and
+  `RepoMaterializationManifestKey` construction must pass the current
+  `RepoMappingSnapshot`; public helpers that silently supplied an empty mapping
+  snapshot no longer compile into non-test `slug_bzlmod`. Guardrails:
+  `cargo check -p slug_bzlmod -p slug_external_cells`, `cargo test -p
+  slug_bzlmod materialization_manifest --lib`, `cargo test -p
+  slug_external_cells extension_repo --lib`, `cargo fmt --check`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1801,6 +1810,8 @@ hardening behavior around it.
      materialization-manifest helpers that derive workspace identity from only a
      project root are also test-only. Zero-repo-env convenience constructors
      for extension execution and materialization manifests are test-only too.
+     Zero-repo-mapping materialization conveniences are test-only as well, so
+     production repository replay must carry the current repo-mapping snapshot.
      Module extension execution and recorded-input validation keys require
      workspace identity instead of carrying or deriving optional provenance; the
      recorded-input key's internal workspace is no longer optional in production.

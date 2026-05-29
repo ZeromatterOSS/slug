@@ -499,6 +499,7 @@ impl ExtensionRepoExecutionKey {
 
     /// Create a new extension repo execution key with explicit workspace
     /// identity and command repo-env.
+    #[cfg(test)]
     pub fn new_with_workspace_id_and_repo_env(
         canonical_name: String,
         extension_id: String,
@@ -586,6 +587,7 @@ impl ExtensionRepoExecutionKey {
     }
 
     /// Create from Arc references with explicit workspace identity and command repo-env.
+    #[cfg(test)]
     pub fn from_arcs_with_workspace_id_and_repo_env(
         canonical_name: Arc<str>,
         extension_id: Arc<str>,

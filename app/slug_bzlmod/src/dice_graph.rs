@@ -5222,6 +5222,7 @@ impl RepoMaterializationManifestKey {
         )
     }
 
+    #[cfg(test)]
     pub fn for_workspace_id_with_repo_spec_digest_and_repo_env(
         workspace_id: WorkspaceId,
         canonical_repo: &str,
