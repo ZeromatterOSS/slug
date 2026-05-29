@@ -203,6 +203,7 @@ impl AnonTargetDyn for AnonTarget {
             query_results: HashMap::new(),
             execution_platform_resolution: exec_resolution,
             cell_alias_resolver: None,
+            root_cell_name: None,
         };
 
         let resolution_ctx = AnonTargetAttrResolutionContext {

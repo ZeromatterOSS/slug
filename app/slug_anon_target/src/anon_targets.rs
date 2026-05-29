@@ -450,6 +450,7 @@ impl AnonTargetKey {
                     Some(attributes),
                     Some(self.0.configured_label()),
                     None,
+                    None,
                     // FIXME(JakobDegen): There should probably be a way to pass plugins
                     // into anon targets
                     Some(

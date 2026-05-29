@@ -41,6 +41,7 @@ use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProvider
 use slug_build_api::interpreter::rule_defs::provider::collection::ProviderCollection;
 use slug_build_signals::env::WaitingCategory;
 use slug_build_signals::env::WaitingData;
+use slug_common::dice::cells::HasCellResolver;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_core::deferred::dynamic::DynamicLambdaResultsKey;
 use slug_core::deferred::key::DeferredHolderKey;
@@ -206,6 +207,12 @@ async fn execute_lambda(
         };
 
         let proto_rule = "dynamic_lambda".to_owned();
+        let analysis_root_cell_name = match dice.get_cell_resolver().await {
+            Ok(cell_resolver) => Some(cell_resolver.root_cell()),
+            Err(e) => {
+                return (TimeSpan::empty_now(), SmallVec::new(), Err(e.into()));
+            }
+        };
 
         let start_event = slug_data::AnalysisStart {
             target: Some(slug_data::analysis_start::Target::DynamicLambda(
@@ -245,6 +252,7 @@ async fn execute_lambda(
                             dynamic_lambda_ctx_data.lambda.attributes()?,
                             self_key.owner().configured_label(),
                             None,
+                            analysis_root_cell_name,
                             dynamic_lambda_ctx_data.lambda.plugins()?,
                             dynamic_lambda_ctx_data.registry,
                             dynamic_lambda_ctx_data.digest_config,

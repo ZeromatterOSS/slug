@@ -524,6 +524,11 @@ fn configured_target_node_value_methods(builder: &mut MethodsBuilder) {
         let query_results = ctx.via_dice(eval, |ctx| {
             ctx.via(|dice_ctx| resolve_queries(dice_ctx, configured_node).boxed_local())
         })?;
+        let root_cell_name = ctx.via_dice(eval, |ctx| {
+            ctx.via(|dice_ctx| {
+                async move { Ok(dice_ctx.get_cell_resolver().await?.root_cell()) }.boxed_local()
+            })
+        })?;
 
         let resolution_ctx = RuleAnalysisAttrResolutionContext {
             module: eval.module(),
@@ -531,6 +536,7 @@ fn configured_target_node_value_methods(builder: &mut MethodsBuilder) {
             query_results,
             execution_platform_resolution: configured_node.execution_platform_resolution().clone(),
             cell_alias_resolver: None,
+            root_cell_name: Some(root_cell_name),
         };
 
         let attrs_iter = this.0.attrs(AttrInspectOptions::All);

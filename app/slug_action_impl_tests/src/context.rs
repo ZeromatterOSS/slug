@@ -87,6 +87,7 @@ fn run_ctx_test(
         Some(attributes),
         Some(label),
         None,
+        None,
         Some(plugins),
         registry,
         DigestConfig::testing_default(),
