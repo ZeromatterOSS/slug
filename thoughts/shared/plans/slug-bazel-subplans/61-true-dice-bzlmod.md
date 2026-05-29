@@ -2003,6 +2003,14 @@ hardening behavior around it.
      slug_build_api dependency_label --lib -- --nocapture`; `cargo test -p
      slug_build_api source_file_target_label --lib -- --nocapture`; `cargo
      check -p slug_interpreter -p slug_build_api -p slug_analysis`.
+   - 2026-05-29 repository_ctx constructor root fallback made test-only:
+     the `RepositoryContext::new(...)` constructor that falls back to
+     `slug_core::cells::get_dynamic_project_root()` is now compiled only for
+     tests. Production Starlark repository-rule execution already uses
+     `new_with_workspace_root(...)` with the active DICE project root, so this
+     removes a dormant process-global root fallback from the production
+     repository-rule API. Guardrail: `cargo check -p
+     slug_interpreter_for_build`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

@@ -713,6 +713,7 @@ pub enum RepositoryWatchInput {
 
 impl RepositoryContext {
     /// Create a new repository context.
+    #[cfg(test)]
     pub fn new(name: String, attr: RepositoryAttr, working_dir: PathBuf) -> Self {
         let workspace_root =
             slug_core::cells::get_dynamic_project_root().unwrap_or_else(|| working_dir.clone());
