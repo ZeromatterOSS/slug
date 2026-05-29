@@ -1938,6 +1938,13 @@ hardening behavior around it.
      falling back to the legacy process-global root helper for generic callers.
      Guardrail: `cargo test -p slug_core
      artifact_fs_bazel_output_uses_resolver_root_cell --lib -- --nocapture`.
+   - 2026-05-29 analysis-context root-adapter reduction: normal rule-analysis
+     `AnalysisContext` now receives the DICE `CellResolver` root cell and uses
+     that explicit owner for `ctx.workspace_name`, `ctx.bin_dir`, and workspace
+     root formatting helpers. The legacy root helper remains only as a no-owner
+     fallback inside the shared formatting helper. Guardrails: `cargo test -p
+     slug_build_api analysis_context_repo_name --lib -- --nocapture`; `cargo
+     check -p slug_analysis -p slug_build_api`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

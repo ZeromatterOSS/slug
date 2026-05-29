@@ -3808,6 +3808,7 @@ async fn run_analysis_with_env_underlying(
             dice.get_cell_alias_resolver(analysis_env.label.pkg().cell_name())
                 .await?,
         );
+        let analysis_root_cell_name = Some(dice.get_cell_resolver().await?.root_cell());
         // Plan 16.6: attr_eval sub-span — attribute coercion + plugin resolution.
         let (attributes, plugins) = dispatch_span_simple::<
             _,
@@ -4380,6 +4381,7 @@ async fn run_analysis_with_env_underlying(
                 Some(attributes),
                 Some(analysis_env.label.dupe()),
                 analysis_cell_alias_resolver,
+                analysis_root_cell_name,
                 Some(plugins.into()),
                 registry,
                 dice.global_data().get_digest_config(),

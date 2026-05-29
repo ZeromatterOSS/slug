@@ -22,6 +22,7 @@ use dice::DiceComputations;
 use dupe::Dupe;
 use futures::FutureExt;
 use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::build_setting::BuildSettingLabel;
 use slug_core::configuration::build_setting::BuildSettingValue;
 use slug_core::configuration::data::ConfigurationData;
@@ -227,6 +228,7 @@ pub struct AnalysisContext<'v> {
     /// Active cell alias resolver for Bazel-visible repository spellings.
     #[trace(unsafe_ignore)]
     cell_alias_resolver: Option<CellAliasResolver>,
+    root_cell_name: Option<CellName>,
     plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
     /// Cached outputs for Bazel-compatible ctx.outputs access.
     /// This is computed lazily on first access and cached thereafter.
@@ -263,6 +265,7 @@ impl<'v> AnalysisContext<'v> {
         configured_label: Option<ValueTyped<'v, StarlarkConfiguredProvidersLabel>>,
         label: Option<ValueTyped<'v, BazelLabel>>,
         cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
         plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
@@ -279,6 +282,7 @@ impl<'v> AnalysisContext<'v> {
             configured_label,
             label,
             cell_alias_resolver,
+            root_cell_name,
             plugins,
             outputs: RefCell::new(None),
             rule_outputs,
@@ -297,10 +301,14 @@ impl<'v> AnalysisContext<'v> {
         match self.configured_label {
             Some(label) => {
                 let cell = label.label().target().pkg().cell_name().as_str();
-                if slug_core::cells::is_root_cell_name(cell) {
+                if is_root_cell_for_context(cell, self.root_cell_name) {
                     "_main".to_owned()
                 } else {
-                    canonical_bazel_repo_name_for_cell(cell, self.cell_alias_resolver.as_ref())
+                    canonical_bazel_repo_name_for_cell(
+                        cell,
+                        self.cell_alias_resolver.as_ref(),
+                        self.root_cell_name,
+                    )
                 }
             }
             None => String::new(),
@@ -319,6 +327,7 @@ impl<'v> AnalysisContext<'v> {
         attrs: Option<ValueOfUnchecked<'v, StructRef<'static>>>,
         label: Option<ConfiguredTargetLabel>,
         cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
         plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
@@ -345,6 +354,7 @@ impl<'v> AnalysisContext<'v> {
             configured_label,
             bazel_label,
             cell_alias_resolver,
+            root_cell_name,
             plugins,
             registry,
             digest_config,
@@ -581,11 +591,14 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         if let Some(label) = this.0.configured_label {
             let cell = label.label().target().pkg().cell_name().as_str();
             // In Bazel, the main repo returns "" or the module name
-            if slug_core::cells::is_root_cell_name(cell) {
+            if is_root_cell_for_context(cell, this.0.root_cell_name) {
                 Ok(heap.alloc_str("").to_value())
             } else {
-                let canonical =
-                    canonical_bazel_repo_name_for_cell(cell, this.0.cell_alias_resolver.as_ref());
+                let canonical = canonical_bazel_repo_name_for_cell(
+                    cell,
+                    this.0.cell_alias_resolver.as_ref(),
+                    this.0.root_cell_name,
+                );
                 Ok(heap.alloc_str(&canonical).to_value())
             }
         } else {
@@ -882,12 +895,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             let cell_name = label.label().target().pkg().cell_name().as_str();
             // In Bazel with bzlmod, the root module is known as "_main".
             // Extension repos use their canonical repo name.
-            if slug_core::cells::is_root_cell_name(cell_name) {
+            if is_root_cell_for_context(cell_name, this.0.root_cell_name) {
                 Ok(heap.alloc_str("_main").to_value())
             } else {
                 let canonical = canonical_bazel_repo_name_for_cell(
                     cell_name,
                     this.0.cell_alias_resolver.as_ref(),
+                    this.0.root_cell_name,
                 );
                 Ok(heap.alloc_str(&canonical).to_value())
             }
@@ -906,8 +920,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// `<buck-out>/gen/<cell>/<cfg_hash>`
     #[starlark(attribute)]
     fn bin_dir<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let path =
-            bin_dir_path_from_label(this.0.configured_label, this.0.cell_alias_resolver.as_ref());
+        let path = bin_dir_path_from_label(
+            this.0.configured_label,
+            this.0.cell_alias_resolver.as_ref(),
+            this.0.root_cell_name,
+        );
         Ok(heap.alloc(CtxDirRoot { path }))
     }
 
@@ -924,8 +941,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         // In Slug, genfiles and bin share the same output root
-        let path =
-            bin_dir_path_from_label(this.0.configured_label, this.0.cell_alias_resolver.as_ref());
+        let path = bin_dir_path_from_label(
+            this.0.configured_label,
+            this.0.cell_alias_resolver.as_ref(),
+            this.0.root_cell_name,
+        );
         Ok(heap.alloc(CtxDirRoot { path }))
     }
 
@@ -1568,16 +1588,17 @@ pub fn bin_dir_path_from_label(
         >,
     >,
     cell_alias_resolver: Option<&CellAliasResolver>,
+    root_cell_name: Option<CellName>,
 ) -> String {
     let buck_out_root = slug_execute::path::artifact_path::get_artifact_path_buck_out_root();
     let buck_out_root = buck_out_root.as_str();
     if let Some(label) = label {
         let target = label.label().target();
         let cell_name = target.pkg().cell_name().as_str();
-        let output_cell_name = if slug_core::cells::is_root_cell_name(cell_name) {
+        let output_cell_name = if is_root_cell_for_context(cell_name, root_cell_name) {
             cell_name.to_owned()
         } else {
-            canonical_bazel_repo_name_for_cell(cell_name, cell_alias_resolver)
+            canonical_bazel_repo_name_for_cell(cell_name, cell_alias_resolver, root_cell_name)
         };
         let cfg_hash = label.label().cfg().output_hash().as_str();
         format!("{}/gen/{}/{}", buck_out_root, output_cell_name, cfg_hash)
@@ -1608,15 +1629,17 @@ pub fn workspace_root_from_label(
         >,
     >,
     cell_alias_resolver: Option<&CellAliasResolver>,
+    root_cell_name: Option<CellName>,
 ) -> String {
     let Some(label) = label else {
         return String::new();
     };
     let cell_name = label.label().target().pkg().cell_name().as_str();
-    if slug_core::cells::is_root_cell_name(cell_name) {
+    if is_root_cell_for_context(cell_name, root_cell_name) {
         String::new()
     } else {
-        let output_cell_name = canonical_bazel_repo_name_for_cell(cell_name, cell_alias_resolver);
+        let output_cell_name =
+            canonical_bazel_repo_name_for_cell(cell_name, cell_alias_resolver, root_cell_name);
         format!("external/{}", output_cell_name)
     }
 }
@@ -1624,8 +1647,9 @@ pub fn workspace_root_from_label(
 fn canonical_bazel_repo_name_for_cell(
     cell_name: &str,
     cell_alias_resolver: Option<&CellAliasResolver>,
+    root_cell_name: Option<CellName>,
 ) -> String {
-    if slug_core::cells::is_root_cell_name(cell_name) {
+    if is_root_cell_for_context(cell_name, root_cell_name) {
         return String::new();
     }
 
@@ -1633,6 +1657,11 @@ fn canonical_bazel_repo_name_for_cell(
         .and_then(|resolver| resolver.resolve_declared_or_runtime_alias(cell_name))
         .map(|cell| cell.as_str().to_owned())
         .unwrap_or_else(|| cell_name.to_owned())
+}
+
+fn is_root_cell_for_context(cell_name: &str, root_cell_name: Option<CellName>) -> bool {
+    root_cell_name.is_some_and(|root| root.as_str() == cell_name)
+        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name))
 }
 
 #[cfg(test)]
@@ -1666,7 +1695,7 @@ mod tests {
         )?;
 
         assert_eq!(
-            canonical_bazel_repo_name_for_cell(apparent, Some(&resolver)),
+            canonical_bazel_repo_name_for_cell(apparent, Some(&resolver), None),
             canonical
         );
         Ok(())
@@ -1687,7 +1716,7 @@ mod tests {
         )?;
 
         assert_eq!(
-            canonical_bazel_repo_name_for_cell(apparent, Some(&resolver)),
+            canonical_bazel_repo_name_for_cell(apparent, Some(&resolver), None),
             apparent
         );
         assert_eq!(
@@ -1709,7 +1738,7 @@ mod tests {
         let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
 
         assert_eq!(
-            canonical_bazel_repo_name_for_cell(apparent, Some(&resolver)),
+            canonical_bazel_repo_name_for_cell(apparent, Some(&resolver), None),
             apparent
         );
         assert_eq!(
@@ -1728,7 +1757,10 @@ mod tests {
             wrong_global.to_owned(),
         );
 
-        assert_eq!(canonical_bazel_repo_name_for_cell(apparent, None), apparent);
+        assert_eq!(
+            canonical_bazel_repo_name_for_cell(apparent, None, None),
+            apparent
+        );
         assert_eq!(
             slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
@@ -1737,7 +1769,21 @@ mod tests {
 
     #[test]
     fn analysis_context_repo_name_root_cell_stays_empty() {
-        assert_eq!(canonical_bazel_repo_name_for_cell("root", None), "");
+        assert_eq!(canonical_bazel_repo_name_for_cell("root", None, None), "");
+    }
+
+    #[test]
+    fn analysis_context_repo_name_uses_explicit_root_cell() {
+        let root_cell = CellName::testing_new("analysis_actual_root");
+
+        assert_eq!(
+            canonical_bazel_repo_name_for_cell("analysis_actual_root", None, Some(root_cell)),
+            ""
+        );
+        assert_eq!(
+            canonical_bazel_repo_name_for_cell("root", None, Some(root_cell)),
+            "root"
+        );
     }
 }
 
