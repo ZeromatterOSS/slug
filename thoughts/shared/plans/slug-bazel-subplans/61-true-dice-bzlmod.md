@@ -35,11 +35,12 @@ Current classification:
 - Replay correctness still has remaining repository/materialization-policy work
   in places where Bazel owns explicit Skyframe keys, but the old resolver bridge
   is no longer the active blocker.
-- Repository materialization recorded-input manifest content, marker/local rule
-  state, BUILD-file layout probes, foreign top-level symlink detection, and
-  invocation-specific layout probes for the known git/local/llvm repository
-  classes now have production DICE read paths. Output-tree digest checks now
-  use DICE-owned metadata, directory-entry, and byte reads.
+- Repository materialization recorded-input manifest content and validation,
+  marker/local rule state, BUILD-file layout probes, foreign top-level symlink
+  detection, and invocation-specific layout probes for the known
+  git/local/llvm repository classes now have production DICE read paths.
+  Output-tree digest checks now use DICE-owned metadata, directory-entry, and
+  byte reads.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -528,6 +529,26 @@ Current state to preserve:
   `cargo build -p slug`, focused Plan 61 materialization pytest selectors for
   repo-env recorded inputs, watched labels, corrupted local layout, and corrupted
   output digest (`4 passed, 152 deselected`), and `git diff --check`.
+- 2026-05-29 repository recorded-input validation DICE read:
+  `RepoMaterializationRecordedInputsValidationKey` no longer calls the direct
+  filesystem validator in production. It parses persisted `FILE`, `DIRENTS`,
+  `DIRTREE`, `ENV`, and `REPO_MAPPING` rows itself and asks the late-bound
+  materialization state reader for recorded file, directory-listing, and
+  directory-tree marker values. The production reader computes those markers
+  through project DICE metadata, directory-entry, and byte-content reads,
+  including binary `DIRTREE` leaves; no-reader production fallback is an
+  invalid unreadable state. Guardrails: `cargo test -p slug_external_cells
+  recorded_input_markers_match_lockfile_format_through_dice_reads --lib`,
+  `cargo test -p slug_bzlmod
+  materialization_state_key_validity_tracks_reader_provenance --lib`,
+  `cargo test -p slug_bzlmod materialization_manifest --lib`, `cargo test -p
+  slug_external_cells --lib`, `cargo test -p slug_bzlmod --lib` (406 passed),
+  `cargo build -p slug`, focused Plan 61 materialization pytest selectors for
+  repo-env recorded inputs, watched labels, corrupted local layout, and
+  corrupted output digest (`4 passed, 152 deselected`), focused repository_ctx
+  recorded-input selectors for read/template/patch/extract/Label repo mappings
+  and text/binary watch_tree (`7 passed, 149 deselected`), `cargo fmt --check`,
+  and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1567,10 +1588,11 @@ hardening behavior around it.
      known git/local/llvm repository classes use DICE metadata/content/dir-entry
      reads too, and no-reader production fallback is invalid rather than a
      direct layout probe. Output-tree digest checks use DICE metadata,
-     directory-entry, and byte-content reads. Materialization child state keys now
-     cache only reader-backed state as valid; direct fallback and recorded-input
-     validation state remain invalid until they are replaced by DICE-backed input
-     nodes.
+     directory-entry, and byte-content reads. Recorded-input validation for
+     `FILE`, `DIRENTS`, `DIRTREE`, `ENV`, and `REPO_MAPPING` rows now uses those
+     reader-backed DICE inputs in production. Materialization child state keys
+     cache only reader-backed state as valid; direct fallback state remains
+     invalid.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

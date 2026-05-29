@@ -54,8 +54,11 @@ use crate::dice_graph::RepoMaterializationManifestKey;
 use crate::dice_graph::RepoMaterializationManifestValue;
 use crate::dice_graph::record_bzlmod_event;
 use crate::dice_graph::repo_env_policy_digest;
+use crate::lockfile::RecordedInput;
 use crate::lockfile::compute_sha256_hex;
-use crate::lockfile::validate_recorded_inputs_current;
+use crate::lockfile::parse_recorded_input_with_value;
+use crate::lockfile::recorded_input_changed_reason;
+use crate::lockfile::recorded_input_changed_reason_with_values;
 use crate::repo_spec::RepoSpec;
 use crate::repository_executor::RepositoryLabelResolution;
 use crate::repository_invocations::AttrValue;
@@ -116,6 +119,27 @@ pub trait RepositoryMaterializationStateReader: Send + Sync + 'static {
         ctx: &mut DiceComputations<'_>,
         workspace_id: crate::WorkspaceId,
         repo_dir: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>>;
+
+    async fn repo_recorded_file_marker_value(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        recorded_path: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>>;
+
+    async fn repo_recorded_dirents_marker_value(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        recorded_path: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>>;
+
+    async fn repo_recorded_dirtree_marker_value(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        recorded_path: Arc<PathBuf>,
     ) -> Result<Arc<str>, Arc<str>>;
 }
 
@@ -699,7 +723,12 @@ fn repository_recorded_inputs_digest(
     let content =
         std::fs::read_to_string(&manifest_path).map_err(|_| "recorded_inputs_unreadable")?;
     let recorded_inputs = parse_repository_recorded_inputs(&content);
-    validate_recorded_inputs_current(&recorded_inputs, None, repo_env, repo_mappings)?;
+    crate::lockfile::validate_recorded_inputs_current(
+        &recorded_inputs,
+        None,
+        repo_env,
+        repo_mappings,
+    )?;
     Ok(Some(compute_sha256_hex(content.as_bytes())))
 }
 
@@ -2020,6 +2049,7 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
         };
         let recorded_inputs = Arc::new(parse_repository_recorded_inputs(&manifest_content));
         let validation_key = RepoMaterializationRecordedInputsValidationKey {
+            workspace_id: self.0.workspace_id.clone(),
             recorded_inputs,
             repo_env: self.0.repo_env.clone(),
             repo_mappings: self.0.repo_mappings.clone(),
@@ -2122,15 +2152,184 @@ impl Key for RepoMaterializationRecordedInputsManifestContentKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "RepoMaterializationRecordedInputsValidationKey({})",
+    "RepoMaterializationRecordedInputsValidationKey({}, {})",
+    workspace_id.stable_hash(),
     recorded_inputs.len()
 )]
 struct RepoMaterializationRecordedInputsValidationKey {
+    workspace_id: crate::WorkspaceId,
     recorded_inputs: Arc<Vec<String>>,
     repo_env: Arc<BTreeMap<String, String>>,
     repo_mappings: Arc<crate::RepoMappingSnapshot>,
+}
+
+fn resolve_repo_materialization_recorded_path(
+    path: &Path,
+    workspace_id: &crate::WorkspaceId,
+) -> Result<PathBuf, String> {
+    if path.is_absolute() {
+        return Ok(path.to_path_buf());
+    }
+    let raw = path.to_string_lossy();
+    for prefix in ["@@//", "@//", "//"] {
+        if let Some(rest) = raw.strip_prefix(prefix) {
+            return Ok(workspace_id.canonical_project_root.join(rest));
+        }
+    }
+    Err("recorded_input_unsupported".to_owned())
+}
+
+async fn validate_repo_materialization_recorded_inputs_with_reader(
+    ctx: &mut DiceComputations<'_>,
+    reader: &'static dyn RepositoryMaterializationStateReader,
+    workspace_id: crate::WorkspaceId,
+    recorded_inputs: &[String],
+    repo_env: &BTreeMap<String, String>,
+    repo_mappings: &crate::RepoMappingSnapshot,
+) -> RepoMaterializationStateValue<Result<(), Arc<str>>> {
+    for raw in recorded_inputs {
+        let Some((input, old_value)) = parse_recorded_input_with_value(raw) else {
+            return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                "recorded_input_malformed",
+            )));
+        };
+        match input {
+            RecordedInput::File(path) => {
+                let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
+                    Ok(path) => path,
+                    Err(reason) => {
+                        return RepoMaterializationStateValue::tracked(Err(reason.into()));
+                    }
+                };
+                let Some(old_value) = old_value else {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        "recorded_input_malformed",
+                    )));
+                };
+                let current = match reader
+                    .repo_recorded_file_marker_value(
+                        ctx,
+                        workspace_id.clone(),
+                        Arc::new(path.clone()),
+                    )
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                            "recorded_input_stat_failed",
+                        )));
+                    }
+                };
+                if current.as_ref() != old_value {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        recorded_input_changed_reason_with_values(raw, &old_value, &current),
+                    )));
+                }
+            }
+            RecordedInput::Dirents(path) => {
+                let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
+                    Ok(path) => path,
+                    Err(reason) => {
+                        return RepoMaterializationStateValue::tracked(Err(reason.into()));
+                    }
+                };
+                let Some(old_value) = old_value else {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        "recorded_input_malformed",
+                    )));
+                };
+                let current = match reader
+                    .repo_recorded_dirents_marker_value(
+                        ctx,
+                        workspace_id.clone(),
+                        Arc::new(path.clone()),
+                    )
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                            "recorded_input_stat_failed",
+                        )));
+                    }
+                };
+                if current.as_ref() != old_value {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        recorded_input_changed_reason(raw),
+                    )));
+                }
+            }
+            RecordedInput::DirTree(path) => {
+                let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
+                    Ok(path) => path,
+                    Err(reason) => {
+                        return RepoMaterializationStateValue::tracked(Err(reason.into()));
+                    }
+                };
+                let Some(old_value) = old_value else {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        "recorded_input_malformed",
+                    )));
+                };
+                let current = match reader
+                    .repo_recorded_dirtree_marker_value(
+                        ctx,
+                        workspace_id.clone(),
+                        Arc::new(path.clone()),
+                    )
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                            "recorded_input_stat_failed",
+                        )));
+                    }
+                };
+                if current.as_ref() != old_value {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        recorded_input_changed_reason(raw),
+                    )));
+                }
+            }
+            RecordedInput::Env(name) => {
+                let current = repo_env.get(&name).cloned();
+                if current != old_value {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        recorded_input_changed_reason(raw),
+                    )));
+                }
+            }
+            RecordedInput::RepoMapping {
+                source_repo,
+                apparent,
+            } => {
+                let Some(source_mapping) = repo_mappings.get(&source_repo) else {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        recorded_input_changed_reason(raw),
+                    )));
+                };
+                let current = source_mapping
+                    .get(&apparent)
+                    .cloned()
+                    .or_else(|| Some(apparent.clone()));
+                if current != old_value {
+                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                        recorded_input_changed_reason(raw),
+                    )));
+                }
+            }
+            RecordedInput::Unsupported => {
+                return RepoMaterializationStateValue::tracked(Err(Arc::from(
+                    "recorded_input_unsupported",
+                )));
+            }
+        }
+    }
+    RepoMaterializationStateValue::tracked(Ok(()))
 }
 
 #[async_trait]
@@ -2139,18 +2338,39 @@ impl Key for RepoMaterializationRecordedInputsValidationKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        RepoMaterializationStateValue::untracked(
-            validate_recorded_inputs_current(
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            return validate_repo_materialization_recorded_inputs_with_reader(
+                ctx,
+                *reader,
+                self.workspace_id.clone(),
                 self.recorded_inputs.as_slice(),
-                None,
-                Some(self.repo_env.as_ref()),
-                Some(self.repo_mappings.as_ref()),
+                self.repo_env.as_ref(),
+                self.repo_mappings.as_ref(),
             )
-            .map_err(Arc::from),
-        )
+            .await;
+        }
+
+        #[cfg(test)]
+        {
+            return RepoMaterializationStateValue::untracked(
+                crate::lockfile::validate_recorded_inputs_current(
+                    self.recorded_inputs.as_slice(),
+                    None,
+                    Some(self.repo_env.as_ref()),
+                    Some(self.repo_mappings.as_ref()),
+                )
+                .map_err(Arc::from),
+            );
+        }
+        #[cfg(not(test))]
+        {
+            RepoMaterializationStateValue::untracked(Err(Arc::from(
+                "recorded_inputs_reader_unavailable",
+            )))
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3594,6 +3814,9 @@ mod tests {
         let validation: RepoMaterializationStateValue<Result<(), Arc<str>>> =
             RepoMaterializationStateValue::untracked(Ok(()));
         assert!(!<RepoMaterializationRecordedInputsValidationKey as Key>::validity(&validation));
+        let validation: RepoMaterializationStateValue<Result<(), Arc<str>>> =
+            RepoMaterializationStateValue::tracked(Ok(()));
+        assert!(<RepoMaterializationRecordedInputsValidationKey as Key>::validity(&validation));
     }
 
     #[tokio::test]

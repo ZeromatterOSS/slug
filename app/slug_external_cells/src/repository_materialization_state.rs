@@ -6,8 +6,10 @@
  * License, Version 2.0 found in the LICENSE-APACHE file in the root directory.
  */
 
+use std::future::Future;
 use std::path::Path;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -16,6 +18,7 @@ use dice::DiceComputations;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod::BzlmodEventKind;
+use slug_bzlmod::RecordedDirtreeEntryState;
 use slug_bzlmod::RepositoryMaterializationStateReader;
 use slug_bzlmod::WorkspaceId;
 use slug_bzlmod::record_bzlmod_event;
@@ -114,6 +117,137 @@ fn repo_output_digest_error(
     reason: impl std::fmt::Display,
 ) -> Arc<str> {
     Arc::from(format!("failed to digest repository output '{}': {reason}", path).as_str())
+}
+
+fn repo_recorded_input_error(
+    path: &ProjectRelativePath,
+    reason: impl std::fmt::Display,
+) -> Arc<str> {
+    Arc::from(format!("failed to read recorded input '{}': {reason}", path).as_str())
+}
+
+async fn repo_recorded_file_marker_value_for_project_path(
+    ctx: &mut DiceComputations<'_>,
+    project_path: ProjectRelativePathBuf,
+) -> Result<Arc<str>, Arc<str>> {
+    record_bzlmod_event(
+        BzlmodEventKind::RepoMaterializationStateRead,
+        format!("metadata:{}", project_path.as_str()),
+    );
+    let metadata =
+        DiceFileComputations::read_project_path_metadata_if_exists(ctx, project_path.as_ref())
+            .await
+            .map_err(|e| repo_recorded_input_error(project_path.as_ref(), e))?;
+    match metadata {
+        None => Ok(Arc::from("ENOENT")),
+        Some(RawPathMetadata::Directory) => Ok(Arc::from("DIR")),
+        Some(RawPathMetadata::File(_)) => {
+            record_bzlmod_event(
+                BzlmodEventKind::RepoMaterializationStateRead,
+                format!("read_bytes:{}", project_path.as_str()),
+            );
+            let bytes =
+                DiceFileComputations::read_project_file_bytes_if_exists(ctx, project_path.as_ref())
+                    .await
+                    .map_err(|e| repo_recorded_input_error(project_path.as_ref(), e))?
+                    .ok_or_else(|| {
+                        repo_recorded_input_error(project_path.as_ref(), "missing file")
+                    })?;
+            Ok(Arc::from(
+                slug_bzlmod::compute_sha256_hex(bytes.as_slice()).as_str(),
+            ))
+        }
+        Some(RawPathMetadata::Symlink { .. }) => Err(repo_recorded_input_error(
+            project_path.as_ref(),
+            "symlink recorded inputs are unsupported",
+        )),
+    }
+}
+
+async fn repo_recorded_dirents_marker_value_for_project_path(
+    ctx: &mut DiceComputations<'_>,
+    project_path: ProjectRelativePathBuf,
+) -> Result<Arc<str>, Arc<str>> {
+    record_bzlmod_event(
+        BzlmodEventKind::RepoMaterializationStateRead,
+        format!("dir_entries:{}", project_path.as_str()),
+    );
+    let entries = DiceFileComputations::read_project_dir_entry_names(ctx, project_path.as_ref())
+        .await
+        .map_err(|e| repo_recorded_input_error(project_path.as_ref(), e))?;
+    Ok(Arc::from(
+        slug_bzlmod::recorded_dirents_marker_value_from_entries(entries.as_ref()).as_str(),
+    ))
+}
+
+fn repo_recorded_dirtree_marker_value_for_project_path<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    project_path: ProjectRelativePathBuf,
+) -> Pin<Box<dyn Future<Output = Result<Arc<str>, Arc<str>>> + Send + 'a>> {
+    Box::pin(async move {
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationStateRead,
+            format!("dir_entries:{}", project_path.as_str()),
+        );
+        let entries =
+            DiceFileComputations::read_project_dir_entry_names(ctx, project_path.as_ref())
+                .await
+                .map_err(|e| repo_recorded_input_error(project_path.as_ref(), e))?;
+        let mut entry_states = Vec::with_capacity(entries.len());
+        for entry in entries.iter() {
+            let child_path = child_project_path(&project_path, entry).ok_or_else(|| {
+                repo_recorded_input_error(project_path.as_ref(), "invalid child path")
+            })?;
+            record_bzlmod_event(
+                BzlmodEventKind::RepoMaterializationStateRead,
+                format!("metadata:{}", child_path.as_str()),
+            );
+            let metadata = DiceFileComputations::read_project_path_metadata_if_exists(
+                ctx,
+                child_path.as_ref(),
+            )
+            .await
+            .map_err(|e| repo_recorded_input_error(child_path.as_ref(), e))?
+            .ok_or_else(|| repo_recorded_input_error(child_path.as_ref(), "missing path"))?;
+            match metadata {
+                RawPathMetadata::Directory => {
+                    let digest =
+                        repo_recorded_dirtree_marker_value_for_project_path(ctx, child_path)
+                            .await?;
+                    entry_states.push(RecordedDirtreeEntryState::DirectoryDigest(
+                        digest.to_string(),
+                    ));
+                }
+                RawPathMetadata::File(_) => {
+                    record_bzlmod_event(
+                        BzlmodEventKind::RepoMaterializationStateRead,
+                        format!("read_bytes:{}", child_path.as_str()),
+                    );
+                    let bytes = DiceFileComputations::read_project_file_bytes_if_exists(
+                        ctx,
+                        child_path.as_ref(),
+                    )
+                    .await
+                    .map_err(|e| repo_recorded_input_error(child_path.as_ref(), e))?
+                    .ok_or_else(|| {
+                        repo_recorded_input_error(child_path.as_ref(), "missing file")
+                    })?;
+                    entry_states.push(RecordedDirtreeEntryState::FileSha256(
+                        Sha256::digest(bytes.as_slice()).to_vec(),
+                    ));
+                }
+                RawPathMetadata::Symlink { .. } => {
+                    entry_states.push(RecordedDirtreeEntryState::Other);
+                }
+            }
+        }
+        let digest = slug_bzlmod::recorded_dirtree_marker_value_from_entry_states(
+            entries.as_ref(),
+            &entry_states,
+        )
+        .map_err(|e| repo_recorded_input_error(project_path.as_ref(), e))?;
+        Ok(Arc::from(digest.as_str()))
+    })
 }
 
 async fn hash_repository_output_entry(
@@ -392,5 +526,130 @@ impl RepositoryMaterializationStateReader for DiceRepositoryMaterializationState
             )
             .as_str(),
         ))
+    }
+
+    async fn repo_recorded_file_marker_value(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        recorded_path: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>> {
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let project_path =
+            repo_state_project_path(&workspace_id, project_root, recorded_path.as_ref())?;
+        repo_recorded_file_marker_value_for_project_path(ctx, project_path).await
+    }
+
+    async fn repo_recorded_dirents_marker_value(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        recorded_path: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>> {
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let project_path =
+            repo_state_project_path(&workspace_id, project_root, recorded_path.as_ref())?;
+        repo_recorded_dirents_marker_value_for_project_path(ctx, project_path).await
+    }
+
+    async fn repo_recorded_dirtree_marker_value(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        recorded_path: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>> {
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let project_path =
+            repo_state_project_path(&workspace_id, project_root, recorded_path.as_ref())?;
+        repo_recorded_dirtree_marker_value_for_project_path(ctx, project_path).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use dice::UserComputationData;
+    use slug_common::dice::data::testing::SetTestingIoProvider;
+    use slug_core::fs::project::ProjectRootTemp;
+
+    use super::*;
+
+    fn recorded_value(recorded: String) -> String {
+        recorded
+            .split_once(' ')
+            .map(|(_, value)| value.to_owned())
+            .expect("recorded input has value")
+    }
+
+    #[tokio::test]
+    async fn recorded_input_markers_match_lockfile_format_through_dice_reads() {
+        let fs = ProjectRootTemp::new().unwrap();
+        let root = fs.path().root().as_path().to_path_buf();
+        let watched = root.join("watched.txt");
+        let dir = root.join("watched_dir");
+        let nested = dir.join("nested");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(&watched, "first\n").unwrap();
+        std::fs::write(dir.join("a.txt"), "alpha\n").unwrap();
+        std::fs::write(nested.join("b.txt"), "beta\n").unwrap();
+
+        let workspace_id = WorkspaceId::new(root.clone(), root.join("buck-out/custom-output-base"));
+        let mut dice = dice::testing::DiceBuilder::new()
+            .set_data(|data| data.set_testing_io_provider(&fs))
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let file_marker = DICE_REPOSITORY_MATERIALIZATION_STATE_READER
+            .repo_recorded_file_marker_value(
+                &mut dice,
+                workspace_id.clone(),
+                Arc::new(watched.clone()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            file_marker.as_ref(),
+            recorded_value(slug_bzlmod::recorded_file_input(&watched).unwrap())
+        );
+
+        let dirents_marker = DICE_REPOSITORY_MATERIALIZATION_STATE_READER
+            .repo_recorded_dirents_marker_value(
+                &mut dice,
+                workspace_id.clone(),
+                Arc::new(dir.clone()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            dirents_marker.as_ref(),
+            recorded_value(slug_bzlmod::recorded_dirents_input(&dir).unwrap())
+        );
+
+        let dirtree_marker = DICE_REPOSITORY_MATERIALIZATION_STATE_READER
+            .repo_recorded_dirtree_marker_value(
+                &mut dice,
+                workspace_id.clone(),
+                Arc::new(dir.clone()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            dirtree_marker.as_ref(),
+            recorded_value(slug_bzlmod::recorded_dirtree_input(&dir).unwrap())
+        );
+
+        std::fs::write(&watched, "second\n").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let changed_file_marker = DICE_REPOSITORY_MATERIALIZATION_STATE_READER
+            .repo_recorded_file_marker_value(&mut dice, workspace_id, Arc::new(watched))
+            .await
+            .unwrap();
+        assert_ne!(file_marker, changed_file_marker);
     }
 }

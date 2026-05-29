@@ -480,7 +480,7 @@ fn validate_base64_sha256_lockfile_digest(
     Ok(())
 }
 
-enum RecordedInput {
+pub(crate) enum RecordedInput {
     File(PathBuf),
     Dirents(PathBuf),
     DirTree(PathBuf),
@@ -490,6 +490,14 @@ enum RecordedInput {
         apparent: String,
     },
     Unsupported,
+}
+
+/// Per-entry state used to reproduce Bazel's `RepoRecordedInput.DirTree`
+/// marker format from DICE-backed file reads.
+pub enum RecordedDirtreeEntryState {
+    FileSha256(Vec<u8>),
+    DirectoryDigest(String),
+    Other,
 }
 
 fn validate_recorded_inputs_for_replay(
@@ -572,7 +580,7 @@ fn validate_recorded_inputs_for_replay(
     Ok(())
 }
 
-fn recorded_input_changed_reason(raw: &str) -> String {
+pub(crate) fn recorded_input_changed_reason(raw: &str) -> String {
     let identity = raw
         .split_once(' ')
         .map(|(identity, _)| identity)
@@ -580,7 +588,11 @@ fn recorded_input_changed_reason(raw: &str) -> String {
     format!("recorded_input_changed:{identity}")
 }
 
-fn recorded_input_changed_reason_with_values(raw: &str, old: &str, current: &str) -> String {
+pub(crate) fn recorded_input_changed_reason_with_values(
+    raw: &str,
+    old: &str,
+    current: &str,
+) -> String {
     format!(
         "{}:old={}:current={}",
         recorded_input_changed_reason(raw),
@@ -640,7 +652,9 @@ fn resolve_recorded_path(path: &Path, workspace_root: Option<&Path>) -> Result<P
     Err("recorded_input_unsupported".to_owned())
 }
 
-fn parse_recorded_input_with_value(raw: &str) -> Option<(RecordedInput, Option<String>)> {
+pub(crate) fn parse_recorded_input_with_value(
+    raw: &str,
+) -> Option<(RecordedInput, Option<String>)> {
     let space = raw.find(' ')?;
     if space == 0 {
         return None;
@@ -736,23 +750,64 @@ fn recorded_file_marker_value(path: &Path) -> std::io::Result<String> {
 fn recorded_dirents_marker_value(path: &Path) -> std::io::Result<String> {
     let mut entries = sorted_directory_entry_names(path)?;
     entries.sort();
-    Ok(bazel_fingerprint_add_strings_hex(&entries))
+    Ok(recorded_dirents_marker_value_from_entries(&entries))
 }
 
 fn recorded_dirtree_marker_value(path: &Path) -> std::io::Result<String> {
     let entries = sorted_directory_entry_names(path)?;
-    let mut subdir_digests = Vec::new();
-    let mut file_values = Vec::new();
+    let mut entry_states = Vec::new();
     for entry in &entries {
         let entry_path = path.join(entry);
         let metadata = fs::metadata(&entry_path)?;
         if metadata.is_dir() {
-            subdir_digests.push(recorded_dirtree_marker_value(&entry_path)?);
-            file_values.push((2, None));
+            entry_states.push(RecordedDirtreeEntryState::DirectoryDigest(
+                recorded_dirtree_marker_value(&entry_path)?,
+            ));
         } else if metadata.is_file() {
-            file_values.push((0, Some(Sha256::digest(fs::read(&entry_path)?).to_vec())));
+            entry_states.push(RecordedDirtreeEntryState::FileSha256(
+                Sha256::digest(fs::read(&entry_path)?).to_vec(),
+            ));
         } else {
-            file_values.push((1, None));
+            entry_states.push(RecordedDirtreeEntryState::Other);
+        }
+    }
+
+    recorded_dirtree_marker_value_from_entry_states(&entries, &entry_states)
+        .map_err(std::io::Error::other)
+}
+
+pub fn recorded_dirents_marker_value_from_entries(entries: &[String]) -> String {
+    let mut entries = entries.to_vec();
+    entries.sort();
+    bazel_fingerprint_add_strings_hex(&entries)
+}
+
+pub fn recorded_dirtree_marker_value_from_entry_states(
+    entries: &[String],
+    entry_states: &[RecordedDirtreeEntryState],
+) -> Result<String, String> {
+    if entries.len() != entry_states.len() {
+        return Err(format!(
+            "dirtree entry state mismatch: {} entries, {} states",
+            entries.len(),
+            entry_states.len()
+        ));
+    }
+
+    let mut subdir_digests = Vec::new();
+    let mut file_values = Vec::new();
+    for state in entry_states {
+        match state {
+            RecordedDirtreeEntryState::FileSha256(digest) => {
+                file_values.push((0, Some(digest.as_slice())));
+            }
+            RecordedDirtreeEntryState::DirectoryDigest(digest) => {
+                subdir_digests.push(digest.clone());
+                file_values.push((2, None));
+            }
+            RecordedDirtreeEntryState::Other => {
+                file_values.push((1, None));
+            }
         }
     }
 
@@ -762,7 +817,7 @@ fn recorded_dirtree_marker_value(path: &Path) -> std::io::Result<String> {
     for (file_state_type_ordinal, digest) in file_values {
         encode_varint(file_state_type_ordinal, &mut bytes);
         if let Some(digest) = digest {
-            bytes.extend_from_slice(&digest);
+            bytes.extend_from_slice(digest);
         }
     }
     Ok(hex::encode(Sha256::digest(&bytes)))
