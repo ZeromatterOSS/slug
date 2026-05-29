@@ -2078,6 +2078,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             if is_bazel_label_string(s) {
                 let path = this.resolve_label_to_filesystem_path(s)?;
                 ensure_label_path_materialized(&path);
+                repository_ctx_maybe_record_file_input(this, &path, "auto")?;
                 path.to_string_lossy().to_string()
             } else {
                 s.to_owned()
@@ -2089,6 +2090,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             let label_str = format!("{}", path_arg);
             let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
+            repository_ctx_maybe_record_file_input(this, &path, "auto")?;
             path.to_string_lossy().to_string()
         } else {
             path_arg.to_repr()

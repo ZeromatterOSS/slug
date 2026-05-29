@@ -2169,6 +2169,15 @@ hardening behavior around it.
      script while later replay had no dependency on that script file. Focused
      guardrails prove script edits rematerialize Starlark repositories and
      re-execute module extensions.
+   - `repository_ctx.path(Label(...))`,
+     `repository_ctx.path("//label:string")`, and
+     `module_ctx.path(Label(...))` now record the resolved label target as an
+     auto-watched input when constructing the returned `RepositoryPath`. This
+     closes the replay hole where later `RepositoryPath.exists`/`is_dir` probes
+     could branch on a source file without leaving any recorded input. Focused
+     guardrails first failed with stale `missing` output / absent
+     `.slug_repo_recorded_inputs`; after the fix, create-transition tests prove
+     module extensions re-execute and Starlark repositories rematerialize.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

@@ -8036,6 +8036,130 @@ use_repo(exec_label, "exec_label_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_path_label_create_reexecutes_extension(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext.path records label paths."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_path_label_ext+path_label_repo"
+    marker = buck.cwd / "marker.txt"
+    _write(
+        buck.cwd / "module_path_label_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+path_label_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _module_path_label_ext_impl(module_ctx):
+    path = module_ctx.path(Label("//:marker.txt"))
+    payload = "missing\\n"
+    if path.exists:
+        payload = "present\\n"
+    path_label_repo_rule(name = "path_label_repo", payload = payload)
+
+module_path_label_ext = module_extension(
+    implementation = _module_path_label_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_path_label_input")
+
+path_label = use_extension("//:module_path_label_ext.bzl", "module_path_label_ext")
+use_repo(path_label, "path_label_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_path_label_repo",
+    srcs = ["@path_label_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_path_label_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "missing\n"
+
+    _write(marker, "created\n")
+    await buck.build("//:uses_path_label_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "present\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_path_label_create_rematerializes_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkRepositoryContext.path and RepoRecordedInput.File."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+repo_path_label_ext+path_label_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    marker = buck.cwd / "marker.txt"
+    _write(
+        buck.cwd / "repo_path_label_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    path = repository_ctx.path(Label("//:marker.txt"))
+    payload = "missing\\n"
+    if path.exists:
+        payload = "present\\n"
+    repository_ctx.file("data.txt", payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+path_label_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_path_label_ext_impl(module_ctx):
+    path_label_repo_rule(name = "path_label_repo")
+
+repo_path_label_ext = module_extension(
+    implementation = _repo_path_label_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repository_ctx_path_label_input")
+
+path_label = use_extension("//:repo_path_label_ext.bzl", "repo_path_label_ext")
+use_repo(path_label, "path_label_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_path_label_repo",
+    srcs = ["@path_label_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_path_label_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "missing\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write(marker, "created\n")
+    await buck.build("//:uses_path_label_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "present\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_label_taking_operations_materialize_or_fail_directly(
     buck: Buck,
 ) -> None:

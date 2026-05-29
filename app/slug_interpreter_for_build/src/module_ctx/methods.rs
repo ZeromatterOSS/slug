@@ -491,6 +491,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             // Plan 36: ensure the spoke is on disk before the caller
             // dereferences the returned path (e.g. with `mctx.execute`).
             ensure_label_path_materialized(&resolved);
+            this.maybe_record_file_input(&resolved, ShouldWatch::Auto)?;
             return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
         } else {
             return Err(slug_error::slug_error!(
