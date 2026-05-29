@@ -330,9 +330,11 @@ pub trait SetBzlmodDiceInputs {
                 String::new(),
                 Arc::new(HashMap::new()),
             ),
-            BzlmodLockfileInputsDataValue::for_workspace(
+            BzlmodLockfileInputsDataValue::for_workspace_policy(
                 workspace_id.clone(),
-                Arc::new(BzlmodLockfileInputsValue::default()),
+                LockfileMode::Update,
+                None,
+                false,
             ),
             BzlmodRepoEnvDataValue::for_workspace(workspace_id.clone(), Arc::new(BTreeMap::new())),
             RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), Vec::new()),

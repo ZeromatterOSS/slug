@@ -845,9 +845,12 @@ Current state to preserve:
   (workspace, mode, hidden path, and root-module-present), and
   `BzlmodLockfileInputsKey` recomputes the current value through
   `BzlmodCleanLockfileInputsKey`. Low-level tests retain a test-only
-  precomputed fallback for cases that do not install the clean-graph IO binding.
-  Guardrails: `cargo test -p slug_bzlmod lockfile_inputs --lib` and
-  `cargo check -p slug_bzlmod`.
+  precomputed constructor for cases that do not install the clean-graph IO
+  binding; production config-load and empty-workspace setup now call the
+  explicit policy constructor, so full-value lockfile input injection is not a
+  production API. Guardrails: `cargo test -p slug_bzlmod lockfile_inputs --lib`,
+  `cargo check -p slug_bzlmod`, `cargo check -p slug_common`, and
+  `cargo test -p slug_common bzlmod --lib`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.

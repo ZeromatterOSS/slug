@@ -3831,20 +3831,20 @@ pub struct BzlmodLockfileInputsDataValue {
 }
 
 impl BzlmodLockfileInputsDataValue {
+    #[cfg(test)]
     pub fn for_workspace(
         workspace_id: WorkspaceId,
         lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
     ) -> Self {
         let root_module_present =
             lockfile_inputs.visible_lockfile.is_some() || lockfile_inputs.hidden_lockfile.is_some();
-        Self::for_workspace_policy(
+        Self {
             workspace_id,
-            lockfile_inputs.lockfile_mode,
-            lockfile_inputs.hidden_lockfile_path.clone(),
+            lockfile_mode: lockfile_inputs.lockfile_mode,
+            hidden_lockfile_path: lockfile_inputs.hidden_lockfile_path.clone(),
             root_module_present,
-            #[cfg(test)]
-            Some(lockfile_inputs),
-        )
+            precomputed_lockfile_inputs: Some(lockfile_inputs),
+        }
     }
 
     pub fn for_workspace_policy(
@@ -3852,7 +3852,6 @@ impl BzlmodLockfileInputsDataValue {
         lockfile_mode: crate::LockfileMode,
         hidden_lockfile_path: Option<PathBuf>,
         root_module_present: bool,
-        #[cfg(test)] precomputed_lockfile_inputs: Option<Arc<BzlmodLockfileInputsValue>>,
     ) -> Self {
         Self {
             workspace_id,
@@ -3860,7 +3859,7 @@ impl BzlmodLockfileInputsDataValue {
             hidden_lockfile_path,
             root_module_present,
             #[cfg(test)]
-            precomputed_lockfile_inputs,
+            precomputed_lockfile_inputs: None,
         }
     }
 }
@@ -5537,7 +5536,6 @@ mod tests {
                 LockfileMode::Update,
                 Some(hidden_path),
                 true,
-                None,
             )),
         )])?;
         let mut dice = updater.commit().await;

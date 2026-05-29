@@ -2386,10 +2386,13 @@ impl BuckConfigBasedCells {
             |value| value.graph_digest.clone(),
         );
         let resolved_graph_for_dice = clean_outputs.as_ref().map(|value| value.graph.clone());
-        let lockfile_inputs_for_dice = slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
-            key.workspace_id.clone(),
-            clean_resolved_module_graph.lockfile_inputs.clone(),
-        );
+        let lockfile_inputs_for_dice =
+            slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace_policy(
+                key.workspace_id.clone(),
+                key.options.lockfile_mode,
+                key.options.hidden_lockfile_path.clone(),
+                clean_outputs.is_some(),
+            );
         let repo_env_for_dice = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             key.workspace_id.clone(),
             Arc::new(key.options.repo_env.clone()),
