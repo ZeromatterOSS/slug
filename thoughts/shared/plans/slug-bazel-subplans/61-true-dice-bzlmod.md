@@ -1554,6 +1554,15 @@ Current state to preserve:
   focused `slug_core` build-setting/deferred tests, `slug_execute` artifact-path
   tests, and `slug_interpreter` configured-label tests; `cargo fmt --check`; and
   `git diff --check`.
+- Current-workspace helper identity now comes from `BzlmodCurrentCellGraphKey`
+  consistently. `module_versions_for_current_workspace`,
+  `registered_toolchains_for_current_workspace`,
+  `registered_execution_platforms_for_current_workspace`, and
+  `bzlmod_workspace_id_for_current_workspace` no longer discover the active
+  workspace/digest from their individual projection data keys. Validation:
+  `cargo test -p slug_bzlmod current_workspace --lib -- --nocapture`;
+  `cargo test -p slug_bzlmod --lib`; `cargo test -p slug_common bzlmod --lib`;
+  and `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`.
 
 What future workers should keep in this file:
 
@@ -2068,7 +2077,7 @@ hardening behavior around it.
      projection consume that value. Registered toolchain/platform projection
      keys use their own workspace-checked injected data, while
      current-workspace helpers still use the cell graph to choose the active
-  workspace. The deferred registered-toolchain pool and markers now depend on
+     workspace. The deferred registered-toolchain pool and markers now depend on
      the same workspace/list signature as eager loading before process-global
      reuse, but this remains transitional until the installed lookup registry is
      a DICE-owned value. Toolchain resolution, target-setting pre-processing,
@@ -2079,6 +2088,11 @@ hardening behavior around it.
      extension-repo symlink replay uses the same graph output base, but the
      graph itself is still legacy-produced and runtime registration remains
      process-global transitional plumbing.
+  - Current-workspace helper identity now comes from
+    `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
+    module versions, registered toolchains, registered execution platforms, and
+    workspace identity. Stale projection payloads are rejected under the current
+    graph identity instead of selecting a different "current" workspace.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
