@@ -588,6 +588,16 @@ Current state to preserve:
   slug_bzlmod`, `cargo test -p slug_bzlmod recorded_inputs --lib`,
   `cargo test -p slug_bzlmod lockfile_replay_validates_recorded_file --lib`,
   and `cargo test -p slug_bzlmod lockfile --lib`.
+- 2026-05-29 direct lockfile file-read API made test-only:
+  `Lockfile::read(...)`, `read_hidden_lockfile_path(...)`,
+  `read_lockfile_with_mode(...)`, and their shared disk-read helper are no
+  longer exported or compiled into non-test `slug_bzlmod`. Production lockfile
+  consumers must use the parsed content/value path rooted in
+  `BzlmodCleanLockfileInputsKey` / `BzlmodLockfileInputsKey`; tests retain the
+  direct reader only for format and policy fixtures. Guardrails:
+  `cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod lockfile --lib`,
+  `cargo fmt --check`, targeted `rg` for removed public re-exports, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1296,6 +1306,9 @@ hardening behavior around it.
      inputs by polling the filesystem are test-only. Production lockfile cache
      consumers must select cache entries and then validate recorded inputs
      through the DICE-backed recorded-input child key before accepting replay.
+   - Direct lockfile file-read helpers are also test-only; production lockfile
+     bytes enter through `BzlmodCleanLockfileInputsKey` /
+     `BzlmodLockfileInputsKey` instead of a public disk-read convenience API.
    - Hidden lockfile edit and facts create/edit/delete transitions have current
      same-daemon guardrail coverage in the Plan 61 Python suite. Fact-bearing
      extension replay intentionally avoids the runtime setup reuse shortcut so

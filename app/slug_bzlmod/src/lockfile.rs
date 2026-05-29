@@ -987,6 +987,7 @@ impl Lockfile {
     }
 
     /// Read a lockfile from disk.
+    #[cfg(test)]
     pub fn read(path: &Path) -> slug_error::Result<Self> {
         record_bzlmod_event(BzlmodEventKind::LockfileRead, path.display().to_string());
 
@@ -1540,6 +1541,7 @@ pub fn lockfile_canonical_extension_id(internal_id: &str) -> String {
 /// Bazel 9's default lockfile behavior. There is deliberately no process-wide
 /// parse cache here: callers that need replayable lockfile identity must go
 /// through their DICE-owned lockfile content key.
+#[cfg(test)]
 fn read_lockfile_at_path(
     path: PathBuf,
     mode: LockfileMode,
@@ -1565,6 +1567,7 @@ fn read_lockfile_at_path(
 /// Bazel parses the hidden output-base lockfile as `update` regardless of the
 /// command's visible lockfile mode, and treats read/parse failures as an empty
 /// hidden lockfile. Visible workspace lockfile failures remain hard errors.
+#[cfg(test)]
 pub fn read_hidden_lockfile_path(
     path: &Path,
 ) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
@@ -1583,6 +1586,7 @@ pub fn read_hidden_lockfile_path(
 
 /// Read `MODULE.bazel.lock` from `workspace_root` with explicit Bazel
 /// lockfile policy.
+#[cfg(test)]
 pub fn read_lockfile_with_mode(
     workspace_root: &Path,
     mode: LockfileMode,
