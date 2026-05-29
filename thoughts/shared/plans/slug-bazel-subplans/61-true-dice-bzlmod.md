@@ -37,8 +37,8 @@ Current classification:
   is no longer the active blocker.
 - Repository materialization recorded-input manifest content, marker/local rule
   state, BUILD-file layout probes, foreign top-level symlink detection, and
-  git-repository `.git` layout probes now have production DICE read paths;
-  non-git invocation-specific layout scans and output-tree state still need
+  invocation-specific layout probes for the known git/local/llvm repository
+  classes now have production DICE read paths; output-tree state still needs
   follow-up DICE ownership.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
@@ -430,6 +430,17 @@ Current state to preserve:
   still call the legacy layout helper and remain follow-up work. Guardrails:
   `cargo test -p slug_bzlmod git_repository_marker_requires_git_layout --lib`
   and `cargo build -p slug`.
+- 2026-05-29 local/new-local/llvm invocation-layout DICE metadata read:
+  `RepositoryMaterializationStateReader` now exposes DICE-backed directory-entry
+  and symlink-target probes. `RepoMaterializationInvocationLayoutStateKey` uses
+  them for `local_repository`, `new_local_repository`, and
+  `_llvm_subproject_repository`, including generated BUILD-file content checks
+  for `new_local_repository`. The legacy layout helper remains only as a
+  no-late-binding/read-error fallback and for unclassified rule classes.
+  Output-tree digest hashing is still direct filesystem work. Guardrails:
+  focused `slug_bzlmod` local/new-local/llvm layout tests, `cargo test -p
+  slug_external_cells repository_materialization_state --lib`, `cargo build -p
+  slug`, and focused Plan 61 corrupted local-repo layout Python selector.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -855,10 +866,10 @@ Current state to preserve:
   `.slug_repo_complete`, `.slug_repo_rule_local`, and repository
   `BUILD.bazel`/`BUILD` presence/content probes use late-bound production DICE
   project-file/metadata reads. Foreign top-level symlink detection uses DICE
-  project directory entries and symlink metadata. Git repository `.git` layout
-  checks use late-bound DICE metadata. Remaining non-git invocation-specific
-  layout scans and output-tree state still poll filesystem state until
-  lower-level tracked filesystem keys are available.
+  project directory entries and symlink metadata. Invocation-specific layout
+  probes for the known git/local/llvm repository classes now use late-bound DICE
+  metadata/content/dir-entry reads. Output-tree state still polls filesystem
+  state until lower-level tracked byte/digest keys are available.
 - The current SDK frontier is no longer the legacy resolution bridge. The
   generated kernel-header source path mismatch and the later
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
@@ -1419,9 +1430,9 @@ hardening behavior around it.
      paths through
      `slug_external_cells`, while keeping no-late-binding direct reads as test
      fallbacks. Foreign top-level symlink detection now uses DICE project dir
-     entries/metadata in production. Git repository `.git` layout checks now
-     use DICE metadata too. Remaining non-git invocation-specific layout scans
-     and output-tree state still need equivalent DICE-owned readers.
+     entries/metadata in production. Invocation-specific layout probes for the
+     known git/local/llvm repository classes use DICE metadata/content/dir-entry
+     reads too. Output-tree state still needs an equivalent DICE-owned reader.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

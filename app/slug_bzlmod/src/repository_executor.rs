@@ -314,7 +314,7 @@ fn local_repository_entry_matches_source(_source_entry: &Path, materialized_entr
     materialized_entry.exists()
 }
 
-fn local_repository_source_path(
+pub(crate) fn local_repository_source_path(
     invocation: &RepositoryInvocation,
     working_dir: &Path,
 ) -> Option<PathBuf> {
@@ -333,7 +333,7 @@ fn local_repository_source_path(
     Some(resolved.canonicalize().unwrap_or(resolved))
 }
 
-fn should_skip_local_repository_entry(name: &str) -> bool {
+pub(crate) fn should_skip_local_repository_entry(name: &str) -> bool {
     matches!(
         name,
         "BUILD"

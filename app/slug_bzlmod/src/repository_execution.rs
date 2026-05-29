@@ -95,6 +95,21 @@ pub trait RepositoryMaterializationStateReader: Send + Sync + 'static {
         workspace_id: crate::WorkspaceId,
         repo_dir: Arc<PathBuf>,
     ) -> Result<bool, Arc<str>>;
+
+    async fn repo_dir_entry_names(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        dir: Arc<PathBuf>,
+    ) -> Result<Arc<Vec<String>>, Arc<str>>;
+
+    async fn repo_symlink_points_to(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        symlink_path: Arc<PathBuf>,
+        expected_target: Arc<PathBuf>,
+    ) -> Result<bool, Arc<str>>;
 }
 
 /// Initialized by `slug_external_cells::init_late_bindings()`.
@@ -890,7 +905,6 @@ fn repo_materialization_build_file_present(repo_dir: &Path) -> bool {
     repo_dir.join("BUILD.bazel").exists() || repo_dir.join("BUILD").exists()
 }
 
-#[cfg(test)]
 fn repo_materialization_invocation_layout_state(
     canonical_name: &str,
     repo_spec: &RepoSpec,
@@ -906,6 +920,25 @@ fn repo_materialization_invocation_layout_state(
         },
         Err(e) => format!("layout-unclassifiable:{e}"),
     }
+}
+
+fn repo_materialization_invocation_layout_state_value(valid: bool) -> Arc<str> {
+    match valid {
+        true => Arc::from("layout-valid"),
+        false => Arc::from("layout-invalid"),
+    }
+}
+
+fn repo_materialization_invocation_layout_state_fallback(
+    canonical_name: &str,
+    repo_spec: &RepoSpec,
+    repo_dir: &Path,
+) -> Arc<str> {
+    Arc::from(repo_materialization_invocation_layout_state(
+        canonical_name,
+        repo_spec,
+        repo_dir,
+    ))
 }
 
 fn repo_has_invalid_empty_target_label(repo_path: &Path) -> bool {
@@ -1432,6 +1465,205 @@ impl Key for RepoMaterializationForeignTopLevelSymlinkKey {
     }
 }
 
+async fn repo_materialization_source_entries_match_links(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: crate::WorkspaceId,
+    source_dir: &Path,
+    repo_dir: &Path,
+    reader: &dyn RepositoryMaterializationStateReader,
+) -> Result<bool, Arc<str>> {
+    let entries = reader
+        .repo_dir_entry_names(
+            ctx,
+            workspace_id.clone(),
+            Arc::new(source_dir.to_path_buf()),
+        )
+        .await?;
+
+    let mut checked_any = false;
+    for name in entries.iter() {
+        if crate::repository_executor::should_skip_local_repository_entry(name) {
+            continue;
+        }
+        checked_any = true;
+        if !reader
+            .repo_symlink_points_to(
+                ctx,
+                workspace_id.clone(),
+                Arc::new(repo_dir.join(name)),
+                Arc::new(source_dir.join(name)),
+            )
+            .await?
+        {
+            return Ok(false);
+        }
+    }
+
+    Ok(checked_any)
+}
+
+async fn repo_materialization_new_local_build_file_is_valid(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: crate::WorkspaceId,
+    repo_dir: &Path,
+    invocation: &RepositoryInvocation,
+    reader: &dyn RepositoryMaterializationStateReader,
+) -> Result<bool, Arc<str>> {
+    let Some(expected) = invocation
+        .attrs
+        .get("build_file_content")
+        .and_then(|attr| attr.as_string())
+    else {
+        return Ok(true);
+    };
+
+    for name in ["BUILD.bazel", "BUILD"] {
+        let actual = reader
+            .read_repo_state_file_if_exists(
+                ctx,
+                workspace_id.clone(),
+                Arc::new(repo_dir.to_path_buf()),
+                name,
+            )
+            .await?;
+        if actual
+            .as_ref()
+            .is_some_and(|actual| actual.as_ref() == expected)
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+async fn repo_materialization_local_repository_layout_is_valid(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: crate::WorkspaceId,
+    invocation: &RepositoryInvocation,
+    repo_dir: &Path,
+    reader: &dyn RepositoryMaterializationStateReader,
+) -> Result<bool, Arc<str>> {
+    let Some(source_dir) =
+        crate::repository_executor::local_repository_source_path(invocation, repo_dir)
+    else {
+        return Ok(true);
+    };
+    reader
+        .repo_symlink_points_to(
+            ctx,
+            workspace_id,
+            Arc::new(repo_dir.to_path_buf()),
+            Arc::new(source_dir),
+        )
+        .await
+}
+
+async fn repo_materialization_new_local_repository_layout_is_valid(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: crate::WorkspaceId,
+    invocation: &RepositoryInvocation,
+    repo_dir: &Path,
+    reader: &dyn RepositoryMaterializationStateReader,
+) -> Result<bool, Arc<str>> {
+    if !repo_materialization_new_local_build_file_is_valid(
+        ctx,
+        workspace_id.clone(),
+        repo_dir,
+        invocation,
+        reader,
+    )
+    .await?
+    {
+        return Ok(false);
+    }
+
+    let Some(source_dir) =
+        crate::repository_executor::local_repository_source_path(invocation, repo_dir)
+    else {
+        return Ok(true);
+    };
+
+    if repo_materialization_source_entries_match_links(
+        ctx,
+        workspace_id.clone(),
+        &source_dir,
+        repo_dir,
+        reader,
+    )
+    .await?
+    {
+        return Ok(true);
+    }
+
+    if reader
+        .repo_state_file_exists(
+            ctx,
+            workspace_id.clone(),
+            Arc::new(repo_dir.to_path_buf()),
+            "BUILD.bazel",
+        )
+        .await?
+    {
+        return Ok(true);
+    }
+    reader
+        .repo_state_file_exists(ctx, workspace_id, Arc::new(repo_dir.to_path_buf()), "BUILD")
+        .await
+}
+
+fn llvm_subproject_source_path(
+    invocation: &RepositoryInvocation,
+    repo_dir: &Path,
+) -> Option<PathBuf> {
+    let dir = invocation
+        .attrs
+        .get("dir")
+        .and_then(|attr| attr.as_string())?;
+    if dir.is_empty() {
+        return None;
+    }
+    let project_root = repo_dir.parent().and_then(|external| external.parent())?;
+    let prefix = invocation.name.rsplit_once('+').map(|(prefix, _)| prefix)?;
+    Some(
+        project_root
+            .join("bazel-external")
+            .join(format!("{prefix}+llvm-raw"))
+            .join(dir),
+    )
+}
+
+async fn repo_materialization_llvm_subproject_layout_is_valid(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: crate::WorkspaceId,
+    invocation: &RepositoryInvocation,
+    repo_dir: &Path,
+    reader: &dyn RepositoryMaterializationStateReader,
+) -> Result<bool, Arc<str>> {
+    let Some(source_dir) = llvm_subproject_source_path(invocation, repo_dir) else {
+        return Ok(true);
+    };
+    if !repo_materialization_source_entries_match_links(
+        ctx,
+        workspace_id.clone(),
+        &source_dir,
+        repo_dir,
+        reader,
+    )
+    .await?
+    {
+        return Ok(false);
+    }
+    reader
+        .repo_state_file_exists(
+            ctx,
+            workspace_id,
+            Arc::new(repo_dir.to_path_buf()),
+            "BUILD.bazel",
+        )
+        .await
+}
+
 #[derive(Clone, Debug, Display, Eq, Allocative)]
 #[display("RepoMaterializationInvocationLayoutStateKey({})", _0)]
 struct RepoMaterializationInvocationLayoutStateKey(RepoMaterializationManifestKey);
@@ -1461,39 +1693,70 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
         let repo_spec = self.0.repo_spec.as_ref();
         let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
         match repo_spec_to_invocation(canonical_name, repo_spec) {
-            Ok(invocation)
-                if matches!(
-                    invocation.rule_name.as_str(),
-                    "git_repository" | "new_git_repository"
-                ) =>
-            {
-                let git_dir_present =
-                    if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            Ok(invocation) => {
+                let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() else {
+                    return repo_materialization_invocation_layout_state_fallback(
+                        canonical_name,
+                        repo_spec,
+                        &repo_dir,
+                    );
+                };
+                let workspace_id = self.0.workspace_id.clone();
+                let layout_valid = match invocation.rule_name.as_str() {
+                    "git_repository" | "new_git_repository" => {
                         reader
                             .repo_state_file_exists(
                                 ctx,
-                                self.0.workspace_id.clone(),
-                                Arc::new(repo_dir),
+                                workspace_id,
+                                Arc::new(repo_dir.clone()),
                                 ".git",
                             )
                             .await
-                            .unwrap_or(false)
-                    } else {
-                        repo_dir.join(".git").exists()
-                    };
-                match git_dir_present {
-                    true => Arc::from("layout-valid"),
-                    false => Arc::from("layout-invalid"),
+                    }
+                    "local_repository" => {
+                        repo_materialization_local_repository_layout_is_valid(
+                            ctx,
+                            workspace_id,
+                            &invocation,
+                            &repo_dir,
+                            *reader,
+                        )
+                        .await
+                    }
+                    "new_local_repository" => {
+                        repo_materialization_new_local_repository_layout_is_valid(
+                            ctx,
+                            workspace_id,
+                            &invocation,
+                            &repo_dir,
+                            *reader,
+                        )
+                        .await
+                    }
+                    "_llvm_subproject_repository" => {
+                        repo_materialization_llvm_subproject_layout_is_valid(
+                            ctx,
+                            workspace_id,
+                            &invocation,
+                            &repo_dir,
+                            *reader,
+                        )
+                        .await
+                    }
+                    _ => Ok(
+                        crate::repository_executor::repo_layout_is_valid_for_invocation(
+                            &invocation,
+                            &repo_dir,
+                        ),
+                    ),
                 }
-            }
-            Ok(invocation) => {
-                match crate::repository_executor::repo_layout_is_valid_for_invocation(
-                    &invocation,
-                    &repo_dir,
-                ) {
-                    true => Arc::from("layout-valid"),
-                    false => Arc::from("layout-invalid"),
-                }
+                .unwrap_or_else(|_| {
+                    crate::repository_executor::repo_layout_is_valid_for_invocation(
+                        &invocation,
+                        &repo_dir,
+                    )
+                });
+                repo_materialization_invocation_layout_state_value(layout_valid)
             }
             Err(e) => Arc::from(format!("layout-unclassifiable:{e}").as_str()),
         }

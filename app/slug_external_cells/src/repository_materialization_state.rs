@@ -65,13 +65,33 @@ fn child_project_path(
     parent: &ProjectRelativePathBuf,
     child_name: &str,
 ) -> Option<ProjectRelativePathBuf> {
-    ProjectRelativePath::new(&format!("{}/{}", parent.as_str(), child_name))
+    let path = if parent.as_str().is_empty() {
+        child_name.to_owned()
+    } else {
+        format!("{}/{}", parent.as_str(), child_name)
+    };
+    ProjectRelativePath::new(&path)
         .ok()
         .map(ProjectRelativePath::to_owned)
 }
 
 fn external_symlink_is_foreign(project_root: &ProjectRoot, target: &Path) -> bool {
     !target.starts_with(project_root.root().as_path())
+}
+
+fn symlink_target_matches_expected(
+    project_root: &ProjectRoot,
+    metadata: Option<RawPathMetadata<Arc<ProjectRelativePathBuf>>>,
+    expected_target: &Path,
+) -> bool {
+    let Some(RawPathMetadata::Symlink { to, .. }) = metadata else {
+        return false;
+    };
+    let actual_target = match to {
+        RawSymlink::External(target) => target.to_path_buf(),
+        RawSymlink::Relative(target, _) => project_root.root().as_path().join(target.as_str()),
+    };
+    actual_target == expected_target
 }
 
 #[async_trait]
@@ -195,5 +215,64 @@ impl RepositoryMaterializationStateReader for DiceRepositoryMaterializationState
         }
 
         Ok(false)
+    }
+
+    async fn repo_dir_entry_names(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        dir: Arc<PathBuf>,
+    ) -> Result<Arc<Vec<String>>, Arc<str>> {
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let project_path = repo_state_project_path(&workspace_id, project_root, &dir)?;
+
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationStateRead,
+            format!("dir_entries:{}", project_path.as_str()),
+        );
+        DiceFileComputations::read_project_dir_entry_names(ctx, project_path.as_ref())
+            .await
+            .map_err(|e| {
+                tracing::debug!(
+                    error = %e,
+                    dir = %dir.display(),
+                    "failed to read repository materialization directory entries through DICE"
+                );
+                Arc::from("repo_state_unreadable")
+            })
+    }
+
+    async fn repo_symlink_points_to(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        symlink_path: Arc<PathBuf>,
+        expected_target: Arc<PathBuf>,
+    ) -> Result<bool, Arc<str>> {
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let project_path = repo_state_project_path(&workspace_id, project_root, &symlink_path)?;
+
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationStateRead,
+            format!("metadata:{}", project_path.as_str()),
+        );
+        let metadata =
+            DiceFileComputations::read_project_path_metadata_if_exists(ctx, project_path.as_ref())
+                .await
+                .map_err(|e| {
+                    tracing::debug!(
+                        error = %e,
+                        symlink_path = %symlink_path.display(),
+                        "failed to read repository materialization symlink metadata through DICE"
+                    );
+                    Arc::from("repo_state_unreadable")
+                })?;
+        Ok(symlink_target_matches_expected(
+            project_root,
+            metadata,
+            &expected_target,
+        ))
     }
 }
