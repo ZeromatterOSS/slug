@@ -727,6 +727,11 @@ struct AbsoluteTextFileInputValue {
     digest: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+struct AbsolutePathMetadataInputValue {
+    exists: bool,
+}
+
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("AbsoluteTextFileInputKey({})", path.display())]
 struct AbsoluteTextFileInputKey {
@@ -755,6 +760,40 @@ impl Key for AbsoluteTextFileInputKey {
     fn validity(_x: &Self::Value) -> bool {
         // Out-of-project bzlmod inputs still poll disk directly in this child
         // key until a lower-level watched filesystem key is available.
+        false
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("AbsolutePathMetadataInputKey({})", path.display())]
+struct AbsolutePathMetadataInputKey {
+    path: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for AbsolutePathMetadataInputKey {
+    type Value = slug_error::Result<Arc<AbsolutePathMetadataInputValue>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        Ok(Arc::new(read_absolute_path_metadata_input_value(
+            &self.path,
+        )?))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
+        // This names the out-of-project path dependency in DICE, but still
+        // repolls until Slug has a watched absolute-path filesystem key.
         false
     }
 }
@@ -800,13 +839,8 @@ async fn local_override_module_dir_exists(
         ));
     }
 
-    match std::fs::symlink_metadata(path) {
-        Ok(_) => Ok((true, BzlmodFileInputTracking::Polled)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Ok((false, BzlmodFileInputTracking::Polled))
-        }
-        Err(e) => Err(e.into()),
-    }
+    let input = read_absolute_path_metadata_input_via_dice(ctx, path).await?;
+    Ok((input.exists, BzlmodFileInputTracking::Polled))
 }
 
 fn project_relative_path_for_abs_path(
@@ -844,11 +878,33 @@ async fn read_absolute_text_file_input_via_dice(
     .await?
 }
 
+async fn read_absolute_path_metadata_input_via_dice(
+    ctx: &mut DiceComputations<'_>,
+    path: &Path,
+) -> slug_error::Result<Arc<AbsolutePathMetadataInputValue>> {
+    ctx.compute(&AbsolutePathMetadataInputKey {
+        path: Arc::new(path.to_path_buf()),
+    })
+    .await?
+}
+
 fn read_absolute_text_file_input_value(
     path: &Path,
 ) -> slug_error::Result<AbsoluteTextFileInputValue> {
     let (content, digest) = read_absolute_text_file_input(path)?;
     Ok(AbsoluteTextFileInputValue { content, digest })
+}
+
+fn read_absolute_path_metadata_input_value(
+    path: &Path,
+) -> slug_error::Result<AbsolutePathMetadataInputValue> {
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => Ok(AbsolutePathMetadataInputValue { exists: true }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Ok(AbsolutePathMetadataInputValue { exists: false })
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 fn read_absolute_text_file_input(
@@ -3684,6 +3740,43 @@ use_repo(ext, "generated")
 
         assert!(second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn local_override_module_inputs_key_repolls_out_of_project_missing_dir()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-local-override-missing-dir-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_dir = external.path().join("dep");
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let key = LocalOverrideModuleInputsKey {
+            project_root,
+            overrides: vec![("dep".to_owned(), module_dir.to_string_lossy().into_owned())],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_untracked_inputs);
+        assert_eq!(first.missing_module_dirs, vec!["dep".to_owned()]);
+
+        std::fs::create_dir(&module_dir).unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.has_untracked_inputs);
+        assert_ne!(first.digest, second.digest);
+        assert!(second.missing_module_dirs.is_empty());
         Ok(())
     }
 

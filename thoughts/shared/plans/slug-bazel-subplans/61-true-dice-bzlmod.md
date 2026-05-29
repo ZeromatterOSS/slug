@@ -840,6 +840,17 @@ Current state to preserve:
   local_override_module_inputs --lib`, `cargo test -p slug_common bzlmod
   --lib`, `cargo build -p slug`, focused Plan 61 out-of-project local override
   selectors (3 passed), `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 out-of-project local-override directory metadata DICE child:
+  `LocalOverrideModuleInputsKey` no longer calls `std::fs::symlink_metadata`
+  directly while deciding whether an out-of-project local override directory
+  exists after `MODULE.bazel` is absent. The directory-presence probe is now an
+  `AbsolutePathMetadataInputKey` child, matching the existing out-of-project
+  file-content child-key shape; the child remains transaction-invalid and
+  marked as polled until Slug has a watched absolute-path filesystem key.
+  Guardrails: `cargo test -p slug_common local_override_module_inputs --lib`
+  (5 passed), `cargo test -p slug_common bzlmod --lib` (15 passed), `cargo
+  build -p slug`, and focused Plan 61 out-of-project local override selectors
+  for warm no-op, deletion, and creation (3 passed).
 - 2026-05-29 unclassified repository-layout fallback reduction:
   `RepoMaterializationInvocationLayoutStateKey` now returns a tracked
   `layout-valid` state directly for repository rule classes with no known
@@ -1518,8 +1529,9 @@ hardening behavior around it.
      Out-of-project local-override included module segments now use the same
      DICE child file-input key as other out-of-project module source classes;
      direct polled include parsing remains only for test poll helpers.
-     Out-of-project local-override directory presence is still directly polled
-     by the named key and marked untracked.
+     Out-of-project local-override directory presence is now represented as a
+     DICE child metadata key and remains transaction-invalid/marked untracked
+     until absolute paths can use a watched filesystem key.
      Git/archive override source-input descriptors now include the same local
      patch digest as resolver fetch/extract cache paths, and the non-registry
      source-input key owns cache-miss fetch/materialization plus
