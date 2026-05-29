@@ -782,9 +782,10 @@ Current state to preserve:
   silently building a partial extension-cell graph. The DICE input updater also
   errors in non-test builds if it is asked to install clean resolved-graph data
   without the extension executor, rather than preserving the old non-empty
-  fallback payload. Guardrails: `cargo test -p slug_bzlmod cell_graph --lib`,
-  `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt --check`, and `git
-  diff --check`.
+  fallback payload; non-test callers also cannot install a non-empty bzlmod
+  cell graph without resolved-graph provenance. Guardrails: `cargo test -p
+  slug_bzlmod cell_graph --lib`, `cargo check -p slug_bzlmod -p slug_common`,
+  `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
