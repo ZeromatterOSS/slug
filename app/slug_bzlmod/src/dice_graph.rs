@@ -3202,7 +3202,17 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
                     declared_cells,
                     cells,
                 )),
-                Err(e) if e.to_string().contains("module extension executor") => Ok(declared_cells),
+                Err(e) if e.to_string().contains("module extension executor") => {
+                    #[cfg(test)]
+                    {
+                        let _ = e;
+                        Ok(declared_cells)
+                    }
+                    #[cfg(not(test))]
+                    {
+                        Err(e)
+                    }
+                }
                 Err(e) => Err(e),
             };
         }

@@ -774,6 +774,14 @@ Current state to preserve:
   unclassified_invocation_layout_state_is_tracked_without_legacy_probe --lib`,
   `cargo test -p slug_bzlmod materialization_manifest --lib`, `cargo check -p
   slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 no-executor extension-cell fallback made test-only:
+  `BzlmodExtensionCellDefinitionsKey` no longer swallows a missing module
+  extension executor in non-test builds. Low-level tests without interpreter
+  late bindings still fall back to declared extension cells, but production
+  graph construction now treats a missing executor as an error instead of
+  silently building a partial extension-cell graph. Guardrails: `cargo test -p
+  slug_bzlmod cell_graph --lib`, `cargo check -p slug_bzlmod`, `cargo fmt
+  --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -904,7 +912,8 @@ Current state to preserve:
   now derives extension cells from DICE extension spokes when extension
   aggregation data exists, filtering generated override aliases through repo
   mappings. The injected extension-cell vector remains as a fallback only for
-  empty/bootstrap paths where the module extension executor is not installed.
+  empty/bootstrap test paths where the module extension executor is not
+  installed; non-test builds now error on a missing executor.
   Guardrail: `cargo test -p slug_common persisted_cell_graph_injects_clean_root_module_version_data --lib`.
 - 2026-05-28 production legacy cell-graph payload disabled: persisted
   config-load now injects an empty `BzlmodCellGraphValue` whenever the real
