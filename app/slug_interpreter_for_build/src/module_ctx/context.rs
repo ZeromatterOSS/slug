@@ -375,6 +375,49 @@ impl ModuleContext {
         self.record_input(recorded)
     }
 
+    pub(crate) fn maybe_record_dirents_input(
+        &self,
+        path: &Path,
+        should_watch: ShouldWatch,
+    ) -> starlark::Result<()> {
+        if should_watch == ShouldWatch::No {
+            return Ok(());
+        }
+        if let Some(working_dir) = self.working_dir()
+            && path.starts_with(working_dir)
+        {
+            if should_watch == ShouldWatch::Auto {
+                return Ok(());
+            }
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "attempted to watch path under working directory"
+            )
+            .into());
+        }
+        let Some(recorded_path) = self.recorded_path_for_watch(path, should_watch)? else {
+            return Ok(());
+        };
+        let recorded = slug_bzlmod::recorded_dirents_input_with_recorded_path(&recorded_path, path)
+            .map_err(|e| {
+                starlark::Error::from(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "Failed to record module_ctx.readdir input '{}': {}",
+                    path.display(),
+                    e
+                ))
+            })?;
+        self.record_input(recorded)
+    }
+
+    pub(crate) fn maybe_record_dirents_input_str(
+        &self,
+        path: &Path,
+        watch: &str,
+    ) -> starlark::Result<()> {
+        self.maybe_record_dirents_input(path, ShouldWatch::parse(watch)?)
+    }
+
     fn recorded_path_for_watch(
         &self,
         path: &Path,

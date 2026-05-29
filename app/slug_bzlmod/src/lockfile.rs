@@ -309,10 +309,19 @@ pub fn recorded_file_input_with_recorded_path(
 
 /// Build a Bazel-style recorded DIRENTS input marker for current filesystem state.
 pub fn recorded_dirents_input(path: &Path) -> std::io::Result<String> {
+    recorded_dirents_input_with_recorded_path(path, path)
+}
+
+/// Build a Bazel-style recorded DIRENTS input marker using a Bazel repo-friendly
+/// recorded path while reading the actual on-disk directory entries.
+pub fn recorded_dirents_input_with_recorded_path(
+    recorded_path: &Path,
+    actual_path: &Path,
+) -> std::io::Result<String> {
     Ok(format_recorded_input(
         "DIRENTS",
-        path,
-        &recorded_dirents_marker_value(path)?,
+        recorded_path,
+        &recorded_dirents_marker_value(actual_path)?,
     ))
 }
 

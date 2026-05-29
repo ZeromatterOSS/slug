@@ -149,7 +149,10 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[cfg(not(unix))]
         let _ = executable;
 
-        Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())))
+        Ok(heap.alloc(RepositoryPath::with_module_context(
+            resolved.to_string_lossy().to_string(),
+            this,
+        )))
     }
 
     /// Download a file from a URL.
@@ -433,16 +436,19 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                         use std::os::unix::fs::PermissionsExt;
                         if let Ok(meta) = std::fs::metadata(&full_path) {
                             if meta.permissions().mode() & 0o111 != 0 {
-                                return Ok(heap.alloc(RepositoryPath::new(
+                                return Ok(heap.alloc(RepositoryPath::with_module_context(
                                     full_path.to_string_lossy().to_string(),
+                                    this,
                                 )));
                             }
                         }
                     }
                     #[cfg(not(unix))]
                     {
-                        return Ok(heap
-                            .alloc(RepositoryPath::new(full_path.to_string_lossy().to_string())));
+                        return Ok(heap.alloc(RepositoryPath::with_module_context(
+                            full_path.to_string_lossy().to_string(),
+                            this,
+                        )));
                     }
                 }
             }
@@ -489,7 +495,10 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             // Plan 36: ensure the spoke is on disk before the caller
             // dereferences the returned path (e.g. with `mctx.execute`).
             ensure_label_path_materialized(&resolved);
-            return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
+            return Ok(heap.alloc(RepositoryPath::with_module_context(
+                resolved.to_string_lossy().to_string(),
+                this,
+            )));
         } else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -506,7 +515,10 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             PathBuf::from(&path_str)
         };
-        Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())))
+        Ok(heap.alloc(RepositoryPath::with_module_context(
+            resolved.to_string_lossy().to_string(),
+            this,
+        )))
     }
 
     /// Extract a local archive.

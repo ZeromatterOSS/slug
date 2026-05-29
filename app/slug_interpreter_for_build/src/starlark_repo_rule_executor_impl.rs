@@ -595,6 +595,13 @@ async fn track_repository_watch_inputs(
                 let _ = DiceFileComputations::read_path_metadata_if_exists(ctx, cell_path.as_ref())
                     .await?;
             }
+            RepositoryWatchInput::Dirents(path) => {
+                let Some(cell_path) = cell_path_for_watch_input(cell_resolver, project_root, path)
+                else {
+                    continue;
+                };
+                let _ = DiceFileComputations::read_dir(ctx, cell_path.as_ref()).await?;
+            }
             RepositoryWatchInput::DirTree(path) => {
                 let Some(cell_path) = cell_path_for_watch_input(cell_resolver, project_root, path)
                 else {

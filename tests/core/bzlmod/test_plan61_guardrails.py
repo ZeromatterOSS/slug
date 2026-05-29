@@ -8283,6 +8283,128 @@ use_repo(no_implicit, "no_implicit_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_path_readdir_dirent_create_reexecutes_extension(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkPath.readdir records RepoRecordedInput.Dirents."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_readdir_ext+readdir_repo"
+    watched_dir = buck.cwd / "watched_dir"
+    watched_dir.mkdir()
+    _write(watched_dir / "a.txt", "a\n")
+    _write(
+        buck.cwd / "module_readdir_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+readdir_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _module_readdir_ext_impl(module_ctx):
+    names = sorted([entry.basename for entry in module_ctx.path(Label("//:watched_dir")).readdir()])
+    readdir_repo_rule(name = "readdir_repo", payload = "\\n".join(names) + "\\n")
+
+module_readdir_ext = module_extension(
+    implementation = _module_readdir_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_readdir_input")
+
+readdir_ext = use_extension("//:module_readdir_ext.bzl", "module_readdir_ext")
+use_repo(readdir_ext, "readdir_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_readdir_repo",
+    srcs = ["@readdir_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_readdir_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "a.txt\n"
+
+    _write(watched_dir / "b.txt", "b\n")
+    await buck.build("//:uses_readdir_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "a.txt\nb.txt\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_path_readdir_dirent_create_rematerializes_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkPath.readdir and RepoRecordedInput.Dirents."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+repo_readdir_ext+readdir_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    watched_dir = buck.cwd / "watched_dir"
+    watched_dir.mkdir()
+    _write(watched_dir / "a.txt", "a\n")
+    _write(
+        buck.cwd / "repo_readdir_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    names = sorted([entry.basename for entry in repository_ctx.path(Label("//:watched_dir")).readdir()])
+    repository_ctx.file("data.txt", "\\n".join(names) + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+readdir_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_readdir_ext_impl(module_ctx):
+    readdir_repo_rule(name = "readdir_repo")
+
+repo_readdir_ext = module_extension(
+    implementation = _repo_readdir_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repository_ctx_readdir_input")
+
+readdir_ext = use_extension("//:repo_readdir_ext.bzl", "repo_readdir_ext")
+use_repo(readdir_ext, "readdir_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_readdir_repo",
+    srcs = ["@readdir_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_readdir_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "a.txt\n"
+    assert recorded_inputs.exists()
+    assert "DIRENTS:" in recorded_inputs.read_text()
+
+    _write(watched_dir / "b.txt", "b\n")
+    await buck.build("//:uses_readdir_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "a.txt\nb.txt\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_label_taking_operations_materialize_or_fail_directly(
     buck: Buck,
 ) -> None:

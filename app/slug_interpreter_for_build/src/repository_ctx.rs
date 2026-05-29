@@ -81,6 +81,7 @@ use zip::ZipArchive;
 use crate::label_filesystem::LabelFilesystemResolver;
 use crate::label_filesystem::RootLabelResolution;
 use crate::label_filesystem::is_bazel_label_string;
+use crate::module_ctx::ModuleContext;
 use crate::module_ctx::RepositoryOs;
 
 // ============================================================================
@@ -207,6 +208,15 @@ pub struct RepositoryPath {
     /// The base directory for the repository.
     #[allocative(skip)]
     base_dir: Option<Arc<PathBuf>>,
+    /// Context used by path methods that have Bazel watch semantics.
+    #[allocative(skip)]
+    watch_context: Option<RepositoryPathWatchContext>,
+}
+
+#[derive(Debug, Clone)]
+enum RepositoryPathWatchContext {
+    Module(ModuleContext),
+    Repository(RepositoryContext),
 }
 
 impl std::fmt::Display for RepositoryPath {
@@ -222,6 +232,7 @@ impl RepositoryPath {
         Self {
             path,
             base_dir: None,
+            watch_context: None,
         }
     }
 
@@ -229,6 +240,27 @@ impl RepositoryPath {
         Self {
             path,
             base_dir: Some(base_dir),
+            watch_context: None,
+        }
+    }
+
+    pub fn with_module_context(path: String, ctx: &ModuleContext) -> Self {
+        Self {
+            path,
+            base_dir: None,
+            watch_context: Some(RepositoryPathWatchContext::Module(ctx.clone())),
+        }
+    }
+
+    fn with_repository_context(
+        path: String,
+        base_dir: Arc<PathBuf>,
+        ctx: &RepositoryContext,
+    ) -> Self {
+        Self {
+            path,
+            base_dir: Some(base_dir),
+            watch_context: Some(RepositoryPathWatchContext::Repository(ctx.clone())),
         }
     }
 
@@ -249,6 +281,21 @@ impl RepositoryPath {
     /// Get the path string.
     pub fn path_str(&self) -> &str {
         &self.path
+    }
+
+    fn maybe_record_dirents_input(&self, watch: &str) -> starlark::Result<()> {
+        let Some(watch_context) = &self.watch_context else {
+            return Ok(());
+        };
+        let path = self.absolute_path();
+        match watch_context {
+            RepositoryPathWatchContext::Module(ctx) => {
+                ctx.maybe_record_dirents_input_str(&path, watch)
+            }
+            RepositoryPathWatchContext::Repository(ctx) => {
+                repository_ctx_maybe_record_dirents_input(ctx, &path, watch)
+            }
+        }
     }
 }
 
@@ -303,6 +350,7 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
         Ok(RepositoryPath {
             path: parent,
             base_dir: this.base_dir.clone(),
+            watch_context: this.watch_context.clone(),
         })
     }
 
@@ -326,6 +374,7 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
         let path = RepositoryPath {
             path: new_path,
             base_dir: this.base_dir.clone(),
+            watch_context: this.watch_context.clone(),
         };
         Ok(heap.alloc(path))
     }
@@ -337,9 +386,14 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Read directory contents.
-    fn readdir(this: &RepositoryPath) -> starlark::Result<Vec<RepositoryPath>> {
+    fn readdir(
+        this: &RepositoryPath,
+        #[starlark(default = "auto")] watch: &str,
+    ) -> starlark::Result<Vec<RepositoryPath>> {
+        let _ = parse_repository_ctx_watch_mode(watch)?;
         let abs_path = this.absolute_path();
         if abs_path.is_dir() {
+            this.maybe_record_dirents_input(watch)?;
             let entries: Vec<RepositoryPath> = std::fs::read_dir(&abs_path)
                 .map_err(|e| {
                     starlark::Error::from(slug_error::slug_error!(
@@ -354,6 +408,7 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
                     RepositoryPath {
                         path: child_path.to_string_lossy().to_string(),
                         base_dir: None,
+                        watch_context: this.watch_context.clone(),
                     }
                 })
                 .collect();
@@ -370,6 +425,7 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
         let path = RepositoryPath {
             path: real.to_string_lossy().to_string(),
             base_dir: None, // Already absolute
+            watch_context: this.watch_context.clone(),
         };
         Ok(heap.alloc(path))
     }
@@ -648,6 +704,7 @@ starlark_simple_value!(RepositoryContext);
 #[derive(Debug, Clone)]
 pub enum RepositoryWatchInput {
     File(PathBuf),
+    Dirents(PathBuf),
     DirTree(PathBuf),
 }
 
@@ -853,6 +910,19 @@ impl RepositoryContext {
         })?;
         self.record_input(recorded)?;
         self.record_watch_input(RepositoryWatchInput::DirTree(path.to_path_buf()))
+    }
+
+    fn record_dirents_input(&self, path: &Path) -> starlark::Result<()> {
+        let recorded = slug_bzlmod::recorded_dirents_input(path).map_err(|e| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Failed to record repository_ctx.readdir input '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
+        self.record_input(recorded)?;
+        self.record_watch_input(RepositoryWatchInput::Dirents(path.to_path_buf()))
     }
 
     fn record_env_input(&self, name: &str) -> starlark::Result<()> {
@@ -2094,7 +2164,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             path_arg.to_repr()
         };
 
-        let repo_path = RepositoryPath::with_base_dir(path_str, this.working_dir.clone());
+        let repo_path =
+            RepositoryPath::with_repository_context(path_str, this.working_dir.clone(), this);
         Ok(heap.alloc(repo_path))
     }
 
@@ -2996,16 +3067,21 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                         use std::os::unix::fs::PermissionsExt;
                         if let Ok(meta) = std::fs::metadata(&full_path) {
                             if meta.permissions().mode() & 0o111 != 0 {
-                                return Ok(heap.alloc(RepositoryPath::new(
+                                return Ok(heap.alloc(RepositoryPath::with_repository_context(
                                     full_path.to_string_lossy().to_string(),
+                                    this.working_dir.clone(),
+                                    this,
                                 )));
                             }
                         }
                     }
                     #[cfg(not(unix))]
                     {
-                        return Ok(heap
-                            .alloc(RepositoryPath::new(full_path.to_string_lossy().to_string())));
+                        return Ok(heap.alloc(RepositoryPath::with_repository_context(
+                            full_path.to_string_lossy().to_string(),
+                            this.working_dir.clone(),
+                            this,
+                        )));
                     }
                 }
             }
@@ -3118,6 +3194,27 @@ fn repository_ctx_maybe_record_file_input(
     }
 }
 
+fn repository_ctx_maybe_record_dirents_input(
+    this: &RepositoryContext,
+    path: &Path,
+    watch: &str,
+) -> starlark::Result<()> {
+    match parse_repository_ctx_watch_mode(watch)? {
+        RepositoryCtxWatchMode::No => Ok(()),
+        RepositoryCtxWatchMode::Auto if path.starts_with(this.working_dir()) => Ok(()),
+        RepositoryCtxWatchMode::Yes if path.starts_with(this.working_dir()) => {
+            Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "attempted to watch path under working directory"
+            )
+            .into())
+        }
+        RepositoryCtxWatchMode::Yes | RepositoryCtxWatchMode::Auto => {
+            this.record_dirents_input(path)
+        }
+    }
+}
+
 fn repository_ctx_record_unpinned_download_file_url_inputs(
     this: &RepositoryContext,
     urls: &[String],
@@ -3154,9 +3251,10 @@ impl<'v> StarlarkValue<'v> for RepositoryContext {
                 }
                 Some(heap.alloc(RepositoryOs::new_with_environ(self.repo_env.clone())))
             }
-            "workspace_root" => Some(heap.alloc(RepositoryPath::with_base_dir(
+            "workspace_root" => Some(heap.alloc(RepositoryPath::with_repository_context(
                 self.workspace_root.to_string_lossy().to_string(),
                 self.workspace_root.clone(),
+                self,
             ))),
             _ => None,
         }

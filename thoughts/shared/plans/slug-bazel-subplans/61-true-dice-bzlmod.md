@@ -1044,6 +1044,15 @@ Current state to preserve:
   --lib`, `cargo test -p slug_common bzlmod --lib`, `cargo test -p
   slug_external_cells extension_repo --lib`, `cargo test -p slug_bzlmod
   --lib`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 repository path `readdir` dirents inputs:
+  context-backed `RepositoryPath.readdir(watch = "auto")` now records Bazel-style
+  `DIRENTS` inputs for both `module_ctx.path(...).readdir()` and
+  `repository_ctx.path(...).readdir()`, so directory entry creation invalidates
+  extension replay and repository materialization. Guardrails: `cargo build -p
+  slug`, focused Plan 61 `readdir_dirent_create` selectors (2 passed), `cargo
+  test -p slug_bzlmod recorded_inputs --lib`, `cargo test -p
+  slug_external_cells extension_repo --lib`, `cargo fmt --check`, and full Plan
+  61 Python guardrails (`178 passed in 79.33s`).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -2167,6 +2176,10 @@ hardening behavior around it.
      `.slug_repo_recorded_inputs` file by itself, and explicit
      `watch(Label(...))` still invalidates module extensions and Starlark
      repositories.
+   - `RepositoryPath.readdir(watch = "auto")` now records `DIRENTS` inputs for
+     context-backed module and repository paths. Directory entry creation under
+     a label-resolved directory re-executes module extensions and rematerializes
+     Starlark repositories through the recorded-input manifest.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
