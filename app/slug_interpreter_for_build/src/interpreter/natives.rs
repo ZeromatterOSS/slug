@@ -1104,6 +1104,7 @@ mod tests {
         let canonical = "label_ctx_current_owner++ext+repo";
         let wrong_global = "label_ctx_current_wrong_owner++ext+repo";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -1166,6 +1167,7 @@ mod tests {
         let canonical = "label_ctx_owner++ext+repo";
         let wrong_global = "label_ctx_wrong_owner++ext+repo";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -1237,6 +1239,7 @@ mod tests {
         let canonical = "label_ctx_owner++ext+generated";
         let wrong_global = "label_ctx_wrong_owner++ext+generated";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
                 owner_module: "label_ctx_owner+".to_owned(),

@@ -503,6 +503,7 @@ mod tests {
         let canonical = "eval_owner++ext+generated";
         let wrong_global = "eval_wrong_owner++ext+generated";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {

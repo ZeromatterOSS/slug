@@ -429,6 +429,20 @@ Current state to preserve:
   `Label()` repo mapping, repository_ctx label read watching, recorded
   repo-mapping cache rejection, and extension-repo source mappings (4 passed),
   and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (156 passed).
+- 2026-05-29 repository_ctx.which repo-env ownership:
+  `repository_ctx.which(...)` now searches the effective repository
+  environment's `PATH` instead of the ambient Slug process environment, ignores
+  relative path entries like Bazel, and records an `ENV:PATH` repository input
+  when queried. Bazel source anchors:
+  `StarlarkBaseExternalContext.which/findCommandOnPath(...)` uses
+  `repoEnv.get("PATH")`, and `RepoRecordedInput.EnvVar` models environment
+  replay inputs. Guardrails: `cargo check -p slug_interpreter_for_build`,
+  `cargo test -p slug_interpreter_for_build --lib` (126 passed, after
+  repairing stale runtime-cell snapshot fixtures), `cargo build -p slug`,
+  focused Plan 61 repository_ctx PATH/env replay selectors (4 passed), and the
+  new regression first failed with
+  `PLAN61_REPOSITORY_CTX_WHICH_DID_NOT_USE_REPO_ENV_PATH` before the fix; the
+  full Plan 61 Python guardrail file passed afterward (`157 passed in 69.55s`).
 - 2026-05-29 repository materialization recorded-input DICE read:
   `RepoMaterializationRecordedInputsManifestContentKey` now carries workspace
   identity and calls a late-bound `RepositoryMaterializationStateReader`.
@@ -1878,6 +1892,9 @@ hardening behavior around it.
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not
      reused across distinct non-empty canonical ids.
+   - `repository_ctx.which(...)` now uses the effective repo-env `PATH` instead
+     of host process `PATH` and records `ENV:PATH`, so PATH changes are
+     materialization inputs instead of ambient host state.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

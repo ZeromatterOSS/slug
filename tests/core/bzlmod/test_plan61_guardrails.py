@@ -7682,6 +7682,77 @@ use_repo(env, "env_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_which_uses_repo_env_path_and_records_input(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkBaseExternalContext.which and RepoRecordedInput.EnvVar."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+repo_which_ext+which_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    first_bin = buck.cwd / "tools_first"
+    second_bin = buck.cwd / "tools_second"
+    first_bin.mkdir()
+    second_bin.mkdir()
+    first_tool = first_bin / "plan61_tool"
+    second_tool = second_bin / "plan61_tool"
+    _write(first_tool, "#!/bin/sh\nexit 0\n")
+    _write(second_tool, "#!/bin/sh\nexit 0\n")
+    first_tool.chmod(0o755)
+    second_tool.chmod(0o755)
+    _write(
+        buck.cwd / "repo_which_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    tool = repository_ctx.which("plan61_tool")
+    if tool == None:
+        fail("PLAN61_REPOSITORY_CTX_WHICH_DID_NOT_USE_REPO_ENV_PATH")
+    repository_ctx.file("data.txt", str(tool) + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+which_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_which_ext_impl(module_ctx):
+    which_repo_rule(name = "which_repo")
+
+repo_which_ext = module_extension(
+    implementation = _repo_which_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repository_ctx_which")
+
+which = use_extension("//:repo_which_ext.bzl", "repo_which_ext")
+use_repo(which, "which_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_which_repo",
+    srcs = ["@which_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_which_repo", f"--repo_env=PATH={first_bin}")
+    first = await _bzlmod_counters(buck, f"--repo_env=PATH={first_bin}")
+    assert (repo_dir / "data.txt").read_text() == f"{first_tool}\n"
+    assert recorded_inputs.exists()
+    assert f"ENV:PATH {first_bin}" in recorded_inputs.read_text()
+
+    await buck.build("//:uses_which_repo", f"--repo_env=PATH={second_bin}")
+    second = await _bzlmod_counters(buck, f"--repo_env=PATH={second_bin}")
+
+    assert (repo_dir / "data.txt").read_text() == f"{second_tool}\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_module_ctx_label_taking_operations_materialize_or_fail_directly(
     buck: Buck,
 ) -> None:
