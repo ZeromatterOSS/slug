@@ -39,7 +39,9 @@ use tar::Archive;
 use zip::ZipArchive;
 
 use crate::dice_graph::BzlmodCellGraphValue;
+#[cfg(test)]
 use crate::dice_graph::BzlmodEventKind;
+#[cfg(test)]
 use crate::dice_graph::record_bzlmod_event;
 use crate::repository_execution::InvocationAttrs;
 use crate::repository_execution::REPO_RECORDED_INPUTS_FILE;
@@ -141,8 +143,12 @@ fn execute_repository_rule_impl(
         working_dir
     );
 
-    // Check if already materialized. A marker is not sufficient for repository
-    // rules whose outputs have layout invariants consumed by downstream rules.
+    #[cfg(not(test))]
+    let _ = allow_marker_reuse;
+
+    // Legacy marker reuse remains test-only. Production callers enter this
+    // executor only after RepoMaterializationManifestKey has rejected reuse.
+    #[cfg(test)]
     if allow_marker_reuse {
         if is_repo_complete(&working_dir)
             && repo_layout_is_valid_for_invocation(invocation, &working_dir)
@@ -212,6 +218,7 @@ fn execute_repository_rule_impl(
 }
 
 /// Check if a repository is already materialized.
+#[cfg(test)]
 fn is_repo_complete(working_dir: &Path) -> bool {
     let marker_path = working_dir.join(".slug_repo_complete");
     if !marker_path.exists() {
@@ -230,6 +237,7 @@ fn is_repo_complete(working_dir: &Path) -> bool {
     repository_output_digest(working_dir).is_ok_and(|digest| digest == expected_output_state)
 }
 
+#[cfg(test)]
 pub(crate) fn repo_layout_is_valid_for_invocation(
     invocation: &RepositoryInvocation,
     working_dir: &Path,
@@ -243,6 +251,7 @@ pub(crate) fn repo_layout_is_valid_for_invocation(
     }
 }
 
+#[cfg(test)]
 fn local_repository_layout_is_valid(invocation: &RepositoryInvocation, working_dir: &Path) -> bool {
     let Some(source_dir) = local_repository_source_path(invocation, working_dir) else {
         return true;
@@ -250,6 +259,7 @@ fn local_repository_layout_is_valid(invocation: &RepositoryInvocation, working_d
     local_repository_root_matches_source(&source_dir, working_dir)
 }
 
+#[cfg(test)]
 fn new_local_repository_layout_is_valid(
     invocation: &RepositoryInvocation,
     working_dir: &Path,
@@ -281,6 +291,7 @@ fn new_local_repository_layout_is_valid(
 }
 
 #[cfg(unix)]
+#[cfg(test)]
 fn local_repository_root_matches_source(source_dir: &Path, working_dir: &Path) -> bool {
     let Ok(metadata) = std::fs::symlink_metadata(working_dir) else {
         return false;
@@ -309,10 +320,12 @@ fn local_repository_root_matches_source(source_dir: &Path, working_dir: &Path) -
 }
 
 #[cfg(not(unix))]
+#[cfg(test)]
 fn local_repository_root_matches_source(_source_dir: &Path, working_dir: &Path) -> bool {
     working_dir.exists()
 }
 
+#[cfg(test)]
 fn new_local_repository_build_file_is_valid(
     invocation: &RepositoryInvocation,
     working_dir: &Path,
@@ -333,6 +346,7 @@ fn new_local_repository_build_file_is_valid(
 }
 
 #[cfg(unix)]
+#[cfg(test)]
 fn local_repository_entry_matches_source(source_entry: &Path, materialized_entry: &Path) -> bool {
     let Ok(metadata) = std::fs::symlink_metadata(materialized_entry) else {
         return false;
@@ -361,6 +375,7 @@ fn local_repository_entry_matches_source(source_entry: &Path, materialized_entry
 }
 
 #[cfg(not(unix))]
+#[cfg(test)]
 fn local_repository_entry_matches_source(_source_entry: &Path, materialized_entry: &Path) -> bool {
     materialized_entry.exists()
 }
@@ -400,6 +415,7 @@ pub(crate) fn should_skip_local_repository_entry(name: &str) -> bool {
     )
 }
 
+#[cfg(test)]
 fn llvm_subproject_layout_is_valid(invocation: &RepositoryInvocation, working_dir: &Path) -> bool {
     let Some(dir) = invocation
         .attrs

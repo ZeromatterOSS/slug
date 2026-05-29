@@ -2178,6 +2178,15 @@ hardening behavior around it.
      materialized_extension_repo_exists_uses_dice_project_metadata --lib -- --nocapture`;
      `cargo test -p slug_external_cells --lib`; `cargo check -p
      slug_external_cells`.
+   - 2026-05-29 native repository marker shortcut made test-only:
+     `repository_executor` no longer production-compiles the legacy
+     marker/layout reuse branch or its direct synchronous layout probes. Normal
+     extension repository execution enters native repo-rule execution only
+     after `RepoMaterializationManifestKey` has rejected reuse; the old shortcut
+     remains under `cfg(test)` solely to prove fresh execution ignores stale
+     markers. Guardrails: `cargo test -p slug_bzlmod
+     fresh_repository_execution_bypasses_marker_shortcut --lib -- --nocapture`;
+     `cargo check -p slug_bzlmod`.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
