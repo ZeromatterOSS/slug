@@ -78,10 +78,11 @@ use crate::extensions::compute_extension_input_hash;
 use crate::lockfile::LockfileMode;
 use crate::lockfile::SelectedExtensionCache;
 use crate::lockfile::compute_sha256_hex;
-use crate::lockfile::validate_recorded_inputs_current;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 use crate::module_extension_executor::ModuleExtensionMetadata;
 use crate::repo_spec::RepoSpec;
+use crate::repository_execution::REPOSITORY_MATERIALIZATION_STATE_READER_IMPL;
+use crate::repository_execution::validate_recorded_inputs_with_dice_reader;
 
 fn stable_json_digest<T: Serialize>(value: &T) -> String {
     let json = serde_json::to_string(value).unwrap_or_else(|_| "<json-error>".to_owned());
@@ -1003,9 +1004,7 @@ impl Key for ExtensionSpokesKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.as_ref()
-            .map(|spokes| spokes.recorded_inputs_current())
-            .unwrap_or(false)
+        x.is_ok()
     }
 }
 
@@ -1116,16 +1115,6 @@ impl ModuleExtensionRecordedInputContext {
             selected.repo_mappings.clone().unwrap_or_default(),
         )
     }
-
-    fn recorded_inputs_current(&self, recorded_inputs: &[String]) -> bool {
-        validate_recorded_inputs_current(
-            recorded_inputs,
-            self.workspace_root.as_deref().map(PathBuf::as_path),
-            Some(self.repo_env.as_ref()),
-            Some(self.repo_mappings.as_ref()),
-        )
-        .is_ok()
-    }
 }
 
 impl ModuleExtensionResult {
@@ -1225,16 +1214,12 @@ impl ModuleExtensionResult {
             .find(|(_, c)| c.as_str() == canonical)
             .map(|(i, _)| i.as_str())
     }
-
-    fn recorded_inputs_current(&self) -> bool {
-        self.recorded_input_context
-            .recorded_inputs_current(&self.recorded_inputs)
-    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("ModuleExtensionRecordedInputsKey({})", recorded_inputs.len())]
 pub struct ModuleExtensionRecordedInputsKey {
+    workspace_id: Option<crate::WorkspaceId>,
     recorded_inputs: Arc<Vec<String>>,
     workspace_root: Option<Arc<PathBuf>>,
     repo_env: Option<Arc<BTreeMap<String, String>>>,
@@ -1249,6 +1234,9 @@ impl ModuleExtensionRecordedInputsKey {
         repo_mappings: Option<Arc<RepoMappingSnapshot>>,
     ) -> Self {
         Self {
+            workspace_id: workspace_root
+                .as_deref()
+                .map(|root| crate::WorkspaceId::new(root.clone(), root.join("buck-out/v2"))),
             recorded_inputs: Arc::new(recorded_inputs),
             workspace_root,
             repo_env,
@@ -1258,6 +1246,10 @@ impl ModuleExtensionRecordedInputsKey {
 
     fn from_selected_cache(selected: &SelectedExtensionCache) -> Self {
         Self {
+            workspace_id: selected
+                .workspace_root
+                .as_ref()
+                .map(|root| crate::WorkspaceId::new(root.clone(), root.join("buck-out/v2"))),
             recorded_inputs: Arc::new(selected.recorded_inputs.clone()),
             workspace_root: selected.workspace_root.clone().map(Arc::new),
             repo_env: selected.repo_env.clone().map(Arc::new),
@@ -1273,6 +1265,7 @@ impl ModuleExtensionRecordedInputsKey {
 impl Dupe for ModuleExtensionRecordedInputsKey {
     fn dupe(&self) -> Self {
         Self {
+            workspace_id: self.workspace_id.clone(),
             recorded_inputs: self.recorded_inputs.clone(),
             workspace_root: self.workspace_root.clone(),
             repo_env: self.repo_env.clone(),
@@ -1287,16 +1280,38 @@ impl Key for ModuleExtensionRecordedInputsKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        validate_recorded_inputs_current(
-            self.recorded_inputs.as_slice(),
-            self.workspace_root.as_deref().map(PathBuf::as_path),
-            self.repo_env.as_deref(),
-            self.repo_mappings.as_deref(),
-        )
-        .map_err(Arc::from)
+        if let Some(workspace_id) = self.workspace_id.clone()
+            && let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get()
+        {
+            return validate_recorded_inputs_with_dice_reader(
+                ctx,
+                *reader,
+                workspace_id,
+                self.recorded_inputs.as_slice(),
+                self.repo_env.as_deref(),
+                self.repo_mappings.as_deref(),
+            )
+            .await;
+        }
+
+        #[cfg(not(test))]
+        {
+            return Err(Arc::from("recorded_inputs_reader_unavailable"));
+        }
+
+        #[cfg(test)]
+        {
+            crate::lockfile::validate_recorded_inputs_current(
+                self.recorded_inputs.as_slice(),
+                self.workspace_root.as_deref().map(PathBuf::as_path),
+                self.repo_env.as_deref(),
+                self.repo_mappings.as_deref(),
+            )
+            .map_err(Arc::from)
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1787,12 +1802,12 @@ async fn validate_fresh_recorded_inputs_dependency(
     if recorded_inputs.is_empty() {
         return Ok(recorded_inputs);
     }
-    let key = ModuleExtensionRecordedInputsKey {
-        recorded_inputs: Arc::new(recorded_inputs),
+    let key = ModuleExtensionRecordedInputsKey::new(
+        recorded_inputs,
         workspace_root,
-        repo_env: Some(repo_env),
-        repo_mappings: Some(repo_mappings),
-    };
+        Some(repo_env),
+        Some(repo_mappings),
+    );
     match ctx.compute(&key).await {
         Ok(Ok(())) => Ok(key.recorded_inputs.as_ref().clone()),
         Ok(Err(reason)) => Err(slug_error::slug_error!(
@@ -1985,9 +2000,7 @@ impl Key for ModuleExtensionFreshEvalKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.as_ref()
-            .map(|result| result.recorded_inputs_current())
-            .unwrap_or(false)
+        x.is_ok()
     }
 }
 
@@ -2078,9 +2091,7 @@ impl Key for ModuleExtensionExecutionKey {
 
     fn validity(x: &Self::Value) -> bool {
         // Don't cache errors - retry on next request
-        x.as_ref()
-            .map(|result| result.recorded_inputs_current())
-            .unwrap_or(false)
+        x.is_ok()
     }
 }
 
@@ -3334,14 +3345,12 @@ mod tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let watched = temp_dir.path().join("watched.txt");
         std::fs::write(&watched, "first\n").unwrap();
-        let key = ModuleExtensionRecordedInputsKey {
-            recorded_inputs: Arc::new(vec![
-                crate::lockfile::recorded_file_input(&watched).unwrap(),
-            ]),
-            workspace_root: Some(Arc::new(temp_dir.path().to_path_buf())),
-            repo_env: Some(Arc::new(BTreeMap::new())),
-            repo_mappings: Some(Arc::new(crate::RepoMappingSnapshot::new())),
-        };
+        let key = ModuleExtensionRecordedInputsKey::new(
+            vec![crate::lockfile::recorded_file_input(&watched).unwrap()],
+            Some(Arc::new(temp_dir.path().to_path_buf())),
+            Some(Arc::new(BTreeMap::new())),
+            Some(Arc::new(crate::RepoMappingSnapshot::new())),
+        );
         let mut dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
             .unwrap()
@@ -3448,7 +3457,7 @@ mod tests {
     }
 
     #[test]
-    fn extension_execution_result_validity_rejects_fresh_recorded_input_edit() {
+    fn extension_execution_result_validity_does_not_poll_recorded_inputs() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let watched = temp_dir.path().join("watched.txt");
         std::fs::write(&watched, "first\n").unwrap();
@@ -3477,11 +3486,11 @@ mod tests {
 
         assert!(<ModuleExtensionExecutionKey as Key>::validity(&value));
         std::fs::write(&watched, "second\n").unwrap();
-        assert!(!<ModuleExtensionExecutionKey as Key>::validity(&value));
+        assert!(<ModuleExtensionExecutionKey as Key>::validity(&value));
     }
 
     #[test]
-    fn extension_spokes_validity_rechecks_replay_inputs() {
+    fn extension_spokes_validity_does_not_poll_recorded_inputs() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let watched = temp_dir.path().join("watched.txt");
         std::fs::write(&watched, "first\n").unwrap();
@@ -3519,7 +3528,7 @@ mod tests {
         ));
 
         std::fs::write(&watched, "second\n").unwrap();
-        assert!(!<ExtensionSpokesKey as Key>::validity(&value));
+        assert!(<ExtensionSpokesKey as Key>::validity(&value));
         assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &optional_value
         ));

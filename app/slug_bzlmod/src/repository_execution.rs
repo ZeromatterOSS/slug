@@ -2181,32 +2181,26 @@ fn resolve_repo_materialization_recorded_path(
     Err("recorded_input_unsupported".to_owned())
 }
 
-async fn validate_repo_materialization_recorded_inputs_with_reader(
+pub(crate) async fn validate_recorded_inputs_with_dice_reader(
     ctx: &mut DiceComputations<'_>,
     reader: &'static dyn RepositoryMaterializationStateReader,
     workspace_id: crate::WorkspaceId,
     recorded_inputs: &[String],
-    repo_env: &BTreeMap<String, String>,
-    repo_mappings: &crate::RepoMappingSnapshot,
-) -> RepoMaterializationStateValue<Result<(), Arc<str>>> {
+    repo_env: Option<&BTreeMap<String, String>>,
+    repo_mappings: Option<&crate::RepoMappingSnapshot>,
+) -> Result<(), Arc<str>> {
     for raw in recorded_inputs {
         let Some((input, old_value)) = parse_recorded_input_with_value(raw) else {
-            return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                "recorded_input_malformed",
-            )));
+            return Err(Arc::from("recorded_input_malformed"));
         };
         match input {
             RecordedInput::File(path) => {
                 let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
                     Ok(path) => path,
-                    Err(reason) => {
-                        return RepoMaterializationStateValue::tracked(Err(reason.into()));
-                    }
+                    Err(reason) => return Err(reason.into()),
                 };
                 let Some(old_value) = old_value else {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        "recorded_input_malformed",
-                    )));
+                    return Err(Arc::from("recorded_input_malformed"));
                 };
                 let current = match reader
                     .repo_recorded_file_marker_value(
@@ -2217,29 +2211,21 @@ async fn validate_repo_materialization_recorded_inputs_with_reader(
                     .await
                 {
                     Ok(value) => value,
-                    Err(_) => {
-                        return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                            "recorded_input_stat_failed",
-                        )));
-                    }
+                    Err(_) => return Err(Arc::from("recorded_input_stat_failed")),
                 };
                 if current.as_ref() != old_value {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        recorded_input_changed_reason_with_values(raw, &old_value, &current),
+                    return Err(Arc::from(recorded_input_changed_reason_with_values(
+                        raw, &old_value, &current,
                     )));
                 }
             }
             RecordedInput::Dirents(path) => {
                 let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
                     Ok(path) => path,
-                    Err(reason) => {
-                        return RepoMaterializationStateValue::tracked(Err(reason.into()));
-                    }
+                    Err(reason) => return Err(reason.into()),
                 };
                 let Some(old_value) = old_value else {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        "recorded_input_malformed",
-                    )));
+                    return Err(Arc::from("recorded_input_malformed"));
                 };
                 let current = match reader
                     .repo_recorded_dirents_marker_value(
@@ -2250,29 +2236,19 @@ async fn validate_repo_materialization_recorded_inputs_with_reader(
                     .await
                 {
                     Ok(value) => value,
-                    Err(_) => {
-                        return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                            "recorded_input_stat_failed",
-                        )));
-                    }
+                    Err(_) => return Err(Arc::from("recorded_input_stat_failed")),
                 };
                 if current.as_ref() != old_value {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        recorded_input_changed_reason(raw),
-                    )));
+                    return Err(Arc::from(recorded_input_changed_reason(raw)));
                 }
             }
             RecordedInput::DirTree(path) => {
                 let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
                     Ok(path) => path,
-                    Err(reason) => {
-                        return RepoMaterializationStateValue::tracked(Err(reason.into()));
-                    }
+                    Err(reason) => return Err(reason.into()),
                 };
                 let Some(old_value) = old_value else {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        "recorded_input_malformed",
-                    )));
+                    return Err(Arc::from("recorded_input_malformed"));
                 };
                 let current = match reader
                     .repo_recorded_dirtree_marker_value(
@@ -2283,53 +2259,45 @@ async fn validate_repo_materialization_recorded_inputs_with_reader(
                     .await
                 {
                     Ok(value) => value,
-                    Err(_) => {
-                        return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                            "recorded_input_stat_failed",
-                        )));
-                    }
+                    Err(_) => return Err(Arc::from("recorded_input_stat_failed")),
                 };
                 if current.as_ref() != old_value {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        recorded_input_changed_reason(raw),
-                    )));
+                    return Err(Arc::from(recorded_input_changed_reason(raw)));
                 }
             }
             RecordedInput::Env(name) => {
+                let Some(repo_env) = repo_env else {
+                    return Err(Arc::from("recorded_input_unsupported"));
+                };
                 let current = repo_env.get(&name).cloned();
                 if current != old_value {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        recorded_input_changed_reason(raw),
-                    )));
+                    return Err(Arc::from(recorded_input_changed_reason(raw)));
                 }
             }
             RecordedInput::RepoMapping {
                 source_repo,
                 apparent,
             } => {
+                let Some(repo_mappings) = repo_mappings else {
+                    return Err(Arc::from("recorded_input_unsupported"));
+                };
                 let Some(source_mapping) = repo_mappings.get(&source_repo) else {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        recorded_input_changed_reason(raw),
-                    )));
+                    return Err(Arc::from(recorded_input_changed_reason(raw)));
                 };
                 let current = source_mapping
                     .get(&apparent)
                     .cloned()
                     .or_else(|| Some(apparent.clone()));
                 if current != old_value {
-                    return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                        recorded_input_changed_reason(raw),
-                    )));
+                    return Err(Arc::from(recorded_input_changed_reason(raw)));
                 }
             }
             RecordedInput::Unsupported => {
-                return RepoMaterializationStateValue::tracked(Err(Arc::from(
-                    "recorded_input_unsupported",
-                )));
+                return Err(Arc::from("recorded_input_unsupported"));
             }
         }
     }
-    RepoMaterializationStateValue::tracked(Ok(()))
+    Ok(())
 }
 
 #[async_trait]
@@ -2342,15 +2310,17 @@ impl Key for RepoMaterializationRecordedInputsValidationKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
-            return validate_repo_materialization_recorded_inputs_with_reader(
-                ctx,
-                *reader,
-                self.workspace_id.clone(),
-                self.recorded_inputs.as_slice(),
-                self.repo_env.as_ref(),
-                self.repo_mappings.as_ref(),
-            )
-            .await;
+            return RepoMaterializationStateValue::tracked(
+                validate_recorded_inputs_with_dice_reader(
+                    ctx,
+                    *reader,
+                    self.workspace_id.clone(),
+                    self.recorded_inputs.as_slice(),
+                    Some(self.repo_env.as_ref()),
+                    Some(self.repo_mappings.as_ref()),
+                )
+                .await,
+            );
         }
 
         #[cfg(test)]

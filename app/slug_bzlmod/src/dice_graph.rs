@@ -5132,18 +5132,6 @@ impl ExtensionSpokesValue {
     pub fn recorded_inputs(&self) -> &[String] {
         self.recorded_inputs.as_slice()
     }
-
-    pub fn recorded_inputs_current(&self) -> bool {
-        crate::lockfile::validate_recorded_inputs_current(
-            self.recorded_inputs.as_slice(),
-            self.recorded_input_workspace_root
-                .as_deref()
-                .map(PathBuf::as_path),
-            Some(self.recorded_input_repo_env.as_ref()),
-            Some(self.recorded_input_repo_mappings.as_ref()),
-        )
-        .is_ok()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]

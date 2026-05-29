@@ -41,6 +41,9 @@ Current classification:
   git/local/llvm repository classes now have production DICE read paths.
   Output-tree digest checks now use DICE-owned metadata, directory-entry, and
   byte reads.
+- Module extension recorded-input replay validation uses DICE-backed project
+  metadata, directory-entry, and byte-content reads in production; extension
+  result/spoke validity no longer reopens recorded inputs synchronously.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -549,6 +552,21 @@ Current state to preserve:
   recorded-input selectors for read/template/patch/extract/Label repo mappings
   and text/binary watch_tree (`7 passed, 149 deselected`), `cargo fmt --check`,
   and `git diff --check`.
+- 2026-05-29 extension recorded-input validation DICE read:
+  `ModuleExtensionRecordedInputsKey` now validates selected lockfile replay
+  inputs and fresh extension-recorded inputs through the same late-bound DICE
+  recorded-input reader used by repository materialization. Extension execution,
+  fresh-eval, and spoke keys no longer call synchronous recorded-input checks
+  from their `validity(...)` hooks; they rely on the recorded-input child key
+  computed during replay/fresh evaluation instead. The direct synchronous
+  validator remains only as a low-level test fallback when late bindings are
+  absent. Guardrails: `cargo test -p slug_bzlmod recorded_inputs --lib`,
+  `cargo test -p slug_bzlmod lockfile_replay_validates_recorded_file --lib`,
+  `cargo test -p slug_bzlmod --lib` (406 passed), `cargo test -p
+  slug_external_cells --lib` (11 passed), `cargo build -p slug`, focused Plan
+  61 extension lockfile replay selectors for recorded file/dirents/dirtree,
+  env, and repo mappings (`6 passed, 150 deselected`), `cargo fmt --check`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1149,8 +1167,9 @@ hardening behavior around it.
      errors before extension eval on missing loaded files. `buck audit cell`
      uses tolerant replay validation to hash missing-load states and prove
      cache hits/misses without executing extensions. Recorded inputs are
-     validated through `ModuleExtensionRecordedInputsKey`. Runtime extension
-     repo cells now overlay static placeholder cells with the real
+     validated through DICE-backed `ModuleExtensionRecordedInputsKey` child
+     reads. Runtime extension repo cells now overlay static placeholder cells
+     with the real
      DICE-produced `RepoSpec` metadata when extension execution has produced
      spokes; warm missing-lockfile no-op builds reuse that setup instead of
      re-entering extension evaluation.
