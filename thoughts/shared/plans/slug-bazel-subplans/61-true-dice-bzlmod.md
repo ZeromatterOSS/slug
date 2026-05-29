@@ -2152,32 +2152,21 @@ hardening behavior around it.
      `module_ctx.patch(Label(...))` now record their source template/patch
      files with default `auto` watch semantics, so same-daemon edits invalidate
      module-extension replay before stale generated repo specs are reused.
-   - `repository_ctx.symlink(Label(...), ...)` and
-     `module_ctx.symlink(Label(...), ...)` now record the resolved label target
-     when it is outside the generated repository/extension working directory.
-     This closes the path where a later `read("linked.txt")` saw only a
-     working-dir symlink and skipped the actual source file as an auto-watched
-     input. Focused guardrails prove label-target edits rematerialize Starlark
-     repositories and re-execute module extensions. A native
-     `git_repository(branch = ...)` guardrail also proves an out-of-workspace
-     local branch ref update rematerializes the generated repo instead of
-     reusing stale checked-out contents.
-   - `repository_ctx.execute([... Label(...) ...])` and
-     `module_ctx.execute([... Label(...) ...])` now record resolved label and
-     `RepositoryPath` arguments as auto-watched inputs before spawning the
-     command. This closes the replay hole where a command read a label-resolved
-     script while later replay had no dependency on that script file. Focused
-     guardrails prove script edits rematerialize Starlark repositories and
-     re-execute module extensions.
-   - `repository_ctx.path(Label(...))`,
-     `repository_ctx.path("//label:string")`, and
-     `module_ctx.path(Label(...))` now record the resolved label target as an
-     auto-watched input when constructing the returned `RepositoryPath`. This
-     closes the replay hole where later `RepositoryPath.exists`/`is_dir` probes
-     could branch on a source file without leaving any recorded input. Focused
-     guardrails first failed with stale `missing` output / absent
-     `.slug_repo_recorded_inputs`; after the fix, create-transition tests prove
-     module extensions re-execute and Starlark repositories rematerialize.
+   - Bazel 9's `--incompatible_no_implicit_watch_label` default is true
+     (`BuildLanguageOptions.INCOMPATIBLE_NO_IMPLICIT_WATCH_LABEL`), so
+     Label-to-path conversion is not itself a recorded-input producer.
+     `module_ctx.path(Label(...))`, `repository_ctx.path(Label(...))`,
+     `repository_ctx.path("//label:string")`, `execute([... Label(...) ...])`,
+     and `symlink(Label(...), ...)` still resolve and lazily materialize label
+     paths, but they no longer auto-record those paths. Explicit
+     `watch(Label(...))` remains the producer for these no-watch APIs, while
+     `read`/`template`/`patch`/`extract` still record through their explicit
+     `watch = "auto"` parameters. Focused guardrails prove unwatched
+     module_ctx label path/execute/symlink inputs do not re-execute the
+     extension, `repository_ctx.path(Label(...))` does not write a
+     `.slug_repo_recorded_inputs` file by itself, and explicit
+     `watch(Label(...))` still invalidates module extensions and Starlark
+     repositories.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

@@ -2078,7 +2078,6 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             if is_bazel_label_string(s) {
                 let path = this.resolve_label_to_filesystem_path(s)?;
                 ensure_label_path_materialized(&path);
-                repository_ctx_maybe_record_file_input(this, &path, "auto")?;
                 path.to_string_lossy().to_string()
             } else {
                 s.to_owned()
@@ -2090,7 +2089,6 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             let label_str = format!("{}", path_arg);
             let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
-            repository_ctx_maybe_record_file_input(this, &path, "auto")?;
             path.to_string_lossy().to_string()
         } else {
             path_arg.to_repr()
@@ -2360,14 +2358,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                 } else if let Some(repo_path) = v.downcast_ref::<RepositoryPath>() {
                     // RepositoryPath: use absolute path
                     let path = repo_path.absolute_path();
-                    repository_ctx_maybe_record_file_input(this, &path, "auto")?;
                     Ok(path.to_string_lossy().to_string())
                 } else if v.get_type() == "Label" {
                     // Label: resolve to filesystem path via cell paths
                     let label_str = v.to_str();
                     let path = this.resolve_label_to_filesystem_path(&label_str)?;
                     ensure_label_path_materialized(&path);
-                    repository_ctx_maybe_record_file_input(this, &path, "auto")?;
                     Ok(path.to_string_lossy().to_string())
                 } else {
                     // Other: convert to string
@@ -2434,11 +2430,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] target: Value<'v>,
         #[starlark(require = pos)] link_name: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let (target_str, target_input_path) = if let Some(s) = target.unpack_str() {
-            (s.to_owned(), None)
+        let target_str = if let Some(s) = target.unpack_str() {
+            s.to_owned()
         } else if let Some(repo_path) = target.downcast_ref::<RepositoryPath>() {
             let path = repo_path.absolute_path();
-            (path.to_string_lossy().to_string(), Some(path))
+            path.to_string_lossy().to_string()
         } else if target.get_type() == "Label" {
             // `rctx.symlink(Label("//templates:foo.bzl"), "foo.bzl")` must
             // resolve the Label to an absolute path so the resulting
@@ -2448,13 +2444,10 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             let label_str = format!("{target}");
             let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
-            (path.to_string_lossy().to_string(), Some(path))
+            path.to_string_lossy().to_string()
         } else {
-            (target.to_repr(), None)
+            target.to_repr()
         };
-        if let Some(path) = target_input_path.as_ref() {
-            repository_ctx_maybe_record_file_input(this, path, "auto")?;
-        }
 
         let link_str = if let Some(s) = link_name.unpack_str() {
             s.to_owned()

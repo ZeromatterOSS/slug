@@ -7673,10 +7673,10 @@ use_repo(exec_ext, "exec_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_module_ctx_execute_label_arg_edit_reexecutes_extension(
+async def test_module_ctx_execute_label_arg_explicit_watch_reexecutes_extension(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: StarlarkBaseExternalContext.execute records label args."""
+    """Bazel anchor: StarlarkBaseExternalContext.watch records label paths."""
     repo_dir = buck.cwd / "bazel-external" / "_main+module_execute_label_ext+exec_label_repo"
     _write(buck.cwd / "script.sh", "printf first\n")
     _write(
@@ -7691,6 +7691,7 @@ exec_label_repo_rule = repository_rule(
 )
 
 def _module_execute_label_ext_impl(module_ctx):
+    module_ctx.watch(Label("//:script.sh"))
     result = module_ctx.execute(["/bin/sh", Label("//:script.sh")])
     if result.return_code != 0:
         fail("PLAN61_MODULE_CTX_EXECUTE_LABEL_FAILED")
@@ -7972,16 +7973,17 @@ use_repo(exec_ext, "exec_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_repository_ctx_execute_label_arg_edit_rematerializes_repo(
+async def test_repository_ctx_execute_label_arg_explicit_watch_rematerializes_repo(
     buck: Buck,
 ) -> None:
-    """Bazel anchors: StarlarkRepositoryContext.execute and RepoRecordedInput.File."""
+    """Bazel anchors: StarlarkRepositoryContext.watch and RepoRecordedInput.File."""
     repo_dir = buck.cwd / "bazel-external" / "_main+repo_execute_label_ext+exec_label_repo"
     recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
     _write(buck.cwd / "script.sh", "printf first\n")
     _write(
         buck.cwd / "repo_execute_label_ext.bzl",
         """def _repo_impl(repository_ctx):
+    repository_ctx.watch(Label("//:script.sh"))
     result = repository_ctx.execute(["/bin/sh", Label("//:script.sh")])
     if result.return_code != 0:
         fail("PLAN61_REPOSITORY_CTX_EXECUTE_LABEL_FAILED")
@@ -8036,10 +8038,10 @@ use_repo(exec_label, "exec_label_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_module_ctx_path_label_create_reexecutes_extension(
+async def test_module_ctx_path_label_explicit_watch_create_reexecutes_extension(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: StarlarkBaseExternalContext.path records label paths."""
+    """Bazel anchor: StarlarkBaseExternalContext.watch records missing label paths."""
     repo_dir = buck.cwd / "bazel-external" / "_main+module_path_label_ext+path_label_repo"
     marker = buck.cwd / "marker.txt"
     _write(
@@ -8054,6 +8056,7 @@ path_label_repo_rule = repository_rule(
 )
 
 def _module_path_label_ext_impl(module_ctx):
+    module_ctx.watch(Label("//:marker.txt"))
     path = module_ctx.path(Label("//:marker.txt"))
     payload = "missing\\n"
     if path.exists:
@@ -8096,16 +8099,17 @@ use_repo(path_label, "path_label_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_repository_ctx_path_label_create_rematerializes_repo(
+async def test_repository_ctx_path_label_explicit_watch_create_rematerializes_repo(
     buck: Buck,
 ) -> None:
-    """Bazel anchors: StarlarkRepositoryContext.path and RepoRecordedInput.File."""
+    """Bazel anchors: StarlarkRepositoryContext.watch and RepoRecordedInput.File."""
     repo_dir = buck.cwd / "bazel-external" / "_main+repo_path_label_ext+path_label_repo"
     recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
     marker = buck.cwd / "marker.txt"
     _write(
         buck.cwd / "repo_path_label_ext.bzl",
         """def _repo_impl(repository_ctx):
+    repository_ctx.watch(Label("//:marker.txt"))
     path = repository_ctx.path(Label("//:marker.txt"))
     payload = "missing\\n"
     if path.exists:
@@ -8157,6 +8161,125 @@ use_repo(path_label, "path_label_repo")
     assert second["repo_materialization_miss_reason"] > first[
         "repo_materialization_miss_reason"
     ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_label_paths_without_watch_do_not_reexecute_extension(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: --incompatible_no_implicit_watch_label default is true."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_no_implicit_ext+no_implicit_repo"
+    _write(buck.cwd / "script.sh", "printf first-exec\n")
+    _write(buck.cwd / "tool.txt", "first-link\n")
+    _write(
+        buck.cwd / "module_no_implicit_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+no_implicit_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _module_no_implicit_ext_impl(module_ctx):
+    marker = "missing"
+    if module_ctx.path(Label("//:marker.txt")).exists:
+        marker = "present"
+    result = module_ctx.execute(["/bin/sh", Label("//:script.sh")])
+    if result.return_code != 0:
+        fail("PLAN61_MODULE_CTX_NO_IMPLICIT_EXECUTE_FAILED")
+    module_ctx.symlink(Label("//:tool.txt"), "linked.txt")
+    no_implicit_repo_rule(
+        name = "no_implicit_repo",
+        payload = marker + "\\n" + result.stdout + "\\n" + module_ctx.read("linked.txt"),
+    )
+
+module_no_implicit_ext = module_extension(
+    implementation = _module_no_implicit_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_no_implicit_label_watch")
+
+no_implicit = use_extension("//:module_no_implicit_ext.bzl", "module_no_implicit_ext")
+use_repo(no_implicit, "no_implicit_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_no_implicit_repo",
+    srcs = ["@no_implicit_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_no_implicit_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "missing\nfirst-exec\nfirst-link\n"
+
+    _write(buck.cwd / "marker.txt", "created\n")
+    _write(buck.cwd / "script.sh", "printf second-exec\n")
+    await buck.build("//:uses_no_implicit_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "missing\nfirst-exec\nfirst-link\n"
+    assert second["extension_eval"] == first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_label_paths_without_watch_do_not_record_input(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkPath.exists/is_dir do not watch path objects."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+repo_no_implicit_ext+no_implicit_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    _write(
+        buck.cwd / "repo_no_implicit_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    marker = "missing"
+    if repository_ctx.path(Label("//:marker.txt")).exists:
+        marker = "present"
+    repository_ctx.file("data.txt", marker + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+no_implicit_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_no_implicit_ext_impl(module_ctx):
+    no_implicit_repo_rule(name = "no_implicit_repo")
+
+repo_no_implicit_ext = module_extension(
+    implementation = _repo_no_implicit_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repository_ctx_no_implicit_label_watch")
+
+no_implicit = use_extension("//:repo_no_implicit_ext.bzl", "repo_no_implicit_ext")
+use_repo(no_implicit, "no_implicit_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_no_implicit_repo",
+    srcs = ["@no_implicit_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_no_implicit_repo")
+    assert (repo_dir / "data.txt").read_text() == "missing\n"
+    assert not recorded_inputs.exists()
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -8419,10 +8542,10 @@ use_repo(download, "download_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_module_ctx_symlink_label_edit_reexecutes_extension(
+async def test_module_ctx_symlink_label_explicit_watch_reexecutes_extension(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: StarlarkBaseExternalContext.symlink records label inputs."""
+    """Bazel anchor: StarlarkBaseExternalContext.watch records label paths."""
     repo_dir = buck.cwd / "bazel-external" / "_main+module_symlink_ext+symlink_repo"
     _write(buck.cwd / "tool.txt", "first\n")
     _write(
@@ -8437,6 +8560,7 @@ symlink_repo_rule = repository_rule(
 )
 
 def _module_symlink_ext_impl(module_ctx):
+    module_ctx.watch(Label("//:tool.txt"))
     module_ctx.symlink(Label("//:tool.txt"), "linked.txt")
     symlink_repo_rule(name = "symlink_repo", payload = module_ctx.read("linked.txt"))
 
@@ -8660,16 +8784,17 @@ use_repo(read_watch, "read_watch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_repository_ctx_symlink_label_edit_rematerializes_repo(
+async def test_repository_ctx_symlink_label_explicit_watch_rematerializes_repo(
     buck: Buck,
 ) -> None:
-    """Bazel anchors: StarlarkRepositoryContext.symlink and RepoRecordedInput.File."""
+    """Bazel anchors: StarlarkRepositoryContext.watch and RepoRecordedInput.File."""
     repo_dir = buck.cwd / "bazel-external" / "_main+symlink_watch_ext+symlink_watch_repo"
     recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
     _write(buck.cwd / "tool.txt", "first\n")
     _write(
         buck.cwd / "symlink_watch_ext.bzl",
         """def _repo_impl(repository_ctx):
+    repository_ctx.watch(Label("//:tool.txt"))
     repository_ctx.symlink(Label("//:tool.txt"), "linked.txt")
     repository_ctx.file("data.txt", repository_ctx.read("linked.txt"))
     repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")

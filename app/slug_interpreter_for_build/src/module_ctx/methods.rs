@@ -309,12 +309,10 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                     let label_str = v.to_str();
                     let path = resolve_module_ctx_label(this, &label_str, "module_ctx.execute()")?;
                     ensure_label_path_materialized(&path);
-                    this.maybe_record_file_input(&path, ShouldWatch::Auto)?;
                     Ok(path.to_string_lossy().to_string())
                 } else if let Some(rp) = v.downcast_ref::<crate::repository_ctx::RepositoryPath>() {
                     // RepositoryPath objects (from mctx.path()) → extract path string
                     let path = rp.absolute_path();
-                    this.maybe_record_file_input(&path, ShouldWatch::Auto)?;
                     Ok(path.to_string_lossy().to_string())
                 } else {
                     Ok(v.unpack_str()
@@ -491,7 +489,6 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             // Plan 36: ensure the spoke is on disk before the caller
             // dereferences the returned path (e.g. with `mctx.execute`).
             ensure_label_path_materialized(&resolved);
-            this.maybe_record_file_input(&resolved, ShouldWatch::Auto)?;
             return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
         } else {
             return Err(slug_error::slug_error!(
@@ -651,7 +648,6 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] link: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
         let target_path = resolve_module_ctx_input_path(this, target, "module_ctx.symlink()")?;
-        this.maybe_record_file_input(&target_path, ShouldWatch::Auto)?;
         let target_str = target_path.to_string_lossy().to_string();
         let link_str = link.unpack_str().unwrap_or("");
 
