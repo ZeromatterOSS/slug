@@ -100,6 +100,7 @@ pub fn run_aspect_basic<'v>(
         aspect_attr,
         target_label.dupe(),
         rule_info,
+        None,
         registry,
         digest_config,
     );

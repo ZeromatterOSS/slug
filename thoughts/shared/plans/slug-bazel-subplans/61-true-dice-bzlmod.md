@@ -1945,6 +1945,12 @@ hardening behavior around it.
      fallback inside the shared formatting helper. Guardrails: `cargo test -p
      slug_build_api analysis_context_repo_name --lib -- --nocapture`; `cargo
      check -p slug_analysis -p slug_build_api`.
+   - 2026-05-29 aspect-context root-adapter reduction: DICE aspect execution now
+     passes the active `CellResolver` root cell into `AspectContext`, and aspect
+     `ctx.workspace_name` uses that explicit root identity. The standalone
+     aspect execution helper keeps the no-owner fallback. Guardrails: `cargo
+     test -p slug_build_api aspect_workspace_name_uses_explicit_root_cell --lib
+     -- --nocapture`; `cargo check -p slug_analysis -p slug_build_api`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

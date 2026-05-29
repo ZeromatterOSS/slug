@@ -21,6 +21,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use allocative::Allocative;
+use slug_core::cells::name::CellName;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProvidersName;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
@@ -83,6 +84,7 @@ pub struct AspectContext<'v> {
     label: ValueTyped<'v, StarlarkConfiguredProvidersLabel>,
     /// Rule information (ctx.rule access).
     rule: ValueTyped<'v, AspectRuleInfo<'v>>,
+    root_cell_name: Option<CellName>,
 }
 
 impl<'v> Display for AspectContext<'v> {
@@ -98,6 +100,7 @@ impl<'v> AspectContext<'v> {
         attrs: Option<ValueOfUnchecked<'v, StructRef<'static>>>,
         label: ValueTyped<'v, StarlarkConfiguredProvidersLabel>,
         rule: ValueTyped<'v, AspectRuleInfo<'v>>,
+        root_cell_name: Option<CellName>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
     ) -> Self {
@@ -111,6 +114,7 @@ impl<'v> AspectContext<'v> {
             }),
             label,
             rule,
+            root_cell_name,
         }
     }
 
@@ -120,6 +124,7 @@ impl<'v> AspectContext<'v> {
         attrs: Option<ValueOfUnchecked<'v, StructRef<'static>>>,
         label: ConfiguredTargetLabel,
         rule: ValueTyped<'v, AspectRuleInfo<'v>>,
+        root_cell_name: Option<CellName>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
     ) -> ValueTyped<'v, AspectContext<'v>> {
@@ -127,7 +132,15 @@ impl<'v> AspectContext<'v> {
             ConfiguredProvidersLabel::new(label, ProvidersName::Default),
         ));
 
-        let ctx = Self::new(heap, attrs, label, rule, registry, digest_config);
+        let ctx = Self::new(
+            heap,
+            attrs,
+            label,
+            rule,
+            root_cell_name,
+            registry,
+            digest_config,
+        );
         heap.alloc_typed(ctx)
     }
 
@@ -367,11 +380,22 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let cell_name = this.0.label.label().target().pkg().cell_name().as_str();
-        if slug_core::cells::is_root_cell_name(cell_name) {
-            Ok(heap.alloc_str("_main").to_value())
-        } else {
-            Ok(heap.alloc_str(cell_name).to_value())
-        }
+        Ok(heap
+            .alloc_str(&aspect_workspace_name_for_cell(
+                cell_name,
+                this.0.root_cell_name,
+            ))
+            .to_value())
+    }
+}
+
+fn aspect_workspace_name_for_cell(cell_name: &str, root_cell_name: Option<CellName>) -> String {
+    if root_cell_name.is_some_and(|root| root.as_str() == cell_name)
+        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name))
+    {
+        "_main".to_owned()
+    } else {
+        cell_name.to_owned()
     }
 }
 
@@ -396,6 +420,27 @@ fn bin_dir_path_for_aspect(label: ValueTyped<'_, StarlarkConfiguredProvidersLabe
         format!("buck-out/v2/gen/{cell_name}/{cfg_hash}/{target_seg}")
     } else {
         format!("buck-out/v2/gen/{cell_name}/{cfg_hash}/{pkg_path}/{target_seg}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use slug_core::cells::name::CellName;
+
+    use super::aspect_workspace_name_for_cell;
+
+    #[test]
+    fn aspect_workspace_name_uses_explicit_root_cell() {
+        let root_cell = CellName::testing_new("aspect_actual_root");
+
+        assert_eq!(
+            aspect_workspace_name_for_cell("aspect_actual_root", Some(root_cell)),
+            "_main"
+        );
+        assert_eq!(
+            aspect_workspace_name_for_cell("root", Some(root_cell)),
+            "root"
+        );
     }
 }
 

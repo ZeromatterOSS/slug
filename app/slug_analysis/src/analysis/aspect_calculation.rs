@@ -22,6 +22,7 @@ use dice::Key;
 use dupe::Dupe;
 use futures::FutureExt;
 use slug_build_api::analysis::AnalysisResult;
+use slug_common::dice::cells::HasCellResolver;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
@@ -710,6 +711,7 @@ async fn execute_aspect(
             let eval_provider = StarlarkEvaluatorProvider::new(ctx, eval_kind).await?;
             let mut reentrant_eval =
                 eval_provider.make_reentrant_evaluator(&env, cancellations.into())?;
+            let aspect_root_cell_name = Some(ctx.get_cell_resolver().await?.root_cell());
 
             // 7. Execute aspect implementation function (inlined from run_aspect_basic)
             let (aspect_context, provider_collection) = reentrant_eval.with_evaluator(|eval| {
@@ -777,6 +779,7 @@ async fn execute_aspect(
                     aspect_attr,
                     target.dupe(),
                     rule_info,
+                    aspect_root_cell_name,
                     registry,
                     ctx.global_data().get_digest_config(),
                 );
