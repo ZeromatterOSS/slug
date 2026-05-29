@@ -2150,11 +2150,31 @@ impl Key for RegistryFileInputsKey {
             };
             hasher.update(path.to_string_lossy().as_bytes());
             hasher.update([0]);
-            let (content, tracking) =
-                read_text_file_for_project_input(ctx, &project_fs, &path).await?;
-            if tracking != BzlmodFileInputTracking::Project {
-                has_untracked_inputs = true;
-            }
+            // http(s) registry files are checksum-pinned by the lockfile's
+            // registry_file_hashes (a tracked DICE input). For OUT-OF-PROJECT cache
+            // files the on-disk blob is therefore content-addressed: read it directly
+            // (no per-transaction DICE poll dependency via the validity=false
+            // AbsoluteTextFileInputKey) so this compute only re-runs when the recorded
+            // hash changes, not every transaction. Mirrors Bazel's RegistryFunction,
+            // which depends on URL + recorded checksum (DownloadManager cache), not a
+            // Skyframe FileValue over the blob. In-project cache files are already
+            // DICE-tracked + watched, so keep their tracked read so on-disk edits
+            // invalidate. file: (and any non-http) registries are IGNORE in Bazel and
+            // stay strict tracked/polled reads.
+            let is_checksum_pinned = url.starts_with("https://") || url.starts_with("http://");
+            let is_out_of_project =
+                project_relative_path_for_abs_path(&project_fs, &path).is_none();
+            let content = if is_checksum_pinned && is_out_of_project {
+                let (content, _digest) = read_absolute_text_file_input(&path)?;
+                content
+            } else {
+                let (content, tracking) =
+                    read_text_file_for_project_input(ctx, &project_fs, &path).await?;
+                if tracking != BzlmodFileInputTracking::Project {
+                    has_untracked_inputs = true;
+                }
+                content
+            };
             match content {
                 Some(content) => {
                     hasher.update(b"present");
@@ -4002,10 +4022,10 @@ use_repo(ext, "generated")
     }
 
     #[tokio::test]
-    async fn registry_file_inputs_key_repolls_same_out_of_project_key() -> slug_error::Result<()> {
+    async fn registry_file_inputs_pinned_entry_is_content_addressed() -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         let external = tempfile::Builder::new()
-            .prefix("slug-plan61-registry-cache-parent-")
+            .prefix("slug-plan61-registry-content-addr-")
             .tempdir_in("/var/mnt/dev")
             .unwrap();
         let cache_base_dir = external.path().join("cache");
@@ -4020,7 +4040,7 @@ use_repo(ext, "generated")
         let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
         let key = RegistryFileInputsKey {
             project_root,
-            registry_file_hashes: vec![(registry_url.clone(), registry_hash)],
+            registry_file_hashes: vec![(registry_url, registry_hash)],
             cache_base_dir: Some(cache_base_dir),
         };
         let mut dice = DiceBuilder::new()
@@ -4033,15 +4053,23 @@ use_repo(ext, "generated")
             .await;
 
         let first = dice.compute(&key).await??;
-        assert!(first.has_untracked_inputs);
-        assert!(<RegistryFileInputsKey as Key>::validity(&Ok(first)));
+        // A checksum-pinned (http(s)) registry file is owned by the lockfile hash,
+        // not a per-transaction filesystem poll; it must not be reported as an
+        // untracked polled input.
+        assert!(
+            !first.has_untracked_inputs,
+            "PLAN61_REGISTRY_FILE_NOT_CONTENT_ADDRESSED: pinned registry read was tracked as a polled untracked input"
+        );
+        assert!(<RegistryFileInputsKey as Key>::validity(&Ok(first.clone())));
 
+        // Editing the on-disk cache blob WITHOUT changing the recorded hash must
+        // not re-read it: the value is content-addressed by the lockfile hash and
+        // stays cached across transactions (matches Bazel's checksum-keyed repo
+        // cache, which does not re-verify cached blobs each build).
         std::fs::write(&registry_path, "{\"mirrors\": []}\n").unwrap();
         let mut dice = dice.into_updater().commit().await;
-        let err = dice.compute(&key).await?.unwrap_err().to_string();
-
-        assert!(err.contains("Registry file checksum mismatch"), "{err}");
-        assert!(err.contains(&registry_url), "{err}");
+        let second = dice.compute(&key).await??;
+        assert_eq!(first.digest, second.digest);
         Ok(())
     }
 

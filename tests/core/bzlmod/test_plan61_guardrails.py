@@ -1990,10 +1990,13 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_warm_noop_out_of_project_registry_cache_reuses_polled_dice_input(
+async def test_warm_noop_out_of_project_registry_cache_is_content_addressed(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: registry cache files are Skyframe module-resolution inputs."""
+    """Bazel anchor: RegistryFunction/IndexRegistry depend on URL + the lockfile's
+    recorded checksum (DownloadManager checksum-keyed cache), not a Skyframe FileValue
+    over the on-disk registry blob, so an on-disk edit with an unchanged recorded hash
+    is content-addressed and not re-validated on a warm build."""
     module_name = "external_cache_lib"
     module_version = "1.0.0"
     cache_home = buck.cwd.parent / f"{buck.cwd.name}_cache_home"
@@ -2051,7 +2054,35 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     assert module_name in output
     assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
+    # Editing the cached registry blob with the lockfile's recorded hash UNCHANGED is
+    # content-addressed (Bazel does not re-validate the cache blob on a warm build), so
+    # resolution does not recompute and the build still succeeds.
     _write(registry_cache / "bazel_registry.json", '{"mirrors": []}\n')
+    output, third = await _audit_cells_and_counters(buck, env=env)
+    assert module_name in output
+    assert third["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
+
+    # The recorded hash IS the tracked input: changing it so it no longer matches the
+    # on-disk content fails checksum verification when resolution recomputes.
+    _write(
+        buck.cwd / "MODULE.bazel.lock",
+        json.dumps(
+            {
+                "lockFileVersion": 26,
+                "registryFileHashes": {
+                    registry_url: "0" * 64,
+                    module_url: _sha256(module_cache / "MODULE.bazel"),
+                    source_url: _sha256(module_cache / "source.json"),
+                },
+                "selectedYankedVersions": {},
+                "moduleExtensions": {},
+                "facts": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
     with pytest.raises(BuckException) as exc:
         await buck.audit("cell", env=env)
     assert "Registry file checksum mismatch" in str(exc.value)

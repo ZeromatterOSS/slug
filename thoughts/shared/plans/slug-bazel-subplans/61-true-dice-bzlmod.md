@@ -250,6 +250,31 @@ edit (`4 passed`); `cargo test -p slug_bzlmod` (405 passed plus doctest);
 slug_external_cells` (10 passed plus doctests); and
 `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (156 passed).
 
+**Bridge surface reduced**: out-of-project registry cache files are now
+content-addressed by their lockfile-recorded checksum instead of polled every
+transaction. `RegistryFileInputsKey::compute` (cells.rs ~2164) no longer routes
+out-of-project (`~/.cache/slug/registry`) `http(s)` registry files through the
+`validity=false` `AbsoluteTextFileInputKey` poll child; it reads them directly,
+verifies against the recorded hash, and lets the key's identity be
+`(project_root, registry_file_hashes)` — so warm builds stop re-reading and
+re-hashing the registry cache, and `has_untracked_inputs` is no longer set for
+those entries. In-project registry caches keep their watched/tracked
+`ProjectReadFileKey` read (on-disk edits still invalidate); `file:`/non-http and
+unsupported URLs keep the strict tracked read. Bazel anchor (verified):
+`RegistryFunction.compute` declares no `FileValue`/`FileStateValue` dependency
+over the cached blob and `IndexRegistry` reads via the checksum-keyed
+`DownloadManager`/`DownloadCache`, so an on-disk blob edit with an unchanged
+recorded hash is invisible to warm Bazel. Sub-plan:
+[61-01-registry-content-addressing.md](./61-01-registry-content-addressing.md).
+Validation: new `registry_file_inputs_pinned_entry_is_content_addressed`
+unit test (red→green), `cargo test -p slug_common registry_file_inputs`
+(4 passed) / `bzlmod` (15 passed), `cargo test -p slug_bzlmod` (423 passed plus
+doctest), `cargo test -p slug_external_cells` (13 passed), `cargo build -p
+slug`, `cargo fmt --check`, `git diff --check`, and
+`pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (178 passed; three
+`bcr.bazel.build` bridge tests updated — out-of-project case relaxed to the
+content-addressed Bazel-parity behavior, in-project edit/delete detection kept).
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
