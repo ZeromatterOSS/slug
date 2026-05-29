@@ -163,8 +163,10 @@ async fn spoke_execution_key(
                 canonical_name
             )
         })?;
-    let lookup_key =
-        crate::ExtensionSpokesByCanonicalRepoKey::for_workspace_id(workspace_id, canonical_name);
+    let lookup_key = crate::ExtensionSpokesByCanonicalRepoKey::for_workspace_id(
+        workspace_id.clone(),
+        canonical_name,
+    );
     let spokes = match ctx.compute(&lookup_key).await {
         Ok(Ok(Some(spokes))) => spokes,
         Ok(Ok(None)) => return Ok(None),
@@ -179,6 +181,15 @@ async fn spoke_execution_key(
         }
     };
     if let Some(spoke) = spokes.by_canonical_or_internal_name(canonical_name) {
+        let repo_mappings = ctx
+            .compute(&crate::BzlmodRepoMappingsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        let repo_mappings = merged_repo_mappings(
+            repo_mappings.repo_mappings.as_ref(),
+            spokes.recorded_input_repo_mappings.as_ref(),
+        );
         return Ok(Some(
             ExtensionRepoExecutionKey::from_arcs_with_workspace_id_repo_env_and_repo_mappings(
                 spoke.canonical_name.clone(),
@@ -186,12 +197,26 @@ async fn spoke_execution_key(
                 spoke.repo_spec.clone(),
                 spokes.workspace_id.clone(),
                 spokes.repo_env.clone(),
-                spokes.recorded_input_repo_mappings.clone(),
+                std::sync::Arc::new(repo_mappings),
             ),
         ));
     }
 
     Ok(None)
+}
+
+fn merged_repo_mappings(
+    graph_mappings: &crate::RepoMappingSnapshot,
+    recorded_mappings: &crate::RepoMappingSnapshot,
+) -> crate::RepoMappingSnapshot {
+    let mut merged = graph_mappings.clone();
+    for (source_repo, mapping) in recorded_mappings {
+        merged
+            .entry(source_repo.clone())
+            .or_default()
+            .extend(mapping.clone());
+    }
+    merged
 }
 
 #[cfg(test)]

@@ -44,6 +44,7 @@ use crate::interpreter::build_context::PerFileTypeContext;
 use crate::interpreter::globspec::GlobSpec;
 use crate::interpreter::module_internals::ModuleInternals;
 use crate::macro_callable::StarlarkMacroCallable;
+use crate::repository_ctx::RepositoryLabelRecorder;
 
 fn depset_to_transitive_set<'v>(
     depset: Value<'v>,
@@ -385,6 +386,12 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             .map(|build_ctx| build_ctx.cell_info().cell_alias_resolver().dupe());
         let current_repo =
             lexical_current_repo_name_for_label_context(&file_cell, alias_resolver.as_ref());
+        if let Some(recorder) = eval
+            .extra
+            .and_then(|extra| extra.downcast_ref::<RepositoryLabelRecorder>())
+        {
+            recorder.record_label(label_string, &current_repo)?;
+        }
         let resolved = slug_bzlmod::canonicalize_label_with_package_context_and_repo_resolver(
             label_string,
             current_repo,

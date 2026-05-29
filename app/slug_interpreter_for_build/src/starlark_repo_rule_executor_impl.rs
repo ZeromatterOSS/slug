@@ -200,6 +200,31 @@ fn repository_rule_label_cell_paths(
     cell_paths
 }
 
+fn repository_rule_source_repo(
+    rule_bzl_path: &str,
+    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
+) -> String {
+    let Some(rest) = rule_bzl_path
+        .strip_prefix("@@")
+        .or_else(|| rule_bzl_path.strip_prefix('@'))
+    else {
+        return String::new();
+    };
+    let repo = rest.split("//").next().unwrap_or(rest);
+    if repo.is_empty() {
+        return String::new();
+    }
+    if repo_mappings.contains_key(repo) {
+        return repo.to_owned();
+    }
+    if let Some(stripped) = repo.strip_suffix('+')
+        && repo_mappings.contains_key(stripped)
+    {
+        return stripped.to_owned();
+    }
+    repo.to_owned()
+}
+
 fn root_local_bzl_path(
     bzl_path: &str,
     current_package: Option<&str>,
@@ -440,6 +465,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         rule_name: &str,
         working_dir: &Path,
         repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<StarlarkRepoRuleExecution> {
         tracing::debug!(
@@ -486,6 +512,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             &workspace_root_path,
             &invocation.name,
         );
+        let label_source_repo = repository_rule_source_repo(rule_bzl_path, repo_mappings.as_ref());
         let repo_ctx = RepositoryContext::new_with_workspace_root(
             invocation.name.clone(),
             repo_attr,
@@ -493,6 +520,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             workspace_root_path,
         )
         .with_label_resolution(cell_paths)
+        .with_label_recording(label_source_repo, repo_mappings)
         .with_repo_env(repo_env);
 
         tracing::debug!(
@@ -510,7 +538,9 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             let impl_fn = frozen_rule.implementation();
             let starlark_module = Module::new();
             let ctx_value = starlark_module.heap().alloc(repo_ctx.clone());
+            let label_recorder = repo_ctx.label_recorder();
             let mut eval = Evaluator::new(&starlark_module);
+            eval.extra = Some(&label_recorder);
             slug_bzlmod::with_extension_dice(ctx, workspace_id, || {
                 eval.eval_function(impl_fn.to_value(), &[ctx_value], &[])
             })

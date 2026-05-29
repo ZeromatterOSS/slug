@@ -422,16 +422,37 @@ impl ExtensionRepoExecutionKey {
         workspace_id: crate::WorkspaceId,
         repo_env: Arc<BTreeMap<String, String>>,
     ) -> Self {
+        Self::new_with_workspace_id_repo_env_and_repo_mappings(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            workspace_id,
+            repo_env,
+            Arc::new(crate::RepoMappingSnapshot::new()),
+        )
+    }
+
+    /// Create a new extension repo execution key with explicit workspace
+    /// identity, command repo-env, and recorded-input repo mappings.
+    pub fn new_with_workspace_id_repo_env_and_repo_mappings(
+        canonical_name: String,
+        extension_id: String,
+        repo_spec: RepoSpec,
+        workspace_id: crate::WorkspaceId,
+        repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<crate::RepoMappingSnapshot>,
+    ) -> Self {
         let project_root = workspace_id.canonical_project_root.as_ref().clone();
         let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
         let repo_spec = Arc::new(repo_spec);
         let materialization_manifest_key =
-            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_and_repo_env(
+            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_repo_env_and_repo_mappings(
                 workspace_id,
                 canonical_name.as_str(),
                 repo_spec.clone(),
                 spec_hash.clone(),
                 repo_env.clone(),
+                repo_mappings.clone(),
             );
         Self {
             canonical_name: Arc::from(canonical_name.as_str()),
@@ -441,7 +462,7 @@ impl ExtensionRepoExecutionKey {
             project_root: Arc::new(project_root),
             materialization_manifest_key: Arc::new(materialization_manifest_key),
             repo_env,
-            repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
+            repo_mappings,
         }
     }
 
@@ -1611,6 +1632,7 @@ impl Key for ExtensionRepoExecutionKey {
                                 rule_fn_name,
                                 &working_dir,
                                 self.repo_env.clone(),
+                                self.repo_mappings.clone(),
                                 self.materialization_manifest_key.workspace_id.clone(),
                             )
                             .await

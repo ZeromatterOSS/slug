@@ -333,6 +333,19 @@ pub fn recorded_env_input(name: &str, value: Option<&str>) -> String {
     format!("{} {}", escape_recorded_input_part(&input), value)
 }
 
+/// Build a Bazel-style recorded repository-mapping marker.
+pub fn recorded_repo_mapping_input(
+    source_repo: &str,
+    apparent: &str,
+    value: Option<&str>,
+) -> String {
+    let input = format!("REPO_MAPPING:{source_repo},{apparent}");
+    let value = value
+        .map(escape_recorded_input_part)
+        .unwrap_or_else(|| "\\0".to_owned());
+    format!("{} {}", escape_recorded_input_part(&input), value)
+}
+
 /// Validate recorded inputs against current filesystem/env/repo-mapping state.
 pub fn validate_recorded_inputs_current(
     recorded_inputs: &[String],

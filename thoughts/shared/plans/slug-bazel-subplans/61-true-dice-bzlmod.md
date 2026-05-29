@@ -345,6 +345,23 @@ Current state to preserve:
   replay selectors for recorded repo-mapping cache rejection and extension-repo
   source mappings. Execution note: this slice ran single-agent because the
   available subagent tool requires explicit user authorization before spawning.
+- 2026-05-29 repository-rule `Label()` repo-mapping inputs:
+  Starlark repository-rule execution now installs a repository label recorder
+  while invoking the rule implementation. `Label("@repo//...")` and
+  `repository_ctx.path/read/template/patch/extract/watch_tree(Label(...))`
+  record Bazel-style `REPO_MAPPING:<source>,<apparent>` rows against the same
+  graph-owned mapping snapshot used by the materialization manifest. Normal
+  external-cell materialization keys now get current `BzlmodRepoMappingsKey`
+  data instead of the empty default snapshot, so a root `repo_name` change
+  invalidates generated repositories before stale replay. Guardrails:
+  `cargo test -p slug_bzlmod test_recorded_repo_mapping_input_manifest_uses_repo_mappings`,
+  `cargo test -p slug_bzlmod` (402 passed plus doctests),
+  `cargo test -p slug_interpreter_for_build --lib` (126 passed),
+  `cargo test -p slug_external_cells` (10 passed plus doctests),
+  `cargo build -p slug`, focused Plan 61 Python selectors for repository-rule
+  `Label()` repo mapping, repository_ctx label read watching, recorded
+  repo-mapping cache rejection, and extension-repo source mappings (4 passed),
+  and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (156 passed).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1318,7 +1335,10 @@ hardening behavior around it.
      an invalid manifest.
    - Repository materialization manifest keys now include current repo mappings
      and validate persisted `REPO_MAPPING` recorded inputs against the
-     graph-owned mapping snapshot used by extension spokes.
+     graph-owned mapping snapshot used by extension spokes and normal
+     external-cell repository execution. Repository-rule `Label()` construction
+     now records those repo-mapping inputs, so apparent repo-name changes are
+     manifest-owned replay misses instead of stale materialization hits.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

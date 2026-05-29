@@ -635,6 +635,12 @@ pub struct RepositoryContext {
     /// execution.
     #[allocative(skip)]
     cell_paths: Arc<HashMap<String, PathBuf>>,
+    /// Source repository for repository-rule Label() mapping recording.
+    #[allocative(skip)]
+    label_source_repo: Arc<str>,
+    /// Current repository mappings for Bazel-style REPO_MAPPING recorded inputs.
+    #[allocative(skip)]
+    repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
 }
 
 starlark_simple_value!(RepositoryContext);
@@ -671,6 +677,8 @@ impl RepositoryContext {
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
             cell_paths: Arc::new(HashMap::new()),
+            label_source_repo: Arc::from(""),
+            repo_mappings: Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
         }
     }
 
@@ -693,6 +701,8 @@ impl RepositoryContext {
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
             cell_paths: Arc::new(HashMap::new()),
+            label_source_repo: Arc::from(""),
+            repo_mappings: Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
         }
     }
 
@@ -713,6 +723,8 @@ impl RepositoryContext {
             watch_inputs: Arc::new(Mutex::new(Vec::new())),
             repo_env: Arc::new(BTreeMap::new()),
             cell_paths: Arc::new(HashMap::new()),
+            label_source_repo: Arc::from(""),
+            repo_mappings: Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
         }
     }
 
@@ -720,6 +732,26 @@ impl RepositoryContext {
     pub fn with_label_resolution(mut self, cell_paths: HashMap<String, PathBuf>) -> Self {
         self.cell_paths = Arc::new(cell_paths);
         self
+    }
+
+    /// Set the source repo and repo mappings used for Label() recorded inputs.
+    pub fn with_label_recording(
+        mut self,
+        source_repo: String,
+        repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
+    ) -> Self {
+        self.label_source_repo = Arc::from(source_repo);
+        self.repo_mappings = repo_mappings;
+        self
+    }
+
+    /// Return a recorder that can be installed as Evaluator extra context for
+    /// the Starlark `Label()` constructor.
+    pub(crate) fn label_recorder(&self) -> RepositoryLabelRecorder {
+        RepositoryLabelRecorder {
+            recorded_inputs: self.recorded_inputs.clone(),
+            repo_mappings: self.repo_mappings.clone(),
+        }
     }
 
     /// Set the effective repository environment for repository_ctx APIs.
@@ -748,6 +780,8 @@ impl RepositoryContext {
     }
 
     fn resolve_label_to_filesystem_path(&self, label_str: &str) -> starlark::Result<PathBuf> {
+        self.label_recorder()
+            .record_label(label_str, self.label_source_repo.as_ref())?;
         let workspace_root = self.workspace_root.as_ref().as_path();
         let resolver = LabelFilesystemResolver::new(workspace_root)
             .with_project_root(Some(workspace_root))
@@ -835,38 +869,7 @@ impl RepositoryContext {
     }
 
     fn record_input(&self, recorded: String) -> starlark::Result<()> {
-        let mut inputs = self.recorded_inputs.lock().map_err(|_| {
-            starlark::Error::from(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "repository_ctx recorded input lock poisoned"
-            ))
-        })?;
-        let (identity, value) = split_recorded_input(&recorded).ok_or_else(|| {
-            starlark::Error::from(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "malformed recorded input '{}'",
-                recorded
-            ))
-        })?;
-        if let Some(existing) = inputs
-            .iter()
-            .find(|input| split_recorded_input(input).is_some_and(|(key, _)| key == identity))
-        {
-            let (_, existing_value) = split_recorded_input(existing).expect("checked above");
-            if existing_value == value {
-                return Ok(());
-            }
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "Conflicting values recorded for input {}: '{}' vs '{}'",
-                identity,
-                existing_value,
-                value
-            )
-            .into());
-        }
-        inputs.push(recorded);
-        Ok(())
+        record_input(&self.recorded_inputs, recorded)
     }
 
     fn record_watch_input(&self, input: RepositoryWatchInput) -> starlark::Result<()> {
@@ -879,6 +882,77 @@ impl RepositoryContext {
         inputs.push(input);
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, ProvidesStaticType)]
+pub(crate) struct RepositoryLabelRecorder {
+    recorded_inputs: Arc<Mutex<Vec<String>>>,
+    repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
+}
+
+impl RepositoryLabelRecorder {
+    pub(crate) fn record_label(&self, label_str: &str, source_repo: &str) -> starlark::Result<()> {
+        let Some(apparent) = apparent_repo_from_label(label_str) else {
+            return Ok(());
+        };
+        let value = self
+            .repo_mappings
+            .get(source_repo)
+            .and_then(|mapping| mapping.get(apparent).map(String::as_str))
+            .unwrap_or(apparent);
+        let recorded = slug_bzlmod::recorded_repo_mapping_input(source_repo, apparent, Some(value));
+        record_input(&self.recorded_inputs, recorded)
+    }
+}
+
+fn apparent_repo_from_label(label_str: &str) -> Option<&str> {
+    let rest = label_str.strip_prefix('@')?;
+    if rest.starts_with('@') {
+        return None;
+    }
+    let apparent = rest.split("//").next().unwrap_or(rest);
+    if apparent.is_empty() || apparent.contains('/') || apparent.contains(':') {
+        return None;
+    }
+    Some(apparent)
+}
+
+fn record_input(
+    recorded_inputs: &Arc<Mutex<Vec<String>>>,
+    recorded: String,
+) -> starlark::Result<()> {
+    let mut inputs = recorded_inputs.lock().map_err(|_| {
+        starlark::Error::from(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "repository_ctx recorded input lock poisoned"
+        ))
+    })?;
+    let (identity, value) = split_recorded_input(&recorded).ok_or_else(|| {
+        starlark::Error::from(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "malformed recorded input '{}'",
+            recorded
+        ))
+    })?;
+    if let Some(existing) = inputs
+        .iter()
+        .find(|input| split_recorded_input(input).is_some_and(|(key, _)| key == identity))
+    {
+        let (_, existing_value) = split_recorded_input(existing).expect("checked above");
+        if existing_value == value {
+            return Ok(());
+        }
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "Conflicting values recorded for input {}: '{}' vs '{}'",
+            identity,
+            existing_value,
+            value
+        )
+        .into());
+    }
+    inputs.push(recorded);
+    Ok(())
 }
 
 fn split_recorded_input(recorded: &str) -> Option<(&str, &str)> {

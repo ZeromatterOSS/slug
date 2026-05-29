@@ -576,6 +576,37 @@ async fn repo_env_for_extension_repo_execution(
     Ok(repo_env)
 }
 
+async fn repo_mappings_for_extension_repo_execution(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: &slug_bzlmod::WorkspaceId,
+    setup: &ExtensionRepoCellSetup,
+) -> slug_error::Result<Arc<slug_bzlmod::RepoMappingSnapshot>> {
+    match ctx
+        .compute(&slug_bzlmod::BzlmodRepoMappingsKey::for_workspace_id(
+            workspace_id.clone(),
+        ))
+        .await
+    {
+        Ok(Ok(repo_mappings)) => Ok(repo_mappings.repo_mappings.clone()),
+        Ok(Err(e)) => Err(ExtensionRepoError::MaterializationFailed {
+            canonical_name: setup.canonical_name.to_string(),
+            reason: format!(
+                "Current bzlmod repo-mapping lookup failed: {}",
+                diagnostic_summary(&e)
+            ),
+        }
+        .into()),
+        Err(e) => Err(ExtensionRepoError::MaterializationFailed {
+            canonical_name: setup.canonical_name.to_string(),
+            reason: format!(
+                "DICE error while reading current bzlmod repo mappings: {}",
+                diagnostic_summary(&e)
+            ),
+        }
+        .into()),
+    }
+}
+
 /// Get the file ops delegate for an extension-generated repository cell.
 ///
 /// This computes the expected path for the materialized repository
@@ -628,6 +659,9 @@ pub(crate) async fn get_file_ops_delegate(
         registered_spokes.as_ref(),
     )
     .await?;
+    let repo_mappings =
+        repo_mappings_for_extension_repo_execution(ctx, &extension_lookup_workspace_id, &setup)
+            .await?;
 
     let repo_spec_for_execution = if let Some(spokes) = registered_spokes.as_ref() {
         match spokes
@@ -661,12 +695,13 @@ pub(crate) async fn get_file_ops_delegate(
         None
     };
     if let Some(repo_spec) = repo_spec_for_execution {
-        let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
+        let key = ExtensionRepoExecutionKey::new_with_workspace_id_repo_env_and_repo_mappings(
             setup.canonical_name.to_string(),
             setup.extension_id.to_string(),
             repo_spec,
             extension_lookup_workspace_id.clone(),
             repo_env.clone(),
+            repo_mappings.clone(),
         );
         match ctx.compute(&key).await {
             Ok(Ok(repo_result)) => {
@@ -746,13 +781,15 @@ pub(crate) async fn get_file_ops_delegate(
                 );
                 inv.rule_source = Some(setup.extension_id.to_string());
                 let repo_spec = slug_bzlmod::RepoSpec::new(setup.extension_id.to_string());
-                let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
-                    setup.canonical_name.to_string(),
-                    setup.extension_id.to_string(),
-                    repo_spec,
-                    extension_lookup_workspace_id.clone(),
-                    repo_env.clone(),
-                );
+                let key =
+                    ExtensionRepoExecutionKey::new_with_workspace_id_repo_env_and_repo_mappings(
+                        setup.canonical_name.to_string(),
+                        setup.extension_id.to_string(),
+                        repo_spec,
+                        extension_lookup_workspace_id.clone(),
+                        repo_env.clone(),
+                        repo_mappings.clone(),
+                    );
                 match ctx.compute(&key).await {
                     Ok(Ok(repo_result)) => {
                         tracing::info!(
@@ -850,12 +887,13 @@ pub(crate) async fn get_file_ops_delegate(
     };
 
     // Create the execution key for lazy materialization of this specific repo
-    let key = ExtensionRepoExecutionKey::new_with_workspace_id_and_repo_env(
+    let key = ExtensionRepoExecutionKey::new_with_workspace_id_repo_env_and_repo_mappings(
         setup.canonical_name.to_string(),
         setup.extension_id.to_string(),
         repo_spec,
         extension_lookup_workspace_id.clone(),
         repo_env.clone(),
+        repo_mappings.clone(),
     );
 
     // Execute via DICE to materialize the repository

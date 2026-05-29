@@ -7927,6 +7927,69 @@ use_repo(read_watch, "read_watch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_label_constructor_records_repo_mapping(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepoRecordedInput.RecordedRepoMapping and RepositoryFetchFunction."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+label_mapping_ext+label_mapping_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    dep = buck.cwd / "dep"
+    dep.mkdir()
+    _write(dep / "MODULE.bazel", 'module(name = "dep", version = "1.0")\n')
+    _write(dep / "BUILD.bazel", 'exports_files(["payload.txt"])\n')
+    _write(dep / "payload.txt", "payload from mapped dep\n")
+    _write(
+        buck.cwd / "label_mapping_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    payload = repository_ctx.read(Label("@mapped_dep//:payload.txt"))
+    repository_ctx.file("data.txt", payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+label_mapping_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _label_mapping_ext_impl(module_ctx):
+    label_mapping_repo_rule(name = "label_mapping_repo")
+
+label_mapping_ext = module_extension(
+    implementation = _label_mapping_ext_impl,
+)
+""",
+    )
+    module_template = """module(name = "plan61_repo_ctx_label_mapping")
+
+bazel_dep(name = "dep", version = "1.0", repo_name = "{repo_name}")
+local_path_override(module_name = "dep", path = "dep")
+
+label_mapping = use_extension("//:label_mapping_ext.bzl", "label_mapping_ext")
+use_repo(label_mapping, "label_mapping_repo")
+"""
+    _write(buck.cwd / "MODULE.bazel", module_template.format(repo_name="mapped_dep"))
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_label_mapping_repo",
+    srcs = ["@label_mapping_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_label_mapping_repo")
+    assert (repo_dir / "data.txt").read_text() == "payload from mapped dep\n"
+    assert recorded_inputs.exists()
+    assert "REPO_MAPPING:,mapped_dep dep+" in recorded_inputs.read_text()
+
+    _write(buck.cwd / "MODULE.bazel", module_template.format(repo_name="remapped_dep"))
+
+    with pytest.raises(BuckException) as exc:
+        await buck.build("//:uses_label_mapping_repo")
+
+    assert "mapped_dep" in str(exc.value)
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_template_label_auto_watch_reexecutes_materialized_repo(
     buck: Buck,
 ) -> None:

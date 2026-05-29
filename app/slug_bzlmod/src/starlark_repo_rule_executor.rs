@@ -117,6 +117,7 @@ pub trait StarlarkRepoRuleExecutorImpl: Send + Sync + 'static {
         rule_name: &str,
         working_dir: &Path,
         repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<crate::RepoMappingSnapshot>,
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<StarlarkRepoRuleExecution>;
 }
