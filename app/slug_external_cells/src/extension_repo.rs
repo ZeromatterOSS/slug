@@ -412,10 +412,14 @@ async fn ensure_extension_spokes_registered(
     extension_id: &str,
     requesting_canonical_name: &str,
 ) -> slug_error::Result<Option<Arc<slug_bzlmod::ExtensionSpokesValue>>> {
-    let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
-        workspace_id.clone(),
-        extension_id,
-    );
+    let resolution_digest =
+        slug_bzlmod::bzlmod_resolution_digest_for_workspace_id(ctx, workspace_id.clone()).await?;
+    let lookup_key =
+        slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id_with_resolution_digest(
+            workspace_id.clone(),
+            resolution_digest,
+            extension_id,
+        );
     let Some(spokes) = (match ctx.compute(&lookup_key).await {
         Ok(Ok(spokes)) => spokes,
         Ok(Err(e)) => {
@@ -834,10 +838,17 @@ pub(crate) async fn get_file_ops_delegate(
     // DICE-owned spoke or enter the repository execution key so its
     // materialization manifest owns reuse.
     let repo_spec = {
-        let lookup_key = slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
+        let resolution_digest = slug_bzlmod::bzlmod_resolution_digest_for_workspace_id(
+            ctx,
             extension_lookup_workspace_id.clone(),
-            &setup.extension_id,
-        );
+        )
+        .await?;
+        let lookup_key =
+            slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id_with_resolution_digest(
+                extension_lookup_workspace_id.clone(),
+                resolution_digest,
+                &setup.extension_id,
+            );
         let spokes = match ctx.compute(&lookup_key).await {
             Ok(Ok(Some(result))) => result,
             Ok(Ok(None)) => {

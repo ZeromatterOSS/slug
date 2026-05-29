@@ -494,6 +494,8 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             registered_toolchains.with_resolution_digest(cell_graph_resolution_digest.clone());
         let registered_execution_platforms = registered_execution_platforms
             .with_resolution_digest(cell_graph_resolution_digest.clone());
+        let extension_aggregations =
+            extension_aggregations.with_resolution_digest(cell_graph_resolution_digest.clone());
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
         let repo_env_data = Arc::new(repo_env);
         let module_versions = Arc::new(module_versions);
@@ -698,6 +700,23 @@ pub async fn bzlmod_resolution_digest_for_current_workspace(
     Ok(current.resolution_digest.clone())
 }
 
+pub async fn bzlmod_resolution_digest_for_workspace_id(
+    ctx: &mut dice::DiceComputations<'_>,
+    workspace_id: WorkspaceId,
+) -> slug_error::Result<Arc<str>> {
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    if current.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "bzlmod resolution digest requested for project root '{}', \
+             but current bzlmod cell graph root is '{}'",
+            workspace_id.canonical_project_root.display(),
+            current.workspace_id.canonical_project_root.display()
+        ));
+    }
+    Ok(current.resolution_digest.clone())
+}
+
 pub async fn bzlmod_cell_graph_for_workspace_id(
     ctx: &mut dice::DiceComputations<'_>,
     workspace_id: WorkspaceId,
@@ -730,6 +749,8 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<()> {
     let workspace_id = bzlmod_workspace_id_for_current_workspace(ctx).await?;
+    let resolution_digest =
+        bzlmod_resolution_digest_for_workspace_id(ctx, workspace_id.clone()).await?;
     let lockfile_inputs = ctx
         .compute(&BzlmodLockfileInputsKey::for_workspace_id(
             workspace_id.clone(),
@@ -751,6 +772,15 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
             aggregations.workspace_id.canonical_project_root.display()
         ));
     }
+    if aggregations.resolution_digest != resolution_digest {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "lockfile extension replay validation requested resolution digest '{}', \
+             but current bzlmod extension aggregation data digest is '{}'",
+            resolution_digest,
+            aggregations.resolution_digest
+        ));
+    }
 
     let mut extension_ids: Vec<_> = aggregations
         .extension_aggregations
@@ -766,6 +796,7 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
         validate_lockfile_extension_replay_for_extension(
             ctx,
             &workspace_id,
+            &resolution_digest,
             &extension_id,
             lockfile_inputs.as_ref(),
         )
@@ -778,14 +809,18 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
 async fn validate_lockfile_extension_replay_for_extension(
     ctx: &mut dice::DiceComputations<'_>,
     workspace_id: &WorkspaceId,
+    resolution_digest: &Arc<str>,
     extension_id: &str,
     lockfile_inputs: &BzlmodLockfileInputsValue,
 ) -> slug_error::Result<()> {
     let aggregation = ctx
-        .compute(&BzlmodExtensionAggregationKey {
-            workspace_id: workspace_id.clone(),
-            extension_id: Arc::from(extension_id),
-        })
+        .compute(
+            &BzlmodExtensionAggregationKey::for_workspace_id_with_resolution_digest(
+                workspace_id.clone(),
+                resolution_digest.clone(),
+                extension_id,
+            ),
+        )
         .await??;
     let Some(aggregation) = aggregation else {
         return Ok(());
@@ -794,6 +829,7 @@ async fn validate_lockfile_extension_replay_for_extension(
         .compute(&ExtensionBzlTransitiveDigestKey {
             workspace_id: workspace_id.clone(),
             extension_id: Arc::from(extension_id),
+            resolution_digest: resolution_digest.clone(),
             allow_missing_loads: true,
         })
         .await??;
@@ -2901,7 +2937,8 @@ mod tests {
                     workspace_id.clone(),
                     "root".to_owned(),
                     Arc::new(HashMap::new()),
-                ),
+                )
+                .with_resolution_digest(resolution_digest.clone()),
             ),
         )])?;
         let mut dice = updater.commit().await;

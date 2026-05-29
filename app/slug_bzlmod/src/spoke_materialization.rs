@@ -163,10 +163,14 @@ async fn spoke_execution_key(
                 canonical_name
             )
         })?;
-    let lookup_key = crate::ExtensionSpokesByCanonicalRepoKey::for_workspace_id(
-        workspace_id.clone(),
-        canonical_name,
-    );
+    let resolution_digest =
+        crate::bzlmod_resolution_digest_for_workspace_id(ctx, workspace_id.clone()).await?;
+    let lookup_key =
+        crate::ExtensionSpokesByCanonicalRepoKey::for_workspace_id_with_resolution_digest(
+            workspace_id.clone(),
+            resolution_digest,
+            canonical_name,
+        );
     let spokes = match ctx.compute(&lookup_key).await {
         Ok(Ok(Some(spokes))) => spokes,
         Ok(Ok(None)) => return Ok(None),

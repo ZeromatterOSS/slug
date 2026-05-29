@@ -1323,7 +1323,8 @@ pub fn clean_resolved_graph_outputs_value(
             .with_resolution_digest(cell_graph_resolution_digest.clone()),
         extension_aggregations: projections
             .extension_aggregations
-            .with_declared_extension_cells(declared_extension_cells),
+            .with_declared_extension_cells(declared_extension_cells)
+            .with_resolution_digest(cell_graph_resolution_digest.clone()),
         repo_mappings: repo_mappings.with_resolution_digest(cell_graph_resolution_digest),
         cell_graph,
     }
@@ -3197,18 +3198,13 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             return Ok(Arc::new(Vec::new()));
         }
         let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
-        if extension_aggregations.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodExtensionCellDefinitionsKey was computed with project root '{}', \
-                 but current bzlmod extension aggregation data root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                extension_aggregations
-                    .workspace_id
-                    .canonical_project_root
-                    .display()
-            ));
-        }
+        validate_extension_aggregations_payload(
+            "BzlmodExtensionCellDefinitionsKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            extension_aggregations.as_ref(),
+            "extension cells",
+        )?;
         if should_use_clean_resolution_data(&self.resolution_digest) {
             return Ok(extension_aggregations.declared_extension_cells.dupe());
         }
@@ -3233,6 +3229,7 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             return match extension_cells_from_spokes(
                 ctx,
                 &self.workspace_id,
+                &self.resolution_digest,
                 extension_aggregations.as_ref(),
                 repo_env.as_ref(),
                 repo_mappings.as_ref(),
@@ -3306,6 +3303,7 @@ fn merge_declared_and_spoke_extension_cells(
 async fn extension_cells_from_spokes(
     ctx: &mut DiceComputations<'_>,
     workspace_id: &WorkspaceId,
+    resolution_digest: &Arc<str>,
     extension_aggregations: &BzlmodExtensionAggregationsDataValue,
     repo_env: &BTreeMap<String, String>,
     repo_mappings: &BzlmodRepoMappingsDataValue,
@@ -3326,10 +3324,13 @@ async fn extension_cells_from_spokes(
     })?;
     for extension_id in extension_ids {
         let spokes = ctx
-            .compute(&ExtensionSpokesByExtensionIdKey::for_workspace_id(
-                workspace_id.clone(),
-                extension_id,
-            ))
+            .compute(
+                &ExtensionSpokesByExtensionIdKey::for_workspace_id_with_resolution_digest(
+                    workspace_id.clone(),
+                    resolution_digest.clone(),
+                    extension_id,
+                ),
+            )
             .await??;
         let Some(spokes) = spokes else {
             continue;
@@ -3514,6 +3515,38 @@ fn validate_module_sources_payload(
     Ok(())
 }
 
+pub(crate) fn validate_extension_aggregations_payload(
+    key_name: &str,
+    workspace_id: &WorkspaceId,
+    resolution_digest: &str,
+    data: &BzlmodExtensionAggregationsDataValue,
+    subject: &str,
+) -> slug_error::Result<()> {
+    if data.workspace_id != *workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} for '{}' was computed with project root '{}', \
+             but current bzlmod extension aggregation data root is '{}'",
+            key_name,
+            subject,
+            workspace_id.canonical_project_root.display(),
+            data.workspace_id.canonical_project_root.display()
+        ));
+    }
+    if data.resolution_digest.as_ref() != resolution_digest {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "{} for '{}' was computed with resolution digest '{}', \
+             but current bzlmod extension aggregation data digest is '{}'",
+            key_name,
+            subject,
+            resolution_digest,
+            data.resolution_digest
+        ));
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl Key for BzlmodCellGraphKey {
     type Value = slug_error::Result<Arc<BzlmodCellGraphValue>>;
@@ -3556,18 +3589,13 @@ impl Key for BzlmodCellGraphKey {
             )
             .await??;
         let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
-        if extension_aggregations.workspace_id != self.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodCellGraphKey was computed with project root '{}', \
-                 but current bzlmod extension aggregation data root is '{}'",
-                self.workspace_id.canonical_project_root.display(),
-                extension_aggregations
-                    .workspace_id
-                    .canonical_project_root
-                    .display()
-            ));
-        }
+        validate_extension_aggregations_payload(
+            "BzlmodCellGraphKey",
+            &self.workspace_id,
+            &self.resolution_digest,
+            extension_aggregations.as_ref(),
+            "cell graph",
+        )?;
         let root_module_name = module_versions.invalidation.root_module_name.clone();
         let root_aliases = merge_declared_root_aliases(
             root_aliases_from_repo_mappings(&repo_mappings),
@@ -4268,6 +4296,7 @@ impl BzlmodRepoMappingsDataValue {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionAggregationsDataValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub root_module_name: String,
     pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
     pub declared_extension_cells: Arc<Vec<BzlmodCellGraphExtensionCell>>,
@@ -4281,10 +4310,16 @@ impl BzlmodExtensionAggregationsDataValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             root_module_name,
             extension_aggregations,
             declared_extension_cells: Arc::new(Vec::new()),
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 
     pub fn with_declared_extension_cells(
@@ -5116,25 +5151,29 @@ pub struct InnateExtensionKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "ExtensionBzlTransitiveDigestKey({}, {}, allow_missing_loads={})",
+    "ExtensionBzlTransitiveDigestKey({}, {}, {}, allow_missing_loads={})",
     workspace_id.stable_hash(),
     extension_id,
+    resolution_digest,
     allow_missing_loads
 )]
 pub struct ExtensionBzlTransitiveDigestKey {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
+    pub resolution_digest: Arc<str>,
     pub allow_missing_loads: bool,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "BzlmodExtensionAggregationKey({}, {})",
+    "BzlmodExtensionAggregationKey({}, {}, {})",
     workspace_id.stable_hash(),
+    resolution_digest,
     extension_id
 )]
 pub struct BzlmodExtensionAggregationKey {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub extension_id: Arc<str>,
 }
 
@@ -5142,6 +5181,19 @@ impl BzlmodExtensionAggregationKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+            extension_id: Arc::from(extension_id),
+        }
+    }
+
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        extension_id: &str,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
             extension_id: Arc::from(extension_id),
         }
     }
@@ -5264,12 +5316,14 @@ impl ExtensionSpokesKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "ExtensionSpokesByExtensionIdKey({}, {})",
+    "ExtensionSpokesByExtensionIdKey({}, {}, {})",
     workspace_id.stable_hash(),
+    resolution_digest,
     extension_id
 )]
 pub struct ExtensionSpokesByExtensionIdKey {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub extension_id: Arc<str>,
 }
 
@@ -5277,6 +5331,19 @@ impl ExtensionSpokesByExtensionIdKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+            extension_id: Arc::from(extension_id),
+        }
+    }
+
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        extension_id: &str,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
             extension_id: Arc::from(extension_id),
         }
     }
@@ -5289,12 +5356,14 @@ impl ExtensionSpokesByExtensionIdKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "ExtensionIdByCanonicalRepoKey({}, {})",
+    "ExtensionIdByCanonicalRepoKey({}, {}, {})",
     workspace_id.stable_hash(),
+    resolution_digest,
     canonical_name
 )]
 pub struct ExtensionIdByCanonicalRepoKey {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub canonical_name: Arc<str>,
 }
 
@@ -5302,6 +5371,19 @@ impl ExtensionIdByCanonicalRepoKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId, canonical_name: &str) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+            canonical_name: Arc::from(canonical_name),
+        }
+    }
+
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        canonical_name: &str,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
             canonical_name: Arc::from(canonical_name),
         }
     }
@@ -5314,12 +5396,14 @@ impl ExtensionIdByCanonicalRepoKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "ExtensionSpokesByCanonicalRepoKey({}, {})",
+    "ExtensionSpokesByCanonicalRepoKey({}, {}, {})",
     workspace_id.stable_hash(),
+    resolution_digest,
     canonical_name
 )]
 pub struct ExtensionSpokesByCanonicalRepoKey {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub canonical_name: Arc<str>,
 }
 
@@ -5327,6 +5411,19 @@ impl ExtensionSpokesByCanonicalRepoKey {
     pub fn for_workspace_id(workspace_id: WorkspaceId, canonical_name: &str) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+            canonical_name: Arc::from(canonical_name),
+        }
+    }
+
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        canonical_name: &str,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
             canonical_name: Arc::from(canonical_name),
         }
     }

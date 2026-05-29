@@ -147,11 +147,16 @@ async fn bzlmod_extension_spoke_aliases(
         return Ok(Vec::new());
     }
     let workspace_id = slug_bzlmod::bzlmod_workspace_id_for_current_workspace(ctx).await?;
+    let resolution_digest =
+        slug_bzlmod::bzlmod_resolution_digest_for_workspace_id(ctx, workspace_id.clone()).await?;
     let aggregation = ctx
-        .compute(&slug_bzlmod::BzlmodExtensionAggregationKey {
-            workspace_id: workspace_id.clone(),
-            extension_id: setup.extension_id.clone(),
-        })
+        .compute(
+            &slug_bzlmod::BzlmodExtensionAggregationKey::for_workspace_id_with_resolution_digest(
+                workspace_id.clone(),
+                resolution_digest.clone(),
+                setup.extension_id.as_ref(),
+            ),
+        )
         .await??;
     let Some(aggregation) = aggregation else {
         return Ok(Vec::new());
@@ -165,8 +170,9 @@ async fn bzlmod_extension_spoke_aliases(
     }
     let spokes = ctx
         .compute(
-            &slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
+            &slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id_with_resolution_digest(
                 workspace_id,
+                resolution_digest,
                 setup.extension_id.as_ref(),
             ),
         )

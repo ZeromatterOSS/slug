@@ -1001,6 +1001,23 @@ Current state to preserve:
   slug_bzlmod cell_graph --lib`, `cargo test -p slug_common bzlmod --lib`,
   `cargo test -p slug_bzlmod --lib`, `cargo fmt --check`, and `git diff
   --check`.
+- 2026-05-29 extension-aggregation graph-digest provenance:
+  `BzlmodExtensionAggregationsDataValue` now carries the active
+  cell-graph/resolution digest; `BzlmodExtensionAggregationKey`,
+  `ExtensionBzlTransitiveDigestKey`, `ExtensionSpokesByExtensionIdKey`,
+  `ExtensionIdByCanonicalRepoKey`, and `ExtensionSpokesByCanonicalRepoKey`
+  carry that digest through extension lookup and reject stale aggregation data.
+  Clean resolved-graph output, updater-installed inputs, cell-graph extension
+  cells, lockfile replay validation, extension repo materialization, and
+  runtime alias consumers now pass the active digest instead of reading the
+  default injected projection. Guardrails: `cargo test -p slug_bzlmod
+  extension_aggregation_key_rejects_stale_resolution_digest --lib`, `cargo
+  test -p slug_bzlmod extension_aggregation --lib`, `cargo test -p slug_bzlmod
+  cell_graph --lib`, `cargo test -p slug_bzlmod extension_spokes --lib`,
+  `cargo test -p slug_bzlmod extension_bzl_digest --lib`, `cargo test -p
+  slug_common bzlmod --lib`, `cargo test -p slug_external_cells
+  extension_repo --lib`, `cargo test -p slug_bzlmod --lib`, `cargo fmt
+  --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
