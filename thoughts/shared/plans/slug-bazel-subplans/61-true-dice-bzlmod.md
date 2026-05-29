@@ -598,6 +598,18 @@ Current state to preserve:
   `cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod lockfile --lib`,
   `cargo fmt --check`, targeted `rg` for removed public re-exports, and
   `git diff --check`.
+- 2026-05-29 module-extension recorded-input workspace identity made explicit:
+  `ModuleExtensionRecordedInputsKey` production construction now requires the
+  parent `WorkspaceId`; it no longer re-derives workspace/output-base identity
+  from a project root. Selected lockfile cache validation, fresh extension
+  recorded-input validation, and lazy extension-repo setup validation all pass
+  the current DICE workspace identity into the child key. The project-root
+  convenience constructor is test-only. Guardrails: `cargo check -p
+  slug_bzlmod -p slug_external_cells`, `cargo test -p slug_bzlmod
+  recorded_inputs --lib`, `cargo test -p slug_bzlmod
+  lockfile_replay_validates_recorded_file --lib`, `cargo test -p
+  slug_external_cells extension_repo --lib`, `cargo fmt --check`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1309,6 +1321,11 @@ hardening behavior around it.
    - Direct lockfile file-read helpers are also test-only; production lockfile
      bytes enter through `BzlmodCleanLockfileInputsKey` /
      `BzlmodLockfileInputsKey` instead of a public disk-read convenience API.
+   - Module-extension recorded-input validation keys now require the parent
+     `WorkspaceId` in production. The project-root/default-output-base
+     constructor remains only for tests, so selected lockfile replay and fresh
+     extension recorded-input checks validate under the same workspace identity
+     as the parent bzlmod graph.
    - Hidden lockfile edit and facts create/edit/delete transitions have current
      same-daemon guardrail coverage in the Plan 61 Python suite. Fact-bearing
      extension replay intentionally avoids the runtime setup reuse shortcut so
@@ -1715,9 +1732,10 @@ hardening behavior around it.
      materialization-manifest helpers that derive workspace identity from only a
      project root are also test-only. Zero-repo-env convenience constructors
      for extension execution and materialization manifests are test-only too.
-     Module extension execution keys require workspace identity instead of
-     carrying optional provenance. The remaining bzlmod projection data wrappers
-     also require workspace provenance instead of accepting absent provenance.
+     Module extension execution and recorded-input validation keys require
+     workspace identity instead of carrying or deriving optional provenance. The
+     remaining bzlmod projection data wrappers also require workspace
+     provenance instead of accepting absent provenance.
      The legacy resolver entry point requires an explicit workspace identity too.
      The outer parse helper also requires callers to choose the empty-projection
      workspace identity explicitly.

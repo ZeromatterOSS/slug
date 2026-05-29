@@ -802,7 +802,14 @@ async fn validate_lockfile_extension_replay_for_extension(
         ) else {
             continue;
         };
-        if selected_cache_recorded_inputs_current(ctx, extension_id, &selected_cache).await? {
+        if selected_cache_recorded_inputs_current(
+            ctx,
+            workspace_id.clone(),
+            extension_id,
+            &selected_cache,
+        )
+        .await?
+        {
             selected_cache.record_hit(extension_id);
             return Ok(());
         }

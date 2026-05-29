@@ -1231,6 +1231,22 @@ pub struct ModuleExtensionRecordedInputsKey {
 }
 
 impl ModuleExtensionRecordedInputsKey {
+    pub fn for_workspace_id(
+        recorded_inputs: Vec<String>,
+        workspace_id: crate::WorkspaceId,
+        repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<RepoMappingSnapshot>,
+    ) -> Self {
+        Self {
+            workspace_root: Some(workspace_id.canonical_project_root.clone()),
+            workspace_id: Some(workspace_id),
+            recorded_inputs: Arc::new(recorded_inputs),
+            repo_env: Some(repo_env),
+            repo_mappings: Some(repo_mappings),
+        }
+    }
+
+    #[cfg(test)]
     pub fn new(
         recorded_inputs: Vec<String>,
         workspace_root: Option<Arc<PathBuf>>,
@@ -1248,21 +1264,24 @@ impl ModuleExtensionRecordedInputsKey {
         }
     }
 
-    fn from_selected_cache(selected: &SelectedExtensionCache) -> Self {
+    fn from_selected_cache_for_workspace_id(
+        workspace_id: crate::WorkspaceId,
+        selected: &SelectedExtensionCache,
+    ) -> Self {
         Self {
-            workspace_id: selected
-                .workspace_root
-                .as_ref()
-                .map(|root| crate::WorkspaceId::new(root.clone(), root.join("buck-out/v2"))),
+            workspace_root: Some(workspace_id.canonical_project_root.clone()),
+            workspace_id: Some(workspace_id),
             recorded_inputs: Arc::new(selected.recorded_inputs.clone()),
-            workspace_root: selected.workspace_root.clone().map(Arc::new),
             repo_env: selected.repo_env.clone().map(Arc::new),
             repo_mappings: selected.repo_mappings.clone().map(Arc::new),
         }
     }
 
-    pub fn for_selected_lockfile_cache(selected: &SelectedExtensionCache) -> Self {
-        Self::from_selected_cache(selected)
+    pub fn for_selected_lockfile_cache(
+        workspace_id: crate::WorkspaceId,
+        selected: &SelectedExtensionCache,
+    ) -> Self {
+        Self::from_selected_cache_for_workspace_id(workspace_id, selected)
     }
 }
 
@@ -1774,10 +1793,14 @@ fn verify_observed_lockfile_digest(
 
 pub async fn selected_cache_recorded_inputs_current(
     ctx: &mut DiceComputations<'_>,
+    workspace_id: crate::WorkspaceId,
     extension_id: &str,
     selected: &SelectedExtensionCache,
 ) -> slug_error::Result<bool> {
-    let key = ModuleExtensionRecordedInputsKey::from_selected_cache(selected);
+    let key = ModuleExtensionRecordedInputsKey::from_selected_cache_for_workspace_id(
+        workspace_id,
+        selected,
+    );
     match ctx.compute(&key).await? {
         Ok(()) => Ok(true),
         Err(reason) => {
@@ -1799,18 +1822,18 @@ async fn validate_fresh_recorded_inputs_dependency(
     ctx: &mut DiceComputations<'_>,
     extension_id: &str,
     recorded_inputs: Vec<String>,
-    workspace_root: Option<Arc<PathBuf>>,
+    workspace_id: crate::WorkspaceId,
     repo_env: Arc<BTreeMap<String, String>>,
     repo_mappings: Arc<RepoMappingSnapshot>,
 ) -> slug_error::Result<Vec<String>> {
     if recorded_inputs.is_empty() {
         return Ok(recorded_inputs);
     }
-    let key = ModuleExtensionRecordedInputsKey::new(
+    let key = ModuleExtensionRecordedInputsKey::for_workspace_id(
         recorded_inputs,
-        workspace_root,
-        Some(repo_env),
-        Some(repo_mappings),
+        workspace_id,
+        repo_env,
+        repo_mappings,
     );
     match ctx.compute(&key).await {
         Ok(Ok(())) => Ok(key.recorded_inputs.as_ref().clone()),
@@ -1962,7 +1985,7 @@ impl Key for ModuleExtensionFreshEvalKey {
             ctx,
             &self.extension_id,
             output.recorded_inputs,
-            self.project_root.clone(),
+            self.workspace_id.clone(),
             self.repo_env.clone(),
             self.repo_mappings.clone(),
         )
@@ -2031,8 +2054,13 @@ impl Key for ModuleExtensionExecutionKey {
         //    visible/hidden entry applies; it only validates recorded inputs
         //    before accepting a selected cache hit.
         if let Some(selected_cache) = self.replay_inputs.selected_cache.clone()
-            && selected_cache_recorded_inputs_current(ctx, &self.extension_id, &selected_cache)
-                .await?
+            && selected_cache_recorded_inputs_current(
+                ctx,
+                self.workspace_id.clone(),
+                &self.extension_id,
+                &selected_cache,
+            )
+            .await?
         {
             let source = self
                 .replay_inputs

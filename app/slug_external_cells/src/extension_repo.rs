@@ -687,13 +687,11 @@ async fn setup_extension_inputs_current(
             )
         })?
     };
-    let recorded_inputs_key = slug_bzlmod::ModuleExtensionRecordedInputsKey::new(
+    let recorded_inputs_key = slug_bzlmod::ModuleExtensionRecordedInputsKey::for_workspace_id(
         recorded_inputs,
-        Some(Arc::new(
-            workspace_id.canonical_project_root.as_ref().clone(),
-        )),
-        Some(identity.repo_env.clone()),
-        Some(identity.repo_mappings.clone()),
+        workspace_id.clone(),
+        identity.repo_env.clone(),
+        identity.repo_mappings.clone(),
     );
     match ctx.compute(&recorded_inputs_key).await? {
         Ok(()) => Ok(true),
