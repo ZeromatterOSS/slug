@@ -620,6 +620,16 @@ Current state to preserve:
   pending_repo_cells --lib`, `cargo test -p slug_bzlmod
   extension_execution_result --lib`, `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 selected-cache replay helper narrowed:
+  `selected_cache_recorded_inputs_current(...)` is no longer re-exported from
+  `slug_bzlmod`, and the unused public
+  `ModuleExtensionRecordedInputsKey::for_selected_lockfile_cache(...)`
+  constructor was removed. Production selected-cache replay validation now stays
+  on crate-internal plumbing that passes explicit workspace identity before
+  accepting a lockfile replay hit. Guardrails: `cargo check -p slug_bzlmod -p
+  slug_external_cells`, `cargo test -p slug_bzlmod recorded_inputs --lib`,
+  `cargo test -p slug_external_cells extension_repo --lib`, `cargo fmt`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

@@ -1279,13 +1279,6 @@ impl ModuleExtensionRecordedInputsKey {
             repo_mappings: selected.repo_mappings.clone().map(Arc::new),
         }
     }
-
-    pub fn for_selected_lockfile_cache(
-        workspace_id: crate::WorkspaceId,
-        selected: &SelectedExtensionCache,
-    ) -> Self {
-        Self::from_selected_cache_for_workspace_id(workspace_id, selected)
-    }
 }
 
 impl Dupe for ModuleExtensionRecordedInputsKey {
@@ -1794,7 +1787,7 @@ fn verify_observed_lockfile_digest(
     Ok(())
 }
 
-pub async fn selected_cache_recorded_inputs_current(
+pub(crate) async fn selected_cache_recorded_inputs_current(
     ctx: &mut DiceComputations<'_>,
     workspace_id: crate::WorkspaceId,
     extension_id: &str,

@@ -192,7 +192,6 @@ pub use extension_execution_dice::extract_extension_name;
 pub use extension_execution_dice::extract_owning_module;
 pub use extension_execution_dice::repo_mapping_overrides_identity_digest;
 pub use extension_execution_dice::repo_mappings_identity_digest;
-pub use extension_execution_dice::selected_cache_recorded_inputs_current;
 pub use extensions::AggregatedExtension;
 pub use extensions::ExtensionResult;
 pub use extensions::GeneratedRepo;
@@ -802,7 +801,7 @@ async fn validate_lockfile_extension_replay_for_extension(
         ) else {
             continue;
         };
-        if selected_cache_recorded_inputs_current(
+        if extension_execution_dice::selected_cache_recorded_inputs_current(
             ctx,
             workspace_id.clone(),
             extension_id,
