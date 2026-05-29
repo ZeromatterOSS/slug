@@ -1920,11 +1920,10 @@ hardening behavior around it.
      and metadata label parsing, repo-mapping canonicalization, and normal
      `CellResolver::get` / path projection before any test-only process-global
      fallback can run.
-   - Remaining item-5 work is narrower: replace temporary root/external
-     cell-name adapters (`is_root_cell_name`, `get_external_cell_names`, and
-     symlink helpers that consult them) with resolver or cell-graph-owned root
-     knowledge where path formatting still lacks an explicit owner, and finish
-     making materialized repository output state a DICE value under item 7.
+   - Remaining item-5 work is narrower: audit the remaining root/external
+     cell-name adapter calls and keep only explicit no-owner/test fallbacks.
+     Production paths with a resolver or cell graph should pass that owner
+     through; materialized repository output state remains tracked under item 7.
    - 2026-05-29 root-adapter reduction: bzlmod runtime symlink replay now calls
      `ensure_external_symlinks_for_cells_with_root_cell(...)` with the root
      module name from `BzlmodCellGraphValue` instead of asking the process-global
