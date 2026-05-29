@@ -1547,13 +1547,20 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
 /// Create `external/` symlinks for all non-root cells.
 /// Called once after cell resolver is set up.
 pub fn ensure_external_symlinks_for_cells(cells: &[(impl AsRef<str>, impl AsRef<str>)]) {
+    ensure_external_symlinks_for_cells_with_root_cell(None, cells)
+}
+
+pub fn ensure_external_symlinks_for_cells_with_root_cell(
+    root_cell_name: Option<&str>,
+    cells: &[(impl AsRef<str>, impl AsRef<str>)],
+) {
     let Some(project_root) = dynamic_project_root() else {
         return;
     };
     for (cell_name, cell_path) in cells {
         let name = cell_name.as_ref();
         let path = cell_path.as_ref();
-        if !is_root_cell_name(name) && !path.is_empty() {
+        if !is_root_cell_name_for_context(name, root_cell_name) && !path.is_empty() {
             ensure_external_symlink(name, path);
             let action_name = action_external_cell_name(&project_root, name, path);
             if action_name != name {
@@ -1561,6 +1568,13 @@ pub fn ensure_external_symlinks_for_cells(cells: &[(impl AsRef<str>, impl AsRef<
             }
         }
     }
+}
+
+fn is_root_cell_name_for_context(cell_name: &str, explicit_root_cell_name: Option<&str>) -> bool {
+    cell_name.is_empty()
+        || cell_name == "root"
+        || explicit_root_cell_name.is_some_and(|root| root == cell_name)
+        || (explicit_root_cell_name.is_none() && is_root_cell_name(cell_name))
 }
 
 /// Look up a dynamically-registered extension repo cell path.
@@ -5319,6 +5333,33 @@ mod tests {
         assert_eq!(
             std::fs::canonicalize(external.join("rules_python+")).unwrap(),
             std::fs::canonicalize(&module_repo).unwrap()
+        );
+    }
+
+    #[test]
+    fn ensure_external_symlinks_with_explicit_root_ignores_stale_global_root() {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let project_root = tmp.path();
+        let current_root_dir = project_root.join("current_root");
+        let dep_dir = project_root.join("dep");
+        std::fs::create_dir_all(&current_root_dir).unwrap();
+        std::fs::create_dir_all(&dep_dir).unwrap();
+        reset_dynamic_bzlmod_state_for_project_root(project_root.to_path_buf());
+        if let Ok(mut root) = ROOT_CELL_NAME.write() {
+            *root = Some(dynamic_bzlmod_entry("stale_root".to_owned()));
+        }
+
+        ensure_external_symlinks_for_cells_with_root_cell(
+            Some("current_root"),
+            &[("current_root", "current_root"), ("dep", "dep")],
+        );
+
+        let external = project_root.join("external");
+        assert!(!external.join("current_root").exists());
+        assert_eq!(
+            std::fs::canonicalize(external.join("dep")).unwrap(),
+            std::fs::canonicalize(dep_dir).unwrap()
         );
     }
 

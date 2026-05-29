@@ -297,7 +297,10 @@ fn replay_bzlmod_runtime_state(
                 .map(|cell| (cell.canonical_name.clone(), cell.path.clone())),
         )
         .collect();
-    slug_core::cells::ensure_external_symlinks_for_cells(&cell_pairs);
+    slug_core::cells::ensure_external_symlinks_for_cells_with_root_cell(
+        Some(cell_graph.root_module_name.as_str()),
+        &cell_pairs,
+    );
     for alias in cell_graph.root_aliases.iter() {
         let alias_str = alias.apparent_name.as_str();
         if let Some(cell) = cell_graph

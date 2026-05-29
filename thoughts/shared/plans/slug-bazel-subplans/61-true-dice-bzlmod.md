@@ -1925,6 +1925,13 @@ hardening behavior around it.
      symlink helpers that consult them) with resolver or cell-graph-owned root
      knowledge where path formatting still lacks an explicit owner, and finish
      making materialized repository output state a DICE value under item 7.
+   - 2026-05-29 root-adapter reduction: bzlmod runtime symlink replay now calls
+     `ensure_external_symlinks_for_cells_with_root_cell(...)` with the root
+     module name from `BzlmodCellGraphValue` instead of asking the process-global
+     root-cell adapter which cells are root. The legacy helper remains for
+     generic callers, but the bzlmod cell-graph path uses graph-owned root
+     identity. Validation: focused `slug_core` symlink test plus affected-crate
+     checks.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and
