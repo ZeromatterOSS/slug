@@ -14,6 +14,8 @@ use dice::DetectCycles;
 use dice::Dice;
 use slug_common::dice::cells::SetCellResolver;
 use slug_common::dice::data::SetIoProvider;
+use slug_common::dice::data::SetWatchedAbsInputRegistry;
+use slug_common::file_ops::watched_abs::WatchedAbsInputRegistry;
 use slug_common::io::IoProvider;
 use slug_common::legacy_configs::configs::LegacyBuckConfig;
 use slug_common::legacy_configs::dice::SetLegacyConfigs;
@@ -31,11 +33,13 @@ pub async fn configure_dice_for_buck(
     digest_config: DigestConfig,
     _root_config: Option<&LegacyBuckConfig>,
     detect_cycles: Option<DetectCycles>,
+    watched_abs_registry: Arc<WatchedAbsInputRegistry>,
 ) -> slug_error::Result<Arc<Dice>> {
     let detect_cycles = detect_cycles.unwrap_or(DetectCycles::Enabled);
 
     let mut dice = Dice::builder();
     dice.set_io_provider(io);
+    dice.set_watched_abs_input_registry(watched_abs_registry);
     dice.set_digest_config(digest_config);
     dice.set_invalidation_tracking_config(false);
 

@@ -27,6 +27,7 @@ use slug_cli_proto::config_override::ConfigType;
 use slug_cli_proto::unstable_dice_dump_request::DiceDumpFormat;
 use slug_common::cas_digest::DigestAlgorithm;
 use slug_common::cas_digest::DigestAlgorithmFamily;
+use slug_common::file_ops::watched_abs::WatchedAbsInputRegistry;
 use slug_common::ignores::ignore_set::IgnoreSet;
 use slug_common::init::DaemonStartupConfig;
 use slug_common::init::SystemWarningConfig;
@@ -123,6 +124,11 @@ pub struct DaemonStateData {
 
     /// Synced every time we run a command.
     pub(crate) file_watcher: Arc<dyn FileWatcher>,
+
+    /// Daemon-owned registry of out-of-project bzlmod input paths. The per-command
+    /// sync runs a re-stat-diff over it to invalidate changed out-of-project inputs
+    /// (Plan 61 sub-plan 02). Shares the same `Arc` installed in `DiceData`.
+    pub(crate) watched_abs_registry: Arc<WatchedAbsInputRegistry>,
 
     /// Settled every time we run a command.
     pub io: Arc<dyn IoProvider>,
@@ -547,8 +553,15 @@ impl DaemonState {
             )
             .await?;
 
+            let watched_abs_registry = Arc::new(WatchedAbsInputRegistry::new());
+
             let dice = init_ctx
-                .construct_dice(io.dupe(), digest_config, root_config)
+                .construct_dice(
+                    io.dupe(),
+                    digest_config,
+                    root_config,
+                    watched_abs_registry.dupe(),
+                )
                 .await?;
 
             let file_watcher = <dyn FileWatcher>::new(
@@ -623,6 +636,7 @@ impl DaemonState {
             Ok(Arc::new(DaemonStateData {
                 dice_manager: ConcurrencyHandler::new(dice),
                 file_watcher,
+                watched_abs_registry,
                 io,
                 re_client_manager,
                 blocking_executor,

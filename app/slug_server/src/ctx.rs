@@ -60,6 +60,7 @@ use slug_common::dice::cells::SetCellResolver;
 use slug_common::dice::cycles::CycleDetectorAdapter;
 use slug_common::dice::cycles::PairDiceCycleDetector;
 use slug_common::file_ops::io::initialize_read_dir_cache;
+use slug_common::file_ops::watched_abs::inject_watched_abs_changes;
 use slug_common::http::SetHttpClient;
 use slug_common::invocation_paths::InvocationPaths;
 use slug_common::io::trace::TracingIoProvider;
@@ -671,7 +672,7 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
         early_timings: &mut EarlyCommandTimingBuilder,
     ) -> slug_error::Result<(DiceTransactionUpdater, UserComputationData)> {
         early_timings.start_span(FILE_WATCHER_WAIT.to_owned());
-        let (ctx_after_sync, mergebase, file_watcher_changed) = self
+        let (mut ctx_after_sync, mergebase, file_watcher_changed) = self
             .cmd_ctx
             .base_context
             .daemon
@@ -680,7 +681,16 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
             .await?;
         early_timings.end_known_span();
 
-        ctx = if file_watcher_changed {
+        // Plan 61 sub-plan 02: re-stat-diff over registered out-of-project bzlmod
+        // inputs and inject their invalidation (the DICE analog of Bazel's
+        // ExternalDirtinessChecker), since the file watcher only covers the project
+        // root.
+        let abs_inputs_changed = inject_watched_abs_changes(
+            &self.cmd_ctx.base_context.daemon.watched_abs_registry,
+            &mut ctx_after_sync,
+        )?;
+
+        ctx = if file_watcher_changed || abs_inputs_changed {
             ctx_after_sync.commit().await.into_updater()
         } else {
             ctx_after_sync

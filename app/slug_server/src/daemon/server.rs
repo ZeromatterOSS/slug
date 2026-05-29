@@ -50,6 +50,7 @@ use slug_cli_proto::daemon_api_server::*;
 use slug_cli_proto::*;
 use slug_common::buckd_connection::BUCK_AUTH_TOKEN_HEADER;
 use slug_common::events::HasEvents;
+use slug_common::file_ops::watched_abs::WatchedAbsInputRegistry;
 use slug_common::init::DaemonStartupConfig;
 use slug_common::invocation_paths::InvocationPaths;
 use slug_common::io::IoProvider;
@@ -180,8 +181,16 @@ impl BuckdServerInitPreferences {
         io: Arc<dyn IoProvider>,
         digest_config: DigestConfig,
         root_config: &LegacyBuckConfig,
+        watched_abs_registry: Arc<WatchedAbsInputRegistry>,
     ) -> slug_error::Result<Arc<Dice>> {
-        configure_dice_for_buck(io, digest_config, Some(root_config), self.detect_cycles).await
+        configure_dice_for_buck(
+            io,
+            digest_config,
+            Some(root_config),
+            self.detect_cycles,
+            watched_abs_registry,
+        )
+        .await
     }
 }
 

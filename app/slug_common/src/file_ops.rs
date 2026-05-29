@@ -15,3 +15,4 @@ pub mod io;
 pub mod metadata;
 pub mod testing;
 pub mod trait_;
+pub mod watched_abs;

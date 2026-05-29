@@ -11,6 +11,8 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -25,6 +27,8 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use futures::future::BoxFuture;
+use sha2::Digest;
+use sha2::Sha256;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::cell_path::CellPathRef;
 use slug_core::cells::name::CellName;
@@ -34,6 +38,7 @@ use slug_fs::paths::file_name::FileNameBuf;
 
 use crate::buildfiles::HasBuildfiles;
 use crate::dice::data::HasIoProvider;
+use crate::dice::data::HasWatchedAbsInputRegistry;
 use crate::file_ops::delegate::get_delegated_file_ops;
 use crate::file_ops::error::FileReadError;
 use crate::file_ops::error::extended_ignore_error;
@@ -127,6 +132,32 @@ impl DiceFileComputations {
             Ok(result) => result.ok_or_else(|| FileReadError::NotFound(path.to_string())),
             Err(e) => Err(FileReadError::Buck(e)),
         }
+    }
+
+    /// Read an out-of-project (absolute-path) bzlmod input file through a cacheable
+    /// DICE input. Invalidation of the returned value is driven by the per-sync
+    /// re-stat-diff over the daemon-owned registered-input registry (Plan 61 sub-plan
+    /// 02). Callers must register the path with that registry so edits are observed.
+    pub async fn read_watched_abs_file_if_exists(
+        ctx: &mut DiceComputations<'_>,
+        path: &Path,
+    ) -> slug_error::Result<Arc<WatchedAbsFileValue>> {
+        ctx.compute(&WatchedAbsFileKey {
+            path: Arc::new(path.to_path_buf()),
+        })
+        .await?
+    }
+
+    /// Read the existence/metadata of an out-of-project (absolute-path) bzlmod input
+    /// path through a cacheable DICE input. See `read_watched_abs_file_if_exists`.
+    pub async fn read_watched_abs_path_metadata_if_exists(
+        ctx: &mut DiceComputations<'_>,
+        path: &Path,
+    ) -> slug_error::Result<Arc<WatchedAbsPathMetadataValue>> {
+        ctx.compute(&WatchedAbsPathMetadataKey {
+            path: Arc::new(path.to_path_buf()),
+        })
+        .await?
     }
 
     /// Reads a project-relative file without going through a cell resolver.
@@ -289,6 +320,11 @@ pub struct FileChangeTracker {
     paths_to_dirty: HashSet<PathMetadataKey>,
     exists_matching_exact_case_to_dirty: HashSet<ExistsMatchingExactCaseKey>,
 
+    // Out-of-project (absolute-path) bzlmod inputs, dirtied by the per-sync
+    // re-stat-diff over the daemon-owned registered-input registry.
+    abs_files_to_dirty: HashSet<WatchedAbsFileKey>,
+    abs_paths_to_dirty: HashSet<WatchedAbsPathMetadataKey>,
+
     maybe_modified_dirs: HashSet<CellPath>,
 }
 
@@ -304,6 +340,8 @@ impl FileChangeTracker {
             paths_to_dirty: Default::default(),
             maybe_modified_dirs: Default::default(),
             exists_matching_exact_case_to_dirty: Default::default(),
+            abs_files_to_dirty: Default::default(),
+            abs_paths_to_dirty: Default::default(),
         }
     }
 
@@ -324,6 +362,8 @@ impl FileChangeTracker {
         ctx.changed(self.dirs_to_dirty)?;
         ctx.changed(self.paths_to_dirty)?;
         ctx.changed(self.exists_matching_exact_case_to_dirty)?;
+        ctx.changed(self.abs_files_to_dirty)?;
+        ctx.changed(self.abs_paths_to_dirty)?;
 
         Ok(())
     }
@@ -407,6 +447,26 @@ impl FileChangeTracker {
     /// is not aware of our ignore rules.
     pub fn dir_entries_changed_for_watchman_bug(&mut self, path: CellPath) {
         self.maybe_modified_dirs.insert(path);
+    }
+
+    /// Invalidate the cached content of an out-of-project (absolute-path) bzlmod
+    /// input file. Called by the per-sync re-stat-diff when the on-disk content of a
+    /// registered out-of-project input changed.
+    pub fn abs_file_contents_changed(&mut self, path: PathBuf) {
+        self.abs_files_to_dirty.insert(WatchedAbsFileKey {
+            path: Arc::new(path),
+        });
+    }
+
+    /// Invalidate the cached existence/metadata of an out-of-project (absolute-path)
+    /// bzlmod input path (creation or deletion).
+    pub fn abs_path_added_or_removed(&mut self, path: PathBuf) {
+        self.abs_paths_to_dirty.insert(WatchedAbsPathMetadataKey {
+            path: Arc::new(path.clone()),
+        });
+        self.abs_files_to_dirty.insert(WatchedAbsFileKey {
+            path: Arc::new(path),
+        });
     }
 }
 
@@ -576,6 +636,136 @@ impl Key for ProjectPathMetadataKey {
 
     fn validity(_x: &Self::Value) -> bool {
         false
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
+
+/// Content + digest of an out-of-project (absolute-path) bzlmod input file.
+///
+/// Unlike `ProjectReadFileKey`, these paths live outside the project root, so the
+/// project file watcher does not proactively watch them. They are made cacheable
+/// DICE inputs here; invalidation is injected by the per-sync re-stat-diff over the
+/// daemon-owned registry of registered out-of-project bzlmod inputs (Plan 61
+/// sub-plan 02 Phase A), mirroring Bazel's `ExternalDirtinessChecker`.
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct WatchedAbsFileValue {
+    pub content: Option<String>,
+    pub digest: Option<String>,
+}
+
+/// Existence of an out-of-project (absolute-path) bzlmod input path.
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct WatchedAbsPathMetadataValue {
+    pub exists: bool,
+}
+
+fn read_watched_abs_file_value(path: &Path) -> slug_error::Result<WatchedAbsFileValue> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(WatchedAbsFileValue {
+                content: None,
+                digest: None,
+            });
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let digest = hex::encode(Sha256::digest(&bytes));
+    let content = String::from_utf8(bytes).map_err(|e| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "Failed to read out-of-project bzlmod input file at {:?} as UTF-8: {}",
+            path,
+            e
+        )
+    })?;
+    Ok(WatchedAbsFileValue {
+        content: Some(content),
+        digest: Some(digest),
+    })
+}
+
+fn read_watched_abs_path_metadata_value(
+    path: &Path,
+) -> slug_error::Result<WatchedAbsPathMetadataValue> {
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => Ok(WatchedAbsPathMetadataValue { exists: true }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Ok(WatchedAbsPathMetadataValue { exists: false })
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("WatchedAbsFileKey({})", path.display())]
+struct WatchedAbsFileKey {
+    path: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for WatchedAbsFileKey {
+    type Value = slug_error::Result<Arc<WatchedAbsFileValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = read_watched_abs_file_value(&self.path)?;
+        // Register so the per-command re-stat-diff observes edits to this
+        // out-of-project input. No-op when no registry is installed (bootstrap/tests).
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            registry.register_file((*self.path).clone(), value.digest.clone());
+        }
+        Ok(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.content == y.content && x.digest == y.digest,
+            _ => false,
+        }
+    }
+
+    // No `validity` override: this is a cacheable DICE input. The per-sync
+    // re-stat-diff (Phase A.2) calls `FileChangeTracker::abs_file_contents_changed`
+    // to invalidate it only when the on-disk content actually changes.
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
+
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("WatchedAbsPathMetadataKey({})", path.display())]
+struct WatchedAbsPathMetadataKey {
+    path: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for WatchedAbsPathMetadataKey {
+    type Value = slug_error::Result<Arc<WatchedAbsPathMetadataValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = read_watched_abs_path_metadata_value(&self.path)?;
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            registry.register_path((*self.path).clone(), value.exists);
+        }
+        Ok(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -788,5 +978,85 @@ async fn read_dir_ext(
             Some(e) => Err(e),
             None => Err(e.into()),
         },
+    }
+}
+
+#[cfg(test)]
+mod watched_abs_tests {
+    use dice::UserComputationData;
+    use dice::testing::DiceBuilder;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn watched_abs_file_is_cacheable_and_dirtied_by_tracker() -> slug_error::Result<()> {
+        let dir = tempfile::Builder::new()
+            .prefix("slug-plan61-watched-abs-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let path = dir.path().join("MODULE.bazel");
+        std::fs::write(&path, "a").unwrap();
+
+        let mut dice = DiceBuilder::new()
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &path).await?;
+        assert_eq!(first.content.as_deref(), Some("a"));
+
+        // Cacheable: editing the file WITHOUT dirtying the key must not be re-read.
+        std::fs::write(&path, "b").unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let cached =
+            DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &path).await?;
+        assert_eq!(
+            cached.content.as_deref(),
+            Some("a"),
+            "value must stay cached until explicitly invalidated"
+        );
+
+        // Dirtying via the FileChangeTracker abs channel re-reads the new content.
+        let mut updater = dice.into_updater();
+        let mut tracker = FileChangeTracker::new();
+        tracker.abs_file_contents_changed(path.clone());
+        tracker.write_to_dice(&mut updater)?;
+        let mut dice = updater.commit().await;
+        let after = DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &path).await?;
+        assert_eq!(after.content.as_deref(), Some("b"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn watched_abs_path_metadata_tracks_existence() -> slug_error::Result<()> {
+        let dir = tempfile::Builder::new()
+            .prefix("slug-plan61-watched-abs-meta-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let path = dir.path().join("MODULE.bazel");
+
+        let mut dice = DiceBuilder::new()
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let missing =
+            DiceFileComputations::read_watched_abs_path_metadata_if_exists(&mut dice, &path)
+                .await?;
+        assert!(!missing.exists);
+
+        std::fs::write(&path, "module(name = \"x\")\n").unwrap();
+        let mut updater = dice.into_updater();
+        let mut tracker = FileChangeTracker::new();
+        tracker.abs_path_added_or_removed(path.clone());
+        tracker.write_to_dice(&mut updater)?;
+        let mut dice = updater.commit().await;
+        let created =
+            DiceFileComputations::read_watched_abs_path_metadata_if_exists(&mut dice, &path)
+                .await?;
+        assert!(created.exists);
+        Ok(())
     }
 }

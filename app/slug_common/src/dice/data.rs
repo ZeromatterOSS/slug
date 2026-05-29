@@ -17,6 +17,7 @@ use dice::DiceDataBuilder;
 use dupe::Dupe;
 
 use crate::cas_digest::CasDigestConfig;
+use crate::file_ops::watched_abs::WatchedAbsInputRegistry;
 use crate::io::IoProvider;
 
 pub trait HasIoProvider {
@@ -39,6 +40,31 @@ impl HasIoProvider for DiceData {
 impl SetIoProvider for DiceDataBuilder {
     fn set_io_provider(&mut self, fs: Arc<dyn IoProvider>) {
         self.set(fs)
+    }
+}
+
+/// Access to the daemon-owned registry of out-of-project bzlmod input paths
+/// (Plan 61 sub-plan 02). Returns `None` when unset (e.g. one-shot/bootstrap or
+/// test DICE instances that have no per-command sync to run the re-stat-diff).
+pub trait HasWatchedAbsInputRegistry {
+    fn get_watched_abs_input_registry(&self) -> Option<Arc<WatchedAbsInputRegistry>>;
+}
+
+pub trait SetWatchedAbsInputRegistry {
+    fn set_watched_abs_input_registry(&mut self, registry: Arc<WatchedAbsInputRegistry>);
+}
+
+impl HasWatchedAbsInputRegistry for DiceData {
+    fn get_watched_abs_input_registry(&self) -> Option<Arc<WatchedAbsInputRegistry>> {
+        self.get::<Arc<WatchedAbsInputRegistry>>()
+            .ok()
+            .map(|r| r.dupe())
+    }
+}
+
+impl SetWatchedAbsInputRegistry for DiceDataBuilder {
+    fn set_watched_abs_input_registry(&mut self, registry: Arc<WatchedAbsInputRegistry>) {
+        self.set(registry)
     }
 }
 
