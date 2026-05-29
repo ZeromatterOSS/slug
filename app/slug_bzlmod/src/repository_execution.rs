@@ -1026,6 +1026,43 @@ fn repo_materialization_manifest_from_states(
 #[display("RepoMaterializationMarkerStateKey({})", _0)]
 struct RepoMaterializationMarkerStateKey(RepoMaterializationManifestKey);
 
+#[derive(Clone, Debug, PartialEq, Eq, Allocative, Dupe)]
+struct RepoMaterializationStateValue<T> {
+    value: T,
+    tracked_by_dice: bool,
+}
+
+impl<T> RepoMaterializationStateValue<T> {
+    fn tracked(value: T) -> Self {
+        Self {
+            value,
+            tracked_by_dice: true,
+        }
+    }
+
+    fn untracked(value: T) -> Self {
+        Self {
+            value,
+            tracked_by_dice: false,
+        }
+    }
+
+    fn with_tracking(value: T, tracked_by_dice: bool) -> Self {
+        Self {
+            value,
+            tracked_by_dice,
+        }
+    }
+
+    fn into_value(self) -> T {
+        self.value
+    }
+
+    fn validity(value: &Self) -> bool {
+        value.tracked_by_dice
+    }
+}
+
 impl PartialEq for RepoMaterializationMarkerStateKey {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
@@ -1040,7 +1077,7 @@ impl std::hash::Hash for RepoMaterializationMarkerStateKey {
 
 #[async_trait]
 impl Key for RepoMaterializationMarkerStateKey {
-    type Value = Arc<str>;
+    type Value = RepoMaterializationStateValue<Arc<str>>;
 
     async fn compute(
         &self,
@@ -1054,7 +1091,9 @@ impl Key for RepoMaterializationMarkerStateKey {
                 repo_dir: Arc::new(repo_dir.clone()),
             })
             .await
-            .unwrap_or(false);
+            .unwrap_or_else(|_| RepoMaterializationStateValue::untracked(false));
+        let repo_rule_local_tracked = repo_rule_local.tracked_by_dice;
+        let repo_rule_local = repo_rule_local.into_value();
         let content_key = RepoMaterializationMarkerContentKey {
             workspace_id: self.0.workspace_id.clone(),
             repo_spec_local: self.0.repo_spec.local,
@@ -1063,34 +1102,65 @@ impl Key for RepoMaterializationMarkerStateKey {
         };
         let content_state = match ctx.compute(&content_key).await {
             Ok(content_state) => content_state,
-            Err(e) => return Arc::from(format!("marker-unreadable:{e}").as_str()),
+            Err(e) => {
+                return RepoMaterializationStateValue::untracked(Arc::from(
+                    format!("marker-unreadable:{e}").as_str(),
+                ));
+            }
         };
+        let mut tracked_by_dice = repo_rule_local_tracked && content_state.tracked_by_dice;
+        let content_state = content_state.into_value();
         let Some(marker) = content_state.strip_prefix(MARKER_CONTENT_PREFIX) else {
-            return content_state;
+            return RepoMaterializationStateValue::with_tracking(content_state, tracked_by_dice);
         };
         let spec_hash = self.0.repo_spec_digest.as_ref();
         if !complete_marker_matches(marker, spec_hash) {
-            return Arc::from(format!("marker-mismatch:{marker}").as_str());
+            return RepoMaterializationStateValue::with_tracking(
+                Arc::from(format!("marker-mismatch:{marker}").as_str()),
+                tracked_by_dice,
+            );
         }
         let Some(expected_output_digest) = complete_marker_expected_output(marker, spec_hash)
         else {
-            return Arc::from(format!("marker:{marker}").as_str());
+            return RepoMaterializationStateValue::with_tracking(
+                Arc::from(format!("marker:{marker}").as_str()),
+                tracked_by_dice,
+            );
         };
         let output_digest_key = RepoMaterializationOutputDigestKey {
             workspace_id: self.0.workspace_id.clone(),
             repo_dir: Arc::new(repo_dir),
         };
         match ctx.compute(&output_digest_key).await {
-            Ok(Ok(current_output_digest))
-                if current_output_digest.as_ref() == expected_output_digest =>
-            {
-                Arc::from(format!("marker:{marker}").as_str())
+            Ok(output_digest) => {
+                tracked_by_dice &= output_digest.tracked_by_dice;
+                match output_digest.into_value() {
+                    Ok(current_output_digest)
+                        if current_output_digest.as_ref() == expected_output_digest =>
+                    {
+                        RepoMaterializationStateValue::with_tracking(
+                            Arc::from(format!("marker:{marker}").as_str()),
+                            tracked_by_dice,
+                        )
+                    }
+                    Ok(current_output_digest) => RepoMaterializationStateValue::with_tracking(
+                        Arc::from(
+                            format!(
+                                "marker-output-mismatch:{marker}:current:{current_output_digest}"
+                            )
+                            .as_str(),
+                        ),
+                        tracked_by_dice,
+                    ),
+                    Err(e) => RepoMaterializationStateValue::with_tracking(
+                        Arc::from(format!("marker-output-unreadable:{marker}:{e}").as_str()),
+                        tracked_by_dice,
+                    ),
+                }
             }
-            Ok(Ok(current_output_digest)) => Arc::from(
-                format!("marker-output-mismatch:{marker}:current:{current_output_digest}").as_str(),
-            ),
-            Ok(Err(e)) => Arc::from(format!("marker-output-unreadable:{marker}:{e}").as_str()),
-            Err(e) => Arc::from(format!("marker-output-unreadable:{marker}:{e}").as_str()),
+            Err(e) => RepoMaterializationStateValue::untracked(Arc::from(
+                format!("marker-output-unreadable:{marker}:{e}").as_str(),
+            )),
         }
     }
 
@@ -1098,12 +1168,8 @@ impl Key for RepoMaterializationMarkerStateKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // This repo-state read still polls disk because slug_bzlmod cannot use
-        // slug_common's project file watcher without creating a crate cycle.
-        // Keeping it as a child key lets unchanged state cut off the parent
-        // manifest while changed state invalidates repository execution.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1120,7 +1186,7 @@ struct RepoMaterializationRuleLocalStateKey {
 
 #[async_trait]
 impl Key for RepoMaterializationRuleLocalStateKey {
-    type Value = bool;
+    type Value = RepoMaterializationStateValue<bool>;
 
     async fn compute(
         &self,
@@ -1128,24 +1194,28 @@ impl Key for RepoMaterializationRuleLocalStateKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
-            return reader
-                .repo_state_file_exists(
-                    ctx,
-                    self.workspace_id.clone(),
-                    self.repo_dir.clone(),
-                    REPO_RULE_LOCAL_FILE,
-                )
-                .await
-                .unwrap_or(true);
+            return RepoMaterializationStateValue::tracked(
+                reader
+                    .repo_state_file_exists(
+                        ctx,
+                        self.workspace_id.clone(),
+                        self.repo_dir.clone(),
+                        REPO_RULE_LOCAL_FILE,
+                    )
+                    .await
+                    .unwrap_or(true),
+            );
         }
 
         #[cfg(test)]
         {
-            repo_materialization_rule_local_state(&self.repo_dir)
+            RepoMaterializationStateValue::untracked(repo_materialization_rule_local_state(
+                &self.repo_dir,
+            ))
         }
         #[cfg(not(test))]
         {
-            true
+            RepoMaterializationStateValue::untracked(true)
         }
     }
 
@@ -1153,9 +1223,8 @@ impl Key for RepoMaterializationRuleLocalStateKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1176,7 +1245,7 @@ struct RepoMaterializationMarkerContentKey {
 
 #[async_trait]
 impl Key for RepoMaterializationMarkerContentKey {
-    type Value = Arc<str>;
+    type Value = RepoMaterializationStateValue<Arc<str>>;
 
     async fn compute(
         &self,
@@ -1184,36 +1253,40 @@ impl Key for RepoMaterializationMarkerContentKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if self.repo_spec_local || self.repo_rule_local {
-            return Arc::from("local-rule");
+            return RepoMaterializationStateValue::tracked(Arc::from("local-rule"));
         }
 
         if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
-            return match reader
-                .read_repo_state_file_if_exists(
-                    ctx,
-                    self.workspace_id.clone(),
-                    self.repo_dir.clone(),
-                    REPO_COMPLETE_MARKER_FILE,
-                )
-                .await
-            {
-                Ok(Some(marker)) => {
-                    Arc::from(format!("{MARKER_CONTENT_PREFIX}{}", marker.trim()).as_str())
-                }
-                Ok(None) => Arc::from("marker-absent"),
-                Err(reason) => Arc::from(format!("marker-unreadable:{reason}").as_str()),
-            };
+            return RepoMaterializationStateValue::tracked(
+                match reader
+                    .read_repo_state_file_if_exists(
+                        ctx,
+                        self.workspace_id.clone(),
+                        self.repo_dir.clone(),
+                        REPO_COMPLETE_MARKER_FILE,
+                    )
+                    .await
+                {
+                    Ok(Some(marker)) => {
+                        Arc::from(format!("{MARKER_CONTENT_PREFIX}{}", marker.trim()).as_str())
+                    }
+                    Ok(None) => Arc::from("marker-absent"),
+                    Err(reason) => Arc::from(format!("marker-unreadable:{reason}").as_str()),
+                },
+            );
         }
 
         #[cfg(test)]
         {
-            Arc::from(
+            RepoMaterializationStateValue::untracked(Arc::from(
                 repo_materialization_marker_content_state(false, false, &self.repo_dir).as_str(),
-            )
+            ))
         }
         #[cfg(not(test))]
         {
-            Arc::from("marker-unreadable:repository materialization state reader unavailable")
+            RepoMaterializationStateValue::untracked(Arc::from(
+                "marker-unreadable:repository materialization state reader unavailable",
+            ))
         }
     }
 
@@ -1221,9 +1294,8 @@ impl Key for RepoMaterializationMarkerContentKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1240,7 +1312,7 @@ struct RepoMaterializationOutputDigestKey {
 
 #[async_trait]
 impl Key for RepoMaterializationOutputDigestKey {
-    type Value = Result<Arc<str>, Arc<str>>;
+    type Value = RepoMaterializationStateValue<Result<Arc<str>, Arc<str>>>;
 
     async fn compute(
         &self,
@@ -1248,25 +1320,29 @@ impl Key for RepoMaterializationOutputDigestKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
-            return reader
-                .repo_output_digest(ctx, self.workspace_id.clone(), self.repo_dir.clone())
-                .await;
+            return RepoMaterializationStateValue::tracked(
+                reader
+                    .repo_output_digest(ctx, self.workspace_id.clone(), self.repo_dir.clone())
+                    .await,
+            );
         }
 
         #[cfg(test)]
         {
-            crate::repository_executor::repository_output_digest(&self.repo_dir)
-                .map(|digest| Arc::from(digest.as_str()))
-                .map_err(|e| {
-                    let reason = e.to_string();
-                    Arc::from(reason.as_str())
-                })
+            RepoMaterializationStateValue::untracked(
+                crate::repository_executor::repository_output_digest(&self.repo_dir)
+                    .map(|digest| Arc::from(digest.as_str()))
+                    .map_err(|e| {
+                        let reason = e.to_string();
+                        Arc::from(reason.as_str())
+                    }),
+            )
         }
         #[cfg(not(test))]
         {
-            Err(Arc::from(
+            RepoMaterializationStateValue::untracked(Err(Arc::from(
                 "repository materialization state reader unavailable",
-            ))
+            )))
         }
     }
 
@@ -1274,9 +1350,8 @@ impl Key for RepoMaterializationOutputDigestKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1298,7 +1373,7 @@ impl std::hash::Hash for RepoMaterializationLayoutStateKey {
 
 #[async_trait]
 impl Key for RepoMaterializationLayoutStateKey {
-    type Value = Arc<str>;
+    type Value = RepoMaterializationStateValue<Arc<str>>;
 
     async fn compute(
         &self,
@@ -1307,6 +1382,7 @@ impl Key for RepoMaterializationLayoutStateKey {
     ) -> Self::Value {
         let repo_spec = self.0.repo_spec.as_ref();
         let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
+        let mut tracked_by_dice = true;
         if repo_spec_requires_build_file(repo_spec) {
             let build_file_present = ctx
                 .compute(&RepoMaterializationBuildFilePresenceKey {
@@ -1314,9 +1390,13 @@ impl Key for RepoMaterializationLayoutStateKey {
                     repo_dir: Arc::new(repo_dir.clone()),
                 })
                 .await
-                .unwrap_or(false);
-            if !build_file_present {
-                return Arc::from("layout-missing-build-file");
+                .unwrap_or_else(|_| RepoMaterializationStateValue::untracked(false));
+            tracked_by_dice &= build_file_present.tracked_by_dice;
+            if !build_file_present.value {
+                return RepoMaterializationStateValue::with_tracking(
+                    Arc::from("layout-missing-build-file"),
+                    tracked_by_dice,
+                );
             }
         }
 
@@ -1326,9 +1406,13 @@ impl Key for RepoMaterializationLayoutStateKey {
                 repo_dir: Arc::new(repo_dir.clone()),
             })
             .await
-            .unwrap_or(false);
-        if invalid_empty_target_label {
-            return Arc::from("layout-invalid-empty-target-label");
+            .unwrap_or_else(|_| RepoMaterializationStateValue::untracked(false));
+        tracked_by_dice &= invalid_empty_target_label.tracked_by_dice;
+        if invalid_empty_target_label.value {
+            return RepoMaterializationStateValue::with_tracking(
+                Arc::from("layout-invalid-empty-target-label"),
+                tracked_by_dice,
+            );
         }
 
         let foreign_top_level_symlink = ctx
@@ -1338,23 +1422,36 @@ impl Key for RepoMaterializationLayoutStateKey {
                 project_root: self.0.workspace_id.canonical_project_root.clone(),
             })
             .await
-            .unwrap_or(false);
-        if foreign_top_level_symlink {
-            return Arc::from("layout-foreign-top-level-symlink");
+            .unwrap_or_else(|_| RepoMaterializationStateValue::untracked(false));
+        tracked_by_dice &= foreign_top_level_symlink.tracked_by_dice;
+        if foreign_top_level_symlink.value {
+            return RepoMaterializationStateValue::with_tracking(
+                Arc::from("layout-foreign-top-level-symlink"),
+                tracked_by_dice,
+            );
         }
 
-        ctx.compute(&RepoMaterializationInvocationLayoutStateKey(self.0.clone()))
+        let invocation_layout = ctx
+            .compute(&RepoMaterializationInvocationLayoutStateKey(self.0.clone()))
             .await
-            .unwrap_or_else(|e| Arc::from(format!("layout-unclassifiable:{e}").as_str()))
+            .unwrap_or_else(|e| {
+                RepoMaterializationStateValue::untracked(Arc::from(
+                    format!("layout-unclassifiable:{e}").as_str(),
+                ))
+            });
+        tracked_by_dice &= invocation_layout.tracked_by_dice;
+        RepoMaterializationStateValue::with_tracking(
+            invocation_layout.into_value(),
+            tracked_by_dice,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1371,7 +1468,7 @@ struct RepoMaterializationBuildFilePresenceKey {
 
 #[async_trait]
 impl Key for RepoMaterializationBuildFilePresenceKey {
-    type Value = bool;
+    type Value = RepoMaterializationStateValue<bool>;
 
     async fn compute(
         &self,
@@ -1389,26 +1486,30 @@ impl Key for RepoMaterializationBuildFilePresenceKey {
                 .await
                 .unwrap_or(false)
             {
-                return true;
+                return RepoMaterializationStateValue::tracked(true);
             }
-            return reader
-                .repo_state_file_exists(
-                    ctx,
-                    self.workspace_id.clone(),
-                    self.repo_dir.clone(),
-                    "BUILD",
-                )
-                .await
-                .unwrap_or(false);
+            return RepoMaterializationStateValue::tracked(
+                reader
+                    .repo_state_file_exists(
+                        ctx,
+                        self.workspace_id.clone(),
+                        self.repo_dir.clone(),
+                        "BUILD",
+                    )
+                    .await
+                    .unwrap_or(false),
+            );
         }
 
         #[cfg(test)]
         {
-            repo_materialization_build_file_present(&self.repo_dir)
+            RepoMaterializationStateValue::untracked(repo_materialization_build_file_present(
+                &self.repo_dir,
+            ))
         }
         #[cfg(not(test))]
         {
-            false
+            RepoMaterializationStateValue::untracked(false)
         }
     }
 
@@ -1416,9 +1517,8 @@ impl Key for RepoMaterializationBuildFilePresenceKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1435,7 +1535,7 @@ struct RepoMaterializationInvalidEmptyTargetLabelKey {
 
 #[async_trait]
 impl Key for RepoMaterializationInvalidEmptyTargetLabelKey {
-    type Value = bool;
+    type Value = RepoMaterializationStateValue<bool>;
 
     async fn compute(
         &self,
@@ -1458,19 +1558,21 @@ impl Key for RepoMaterializationInvalidEmptyTargetLabelKey {
                     .as_ref()
                     .is_some_and(|content| build_file_has_invalid_empty_target_label(content))
                 {
-                    return true;
+                    return RepoMaterializationStateValue::tracked(true);
                 }
             }
-            return false;
+            return RepoMaterializationStateValue::tracked(false);
         }
 
         #[cfg(test)]
         {
-            repo_has_invalid_empty_target_label(&self.repo_dir)
+            RepoMaterializationStateValue::untracked(repo_has_invalid_empty_target_label(
+                &self.repo_dir,
+            ))
         }
         #[cfg(not(test))]
         {
-            true
+            RepoMaterializationStateValue::untracked(true)
         }
     }
 
@@ -1478,9 +1580,8 @@ impl Key for RepoMaterializationInvalidEmptyTargetLabelKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1499,7 +1600,7 @@ struct RepoMaterializationForeignTopLevelSymlinkKey {
 
 #[async_trait]
 impl Key for RepoMaterializationForeignTopLevelSymlinkKey {
-    type Value = bool;
+    type Value = RepoMaterializationStateValue<bool>;
 
     async fn compute(
         &self,
@@ -1507,23 +1608,28 @@ impl Key for RepoMaterializationForeignTopLevelSymlinkKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
-            return reader
-                .repo_has_foreign_top_level_symlink(
-                    ctx,
-                    self.workspace_id.clone(),
-                    self.repo_dir.clone(),
-                )
-                .await
-                .unwrap_or(false);
+            return RepoMaterializationStateValue::tracked(
+                reader
+                    .repo_has_foreign_top_level_symlink(
+                        ctx,
+                        self.workspace_id.clone(),
+                        self.repo_dir.clone(),
+                    )
+                    .await
+                    .unwrap_or(false),
+            );
         }
 
         #[cfg(test)]
         {
-            repo_has_foreign_top_level_symlink(&self.repo_dir, &self.project_root)
+            RepoMaterializationStateValue::untracked(repo_has_foreign_top_level_symlink(
+                &self.repo_dir,
+                &self.project_root,
+            ))
         }
         #[cfg(not(test))]
         {
-            true
+            RepoMaterializationStateValue::untracked(true)
         }
     }
 
@@ -1531,9 +1637,8 @@ impl Key for RepoMaterializationForeignTopLevelSymlinkKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1754,7 +1859,7 @@ impl std::hash::Hash for RepoMaterializationInvocationLayoutStateKey {
 
 #[async_trait]
 impl Key for RepoMaterializationInvocationLayoutStateKey {
-    type Value = Arc<str>;
+    type Value = RepoMaterializationStateValue<Arc<str>>;
 
     async fn compute(
         &self,
@@ -1769,32 +1874,37 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
                 let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() else {
                     #[cfg(test)]
                     {
-                        return repo_materialization_invocation_layout_state_fallback(
-                            canonical_name,
-                            repo_spec,
-                            &repo_dir,
+                        return RepoMaterializationStateValue::untracked(
+                            repo_materialization_invocation_layout_state_fallback(
+                                canonical_name,
+                                repo_spec,
+                                &repo_dir,
+                            ),
                         );
                     }
                     #[cfg(not(test))]
                     {
-                        return Arc::from(
+                        return RepoMaterializationStateValue::untracked(Arc::from(
                             "layout-invalid:repository-materialization-state-reader-unavailable",
-                        );
+                        ));
                     }
                 };
                 let workspace_id = self.0.workspace_id.clone();
                 let layout_valid = match invocation.rule_name.as_str() {
                     "git_repository" | "new_git_repository" => {
-                        reader
-                            .repo_state_file_exists(
-                                ctx,
-                                workspace_id,
-                                Arc::new(repo_dir.clone()),
-                                ".git",
-                            )
-                            .await
+                        RepoMaterializationStateValue::tracked(
+                            reader
+                                .repo_state_file_exists(
+                                    ctx,
+                                    workspace_id,
+                                    Arc::new(repo_dir.clone()),
+                                    ".git",
+                                )
+                                .await
+                                .unwrap_or(false),
+                        )
                     }
-                    "local_repository" => {
+                    "local_repository" => RepoMaterializationStateValue::tracked(
                         repo_materialization_local_repository_layout_is_valid(
                             ctx,
                             workspace_id,
@@ -1803,8 +1913,9 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
                             *reader,
                         )
                         .await
-                    }
-                    "new_local_repository" => {
+                        .unwrap_or(false),
+                    ),
+                    "new_local_repository" => RepoMaterializationStateValue::tracked(
                         repo_materialization_new_local_repository_layout_is_valid(
                             ctx,
                             workspace_id,
@@ -1813,8 +1924,9 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
                             *reader,
                         )
                         .await
-                    }
-                    "_llvm_subproject_repository" => {
+                        .unwrap_or(false),
+                    ),
+                    "_llvm_subproject_repository" => RepoMaterializationStateValue::tracked(
                         repo_materialization_llvm_subproject_layout_is_valid(
                             ctx,
                             workspace_id,
@@ -1823,30 +1935,23 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
                             *reader,
                         )
                         .await
-                    }
-                    _ => Ok(
+                        .unwrap_or(false),
+                    ),
+                    _ => RepoMaterializationStateValue::untracked(
                         crate::repository_executor::repo_layout_is_valid_for_invocation(
                             &invocation,
                             &repo_dir,
                         ),
                     ),
-                }
-                .unwrap_or_else(|_| {
-                    #[cfg(test)]
-                    {
-                        crate::repository_executor::repo_layout_is_valid_for_invocation(
-                            &invocation,
-                            &repo_dir,
-                        )
-                    }
-                    #[cfg(not(test))]
-                    {
-                        false
-                    }
-                });
-                repo_materialization_invocation_layout_state_value(layout_valid)
+                };
+                RepoMaterializationStateValue::with_tracking(
+                    repo_materialization_invocation_layout_state_value(layout_valid.value),
+                    layout_valid.tracked_by_dice,
+                )
             }
-            Err(e) => Arc::from(format!("layout-unclassifiable:{e}").as_str()),
+            Err(e) => RepoMaterializationStateValue::tracked(Arc::from(
+                format!("layout-unclassifiable:{e}").as_str(),
+            )),
         }
     }
 
@@ -1854,9 +1959,8 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1878,7 +1982,7 @@ impl std::hash::Hash for RepoMaterializationRecordedInputsStateKey {
 
 #[async_trait]
 impl Key for RepoMaterializationRecordedInputsStateKey {
-    type Value = Arc<str>;
+    type Value = RepoMaterializationStateValue<Arc<str>>;
 
     async fn compute(
         &self,
@@ -1891,10 +1995,28 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
             repo_dir: Arc::new(repo_dir),
         };
         let manifest_content = match ctx.compute(&content_key).await {
-            Ok(Ok(Some(content))) => content,
-            Ok(Ok(None)) => return Arc::from("inputs:none"),
-            Ok(Err(reason)) => return Arc::from(format!("inputs-invalid:{reason}").as_str()),
-            Err(e) => return Arc::from(format!("inputs-invalid:{e}").as_str()),
+            Ok(content) => content,
+            Err(e) => {
+                return RepoMaterializationStateValue::untracked(Arc::from(
+                    format!("inputs-invalid:{e}").as_str(),
+                ));
+            }
+        };
+        let tracked_by_dice = manifest_content.tracked_by_dice;
+        let manifest_content = match manifest_content.into_value() {
+            Ok(Some(content)) => content,
+            Ok(None) => {
+                return RepoMaterializationStateValue::with_tracking(
+                    Arc::from("inputs:none"),
+                    tracked_by_dice,
+                );
+            }
+            Err(reason) => {
+                return RepoMaterializationStateValue::with_tracking(
+                    Arc::from(format!("inputs-invalid:{reason}").as_str()),
+                    tracked_by_dice,
+                );
+            }
         };
         let recorded_inputs = Arc::new(parse_repository_recorded_inputs(&manifest_content));
         let validation_key = RepoMaterializationRecordedInputsValidationKey {
@@ -1903,15 +2025,28 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
             repo_mappings: self.0.repo_mappings.clone(),
         };
         match ctx.compute(&validation_key).await {
-            Ok(Ok(())) => Arc::from(
-                format!(
-                    "inputs:{}:valid",
-                    compute_sha256_hex(manifest_content.as_bytes())
-                )
-                .as_str(),
-            ),
-            Ok(Err(reason)) => Arc::from(format!("inputs-invalid:{reason}").as_str()),
-            Err(e) => Arc::from(format!("inputs-invalid:{e}").as_str()),
+            Ok(validation) => {
+                let tracked_by_dice = tracked_by_dice && validation.tracked_by_dice;
+                match validation.into_value() {
+                    Ok(()) => RepoMaterializationStateValue::with_tracking(
+                        Arc::from(
+                            format!(
+                                "inputs:{}:valid",
+                                compute_sha256_hex(manifest_content.as_bytes())
+                            )
+                            .as_str(),
+                        ),
+                        tracked_by_dice,
+                    ),
+                    Err(reason) => RepoMaterializationStateValue::with_tracking(
+                        Arc::from(format!("inputs-invalid:{reason}").as_str()),
+                        tracked_by_dice,
+                    ),
+                }
+            }
+            Err(e) => RepoMaterializationStateValue::untracked(Arc::from(
+                format!("inputs-invalid:{e}").as_str(),
+            )),
         }
     }
 
@@ -1919,9 +2054,8 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1938,7 +2072,7 @@ struct RepoMaterializationRecordedInputsManifestContentKey {
 
 #[async_trait]
 impl Key for RepoMaterializationRecordedInputsManifestContentKey {
-    type Value = Result<Option<Arc<str>>, Arc<str>>;
+    type Value = RepoMaterializationStateValue<Result<Option<Arc<str>>, Arc<str>>>;
 
     async fn compute(
         &self,
@@ -1946,30 +2080,36 @@ impl Key for RepoMaterializationRecordedInputsManifestContentKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
-            return reader
-                .read_repo_state_file_if_exists(
-                    ctx,
-                    self.workspace_id.clone(),
-                    self.repo_dir.clone(),
-                    REPO_RECORDED_INPUTS_FILE,
-                )
-                .await
-                .map_err(|_| Arc::from("recorded_inputs_unreadable"));
+            return RepoMaterializationStateValue::tracked(
+                reader
+                    .read_repo_state_file_if_exists(
+                        ctx,
+                        self.workspace_id.clone(),
+                        self.repo_dir.clone(),
+                        REPO_RECORDED_INPUTS_FILE,
+                    )
+                    .await
+                    .map_err(|_| Arc::from("recorded_inputs_unreadable")),
+            );
         }
 
         #[cfg(test)]
         {
             let manifest_path = self.repo_dir.join(REPO_RECORDED_INPUTS_FILE);
             if !manifest_path.exists() {
-                return Ok(None);
+                return RepoMaterializationStateValue::untracked(Ok(None));
             }
-            std::fs::read_to_string(&manifest_path)
-                .map(|content| Some(Arc::from(content.as_str())))
-                .map_err(|_| Arc::from("recorded_inputs_unreadable"))
+            RepoMaterializationStateValue::untracked(
+                std::fs::read_to_string(&manifest_path)
+                    .map(|content| Some(Arc::from(content.as_str())))
+                    .map_err(|_| Arc::from("recorded_inputs_unreadable")),
+            )
         }
         #[cfg(not(test))]
         {
-            Err(Arc::from("recorded_inputs_reader_unavailable"))
+            RepoMaterializationStateValue::untracked(Err(Arc::from(
+                "recorded_inputs_reader_unavailable",
+            )))
         }
     }
 
@@ -1977,9 +2117,8 @@ impl Key for RepoMaterializationRecordedInputsManifestContentKey {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -1996,29 +2135,30 @@ struct RepoMaterializationRecordedInputsValidationKey {
 
 #[async_trait]
 impl Key for RepoMaterializationRecordedInputsValidationKey {
-    type Value = Result<(), Arc<str>>;
+    type Value = RepoMaterializationStateValue<Result<(), Arc<str>>>;
 
     async fn compute(
         &self,
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        validate_recorded_inputs_current(
-            self.recorded_inputs.as_slice(),
-            None,
-            Some(self.repo_env.as_ref()),
-            Some(self.repo_mappings.as_ref()),
+        RepoMaterializationStateValue::untracked(
+            validate_recorded_inputs_current(
+                self.recorded_inputs.as_slice(),
+                None,
+                Some(self.repo_env.as_ref()),
+                Some(self.repo_mappings.as_ref()),
+            )
+            .map_err(Arc::from),
         )
-        .map_err(Arc::from)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        // See RepoMaterializationMarkerStateKey::validity.
-        false
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
     }
 }
 
@@ -2042,9 +2182,9 @@ impl Key for RepoMaterializationManifestKey {
             .await?;
         Ok(Arc::new(repo_materialization_manifest_from_states(
             self,
-            marker_state,
-            layout_state,
-            recorded_inputs_state,
+            marker_state.into_value(),
+            layout_state.into_value(),
+            recorded_inputs_state.into_value(),
         )))
     }
 
@@ -3416,6 +3556,44 @@ mod tests {
         let second = dice.compute(&key).await.unwrap().unwrap();
         assert_ne!(first.digest, second.digest);
         assert_eq!(second.marker_state.as_ref(), format!("marker:{marker}"));
+    }
+
+    #[test]
+    fn materialization_state_key_validity_tracks_reader_provenance() {
+        let tracked_bool = RepoMaterializationStateValue::tracked(true);
+        let untracked_bool = RepoMaterializationStateValue::untracked(true);
+        assert!(<RepoMaterializationBuildFilePresenceKey as Key>::validity(
+            &tracked_bool
+        ));
+        assert!(!<RepoMaterializationBuildFilePresenceKey as Key>::validity(
+            &untracked_bool
+        ));
+
+        let tracked_text: RepoMaterializationStateValue<Arc<str>> =
+            RepoMaterializationStateValue::tracked(Arc::from("state"));
+        let untracked_text: RepoMaterializationStateValue<Arc<str>> =
+            RepoMaterializationStateValue::untracked(Arc::from("state"));
+        assert!(<RepoMaterializationMarkerContentKey as Key>::validity(
+            &tracked_text
+        ));
+        assert!(!<RepoMaterializationMarkerContentKey as Key>::validity(
+            &untracked_text
+        ));
+
+        let tracked_digest: RepoMaterializationStateValue<Result<Arc<str>, Arc<str>>> =
+            RepoMaterializationStateValue::tracked(Ok(Arc::from("sha256-test")));
+        let untracked_digest: RepoMaterializationStateValue<Result<Arc<str>, Arc<str>>> =
+            RepoMaterializationStateValue::untracked(Ok(Arc::from("sha256-test")));
+        assert!(<RepoMaterializationOutputDigestKey as Key>::validity(
+            &tracked_digest
+        ));
+        assert!(!<RepoMaterializationOutputDigestKey as Key>::validity(
+            &untracked_digest
+        ));
+
+        let validation: RepoMaterializationStateValue<Result<(), Arc<str>>> =
+            RepoMaterializationStateValue::untracked(Ok(()));
+        assert!(!<RepoMaterializationRecordedInputsValidationKey as Key>::validity(&validation));
     }
 
     #[tokio::test]

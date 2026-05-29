@@ -513,6 +513,21 @@ Current state to preserve:
   Guardrails: `cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod
   materialization_manifest --lib`, and `cargo test -p slug_external_cells
   --lib`.
+- 2026-05-29 repository materialization validity provenance:
+  materialization child state values now carry whether the value was produced by
+  DICE-backed reader dependencies or by a no-reader/test/direct fallback. Marker,
+  local-rule, BUILD/layout, invocation-layout, output-digest, and
+  recorded-input manifest-content keys can now be valid cache values only when
+  their observed state is reader-backed; no-reader/test fallbacks and the still
+  direct recorded-input validation key remain invalid. This lets unchanged
+  DICE-backed child state cut off the manifest parent without incorrectly
+  caching legacy fallback probes. Guardrails: `cargo test -p slug_bzlmod
+  materialization_state_key_validity_tracks_reader_provenance --lib`, `cargo
+  test -p slug_bzlmod materialization_manifest --lib`, `cargo test -p
+  slug_external_cells --lib`, `cargo test -p slug_bzlmod --lib` (406 passed),
+  `cargo build -p slug`, focused Plan 61 materialization pytest selectors for
+  repo-env recorded inputs, watched labels, corrupted local layout, and corrupted
+  output digest (`4 passed, 152 deselected`), and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1181,9 +1196,11 @@ hardening behavior around it.
      parse-error, UTF-8-error, and include-cycle guardrails.
    - Replace remaining direct `std::fs` validity hacks with tracked filesystem
      dependencies or equivalent DICE input nodes. Repository materialization
-     marker/layout/recorded-input reads are now child DICE nodes, but those
-     children still poll until the tracked filesystem API is available below
-     `slug_common`.
+     marker/layout/recorded-input reads now distinguish DICE-backed reader
+     provenance from no-reader/test/direct fallback state, so reader-backed child
+     values can cut off parents while fallback values remain invalid. The
+     underlying project-file child keys still poll until the tracked filesystem
+     API is available below `slug_common`.
    - Include create/delete transitions, parse failures, include cycles, and
      UTF-8 failures for every module source class. Cached git/archive override
      coverage now includes create/delete, parse/UTF-8 failures, and include
@@ -1550,7 +1567,10 @@ hardening behavior around it.
      known git/local/llvm repository classes use DICE metadata/content/dir-entry
      reads too, and no-reader production fallback is invalid rather than a
      direct layout probe. Output-tree digest checks use DICE metadata,
-     directory-entry, and byte-content reads.
+     directory-entry, and byte-content reads. Materialization child state keys now
+     cache only reader-backed state as valid; direct fallback and recorded-input
+     validation state remain invalid until they are replaced by DICE-backed input
+     nodes.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not
