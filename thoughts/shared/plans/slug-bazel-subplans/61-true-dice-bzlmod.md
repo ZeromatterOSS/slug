@@ -635,6 +635,14 @@ Current state to preserve:
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py`; the full Plan 61 guardrail file
   passed (`156 passed in 71.61s`). `slugd` was cleaned before and after.
+- 2026-05-29 legacy cell-graph data constructors made test-only:
+  `BzlmodCellGraphDataValue::for_workspace(...)` and
+  `for_workspace_with_resolved_graph(...)` no longer compile into non-test
+  `slug_bzlmod`; production callers must use the explicit
+  `for_workspace_with_resolved_graph_and_fallback(...)` constructor while the
+  remaining fallback payload is burned down. Guardrails: `cargo check -p
+  slug_bzlmod`, `cargo test -p slug_bzlmod cell_graph --lib`, `cargo
+  fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1746,6 +1754,9 @@ hardening behavior around it.
      remains only as the late-bound project-file, lockfile-content, non-root
      module-file, and preseed IO provider until those filesystem-backed
      source-input dependencies are modeled behind lower-level bzlmod APIs.
+     Full-cell-graph `BzlmodCellGraphDataValue` injection convenience
+     constructors are test-only; production callers that still need the
+     transitional fallback payload must name it explicitly.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being

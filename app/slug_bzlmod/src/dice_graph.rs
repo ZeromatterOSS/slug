@@ -2783,6 +2783,7 @@ pub struct BzlmodCellGraphDataValue {
 }
 
 impl BzlmodCellGraphDataValue {
+    #[cfg(test)]
     pub fn for_workspace(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
@@ -2795,6 +2796,7 @@ impl BzlmodCellGraphDataValue {
         }
     }
 
+    #[cfg(test)]
     pub fn for_workspace_with_resolved_graph(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
