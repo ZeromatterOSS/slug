@@ -305,6 +305,9 @@ pub struct ExtensionRepoExecutionKey {
 
     /// Effective repository environment for Starlark repository rule execution.
     pub repo_env: Arc<BTreeMap<String, String>>,
+
+    /// Current scoped repository mappings used for REPO_MAPPING recorded-input replay.
+    pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
 }
 
 impl std::hash::Hash for ExtensionRepoExecutionKey {
@@ -316,6 +319,7 @@ impl std::hash::Hash for ExtensionRepoExecutionKey {
         self.project_root.hash(state);
         self.materialization_manifest_key.hash(state);
         self.repo_env.hash(state);
+        self.repo_mappings.hash(state);
     }
 }
 
@@ -328,6 +332,7 @@ impl PartialEq for ExtensionRepoExecutionKey {
             && self.project_root == other.project_root
             && self.materialization_manifest_key == other.materialization_manifest_key
             && self.repo_env == other.repo_env
+            && self.repo_mappings == other.repo_mappings
     }
 }
 
@@ -436,6 +441,7 @@ impl ExtensionRepoExecutionKey {
             project_root: Arc::new(project_root),
             materialization_manifest_key: Arc::new(materialization_manifest_key),
             repo_env,
+            repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
         }
     }
 
@@ -482,15 +488,36 @@ impl ExtensionRepoExecutionKey {
         workspace_id: crate::WorkspaceId,
         repo_env: Arc<BTreeMap<String, String>>,
     ) -> Self {
+        Self::from_arcs_with_workspace_id_repo_env_and_repo_mappings(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            workspace_id,
+            repo_env,
+            Arc::new(crate::RepoMappingSnapshot::new()),
+        )
+    }
+
+    /// Create from Arc references with explicit workspace identity, command
+    /// repo-env, and recorded-input repo mappings.
+    pub fn from_arcs_with_workspace_id_repo_env_and_repo_mappings(
+        canonical_name: Arc<str>,
+        extension_id: Arc<str>,
+        repo_spec: Arc<RepoSpec>,
+        workspace_id: crate::WorkspaceId,
+        repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<crate::RepoMappingSnapshot>,
+    ) -> Self {
         let project_root = workspace_id.canonical_project_root.clone();
         let spec_hash = repo_execution_spec_hash(&repo_spec, &repo_env);
         let materialization_manifest_key =
-            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_and_repo_env(
+            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_repo_env_and_repo_mappings(
                 workspace_id,
                 canonical_name.as_ref(),
                 repo_spec.clone(),
                 spec_hash.clone(),
                 repo_env.clone(),
+                repo_mappings.clone(),
             );
         Self {
             canonical_name,
@@ -500,6 +527,7 @@ impl ExtensionRepoExecutionKey {
             project_root,
             materialization_manifest_key: Arc::new(materialization_manifest_key),
             repo_env,
+            repo_mappings,
         }
     }
 
@@ -581,6 +609,7 @@ fn complete_marker_state_with_output_digest(
 fn repository_recorded_inputs_digest(
     repo_dir: &Path,
     repo_env: Option<&BTreeMap<String, String>>,
+    repo_mappings: Option<&crate::RepoMappingSnapshot>,
 ) -> Result<Option<String>, String> {
     let manifest_path = repo_dir.join(REPO_RECORDED_INPUTS_FILE);
     if !manifest_path.exists() {
@@ -589,7 +618,7 @@ fn repository_recorded_inputs_digest(
     let content =
         std::fs::read_to_string(&manifest_path).map_err(|_| "recorded_inputs_unreadable")?;
     let recorded_inputs = parse_repository_recorded_inputs(&content);
-    validate_recorded_inputs_current(&recorded_inputs, None, repo_env, None)?;
+    validate_recorded_inputs_current(&recorded_inputs, None, repo_env, repo_mappings)?;
     Ok(Some(compute_sha256_hex(content.as_bytes())))
 }
 
@@ -697,7 +726,11 @@ fn repo_materialization_recorded_inputs_state_for_key(
     key: &RepoMaterializationManifestKey,
 ) -> String {
     let repo_dir = repo_dir_for_materialization_manifest_key(key);
-    match repository_recorded_inputs_digest(&repo_dir, Some(key.repo_env.as_ref())) {
+    match repository_recorded_inputs_digest(
+        &repo_dir,
+        Some(key.repo_env.as_ref()),
+        Some(key.repo_mappings.as_ref()),
+    ) {
         Ok(Some(digest)) => format!("inputs:{digest}:valid"),
         Ok(None) => "inputs:none".to_owned(),
         Err(reason) => format!("inputs-invalid:{reason}"),
@@ -1316,6 +1349,7 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
         let validation_key = RepoMaterializationRecordedInputsValidationKey {
             recorded_inputs,
             repo_env: self.0.repo_env.clone(),
+            repo_mappings: self.0.repo_mappings.clone(),
         };
         match ctx.compute(&validation_key).await {
             Ok(Ok(())) => Arc::from(
@@ -1385,6 +1419,7 @@ impl Key for RepoMaterializationRecordedInputsManifestContentKey {
 struct RepoMaterializationRecordedInputsValidationKey {
     recorded_inputs: Arc<Vec<String>>,
     repo_env: Arc<BTreeMap<String, String>>,
+    repo_mappings: Arc<crate::RepoMappingSnapshot>,
 }
 
 #[async_trait]
@@ -1400,7 +1435,7 @@ impl Key for RepoMaterializationRecordedInputsValidationKey {
             self.recorded_inputs.as_slice(),
             None,
             Some(self.repo_env.as_ref()),
-            None,
+            Some(self.repo_mappings.as_ref()),
         )
         .map_err(Arc::from)
     }
@@ -2529,6 +2564,80 @@ mod tests {
 
         let stale_manifest =
             repo_materialization_manifest_for_key(&stale.materialization_manifest_key);
+        assert_ne!(valid_manifest.digest, stale_manifest.digest);
+        assert!(
+            stale_manifest
+                .recorded_inputs_state
+                .contains("inputs-invalid:recorded_input_changed")
+        );
+    }
+
+    #[test]
+    fn test_recorded_repo_mapping_input_manifest_uses_repo_mappings() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+mapping_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "stable").unwrap();
+
+        let repo_spec = Arc::new(
+            RepoSpec::new("@@//:mapping_repo.bzl%mapping_repository".to_owned()).with_attr(
+                "name".to_owned(),
+                AttrValue::String("mapping_repo".to_owned()),
+            ),
+        );
+        let spec_hash = repo_spec.compute_hash();
+        let output_digest =
+            crate::repository_executor::repository_output_digest(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join(".slug_repo_complete"),
+            complete_marker(&spec_hash, &output_digest),
+        )
+        .unwrap();
+        std::fs::write(
+            repo_dir.join(REPO_RECORDED_INPUTS_FILE),
+            "REPO_MAPPING:,mapped_dep dep+\n",
+        )
+        .unwrap();
+
+        let mut first_root_mapping = BTreeMap::new();
+        first_root_mapping.insert("mapped_dep".to_owned(), "dep+".to_owned());
+        let mut first_mappings = crate::RepoMappingSnapshot::new();
+        first_mappings.insert(String::new(), first_root_mapping);
+        let first_key =
+            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_repo_env_and_repo_mappings(
+                crate::WorkspaceId::for_project_root(project_root.clone()),
+                canonical_name,
+                repo_spec.clone(),
+                spec_hash.clone(),
+                Arc::new(BTreeMap::new()),
+                Arc::new(first_mappings),
+            );
+        let valid_manifest = repo_materialization_manifest_for_key(&first_key);
+        assert!(valid_manifest.recorded_inputs_state.ends_with(":valid"));
+
+        let mut second_root_mapping = BTreeMap::new();
+        second_root_mapping.insert("mapped_dep".to_owned(), "other+".to_owned());
+        let mut second_mappings = crate::RepoMappingSnapshot::new();
+        second_mappings.insert(String::new(), second_root_mapping);
+        let stale_key =
+            RepoMaterializationManifestKey::for_workspace_id_with_repo_spec_digest_repo_env_and_repo_mappings(
+                crate::WorkspaceId::for_project_root(project_root),
+                canonical_name,
+                repo_spec,
+                spec_hash,
+                Arc::new(BTreeMap::new()),
+                Arc::new(second_mappings),
+            );
+        let stale_manifest = repo_materialization_manifest_for_key(&stale_key);
+
+        assert_ne!(first_key, stale_key);
         assert_ne!(valid_manifest.digest, stale_manifest.digest);
         assert!(
             stale_manifest

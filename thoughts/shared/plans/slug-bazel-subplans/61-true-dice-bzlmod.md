@@ -332,6 +332,19 @@ Current state to preserve:
   rather than relying on a daemon restart. Guardrails: `cargo test -p
   slug_interpreter_for_build --lib` (126 passed), `cargo build -p slug`, and
   focused same-daemon marker pytest selectors (2 passed).
+- 2026-05-29 repository materialization REPO_MAPPING replay:
+  materialized extension repo manifests now carry graph-owned repo mappings in
+  the manifest key identity and validate `.slug_repo_recorded_inputs`
+  `REPO_MAPPING` rows against those mappings instead of treating them as
+  unsupported. Spoke materialization passes the extension spokes' recorded-input
+  repo mapping snapshot into `ExtensionRepoExecutionKey`, matching Bazel's
+  `RepoRecordedInput.RecordedRepoMapping` / `RepositoryMappingValue` dependency
+  boundary for materialized generated repos. Guardrails: `cargo test -p
+  slug_bzlmod test_recorded_repo_mapping_input_manifest_uses_repo_mappings`,
+  `cargo test -p slug_bzlmod`, `cargo build -p slug`, and focused Python
+  replay selectors for recorded repo-mapping cache rejection and extension-repo
+  source mappings. Execution note: this slice ran single-agent because the
+  available subagent tool requires explicit user authorization before spawning.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1303,6 +1316,9 @@ hardening behavior around it.
      same-value inputs are deduplicated, and conflicting values for the same
      input identity fail during repository-rule execution rather than producing
      an invalid manifest.
+   - Repository materialization manifest keys now include current repo mappings
+     and validate persisted `REPO_MAPPING` recorded inputs against the
+     graph-owned mapping snapshot used by extension spokes.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

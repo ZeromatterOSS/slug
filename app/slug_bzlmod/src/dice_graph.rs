@@ -4980,6 +4980,7 @@ pub struct RepoMaterializationManifestKey {
     pub repo_spec_digest: Arc<str>,
     pub repo_spec: Arc<RepoSpec>,
     pub repo_env: Arc<BTreeMap<String, String>>,
+    pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
 }
 
 impl RepoMaterializationManifestKey {
@@ -5049,6 +5050,24 @@ impl RepoMaterializationManifestKey {
         repo_spec_digest: String,
         repo_env: Arc<BTreeMap<String, String>>,
     ) -> Self {
+        Self::for_workspace_id_with_repo_spec_digest_repo_env_and_repo_mappings(
+            workspace_id,
+            canonical_repo,
+            repo_spec,
+            repo_spec_digest,
+            repo_env,
+            Arc::new(crate::RepoMappingSnapshot::new()),
+        )
+    }
+
+    pub fn for_workspace_id_with_repo_spec_digest_repo_env_and_repo_mappings(
+        workspace_id: WorkspaceId,
+        canonical_repo: &str,
+        repo_spec: Arc<RepoSpec>,
+        repo_spec_digest: String,
+        repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<crate::RepoMappingSnapshot>,
+    ) -> Self {
         Self {
             output_base: workspace_id.output_base.clone(),
             workspace_id,
@@ -5056,6 +5075,7 @@ impl RepoMaterializationManifestKey {
             repo_spec_digest: Arc::from(repo_spec_digest.as_str()),
             repo_spec,
             repo_env,
+            repo_mappings,
         }
     }
 
@@ -5084,6 +5104,7 @@ impl PartialEq for RepoMaterializationManifestKey {
             && self.canonical_repo == other.canonical_repo
             && self.repo_spec_digest == other.repo_spec_digest
             && self.repo_env == other.repo_env
+            && self.repo_mappings == other.repo_mappings
     }
 }
 
@@ -5094,6 +5115,7 @@ impl std::hash::Hash for RepoMaterializationManifestKey {
         self.canonical_repo.hash(state);
         self.repo_spec_digest.hash(state);
         self.repo_env.hash(state);
+        self.repo_mappings.hash(state);
     }
 }
 
