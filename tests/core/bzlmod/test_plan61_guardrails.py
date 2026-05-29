@@ -10354,6 +10354,130 @@ repo(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_native_http_archive_build_file_label_edit_rematerializes_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepoRecordedInput.File and RepositoryFetchFunction."""
+    repo_dir = buck.cwd / "bazel-external" / "+http_archive+native_archive"
+    archive = buck.cwd / "archive.zip"
+    _write_zip(
+        archive,
+        {
+            "first.txt": "first payload\n",
+            "second.txt": "second payload\n",
+        },
+    )
+    _write(
+        buck.cwd / "archive.BUILD",
+        """filegroup(name = "data", srcs = ["first.txt"])
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_native_http_archive_build_file")
+
+http_archive = use_repo_rule("@@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "native_archive",
+    url = "{archive.as_uri()}",
+    sha256 = "{_sha256(archive)}",
+    build_file = "//:archive.BUILD",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_native_archive",
+    srcs = ["@native_archive//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_native_archive")
+    first = await _bzlmod_counters(buck)
+    assert "first.txt" in (repo_dir / "BUILD.bazel").read_text()
+
+    _write(
+        buck.cwd / "archive.BUILD",
+        """filegroup(name = "data", srcs = ["second.txt"])
+""",
+    )
+
+    await buck.build("//:uses_native_archive")
+    second = await _bzlmod_counters(buck)
+
+    assert "second.txt" in (repo_dir / "BUILD.bazel").read_text()
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_native_http_archive_patch_label_edit_rematerializes_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: RepoRecordedInput.File and RepositoryFetchFunction."""
+    repo_dir = buck.cwd / "bazel-external" / "+http_archive+patched_archive"
+    archive = buck.cwd / "archive.zip"
+    _write_zip(archive, {"data.txt": "base\n"})
+    _write(
+        buck.cwd / "change.patch",
+        """--- data.txt
++++ data.txt
+@@ -1 +1 @@
+-base
++first
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_native_http_archive_patch")
+
+http_archive = use_repo_rule("@@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "patched_archive",
+    url = "{archive.as_uri()}",
+    sha256 = "{_sha256(archive)}",
+    build_file_content = "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n",
+    patches = ["//:change.patch"],
+    patch_args = ["-p0"],
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_patched_archive",
+    srcs = ["@patched_archive//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_patched_archive")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    _write(
+        buck.cwd / "change.patch",
+        """--- data.txt
++++ data.txt
+@@ -1 +1 @@
+-base
++second
+""",
+    )
+
+    await buck.build("//:uses_patched_archive")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_materialized_repo_marker_revalidates_corrupted_local_repo_layout(
     buck: Buck,
 ) -> None:

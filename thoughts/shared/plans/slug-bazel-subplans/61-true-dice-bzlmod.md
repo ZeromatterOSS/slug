@@ -635,6 +635,18 @@ Current state to preserve:
   61 extension lockfile replay selectors for recorded file/dirents/dirtree,
   env, and repo mappings (`6 passed, 150 deselected`), `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 native repository label inputs recorded:
+  native `http_archive` execution now writes resolver-owned `build_file` and
+  `patches` label reads into the repository recorded-input manifest before the
+  completion marker is accepted. `RepositoryLabelResolution` also maps the
+  graph-owned root module name to the workspace root, so `use_repo_rule(...)`
+  attrs canonicalized as `@@root_module//...` do not fall off the resolver-owned
+  path. Guardrails: `cargo test -p slug_bzlmod repository_executor --lib`,
+  `cargo test -p slug_bzlmod materialization_manifest --lib`, `cargo build -p
+  slug`, focused Plan 61 native `http_archive` build-file/patch selectors (`2
+  passed, 162 deselected`), full Plan 61 guardrails (`164 passed`), `cargo test
+  -p slug_bzlmod --lib` (420 passed), `cargo fmt --check`, and `git diff
+  --check`.
 - 2026-05-29 synchronous lockfile recorded-input replay API made test-only:
   `Lockfile::get_extension_cache*`, `LockfileExtensionData::recorded_inputs_current`,
   `SelectedExtensionCache::recorded_inputs_current`, and the direct
@@ -2072,6 +2084,12 @@ hardening behavior around it.
    - `repository_ctx.patch(Label(...))` with default `watch_patch = "auto"` now
      records the patch file as a repository materialization input, so editing
      the patch rematerializes the generated repository in the same daemon.
+   - Native `http_archive(build_file = Label(...), patches = [Label(...)])`
+     now records those label files in `.slug_repo_recorded_inputs`, and the
+     manifest invalidates same-daemon materialization hits when either file
+     changes. Root-module-canonical labels from `use_repo_rule(...)` resolve
+     through the graph-owned root module name instead of a legacy main-repo
+     fallback.
    - `repository_ctx.extract(Label(...))` with default `watch_archive = "auto"`
      now records the archive file as a repository materialization input, so
      editing a binary source archive rematerializes the generated repository in

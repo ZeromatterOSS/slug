@@ -742,7 +742,10 @@ fn parse_repository_recorded_inputs(content: &str) -> Vec<String> {
         .collect()
 }
 
-fn write_repository_recorded_inputs(repo_dir: &Path, inputs: &[String]) -> slug_error::Result<()> {
+pub(crate) fn write_repository_recorded_inputs(
+    repo_dir: &Path,
+    inputs: &[String],
+) -> slug_error::Result<()> {
     let manifest_path = repo_dir.join(REPO_RECORDED_INPUTS_FILE);
     if inputs.is_empty() {
         if let Err(e) = std::fs::remove_file(&manifest_path)

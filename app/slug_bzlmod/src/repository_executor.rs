@@ -45,7 +45,34 @@ use crate::repository_execution::InvocationAttrs;
 use crate::repository_execution::REPO_RECORDED_INPUTS_FILE;
 use crate::repository_execution::RepositoryExecutionError;
 use crate::repository_execution::RepositoryRuleResult;
+use crate::repository_execution::write_repository_recorded_inputs;
 use crate::repository_invocations::RepositoryInvocation;
+
+#[derive(Default)]
+struct NativeRepositoryRecordedInputs {
+    inputs: Vec<String>,
+}
+
+impl NativeRepositoryRecordedInputs {
+    fn record_file(
+        &mut self,
+        invocation: &RepositoryInvocation,
+        path: &Path,
+    ) -> slug_error::Result<()> {
+        let input = crate::lockfile::recorded_file_input(path).map_err(|e| {
+            RepositoryExecutionError::ExecutionFailed {
+                name: invocation.name.clone(),
+                reason: format!(
+                    "Failed to record repository input '{}': {}",
+                    path.display(),
+                    e
+                ),
+            }
+        })?;
+        self.inputs.push(input);
+        Ok(())
+    }
+}
 
 /// Execute a repository rule invocation using legacy marker reuse.
 ///
@@ -129,9 +156,17 @@ fn execute_repository_rule_impl(
     // Clean and create working directory
     prepare_working_dir(&working_dir)?;
 
+    let mut recorded_inputs = NativeRepositoryRecordedInputs::default();
+
     // Dispatch based on rule name
     let result = match invocation.rule_name.as_str() {
-        "http_archive" => execute_http_archive(invocation, &attrs, &working_dir, label_resolution),
+        "http_archive" => execute_http_archive(
+            invocation,
+            &attrs,
+            &working_dir,
+            label_resolution,
+            &mut recorded_inputs,
+        ),
         "http_file" => execute_http_file(invocation, &attrs, &working_dir),
         "http_jar" => execute_http_jar(invocation, &attrs, &working_dir),
         "git_repository" => execute_git_repository(invocation, &attrs, &working_dir),
@@ -146,6 +181,7 @@ fn execute_repository_rule_impl(
 
     match result {
         Ok(()) => {
+            write_repository_recorded_inputs(&working_dir, &recorded_inputs.inputs)?;
             mark_repo_complete(&working_dir)?;
             Ok(RepositoryRuleResult::success(
                 invocation.name.clone(),
@@ -523,6 +559,7 @@ fn execute_http_archive(
     attrs: &InvocationAttrs,
     working_dir: &Path,
     label_resolution: &RepositoryLabelResolution,
+    recorded_inputs: &mut NativeRepositoryRecordedInputs,
 ) -> slug_error::Result<()> {
     // Get URLs - can be `url` (single) or `urls` (list)
     let urls = get_urls(attrs)?;
@@ -564,6 +601,7 @@ fn execute_http_archive(
                     // build_file is a label like "@@repo//path:BUILD.foo" or a file path
                     let build_file_path =
                         resolve_build_file_label(build_file, working_dir, label_resolution)?;
+                    recorded_inputs.record_file(invocation, Path::new(&build_file_path))?;
                     let content = std::fs::read_to_string(&build_file_path).map_err(|e| {
                         RepositoryExecutionError::ExecutionFailed {
                             name: invocation.name.clone(),
@@ -582,7 +620,13 @@ fn execute_http_archive(
                 }
 
                 // Apply patches if specified
-                apply_patches(invocation, attrs, working_dir, label_resolution)?;
+                apply_patches(
+                    invocation,
+                    attrs,
+                    working_dir,
+                    label_resolution,
+                    recorded_inputs,
+                )?;
 
                 materialize_llvm_multicall_aliases(working_dir);
 
@@ -701,6 +745,7 @@ fn apply_patches(
     attrs: &InvocationAttrs,
     working_dir: &Path,
     label_resolution: &RepositoryLabelResolution,
+    recorded_inputs: &mut NativeRepositoryRecordedInputs,
 ) -> slug_error::Result<()> {
     // Apply patch files
     if let Some(patches) = attrs.get_string_list("patches") {
@@ -729,6 +774,7 @@ fn apply_patches(
                         continue;
                     }
                 };
+            recorded_inputs.record_file(invocation, Path::new(&resolved_patch_path))?;
             if let Err(e) =
                 apply_patch_file(Path::new(&resolved_patch_path), patch_args, working_dir)
             {
@@ -1109,6 +1155,12 @@ pub(crate) struct RepositoryLabelResolution {
 impl RepositoryLabelResolution {
     pub(crate) fn from_cell_graph(project_root: &Path, cell_graph: &BzlmodCellGraphValue) -> Self {
         let mut cell_paths = BTreeMap::new();
+        if !cell_graph.root_module_name.is_empty() {
+            cell_paths.insert(
+                cell_graph.root_module_name.to_owned(),
+                project_root.to_path_buf(),
+            );
+        }
         for cell in cell_graph.cells.iter() {
             let path = project_relative_or_absolute(project_root, &cell.path);
             cell_paths.insert(cell.name.clone(), path.clone());
@@ -2357,6 +2409,34 @@ mod tests {
         let resolved =
             resolve_build_file_label("//tools:BUILD.repo", &working_dir, &label_resolution)
                 .unwrap();
+
+        assert_eq!(
+            PathBuf::from(resolved),
+            project_root.join("tools").join("BUILD.repo")
+        );
+    }
+
+    #[test]
+    fn resolve_build_file_label_supports_graph_root_module_labels() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let working_dir = project_root.join("bazel-external").join("current_repo");
+        std::fs::create_dir_all(project_root.join("tools")).unwrap();
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(project_root.join("tools").join("BUILD.repo"), "").unwrap();
+        let mut cell_graph = BzlmodCellGraphValue::empty_for_workspace(
+            WorkspaceId::for_project_root(project_root.to_path_buf()),
+        );
+        cell_graph.root_module_name = "root_module".to_owned();
+        let label_resolution =
+            RepositoryLabelResolution::from_cell_graph(project_root, &cell_graph);
+
+        let resolved = resolve_build_file_label(
+            "@@root_module//tools:BUILD.repo",
+            &working_dir,
+            &label_resolution,
+        )
+        .unwrap();
 
         assert_eq!(
             PathBuf::from(resolved),
