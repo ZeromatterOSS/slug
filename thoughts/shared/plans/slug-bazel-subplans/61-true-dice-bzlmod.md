@@ -963,6 +963,18 @@ Current state to preserve:
   --lib`, `cargo test -p slug_common bzlmod --lib`, `cargo test -p
   slug_external_cells extension_repo --lib`, `cargo test -p slug_bzlmod --lib`,
   `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 repo-env graph-digest provenance:
+  `BzlmodRepoEnvDataValue` now carries the active cell-graph/resolution digest,
+  `BzlmodRepoEnvKey` rejects stale digest reads, and extension cell,
+  extension-spoke, lockfile replay validation, extension-repo execution, and
+  current-workspace repo-env consumers request the active digest instead of the
+  injected-projection default. This makes command/config repo-env policy reads
+  auditable against the graph digest that is consuming them. Guardrails: `cargo
+  test -p slug_bzlmod repo_env_key_rejects_stale_resolution_digest --lib`,
+  `cargo test -p slug_bzlmod current_workspace_helpers --lib`, `cargo test -p
+  slug_bzlmod cell_graph --lib`, `cargo test -p slug_common bzlmod --lib`,
+  `cargo test -p slug_external_cells extension_repo --lib`, and `cargo test -p
+  slug_bzlmod --lib`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

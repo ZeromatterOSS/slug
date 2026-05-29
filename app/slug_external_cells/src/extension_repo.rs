@@ -563,34 +563,20 @@ async fn repo_env_for_extension_repo_execution(
         return Ok(spokes.repo_env.clone());
     }
 
-    let repo_env = match ctx
-        .compute(&slug_bzlmod::BzlmodRepoEnvKey::for_workspace_id(
-            workspace_id.clone(),
-        ))
-        .await
-    {
-        Ok(Ok(repo_env)) => repo_env,
-        Ok(Err(e)) => {
-            return Err(ExtensionRepoError::MaterializationFailed {
-                canonical_name: setup.canonical_name.to_string(),
-                reason: format!(
-                    "Current bzlmod repo-env lookup failed: {}",
-                    diagnostic_summary(&e)
-                ),
+    let repo_env =
+        match slug_bzlmod::bzlmod_repo_env_for_workspace_id(ctx, workspace_id.clone()).await {
+            Ok(repo_env) => repo_env,
+            Err(e) => {
+                return Err(ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!(
+                        "Current bzlmod repo-env lookup failed: {}",
+                        diagnostic_summary(&e)
+                    ),
+                }
+                .into());
             }
-            .into());
-        }
-        Err(e) => {
-            return Err(ExtensionRepoError::MaterializationFailed {
-                canonical_name: setup.canonical_name.to_string(),
-                reason: format!(
-                    "DICE error while reading current bzlmod repo-env: {}",
-                    diagnostic_summary(&e)
-                ),
-            }
-            .into());
-        }
-    };
+        };
 
     if !setup.repo_env_json.is_empty() {
         let setup_repo_env = repo_env_from_setup(setup)?;

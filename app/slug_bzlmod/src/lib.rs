@@ -485,6 +485,7 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
 
         let module_versions =
             module_versions.with_resolution_digest(cell_graph_resolution_digest.clone());
+        let repo_env = repo_env.with_resolution_digest(cell_graph_resolution_digest.clone());
         let repo_mappings =
             repo_mappings.with_resolution_digest(cell_graph_resolution_digest.clone());
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
@@ -604,6 +605,38 @@ pub async fn bzlmod_repo_mappings_for_workspace_id(
         ));
     }
     let key = BzlmodRepoMappingsKey::for_workspace_id_with_resolution_digest(
+        workspace_id,
+        current.resolution_digest.clone(),
+    );
+    ctx.compute(&key).await?
+}
+
+pub async fn bzlmod_repo_env_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<Arc<BTreeMap<String, String>>> {
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    let key = BzlmodRepoEnvKey::for_workspace_id_with_resolution_digest(
+        current.workspace_id.clone(),
+        current.resolution_digest.clone(),
+    );
+    ctx.compute(&key).await?
+}
+
+pub async fn bzlmod_repo_env_for_workspace_id(
+    ctx: &mut dice::DiceComputations<'_>,
+    workspace_id: WorkspaceId,
+) -> slug_error::Result<Arc<BTreeMap<String, String>>> {
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    if current.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "bzlmod repo env requested for project root '{}', \
+             but current bzlmod cell graph root is '{}'",
+            workspace_id.canonical_project_root.display(),
+            current.workspace_id.canonical_project_root.display()
+        ));
+    }
+    let key = BzlmodRepoEnvKey::for_workspace_id_with_resolution_digest(
         workspace_id,
         current.resolution_digest.clone(),
     );
@@ -742,9 +775,7 @@ async fn validate_lockfile_extension_replay_for_extension(
         })
         .await??;
     let usages_digest = compute_extension_input_hash(aggregation.aggregated.as_ref());
-    let repo_env = ctx
-        .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
-        .await??;
+    let repo_env = bzlmod_repo_env_for_workspace_id(ctx, workspace_id.clone()).await?;
     let repo_mappings = bzlmod_repo_mappings_for_workspace_id(ctx, workspace_id.clone()).await?;
 
     for lockfile_value in [
@@ -2022,6 +2053,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn repo_env_key_rejects_stale_resolution_digest() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-repo-env-digest"),
+            PathBuf::from("/tmp/slug-plan61-repo-env-digest-output"),
+        );
+        let repo_env =
+            BzlmodRepoEnvDataValue::for_workspace(workspace_id.clone(), Arc::new(BTreeMap::new()))
+                .with_resolution_digest(Arc::from("current-digest"));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(BzlmodRepoEnvDataKey, Arc::new(repo_env))])?;
+        let mut dice = updater.commit().await;
+
+        let err = dice
+            .compute(&BzlmodRepoEnvKey::for_workspace_id_with_resolution_digest(
+                workspace_id,
+                Arc::from("stale-digest"),
+            ))
+            .await?
+            .unwrap_err();
+        assert!(err.to_string().contains("repo env data digest"), "{err:?}");
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn cell_graph_key_uses_module_data_root_name() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-cell-graph-module-root"),
@@ -2657,10 +2719,13 @@ mod tests {
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoEnvDataKey,
-            Arc::new(BzlmodRepoEnvDataValue::for_workspace(
-                workspace_id.clone(),
-                Arc::new(BTreeMap::new()),
-            )),
+            Arc::new(
+                BzlmodRepoEnvDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BTreeMap::new()),
+                )
+                .with_resolution_digest(resolution_digest.clone()),
+            ),
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoMappingsDataKey,

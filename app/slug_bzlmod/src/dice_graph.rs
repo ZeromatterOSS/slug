@@ -3211,8 +3211,9 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
                 .await?;
         if !extension_aggregations.extension_aggregations.is_empty() {
             let repo_env = ctx
-                .compute(&BzlmodRepoEnvKey::for_workspace_id(
+                .compute(&BzlmodRepoEnvKey::for_workspace_id_with_resolution_digest(
                     self.workspace_id.clone(),
+                    self.resolution_digest.clone(),
                 ))
                 .await??;
             let repo_mappings = ctx
@@ -4027,6 +4028,16 @@ impl BzlmodRepoEnvKey {
         }
     }
 
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+        }
+    }
+
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
@@ -4036,6 +4047,7 @@ impl BzlmodRepoEnvKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoEnvDataValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub repo_env: Arc<BTreeMap<String, String>>,
 }
 
@@ -4046,8 +4058,14 @@ impl BzlmodRepoEnvDataValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             repo_env,
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 }
 
@@ -4457,6 +4475,15 @@ impl Key for BzlmodRepoEnvKey {
                  but current bzlmod repo env data root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
                 data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodRepoEnvKey was computed with resolution digest '{}', \
+                 but current bzlmod repo env data digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
             ));
         }
         Ok(data.repo_env.clone())
