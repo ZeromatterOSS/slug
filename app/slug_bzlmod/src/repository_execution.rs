@@ -2735,14 +2735,24 @@ impl Key for ExtensionRepoExecutionKey {
                                 )?;
                                 let effective_local = self.repo_spec.local || execution.local;
                                 write_repository_rule_local_state(&working_dir, effective_local)?;
-                                let output_digest =
-                                    crate::repository_executor::repository_output_digest(
-                                        &working_dir,
-                                    )?;
-                                let _ = std::fs::write(
-                                    working_dir.join(".slug_repo_complete"),
-                                    complete_marker(&self.spec_hash, &output_digest),
-                                );
+                                // Mirror the reuse predicate (which gates on
+                                // `!self.repo_spec.local`): the `.slug_repo_complete`
+                                // marker is never consulted for a repo_spec.local repo,
+                                // so skip the vestigial write (Plan 61 item 7). Note this
+                                // intentionally uses `self.repo_spec.local`, NOT
+                                // `effective_local`: an execution.local-only repo
+                                // (repo_spec.local == false) is still reachable by the
+                                // reuse predicate and must keep its marker.
+                                if !self.repo_spec.local {
+                                    let output_digest =
+                                        crate::repository_executor::repository_output_digest(
+                                            &working_dir,
+                                        )?;
+                                    let _ = std::fs::write(
+                                        working_dir.join(".slug_repo_complete"),
+                                        complete_marker(&self.spec_hash, &output_digest),
+                                    );
+                                }
                                 let mut result = RepositoryRuleResult::success(
                                     self.canonical_name.to_string(),
                                     working_dir,
@@ -2786,19 +2796,27 @@ impl Key for ExtensionRepoExecutionKey {
             result = result.non_cacheable();
         }
         write_repository_rule_local_state(&result.repo_path, self.repo_spec.local)?;
-        let output_digest =
-            crate::repository_executor::repository_output_digest(&result.repo_path)?;
 
-        std::fs::write(
-            result.repo_path.join(".slug_repo_complete"),
-            complete_marker(&self.spec_hash, &output_digest),
-        )
-        .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
-            reason: format!(
-                "Failed to write spec-hashed completion marker for '{}': {}",
-                self.canonical_name, e
-            ),
-        })?;
+        // The `.slug_repo_complete` marker only gates the reuse predicate at
+        // `marker_matches` above, which requires `!self.repo_spec.local`. For a local
+        // repository the marker can never satisfy that predicate, so writing it is a
+        // vestigial pre-DICE filesystem-trust artifact; reuse is owned by
+        // RepoMaterializationManifestKey. Skip the write for local repos so production
+        // does not leave a marker that nothing consults (Plan 61 item 7).
+        if !self.repo_spec.local {
+            let output_digest =
+                crate::repository_executor::repository_output_digest(&result.repo_path)?;
+            std::fs::write(
+                result.repo_path.join(".slug_repo_complete"),
+                complete_marker(&self.spec_hash, &output_digest),
+            )
+            .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
+                reason: format!(
+                    "Failed to write spec-hashed completion marker for '{}': {}",
+                    self.canonical_name, e
+                ),
+            })?;
+        }
 
         tracing::info!(
             "Successfully materialized repository '{}' at {:?}",
