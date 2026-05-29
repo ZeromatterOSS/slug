@@ -1953,16 +1953,22 @@ pub struct BzlmodCellGraphKey {
 }
 
 impl BzlmodCellGraphKey {
-    pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
+    pub fn for_workspace_id_and_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
         Self {
             workspace_id,
-            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+            resolution_digest,
         }
     }
 
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
-        Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
+        Self::for_workspace_id_and_resolution_digest(
+            WorkspaceId::for_project_root(project_root),
+            Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+        )
     }
 }
 

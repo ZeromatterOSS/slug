@@ -731,6 +731,15 @@ Current state to preserve:
   --lib`, `cargo test -p slug_external_cells
   extension_repo_setup_repo_env_uses_current_dice_repo_env --lib`, targeted `rg`
   for the removed public helper, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 implicit injected cell-graph key constructor removed:
+  `BzlmodCellGraphKey::for_workspace_id(...)` no longer exists as a public
+  convenience that silently selected the injected projection digest. Callers
+  must pass an explicit resolution digest through
+  `for_workspace_id_and_resolution_digest(...)`; stale/injected-key cases in
+  tests now name that intent directly. Guardrails: `cargo check -p slug_bzlmod
+  -p slug_common`, `cargo test -p slug_bzlmod cell_graph --lib`, `cargo test
+  -p slug_common bzlmod --lib`, targeted `rg` for the removed constructor,
+  `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1865,9 +1874,10 @@ hardening behavior around it.
      production repository replay must carry the current repo-mapping snapshot.
      The digest-only updater helper that omitted resolved-graph provenance is
      removed, and the generic updater helper that silently selected the
-     injected projection digest is gone from the public trait. Remaining
-     non-empty graph injection must choose either the named injected digest path
-     or the resolved-graph-carrying path explicitly.
+     injected projection digest is gone from the public trait. The default
+     cell-graph key constructor that silently selected that same injected digest
+     is removed too. Remaining non-empty graph injection must choose either the
+     named injected digest path or the resolved-graph-carrying path explicitly.
      Module extension execution and recorded-input validation keys require
      workspace identity instead of carrying or deriving optional provenance; the
      recorded-input key's internal workspace is no longer optional in production.

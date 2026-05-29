@@ -840,6 +840,13 @@ mod tests {
         }
     }
 
+    fn injected_cell_graph_key(workspace_id: WorkspaceId) -> BzlmodCellGraphKey {
+        BzlmodCellGraphKey::for_workspace_id_and_resolution_digest(
+            workspace_id,
+            Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+        )
+    }
+
     #[tokio::test]
     async fn set_bzlmod_cell_graph_data_with_inputs_uses_projection_workspace_id()
     -> slug_error::Result<()> {
@@ -916,7 +923,7 @@ mod tests {
             Some("dep+")
         );
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
+            .compute(&injected_cell_graph_key(workspace_id.clone()))
             .await??;
         assert_eq!(cell_graph.workspace_id, workspace_id);
         assert_eq!(cell_graph.root_module_name, "root_mod");
@@ -1723,7 +1730,7 @@ mod tests {
         assert_eq!(lockfile_inputs.lockfile_mode, LockfileMode::Update);
         assert!(repo_env.is_empty());
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
+            .compute(&injected_cell_graph_key(workspace_id.clone()))
             .await??;
         assert_eq!(cell_graph.workspace_id, workspace_id);
 
@@ -1777,7 +1784,7 @@ mod tests {
         )])?;
         let mut dice = updater.commit().await;
         let err = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id.clone()))
+            .compute(&injected_cell_graph_key(workspace_id.clone()))
             .await?
             .unwrap_err();
         assert!(
@@ -1955,7 +1962,7 @@ mod tests {
         let mut dice = updater.commit().await;
 
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .compute(&injected_cell_graph_key(workspace_id))
             .await??;
 
         assert_eq!(cell_graph.root_module_name, "root_from_module_data");
@@ -2055,7 +2062,7 @@ mod tests {
         let mut dice = updater.commit().await;
 
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .compute(&injected_cell_graph_key(workspace_id))
             .await??;
 
         assert_eq!(
@@ -2166,7 +2173,7 @@ mod tests {
         let mut dice = updater.commit().await;
 
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .compute(&injected_cell_graph_key(workspace_id))
             .await??;
 
         assert_eq!(
@@ -2275,7 +2282,7 @@ mod tests {
         let mut dice = updater.commit().await;
 
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .compute(&injected_cell_graph_key(workspace_id))
             .await??;
 
         assert_eq!(
@@ -2394,7 +2401,7 @@ mod tests {
         let mut dice = updater.commit().await;
 
         let cell_graph = dice
-            .compute(&BzlmodCellGraphKey::for_workspace_id(workspace_id))
+            .compute(&injected_cell_graph_key(workspace_id))
             .await??;
 
         assert_eq!(

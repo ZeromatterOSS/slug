@@ -3323,9 +3323,12 @@ use_repo(ext, "generated")
                 .any(|cell| cell.canonical_name == "_main+ext+generated")
         );
         let stale_key_error = dice
-            .compute(&slug_bzlmod::BzlmodCellGraphKey::for_workspace_id(
-                module_versions.workspace_id.clone(),
-            ))
+            .compute(
+                &slug_bzlmod::BzlmodCellGraphKey::for_workspace_id_and_resolution_digest(
+                    module_versions.workspace_id.clone(),
+                    Arc::from("stale-bzlmod-cell-graph"),
+                ),
+            )
             .await?
             .unwrap_err();
         assert!(
