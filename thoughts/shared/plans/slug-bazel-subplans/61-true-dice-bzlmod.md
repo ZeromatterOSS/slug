@@ -1018,6 +1018,20 @@ Current state to preserve:
   slug_common bzlmod --lib`, `cargo test -p slug_external_cells
   extension_repo --lib`, `cargo test -p slug_bzlmod --lib`, `cargo fmt
   --check`, and `git diff --check`.
+- 2026-05-29 lockfile-input graph-digest provenance:
+  `BzlmodLockfileInputsDataValue` now carries the active
+  cell-graph/resolution digest, and `BzlmodLockfileInputsKey` rejects stale
+  digest reads before recomputing clean lockfile inputs or returning
+  precomputed test inputs. `ModuleExtensionReplayInputsKey` and
+  `ExtensionSpokesKey` now carry the same digest so extension replay and spoke
+  execution consume lockfile policy/content through the graph that requested
+  them. Guardrails: `cargo test -p slug_bzlmod
+  lockfile_inputs_key_rejects_stale_resolution_digest --lib`, `cargo test -p
+  slug_bzlmod module_extension_replay_inputs --lib`, `cargo test -p
+  slug_bzlmod cell_graph --lib`, `cargo test -p slug_bzlmod extension_spokes
+  --lib`, `cargo test -p slug_common bzlmod --lib`, `cargo test -p
+  slug_external_cells extension_repo --lib`, `cargo test -p slug_bzlmod
+  --lib`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

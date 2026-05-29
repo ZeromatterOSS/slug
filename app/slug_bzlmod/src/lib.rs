@@ -496,6 +496,8 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             .with_resolution_digest(cell_graph_resolution_digest.clone());
         let extension_aggregations =
             extension_aggregations.with_resolution_digest(cell_graph_resolution_digest.clone());
+        let lockfile_inputs =
+            lockfile_inputs.with_resolution_digest(cell_graph_resolution_digest.clone());
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
         let repo_env_data = Arc::new(repo_env);
         let module_versions = Arc::new(module_versions);
@@ -752,9 +754,12 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
     let resolution_digest =
         bzlmod_resolution_digest_for_workspace_id(ctx, workspace_id.clone()).await?;
     let lockfile_inputs = ctx
-        .compute(&BzlmodLockfileInputsKey::for_workspace_id(
-            workspace_id.clone(),
-        ))
+        .compute(
+            &BzlmodLockfileInputsKey::for_workspace_id_with_resolution_digest(
+                workspace_id.clone(),
+                resolution_digest.clone(),
+            ),
+        )
         .await??;
     if lockfile_inputs.lockfile_mode == LockfileMode::Off
         || !lockfile_inputs_has_extension_caches(lockfile_inputs.as_ref())
@@ -2073,6 +2078,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn lockfile_inputs_key_rejects_stale_resolution_digest() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-lockfile-inputs-digest"),
+            PathBuf::from("/tmp/slug-plan61-lockfile-inputs-digest-output"),
+        );
+        let lockfile_inputs = BzlmodLockfileInputsDataValue::for_workspace(
+            workspace_id.clone(),
+            Arc::new(BzlmodLockfileInputsValue::default()),
+        )
+        .with_resolution_digest(Arc::from("current-digest"));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(lockfile_inputs),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let err = dice
+            .compute(
+                &BzlmodLockfileInputsKey::for_workspace_id_with_resolution_digest(
+                    workspace_id,
+                    Arc::from("stale-digest"),
+                ),
+            )
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("lockfile input data digest"),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn repo_mappings_key_rejects_stale_resolution_digest() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-repo-mappings-digest"),
@@ -2893,10 +2939,13 @@ mod tests {
         )])?;
         updater.changed_to(vec![(
             BzlmodLockfileInputsDataKey,
-            Arc::new(BzlmodLockfileInputsDataValue::for_workspace(
-                workspace_id.clone(),
-                Arc::new(BzlmodLockfileInputsValue::default()),
-            )),
+            Arc::new(
+                BzlmodLockfileInputsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BzlmodLockfileInputsValue::default()),
+                )
+                .with_resolution_digest(resolution_digest.clone()),
+            ),
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoEnvDataKey,

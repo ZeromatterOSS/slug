@@ -364,9 +364,14 @@ fn module_extension_replay_inputs_identity_digest(
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display("ModuleExtensionReplayInputsKey({})", extension_id)]
+#[display(
+    "ModuleExtensionReplayInputsKey({}, {})",
+    extension_id,
+    resolution_digest
+)]
 pub struct ModuleExtensionReplayInputsKey {
     pub workspace_id: crate::WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub extension_id: Arc<str>,
     pub bzl_transitive_digest: Arc<str>,
     pub usages_digest: Arc<str>,
@@ -387,9 +392,12 @@ impl Key for ModuleExtensionReplayInputsKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let lockfile_inputs = ctx
-            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
+            .compute(
+                &BzlmodLockfileInputsKey::for_workspace_id_with_resolution_digest(
+                    self.workspace_id.clone(),
+                    self.resolution_digest.clone(),
+                ),
+            )
             .await??;
         ModuleExtensionReplayInputsValue::from_lockfile_inputs(
             &self.extension_id,
@@ -496,6 +504,7 @@ async fn extension_spokes_identity_for_aggregation(
     let replay_inputs = ctx
         .compute(&ModuleExtensionReplayInputsKey {
             workspace_id: workspace_id.clone(),
+            resolution_digest: aggregation.resolution_digest.clone(),
             extension_id: aggregation.extension_id.clone(),
             bzl_transitive_digest: Arc::from(bzl_transitive_digest.digest()),
             usages_digest: Arc::from(usages_digest.as_str()),
@@ -583,18 +592,21 @@ async fn extension_spokes_key_for_aggregation(
         bzl_transitive_digest,
     )
     .await?;
-    Ok(ExtensionSpokesKey::for_workspace_id_with_inputs(
-        workspace_id.clone(),
-        identity.extension_id.as_ref(),
-        identity.bzl_transitive_digest.as_ref(),
-        identity.usages_digest.as_ref(),
-        identity.root_module_name.as_ref(),
-        identity.replay_inputs_identity_digest.as_ref(),
-        identity.aggregated.clone(),
-        identity.repo_env.clone(),
-        identity.repo_mappings.clone(),
-        identity.repo_mapping_overrides.clone(),
-    ))
+    Ok(
+        ExtensionSpokesKey::for_workspace_id_with_resolution_digest_and_inputs(
+            workspace_id.clone(),
+            aggregation.resolution_digest.clone(),
+            identity.extension_id.as_ref(),
+            identity.bzl_transitive_digest.as_ref(),
+            identity.usages_digest.as_ref(),
+            identity.root_module_name.as_ref(),
+            identity.replay_inputs_identity_digest.as_ref(),
+            identity.aggregated.clone(),
+            identity.repo_env.clone(),
+            identity.repo_mappings.clone(),
+            identity.repo_mapping_overrides.clone(),
+        ),
+    )
 }
 
 #[async_trait]
@@ -622,6 +634,7 @@ impl Key for BzlmodExtensionAggregationKey {
         };
         Ok(Some(Arc::new(BzlmodExtensionAggregationValue {
             workspace_id: aggregations.workspace_id.clone(),
+            resolution_digest: aggregations.resolution_digest.clone(),
             extension_id: self.extension_id.clone(),
             aggregated: Arc::new(aggregated.clone()),
             root_module_name: Arc::from(aggregations.root_module_name.as_str()),
@@ -904,6 +917,7 @@ impl Key for ExtensionSpokesKey {
     ) -> Self::Value {
         let aggregation = BzlmodExtensionAggregationValue {
             workspace_id: self.workspace_id.clone(),
+            resolution_digest: self.resolution_digest.clone(),
             extension_id: self.extension_id.clone(),
             aggregated: self.aggregated.clone(),
             root_module_name: self.root_module_name.clone(),
@@ -921,6 +935,7 @@ impl Key for ExtensionSpokesKey {
         let replay_inputs = ctx
             .compute(&ModuleExtensionReplayInputsKey {
                 workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
                 extension_id: self.extension_id.clone(),
                 bzl_transitive_digest: self.bzl_transitive_digest.clone(),
                 usages_digest: Arc::from(usages_digest.as_str()),
@@ -3368,6 +3383,7 @@ mod tests {
 
         let aggregation = BzlmodExtensionAggregationValue {
             workspace_id: workspace_id.clone(),
+            resolution_digest: Arc::from(crate::dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
             extension_id: Arc::from(extension_id.as_str()),
             aggregated: Arc::new(data.extension_aggregations[&extension_id].clone()),
             root_module_name: Arc::from("root"),
@@ -3514,6 +3530,7 @@ mod tests {
         let replay_inputs = dice
             .compute(&ModuleExtensionReplayInputsKey {
                 workspace_id,
+                resolution_digest: Arc::from(crate::dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
                 extension_id: Arc::from(extension_id.as_str()),
                 bzl_transitive_digest: Arc::from("bzl-digest"),
                 usages_digest: Arc::from(usages_digest.as_str()),

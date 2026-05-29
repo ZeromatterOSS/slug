@@ -3993,6 +3993,16 @@ impl BzlmodLockfileInputsKey {
         }
     }
 
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+        }
+    }
+
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
@@ -4002,6 +4012,7 @@ impl BzlmodLockfileInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodLockfileInputsDataValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub lockfile_mode: crate::LockfileMode,
     pub hidden_lockfile_path: Option<PathBuf>,
     pub root_module_present: bool,
@@ -4019,6 +4030,7 @@ impl BzlmodLockfileInputsDataValue {
             lockfile_inputs.visible_lockfile.is_some() || lockfile_inputs.hidden_lockfile.is_some();
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             lockfile_mode: lockfile_inputs.lockfile_mode,
             hidden_lockfile_path: lockfile_inputs.hidden_lockfile_path.clone(),
             root_module_present,
@@ -4034,12 +4046,18 @@ impl BzlmodLockfileInputsDataValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             lockfile_mode,
             hidden_lockfile_path,
             root_module_present,
             #[cfg(test)]
             precomputed_lockfile_inputs: None,
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 }
 
@@ -4334,6 +4352,7 @@ impl BzlmodExtensionAggregationsDataValue {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionAggregationValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub extension_id: Arc<str>,
     pub aggregated: Arc<AggregatedExtension>,
     pub root_module_name: Arc<str>,
@@ -4486,6 +4505,15 @@ impl Key for BzlmodLockfileInputsKey {
                  but current bzlmod lockfile input data root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
                 data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodLockfileInputsKey was computed with resolution digest '{}', \
+                 but current bzlmod lockfile input data digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
             ));
         }
         #[cfg(test)]
@@ -5206,8 +5234,9 @@ impl BzlmodExtensionAggregationKey {
 
 #[derive(Clone, Debug, Display, Allocative)]
 #[display(
-    "ExtensionSpokesKey({}, {}, {}, {}, {})",
+    "ExtensionSpokesKey({}, {}, {}, {}, {}, {})",
     workspace_id.stable_hash(),
+    resolution_digest,
     extension_id,
     bzl_transitive_digest,
     usages_digest,
@@ -5215,6 +5244,7 @@ impl BzlmodExtensionAggregationKey {
 )]
 pub struct ExtensionSpokesKey {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub extension_id: Arc<str>,
     pub bzl_transitive_digest: Arc<str>,
     pub usages_digest: Arc<str>,
@@ -5230,6 +5260,7 @@ pub struct ExtensionSpokesKey {
 impl PartialEq for ExtensionSpokesKey {
     fn eq(&self, other: &Self) -> bool {
         self.workspace_id == other.workspace_id
+            && self.resolution_digest == other.resolution_digest
             && self.extension_id == other.extension_id
             && self.bzl_transitive_digest == other.bzl_transitive_digest
             && self.usages_digest == other.usages_digest
@@ -5246,6 +5277,7 @@ impl Eq for ExtensionSpokesKey {}
 impl Hash for ExtensionSpokesKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.workspace_id.hash(state);
+        self.resolution_digest.hash(state);
         self.extension_id.hash(state);
         self.bzl_transitive_digest.hash(state);
         self.usages_digest.hash(state);
@@ -5294,8 +5326,38 @@ impl ExtensionSpokesKey {
         repo_mappings: Arc<crate::RepoMappingSnapshot>,
         repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
     ) -> Self {
+        Self::for_workspace_id_with_resolution_digest_and_inputs(
+            workspace_id,
+            Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+            extension_id,
+            bzl_transitive_digest,
+            usages_digest,
+            root_module_name,
+            replay_inputs_identity_digest,
+            aggregated,
+            repo_env,
+            repo_mappings,
+            repo_mapping_overrides,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn for_workspace_id_with_resolution_digest_and_inputs(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+        extension_id: &str,
+        bzl_transitive_digest: &str,
+        usages_digest: &str,
+        root_module_name: &str,
+        replay_inputs_identity_digest: &str,
+        aggregated: Arc<AggregatedExtension>,
+        repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<crate::RepoMappingSnapshot>,
+        repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+    ) -> Self {
         Self {
             workspace_id,
+            resolution_digest,
             extension_id: Arc::from(extension_id),
             bzl_transitive_digest: Arc::from(bzl_transitive_digest),
             usages_digest: Arc::from(usages_digest),
