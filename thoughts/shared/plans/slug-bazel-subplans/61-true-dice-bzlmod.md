@@ -273,6 +273,21 @@ Current state to preserve:
   extensions. Loaded `.bzl` digest reads now use DICE `ReadFileKey` dependencies
   for root, mapped external, and bzlmod module symlink cells. Lockfile preseed no
   longer seeds extension cells from cached lockfile specs.
+- 2026-05-29 runtime internal/spoke alias provider slice: runtime cell-install
+  snapshots now carry the root module name, so generated-repo internal aliases
+  can exclude root-owned and ambiguous extension repos instead of leaking root
+  aliases globally. Non-root extension hub repos can also get `__` generated
+  repo aliases from the DICE `ExtensionSpokesByExtensionIdKey` producer, scoped
+  to the hub before any replay-affecting DICE lookup. This proved the
+  `rules_rs` crate hub path in `/var/mnt/dev/zeromatter-kuro` without broadening
+  mapped-extension replay: `deps(@crates//:serde-1.0.228, 1)` resolves
+  `@crates__serde-1.0.228` to
+  `rules_rs++crate+crates__serde-1.0.228`, and
+  `//lib/zm_allocator:zm_allocator` builds. The current focused replay subset
+  is `3 failed, 2 passed`: the mapped external edit/delete replay selectors
+  pass, while hidden lockfile edit, hidden facts edit, and extension tag attr
+  edit still replay stale state. Treat those three as the next replay input
+  blockers, not as regressions from this alias-provider slice.
 - 2026-05-28 probe: simply passing an empty digest map to lockfile spoke
   preseed is not viable. `test_valid_lockfile_replay_materializes_generated_repo_without_extension_eval`
   still passed, but `test_lockfile_replay_recorded_file_input_edit_rejects_cache`
@@ -1086,14 +1101,19 @@ hardening behavior around it.
      DICE-produced `RepoSpec` metadata when extension execution has produced
      spokes; warm missing-lockfile no-op builds reuse that setup instead of
      re-entering extension evaluation.
-   - Current evidence:
-     `cargo build -p slug`;
-     `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (155 passed);
-     `cargo test -p slug_bzlmod --lib` (401 passed);
-     `cargo test -p slug_common bzlmod` (15 passed);
-     `cargo test -p slug_external_cells` (10 passed plus doctests);
-     `cargo test -p slug_file_watcher --lib` (11 passed);
-     `cargo test -p slug_interpreter_for_build --lib` (125 passed).
+   - Current evidence for the latest runtime alias-provider slice:
+     `cargo fmt`; `cargo test -p slug_common bzlmod` (15 passed);
+     `cargo test -p slug_core bzlmod_runtime_snapshot_` (9 passed);
+     `cargo test -p slug_analysis metadata_owner_scoped_internal_alias_uses_runtime_snapshot_without_root_alias_conflict`
+     (1 passed); `cargo build -p slug`; Kuro uquery for
+     `deps(@crates//:serde-1.0.228, 1)` resolves the generated serde repo to
+     `rules_rs++crate+crates__serde-1.0.228`; and Kuro
+     `//lib/zm_allocator:zm_allocator` reaches `BUILD SUCCEEDED` with no grep
+     matches for `StableCrateId` or the old `gen/crates__serde-1.0.228` path.
+     `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q`
+     on the five focused replay selectors currently reports `3 failed, 2
+     passed`: mapped external edit/delete pass; hidden lockfile edit, hidden
+     facts edit, and extension tag attr edit remain open replay blockers.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path, projection bridge key, and direct cell-graph
      parser are removed; remaining proof belongs on the named graph, replay,

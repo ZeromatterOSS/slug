@@ -132,6 +132,7 @@ fn runtime_cell_install_snapshot(
     cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
 ) -> slug_core::cells::BzlmodRuntimeCellInstallSnapshot {
     let mut snapshot = slug_core::cells::BzlmodRuntimeCellInstallSnapshot::default();
+    snapshot.root_module_name = Some(cell_graph.root_module_name.clone());
     snapshot
         .extension_cells
         .extend(cell_graph.extension_cells.iter().map(|cell| {

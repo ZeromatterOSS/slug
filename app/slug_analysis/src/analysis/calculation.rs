@@ -1761,6 +1761,7 @@ mod tests {
         let canonical = "plan61_owner++settings+generated";
         let wrong_global = "plan61_wrong_owner++settings+wrong_generated";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {

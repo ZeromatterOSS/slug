@@ -258,6 +258,7 @@ pub struct BzlmodRuntimeDynamicAlias {
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct BzlmodRuntimeCellInstallSnapshot {
+    pub root_module_name: Option<String>,
     pub extension_cells: Vec<BzlmodRuntimeExtensionCell>,
     pub scoped_aliases: Vec<BzlmodRuntimeScopedRepoAlias>,
     pub dynamic_aliases: Vec<BzlmodRuntimeDynamicAlias>,
@@ -293,12 +294,33 @@ impl BzlmodRuntimeAliasResolver {
             .iter()
             .map(|cell| cell.canonical_name.clone())
             .collect();
-        let extension_cell_internal_names = snapshot
+        let mut extension_cell_internal_names = HashMap::new();
+        let mut duplicate_internal_names = HashSet::new();
+        for cell in snapshot
             .extension_cells
             .iter()
             .filter(|cell| cell.internal_name != cell.canonical_name)
-            .map(|cell| (cell.internal_name.clone(), cell.canonical_name.clone()))
-            .collect();
+            .filter(|cell| {
+                !extension_id_is_root_owned(
+                    cell.setup.extension_id.as_ref(),
+                    snapshot.root_module_name.as_deref(),
+                )
+            })
+        {
+            match extension_cell_internal_names.entry(cell.internal_name.clone()) {
+                hash_map::Entry::Occupied(entry) => {
+                    if entry.get() != &cell.canonical_name {
+                        duplicate_internal_names.insert(cell.internal_name.clone());
+                    }
+                }
+                hash_map::Entry::Vacant(entry) => {
+                    entry.insert(cell.canonical_name.clone());
+                }
+            }
+        }
+        for duplicate in duplicate_internal_names {
+            extension_cell_internal_names.remove(&duplicate);
+        }
         Arc::new(Self {
             scoped_aliases,
             dynamic_aliases,
@@ -309,6 +331,12 @@ impl BzlmodRuntimeAliasResolver {
 
     fn resolve_dynamic_alias(&self, apparent_name: &str) -> Option<String> {
         self.dynamic_aliases.get(apparent_name).cloned()
+    }
+
+    fn resolve_internal_extension_alias(&self, apparent_name: &str) -> Option<String> {
+        self.extension_cell_internal_names
+            .get(apparent_name)
+            .cloned()
     }
 
     fn canonicalize_current_cell(&self, current_cell: &str) -> Option<String> {
@@ -325,6 +353,22 @@ impl BzlmodRuntimeAliasResolver {
     fn has_extension_cell(&self, name: &str) -> bool {
         self.extension_cell_names.contains(name)
     }
+}
+
+fn extension_id_is_root_owned(extension_id: &str, root_module_name: Option<&str>) -> bool {
+    let bzl_part = extension_id.split('%').next().unwrap_or(extension_id);
+    if bzl_part.starts_with("//") {
+        return true;
+    }
+    let stripped = bzl_part
+        .strip_prefix("@@")
+        .or_else(|| bzl_part.strip_prefix('@'))
+        .unwrap_or(bzl_part);
+    let Some(pos) = stripped.find("//") else {
+        return true;
+    };
+    let module = &stripped[..pos];
+    module == "_main" || root_module_name.is_some_and(|root| module == root)
 }
 
 #[derive(Debug)]
@@ -1685,6 +1729,13 @@ impl CellAliasResolver {
             }
         }
 
+        if let Some(canonical_name) = self.resolve_internal_extension_cell_alias_from_runtime(alias)
+        {
+            if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
+                return Some(cell_name);
+            }
+        }
+
         if self.has_bzlmod_runtime_extension_cell(alias) {
             if let Ok(cell_name) = CellName::unchecked_new(alias) {
                 return Some(cell_name);
@@ -1761,6 +1812,13 @@ impl CellAliasResolver {
                     .then(|| process_global_dynamic_extension_alias_fallback(alias))
                     .flatten()
             })
+        {
+            if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
+                return Ok(cell_name);
+            }
+        }
+
+        if let Some(canonical_name) = self.resolve_internal_extension_cell_alias_from_runtime(alias)
         {
             if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
                 return Ok(cell_name);
@@ -1857,6 +1915,12 @@ impl CellAliasResolver {
         self.bzlmod_runtime_aliases
             .as_ref()
             .and_then(|runtime_aliases| runtime_aliases.resolve_dynamic_alias(alias))
+    }
+
+    fn resolve_internal_extension_cell_alias_from_runtime(&self, alias: &str) -> Option<String> {
+        self.bzlmod_runtime_aliases
+            .as_ref()
+            .and_then(|runtime_aliases| runtime_aliases.resolve_internal_extension_alias(alias))
     }
 
     fn has_bzlmod_runtime_extension_cell(&self, name: &str) -> bool {
@@ -3288,6 +3352,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![
                 BzlmodRuntimeExtensionCell {
                     canonical_name: canonical.to_owned(),
@@ -3427,6 +3492,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![BzlmodRuntimeExtensionCell {
                 canonical_name: canonical.to_owned(),
                 internal_name: "generated".to_owned(),
@@ -3736,6 +3802,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![BzlmodRuntimeExtensionCell {
                 canonical_name: "rules_rs++crate+crates".to_owned(),
                 internal_name: "crates".to_owned(),
@@ -3753,6 +3820,141 @@ mod tests {
         assert_eq!(
             aliases.resolve_declared_or_runtime_alias("rules_rs"),
             Some(CellName::testing_new("rules_rs+"))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_runtime_snapshot_resolves_unique_internal_extension_repo_name()
+    -> slug_error::Result<()> {
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from("rules_rs++crate+crates__serde-1.0.228"),
+            extension_id: Arc::from("@rules_rs//rs:extensions.bzl%crate"),
+            internal_name: Arc::from("crates__serde-1.0.228"),
+            spec_hash: Arc::from("sha256-serde"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: "rules_rs++crate+crates__serde-1.0.228".to_owned(),
+                internal_name: "crates__serde-1.0.228".to_owned(),
+                path: "bazel-external/rules_rs++crate+crates__serde-1.0.228".to_owned(),
+                setup,
+            }],
+            ..Default::default()
+        };
+        let aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(
+            aliases.resolve_declared_or_runtime_alias("crates__serde-1.0.228"),
+            Some(CellName::testing_new(
+                "rules_rs++crate+crates__serde-1.0.228"
+            ))
+        );
+        assert_eq!(
+            aliases.resolve("crates__serde-1.0.228")?,
+            CellName::testing_new("rules_rs++crate+crates__serde-1.0.228")
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_runtime_snapshot_ignores_ambiguous_internal_extension_repo_name()
+    -> slug_error::Result<()> {
+        let first_setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from("first_owner++crate+generated"),
+            extension_id: Arc::from("@first_owner//:extensions.bzl%crate"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-first"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let second_setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from("second_owner++crate+generated"),
+            extension_id: Arc::from("@second_owner//:extensions.bzl%crate"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-second"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            extension_cells: vec![
+                BzlmodRuntimeExtensionCell {
+                    canonical_name: "first_owner++crate+generated".to_owned(),
+                    internal_name: "generated".to_owned(),
+                    path: "bazel-external/first_owner++crate+generated".to_owned(),
+                    setup: first_setup,
+                },
+                BzlmodRuntimeExtensionCell {
+                    canonical_name: "second_owner++crate+generated".to_owned(),
+                    internal_name: "generated".to_owned(),
+                    path: "bazel-external/second_owner++crate+generated".to_owned(),
+                    setup: second_setup,
+                },
+            ],
+            ..Default::default()
+        };
+        let aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(aliases.resolve_declared_or_runtime_alias("generated"), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_runtime_snapshot_ignores_root_internal_extension_repo_name() -> slug_error::Result<()>
+    {
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from("plan61_root++replay_ext+replayed_repo"),
+            extension_id: Arc::from("@plan61_root//:replay_ext.bzl%replay_ext"),
+            internal_name: Arc::from("replayed_repo"),
+            spec_hash: Arc::from("sha256-replayed"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: Some("plan61_root".to_owned()),
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: "plan61_root++replay_ext+replayed_repo".to_owned(),
+                internal_name: "replayed_repo".to_owned(),
+                path: "bazel-external/plan61_root++replay_ext+replayed_repo".to_owned(),
+                setup,
+            }],
+            ..Default::default()
+        };
+        let aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("root"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+
+        assert_eq!(
+            aliases.resolve_declared_or_runtime_alias("replayed_repo"),
+            None
         );
 
         Ok(())
@@ -3940,6 +4142,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![BzlmodRuntimeExtensionCell {
                 canonical_name: canonical.to_owned(),
                 internal_name: "generated".to_owned(),

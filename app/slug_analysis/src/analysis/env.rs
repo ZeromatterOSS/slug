@@ -2365,22 +2365,31 @@ impl<'a> MetadataLabelContext<'a> {
         apparent_cell: &str,
     ) -> Option<String> {
         if let Some(cell_resolver) = self.cell_resolver {
-            if let Ok(owner_cell_name) = CellName::unchecked_new(owner_cell)
-                && let Ok(owner_aliases) =
-                    slug_core::cells::CellAliasResolver::new_for_non_root_cell(
-                        owner_cell_name,
-                        cell_resolver.root_cell_cell_alias_resolver(),
-                        std::iter::empty::<(
-                            slug_core::cells::alias::NonEmptyCellAlias,
-                            slug_core::cells::alias::NonEmptyCellAlias,
-                        )>(),
-                    )
-                && let Some(resolved) =
-                    owner_aliases.resolve_declared_or_runtime_alias(apparent_cell)
-            {
-                return Some(resolved.as_str().to_owned());
-            }
-            return None;
+            let root_aliases = cell_resolver.root_cell_cell_alias_resolver();
+            let Ok(owner_cell_name) = CellName::unchecked_new(owner_cell) else {
+                return None;
+            };
+            let owner_aliases = if root_aliases.has_bzlmod_runtime_alias_snapshot() {
+                slug_core::cells::CellAliasResolver::new_bzlmod_for_non_root_cell(
+                    owner_cell_name,
+                    root_aliases,
+                    HashMap::new(),
+                )
+            } else {
+                slug_core::cells::CellAliasResolver::new_for_non_root_cell(
+                    owner_cell_name,
+                    root_aliases,
+                    std::iter::empty::<(
+                        slug_core::cells::alias::NonEmptyCellAlias,
+                        slug_core::cells::alias::NonEmptyCellAlias,
+                    )>(),
+                )
+            };
+            return owner_aliases.ok().and_then(|aliases| {
+                aliases
+                    .resolve_declared_or_runtime_alias(apparent_cell)
+                    .map(|resolved| resolved.as_str().to_owned())
+            });
         }
 
         self.process_global_scoped_dynamic_extension_cell_name(owner_cell, apparent_cell)
@@ -5760,6 +5769,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![BzlmodRuntimeExtensionCell {
                 canonical_name: canonical.to_owned(),
                 internal_name: "generated".to_owned(),
@@ -5872,6 +5882,7 @@ mod tests {
             wrong_global.to_owned(),
         );
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
                 owner_module: "plan61_owner+".to_owned(),
@@ -5935,6 +5946,92 @@ mod tests {
             .cell_name(),
             CellName::testing_new(wrong_global)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_owner_scoped_internal_alias_uses_runtime_snapshot_without_root_alias_conflict()
+    -> slug_error::Result<()> {
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let hub = "rules_rs++crate+crates";
+        let serde = "rules_rs++crate+crates__serde-1.0.228";
+        let hub_setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(hub),
+            extension_id: Arc::from("@rules_rs//rs:extensions.bzl%crate"),
+            internal_name: Arc::from("crates"),
+            spec_hash: Arc::from("sha256-plan61-crate-hub"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let serde_setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(serde),
+            extension_id: Arc::from("@rules_rs//rs:extensions.bzl%crate"),
+            internal_name: Arc::from("crates__serde-1.0.228"),
+            spec_hash: Arc::from("sha256-plan61-serde"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
+            extension_cells: vec![
+                BzlmodRuntimeExtensionCell {
+                    canonical_name: hub.to_owned(),
+                    internal_name: "crates".to_owned(),
+                    path: format!("bazel-external/{hub}"),
+                    setup: hub_setup,
+                },
+                BzlmodRuntimeExtensionCell {
+                    canonical_name: serde.to_owned(),
+                    internal_name: "crates__serde-1.0.228".to_owned(),
+                    path: format!("bazel-external/{serde}"),
+                    setup: serde_setup,
+                },
+            ],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: Vec::new(),
+        };
+        let mut root_aliases = HashMap::new();
+        root_aliases.insert(
+            slug_core::cells::alias::NonEmptyCellAlias::new("crates".to_owned())?,
+            CellName::testing_new(hub),
+        );
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            root_aliases,
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+        )?;
+
+        let owner_label = TargetLabel::testing_parse("@crates//:serde-1.0.228");
+        let label = TargetLabel::testing_parse("@crates__serde-1.0.228//:serde");
+        let resolved = metadata_canonicalize_label_for_owner(
+            &owner_label,
+            label,
+            MetadataLabelContext::new(Some(&resolver)),
+        );
+
+        assert_eq!(resolved.pkg().cell_name(), CellName::testing_new(serde));
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+        let path =
+            metadata_path_for_label(&resolved, &cfg, MetadataLabelContext::new(Some(&resolver)));
+        assert!(path.contains(&format!("external/{serde}/serde")));
         Ok(())
     }
 
@@ -6088,6 +6185,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![BzlmodRuntimeExtensionCell {
                 canonical_name: canonical.to_owned(),
                 internal_name: "generated".to_owned(),
@@ -6212,6 +6310,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![BzlmodRuntimeExtensionCell {
                 canonical_name: canonical.to_owned(),
                 internal_name: "generated".to_owned(),

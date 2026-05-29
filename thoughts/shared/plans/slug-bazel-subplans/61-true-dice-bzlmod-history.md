@@ -4202,3 +4202,42 @@ What did not work or remains risky:
   slug_bzlmod -p slug_interpreter_for_build`, `cargo build -p slug`, and the
   explicit-binary Plan 61 replay/invalidation selector (`5 passed, 151
   deselected`).
+- 2026-05-29 runtime internal/spoke alias provider slice: while replacing the
+  process-global alias bridge, Kuro exposed a real non-root generated-repo alias
+  gap: `@crates//:serde-1.0.228` could see the crate hub but resolved
+  `@crates__serde-1.0.228` to the apparent `crates__...` cell instead of
+  `rules_rs++crate+crates__serde-1.0.228`. The accepted shape is not a legacy
+  resolver wrapper: `BzlmodRuntimeCellInstallSnapshot` now carries
+  `root_module_name`, runtime internal generated-repo aliases are unique-only
+  and exclude root-owned extension IDs, and `CellAliasResolverKey` augments
+  non-root extension hub repos with DICE-produced `ExtensionSpokesByExtensionIdKey`
+  aliases for internal generated repo names containing `__`. The hub filter runs
+  before any replay-affecting DICE lookup, and spokes are fetched by extension
+  ID/current loaded `.bzl` digest rather than through a stale digest from the
+  runtime cell setup. An abandoned replay-only key and broad spoke helper were
+  removed after they either duplicated replay plumbing or caused mapped
+  external helper edit/delete guardrails to replay stale lockfile state.
+  Validation passed with `cargo fmt`, `cargo test -p slug_common bzlmod`,
+  `cargo test -p slug_core bzlmod_runtime_snapshot_`, `cargo test -p
+  slug_analysis metadata_owner_scoped_internal_alias_uses_runtime_snapshot_without_root_alias_conflict`,
+  `cargo build -p slug`, and focused mapped replay selectors:
+  `test_mapped_external_extension_bzl_load_edit_rejects_replay` and
+  `test_mapped_external_extension_bzl_load_deletion_rejects_replay` (2 passed).
+  Kuro validation used `/var/mnt/dev/slug/target/debug/slug --isolation-dir
+  slug-plan61-query-hub-helper-final uquery 'deps(@crates//:serde-1.0.228, 1)'`
+  and produced `rules_rs++crate+crates//:serde-1.0.228` plus
+  `rules_rs++crate+crates__serde-1.0.228//:serde`; log:
+  `/var/mnt/dev/.slug-tmp/slug-plan61-uquery-serde-deps-hub-helper-final.log`.
+  The focused Kuro build
+  `--isolation-dir slug-plan61-spoke-alias-final3 build //lib/zm_allocator:zm_allocator`
+  reached `BUILD SUCCEEDED`; grep of
+  `/var/mnt/dev/.slug-tmp/slug-plan61-zm-allocator-spoke-alias-final3.log`
+  found only `BUILD SUCCEEDED`, with no `StableCrateId`, `--extern=serde`,
+  stale `gen/crates__serde-1.0.228`, or expected canonical generated path
+  matches. The current five-selector replay subset with
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug` is `3 failed, 2
+  passed`: mapped external edit/delete pass, while
+  `test_hidden_lockfile_edit_invalidates_replay_in_same_daemon`,
+  `test_hidden_lockfile_facts_create_edit_delete_are_observed`, and
+  `test_extension_tag_attr_edit_invalidates_or_rejects_replay` still replay
+  stale state and remain the next root replay input blockers.

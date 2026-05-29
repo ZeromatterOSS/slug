@@ -24,6 +24,8 @@ use dice::Key;
 use dupe::Dupe;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::CellResolver;
+use slug_core::cells::alias::NonEmptyCellAlias;
+use slug_core::cells::external::ExternalCellOrigin;
 use slug_core::cells::name::CellName;
 use slug_core::fs::project_rel_path::ProjectRelativePath;
 
@@ -127,6 +129,71 @@ impl HasCellResolver for DiceComputations<'_> {
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
 struct CellAliasResolverKey(CellName);
 
+async fn bzlmod_extension_spoke_aliases(
+    ctx: &mut DiceComputations<'_>,
+    resolver: &CellResolver,
+    current: CellName,
+) -> slug_error::Result<Vec<(NonEmptyCellAlias, CellName)>> {
+    let Ok(instance) = resolver.get(current) else {
+        return Ok(Vec::new());
+    };
+    let Some(ExternalCellOrigin::ExtensionRepo(setup)) = instance.external() else {
+        return Ok(Vec::new());
+    };
+    let extension_name = slug_bzlmod::extract_extension_name(setup.extension_id.as_ref());
+    if setup.internal_name.as_ref() != extension_name
+        && setup.internal_name.as_ref() != format!("{extension_name}s")
+    {
+        return Ok(Vec::new());
+    }
+    let workspace_id = slug_bzlmod::bzlmod_workspace_id_for_current_workspace(ctx).await?;
+    let aggregation = ctx
+        .compute(&slug_bzlmod::BzlmodExtensionAggregationKey {
+            workspace_id: workspace_id.clone(),
+            extension_id: setup.extension_id.clone(),
+        })
+        .await??;
+    let Some(aggregation) = aggregation else {
+        return Ok(Vec::new());
+    };
+    if slug_bzlmod::extract_owning_module(
+        setup.extension_id.as_ref(),
+        aggregation.root_module_name.as_ref(),
+    ) == "_main"
+    {
+        return Ok(Vec::new());
+    }
+    let spokes = ctx
+        .compute(
+            &slug_bzlmod::ExtensionSpokesByExtensionIdKey::for_workspace_id(
+                workspace_id,
+                setup.extension_id.as_ref(),
+            ),
+        )
+        .await??;
+    let Some(spokes) = spokes else {
+        return Ok(Vec::new());
+    };
+
+    let mut aliases = Vec::new();
+    for spoke in spokes.iter() {
+        if spoke.internal_name == spoke.canonical_name {
+            continue;
+        }
+        if !spoke.internal_name.contains("__") {
+            continue;
+        }
+        let Ok(alias) = NonEmptyCellAlias::new(spoke.internal_name.to_string()) else {
+            continue;
+        };
+        let Ok(canonical) = CellName::unchecked_new(spoke.canonical_name.as_ref()) else {
+            continue;
+        };
+        aliases.push((alias, canonical));
+    }
+    Ok(aliases)
+}
+
 #[async_trait]
 impl Key for CellAliasResolverKey {
     type Value = slug_error::Result<CellAliasResolver>;
@@ -168,6 +235,11 @@ impl Key for CellAliasResolverKey {
             };
             canonical_aliases
                 .extend(resolver.bzlmod_same_extension_internal_aliases(current.as_str()));
+            canonical_aliases.extend(
+                bzlmod_extension_spoke_aliases(ctx, &resolver, current)
+                    .await?
+                    .into_iter(),
+            );
             return CellAliasResolver::new_bzlmod_for_non_root_cell(
                 current,
                 root_aliases,
@@ -224,6 +296,8 @@ mod tests {
 
     use dice::UserComputationData;
     use dice::testing::DiceBuilder;
+    use slug_bzlmod::SetBzlmodDiceInputs;
+    use slug_bzlmod::WorkspaceId;
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
     use slug_core::cells::BzlmodRuntimeExtensionCell;
@@ -276,6 +350,7 @@ mod tests {
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: vec![BzlmodRuntimeExtensionCell {
                 canonical_name: canonical.to_owned(),
                 internal_name: "generated".to_owned(),
@@ -327,6 +402,10 @@ mod tests {
         let mut updater = dice.into_updater();
         updater.set_cell_resolver(resolver)?;
         updater.set_is_bzlmod(true)?;
+        updater.set_empty_bzlmod_dice_inputs_for_workspace(WorkspaceId::new(
+            tmp.path().to_path_buf(),
+            tmp.path().join("buck-out"),
+        ))?;
         let mut dice = updater.commit().await;
 
         let aliases = dice.get_cell_alias_resolver(dep).await?;
