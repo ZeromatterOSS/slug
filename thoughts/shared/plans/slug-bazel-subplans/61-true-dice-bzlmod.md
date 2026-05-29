@@ -2166,6 +2166,18 @@ hardening behavior around it.
      surface on invalid inputs. Validation: `cargo test -p
      slug_interpreter_for_build test_repository_path_readdir_rejects_non_directory
      --lib -- --nocapture`.
+   - 2026-05-29 extension-repo delegate existence DICE read:
+     `extension_repo::get_file_ops_delegate(...)` no longer calls direct
+     `Path::exists()` after repo-rule, `use_repo_rule`, or extension-spoke
+     materialization. Those post-execution repository-presence checks now
+     read `bazel-external/<repo>` metadata through
+     `DiceFileComputations::read_project_path_metadata_if_exists(...)` and
+     emit `repo_materialization_state_read`, leaving the materialization
+     manifest/DICE reader path as the authority for extension-repo reuse.
+     Guardrails: `cargo test -p slug_external_cells
+     materialized_extension_repo_exists_uses_dice_project_metadata --lib -- --nocapture`;
+     `cargo test -p slug_external_cells --lib`; `cargo check -p
+     slug_external_cells`.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
