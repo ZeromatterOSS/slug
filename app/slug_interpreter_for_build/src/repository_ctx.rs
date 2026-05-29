@@ -2357,12 +2357,15 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     Ok(s.to_owned())
                 } else if let Some(repo_path) = v.downcast_ref::<RepositoryPath>() {
                     // RepositoryPath: use absolute path
-                    Ok(repo_path.absolute_path().to_string_lossy().to_string())
+                    let path = repo_path.absolute_path();
+                    repository_ctx_maybe_record_file_input(this, &path, "auto")?;
+                    Ok(path.to_string_lossy().to_string())
                 } else if v.get_type() == "Label" {
                     // Label: resolve to filesystem path via cell paths
                     let label_str = v.to_str();
                     let path = this.resolve_label_to_filesystem_path(&label_str)?;
                     ensure_label_path_materialized(&path);
+                    repository_ctx_maybe_record_file_input(this, &path, "auto")?;
                     Ok(path.to_string_lossy().to_string())
                 } else {
                     // Other: convert to string

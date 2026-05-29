@@ -309,10 +309,13 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                     let label_str = v.to_str();
                     let path = resolve_module_ctx_label(this, &label_str, "module_ctx.execute()")?;
                     ensure_label_path_materialized(&path);
+                    this.maybe_record_file_input(&path, ShouldWatch::Auto)?;
                     Ok(path.to_string_lossy().to_string())
                 } else if let Some(rp) = v.downcast_ref::<crate::repository_ctx::RepositoryPath>() {
                     // RepositoryPath objects (from mctx.path()) → extract path string
-                    Ok(rp.path_str().to_owned())
+                    let path = rp.absolute_path();
+                    this.maybe_record_file_input(&path, ShouldWatch::Auto)?;
+                    Ok(path.to_string_lossy().to_string())
                 } else {
                     Ok(v.unpack_str()
                         .map(|s| s.to_owned())

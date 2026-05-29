@@ -2162,6 +2162,13 @@ hardening behavior around it.
      `git_repository(branch = ...)` guardrail also proves an out-of-workspace
      local branch ref update rematerializes the generated repo instead of
      reusing stale checked-out contents.
+   - `repository_ctx.execute([... Label(...) ...])` and
+     `module_ctx.execute([... Label(...) ...])` now record resolved label and
+     `RepositoryPath` arguments as auto-watched inputs before spawning the
+     command. This closes the replay hole where a command read a label-resolved
+     script while later replay had no dependency on that script file. Focused
+     guardrails prove script edits rematerialize Starlark repositories and
+     re-execute module extensions.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
