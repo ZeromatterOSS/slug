@@ -2158,6 +2158,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             this.resolve_path(&output_str)
         };
 
+        repository_ctx_record_unpinned_download_file_url_inputs(this, &urls, sha256, integrity)?;
         match perform_download_to_path(
             &urls,
             &output_path,
@@ -2251,6 +2252,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let rename_files =
             parse_rename_files(rename_files, "repository_ctx.download_and_extract()")?;
 
+        repository_ctx_record_unpinned_download_file_url_inputs(this, &urls, sha256, integrity)?;
         match perform_download_and_extract_to_dir(
             &urls,
             &output_dir,
@@ -3112,6 +3114,22 @@ fn repository_ctx_maybe_record_file_input(
         }
         RepositoryCtxWatchMode::Yes | RepositoryCtxWatchMode::Auto => this.record_file_input(path),
     }
+}
+
+fn repository_ctx_record_unpinned_download_file_url_inputs(
+    this: &RepositoryContext,
+    urls: &[String],
+    sha256: &str,
+    integrity: &str,
+) -> starlark::Result<()> {
+    for path in slug_bzlmod::unpinned_local_file_url_paths(
+        urls.iter().map(String::as_str),
+        Some(sha256),
+        Some(integrity),
+    ) {
+        this.record_file_input(&path)?;
+    }
+    Ok(())
 }
 
 #[starlark_value(type = "repository_ctx")]

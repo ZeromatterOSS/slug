@@ -8111,6 +8111,67 @@ use_repo(patch_ext, "patch_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_download_file_url_edit_reexecutes_extension(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext.download records unpinned file URLs."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_download_file_url_ext+download_repo"
+    payload = buck.cwd / "module_download_payload.txt"
+    _write(payload, "first\n")
+    _write(
+        buck.cwd / "module_download_file_url_ext.bzl",
+        f"""def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+download_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {{"payload": attr.string()}},
+)
+
+def _module_download_file_url_ext_impl(module_ctx):
+    module_ctx.download(
+        url = "{payload.as_uri()}",
+        output = "downloaded.txt",
+    )
+    download_repo_rule(name = "download_repo", payload = module_ctx.read("downloaded.txt"))
+
+module_download_file_url_ext = module_extension(
+    implementation = _module_download_file_url_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_download_file_url_input")
+
+download = use_extension("//:module_download_file_url_ext.bzl", "module_download_file_url_ext")
+use_repo(download, "download_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_download_repo",
+    srcs = ["@download_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_download_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    _write(payload, "second\n")
+    await buck.build("//:uses_download_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_watch_tree_label_fails_directly_for_non_directory(
     buck: Buck,
 ) -> None:
@@ -8613,6 +8674,71 @@ use_repo(repo_download_extract, "repo_download_extract_repo")
     assert not (repo_dir / "pkg" / "data.txt").exists()
     assert not (repo_dir / "outside" / "ignored.txt").exists()
     assert not (repo_dir / "ness" / "false-prefix.txt").exists()
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_download_file_url_edit_rematerializes_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkBaseExternalContext.download and RepoRecordedInput.File."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+repo_download_file_url_ext+download_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    payload = buck.cwd / "repo_download_payload.txt"
+    _write(payload, "first\n")
+    _write(
+        buck.cwd / "repo_download_file_url_ext.bzl",
+        f"""def _repo_impl(repository_ctx):
+    repository_ctx.download(
+        url = "{payload.as_uri()}",
+        output = "data.txt",
+    )
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+download_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_download_file_url_ext_impl(module_ctx):
+    download_repo_rule(name = "download_repo")
+
+repo_download_file_url_ext = module_extension(
+    implementation = _repo_download_file_url_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_download_file_url_input")
+
+download = use_extension("//:repo_download_file_url_ext.bzl", "repo_download_file_url_ext")
+use_repo(download, "download_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_download_repo",
+    srcs = ["@download_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_download_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write(payload, "second\n")
+
+    await buck.build("//:uses_download_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -10469,6 +10595,53 @@ http_archive(
     )
 
     await buck.build("//:uses_patched_archive")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_native_http_archive_file_url_edit_rematerializes_repo_without_checksum(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: DownloadManager and RepoRecordedInput.File."""
+    repo_dir = buck.cwd / "bazel-external" / "+http_archive+native_download_archive"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    archive = buck.cwd / "archive.zip"
+    _write_zip(archive, {"data.txt": "first\n"})
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_native_http_archive_file_url_input")
+
+http_archive = use_repo_rule("@@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "native_download_archive",
+    url = "{archive.as_uri()}",
+    build_file_content = "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_native_download_archive",
+    srcs = ["@native_download_archive//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_native_download_archive")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write_zip(archive, {"data.txt": "second\n"})
+
+    await buck.build("//:uses_native_download_archive")
     second = await _bzlmod_counters(buck)
 
     assert (repo_dir / "data.txt").read_text() == "second\n"

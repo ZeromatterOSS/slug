@@ -2129,6 +2129,16 @@ hardening behavior around it.
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not
      reused across distinct non-empty canonical ids.
+   - Unpinned local `file://` downloads now record their source files as replay
+     inputs in `repository_ctx.download*`, `module_ctx.download*`, and native
+     `http_archive`/`http_file`/`http_jar`, while checksum/integrity-pinned
+     downloads keep using the checksum as content identity. Same-daemon
+     guardrails prove source edits re-execute module extensions and
+     rematerialize Starlark and native repositories instead of accepting stale
+     downloaded output. Validation passed with the focused three-selector Plan
+     61 run (`3 passed, 164 deselected`), `cargo test -p slug_bzlmod --lib`
+     (`422 passed`), `cargo build -p slug`, and the full Plan 61 Python suite
+     (`167 passed`).
    - `repository_ctx.which(...)` now uses the effective repo-env `PATH` instead
      of host process `PATH` and records `ENV:PATH`, so PATH changes are
      materialization inputs instead of ambient host state.

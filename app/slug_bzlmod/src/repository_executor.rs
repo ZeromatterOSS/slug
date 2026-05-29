@@ -72,6 +72,21 @@ impl NativeRepositoryRecordedInputs {
         self.inputs.push(input);
         Ok(())
     }
+
+    fn record_unpinned_file_urls(
+        &mut self,
+        invocation: &RepositoryInvocation,
+        urls: &[String],
+        sha256: Option<&str>,
+        integrity: Option<&str>,
+    ) -> slug_error::Result<()> {
+        for path in
+            crate::unpinned_local_file_url_paths(urls.iter().map(String::as_str), sha256, integrity)
+        {
+            self.record_file(invocation, &path)?;
+        }
+        Ok(())
+    }
 }
 
 /// Execute a repository rule invocation using legacy marker reuse.
@@ -167,8 +182,8 @@ fn execute_repository_rule_impl(
             label_resolution,
             &mut recorded_inputs,
         ),
-        "http_file" => execute_http_file(invocation, &attrs, &working_dir),
-        "http_jar" => execute_http_jar(invocation, &attrs, &working_dir),
+        "http_file" => execute_http_file(invocation, &attrs, &working_dir, &mut recorded_inputs),
+        "http_jar" => execute_http_jar(invocation, &attrs, &working_dir, &mut recorded_inputs),
         "git_repository" => execute_git_repository(invocation, &attrs, &working_dir),
         "local_repository" | "new_local_repository" => {
             execute_local_repository(invocation, &attrs, &working_dir)
@@ -576,6 +591,7 @@ fn execute_http_archive(
     let integrity = attrs.get_optional_string("integrity");
     let canonical_id = attrs.get_optional_string("canonical_id");
     let strip_prefix = attrs.get_optional_string("strip_prefix");
+    recorded_inputs.record_unpinned_file_urls(invocation, &urls, sha256, integrity)?;
 
     // Try each URL until one succeeds
     let mut last_error = None;
@@ -878,6 +894,7 @@ fn execute_http_file(
     invocation: &RepositoryInvocation,
     attrs: &InvocationAttrs,
     working_dir: &Path,
+    recorded_inputs: &mut NativeRepositoryRecordedInputs,
 ) -> slug_error::Result<()> {
     let urls = get_urls(attrs)?;
     if urls.is_empty() {
@@ -894,6 +911,12 @@ fn execute_http_file(
     let downloaded_file_path = attrs
         .get_optional_string("downloaded_file_path")
         .unwrap_or("downloaded");
+    recorded_inputs.record_unpinned_file_urls(
+        invocation,
+        &urls,
+        sha256.as_deref(),
+        integrity.as_deref(),
+    )?;
 
     // Download the file
     let mut last_error = None;
@@ -994,6 +1017,7 @@ fn execute_http_jar(
     invocation: &RepositoryInvocation,
     attrs: &InvocationAttrs,
     working_dir: &Path,
+    recorded_inputs: &mut NativeRepositoryRecordedInputs,
 ) -> slug_error::Result<()> {
     let urls = get_urls(attrs)?;
     if urls.is_empty() {
@@ -1007,6 +1031,12 @@ fn execute_http_jar(
     let sha256 = attrs.get_optional_string("sha256");
     let integrity = attrs.get_optional_string("integrity");
     let canonical_id = attrs.get_optional_string("canonical_id");
+    recorded_inputs.record_unpinned_file_urls(
+        invocation,
+        &urls,
+        sha256.as_deref(),
+        integrity.as_deref(),
+    )?;
 
     // Download the jar
     let mut last_error = None;

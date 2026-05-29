@@ -205,6 +205,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             PathBuf::from(output)
         };
 
+        module_ctx_record_unpinned_download_file_url_inputs(this, &urls, sha256, integrity)?;
         match crate::repository_ctx::perform_download_to_path(
             &urls,
             &output_path,
@@ -274,6 +275,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             Some(strip_prefix)
         };
         let rename_files = parse_rename_files(rename_files, "module_ctx.download_and_extract()")?;
+        module_ctx_record_unpinned_download_file_url_inputs(this, &urls, sha256, integrity)?;
         match crate::repository_ctx::perform_download_and_extract_to_dir(
             &urls,
             &output_dir,
@@ -814,6 +816,22 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         })?;
         Ok(Value::new_none())
     }
+}
+
+fn module_ctx_record_unpinned_download_file_url_inputs(
+    this: &ModuleContext,
+    urls: &[String],
+    sha256: &str,
+    integrity: &str,
+) -> starlark::Result<()> {
+    for path in slug_bzlmod::unpinned_local_file_url_paths(
+        urls.iter().map(String::as_str),
+        Some(sha256),
+        Some(integrity),
+    ) {
+        this.record_file_input(&path)?;
+    }
+    Ok(())
 }
 
 fn resolve_module_ctx_input_path(

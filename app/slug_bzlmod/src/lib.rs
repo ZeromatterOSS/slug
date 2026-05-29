@@ -28,6 +28,7 @@
 
 pub mod cache;
 pub mod dice_graph;
+mod download_inputs;
 mod extension_execution_dice;
 mod extensions;
 pub mod fetch;
@@ -182,6 +183,8 @@ pub use dice_graph::resolve_graph_with_module_file_inputs;
 pub use dice_graph::resolved_graph_projection_values;
 pub use dice_graph::resolved_module_sources_from_graph;
 pub use dice_graph::selected_bzlmod_cell_name_for_dep;
+pub use download_inputs::local_file_url_path;
+pub use download_inputs::unpinned_local_file_url_paths;
 pub use extension_execution_dice::ExtensionSpokesIdentityValue;
 pub use extension_execution_dice::ModuleExtensionError;
 pub use extension_execution_dice::ModuleExtensionExecutionKey;
