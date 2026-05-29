@@ -49,6 +49,7 @@ use slug_build_api::interpreter::rule_defs::provider::builtin::external_runner_t
 use slug_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::constraints::ConstraintKey;
 use slug_core::configuration::constraints::ConstraintValue;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
@@ -287,6 +288,7 @@ pub fn analyze_native_rule(
     flag_values_match: bool,
     values_match: bool,
     cell_alias_resolver: Option<&CellAliasResolver>,
+    root_cell_name: Option<CellName>,
 ) -> slug_error::Result<AnalysisResult> {
     match kind {
         NativeRuleKind::ConstraintSetting => analyze_constraint_setting(target, configured_node),
@@ -306,7 +308,9 @@ pub fn analyze_native_rule(
         NativeRuleKind::Genrule => {
             analyze_genrule(target, configured_node, dep_analysis, cell_alias_resolver)
         }
-        NativeRuleKind::Platform => analyze_platform(target, configured_node, dep_analysis),
+        NativeRuleKind::Platform => {
+            analyze_platform(target, configured_node, dep_analysis, root_cell_name)
+        }
         NativeRuleKind::TestSuite => analyze_test_suite(target, dep_analysis),
         NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
         NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
@@ -1157,6 +1161,7 @@ fn analyze_platform(
     target: &ConfiguredTargetLabel,
     configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    root_cell_name: Option<CellName>,
 ) -> slug_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
 
@@ -1216,7 +1221,7 @@ fn analyze_platform(
     // Bazel labels name the main repo without a cell prefix (`//pkg:tgt`).
     // Slug's internal Display keeps the root cell (`zeromatter//pkg:tgt`),
     // which is not parseable by the Bazel-shaped validation path.
-    let label_str = bazel_platform_label(target.unconfigured());
+    let label_str = bazel_platform_label(target.unconfigured(), root_cell_name);
 
     // Create PlatformInfo with the merged constraint configuration.
     let platform_info = FrozenPlatformInfo::for_native_platform_keys(
@@ -1238,8 +1243,11 @@ fn analyze_platform(
     make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
-fn bazel_platform_label(target: &TargetLabel) -> String {
-    if slug_core::cells::is_root_cell_name(target.pkg().cell_name().as_str()) {
+fn bazel_platform_label(target: &TargetLabel, root_cell_name: Option<CellName>) -> String {
+    let cell_name = target.pkg().cell_name();
+    if root_cell_name.is_some_and(|root| root == cell_name)
+        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name.as_str()))
+    {
         format!("//{}:{}", target.pkg().cell_relative_path(), target.name())
     } else {
         target.to_string()
@@ -1581,4 +1589,28 @@ fn create_minimal_analysis_result(
     )]);
 
     make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
+}
+
+#[cfg(test)]
+mod tests {
+    use slug_core::cells::name::CellName;
+    use slug_core::target::label::label::TargetLabel;
+
+    use super::bazel_platform_label;
+
+    #[test]
+    fn platform_label_uses_explicit_root_cell() {
+        let root = CellName::testing_new("actual_platform_root");
+        let root_target = TargetLabel::testing_parse("actual_platform_root//pkg:platform");
+        let legacy_root_target = TargetLabel::testing_parse("root//pkg:platform");
+
+        assert_eq!(
+            bazel_platform_label(&root_target, Some(root)),
+            "//pkg:platform"
+        );
+        assert_eq!(
+            bazel_platform_label(&legacy_root_target, Some(root)),
+            "root//pkg:platform"
+        );
+    }
 }

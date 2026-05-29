@@ -1965,6 +1965,12 @@ hardening behavior around it.
      fallback. Guardrails: `cargo test -p slug_analysis
      metadata_paths_use_resolver_root_cell --lib -- --nocapture`; `cargo check
      -p slug_analysis`.
+   - 2026-05-29 native platform root-adapter reduction: native `platform()`
+     analysis now receives the active DICE root cell and formats main-repo
+     platform labels from that explicit owner instead of the process-global root
+     helper. Guardrails: `cargo test -p slug_analysis
+     platform_label_uses_explicit_root_cell --lib -- --nocapture`; `cargo check
+     -p slug_analysis`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

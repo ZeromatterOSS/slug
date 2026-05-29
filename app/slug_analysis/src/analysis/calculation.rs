@@ -1546,6 +1546,7 @@ async fn get_analysis_result_inner(
             let cell_alias_resolver = ctx
                 .get_cell_alias_resolver(target.pkg().cell_name())
                 .await?;
+            let root_cell_name = ctx.get_cell_resolver().await?.root_cell();
 
             // For config_setting, pre-compute whether flag_values and values match.
             // This must be done asynchronously (DICE lookup) before the sync analyze_native_rule call.
@@ -1569,6 +1570,7 @@ async fn get_analysis_result_inner(
                     flag_values_match && define_values_match,
                     values_match,
                     Some(&cell_alias_resolver),
+                    Some(root_cell_name),
                 )?;
                 Ok(MaybeCompatible::Compatible(result))
             });
