@@ -2152,6 +2152,16 @@ hardening behavior around it.
      `module_ctx.patch(Label(...))` now record their source template/patch
      files with default `auto` watch semantics, so same-daemon edits invalidate
      module-extension replay before stale generated repo specs are reused.
+   - `repository_ctx.symlink(Label(...), ...)` and
+     `module_ctx.symlink(Label(...), ...)` now record the resolved label target
+     when it is outside the generated repository/extension working directory.
+     This closes the path where a later `read("linked.txt")` saw only a
+     working-dir symlink and skipped the actual source file as an auto-watched
+     input. Focused guardrails prove label-target edits rematerialize Starlark
+     repositories and re-execute module extensions. A native
+     `git_repository(branch = ...)` guardrail also proves an out-of-workspace
+     local branch ref update rematerializes the generated repo instead of
+     reusing stale checked-out contents.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

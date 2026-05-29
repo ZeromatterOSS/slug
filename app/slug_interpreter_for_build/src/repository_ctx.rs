@@ -2429,10 +2429,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] target: Value<'v>,
         #[starlark(require = pos)] link_name: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let target_str = if let Some(s) = target.unpack_str() {
-            s.to_owned()
+        let (target_str, target_input_path) = if let Some(s) = target.unpack_str() {
+            (s.to_owned(), None)
         } else if let Some(repo_path) = target.downcast_ref::<RepositoryPath>() {
-            repo_path.absolute_path().to_string_lossy().to_string()
+            let path = repo_path.absolute_path();
+            (path.to_string_lossy().to_string(), Some(path))
         } else if target.get_type() == "Label" {
             // `rctx.symlink(Label("//templates:foo.bzl"), "foo.bzl")` must
             // resolve the Label to an absolute path so the resulting
@@ -2442,10 +2443,13 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             let label_str = format!("{target}");
             let path = this.resolve_label_to_filesystem_path(&label_str)?;
             ensure_label_path_materialized(&path);
-            path.to_string_lossy().to_string()
+            (path.to_string_lossy().to_string(), Some(path))
         } else {
-            target.to_repr()
+            (target.to_repr(), None)
         };
+        if let Some(path) = target_input_path.as_ref() {
+            repository_ctx_maybe_record_file_input(this, path, "auto")?;
+        }
 
         let link_str = if let Some(s) = link_name.unpack_str() {
             s.to_owned()

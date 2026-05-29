@@ -646,9 +646,9 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] target: Value<'v>,
         #[starlark(require = pos)] link: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let target_str = resolve_module_ctx_input_path(this, target, "module_ctx.symlink()")?
-            .to_string_lossy()
-            .to_string();
+        let target_path = resolve_module_ctx_input_path(this, target, "module_ctx.symlink()")?;
+        this.maybe_record_file_input(&target_path, ShouldWatch::Auto)?;
+        let target_str = target_path.to_string_lossy().to_string();
         let link_str = link.unpack_str().unwrap_or("");
 
         let resolved_link = if Path::new(link_str).is_absolute() {

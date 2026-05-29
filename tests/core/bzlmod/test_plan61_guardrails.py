@@ -8172,6 +8172,63 @@ use_repo(download, "download_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_symlink_label_edit_reexecutes_extension(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext.symlink records label inputs."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_symlink_ext+symlink_repo"
+    _write(buck.cwd / "tool.txt", "first\n")
+    _write(
+        buck.cwd / "module_symlink_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+symlink_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _module_symlink_ext_impl(module_ctx):
+    module_ctx.symlink(Label("//:tool.txt"), "linked.txt")
+    symlink_repo_rule(name = "symlink_repo", payload = module_ctx.read("linked.txt"))
+
+module_symlink_ext = module_extension(
+    implementation = _module_symlink_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_symlink_input")
+
+symlink_ext = use_extension("//:module_symlink_ext.bzl", "module_symlink_ext")
+use_repo(symlink_ext, "symlink_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_symlink_repo",
+    srcs = ["@symlink_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_symlink_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    _write(buck.cwd / "tool.txt", "second\n")
+    await buck.build("//:uses_symlink_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_watch_tree_label_fails_directly_for_non_directory(
     buck: Buck,
 ) -> None:
@@ -8347,6 +8404,68 @@ use_repo(read_watch, "read_watch_repo")
     _write(buck.cwd / "watched.txt", "second\n")
 
     await buck.build("//:uses_read_watch_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_symlink_label_edit_rematerializes_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchors: StarlarkRepositoryContext.symlink and RepoRecordedInput.File."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+symlink_watch_ext+symlink_watch_repo"
+    recorded_inputs = repo_dir / ".slug_repo_recorded_inputs"
+    _write(buck.cwd / "tool.txt", "first\n")
+    _write(
+        buck.cwd / "symlink_watch_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.symlink(Label("//:tool.txt"), "linked.txt")
+    repository_ctx.file("data.txt", repository_ctx.read("linked.txt"))
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+symlink_watch_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _symlink_watch_ext_impl(module_ctx):
+    symlink_watch_repo_rule(name = "symlink_watch_repo")
+
+symlink_watch_ext = module_extension(
+    implementation = _symlink_watch_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repo_ctx_symlink_input")
+
+symlink_watch = use_extension("//:symlink_watch_ext.bzl", "symlink_watch_ext")
+use_repo(symlink_watch, "symlink_watch_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_symlink_watch_repo",
+    srcs = ["@symlink_watch_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_symlink_watch_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+    assert recorded_inputs.exists()
+    assert "FILE:" in recorded_inputs.read_text()
+
+    _write(buck.cwd / "tool.txt", "second\n")
+
+    await buck.build("//:uses_symlink_watch_repo")
     second = await _bzlmod_counters(buck)
 
     assert (repo_dir / "data.txt").read_text() == "second\n"
@@ -10642,6 +10761,90 @@ http_archive(
     _write_zip(archive, {"data.txt": "second\n"})
 
     await buck.build("//:uses_native_download_archive")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["repo_materialization_miss_reason"] > first[
+        "repo_materialization_miss_reason"
+    ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_native_git_repository_branch_update_rematerializes_repo(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: GitRepositoryFunction resolves moving refs during fetch."""
+    source_repo = buck.cwd.parent / f"{buck.cwd.name}_source_git_repo"
+    source_repo.mkdir()
+    subprocess.run(["git", "init"], cwd=source_repo, check=True)
+    subprocess.run(["git", "checkout", "-b", "main"], cwd=source_repo, check=True)
+    _write(
+        source_repo / "BUILD.bazel",
+        """exports_files(["data.txt"])
+filegroup(name = "data", srcs = ["data.txt"])
+""",
+    )
+    _write(source_repo / "data.txt", "first\n")
+    subprocess.run(["git", "add", "."], cwd=source_repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Plan 61",
+            "-c",
+            "user.email=plan61@example.com",
+            "commit",
+            "-m",
+            "first",
+        ],
+        cwd=source_repo,
+        check=True,
+    )
+
+    repo_dir = buck.cwd / "bazel-external" / "+git_repository+branch_repo"
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "plan61_native_git_branch_ref_input")
+
+git_repository = use_repo_rule("@@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+git_repository(
+    name = "branch_repo",
+    remote = "{source_repo.as_uri()}",
+    branch = "main",
+)
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_branch_repo",
+    srcs = ["@branch_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_branch_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    _write(source_repo / "data.txt", "second\n")
+    subprocess.run(["git", "add", "."], cwd=source_repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Plan 61",
+            "-c",
+            "user.email=plan61@example.com",
+            "commit",
+            "-m",
+            "second",
+        ],
+        cwd=source_repo,
+        check=True,
+    )
+
+    await buck.build("//:uses_branch_repo")
     second = await _bzlmod_counters(buck)
 
     assert (repo_dir / "data.txt").read_text() == "second\n"
