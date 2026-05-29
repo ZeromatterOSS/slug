@@ -1053,6 +1053,13 @@ Current state to preserve:
   test -p slug_bzlmod recorded_inputs --lib`, `cargo test -p
   slug_external_cells extension_repo --lib`, `cargo fmt --check`, and full Plan
   61 Python guardrails (`178 passed in 79.33s`).
+- 2026-05-29 injected-digest key constructors made test-only:
+  graph-digest keyed bzlmod read keys no longer expose production constructors
+  that silently select the old injected projection digest; production callers
+  must pass an explicit active resolution digest. The remaining silent
+  constructors are test-only for stale/injected fallback fixtures. Guardrails:
+  `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`, `cargo
+  test -p slug_bzlmod cell_graph --lib`, and `cargo fmt --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -2260,8 +2267,11 @@ hardening behavior around it.
      recorded-input key's internal workspace is no longer optional in production.
      Empty module-extension result constructors are test-only, so production
      extension results must carry the recorded-input context from fresh
-     execution or replay. The remaining bzlmod projection data wrappers also
-     require workspace provenance instead of accepting absent provenance.
+     execution or replay. Default constructors for graph-digest keyed bzlmod
+     read keys are test-only, so production consumers must name the active
+     resolution digest instead of silently choosing the injected projection
+     digest. The remaining bzlmod projection data wrappers also require
+     workspace provenance instead of accepting absent provenance.
      The legacy resolver entry point requires an explicit workspace identity too.
      The outer parse helper also requires callers to choose the empty-projection
      workspace identity explicitly.

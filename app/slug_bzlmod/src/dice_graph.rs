@@ -3942,6 +3942,7 @@ pub struct ModuleVersionsKey {
 }
 
 impl ModuleVersionsKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
@@ -3986,6 +3987,7 @@ pub struct BzlmodLockfileInputsKey {
 }
 
 impl BzlmodLockfileInputsKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
@@ -4073,6 +4075,7 @@ pub struct BzlmodRepoEnvKey {
 }
 
 impl BzlmodRepoEnvKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
@@ -4133,6 +4136,7 @@ pub struct BzlmodRepoMappingsKey {
 }
 
 impl BzlmodRepoMappingsKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
@@ -4207,6 +4211,7 @@ pub struct BzlmodResolutionFactsKey {
 }
 
 impl BzlmodResolutionFactsKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
@@ -4872,6 +4877,7 @@ pub struct RegisteredToolchainsKey {
 }
 
 impl RegisteredToolchainsKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
@@ -5001,6 +5007,7 @@ pub struct RegisteredExecutionPlatformsKey {
 }
 
 impl RegisteredExecutionPlatformsKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId) -> Self {
         Self {
             workspace_id,
@@ -5206,6 +5213,7 @@ pub struct BzlmodExtensionAggregationKey {
 }
 
 impl BzlmodExtensionAggregationKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
         Self {
             workspace_id,
@@ -5290,10 +5298,12 @@ impl Hash for ExtensionSpokesKey {
 }
 
 impl ExtensionSpokesKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
         Self::for_workspace_id_with_digest(workspace_id, extension_id, "")
     }
 
+    #[cfg(test)]
     pub fn for_workspace_id_with_digest(
         workspace_id: WorkspaceId,
         extension_id: &str,
@@ -5313,6 +5323,7 @@ impl ExtensionSpokesKey {
         )
     }
 
+    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub fn for_workspace_id_with_inputs(
         workspace_id: WorkspaceId,
@@ -5390,6 +5401,7 @@ pub struct ExtensionSpokesByExtensionIdKey {
 }
 
 impl ExtensionSpokesByExtensionIdKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId, extension_id: &str) -> Self {
         Self {
             workspace_id,
@@ -5430,6 +5442,7 @@ pub struct ExtensionIdByCanonicalRepoKey {
 }
 
 impl ExtensionIdByCanonicalRepoKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId, canonical_name: &str) -> Self {
         Self {
             workspace_id,
@@ -5470,6 +5483,7 @@ pub struct ExtensionSpokesByCanonicalRepoKey {
 }
 
 impl ExtensionSpokesByCanonicalRepoKey {
+    #[cfg(test)]
     pub fn for_workspace_id(workspace_id: WorkspaceId, canonical_name: &str) -> Self {
         Self {
             workspace_id,
