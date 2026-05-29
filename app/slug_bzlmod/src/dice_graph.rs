@@ -513,15 +513,6 @@ pub trait BzlmodCleanGraphIo: Send + Sync + 'static {
         root_module_name: &str,
     ) -> slug_error::Result<Arc<NonRootModuleFilesValue>>;
 
-    async fn append_lockfile_seeded_extension_cells(
-        &self,
-        key: &BzlmodResolvedModuleGraphKey,
-        ctx: &mut DiceComputations<'_>,
-        builder: &mut BzlmodCleanCellGraphBuilder,
-        visible_lockfile: Option<&Lockfile>,
-        hidden_lockfile: Option<&Lockfile>,
-    ) -> slug_error::Result<()>;
-
     async fn compute_lockfile_content(
         &self,
         workspace_id: &WorkspaceId,
@@ -1293,8 +1284,14 @@ pub fn clean_resolved_graph_outputs_value(
         workspace_id,
         Arc::new(repo_mapping_snapshot),
         Arc::new(repo_mapping_overrides),
+    )
+    .with_declared_aliases(
+        cell_graph.root_aliases.dupe(),
+        cell_graph.scoped_aliases.dupe(),
+        cell_graph.dynamic_aliases.dupe(),
     );
     let graph_digest = bzlmod_resolved_graph_digest(&graph);
+    let declared_extension_cells = cell_graph.extension_cells.dupe();
 
     BzlmodResolvedGraphOutputsValue {
         graph: Arc::new(graph),
@@ -1303,7 +1300,9 @@ pub fn clean_resolved_graph_outputs_value(
         resolution_facts: projections.resolution_facts,
         registered_toolchains: projections.registered_toolchains,
         registered_execution_platforms: projections.registered_execution_platforms,
-        extension_aggregations: projections.extension_aggregations,
+        extension_aggregations: projections
+            .extension_aggregations
+            .with_declared_extension_cells(declared_extension_cells),
         repo_mappings,
         cell_graph,
     }
@@ -1371,7 +1370,7 @@ async fn compute_bzlmod_resolved_module_graph(
             "clean DICE bzlmod resolved graph requires tracked visible lockfile input"
         ));
     };
-    let hidden_lockfile = if key.options.lockfile_mode == LockfileMode::Off {
+    let _hidden_lockfile = if key.options.lockfile_mode == LockfileMode::Off {
         None
     } else if let Some(hidden_lockfile) = inputs.lockfile_inputs.hidden_lockfile.as_ref() {
         hidden_lockfile.lockfile.clone()
@@ -1438,14 +1437,6 @@ async fn compute_bzlmod_resolved_module_graph(
         .resolve_use_repo_rule_local_bits(dice_ctx, &parsed_modules)
         .await?;
     builder.install_precomputed_extension_mapping_rows();
-    io.append_lockfile_seeded_extension_cells(
-        key,
-        dice_ctx,
-        &mut builder,
-        visible_lockfile.as_deref(),
-        hidden_lockfile.as_deref(),
-    )
-    .await?;
     let cell_graph = builder.finish()?;
     let outputs = clean_resolved_graph_outputs_value(
         key.workspace_id.clone(),
@@ -1466,10 +1457,22 @@ pub fn repo_mapping_snapshot_for_modules(
     parsed_modules: &[(String, ParsedModuleFile)],
     root_module_name: &str,
 ) -> crate::RepoMappingSnapshot {
+    repo_mapping_snapshot_for_modules_with_policy(parsed_modules, root_module_name, false)
+}
+
+pub fn repo_mapping_snapshot_for_modules_with_policy(
+    parsed_modules: &[(String, ParsedModuleFile)],
+    root_module_name: &str,
+    ignore_dev_dependency: bool,
+) -> crate::RepoMappingSnapshot {
     let mut snapshot = crate::RepoMappingSnapshot::new();
     for (module_name, parsed_mod) in parsed_modules {
-        let mapping =
-            BzlmodRepoMapping::for_module(parsed_mod, root_module_name).entries_as_strings();
+        let mapping = BzlmodRepoMapping::for_module_with_policy(
+            parsed_mod,
+            root_module_name,
+            ignore_dev_dependency,
+        )
+        .entries_as_strings();
         if module_name == root_module_name {
             snapshot.insert(String::new(), mapping.clone());
         }
@@ -1485,7 +1488,11 @@ pub fn graph_owned_repo_mapping_state(
     cell_names: &[&str],
     resolved_graph: Option<&ResolvedGraph>,
 ) -> (crate::RepoMappingSnapshot, crate::RepoMappingOverrides) {
-    let mut repo_mappings = repo_mapping_snapshot_for_modules(parsed_modules, root_module_name);
+    let mut repo_mappings = repo_mapping_snapshot_for_modules_with_policy(
+        parsed_modules,
+        root_module_name,
+        ignore_dev_dependency,
+    );
     let mut repo_mapping_overrides =
         repo_mapping_overrides_for_root(parsed_modules, root_module_name, ignore_dev_dependency);
     canonicalize_repo_mapping_targets(
@@ -2014,9 +2021,6 @@ impl BzlmodCellGraphValue {
     }
 }
 
-pub type PrevalidatedExtensionCaches =
-    fxhash::FxHashMap<String, fxhash::FxHashMap<String, RepoSpec>>;
-
 pub struct BzlmodCleanCellGraphBuilder {
     workspace_id: WorkspaceId,
     root_module_name: String,
@@ -2032,7 +2036,6 @@ pub struct BzlmodCleanCellGraphBuilder {
     pre_computed_cells: Vec<crate::pending_repo_cells::PendingRepoCell>,
     pre_computed_aliases: Vec<crate::pending_repo_cells::RepoAlias>,
     extension_mapping_cells: Vec<crate::pending_repo_cells::PendingRepoCell>,
-    lockfile_seeded_cells: Vec<crate::pending_repo_cells::PendingRepoCell>,
     repo_env_json: String,
 }
 
@@ -2296,7 +2299,6 @@ impl BzlmodCleanCellGraphBuilder {
             pre_computed_cells,
             pre_computed_aliases,
             extension_mapping_cells: Vec::new(),
-            lockfile_seeded_cells: Vec::new(),
             repo_env_json,
         })
     }
@@ -2333,32 +2335,6 @@ impl BzlmodCleanCellGraphBuilder {
 
     pub fn install_precomputed_extension_mapping_rows(&mut self) {
         self.extension_mapping_cells = self.pre_computed_cells.clone();
-        self.add_extension_repo_mapping_rows_from_current_cells();
-    }
-
-    pub fn append_lockfile_seeded_extension_cells(
-        &mut self,
-        lockfile: &Lockfile,
-        workspace_root: &Path,
-        repo_env: Option<&BTreeMap<String, String>>,
-        bzl_transitive_digests: &HashMap<String, String>,
-        prevalidated_caches: Option<&PrevalidatedExtensionCaches>,
-    ) {
-        let extra =
-            crate::pending_repo_cells::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches(
-                lockfile,
-                &self.aggregated_extensions,
-                &self.root_module_name,
-                &mut self.pre_computed_cells,
-                workspace_root,
-                repo_env,
-                bzl_transitive_digests,
-                Some(&self.repo_mappings),
-                Some(&self.repo_mapping_overrides),
-                prevalidated_caches,
-            );
-        self.lockfile_seeded_cells.extend(extra.iter().cloned());
-        self.extension_mapping_cells.extend(extra);
         self.add_extension_repo_mapping_rows_from_current_cells();
     }
 
@@ -2456,10 +2432,6 @@ impl BzlmodCleanCellGraphBuilder {
                     }
                 }
                 extension_cells.retain(|cell| cell.canonical_name != alias.apparent_name);
-                self.lockfile_seeded_cells.retain(|cell| {
-                    cell.canonical_name != alias.apparent_name
-                        && cell.internal_name != alias.apparent_name
-                });
             }
             if !is_root_declared_alias {
                 continue;
@@ -2499,24 +2471,7 @@ impl BzlmodCleanCellGraphBuilder {
                     )
                     .collect(),
             ),
-            extension_cells: Arc::new(
-                extension_cells
-                    .into_iter()
-                    .chain(self.lockfile_seeded_cells.into_iter().map(|cell| {
-                        BzlmodCellGraphExtensionCell {
-                            canonical_name: cell.canonical_name,
-                            internal_name: cell.internal_name,
-                            path: cell.path,
-                            extension_id: cell.extension_id,
-                            spec_hash: cell.spec_hash,
-                            repo_spec_json: cell.repo_spec_json,
-                            repo_env_json: self.repo_env_json.clone(),
-                            materialized: false,
-                            lazy: true,
-                        }
-                    }))
-                    .collect(),
-            ),
+            extension_cells: Arc::new(extension_cells),
             root_aliases: Arc::new(self.root_aliases),
             module_symlinks: Arc::new(self.module_symlinks),
             scoped_aliases: Arc::new(self.scoped_aliases),
@@ -3162,6 +3117,12 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
                     .display()
             ));
         }
+        if should_use_clean_resolution_data(&self.resolution_digest) {
+            return Ok(extension_aggregations.declared_extension_cells.dupe());
+        }
+        let declared_cells =
+            fallback_extension_cells(ctx, &self.workspace_id, self.resolution_digest.clone())
+                .await?;
         if !extension_aggregations.extension_aggregations.is_empty() {
             let repo_env = ctx
                 .compute(&BzlmodRepoEnvKey::for_workspace_id(
@@ -3182,35 +3143,15 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             )
             .await
             {
-                Ok(cells) => Ok(cells),
-                Err(e) if e.to_string().contains("module extension executor") => {
-                    let data = ctx
-                        .compute(&BzlmodFallbackCellGraphKey {
-                            workspace_id: self.workspace_id.clone(),
-                            resolution_digest: self.resolution_digest.clone(),
-                        })
-                        .await??;
-                    Ok(data.fallback_cell_graph.as_ref().map_or_else(
-                        || Arc::new(Vec::new()),
-                        |graph| graph.extension_cells.dupe(),
-                    ))
-                }
+                Ok(cells) => Ok(merge_declared_and_spoke_extension_cells(
+                    declared_cells,
+                    cells,
+                )),
+                Err(e) if e.to_string().contains("module extension executor") => Ok(declared_cells),
                 Err(e) => Err(e),
             };
         }
-        if should_use_clean_resolution_data(&self.resolution_digest) {
-            return Ok(Arc::new(Vec::new()));
-        }
-        let data = ctx
-            .compute(&BzlmodFallbackCellGraphKey {
-                workspace_id: self.workspace_id.clone(),
-                resolution_digest: self.resolution_digest.clone(),
-            })
-            .await??;
-        Ok(data.fallback_cell_graph.as_ref().map_or_else(
-            || Arc::new(Vec::new()),
-            |graph| graph.extension_cells.dupe(),
-        ))
+        Ok(declared_cells)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3219,6 +3160,41 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             _ => false,
         }
     }
+}
+
+async fn fallback_extension_cells(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: &WorkspaceId,
+    resolution_digest: Arc<str>,
+) -> slug_error::Result<Arc<Vec<BzlmodCellGraphExtensionCell>>> {
+    let data = ctx
+        .compute(&BzlmodFallbackCellGraphKey {
+            workspace_id: workspace_id.clone(),
+            resolution_digest,
+        })
+        .await??;
+    Ok(data.fallback_cell_graph.as_ref().map_or_else(
+        || Arc::new(Vec::new()),
+        |graph| graph.extension_cells.dupe(),
+    ))
+}
+
+fn merge_declared_and_spoke_extension_cells(
+    declared: Arc<Vec<BzlmodCellGraphExtensionCell>>,
+    spokes: Arc<Vec<BzlmodCellGraphExtensionCell>>,
+) -> Arc<Vec<BzlmodCellGraphExtensionCell>> {
+    let mut seen = BTreeSet::new();
+    let mut merged = Vec::with_capacity(spokes.len() + declared.len());
+    for cell in spokes.iter() {
+        seen.insert(cell.canonical_name.clone());
+        merged.push(cell.clone());
+    }
+    for cell in declared.iter() {
+        if seen.insert(cell.canonical_name.clone()) {
+            merged.push(cell.clone());
+        }
+    }
+    Arc::new(merged)
 }
 
 async fn extension_cells_from_spokes(
@@ -3452,21 +3428,30 @@ impl Key for BzlmodCellGraphKey {
             ));
         }
         let root_module_name = module_versions.invalidation.root_module_name.clone();
+        let root_aliases = merge_declared_root_aliases(
+            root_aliases_from_repo_mappings(&repo_mappings),
+            repo_mappings.declared_root_aliases.as_ref(),
+        );
+        let scoped_aliases = merge_declared_scoped_aliases(
+            scoped_aliases_from_repo_mappings(&repo_mappings, &root_module_name),
+            repo_mappings.declared_scoped_aliases.as_ref(),
+        );
+        let dynamic_aliases = merge_declared_dynamic_aliases(
+            dynamic_aliases_from_repo_mappings(&repo_mappings),
+            repo_mappings.declared_dynamic_aliases.as_ref(),
+        );
         Ok(Arc::new(BzlmodCellGraphValue {
             workspace_id: self.workspace_id.clone(),
             root_module_name: root_module_name.clone(),
             cells: cells.dupe(),
             extension_cells,
-            root_aliases: Arc::new(root_aliases_from_repo_mappings(&repo_mappings)),
+            root_aliases: Arc::new(root_aliases),
             module_symlinks: Arc::new(module_symlinks_from_cells_and_residuals(
                 cells.as_ref(),
                 residual_module_symlinks.as_ref(),
             )),
-            scoped_aliases: Arc::new(scoped_aliases_from_repo_mappings(
-                &repo_mappings,
-                &root_module_name,
-            )),
-            dynamic_aliases: Arc::new(dynamic_aliases_from_repo_mappings(&repo_mappings)),
+            scoped_aliases: Arc::new(scoped_aliases),
+            dynamic_aliases: Arc::new(dynamic_aliases),
         }))
     }
 
@@ -4011,6 +3996,9 @@ pub struct BzlmodRepoMappingsDataValue {
     pub workspace_id: WorkspaceId,
     pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+    pub declared_root_aliases: Arc<Vec<BzlmodCellGraphAlias>>,
+    pub declared_scoped_aliases: Arc<Vec<BzlmodCellGraphScopedAlias>>,
+    pub declared_dynamic_aliases: Arc<Vec<BzlmodCellGraphDynamicAlias>>,
 }
 
 impl BzlmodRepoMappingsDataValue {
@@ -4023,7 +4011,22 @@ impl BzlmodRepoMappingsDataValue {
             workspace_id,
             repo_mappings,
             repo_mapping_overrides,
+            declared_root_aliases: Arc::new(Vec::new()),
+            declared_scoped_aliases: Arc::new(Vec::new()),
+            declared_dynamic_aliases: Arc::new(Vec::new()),
         }
+    }
+
+    pub fn with_declared_aliases(
+        mut self,
+        root_aliases: Arc<Vec<BzlmodCellGraphAlias>>,
+        scoped_aliases: Arc<Vec<BzlmodCellGraphScopedAlias>>,
+        dynamic_aliases: Arc<Vec<BzlmodCellGraphDynamicAlias>>,
+    ) -> Self {
+        self.declared_root_aliases = root_aliases;
+        self.declared_scoped_aliases = scoped_aliases;
+        self.declared_dynamic_aliases = dynamic_aliases;
+        self
     }
 }
 
@@ -4032,6 +4035,7 @@ pub struct BzlmodExtensionAggregationsDataValue {
     pub workspace_id: WorkspaceId,
     pub root_module_name: String,
     pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
+    pub declared_extension_cells: Arc<Vec<BzlmodCellGraphExtensionCell>>,
 }
 
 impl BzlmodExtensionAggregationsDataValue {
@@ -4044,7 +4048,16 @@ impl BzlmodExtensionAggregationsDataValue {
             workspace_id,
             root_module_name,
             extension_aggregations,
+            declared_extension_cells: Arc::new(Vec::new()),
         }
+    }
+
+    pub fn with_declared_extension_cells(
+        mut self,
+        declared_extension_cells: Arc<Vec<BzlmodCellGraphExtensionCell>>,
+    ) -> Self {
+        self.declared_extension_cells = declared_extension_cells;
+        self
     }
 }
 
@@ -4383,6 +4396,22 @@ fn root_aliases_from_repo_mappings(
         .collect()
 }
 
+fn merge_declared_root_aliases(
+    mut aliases: Vec<BzlmodCellGraphAlias>,
+    declared_aliases: &[BzlmodCellGraphAlias],
+) -> Vec<BzlmodCellGraphAlias> {
+    let mut seen: BTreeSet<_> = aliases
+        .iter()
+        .map(|alias| alias.apparent_name.clone())
+        .collect();
+    for alias in declared_aliases {
+        if seen.insert(alias.apparent_name.clone()) {
+            aliases.push(alias.clone());
+        }
+    }
+    aliases
+}
+
 fn dynamic_aliases_from_repo_mappings(
     repo_mappings: &BzlmodRepoMappingsDataValue,
 ) -> Vec<BzlmodCellGraphDynamicAlias> {
@@ -4404,6 +4433,22 @@ fn dynamic_aliases_from_repo_mappings(
             }
         })
         .collect()
+}
+
+fn merge_declared_dynamic_aliases(
+    mut aliases: Vec<BzlmodCellGraphDynamicAlias>,
+    declared_aliases: &[BzlmodCellGraphDynamicAlias],
+) -> Vec<BzlmodCellGraphDynamicAlias> {
+    let mut seen: BTreeSet<_> = aliases
+        .iter()
+        .map(|alias| alias.apparent_name.clone())
+        .collect();
+    for alias in declared_aliases {
+        if seen.insert(alias.apparent_name.clone()) {
+            aliases.push(alias.clone());
+        }
+    }
+    aliases
 }
 
 fn scoped_aliases_from_repo_mappings(
@@ -4442,6 +4487,22 @@ fn scoped_aliases_from_repo_mappings(
         }
     }
     scoped_aliases
+}
+
+fn merge_declared_scoped_aliases(
+    mut aliases: Vec<BzlmodCellGraphScopedAlias>,
+    declared_aliases: &[BzlmodCellGraphScopedAlias],
+) -> Vec<BzlmodCellGraphScopedAlias> {
+    let mut seen: BTreeSet<_> = aliases
+        .iter()
+        .map(|alias| (alias.owner_module.clone(), alias.apparent_name.clone()))
+        .collect();
+    for alias in declared_aliases {
+        if seen.insert((alias.owner_module.clone(), alias.apparent_name.clone())) {
+            aliases.push(alias.clone());
+        }
+    }
+    aliases
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -4711,13 +4772,15 @@ pub struct InnateExtensionKey {
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "ExtensionBzlTransitiveDigestKey({}, {})",
+    "ExtensionBzlTransitiveDigestKey({}, {}, allow_missing_loads={})",
     workspace_id.stable_hash(),
-    extension_id
+    extension_id,
+    allow_missing_loads
 )]
 pub struct ExtensionBzlTransitiveDigestKey {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
+    pub allow_missing_loads: bool,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -5282,17 +5345,6 @@ mod tests {
                 slug_error::ErrorTag::Tier0,
                 "test clean graph IO does not provide non-root module files"
             ))
-        }
-
-        async fn append_lockfile_seeded_extension_cells(
-            &self,
-            _key: &BzlmodResolvedModuleGraphKey,
-            _ctx: &mut DiceComputations<'_>,
-            _builder: &mut BzlmodCleanCellGraphBuilder,
-            _visible_lockfile: Option<&Lockfile>,
-            _hidden_lockfile: Option<&Lockfile>,
-        ) -> slug_error::Result<()> {
-            Ok(())
         }
 
         async fn compute_lockfile_content(

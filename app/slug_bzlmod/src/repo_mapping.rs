@@ -155,11 +155,20 @@ impl BzlmodRepoMapping {
     /// - repositories imported with `use_repo()`;
     /// - `override_repo()` entries overriding generated extension repos.
     pub fn for_module(parsed: &ParsedModuleFile, root_module_name: &str) -> Self {
+        Self::for_module_with_policy(parsed, root_module_name, false)
+    }
+
+    pub fn for_module_with_policy(
+        parsed: &ParsedModuleFile,
+        root_module_name: &str,
+        ignore_dev_dependency: bool,
+    ) -> Self {
         let mut entries = HashMap::new();
         let module_name = parsed_module_name(parsed, root_module_name);
-        let use_usage_overrides = parsed.module.name.is_empty()
+        let is_root = parsed.module.name.is_empty()
             || module_name == root_module_name
             || module_name == "_main";
+        let use_usage_overrides = is_root && !ignore_dev_dependency;
 
         for dep in &parsed.module.bazel_deps {
             entries.insert(
@@ -628,6 +637,37 @@ mod tests {
                 .unwrap()
                 .to_storage_string(),
             "@actual_dep//pkg:target"
+        );
+    }
+
+    #[test]
+    fn ignores_root_override_repo_rows_under_ignore_dev_dependency() {
+        let mut module = parsed_module("root");
+        let mut usage =
+            ExtensionUsage::new("@rules_owner//:extensions.bzl".to_owned(), "ext".to_owned());
+        usage.imports.push(
+            UseRepo::new().add_mapping("public_name".to_owned(), "generated_name".to_owned()),
+        );
+        usage
+            .repo_overrides
+            .push(("generated_name".to_owned(), "actual_dep".to_owned()));
+        module.extension_usages.push(usage);
+
+        let mapping = BzlmodRepoMapping::for_module_with_policy(&module, "root", true);
+
+        assert_eq!(
+            mapping
+                .canonicalize_label("@public_name//pkg:target")
+                .unwrap()
+                .to_storage_string(),
+            "@rules_owner++ext+generated_name//pkg:target"
+        );
+        assert_eq!(
+            mapping
+                .canonicalize_label("@rules_owner++ext+generated_name//pkg:target")
+                .unwrap()
+                .to_storage_string(),
+            "@rules_owner++ext+generated_name//pkg:target"
         );
     }
 

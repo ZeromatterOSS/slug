@@ -353,8 +353,37 @@ impl Key for EvalImportKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+        match x {
+            Ok(module) => !loaded_module_touches_bzlmod_module_cell(module),
+            Err(_) => false,
+        }
     }
+}
+
+fn loaded_module_touches_bzlmod_module_cell(module: &LoadedModule) -> bool {
+    starlark_module_path_uses_bzlmod_module_cell(module.path())
+        || module
+            .direct_imports()
+            .iter()
+            .any(|path| starlark_module_path_uses_bzlmod_module_cell(path.borrow()))
+}
+
+fn starlark_module_path_uses_bzlmod_module_cell(path: StarlarkModulePath<'_>) -> bool {
+    match path {
+        StarlarkModulePath::LoadFile(path)
+        | StarlarkModulePath::JsonFile(path)
+        | StarlarkModulePath::TomlFile(path) => {
+            is_bzlmod_module_cell_name(path.path().cell().as_str())
+        }
+        StarlarkModulePath::BxlFile(_) => false,
+    }
+}
+
+fn is_bzlmod_module_cell_name(cell: &str) -> bool {
+    cell.ends_with('+')
+        && !cell.starts_with('+')
+        && !cell.starts_with("_main+")
+        && !cell.contains("++")
 }
 
 #[async_trait]

@@ -8650,6 +8650,7 @@ use_repo(replay, "replayed_repo")
 
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    assert second["extension_eval"] == first["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -8721,6 +8722,7 @@ use_repo(replay, "replayed_repo")
 
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    assert second["extension_eval"] == first["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -8793,6 +8795,7 @@ use_repo(replay, "replayed_repo")
 
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    assert second["extension_eval"] == first["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -8861,6 +8864,7 @@ use_repo(replay, "replayed_repo")
 
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    assert second["extension_eval"] == first["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -8937,6 +8941,7 @@ use_repo(replay, "replayed_repo")
 
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    assert second["extension_eval"] == first["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -9010,6 +9015,7 @@ use_repo(replay, "replayed_repo")
 
     assert second["extension_replay_miss_reason"] > first["extension_replay_miss_reason"]
     assert second["extension_replay_hit"] == first["extension_replay_hit"]
+    assert second["extension_eval"] == first["extension_eval"]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

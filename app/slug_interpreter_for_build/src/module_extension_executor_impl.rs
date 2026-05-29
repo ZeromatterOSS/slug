@@ -55,7 +55,7 @@ use slug_bzlmod::AggregatedExtension;
 use slug_bzlmod::ExtensionExecutionOutput;
 use slug_bzlmod::ModuleExtensionExecutorImpl;
 use slug_bzlmod::WorkspaceId;
-use slug_bzlmod::compute_bzl_transitive_digest_from_file_contents;
+use slug_bzlmod::compute_bzl_transitive_digest_from_file_states;
 use slug_bzlmod::with_repo_spec_registry;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
@@ -66,17 +66,21 @@ use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePathBuf;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_interpreter::load_module::InterpreterCalculation;
 use slug_interpreter::paths::module::OwnedStarlarkModulePath;
 use slug_interpreter::paths::module::StarlarkModulePath;
+use slug_interpreter::paths::path::OwnedStarlarkPath;
+use slug_interpreter::paths::path::StarlarkPath;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::values::OwnedFrozenValueTyped;
 use starlark::values::ValueLike;
 
 use crate::extension_execution::build_module_context;
+use crate::interpreter::dice_calculation_delegate::HasCalculationDelegate;
 use crate::module_ctx::StarlarkModuleExtensionMetadata;
 use crate::module_extension::FrozenStarlarkModuleExtension;
 
@@ -227,27 +231,50 @@ fn record_declared_extension_environ(
     Ok(())
 }
 
+async fn read_loaded_bzl_file_for_digest(
+    ctx: &mut DiceComputations<'_>,
+    project_root: &PathBuf,
+    project_relative: &ProjectRelativePathBuf,
+    cell_path: &CellPath,
+) -> Result<String, String> {
+    if is_bzlmod_module_cell_name(cell_path.cell().as_str()) {
+        return std::fs::read_to_string(project_root.join(project_relative.as_str()))
+            .map_err(|e| e.to_string());
+    }
+    DiceFileComputations::read_file(ctx, cell_path.as_ref())
+        .await
+        .without_package_context_information()
+        .map_err(|e| e.to_string())
+}
+
+fn is_bzlmod_module_cell_name(cell: &str) -> bool {
+    cell.ends_with('+')
+        && !cell.starts_with('+')
+        && !cell.starts_with("_main+")
+        && !cell.contains("++")
+}
+
 impl ConcreteModuleExtensionExecutor {
     async fn try_loaded_bzl_transitive_digest(
         &self,
         ctx: &mut DiceComputations<'_>,
         extension_id: &str,
         aggregated: &AggregatedExtension,
+        allow_missing_loads: bool,
     ) -> slug_error::Result<String> {
         let cell_resolver = ctx.get_cell_resolver().await?;
+        let project_root = ctx
+            .global_data()
+            .get_io_provider()
+            .project_root()
+            .root()
+            .to_path_buf();
         let import_path = parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
         let root_path = OwnedStarlarkModulePath::new(StarlarkModulePath::LoadFile(&import_path));
 
-        ctx.get_loaded_module(root_path.borrow())
-            .await
-            .buck_error_context(format!(
-                "Loading extension bzl file for digest: {}",
-                aggregated.extension_bzl_file
-            ))?;
-
         let mut queue = VecDeque::from([root_path]);
         let mut seen = BTreeSet::new();
-        let mut file_contents = BTreeMap::new();
+        let mut file_states = BTreeMap::new();
         while let Some(module_path) = queue.pop_front() {
             if !seen.insert(module_path.to_string()) {
                 continue;
@@ -258,27 +285,61 @@ impl ConcreteModuleExtensionExecutor {
                 continue;
             }
 
-            let loaded_module = ctx.get_loaded_module(module_path.borrow()).await?;
-            if matches!(module_path.borrow(), StarlarkModulePath::LoadFile(_)) {
-                let cell_path = module_path.path();
-                let cell = cell_resolver.get(cell_path.cell())?;
-                let project_relative = cell.path().join(cell_path.path());
-                let content = DiceFileComputations::read_file(ctx, cell_path)
-                    .await
-                    .without_package_context_information()?;
-                file_contents.insert(project_relative.as_str().to_owned(), content);
-            }
+            let StarlarkModulePath::LoadFile(import_path) = module_path.borrow() else {
+                continue;
+            };
+            let cell_path = import_path.path();
+            let cell = cell_resolver.get(cell_path.cell())?;
+            let project_relative = cell.path().join(cell_path.path());
 
-            for import in loaded_module.direct_imports() {
-                if matches!(import.borrow(), StarlarkModulePath::LoadFile(_)) {
-                    queue.push_back(import.clone());
+            let content =
+                read_loaded_bzl_file_for_digest(ctx, &project_root, &project_relative, cell_path)
+                    .await;
+            let content = match content {
+                Ok(content) => content,
+                Err(error) => {
+                    if !allow_missing_loads {
+                        let reason = if error.contains("No such file") {
+                            format!("File not found: {}", project_relative)
+                        } else {
+                            error
+                        };
+                        return Err(slug_error::slug_error!(
+                            slug_error::ErrorTag::Input,
+                            "Reading loaded extension .bzl file '{}' for transitive digest: {}",
+                            project_relative,
+                            reason
+                        ));
+                    }
+                    file_states.insert(project_relative.as_str().to_owned(), Err(error));
+                    continue;
+                }
+            };
+
+            {
+                let starlark_path = StarlarkPath::LoadFile(import_path);
+                let parsed = ctx
+                    .get_interpreter_calculator(OwnedStarlarkPath::new(starlark_path))
+                    .await?
+                    .prepare_eval_with_content(starlark_path, content.clone())?;
+                let parsed = parsed.with_buck_error_context(|| {
+                    format!(
+                        "Parsing loaded extension .bzl file '{}' for transitive digest",
+                        project_relative
+                    )
+                })?;
+                for (_, import) in parsed.imports().iter() {
+                    if matches!(import.borrow(), StarlarkModulePath::LoadFile(_)) {
+                        queue.push_back(import.clone());
+                    }
                 }
             }
+            file_states.insert(project_relative.as_str().to_owned(), Ok(content));
         }
 
-        Ok(compute_bzl_transitive_digest_from_file_contents(
+        Ok(compute_bzl_transitive_digest_from_file_states(
             extension_id,
-            &file_contents,
+            &file_states,
         ))
     }
 
@@ -458,8 +519,9 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         ctx: &mut DiceComputations<'_>,
         extension_id: &str,
         aggregated: &AggregatedExtension,
+        allow_missing_loads: bool,
     ) -> slug_error::Result<String> {
-        self.try_loaded_bzl_transitive_digest(ctx, extension_id, aggregated)
+        self.try_loaded_bzl_transitive_digest(ctx, extension_id, aggregated, allow_missing_loads)
             .await
     }
 

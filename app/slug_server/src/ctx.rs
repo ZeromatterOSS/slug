@@ -686,9 +686,8 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
             ctx_after_sync
         };
 
-        let cells_and_configs = self.cmd_ctx.load_new_configs(&mut ctx).await?;
+        let mut cells_and_configs = self.cmd_ctx.load_new_configs(&mut ctx).await?;
         let is_bzlmod = cells_and_configs.is_bzlmod;
-        let cell_resolver = cells_and_configs.cell_resolver;
 
         let configuror = BuildInterpreterConfiguror::new(
             self.interpreter_platform,
@@ -732,16 +731,46 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
         let profiler_instrumentation_override =
             &self.cmd_ctx.starlark_profiling_manager.configuration;
 
-        setup_interpreter(
-            &mut ctx,
-            cell_resolver,
-            configuror,
-            cells_and_configs.external_data,
-            profiler_instrumentation_override.clone(),
-            self.cmd_ctx.disable_starlark_types,
-            self.cmd_ctx.unstable_typecheck,
-        )?;
-        ctx.set_is_bzlmod(is_bzlmod)?;
+        if is_bzlmod {
+            let mut precompute_user_data =
+                self.make_user_computation_data(&cells_and_configs.root_config)?;
+            precompute_user_data.set_mergebase(mergebase.dupe());
+            let mut precompute_ctx = ctx.commit_with_data(precompute_user_data).await;
+            let full_cell_graph = slug_events::dispatch::with_dispatcher_async(
+                self.cmd_ctx.base_context.events.dupe(),
+                async {
+                    slug_bzlmod::bzlmod_cell_graph_for_current_workspace(&mut precompute_ctx).await
+                },
+            )
+            .await?;
+            ctx = precompute_ctx.into_updater();
+            let full_cell_resolver = BuckConfigBasedCells::cell_resolver_from_bzlmod_cell_graph(
+                &self.cmd_ctx.base_context.project_root,
+                full_cell_graph.as_ref(),
+            )?;
+            cells_and_configs.cell_resolver = full_cell_resolver.dupe();
+            setup_interpreter(
+                &mut ctx,
+                full_cell_resolver,
+                configuror,
+                cells_and_configs.external_data.clone(),
+                profiler_instrumentation_override.clone(),
+                self.cmd_ctx.disable_starlark_types,
+                self.cmd_ctx.unstable_typecheck,
+            )?;
+            ctx.set_is_bzlmod(is_bzlmod)?;
+        } else {
+            setup_interpreter(
+                &mut ctx,
+                cells_and_configs.cell_resolver.dupe(),
+                configuror,
+                cells_and_configs.external_data.clone(),
+                profiler_instrumentation_override.clone(),
+                self.cmd_ctx.disable_starlark_types,
+                self.cmd_ctx.unstable_typecheck,
+            )?;
+            ctx.set_is_bzlmod(is_bzlmod)?;
+        }
 
         let mut user_data = self.make_user_computation_data(&cells_and_configs.root_config)?;
         user_data.set_mergebase(mergebase);

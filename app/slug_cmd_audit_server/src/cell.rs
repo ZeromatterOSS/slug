@@ -74,6 +74,9 @@ pub(crate) async fn audit_cell(
     cwd: &ProjectRelativePath,
     fs: &ProjectRoot,
 ) -> slug_error::Result<IndexMap<String, AbsNormPathBuf>> {
+    if ctx.is_bzlmod().await? {
+        slug_bzlmod::validate_lockfile_extension_replay_for_current_workspace(ctx).await?;
+    }
     let cells = ctx.get_cell_resolver().await?;
     let this_resolver = ctx.get_cell_alias_resolver_for_dir(cwd).await?;
     let mappings: IndexMap<_, _> = {

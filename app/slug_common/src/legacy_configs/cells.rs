@@ -9,7 +9,6 @@
  */
 
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -69,8 +68,6 @@ use crate::dice::data::SetIoProvider;
 use crate::external_cells::EXTERNAL_CELLS_IMPL;
 use crate::file_ops::dice::DiceFileComputations;
 use crate::file_ops::dice::register_bzlmod_config_project_file;
-use crate::file_ops::metadata::FileType;
-use crate::file_ops::metadata::RawPathMetadata;
 use crate::io::fs::FsIoProvider;
 use crate::legacy_configs::aggregator::CellsAggregator;
 use crate::legacy_configs::args::ResolvedLegacyConfigArg;
@@ -273,6 +270,7 @@ fn replay_bzlmod_runtime_state(
             );
         }
     }
+
     cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
     cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
 
@@ -307,6 +305,87 @@ fn replay_bzlmod_runtime_state(
         }
     }
     slug_core::cells::repair_external_symlink_targets(project_root.root().as_path());
+}
+
+fn cell_resolver_from_bzlmod_cell_graph(
+    project_fs: &ProjectRoot,
+    cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
+) -> slug_error::Result<CellResolver> {
+    let root_path = CellRootPathBuf::new(ProjectRelativePath::empty().to_owned());
+    let runtime_cell_snapshot = runtime_cell_install_snapshot(cell_graph);
+    replay_bzlmod_runtime_state(cell_graph, project_fs);
+
+    let mut cell_definitions = Vec::new();
+    let mut bzlmod_external_cells: Vec<(CellName, BzlmodCellSetup)> = Vec::new();
+    let mut bzlmod_extension_cells: Vec<(CellName, ExtensionRepoCellSetup)> = Vec::new();
+    let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
+    let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
+
+    let root_cell_name = CellName::unchecked_new(&cell_graph.root_module_name)?;
+    cell_definitions.push((root_cell_name, root_path));
+
+    for cell in cell_graph.cells.iter() {
+        let name = CellName::unchecked_new(&cell.name)?;
+        let path = cell_root_path_from_cell_graph(&cell.path)?;
+        if !cell_definitions.iter().any(|(n, _)| *n == name) {
+            cell_definitions.push((name, path));
+            if let Some(setup) = module_setup_from_cell_graph(cell) {
+                bzlmod_external_cells.push((name, setup));
+            } else if cell.bundled {
+                bzlmod_bundled_cells.push(name);
+            }
+        }
+    }
+
+    for cell in cell_graph.extension_cells.iter().filter(|cell| !cell.lazy) {
+        let name = CellName::unchecked_new(&cell.canonical_name)?;
+        let path = cell_root_path_from_cell_graph(&cell.path)?;
+        if !cell_definitions.iter().any(|(n, _)| *n == name) {
+            let setup = runtime_extension_setup_from_cell_graph(cell);
+            cell_definitions.push((name, path));
+            bzlmod_extension_cells.push((name, setup));
+        }
+    }
+
+    for alias in cell_graph.root_aliases.iter() {
+        bzlmod_aliases.push((
+            NonEmptyCellAlias::new(alias.apparent_name.clone())?,
+            CellName::unchecked_new(&alias.target_name)?,
+        ));
+    }
+
+    let mut root_aliases = HashMap::new();
+    for (alias, target) in bzlmod_aliases {
+        let target_alias = NonEmptyCellAlias::new(target.as_str().to_owned())?;
+        if root_aliases.contains_key(&alias) {
+            continue;
+        }
+        if cell_definitions
+            .iter()
+            .any(|(n, _)| n.as_str() == alias.as_str())
+        {
+            tracing::debug!(
+                "Skipping bzlmod alias '{}' -> '{}': conflicts with cell definition",
+                alias,
+                target
+            );
+            continue;
+        }
+        root_aliases.insert(alias, target_alias);
+    }
+
+    let mut aggregator = CellsAggregator::new(cell_definitions, root_aliases)?;
+    for (name, setup) in bzlmod_external_cells {
+        aggregator.mark_external_cell(name, ExternalCellOrigin::Bzlmod(setup))?;
+    }
+    for name in bzlmod_bundled_cells {
+        aggregator.mark_external_cell(name, ExternalCellOrigin::Bundled(name))?;
+    }
+    for (name, setup) in bzlmod_extension_cells {
+        aggregator.mark_external_cell(name, ExternalCellOrigin::ExtensionRepo(setup))?;
+    }
+
+    aggregator.make_bzlmod_cell_resolver(runtime_cell_snapshot)
 }
 
 // Instrumentation-only caches used by Plan 61 guardrails to distinguish a
@@ -831,869 +910,6 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
     state: &mut H,
 ) {
     value.hash(state);
-}
-
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display(
-    "TrackedScannedExtensionBzlDigestKey({}, {}, {})",
-    project_root.display(),
-    root_module_name,
-    extension_id
-)]
-struct FallbackScannedExtensionBzlDigestKey {
-    project_root: AbsNormPathBuf,
-    root_module_name: Arc<str>,
-    extension_id: Arc<str>,
-    repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
-}
-
-#[derive(Clone, Dupe, Debug, PartialEq, Eq, Allocative)]
-struct FallbackScannedExtensionBzlDigestValue {
-    digest: Arc<str>,
-    cache_safe: bool,
-}
-
-#[async_trait]
-impl Key for FallbackScannedExtensionBzlDigestKey {
-    type Value = slug_error::Result<FallbackScannedExtensionBzlDigestValue>;
-
-    async fn compute(
-        &self,
-        ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        tracked_scanned_extension_bzl_digest(
-            ctx,
-            self.extension_id.as_ref(),
-            self.project_root.as_path(),
-            self.root_module_name.as_ref(),
-            self.repo_mappings.as_ref(),
-        )
-        .await
-        .map(|value| FallbackScannedExtensionBzlDigestValue {
-            digest: Arc::from(value.digest.as_str()),
-            cache_safe: value.cache_safe,
-        })
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        match (x, y) {
-            (Ok(x), Ok(y)) => x == y,
-            _ => false,
-        }
-    }
-
-    fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => value.cache_safe,
-            Err(_) => false,
-        }
-    }
-}
-
-const FALLBACK_SCANNED_BZL_MISSING_CONTENT: &str =
-    "read_error:No such file or directory (os error 2)";
-
-struct TrackedScannedExtensionBzlDigestValue {
-    digest: String,
-    cache_safe: bool,
-}
-
-fn tracked_project_bzl_location(
-    project_root: &Path,
-    repo: &str,
-    package: &str,
-    name: &str,
-) -> slug_bzlmod::BzlLoadLocation {
-    let mut path = if repo.is_empty() || repo == "_main" {
-        project_root.to_path_buf()
-    } else {
-        project_root.join("bazel-external").join(repo)
-    };
-    if !package.is_empty() {
-        path.push(package);
-    }
-    path.push(name);
-    slug_bzlmod::BzlLoadLocation {
-        path,
-        repo: repo.to_owned(),
-        package: package.to_owned(),
-    }
-}
-
-fn tracked_external_repo_candidate(repo: &str) -> String {
-    if repo.ends_with('+') || repo.contains('+') {
-        repo.to_owned()
-    } else {
-        format!("{repo}+")
-    }
-}
-
-fn tracked_root_repo_for_label(repo: &str, root_module_name: &str) -> bool {
-    repo.is_empty() || repo == "_main" || (!root_module_name.is_empty() && repo == root_module_name)
-}
-
-fn tracked_project_repo_for_unmapped_label(repo: &str, root_module_name: &str) -> String {
-    if tracked_root_repo_for_label(repo, root_module_name) {
-        String::new()
-    } else {
-        tracked_external_repo_candidate(repo)
-    }
-}
-
-fn tracked_mapping_for_source_repo<'a>(
-    repo_mappings: &'a slug_bzlmod::RepoMappingSnapshot,
-    current_repo: &str,
-) -> Option<&'a BTreeMap<String, String>> {
-    let mut candidates = Vec::new();
-    candidates.push(current_repo.to_owned());
-    if current_repo.is_empty() || current_repo == "_main" {
-        candidates.push("_main".to_owned());
-        candidates.push(String::new());
-    } else if current_repo.ends_with('+') {
-        candidates.push(current_repo.trim_end_matches('+').to_owned());
-    } else if !current_repo.contains('+') {
-        candidates.push(format!("{current_repo}+"));
-    }
-    for candidate in candidates {
-        if let Some(mapping) = repo_mappings.get(&candidate) {
-            return Some(mapping);
-        }
-    }
-    None
-}
-
-fn tracked_split_bzl_label_target(target: &str) -> Option<(&str, &str)> {
-    target.split_once(':')
-}
-
-fn tracked_label_bzl_location_under_project(
-    label: &str,
-    project_root: &Path,
-    root_module_name: &str,
-    current: Option<&slug_bzlmod::BzlLoadLocation>,
-    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
-) -> Option<slug_bzlmod::BzlLoadLocation> {
-    if let Some(rest) = label.strip_prefix("@@") {
-        let (repo, target) = rest.split_once("//")?;
-        let (pkg, name) = tracked_split_bzl_label_target(target)?;
-        let repo = if repo.contains('+') {
-            tracked_external_repo_candidate(repo)
-        } else {
-            tracked_project_repo_for_unmapped_label(repo, root_module_name)
-        };
-        return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
-    }
-    if let Some(rest) = label.strip_prefix('@') {
-        let (repo, target) = rest.split_once("//")?;
-        let (pkg, name) = tracked_split_bzl_label_target(target)?;
-        let repo = if repo.contains('+') {
-            repo.to_owned()
-        } else if let Some(current) = current {
-            tracked_mapping_for_source_repo(repo_mappings, &current.repo)
-                .and_then(|mapping| mapping.get(repo).cloned())
-                .unwrap_or_else(|| tracked_project_repo_for_unmapped_label(repo, root_module_name))
-        } else {
-            tracked_project_repo_for_unmapped_label(repo, root_module_name)
-        };
-        return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
-    }
-    if let Some(rest) = label.strip_prefix("//") {
-        let current_repo = current.map(|location| location.repo.as_str()).unwrap_or("");
-        let (pkg, name) = tracked_split_bzl_label_target(rest)?;
-        return Some(tracked_project_bzl_location(
-            project_root,
-            current_repo,
-            pkg,
-            name,
-        ));
-    }
-    if let Some(name) = label.strip_prefix(':') {
-        let current = current?;
-        return Some(tracked_project_bzl_location(
-            project_root,
-            &current.repo,
-            &current.package,
-            name,
-        ));
-    }
-    if label.contains("//") {
-        let (repo, target) = label.split_once("//")?;
-        let (pkg, name) = tracked_split_bzl_label_target(target)?;
-        let repo = if repo.contains('+') {
-            repo.to_owned()
-        } else if let Some(current) = current {
-            tracked_mapping_for_source_repo(repo_mappings, &current.repo)
-                .and_then(|mapping| mapping.get(repo).cloned())
-                .unwrap_or_else(|| tracked_project_repo_for_unmapped_label(repo, root_module_name))
-        } else {
-            tracked_project_repo_for_unmapped_label(repo, root_module_name)
-        };
-        return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
-    }
-    let current = current?;
-    let mut path = current.path.parent()?.to_path_buf();
-    path.push(label);
-    Some(slug_bzlmod::BzlLoadLocation {
-        path,
-        repo: current.repo.clone(),
-        package: current.package.clone(),
-    })
-}
-
-async fn tracked_read_bzl_location(
-    ctx: &mut DiceComputations<'_>,
-    project_root: &Path,
-    location: &slug_bzlmod::BzlLoadLocation,
-) -> slug_error::Result<Option<(String, String, bool)>> {
-    let Ok(rel) = location.path.strip_prefix(project_root) else {
-        return Ok(None);
-    };
-    let rel = rel.to_string_lossy();
-    let project_path = ProjectRelativePath::new(rel.as_ref())?;
-    register_bzlmod_config_project_file(project_path.to_owned());
-    let cache_safe = tracked_bzl_location_cache_safe(ctx, location).await?;
-    let content = DiceFileComputations::read_project_file_if_exists(ctx, project_path).await?;
-    Ok(Some((
-        rel.into_owned(),
-        content.unwrap_or_else(|| FALLBACK_SCANNED_BZL_MISSING_CONTENT.to_owned()),
-        cache_safe,
-    )))
-}
-
-async fn tracked_bzl_location_cache_safe(
-    ctx: &mut DiceComputations<'_>,
-    location: &slug_bzlmod::BzlLoadLocation,
-) -> slug_error::Result<bool> {
-    if location.repo.is_empty() || location.repo == "_main" {
-        return Ok(true);
-    }
-    let repo_root_rel = format!("bazel-external/{}", location.repo);
-    let repo_root_path = ProjectRelativePath::new(repo_root_rel.as_str())?.to_owned();
-    register_bzlmod_config_project_file(repo_root_path.clone());
-    let Some(metadata) =
-        DiceFileComputations::read_project_path_metadata_if_exists(ctx, repo_root_path.as_ref())
-            .await?
-    else {
-        return Ok(false);
-    };
-    Ok(matches!(metadata, RawPathMetadata::Directory))
-}
-
-async fn tracked_scanned_extension_bzl_digest(
-    ctx: &mut DiceComputations<'_>,
-    extension_id: &str,
-    project_root: &Path,
-    root_module_name: &str,
-    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
-) -> slug_error::Result<TrackedScannedExtensionBzlDigestValue> {
-    let label = extension_id.split('%').next().unwrap_or(extension_id);
-    let Some(root_location) = tracked_label_bzl_location_under_project(
-        label,
-        project_root,
-        root_module_name,
-        None,
-        repo_mappings,
-    ) else {
-        return Ok(TrackedScannedExtensionBzlDigestValue {
-            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
-            cache_safe: true,
-        });
-    };
-
-    let Some((root_rel, root_content, root_cache_safe)) =
-        tracked_read_bzl_location(ctx, project_root, &root_location).await?
-    else {
-        return Ok(TrackedScannedExtensionBzlDigestValue {
-            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
-            cache_safe: true,
-        });
-    };
-    if root_content == FALLBACK_SCANNED_BZL_MISSING_CONTENT {
-        return Ok(TrackedScannedExtensionBzlDigestValue {
-            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
-            cache_safe: false,
-        });
-    }
-
-    let mut seen_locations = BTreeSet::new();
-    let mut file_contents = BTreeMap::new();
-    let mut cache_safe = root_cache_safe;
-    let mut queue = VecDeque::from([(root_location, root_rel, root_content, root_cache_safe)]);
-    while let Some((location, rel, content, location_cache_safe)) = queue.pop_front() {
-        cache_safe &= location_cache_safe;
-        let key = (
-            location.path.clone(),
-            location.repo.clone(),
-            location.package.clone(),
-        );
-        if !seen_locations.insert(key) {
-            continue;
-        }
-        file_contents.insert(rel, content.clone());
-        if content == FALLBACK_SCANNED_BZL_MISSING_CONTENT {
-            cache_safe = false;
-            continue;
-        }
-        for load in slug_bzlmod::literal_loads(&location.path, &content) {
-            let Some(load_location) = tracked_label_bzl_location_under_project(
-                &load,
-                project_root,
-                root_module_name,
-                Some(&location),
-                repo_mappings,
-            ) else {
-                continue;
-            };
-            if !load_location.path.starts_with(project_root) {
-                continue;
-            }
-            if let Some((load_rel, load_content, load_cache_safe)) =
-                tracked_read_bzl_location(ctx, project_root, &load_location).await?
-            {
-                queue.push_back((load_location, load_rel, load_content, load_cache_safe));
-            }
-        }
-    }
-
-    if file_contents.is_empty() {
-        return Ok(TrackedScannedExtensionBzlDigestValue {
-            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
-            cache_safe,
-        });
-    }
-    Ok(TrackedScannedExtensionBzlDigestValue {
-        digest: slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
-            extension_id,
-            &file_contents,
-        ),
-        cache_safe,
-    })
-}
-
-async fn fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
-    ctx: &mut DiceComputations<'_>,
-    project_root: &AbsNormPathBuf,
-    root_module_name: &str,
-    aggregated: &HashMap<String, slug_bzlmod::AggregatedExtension>,
-    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
-) -> slug_error::Result<HashMap<String, String>> {
-    let repo_mappings = Arc::new(repo_mappings.clone());
-    let root_module_name = Arc::<str>::from(root_module_name);
-    let mut digests = HashMap::new();
-    for extension_id in aggregated.keys() {
-        let key = FallbackScannedExtensionBzlDigestKey {
-            project_root: project_root.clone(),
-            root_module_name: root_module_name.clone(),
-            extension_id: Arc::from(extension_id.as_str()),
-            repo_mappings: repo_mappings.clone(),
-        };
-        let digest = ctx.compute(&key).await??;
-        digests.insert(extension_id.clone(), digest.digest.to_string());
-    }
-    Ok(digests)
-}
-
-fn current_extension_for_lockfile_preseed<'a>(
-    aggregated: &'a HashMap<String, slug_bzlmod::AggregatedExtension>,
-    lockfile_ext_id: &'a str,
-) -> Option<(&'a str, &'a slug_bzlmod::AggregatedExtension)> {
-    if let Some(extension) = aggregated.get(lockfile_ext_id) {
-        return Some((lockfile_ext_id, extension));
-    }
-
-    let lockfile_canonical = slug_bzlmod::lockfile_canonical_extension_id(lockfile_ext_id);
-    aggregated
-        .iter()
-        .find(|(current_id, _)| {
-            slug_bzlmod::lockfile_canonical_extension_id(current_id) == lockfile_canonical
-        })
-        .map(|(current_id, extension)| (current_id.as_str(), extension))
-}
-
-async fn prevalidated_extension_caches_for_lockfile_preseed(
-    ctx: &mut DiceComputations<'_>,
-    lockfile: &slug_bzlmod::Lockfile,
-    aggregated: &HashMap<String, slug_bzlmod::AggregatedExtension>,
-    root_module_name: &str,
-    workspace_root: &Path,
-    repo_env: &BTreeMap<String, String>,
-    bzl_transitive_digests: &HashMap<String, String>,
-    repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
-    repo_mapping_overrides: &slug_bzlmod::RepoMappingOverrides,
-) -> slug_error::Result<fxhash::FxHashMap<String, fxhash::FxHashMap<String, slug_bzlmod::RepoSpec>>>
-{
-    let mut caches = fxhash::FxHashMap::default();
-    for ext_id in lockfile.extension_ids() {
-        if ext_id.starts_with(':') || ext_id.starts_with("//") {
-            continue;
-        }
-        let Some((current_ext_id, current_extension)) =
-            current_extension_for_lockfile_preseed(aggregated, ext_id)
-        else {
-            continue;
-        };
-        let Some(bzl_transitive_digest) = bzl_transitive_digests.get(current_ext_id) else {
-            continue;
-        };
-        let usages_digest = slug_bzlmod::compute_extension_input_hash(current_extension);
-        let Some(selected) = lockfile.select_extension_cache_for_workspace(
-            current_ext_id,
-            bzl_transitive_digest,
-            &usages_digest,
-            Some(workspace_root),
-            Some(repo_env),
-            Some(repo_mappings),
-            Some(root_module_name),
-            Some(repo_mapping_overrides),
-        ) else {
-            continue;
-        };
-        if selected_cache_recorded_inputs_current_for_preseed(ctx, current_ext_id, &selected)
-            .await?
-        {
-            selected.record_hit(current_ext_id);
-            caches.insert(current_ext_id.to_owned(), selected.repo_specs().clone());
-        }
-    }
-    Ok(caches)
-}
-
-async fn selected_cache_recorded_inputs_current_for_preseed(
-    ctx: &mut DiceComputations<'_>,
-    extension_id: &str,
-    selected: &slug_bzlmod::SelectedExtensionCache,
-) -> slug_error::Result<bool> {
-    let key = PreseedRecordedInputsKey::from_selected_cache(selected);
-    match ctx.compute(&key).await? {
-        Ok(PreseedRecordedInputsValue::Current) => return Ok(true),
-        Ok(PreseedRecordedInputsValue::Stale(reason)) => {
-            record_bzlmod_event(
-                BzlmodEventKind::ExtensionReplayMissReason,
-                format!("{extension_id}:recorded_inputs:{reason}"),
-            );
-            return Ok(false);
-        }
-        Ok(PreseedRecordedInputsValue::Unsupported) => {}
-        Err(e) => return Err(e),
-    }
-
-    slug_bzlmod::selected_cache_recorded_inputs_current(ctx, extension_id, selected).await
-}
-
-#[derive(Clone, Dupe, Debug, PartialEq, Eq, Allocative)]
-enum PreseedRecordedInputsValue {
-    Current,
-    Stale(Arc<str>),
-    Unsupported,
-}
-
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display("PreseedRecordedInputsKey({})", recorded_inputs.len())]
-struct PreseedRecordedInputsKey {
-    recorded_inputs: Arc<Vec<String>>,
-    workspace_root: Option<Arc<PathBuf>>,
-    repo_env: Option<Arc<BTreeMap<String, String>>>,
-    repo_mappings: Option<Arc<slug_bzlmod::RepoMappingSnapshot>>,
-}
-
-impl PreseedRecordedInputsKey {
-    fn from_selected_cache(selected: &slug_bzlmod::SelectedExtensionCache) -> Self {
-        Self {
-            recorded_inputs: Arc::new(selected.recorded_inputs().to_vec()),
-            workspace_root: selected
-                .workspace_root()
-                .map(|path| Arc::new(path.to_path_buf())),
-            repo_env: selected.repo_env().map(|env| Arc::new(env.clone())),
-            repo_mappings: selected
-                .repo_mappings()
-                .map(|mappings| Arc::new(mappings.clone())),
-        }
-    }
-}
-
-impl Dupe for PreseedRecordedInputsKey {
-    fn dupe(&self) -> Self {
-        Self {
-            recorded_inputs: self.recorded_inputs.dupe(),
-            workspace_root: self.workspace_root.dupe(),
-            repo_env: self.repo_env.dupe(),
-            repo_mappings: self.repo_mappings.dupe(),
-        }
-    }
-}
-
-#[async_trait]
-impl Key for PreseedRecordedInputsKey {
-    type Value = slug_error::Result<PreseedRecordedInputsValue>;
-
-    async fn compute(
-        &self,
-        ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        match preseed_recorded_inputs_current_through_dice(
-            ctx,
-            self.recorded_inputs.as_slice(),
-            self.workspace_root.as_deref().map(PathBuf::as_path),
-            self.repo_env.as_deref(),
-            self.repo_mappings.as_deref(),
-        )
-        .await?
-        {
-            Some(Ok(())) => Ok(PreseedRecordedInputsValue::Current),
-            Some(Err(reason)) => Ok(PreseedRecordedInputsValue::Stale(Arc::from(reason))),
-            None => Ok(PreseedRecordedInputsValue::Unsupported),
-        }
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        match (x, y) {
-            (Ok(x), Ok(y)) => x == y,
-            _ => false,
-        }
-    }
-
-    fn validity(_x: &Self::Value) -> bool {
-        false
-    }
-}
-
-async fn preseed_recorded_inputs_current_through_dice(
-    ctx: &mut DiceComputations<'_>,
-    recorded_inputs: &[String],
-    workspace_root: Option<&Path>,
-    repo_env: Option<&BTreeMap<String, String>>,
-    repo_mappings: Option<&slug_bzlmod::RepoMappingSnapshot>,
-) -> slug_error::Result<Option<Result<(), String>>> {
-    for raw in recorded_inputs {
-        let Some((input, old_value)) = parse_preseed_recorded_input_with_value(raw) else {
-            return Ok(Some(Err("recorded_input_malformed".to_owned())));
-        };
-        match input {
-            PreseedRecordedInput::File(path) => {
-                let Some(old_value) = old_value else {
-                    return Ok(Some(Err("recorded_input_malformed".to_owned())));
-                };
-                let Some(project_path) = preseed_recorded_file_project_path(&path, workspace_root)
-                else {
-                    return Ok(None);
-                };
-                let Some(current) =
-                    preseed_recorded_file_marker_value(ctx, project_path.as_ref()).await?
-                else {
-                    return Ok(None);
-                };
-                if current != old_value {
-                    return Ok(Some(Err(recorded_input_changed_reason_with_values(
-                        raw, &old_value, &current,
-                    ))));
-                }
-            }
-            PreseedRecordedInput::Dirents(path) => {
-                let Some(old_value) = old_value else {
-                    return Ok(Some(Err("recorded_input_malformed".to_owned())));
-                };
-                let Some(project_path) = preseed_recorded_project_path(&path, workspace_root)
-                else {
-                    return Ok(None);
-                };
-                let current =
-                    preseed_recorded_dirents_marker_value(ctx, project_path.as_ref()).await?;
-                if current != old_value {
-                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
-                }
-            }
-            PreseedRecordedInput::DirTree(path) => {
-                let Some(old_value) = old_value else {
-                    return Ok(Some(Err("recorded_input_malformed".to_owned())));
-                };
-                let Some(project_path) = preseed_recorded_project_path(&path, workspace_root)
-                else {
-                    return Ok(None);
-                };
-                let Some(current) =
-                    preseed_recorded_dirtree_marker_value(ctx, project_path.as_ref()).await?
-                else {
-                    return Ok(None);
-                };
-                if current != old_value {
-                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
-                }
-            }
-            PreseedRecordedInput::Env(name) => {
-                let Some(repo_env) = repo_env else {
-                    return Ok(Some(Err("recorded_input_unsupported".to_owned())));
-                };
-                let current = repo_env.get(&name).cloned();
-                if current != old_value {
-                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
-                }
-            }
-            PreseedRecordedInput::RepoMapping {
-                source_repo,
-                apparent,
-            } => {
-                let Some(repo_mappings) = repo_mappings else {
-                    return Ok(Some(Err("recorded_input_unsupported".to_owned())));
-                };
-                let Some(source_mapping) = repo_mappings.get(&source_repo) else {
-                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
-                };
-                let current = source_mapping
-                    .get(&apparent)
-                    .cloned()
-                    .or_else(|| Some(apparent.clone()));
-                if current != old_value {
-                    return Ok(Some(Err(recorded_input_changed_reason(raw))));
-                }
-            }
-            PreseedRecordedInput::Unsupported => return Ok(None),
-        }
-    }
-    Ok(Some(Ok(())))
-}
-
-enum PreseedRecordedInput {
-    File(PathBuf),
-    Dirents(PathBuf),
-    DirTree(PathBuf),
-    Env(String),
-    RepoMapping {
-        source_repo: String,
-        apparent: String,
-    },
-    Unsupported,
-}
-
-fn parse_preseed_recorded_input_with_value(
-    raw: &str,
-) -> Option<(PreseedRecordedInput, Option<String>)> {
-    let space = raw.find(' ')?;
-    if space == 0 {
-        return None;
-    }
-    let input = unescape_preseed_recorded_input_part(&raw[..space])?;
-    let value = unescape_preseed_recorded_input_part(&raw[space + 1..]);
-    Some((parse_preseed_recorded_input(&input), value))
-}
-
-fn parse_preseed_recorded_input(input: &str) -> PreseedRecordedInput {
-    let Some((kind, payload)) = input.split_once(':') else {
-        return PreseedRecordedInput::Unsupported;
-    };
-    match kind {
-        "FILE" => PreseedRecordedInput::File(PathBuf::from(payload)),
-        "DIRENTS" => PreseedRecordedInput::Dirents(PathBuf::from(payload)),
-        "DIRTREE" => PreseedRecordedInput::DirTree(PathBuf::from(payload)),
-        "ENV" => PreseedRecordedInput::Env(payload.to_owned()),
-        "REPO_MAPPING" => payload
-            .split_once(',')
-            .map(
-                |(source_repo, apparent)| PreseedRecordedInput::RepoMapping {
-                    source_repo: source_repo.to_owned(),
-                    apparent: apparent.to_owned(),
-                },
-            )
-            .unwrap_or(PreseedRecordedInput::Unsupported),
-        _ => PreseedRecordedInput::Unsupported,
-    }
-}
-
-fn unescape_preseed_recorded_input_part(input: &str) -> Option<String> {
-    if input == "\\0" {
-        return None;
-    }
-    let mut result = String::with_capacity(input.len());
-    let mut escaped = false;
-    for ch in input.chars() {
-        if escaped {
-            match ch {
-                'n' => result.push('\n'),
-                's' => result.push(' '),
-                other => result.push(other),
-            }
-            escaped = false;
-        } else if ch == '\\' {
-            escaped = true;
-        } else {
-            result.push(ch);
-        }
-    }
-    if escaped {
-        result.push('\\');
-    }
-    Some(result)
-}
-
-fn preseed_recorded_file_project_path(
-    path: &Path,
-    workspace_root: Option<&Path>,
-) -> Option<ProjectRelativePathBuf> {
-    preseed_recorded_project_path(path, workspace_root)
-}
-
-fn preseed_recorded_project_path(
-    path: &Path,
-    workspace_root: Option<&Path>,
-) -> Option<ProjectRelativePathBuf> {
-    let raw = path.to_string_lossy();
-    for prefix in ["@@//", "@//", "//"] {
-        if let Some(rest) = raw.strip_prefix(prefix) {
-            workspace_root?;
-            return ProjectRelativePathBuf::try_from(rest.to_owned()).ok();
-        }
-    }
-    if path.is_absolute() {
-        let workspace_root = workspace_root?;
-        let relative = path.strip_prefix(workspace_root).ok()?;
-        return ProjectRelativePathBuf::try_from(relative.to_path_buf()).ok();
-    }
-    None
-}
-
-async fn preseed_recorded_file_marker_value(
-    ctx: &mut DiceComputations<'_>,
-    path: &ProjectRelativePath,
-) -> slug_error::Result<Option<String>> {
-    register_bzlmod_config_project_file(path.to_owned());
-    let Some(metadata) =
-        DiceFileComputations::read_project_path_metadata_if_exists(ctx, path).await?
-    else {
-        return Ok(Some("ENOENT".to_owned()));
-    };
-    match metadata {
-        RawPathMetadata::Directory => Ok(Some("DIR".to_owned())),
-        RawPathMetadata::File(_) => {
-            let Some(content) =
-                DiceFileComputations::read_project_file_if_exists(ctx, path).await?
-            else {
-                return Ok(Some("ENOENT".to_owned()));
-            };
-            Ok(Some(hex::encode(Sha256::digest(content.as_bytes()))))
-        }
-        RawPathMetadata::Symlink { .. } => Ok(None),
-    }
-}
-
-async fn preseed_recorded_dirents_marker_value(
-    ctx: &mut DiceComputations<'_>,
-    path: &ProjectRelativePath,
-) -> slug_error::Result<String> {
-    register_bzlmod_config_project_file(path.to_owned());
-    let entries = DiceFileComputations::read_project_dir_entry_names(ctx, path).await?;
-    Ok(bazel_fingerprint_add_strings_hex(entries.as_slice()))
-}
-
-async fn preseed_recorded_dirtree_marker_value(
-    ctx: &mut DiceComputations<'_>,
-    path: &ProjectRelativePath,
-) -> slug_error::Result<Option<String>> {
-    register_bzlmod_config_project_file(path.to_owned());
-    let entries = match DiceFileComputations::read_project_dir_entries(ctx, path).await {
-        Ok(entries) => entries,
-        Err(_) => return Ok(Some("ENOENT".to_owned())),
-    };
-    let entry_names: Vec<String> = entries.iter().map(|(name, _)| name.clone()).collect();
-    let mut subdir_digests = Vec::new();
-    let mut file_values = Vec::new();
-    for (entry, file_type) in entries.iter() {
-        let Some(entry_path) = project_child_path(path, entry) else {
-            return Ok(None);
-        };
-        match *file_type {
-            FileType::Directory => {
-                let Some(digest) = Box::pin(preseed_recorded_dirtree_marker_value(
-                    ctx,
-                    entry_path.as_ref(),
-                ))
-                .await?
-                else {
-                    return Ok(None);
-                };
-                subdir_digests.push(digest);
-                file_values.push((2, None));
-            }
-            FileType::File => {
-                let content = match DiceFileComputations::read_project_file_if_exists(
-                    ctx,
-                    entry_path.as_ref(),
-                )
-                .await
-                {
-                    Ok(Some(content)) => content,
-                    Ok(None) => {
-                        file_values.push((1, None));
-                        continue;
-                    }
-                    Err(_) => return Ok(None),
-                };
-                file_values.push((0, Some(Sha256::digest(content.as_bytes()).to_vec())));
-            }
-            FileType::Symlink => return Ok(None),
-            FileType::Unknown => file_values.push((1, None)),
-        }
-    }
-
-    let mut bytes = Vec::new();
-    bazel_fingerprint_add_strings(&entry_names, &mut bytes);
-    bazel_fingerprint_add_strings(&subdir_digests, &mut bytes);
-    for (file_state_type_ordinal, digest) in file_values {
-        encode_varint(file_state_type_ordinal, &mut bytes);
-        if let Some(digest) = digest {
-            bytes.extend_from_slice(&digest);
-        }
-    }
-    Ok(Some(hex::encode(Sha256::digest(&bytes))))
-}
-
-fn project_child_path(parent: &ProjectRelativePath, child: &str) -> Option<ProjectRelativePathBuf> {
-    let path = if parent.as_str().is_empty() {
-        child.to_owned()
-    } else {
-        format!("{}/{}", parent.as_str(), child)
-    };
-    ProjectRelativePathBuf::try_from(path).ok()
-}
-
-fn bazel_fingerprint_add_strings_hex(inputs: &[String]) -> String {
-    let mut bytes = Vec::new();
-    bazel_fingerprint_add_strings(inputs, &mut bytes);
-    hex::encode(Sha256::digest(&bytes))
-}
-
-fn bazel_fingerprint_add_strings(inputs: &[String], bytes: &mut Vec<u8>) {
-    encode_varint(inputs.len() as u64, bytes);
-    for input in inputs {
-        let input = input.as_bytes();
-        encode_varint(input.len() as u64, bytes);
-        bytes.extend_from_slice(input);
-    }
-}
-
-fn encode_varint(mut value: u64, out: &mut Vec<u8>) {
-    while value >= 0x80 {
-        out.push(((value as u8) & 0x7f) | 0x80);
-        value >>= 7;
-    }
-    out.push(value as u8);
-}
-
-fn recorded_input_changed_reason(raw: &str) -> String {
-    let identity = raw
-        .split_once(' ')
-        .map(|(identity, _)| identity)
-        .unwrap_or(raw);
-    format!("recorded_input_changed:{identity}")
-}
-
-fn recorded_input_changed_reason_with_values(raw: &str, old: &str, current: &str) -> String {
-    format!(
-        "{}:old={}:current={}",
-        recorded_input_changed_reason(raw),
-        old,
-        current
-    )
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -2930,6 +2146,13 @@ impl Key for OverridePatchInputsKey {
 }
 
 impl BuckConfigBasedCells {
+    pub fn cell_resolver_from_bzlmod_cell_graph(
+        project_fs: &ProjectRoot,
+        cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
+    ) -> slug_error::Result<CellResolver> {
+        cell_resolver_from_bzlmod_cell_graph(project_fs, cell_graph)
+    }
+
     /// In the client and one place in the daemon, we need access to the alias resolver for the cwd
     /// in some places where we don't have normal dice access
     ///
@@ -3371,81 +2594,6 @@ impl slug_bzlmod::BzlmodCleanGraphIo for CommonBzlmodCleanGraphIo {
                 root_module_name
             )
         })
-    }
-
-    async fn append_lockfile_seeded_extension_cells(
-        &self,
-        key: &slug_bzlmod::BzlmodResolvedModuleGraphKey,
-        ctx: &mut DiceComputations<'_>,
-        builder: &mut slug_bzlmod::BzlmodCleanCellGraphBuilder,
-        visible_lockfile: Option<&slug_bzlmod::Lockfile>,
-        hidden_lockfile: Option<&slug_bzlmod::Lockfile>,
-    ) -> slug_error::Result<()> {
-        let project_root = bzlmod_key_project_root(key)?;
-        let workspace_root = project_root.as_path();
-
-        if let Some(lockfile) = visible_lockfile {
-            let fallback_scanned_bzl_transitive_digests =
-                fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
-                    ctx,
-                    &project_root,
-                    builder.root_module_name(),
-                    builder.extension_aggregations(),
-                    builder.repo_mappings(),
-                )
-                .await?;
-            let prevalidated_caches = prevalidated_extension_caches_for_lockfile_preseed(
-                ctx,
-                lockfile,
-                builder.extension_aggregations(),
-                builder.root_module_name(),
-                workspace_root,
-                &key.options.repo_env,
-                &fallback_scanned_bzl_transitive_digests,
-                builder.repo_mappings(),
-                builder.repo_mapping_overrides(),
-            )
-            .await?;
-            builder.append_lockfile_seeded_extension_cells(
-                lockfile,
-                workspace_root,
-                Some(&key.options.repo_env),
-                &fallback_scanned_bzl_transitive_digests,
-                Some(&prevalidated_caches),
-            );
-        }
-        if let Some(lockfile) = hidden_lockfile {
-            let fallback_scanned_bzl_transitive_digests =
-                fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
-                    ctx,
-                    &project_root,
-                    builder.root_module_name(),
-                    builder.extension_aggregations(),
-                    builder.repo_mappings(),
-                )
-                .await?;
-            let prevalidated_caches = prevalidated_extension_caches_for_lockfile_preseed(
-                ctx,
-                lockfile,
-                builder.extension_aggregations(),
-                builder.root_module_name(),
-                workspace_root,
-                &key.options.repo_env,
-                &fallback_scanned_bzl_transitive_digests,
-                builder.repo_mappings(),
-                builder.repo_mapping_overrides(),
-            )
-            .await?;
-            builder.append_lockfile_seeded_extension_cells(
-                lockfile,
-                workspace_root,
-                Some(&key.options.repo_env),
-                &fallback_scanned_bzl_transitive_digests,
-                Some(&prevalidated_caches),
-            );
-        }
-
-        Ok(())
     }
 
     async fn compute_lockfile_content(
@@ -5335,369 +4483,6 @@ use_repo(ext, "generated")
             }
             other => panic!("expected bazel_tools to be a bundled cell, got {other:?}"),
         }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn fallback_scanned_extension_bzl_digest_matches_legacy_project_load_digest()
-    -> slug_error::Result<()> {
-        let fs = ProjectRootTemp::new()?;
-        let ext_content = r#"
-load(":helper.bzl", "HELPER")
-
-def _impl(module_ctx):
-    pass
-
-ext = module_extension(implementation = _impl)
-"#;
-        let helper_content = "HELPER = 'tracked'\n";
-        fs.write_file("ext.bzl", ext_content);
-        fs.write_file("helper.bzl", helper_content);
-
-        let extension_id = "@@root//:ext.bzl%ext";
-        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
-        let expected = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
-            extension_id,
-            &BTreeMap::from([
-                ("ext.bzl".to_owned(), ext_content.to_owned()),
-                ("helper.bzl".to_owned(), helper_content.to_owned()),
-            ]),
-        );
-        let mut dice = DiceBuilder::new()
-            .set_data(|data| {
-                data.set_testing_io_provider(&fs);
-            })
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-        let fallback_scanned = dice
-            .compute(&FallbackScannedExtensionBzlDigestKey {
-                project_root: AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?,
-                root_module_name: Arc::from("root"),
-                extension_id: Arc::from(extension_id),
-                repo_mappings: Arc::new(repo_mappings.clone()),
-            })
-            .await??;
-
-        assert_eq!(fallback_scanned.digest.as_ref(), expected);
-        assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
-            &Ok(fallback_scanned)
-        ));
-        Ok(())
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn fallback_scanned_extension_bzl_digest_marks_external_symlink_load_uncacheable()
-    -> slug_error::Result<()> {
-        let fs = ProjectRootTemp::new()?;
-        let external = tempfile::Builder::new()
-            .prefix("slug-plan61-external-bzl-")
-            .tempdir()?;
-        let owner_dir = external.path().join("owner");
-        let helper_dir = external.path().join("helper");
-        std::fs::create_dir_all(&owner_dir)?;
-        std::fs::create_dir_all(&helper_dir)?;
-        let ext_content = r#"
-load("@helper_alias//:helper.bzl", "HELPER")
-
-def _impl(module_ctx):
-    pass
-
-ext = module_extension(implementation = _impl)
-"#;
-        let helper_content = "HELPER = 'mapped external symlink'\n";
-        std::fs::write(owner_dir.join("replay_ext.bzl"), ext_content)?;
-        std::fs::write(helper_dir.join("helper.bzl"), helper_content)?;
-        std::fs::create_dir_all(fs.path().root().as_path().join("bazel-external"))?;
-        std::os::unix::fs::symlink(
-            &owner_dir,
-            fs.path().root().as_path().join("bazel-external/owner+"),
-        )?;
-        std::os::unix::fs::symlink(
-            &helper_dir,
-            fs.path().root().as_path().join("bazel-external/helper+"),
-        )?;
-
-        let extension_id = "@owner//:replay_ext.bzl%ext";
-        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::from([(
-            "owner".to_owned(),
-            BTreeMap::from([("helper_alias".to_owned(), "helper+".to_owned())]),
-        )]);
-        let expected = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
-            extension_id,
-            &BTreeMap::from([
-                (
-                    "bazel-external/helper+/helper.bzl".to_owned(),
-                    helper_content.to_owned(),
-                ),
-                (
-                    "bazel-external/owner+/replay_ext.bzl".to_owned(),
-                    ext_content.to_owned(),
-                ),
-            ]),
-        );
-        let mut dice = DiceBuilder::new()
-            .set_data(|data| {
-                data.set_testing_io_provider(&fs);
-            })
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-        let fallback_scanned = dice
-            .compute(&FallbackScannedExtensionBzlDigestKey {
-                project_root: AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?,
-                root_module_name: Arc::from("root"),
-                extension_id: Arc::from(extension_id),
-                repo_mappings: Arc::new(repo_mappings),
-            })
-            .await??;
-
-        assert_eq!(fallback_scanned.digest.as_ref(), expected);
-        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
-            &Ok(fallback_scanned)
-        ));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn fallback_scanned_extension_bzl_digest_tracks_missing_project_load_digest()
-    -> slug_error::Result<()> {
-        let fs = ProjectRootTemp::new()?;
-        let ext_content = r#"
-load(":helper.bzl", "HELPER")
-
-def _impl(module_ctx):
-    pass
-
-ext = module_extension(implementation = _impl)
-"#;
-        fs.write_file("ext.bzl", ext_content);
-
-        let extension_id = "@@root//:ext.bzl%ext";
-        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
-        let expected_missing = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
-            extension_id,
-            &BTreeMap::from([
-                ("ext.bzl".to_owned(), ext_content.to_owned()),
-                (
-                    "helper.bzl".to_owned(),
-                    FALLBACK_SCANNED_BZL_MISSING_CONTENT.to_owned(),
-                ),
-            ]),
-        );
-        let project_root = AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?;
-        let key = FallbackScannedExtensionBzlDigestKey {
-            project_root: project_root.clone(),
-            root_module_name: Arc::from("root"),
-            extension_id: Arc::from(extension_id),
-            repo_mappings: Arc::new(repo_mappings.clone()),
-        };
-        let mut dice = DiceBuilder::new()
-            .set_data(|data| {
-                data.set_testing_io_provider(&fs);
-            })
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-
-        let fallback_scanned_missing = dice.compute(&key).await??;
-        assert_ne!(
-            fallback_scanned_missing.digest.as_ref(),
-            slug_bzlmod::compute_bzl_transitive_digest(extension_id)
-        );
-        assert_eq!(fallback_scanned_missing.digest.as_ref(), expected_missing);
-        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
-            &Ok(fallback_scanned_missing.clone())
-        ));
-
-        let created_helper_content = "HELPER = 'created'\n";
-        fs.write_file("helper.bzl", created_helper_content);
-        let mut updater = dice.into_updater();
-        let mut changes = crate::file_ops::dice::FileChangeTracker::new();
-        changes.project_file_added_or_removed(ProjectRelativePathBuf::unchecked_new(
-            "helper.bzl".to_owned(),
-        ));
-        changes.write_to_dice(&mut updater)?;
-        let mut dice = updater.commit().await;
-        let expected_created = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
-            extension_id,
-            &BTreeMap::from([
-                ("ext.bzl".to_owned(), ext_content.to_owned()),
-                ("helper.bzl".to_owned(), created_helper_content.to_owned()),
-            ]),
-        );
-        let fallback_scanned_created = dice
-            .compute(&FallbackScannedExtensionBzlDigestKey {
-                project_root,
-                root_module_name: Arc::from("root"),
-                extension_id: Arc::from(extension_id),
-                repo_mappings: Arc::new(repo_mappings),
-            })
-            .await??;
-
-        assert_ne!(fallback_scanned_missing, fallback_scanned_created);
-        assert_eq!(fallback_scanned_created.digest.as_ref(), expected_created);
-        assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
-            &Ok(fallback_scanned_created)
-        ));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn preseed_recorded_inputs_track_workspace_file_through_dice() -> slug_error::Result<()> {
-        let fs = ProjectRootTemp::new()?;
-        fs.write_file("watched.txt", "first\n");
-        register_bzlmod_config_project_file(ProjectRelativePathBuf::unchecked_new(
-            "watched.txt".to_owned(),
-        ));
-        let recorded_inputs = vec![slug_bzlmod::recorded_file_input_with_recorded_path(
-            Path::new("@@//watched.txt"),
-            &fs.path().root().as_path().join("watched.txt"),
-        )?];
-        let repo_env = BTreeMap::new();
-        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
-        let mut dice = DiceBuilder::new()
-            .set_data(|data| {
-                data.set_testing_io_provider(&fs);
-            })
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-
-        assert_eq!(
-            preseed_recorded_inputs_current_through_dice(
-                &mut dice,
-                &recorded_inputs,
-                Some(fs.path().root().as_path()),
-                Some(&repo_env),
-                Some(&repo_mappings),
-            )
-            .await?,
-            Some(Ok(()))
-        );
-
-        fs.write_file("watched.txt", "second\n");
-        let mut updater = dice.into_updater();
-        let mut changes = crate::file_ops::dice::FileChangeTracker::new();
-        changes.project_file_contents_changed(ProjectRelativePathBuf::unchecked_new(
-            "watched.txt".to_owned(),
-        ));
-        changes.write_to_dice(&mut updater)?;
-        let mut dice = updater.commit().await;
-
-        let result = preseed_recorded_inputs_current_through_dice(
-            &mut dice,
-            &recorded_inputs,
-            Some(fs.path().root().as_path()),
-            Some(&repo_env),
-            Some(&repo_mappings),
-        )
-        .await?;
-        assert!(matches!(result, Some(Err(reason)) if reason.contains("recorded_input_changed")));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn preseed_recorded_inputs_track_workspace_dirents_through_dice() -> slug_error::Result<()>
-    {
-        let fs = ProjectRootTemp::new()?;
-        std::fs::create_dir(fs.path().root().as_path().join("watched_dir"))?;
-        fs.write_file("watched_dir/first.txt", "first\n");
-        let recorded =
-            slug_bzlmod::recorded_dirents_input(&fs.path().root().as_path().join("watched_dir"))?;
-        let (_, digest) = recorded
-            .split_once(' ')
-            .expect("recorded dirents marker has digest");
-        let recorded_inputs = vec![format!("DIRENTS:@@//watched_dir {digest}")];
-        let repo_env = BTreeMap::new();
-        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
-        let mut dice = DiceBuilder::new()
-            .set_data(|data| {
-                data.set_testing_io_provider(&fs);
-            })
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-
-        assert_eq!(
-            preseed_recorded_inputs_current_through_dice(
-                &mut dice,
-                &recorded_inputs,
-                Some(fs.path().root().as_path()),
-                Some(&repo_env),
-                Some(&repo_mappings),
-            )
-            .await?,
-            Some(Ok(()))
-        );
-
-        fs.write_file("watched_dir/second.txt", "second\n");
-        let mut dice = dice.into_updater().commit().await;
-        let result = preseed_recorded_inputs_current_through_dice(
-            &mut dice,
-            &recorded_inputs,
-            Some(fs.path().root().as_path()),
-            Some(&repo_env),
-            Some(&repo_mappings),
-        )
-        .await?;
-        assert!(matches!(result, Some(Err(reason)) if reason.contains("recorded_input_changed")));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn preseed_recorded_inputs_track_workspace_dirtree_through_dice() -> slug_error::Result<()>
-    {
-        let fs = ProjectRootTemp::new()?;
-        std::fs::create_dir(fs.path().root().as_path().join("watched_tree"))?;
-        std::fs::create_dir(fs.path().root().as_path().join("watched_tree/nested"))?;
-        fs.write_file("watched_tree/nested/leaf.txt", "first\n");
-        let recorded =
-            slug_bzlmod::recorded_dirtree_input(&fs.path().root().as_path().join("watched_tree"))?;
-        let (_, digest) = recorded
-            .split_once(' ')
-            .expect("recorded dirtree marker has digest");
-        let recorded_inputs = vec![format!("DIRTREE:@@//watched_tree {digest}")];
-        let repo_env = BTreeMap::new();
-        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
-        let mut dice = DiceBuilder::new()
-            .set_data(|data| {
-                data.set_testing_io_provider(&fs);
-            })
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-
-        assert_eq!(
-            preseed_recorded_inputs_current_through_dice(
-                &mut dice,
-                &recorded_inputs,
-                Some(fs.path().root().as_path()),
-                Some(&repo_env),
-                Some(&repo_mappings),
-            )
-            .await?,
-            Some(Ok(()))
-        );
-
-        fs.write_file("watched_tree/nested/leaf.txt", "second\n");
-        let mut dice = dice.into_updater().commit().await;
-        let result = preseed_recorded_inputs_current_through_dice(
-            &mut dice,
-            &recorded_inputs,
-            Some(fs.path().root().as_path()),
-            Some(&repo_env),
-            Some(&repo_mappings),
-        )
-        .await?;
-        assert!(matches!(result, Some(Err(reason)) if reason.contains("recorded_input_changed")));
         Ok(())
     }
 

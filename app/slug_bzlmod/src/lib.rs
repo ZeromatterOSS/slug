@@ -143,7 +143,6 @@ pub use dice_graph::NonRegistryOverrideModuleInputsValue;
 pub use dice_graph::NonRegistryOverrideModuleSource;
 pub use dice_graph::NonRootModuleFileInput;
 pub use dice_graph::NonRootModuleFilesValue;
-pub use dice_graph::PrevalidatedExtensionCaches;
 pub use dice_graph::RegisteredExecutionPlatformsDataValue;
 pub use dice_graph::RegisteredExecutionPlatformsKey;
 pub use dice_graph::RegisteredExecutionPlatformsValue;
@@ -188,6 +187,7 @@ pub use extension_execution_dice::ModuleExtensionRecordedInputsKey;
 pub use extension_execution_dice::ModuleExtensionResult;
 pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::compute_bzl_transitive_digest_from_file_contents;
+pub use extension_execution_dice::compute_bzl_transitive_digest_from_file_states;
 pub use extension_execution_dice::extension_bzl_location_under_project;
 pub use extension_execution_dice::extract_extension_name;
 pub use extension_execution_dice::extract_owning_module;
@@ -246,8 +246,6 @@ pub use pending_repo_cells::extract_use_repos_for_extension;
 pub use pending_repo_cells::is_extension_repo_canonical_name;
 pub use pending_repo_cells::parse_canonical_name;
 pub use pending_repo_cells::pre_compute_extension_repo_cells;
-pub use pending_repo_cells::pre_compute_extension_repo_cells_from_lockfile;
-pub use pending_repo_cells::pre_compute_extension_repo_cells_from_lockfile_with_prevalidated_caches;
 pub use registry::DEFAULT_REGISTRY_URL;
 // `RegisteredToolchain` is defined below; re-export under the crate root for
 // consumers that already do `use slug_bzlmod::RegisteredToolchain`.
@@ -687,6 +685,147 @@ pub async fn bzlmod_workspace_id_for_current_workspace(
 ) -> slug_error::Result<WorkspaceId> {
     let data = ctx.compute(&BzlmodRepoEnvDataKey).await?;
     Ok(data.workspace_id.clone())
+}
+
+pub async fn validate_lockfile_extension_replay_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<()> {
+    let workspace_id = bzlmod_workspace_id_for_current_workspace(ctx).await?;
+    let lockfile_inputs = ctx
+        .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+            workspace_id.clone(),
+        ))
+        .await??;
+    if lockfile_inputs.lockfile_mode == LockfileMode::Off
+        || !lockfile_inputs_has_extension_caches(lockfile_inputs.as_ref())
+    {
+        return Ok(());
+    }
+
+    let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+    if aggregations.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "lockfile extension replay validation requested for project root '{}', \
+             but current bzlmod extension aggregation data root is '{}'",
+            workspace_id.canonical_project_root.display(),
+            aggregations.workspace_id.canonical_project_root.display()
+        ));
+    }
+
+    let mut extension_ids: Vec<_> = aggregations
+        .extension_aggregations
+        .keys()
+        .filter(|extension_id| {
+            lockfile_inputs_has_extension_cache_for(lockfile_inputs.as_ref(), extension_id)
+        })
+        .cloned()
+        .collect();
+    extension_ids.sort();
+
+    for extension_id in extension_ids {
+        validate_lockfile_extension_replay_for_extension(
+            ctx,
+            &workspace_id,
+            &extension_id,
+            lockfile_inputs.as_ref(),
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn validate_lockfile_extension_replay_for_extension(
+    ctx: &mut dice::DiceComputations<'_>,
+    workspace_id: &WorkspaceId,
+    extension_id: &str,
+    lockfile_inputs: &BzlmodLockfileInputsValue,
+) -> slug_error::Result<()> {
+    let aggregation = ctx
+        .compute(&BzlmodExtensionAggregationKey {
+            workspace_id: workspace_id.clone(),
+            extension_id: Arc::from(extension_id),
+        })
+        .await??;
+    let Some(aggregation) = aggregation else {
+        return Ok(());
+    };
+    let bzl_transitive_digest = ctx
+        .compute(&ExtensionBzlTransitiveDigestKey {
+            workspace_id: workspace_id.clone(),
+            extension_id: Arc::from(extension_id),
+            allow_missing_loads: true,
+        })
+        .await??;
+    let usages_digest = compute_extension_input_hash(aggregation.aggregated.as_ref());
+    let repo_env = ctx
+        .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
+        .await??;
+    let repo_mappings = ctx
+        .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+            workspace_id.clone(),
+        ))
+        .await??;
+
+    for lockfile_value in [
+        lockfile_inputs.visible_lockfile.as_ref(),
+        lockfile_inputs.hidden_lockfile.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let Some(lockfile) = lockfile_value.lockfile.as_ref() else {
+            continue;
+        };
+        let Some(selected_cache) = lockfile.select_extension_cache_for_workspace(
+            extension_id,
+            bzl_transitive_digest.digest(),
+            &usages_digest,
+            Some(workspace_id.canonical_project_root.as_ref()),
+            Some(repo_env.as_ref()),
+            Some(repo_mappings.repo_mappings.as_ref()),
+            Some(aggregation.root_module_name.as_ref()),
+            Some(repo_mappings.repo_mapping_overrides.as_ref()),
+        ) else {
+            continue;
+        };
+        if selected_cache_recorded_inputs_current(ctx, extension_id, &selected_cache).await? {
+            selected_cache.record_hit(extension_id);
+            return Ok(());
+        }
+    }
+
+    Ok(())
+}
+
+fn lockfile_inputs_has_extension_caches(inputs: &BzlmodLockfileInputsValue) -> bool {
+    inputs
+        .visible_lockfile
+        .as_ref()
+        .and_then(|value| value.lockfile.as_ref())
+        .is_some_and(|lockfile| lockfile.has_extension_cache())
+        || inputs
+            .hidden_lockfile
+            .as_ref()
+            .and_then(|value| value.lockfile.as_ref())
+            .is_some_and(|lockfile| lockfile.has_extension_cache())
+}
+
+fn lockfile_inputs_has_extension_cache_for(
+    inputs: &BzlmodLockfileInputsValue,
+    extension_id: &str,
+) -> bool {
+    inputs
+        .visible_lockfile
+        .as_ref()
+        .and_then(|value| value.lockfile.as_ref())
+        .is_some_and(|lockfile| lockfile.has_extension_cache_candidate(extension_id))
+        || inputs
+            .hidden_lockfile
+            .as_ref()
+            .and_then(|value| value.lockfile.as_ref())
+            .is_some_and(|lockfile| lockfile.has_extension_cache_candidate(extension_id))
 }
 
 #[cfg(test)]

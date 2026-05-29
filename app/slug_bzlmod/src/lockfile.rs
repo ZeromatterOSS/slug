@@ -1346,6 +1346,12 @@ impl Lockfile {
     pub fn get_extension_data(&self, extension_id: &str) -> Option<&LockfileExtensionData> {
         self.module_extensions.get(extension_id)
     }
+
+    pub fn has_extension_cache_candidate(&self, extension_id: &str) -> bool {
+        Self::extension_candidate_keys(extension_id)
+            .iter()
+            .any(|candidate| self.module_extensions.contains_key(candidate))
+    }
 }
 
 pub fn parse_lockfile_content(path: &Path, content: &str) -> slug_error::Result<Lockfile> {

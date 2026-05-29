@@ -245,8 +245,8 @@ impl Key for BzlmodExtensionAggregationKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        false
     }
 }
 
@@ -284,8 +284,16 @@ impl Key for ExtensionBzlTransitiveDigestKey {
                 ctx,
                 self.extension_id.as_ref(),
                 aggregation.aggregated.as_ref(),
+                self.allow_missing_loads,
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                record_bzlmod_event(
+                    BzlmodEventKind::ExtensionReplayMissReason,
+                    format!("{}:loaded_bzl_digest_error", self.extension_id),
+                );
+                e
+            })?;
         Ok(Arc::new(ExtensionBzlTransitiveDigestValue::new(digest)))
     }
 
@@ -296,8 +304,8 @@ impl Key for ExtensionBzlTransitiveDigestKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        false
     }
 }
 
@@ -313,7 +321,7 @@ impl ExtensionBzlTransitiveDigestValue {
         }
     }
 
-    fn digest(&self) -> &str {
+    pub fn digest(&self) -> &str {
         &self.digest
     }
 }
@@ -340,6 +348,7 @@ impl Key for ExtensionSpokesByExtensionIdKey {
             .compute(&ExtensionBzlTransitiveDigestKey {
                 workspace_id: self.workspace_id.clone(),
                 extension_id: self.extension_id.clone(),
+                allow_missing_loads: false,
             })
             .await??;
         let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
@@ -433,6 +442,7 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
             .compute(&ExtensionBzlTransitiveDigestKey {
                 workspace_id: self.workspace_id.clone(),
                 extension_id: extension_id.clone(),
+                allow_missing_loads: false,
             })
             .await??;
         let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
@@ -1852,7 +1862,18 @@ pub fn compute_bzl_transitive_digest_from_file_contents(
     extension_id: &str,
     file_contents: &BTreeMap<String, String>,
 ) -> String {
-    if file_contents.is_empty() {
+    let file_states = file_contents
+        .iter()
+        .map(|(path, content)| (path.clone(), Ok(content.clone())))
+        .collect();
+    compute_bzl_transitive_digest_from_file_states(extension_id, &file_states)
+}
+
+pub fn compute_bzl_transitive_digest_from_file_states(
+    extension_id: &str,
+    file_states: &BTreeMap<String, Result<String, String>>,
+) -> String {
+    if file_states.is_empty() {
         return compute_bzl_transitive_digest(extension_id);
     }
 
@@ -1864,10 +1885,16 @@ pub fn compute_bzl_transitive_digest_from_file_contents(
     hasher.update(b"bzl_transitive_v2:");
     hasher.update(extension_id.as_bytes());
     hasher.update([0]);
-    for (path, content) in file_contents {
+    for (path, state) in file_states {
         hasher.update(path.as_bytes());
         hasher.update([0]);
-        hasher.update(content.as_bytes());
+        match state {
+            Ok(content) => hasher.update(content.as_bytes()),
+            Err(error) => {
+                hasher.update(b"read_error:");
+                hasher.update(error.as_bytes());
+            }
+        }
         hasher.update([0]);
     }
 
@@ -2456,7 +2483,7 @@ mod tests {
             slug_error::slug_error!(slug_error::ErrorTag::Tier0, "digest failed"),
         );
 
-        assert!(<BzlmodExtensionAggregationKey as Key>::validity(
+        assert!(!<BzlmodExtensionAggregationKey as Key>::validity(
             &missing_aggregation
         ));
         assert!(!<BzlmodExtensionAggregationKey as Key>::validity(
@@ -2489,7 +2516,7 @@ mod tests {
             &first_digest,
             &changed_digest
         ));
-        assert!(<ExtensionBzlTransitiveDigestKey as Key>::validity(
+        assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
             &first_digest
         ));
         assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
@@ -2556,6 +2583,7 @@ mod tests {
         let key = ExtensionBzlTransitiveDigestKey {
             workspace_id,
             extension_id: Arc::from(extension_id),
+            allow_missing_loads: false,
         };
         let err = dice.compute(&key).await?.unwrap_err();
 
@@ -2691,6 +2719,7 @@ mod tests {
         let key = ExtensionBzlTransitiveDigestKey {
             workspace_id: workspace_id.clone(),
             extension_id: Arc::from(extension_id.as_str()),
+            allow_missing_loads: false,
         };
 
         let dice = dice::testing::DiceBuilder::new()

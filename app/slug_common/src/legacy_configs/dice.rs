@@ -29,7 +29,7 @@ use dupe::Dupe;
 use pagable::Pagable;
 use slug_core::cells::name::CellName;
 use slug_error::BuckErrorContext;
-use slug_events::dispatch::get_dispatcher;
+use slug_events::dispatch::get_dispatcher_opt;
 
 use crate::dice::cells::HasCellResolver;
 use crate::legacy_configs::cells::BuckConfigBasedCells;
@@ -202,7 +202,9 @@ impl Key for LegacyBuckConfigForCellKey {
         let event = slug_data::CellHasNewConfigs {
             cell: self.cell_name.as_str().to_owned(),
         };
-        get_dispatcher().instant_event(event);
+        if let Some(dispatcher) = get_dispatcher_opt() {
+            dispatcher.instant_event(event);
+        }
 
         Ok(config)
     }

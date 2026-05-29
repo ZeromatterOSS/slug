@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::mem;
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -74,8 +75,25 @@ const RESERVED_OUTPUT_COMPONENTS: &[&str] = &[
 pub(crate) fn is_reserved_output_path(
     path: &slug_core::fs::project_rel_path::ProjectRelativePath,
 ) -> bool {
-    path.iter()
-        .any(|c| RESERVED_OUTPUT_COMPONENTS.contains(&c.as_str()))
+    let mut components = path.iter();
+    while let Some(component) = components.next() {
+        if component.as_str() == "bazel-external" {
+            return components
+                .next()
+                .is_none_or(|repo| !is_bzlmod_module_repo_component(repo.as_str()));
+        }
+        if RESERVED_OUTPUT_COMPONENTS.contains(&component.as_str()) {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_bzlmod_module_repo_component(repo: &str) -> bool {
+    repo.ends_with('+')
+        && !repo.starts_with('+')
+        && !repo.starts_with("_main+")
+        && !repo.contains("++")
 }
 
 fn ignore_event_kind(event_kind: &EventKind) -> bool {
@@ -369,10 +387,21 @@ fn install_filtered_watches(
             Err(_) => continue,
         };
         if !entry.file_type().is_dir() {
-            // walkdir emits files too; only directories need a watch.
-            // Count a symlink skip so the log reflects what we trimmed.
             if entry.file_type().is_symlink() {
                 skipped_symlink += 1;
+                if is_bzlmod_module_symlink_dir(root_path, entry.path()) {
+                    match watcher.watch(entry.path(), notify::RecursiveMode::Recursive) {
+                        Ok(()) => watched += 1,
+                        Err(e) => {
+                            tracing::debug!(
+                                "notify: failed to watch bzlmod module symlink {:?}: {}",
+                                entry.path(),
+                                e
+                            );
+                            skipped_ignored += 1;
+                        }
+                    }
+                }
             }
             continue;
         }
@@ -395,6 +424,24 @@ fn install_filtered_watches(
         skipped_ignored,
     );
     Ok(())
+}
+
+fn is_bzlmod_module_symlink_dir(root_path: &Path, path: &Path) -> bool {
+    if !std::fs::metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
+        return false;
+    }
+    let Ok(rel) = path.strip_prefix(root_path) else {
+        return false;
+    };
+    let Some(rel_str) = rel.to_str() else {
+        return false;
+    };
+    let mut components = rel_str.split('/');
+    matches!(components.next(), Some("bazel-external"))
+        && components
+            .next()
+            .is_some_and(is_bzlmod_module_repo_component)
+        && components.next().is_none()
 }
 
 #[derive(Allocative)]
@@ -510,6 +557,11 @@ mod tests {
     }
 
     #[test]
+    fn bazel_external_module_repo_symlink_contents_not_filtered() {
+        assert!(!check("bazel-external/rules_cc+/cc/toolchain.bzl"));
+    }
+
+    #[test]
     fn external_symlink_tree_at_root() {
         assert!(check("external/abseil-cpp/absl/base/config.h"));
     }
@@ -528,7 +580,6 @@ mod tests {
             "bazel-out",
             "bazel-testlogs",
             "bazel-bazel",
-            "bazel-external",
             "external",
             "execroot",
         ] {
@@ -538,5 +589,8 @@ mod tests {
                 "expected nested {c} to be filtered"
             );
         }
+        assert!(check("bazel-external/+repo_rule+repo/file"));
+        assert!(check("bazel-external/_main+ext+repo/file"));
+        assert!(check("bazel-external/rules_python++pip+numpy/file"));
     }
 }

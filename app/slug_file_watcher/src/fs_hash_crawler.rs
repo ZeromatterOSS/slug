@@ -25,7 +25,6 @@ use dupe::Dupe;
 use slug_common::file_ops::dice::FileChangeTracker;
 use slug_common::file_ops::metadata::FileType;
 use slug_common::ignores::ignore_set::IgnoreSet;
-use slug_common::invocation_paths::InvocationPaths;
 use slug_core::cells::CellResolver;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::name::CellName;
@@ -294,8 +293,7 @@ impl FsSnapshot {
             let rel_path = root.relativize(&disk_path)?;
             let cell_path = cells.get_cell_path(&rel_path);
 
-            // We ignore buck-out and .hg dirs, as those are uninteresting events caused by us.
-            if rel_path.starts_with(InvocationPaths::buck_out_dir_prefix())
+            if rel_path.starts_with(ProjectRelativePath::unchecked_new("buck-out"))
                 || rel_path.starts_with(ProjectRelativePath::unchecked_new(".hg"))
             {
                 continue;
@@ -312,7 +310,16 @@ impl FsSnapshot {
                     self.add_entry(cell_path, EntryInfo::Directory);
                 }
                 FileType::Symlink => {
-                    self.add_entry(cell_path, EntryInfo::Symlink);
+                    let is_bzlmod_external_symlink_dir = rel_path
+                        .starts_with(ProjectRelativePath::unchecked_new("bazel-external"))
+                        && std::fs::metadata(disk_path.as_maybe_relativized())
+                            .is_ok_and(|metadata| metadata.is_dir());
+                    if is_bzlmod_external_symlink_dir {
+                        self.build_fs_snapshot(root, cells, &disk_path)?;
+                        self.add_entry(cell_path, EntryInfo::Directory);
+                    } else {
+                        self.add_entry(cell_path, EntryInfo::Symlink);
+                    }
                 }
                 FileType::Unknown => (),
             }
@@ -363,6 +370,7 @@ mod tests {
     use slug_fs::fs_util;
     use slug_fs::paths::abs_norm_path::AbsNormPathBuf;
     use slug_fs::paths::abs_path::AbsPathBuf;
+    use slug_fs::paths::forward_rel_path::ForwardRelativePath;
 
     use crate::fs_hash_crawler::FsEvent;
     use crate::fs_hash_crawler::FsSnapshot;
@@ -425,6 +433,47 @@ mod tests {
         let events = events.iter().collect::<BTreeSet<_>>();
         let expected = expected.iter().collect::<BTreeSet<_>>();
         assert_eq!(events, expected);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_fs_snapshot_tracks_bzlmod_external_symlink_dir_contents() -> slug_error::Result<()>
+    {
+        let cell_resolver = CellResolver::testing_with_name_and_path(
+            CellName::testing_new("root"),
+            CellRootPathBuf::testing_new(""),
+        );
+        let tempdir = tempfile::tempdir()?;
+        let root_path = fs_util::canonicalize(AbsNormPathBuf::new(tempdir.path().to_owned())?)?;
+        let proj_root = ProjectRoot::new(root_path)?;
+
+        let external_dir = proj_root.resolve(ProjectRelativePath::new("bazel-external")?);
+        let target_dir = proj_root.resolve(ProjectRelativePath::new("target-dir")?);
+        let target_file = target_dir.join(ForwardRelativePath::new("helper.bzl")?);
+        fs_util::create_dir_all(&external_dir)?;
+        fs_util::create_dir_all(&target_dir)?;
+        fs_util::write(&target_file, "old content")?;
+        std::os::unix::fs::symlink(
+            target_dir.as_path(),
+            external_dir
+                .join(ForwardRelativePath::new("dep+")?)
+                .as_maybe_relativized(),
+        )?;
+
+        let old_snapshot = FsSnapshot::build(&proj_root, &cell_resolver)?;
+        fs_util::write(&target_file, "new content")?;
+        let new_snapshot = FsSnapshot::build(&proj_root, &cell_resolver)?;
+        let events = old_snapshot.get_updates(&new_snapshot)?;
+
+        assert!(events.iter().any(|event| {
+            event.cell_path
+                == cell_resolver.get_cell_path(
+                    ProjectRelativePath::new("bazel-external/dep+/helper.bzl").unwrap(),
+                )
+                && event.event == FileWatcherEventType::Modify
+                && event.kind == FileWatcherKind::File
+        }));
         Ok(())
     }
 }

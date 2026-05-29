@@ -94,6 +94,7 @@ pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
         ctx: &mut DiceComputations<'_>,
         extension_id: &str,
         aggregated: &AggregatedExtension,
+        allow_missing_loads: bool,
     ) -> slug_error::Result<String>;
 
     /// Execute a module extension and return the captured RepoSpecs.
