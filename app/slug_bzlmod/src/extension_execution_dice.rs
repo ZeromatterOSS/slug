@@ -1092,6 +1092,7 @@ struct ModuleExtensionRecordedInputContext {
 }
 
 impl ModuleExtensionRecordedInputContext {
+    #[cfg(test)]
     fn empty() -> Self {
         Self {
             workspace_root: None,
@@ -1129,6 +1130,7 @@ impl ModuleExtensionResult {
     /// `_main` placeholder for the root module's own extensions; without it
     /// the root module's declared name leaks into canonical names and they
     /// disagree with the cells pre-computed in `pending_repo_cells.rs`.
+    #[cfg(test)]
     pub fn new(
         extension_id: Arc<str>,
         input_hash: String,
@@ -1145,6 +1147,7 @@ impl ModuleExtensionResult {
         )
     }
 
+    #[cfg(test)]
     pub fn new_with_metadata(
         extension_id: Arc<str>,
         input_hash: String,

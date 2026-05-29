@@ -610,6 +610,16 @@ Current state to preserve:
   lockfile_replay_validates_recorded_file --lib`, `cargo test -p
   slug_external_cells extension_repo --lib`, `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 empty module-extension result constructors made test-only:
+  `ModuleExtensionResult::new(...)`,
+  `ModuleExtensionResult::new_with_metadata(...)`, and the empty
+  recorded-input context helper no longer compile into non-test `slug_bzlmod`.
+  Production extension results must come from fresh execution or selected
+  replay paths that carry the recorded-input context into `ExtensionSpokesValue`.
+  Guardrails: `cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  pending_repo_cells --lib`, `cargo test -p slug_bzlmod
+  extension_execution_result --lib`, `cargo fmt --check`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1733,9 +1743,11 @@ hardening behavior around it.
      project root are also test-only. Zero-repo-env convenience constructors
      for extension execution and materialization manifests are test-only too.
      Module extension execution and recorded-input validation keys require
-     workspace identity instead of carrying or deriving optional provenance. The
-     remaining bzlmod projection data wrappers also require workspace
-     provenance instead of accepting absent provenance.
+     workspace identity instead of carrying or deriving optional provenance.
+     Empty module-extension result constructors are test-only, so production
+     extension results must carry the recorded-input context from fresh
+     execution or replay. The remaining bzlmod projection data wrappers also
+     require workspace provenance instead of accepting absent provenance.
      The legacy resolver entry point requires an explicit workspace identity too.
      The outer parse helper also requires callers to choose the empty-projection
      workspace identity explicitly.
