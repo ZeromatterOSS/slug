@@ -649,6 +649,7 @@ pub fn override_patch_labels_from_module(
 pub fn non_registry_override_module_dirs_from_root_module(
     root_module_file: &RootModuleFileValue,
     ignore_dev_dependency: bool,
+    override_patch_inputs: &crate::OverridePatchInputs,
 ) -> slug_error::Result<Vec<(String, PathBuf)>> {
     let Some(parsed) = &root_module_file.parsed else {
         return Ok(Vec::new());
@@ -661,17 +662,37 @@ pub fn non_registry_override_module_dirs_from_root_module(
         return Ok(Vec::new());
     }
     let cache = ModuleCache::new()?;
-    Ok(active_overrides
-        .iter()
-        .filter_map(|override_| match override_ {
-            Override::Git(git) => Some((git.module_name.clone(), cache.git_override_dir(git))),
-            Override::Archive(archive) => Some((
-                archive.module_name.clone(),
-                cache.archive_override_dir(archive),
-            )),
-            _ => None,
-        })
-        .collect::<Vec<_>>())
+    let mut dirs = Vec::new();
+    for override_ in &active_overrides {
+        match override_ {
+            Override::Git(git) => {
+                let patch_digest =
+                    crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
+                        &git.patches,
+                        git.patch_strip,
+                        override_patch_inputs,
+                    )?;
+                dirs.push((
+                    git.module_name.clone(),
+                    cache.git_override_dir_with_patch_digest(git, patch_digest.as_deref()),
+                ));
+            }
+            Override::Archive(archive) => {
+                let patch_digest =
+                    crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
+                        &archive.patches,
+                        archive.patch_strip,
+                        override_patch_inputs,
+                    )?;
+                dirs.push((
+                    archive.module_name.clone(),
+                    cache.archive_override_dir_with_patch_digest(archive, patch_digest.as_deref()),
+                ));
+            }
+            _ => {}
+        }
+    }
+    Ok(dirs)
 }
 
 /// The module name used by the canonical rules_python Bazel module. Matched
@@ -4992,6 +5013,7 @@ mod tests {
     use super::*;
     use crate::types::BazelDep;
     use crate::types::ExtensionUsage;
+    use crate::types::GitOverride;
     use crate::types::LocalPathOverride;
     use crate::types::RegisteredItem;
     use crate::version::Version;
@@ -5445,6 +5467,55 @@ mod tests {
             dep_info.source,
             ModuleSource::LocalPath { ref path } if path == "dep"
         ));
+    }
+
+    #[test]
+    fn non_registry_override_dirs_include_patch_digest() {
+        let mut root = parsed_module("root");
+        let git = GitOverride {
+            module_name: "dep".to_owned(),
+            remote: "https://example.invalid/dep.git".to_owned(),
+            commit: "abcdef".to_owned(),
+            shallow_since: None,
+            patches: vec!["//:fix.patch".to_owned()],
+            patch_strip: 1,
+        };
+        root.module.overrides.push(Override::Git(git.clone()));
+        let root_value = RootModuleFileValue {
+            path: Arc::new(PathBuf::from("/tmp/workspace/MODULE.bazel")),
+            input_digest: Some("root".to_owned()),
+            input_count: 1,
+            parsed: Some(root),
+        };
+        let patch_inputs = crate::OverridePatchInputs {
+            digest: "patches".to_owned(),
+            inputs: vec![crate::OverridePatchInput {
+                label: "//:fix.patch".to_owned(),
+                path: PathBuf::from("/tmp/workspace/fix.patch"),
+                digest: "patch".to_owned(),
+                content: b"diff --git a/MODULE.bazel b/MODULE.bazel\n".to_vec(),
+            }],
+            has_untracked_inputs: false,
+        };
+        let expected_patch_digest =
+            crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
+                &git.patches,
+                git.patch_strip,
+                &patch_inputs,
+            )
+            .unwrap();
+        let cache = ModuleCache::new().unwrap();
+
+        let dirs =
+            non_registry_override_module_dirs_from_root_module(&root_value, false, &patch_inputs)
+                .unwrap();
+
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].0, "dep");
+        assert_eq!(
+            dirs[0].1,
+            cache.git_override_dir_with_patch_digest(&git, expected_patch_digest.as_deref())
+        );
     }
 
     #[test]

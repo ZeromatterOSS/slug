@@ -616,6 +616,14 @@ Current state to preserve:
   helper; git/archive need a patch-digest-aware source-input slice before the
   direct parse can be removed safely. Guardrail:
   `cargo test -p slug_bzlmod test_resolve_local_module_from_precomputed_inputs --lib && cargo test -p slug_bzlmod resolve_graph_with_module_file_inputs_uses_tracked_local_overrides --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 non-registry override input paths include patch identity:
+  `NonRegistryOverrideModuleInputsKey` now receives git/archive override cache
+  directories computed with the same local patch digest that `MvsResolver` uses
+  for fetch/extract caches. This is a prerequisite for replacing the remaining
+  git/archive direct parser with DICE source inputs: the input key now observes
+  the patch-digested source tree instead of the unpatched cache directory.
+  Guardrail:
+  `cargo test -p slug_bzlmod non_registry_override_dirs_include_patch_digest --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -906,6 +914,9 @@ hardening behavior around it.
      Local-path overrides resolved during clean MVS discovery now also consume
      the precomputed local override module inputs rather than reparsing their
      `MODULE.bazel` files directly from disk.
+     Git/archive override source-input paths now include the same local patch
+     digest as resolver fetch/extract cache paths, but MVS still directly
+     parses those fetched `MODULE.bazel` files after a cache miss/fetch.
       `NonRootModuleFilesKey` exists with same-key recompute guardrails, and
       is now wired into the clean resolved-graph producer. Registry and
       git/archive override `MODULE.bazel` files discovered during MVS resolution

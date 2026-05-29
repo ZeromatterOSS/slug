@@ -3158,9 +3158,23 @@ async fn compute_bzlmod_resolved_module_graph_inputs(
         })
         .await?
         .buck_error_context("Computing local override MODULE.bazel inputs for clean graph")?;
+    let (main_repo_name, override_patch_labels) =
+        slug_bzlmod::override_patch_labels_from_root_module(
+            root_module_file.as_ref(),
+            key.options.ignore_dev_dependency,
+        );
+    let override_patch_inputs = dice_ctx
+        .compute(&OverridePatchInputsKey {
+            project_root: project_root.clone(),
+            main_repo_name,
+            patch_labels: override_patch_labels,
+        })
+        .await?
+        .buck_error_context("Computing override patch inputs for clean bzlmod graph")?;
     let non_registry_overrides = slug_bzlmod::non_registry_override_module_dirs_from_root_module(
         root_module_file.as_ref(),
         key.options.ignore_dev_dependency,
+        override_patch_inputs.as_ref(),
     )?;
     let non_registry_override_inputs = dice_ctx
         .compute(&NonRegistryOverrideModuleInputsKey {
@@ -3192,19 +3206,6 @@ async fn compute_bzlmod_resolved_module_graph_inputs(
         })
         .await?
         .buck_error_context("Computing registry file inputs for clean bzlmod graph")?;
-    let (main_repo_name, override_patch_labels) =
-        slug_bzlmod::override_patch_labels_from_root_module(
-            root_module_file.as_ref(),
-            key.options.ignore_dev_dependency,
-        );
-    let override_patch_inputs = dice_ctx
-        .compute(&OverridePatchInputsKey {
-            project_root: project_root.clone(),
-            main_repo_name,
-            patch_labels: override_patch_labels,
-        })
-        .await?
-        .buck_error_context("Computing override patch inputs for clean bzlmod graph")?;
 
     Ok(slug_bzlmod::BzlmodResolvedGraphSourceInputsValue {
         root_module_file,
