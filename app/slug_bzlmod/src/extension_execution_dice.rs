@@ -31,6 +31,7 @@
 //! This follows the `RepositoryRuleExecutionKey` pattern from `repository_execution.rs`.
 
 use std::collections::BTreeMap;
+#[cfg(test)]
 use std::collections::BTreeSet;
 use std::hash::Hash;
 use std::path::Path;
@@ -1895,7 +1896,8 @@ fn compute_bzl_transitive_digest_for_project(extension_id: &str, project_root: &
     )
 }
 
-pub fn compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
+#[cfg(test)]
+fn compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
     extension_id: &str,
     project_root: &Path,
     repo_mappings: Option<&RepoMappingSnapshot>,
@@ -2199,6 +2201,7 @@ fn split_bzl_label_target(target: &str) -> Option<(&str, &str)> {
     target.split_once(':')
 }
 
+#[cfg(test)]
 fn collect_bzl_transitive_files(
     project_root: &Path,
     location: BzlLoadLocation,

@@ -271,6 +271,22 @@ Current state to preserve:
   `cargo test -p slug_common bzlmod --lib` still fails the unrelated
   `bzlmod_cell_resolver_uses_canonical_module_cells_from_cell_graph` assertion
   that `CellResolver::get("dep")` should error.
+- 2026-05-29 direct fallback scanner API reduction: the direct filesystem
+  helper
+  `compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings`
+  is no longer exported by `slug_bzlmod` and is compiled only for
+  `slug_bzlmod` tests. Production lockfile preseed can no longer call that
+  direct scanner through the bzlmod crate API; its remaining fallback digest
+  surface is the named `FallbackScannedExtensionBzlDigestKey` in `slug_common`,
+  which reads project-local files through DICE. The clean-graph preseed still
+  cannot call `ExtensionBzlTransitiveDigestKey` directly because it runs before
+  the cell resolver/aggregation values are injected; replacing the fallback
+  entirely requires exposing the loaded graph digest without that bootstrap
+  cycle or moving preseed after a DICE-owned resolver snapshot exists.
+  Validated with
+  `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
+  `cargo test -p slug_bzlmod project_bzl_digest --lib`,
+  `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1013,9 +1029,11 @@ hardening behavior around it.
      Slug's implicit `@slug_builtins` autoload is excluded from the Bazel
      lockfile digest, and missing-load cases now fail through the loader before
      replay instead of falling back to the transitional scanner. Non-DICE
-     bootstrap/preseed callers still use the transitional scanner.
-     Loaded-graph digest values are transaction-valid; fallback-scanner digest
-     values remain invalid across transactions.
+     bootstrap/preseed callers still use the transitional scanner. The direct
+     filesystem scanner helper is now test-only in `slug_bzlmod`; production
+     preseed uses the named tracked scanner key in `slug_common` until this
+     bootstrap cycle is removed. Loaded-graph digest values and tracked
+     fallback-scanner digest values are transaction-valid.
    - Keep the current external `bazel-external/<repo>` and mapped literal-load
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.

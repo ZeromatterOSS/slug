@@ -5256,25 +5256,26 @@ use_repo(ext, "generated")
     async fn fallback_scanned_extension_bzl_digest_matches_legacy_project_load_digest()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
-        fs.write_file(
-            "ext.bzl",
-            r#"
+        let ext_content = r#"
 load(":helper.bzl", "HELPER")
 
 def _impl(module_ctx):
     pass
 
 ext = module_extension(implementation = _impl)
-"#,
-        );
-        fs.write_file("helper.bzl", "HELPER = 'tracked'\n");
+"#;
+        let helper_content = "HELPER = 'tracked'\n";
+        fs.write_file("ext.bzl", ext_content);
+        fs.write_file("helper.bzl", helper_content);
 
         let extension_id = "@@root//:ext.bzl%ext";
         let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
-        let direct = slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
+        let expected = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
             extension_id,
-            fs.path().root().as_path(),
-            Some(&repo_mappings),
+            &BTreeMap::from([
+                ("ext.bzl".to_owned(), ext_content.to_owned()),
+                ("helper.bzl".to_owned(), helper_content.to_owned()),
+            ]),
         );
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
@@ -5292,7 +5293,7 @@ ext = module_extension(implementation = _impl)
             })
             .await??;
 
-        assert_eq!(fallback_scanned.as_ref(), direct);
+        assert_eq!(fallback_scanned.as_ref(), expected);
         assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned)
         ));
@@ -5303,20 +5304,25 @@ ext = module_extension(implementation = _impl)
     async fn fallback_scanned_extension_bzl_digest_tracks_missing_project_load_digest()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
-        fs.write_file(
-            "ext.bzl",
-            r#"
+        let ext_content = r#"
 load(":helper.bzl", "HELPER")
 
 def _impl(module_ctx):
     pass
 
 ext = module_extension(implementation = _impl)
-"#,
-        );
+"#;
+        fs.write_file("ext.bzl", ext_content);
 
         let extension_id = "@@root//:ext.bzl%ext";
         let repo_mappings = slug_bzlmod::RepoMappingSnapshot::new();
+        let expected_missing = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
+            extension_id,
+            &BTreeMap::from([
+                ("ext.bzl".to_owned(), ext_content.to_owned()),
+                ("helper.bzl".to_owned(), "read_error:missing".to_owned()),
+            ]),
+        );
         let project_root = AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?;
         let key = FallbackScannedExtensionBzlDigestKey {
             project_root: project_root.clone(),
@@ -5337,11 +5343,13 @@ ext = module_extension(implementation = _impl)
             fallback_scanned_missing.as_ref(),
             slug_bzlmod::compute_bzl_transitive_digest(extension_id)
         );
+        assert_eq!(fallback_scanned_missing.as_ref(), expected_missing);
         assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_missing.clone())
         ));
 
-        fs.write_file("helper.bzl", "HELPER = 'created'\n");
+        let created_helper_content = "HELPER = 'created'\n";
+        fs.write_file("helper.bzl", created_helper_content);
         let mut updater = dice.into_updater();
         let mut changes = crate::file_ops::dice::FileChangeTracker::new();
         changes.project_file_added_or_removed(ProjectRelativePathBuf::unchecked_new(
@@ -5349,12 +5357,13 @@ ext = module_extension(implementation = _impl)
         ));
         changes.write_to_dice(&mut updater)?;
         let mut dice = updater.commit().await;
-        let direct_created =
-            slug_bzlmod::compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings(
-                extension_id,
-                fs.path().root().as_path(),
-                Some(&repo_mappings),
-            );
+        let expected_created = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
+            extension_id,
+            &BTreeMap::from([
+                ("ext.bzl".to_owned(), ext_content.to_owned()),
+                ("helper.bzl".to_owned(), created_helper_content.to_owned()),
+            ]),
+        );
         let fallback_scanned_created = dice
             .compute(&FallbackScannedExtensionBzlDigestKey {
                 project_root,
@@ -5364,7 +5373,7 @@ ext = module_extension(implementation = _impl)
             .await??;
 
         assert_ne!(fallback_scanned_missing, fallback_scanned_created);
-        assert_eq!(fallback_scanned_created.as_ref(), direct_created);
+        assert_eq!(fallback_scanned_created.as_ref(), expected_created);
         assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_created)
         ));
