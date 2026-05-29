@@ -1979,6 +1979,13 @@ hardening behavior around it.
      suppressing bzlmod runtime alias canonicalization. Guardrails: `cargo test
      -p slug_analysis source_file_package --lib -- --nocapture`; `cargo check
      -p slug_analysis`.
+   - 2026-05-29 module_ctx recorded-input root-adapter reduction: extension
+     execution now passes the active `CellResolver` root cell into
+     `ModuleContext` along with the resolver-owned label path map, and watched
+     path recording uses that explicit root before falling back to the legacy
+     helper in test/no-owner contexts. Guardrails: `cargo test -p
+     slug_interpreter_for_build module_context --lib -- --nocapture`; `cargo
+     check -p slug_interpreter_for_build`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

@@ -337,6 +337,39 @@ fn test_module_context_records_workspace_path_when_named_root_cell_matches_proje
 }
 
 #[test]
+fn test_module_context_uses_explicit_root_cell_for_recorded_external_paths() {
+    let project_root = TempDir::new().unwrap();
+    let external_root = TempDir::new().unwrap();
+    let working_dir = project_root.path().join("work");
+    let watched = external_root.path().join("pkg/file.txt");
+    std::fs::create_dir_all(watched.parent().unwrap()).unwrap();
+    std::fs::create_dir_all(&working_dir).unwrap();
+    std::fs::write(&watched, "first\n").unwrap();
+    let mut cell_paths = HashMap::new();
+    cell_paths.insert("root".to_owned(), external_root.path().to_path_buf());
+    let ctx = ModuleContext::empty()
+        .with_temp_working_dir(working_dir)
+        .with_label_resolution_and_root_cell(
+            project_root.path().to_path_buf(),
+            cell_paths,
+            Some("workspace".to_owned()),
+        );
+
+    ctx.record_file_input(&watched).unwrap();
+
+    assert_eq!(
+        ctx.recorded_inputs().unwrap(),
+        vec![
+            slug_bzlmod::recorded_file_input_with_recorded_path(
+                PathBuf::from("@@root+//pkg/file.txt").as_path(),
+                &watched,
+            )
+            .unwrap()
+        ]
+    );
+}
+
+#[test]
 fn test_module_context_read_watch_parameter_records_workspace_inputs() {
     use starlark::environment::Globals;
     use starlark::environment::Module;

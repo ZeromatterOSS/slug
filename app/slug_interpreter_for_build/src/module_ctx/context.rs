@@ -93,6 +93,9 @@ pub struct ModuleContext {
     /// Built from CellResolver before entering Starlark eval.
     #[allocative(skip)]
     cell_paths: HashMap<String, PathBuf>,
+    /// Active CellResolver root cell name for distinguishing main-repo paths
+    /// from external repos without consulting process-global root aliases.
+    root_cell_name: Option<String>,
     /// Facts returned by a previous execution of this extension.
     #[allocative(skip)]
     facts: serde_json::Value,
@@ -148,6 +151,7 @@ impl ModuleContext {
             delete_on_close: true,
             project_root: None,
             cell_paths: HashMap::new(),
+            root_cell_name: None,
             facts: empty_facts(),
             repo_env: Arc::new(BTreeMap::new()),
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
@@ -166,6 +170,7 @@ impl ModuleContext {
             delete_on_close: true,
             project_root: None,
             cell_paths: HashMap::new(),
+            root_cell_name: None,
             facts: empty_facts(),
             repo_env: Arc::new(BTreeMap::new()),
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
@@ -181,6 +186,7 @@ impl ModuleContext {
             delete_on_close: true,
             project_root: None,
             cell_paths: HashMap::new(),
+            root_cell_name: None,
             facts: empty_facts(),
             repo_env: Arc::new(BTreeMap::new()),
             recorded_inputs: Arc::new(Mutex::new(Vec::new())),
@@ -221,6 +227,19 @@ impl ModuleContext {
     ) -> Self {
         self.project_root = Some(project_root);
         self.cell_paths = cell_paths;
+        self.root_cell_name = None;
+        self
+    }
+
+    pub fn with_label_resolution_and_root_cell(
+        mut self,
+        project_root: PathBuf,
+        cell_paths: HashMap<String, PathBuf>,
+        root_cell_name: Option<String>,
+    ) -> Self {
+        self.project_root = Some(project_root);
+        self.cell_paths = cell_paths;
+        self.root_cell_name = root_cell_name;
         self
     }
 
@@ -428,7 +447,7 @@ impl ModuleContext {
                 .iter()
                 .filter(|(cell_name, cell_path)| {
                     !cell_name.is_empty()
-                        && !slug_core::cells::is_root_cell_name(cell_name)
+                        && !self.is_root_cell_name(cell_name)
                         && !self.project_root.as_ref().is_some_and(|project_root| {
                             project_root.as_path() == cell_path.as_path()
                         })
@@ -461,6 +480,13 @@ impl ModuleContext {
             "attempted to watch path outside workspace, but it's prohibited in the current context"
         )
         .into())
+    }
+
+    fn is_root_cell_name(&self, cell_name: &str) -> bool {
+        self.root_cell_name
+            .as_deref()
+            .is_some_and(|root| root == cell_name)
+            || (self.root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name))
     }
 
     pub fn record_env_input(&self, name: &str) -> starlark::Result<()> {

@@ -616,7 +616,11 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         // Build the module_ctx from aggregated extension data
         let module_ctx = build_module_context(aggregated, root_module_name)
             .with_temp_working_dir(working_dir.clone())
-            .with_label_resolution(project_root.clone(), cell_paths)
+            .with_label_resolution_and_root_cell(
+                project_root.clone(),
+                cell_paths,
+                Some(cell_resolver.root_cell().as_str().to_owned()),
+            )
             .with_facts(prior_facts)
             .with_repo_env(repo_env.clone());
 
