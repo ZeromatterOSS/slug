@@ -7562,6 +7562,67 @@ use_repo(env, "env_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_which_uses_repo_env_path(buck: Buck) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext.which/findCommandOnPath."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_which_ext+which_repo"
+    first_bin = buck.cwd / "module_tools_first"
+    second_bin = buck.cwd / "module_tools_second"
+    first_bin.mkdir()
+    second_bin.mkdir()
+    first_tool = first_bin / "plan61_module_tool"
+    second_tool = second_bin / "plan61_module_tool"
+    _write(first_tool, "#!/bin/sh\nexit 0\n")
+    _write(second_tool, "#!/bin/sh\nexit 0\n")
+    first_tool.chmod(0o755)
+    second_tool.chmod(0o755)
+    _write(
+        buck.cwd / "module_which_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.tool_path + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+which_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"tool_path": attr.string()},
+)
+
+def _module_which_ext_impl(module_ctx):
+    tool = module_ctx.which(" plan61_module_tool ")
+    if tool == None:
+        fail("PLAN61_MODULE_CTX_WHICH_DID_NOT_USE_REPO_ENV_PATH")
+    which_repo_rule(name = "which_repo", tool_path = str(tool))
+
+module_which_ext = module_extension(
+    implementation = _module_which_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_which")
+
+which = use_extension("//:module_which_ext.bzl", "module_which_ext")
+use_repo(which, "which_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_which_repo",
+    srcs = ["@which_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_which_repo", f"--repo_env=PATH={first_bin}")
+    assert (repo_dir / "data.txt").read_text() == f"{first_tool}\n"
+
+    await buck.build("//:uses_which_repo", f"--repo_env=PATH={second_bin}")
+    assert (repo_dir / "data.txt").read_text() == f"{second_tool}\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_fresh_module_ctx_read_watch_file_edit_invalidates_extension_result(
     buck: Buck,
 ) -> None:
@@ -7701,7 +7762,7 @@ async def test_repository_ctx_which_uses_repo_env_path_and_records_input(
     _write(
         buck.cwd / "repo_which_ext.bzl",
         """def _repo_impl(repository_ctx):
-    tool = repository_ctx.which("plan61_tool")
+    tool = repository_ctx.which(" plan61_tool ")
     if tool == None:
         fail("PLAN61_REPOSITORY_CTX_WHICH_DID_NOT_USE_REPO_ENV_PATH")
     repository_ctx.file("data.txt", str(tool) + "\\n")

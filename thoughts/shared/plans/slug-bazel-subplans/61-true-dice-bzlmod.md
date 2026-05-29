@@ -443,6 +443,21 @@ Current state to preserve:
   new regression first failed with
   `PLAN61_REPOSITORY_CTX_WHICH_DID_NOT_USE_REPO_ENV_PATH` before the fix; the
   full Plan 61 Python guardrail file passed afterward (`157 passed in 69.55s`).
+- 2026-05-29 module_ctx.which repo-env ownership:
+  `module_ctx.which(...)` now uses the same `StarlarkBaseExternalContext`
+  semantics as repository rules: reject empty/slashed program names, search only
+  absolute entries from the effective repo-env `PATH`, trim the program segment
+  for lookup like Bazel's `findCommandOnPath`, and record `ENV:PATH` as an
+  extension replay input. The repository_ctx guardrail was tightened to cover
+  the same trim behavior. Guardrails: the new unit regression first failed with
+  `left: Some("None")` before the fix, the focused Plan 61 module/repository
+  `which` selectors first failed with
+  `PLAN61_MODULE_CTX_WHICH_DID_NOT_USE_REPO_ENV_PATH` and
+  `PLAN61_REPOSITORY_CTX_WHICH_DID_NOT_USE_REPO_ENV_PATH`, then
+  `cargo test -p slug_interpreter_for_build --lib` (127 passed),
+  `cargo build -p slug`, focused Plan 61 `which` selectors (2 passed), and full
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (`158 passed in 70.81s`).
 - 2026-05-29 repository materialization recorded-input DICE read:
   `RepoMaterializationRecordedInputsManifestContentKey` now carries workspace
   identity and calls a late-bound `RepositoryMaterializationStateReader`.
@@ -1895,6 +1910,9 @@ hardening behavior around it.
    - `repository_ctx.which(...)` now uses the effective repo-env `PATH` instead
      of host process `PATH` and records `ENV:PATH`, so PATH changes are
      materialization inputs instead of ambient host state.
+   - `module_ctx.which(...)` now uses the effective repo-env `PATH` and records
+     `ENV:PATH`, so module-extension replay and generated repo specs do not
+     depend on the ambient Slug process path.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

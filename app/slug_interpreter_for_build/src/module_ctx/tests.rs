@@ -115,6 +115,51 @@ fn test_module_context_records_getenv_inputs() {
 }
 
 #[test]
+fn test_module_context_which_uses_repo_env_path_and_records_input() {
+    use starlark::environment::Globals;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    let temp_dir = TempDir::new().unwrap();
+    let bin_dir = temp_dir.path().join("bin");
+    std::fs::create_dir_all(&bin_dir).unwrap();
+    let tool = bin_dir.join("plan61_tool");
+    std::fs::write(&tool, "#!/bin/sh\nexit 0\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    let mut repo_env = BTreeMap::new();
+    repo_env.insert("PATH".to_owned(), bin_dir.to_string_lossy().to_string());
+    let ctx = ModuleContext::empty().with_repo_env(Arc::new(repo_env));
+    let ctx_handle = ctx.clone();
+
+    let module = Module::new();
+    let heap = module.heap();
+    module.set("mctx", heap.alloc(ctx));
+
+    let ast = AstModule::parse(
+        "which.star",
+        "str(mctx.which(' plan61_tool '))".to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    let result = eval.eval_module(ast, &Globals::standard()).unwrap();
+
+    let tool_path = tool.to_string_lossy();
+    assert_eq!(result.unpack_str(), Some(tool_path.as_ref()));
+    assert_eq!(
+        ctx_handle.recorded_inputs().unwrap(),
+        vec![format!("ENV:PATH {}", bin_dir.to_string_lossy())]
+    );
+}
+
+#[test]
 fn test_module_context_records_watch_file_inputs() {
     use starlark::environment::Globals;
     use starlark::environment::Module;

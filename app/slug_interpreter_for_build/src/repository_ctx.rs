@@ -2938,7 +2938,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         for dir in std::env::split_paths(path_var).filter(|path| path.is_absolute()) {
             // On Windows, also try common executable extensions.
             let candidates: Vec<std::path::PathBuf> = if cfg!(windows) {
-                let base = dir.join(program);
+                let base = dir.join(program.trim());
                 if base.extension().is_some() {
                     vec![base]
                 } else {
@@ -2951,7 +2951,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     ]
                 }
             } else {
-                vec![dir.join(program)]
+                vec![dir.join(program.trim())]
             };
 
             for full_path in candidates {

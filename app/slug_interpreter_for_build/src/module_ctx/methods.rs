@@ -394,46 +394,61 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] program: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        if let Ok(path_var) = std::env::var("PATH") {
-            let separator = if cfg!(windows) { ';' } else { ':' };
-            for dir in path_var.split(separator) {
-                let candidates: Vec<PathBuf> = if cfg!(windows) {
-                    let base = Path::new(dir).join(program);
-                    if base.extension().is_some() {
-                        vec![base]
-                    } else {
-                        vec![
-                            base.with_extension("exe"),
-                            base.with_extension("cmd"),
-                            base.with_extension("bat"),
-                            base.with_extension("com"),
-                            base.clone(),
-                        ]
-                    }
-                } else {
-                    vec![Path::new(dir).join(program)]
-                };
+        if program.contains('/') || program.contains('\\') {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Program argument of which() may not contain a / or a \\ ('{}' given)",
+                program
+            )
+            .into());
+        }
+        if program.is_empty() {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Program argument of which() may not be empty"
+            )
+            .into());
+        }
 
-                for full_path in candidates {
-                    if full_path.is_file() {
-                        #[cfg(unix)]
-                        {
-                            use std::os::unix::fs::PermissionsExt;
-                            if let Ok(meta) = std::fs::metadata(&full_path) {
-                                if meta.permissions().mode() & 0o111 != 0 {
-                                    return Ok(heap.alloc(RepositoryPath::new(
-                                        full_path.to_string_lossy().to_string(),
-                                    )));
-                                }
+        this.record_env_input("PATH")?;
+        let Some(path_var) = this.repo_env().get("PATH") else {
+            return Ok(Value::new_none());
+        };
+        for dir in std::env::split_paths(path_var).filter(|path| path.is_absolute()) {
+            let candidates: Vec<PathBuf> = if cfg!(windows) {
+                let base = dir.join(program.trim());
+                if base.extension().is_some() {
+                    vec![base]
+                } else {
+                    vec![
+                        base.with_extension("exe"),
+                        base.with_extension("cmd"),
+                        base.with_extension("bat"),
+                        base.with_extension("com"),
+                        base.clone(),
+                    ]
+                }
+            } else {
+                vec![dir.join(program.trim())]
+            };
+
+            for full_path in candidates {
+                if full_path.is_file() {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        if let Ok(meta) = std::fs::metadata(&full_path) {
+                            if meta.permissions().mode() & 0o111 != 0 {
+                                return Ok(heap.alloc(RepositoryPath::new(
+                                    full_path.to_string_lossy().to_string(),
+                                )));
                             }
                         }
-                        #[cfg(not(unix))]
-                        {
-                            return Ok(heap.alloc(RepositoryPath::new(
-                                full_path.to_string_lossy().to_string(),
-                            )));
-                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        return Ok(heap
+                            .alloc(RepositoryPath::new(full_path.to_string_lossy().to_string())));
                     }
                 }
             }
