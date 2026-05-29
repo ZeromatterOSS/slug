@@ -695,6 +695,11 @@ Current state to preserve:
   slug_interpreter_for_build`, targeted `rg` for the removed method, `cargo
   test -p slug_bzlmod cell_graph --lib`, `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 validation checkpoint after API burn-down: rebuilt
+  `target/debug/slug` with `cargo build -p slug`, then ran
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py`; the full Plan 61 guardrail file
+  passed (`156 passed in 70.00s`). `slugd` was cleaned before and after.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
