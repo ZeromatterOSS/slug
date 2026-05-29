@@ -18,6 +18,7 @@ use std::fmt;
 
 use allocative::Allocative;
 use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -39,9 +40,17 @@ pub(crate) fn bazel_label_from_configured_with_alias_resolver(
     label: &ConfiguredProvidersLabel,
     cell_alias_resolver: Option<&CellAliasResolver>,
 ) -> BazelLabel {
+    bazel_label_from_configured_with_alias_resolver_and_root(label, cell_alias_resolver, None)
+}
+
+pub(crate) fn bazel_label_from_configured_with_alias_resolver_and_root(
+    label: &ConfiguredProvidersLabel,
+    cell_alias_resolver: Option<&CellAliasResolver>,
+    root_cell_name: Option<CellName>,
+) -> BazelLabel {
     let target = label.target().unconfigured();
     let cell = target.pkg().cell_name().as_str();
-    let workspace_name = if slug_core::cells::is_root_cell_name(cell) {
+    let workspace_name = if is_root_workspace_name_for_context(cell, root_cell_name) {
         String::new()
     } else {
         cell_alias_resolver
@@ -53,7 +62,17 @@ pub(crate) fn bazel_label_from_configured_with_alias_resolver(
         workspace_name,
         target.pkg().cell_relative_path().as_str().to_owned(),
         target.name().as_str().to_owned(),
+        root_cell_name,
     )
+}
+
+fn is_root_workspace_name_for_context(
+    workspace_name: &str,
+    root_cell_name: Option<CellName>,
+) -> bool {
+    workspace_name.is_empty()
+        || root_cell_name.is_some_and(|root| root.as_str() == workspace_name)
+        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(workspace_name))
 }
 
 /// A Bazel-compatible Label value returned by `Label()` and `ctx.package_relative_label()`.
@@ -70,6 +89,7 @@ pub struct BazelLabel {
     package: String,
     /// The workspace/repo name (e.g., "repo" or "")
     workspace_name: String,
+    root_cell_name: Option<CellName>,
 }
 
 impl fmt::Display for BazelLabel {
@@ -79,9 +99,7 @@ impl fmt::Display for BazelLabel {
         // - "@@//pkg:target" for the root repo
         // This is critical for bazel_features is_bzlmod_enabled detection:
         //   str(Label("//:invalid")).startswith("@@") must be True
-        if self.workspace_name.is_empty()
-            || slug_core::cells::is_root_cell_name(&self.workspace_name)
-        {
+        if self.is_root_workspace_name() {
             write!(f, "@@//{}:{}", self.package, self.name)
         } else {
             write!(
@@ -167,9 +185,7 @@ impl<'v> StarlarkValue<'v> for BazelLabel {
             "workspace_root" => {
                 // In Bazel, workspace_root is "" for the main repo and
                 // "external/<repo_name>" for external repos.
-                if self.workspace_name.is_empty()
-                    || slug_core::cells::is_root_cell_name(&self.workspace_name)
-                {
+                if self.is_root_workspace_name() {
                     Some(heap.alloc(""))
                 } else {
                     Some(heap.alloc(format!("external/{}", self.workspace_name)))
@@ -206,20 +222,29 @@ impl<'v> StarlarkValue<'v> for BazelLabel {
 }
 
 impl BazelLabel {
-    fn new(workspace_name: String, package: String, name: String) -> Self {
-        let full =
-            if workspace_name.is_empty() || slug_core::cells::is_root_cell_name(&workspace_name) {
-                format!("@@//{}:{}", package, name)
-            } else {
-                format!("@@{}//{}:{}", workspace_name, package, name)
-            };
+    fn new(
+        workspace_name: String,
+        package: String,
+        name: String,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        let full = if is_root_workspace_name_for_context(&workspace_name, root_cell_name) {
+            format!("@@//{}:{}", package, name)
+        } else {
+            format!("@@{}//{}:{}", workspace_name, package, name)
+        };
 
         BazelLabel {
             full,
             name,
             package,
             workspace_name,
+            root_cell_name,
         }
+    }
+
+    fn is_root_workspace_name(&self) -> bool {
+        is_root_workspace_name_for_context(&self.workspace_name, self.root_cell_name)
     }
 
     /// Parse a fully-resolved label string like "@repo//pkg:target" into a BazelLabel.
@@ -258,7 +283,7 @@ impl BazelLabel {
             (rest.to_owned(), last.to_owned())
         };
 
-        Self::new(workspace, package, name)
+        Self::new(workspace, package, name, None)
     }
 
     /// Get the full label string.
@@ -327,6 +352,34 @@ mod tests {
         assert_eq!(bazel_label.name(), "_bs");
         assert_eq!(bazel_label.workspace_name(), "crates__serde_core-1.0.228");
         assert_eq!(bazel_label.full(), "@@crates__serde_core-1.0.228//:_bs");
+    }
+
+    #[test]
+    fn configured_label_uses_explicit_root_cell() {
+        let root_cell = CellName::testing_new("actual_root_module");
+        let target = TargetLabel::testing_parse("actual_root_module//pkg:target")
+            .configure(ConfigurationData::testing_new());
+        let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
+
+        let bazel_label =
+            bazel_label_from_configured_with_alias_resolver_and_root(&label, None, Some(root_cell));
+
+        assert_eq!(bazel_label.package(), "pkg");
+        assert_eq!(bazel_label.name(), "target");
+        assert_eq!(bazel_label.workspace_name(), "");
+        assert_eq!(bazel_label.full(), "@@//pkg:target");
+
+        let legacy_root_target = TargetLabel::testing_parse("root//pkg:target")
+            .configure(ConfigurationData::testing_new());
+        let legacy_root_label =
+            ConfiguredProvidersLabel::new(legacy_root_target, ProvidersName::Default);
+        let legacy_root_bazel_label = bazel_label_from_configured_with_alias_resolver_and_root(
+            &legacy_root_label,
+            None,
+            Some(root_cell),
+        );
+        assert_eq!(legacy_root_bazel_label.workspace_name(), "root");
+        assert_eq!(legacy_root_bazel_label.full(), "@@root//pkg:target");
     }
 
     #[test]

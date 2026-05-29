@@ -1951,6 +1951,13 @@ hardening behavior around it.
      aspect execution helper keeps the no-owner fallback. Guardrails: `cargo
      test -p slug_build_api aspect_workspace_name_uses_explicit_root_cell --lib
      -- --nocapture`; `cargo check -p slug_analysis -p slug_build_api`.
+   - 2026-05-29 BazelLabel root-adapter reduction: labels created from normal
+     analysis context now carry the explicit DICE root cell and use it for
+     canonical label formatting, `workspace_name`, and `workspace_root`. Parsed
+     or standalone labels retain the no-owner fallback. Guardrails: `cargo test
+     -p slug_build_api configured_label_uses_explicit_root_cell --lib --
+     --nocapture`; `cargo test -p slug_build_api bazel_label --lib --
+     --nocapture`; `cargo check -p slug_build_api`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

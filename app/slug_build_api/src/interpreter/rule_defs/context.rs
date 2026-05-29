@@ -78,7 +78,7 @@ use crate::artifact_groups::InputSymlink;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
-use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured_with_alias_resolver;
+use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured_with_alias_resolver_and_root;
 use crate::interpreter::rule_defs::cc_common::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::cc_common::CcToolchainVariablesGen;
@@ -342,9 +342,10 @@ impl<'v> AnalysisContext<'v> {
             )
         });
         let bazel_label = configured_label.map(|label| {
-            heap.alloc_typed(bazel_label_from_configured_with_alias_resolver(
+            heap.alloc_typed(bazel_label_from_configured_with_alias_resolver_and_root(
                 label.inner(),
                 cell_alias_resolver.as_ref(),
+                root_cell_name,
             ))
         });
 
