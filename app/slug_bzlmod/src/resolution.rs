@@ -429,6 +429,7 @@ pub struct MvsResolver {
     /// Parsed local override MODULE.bazel files supplied by the clean DICE
     /// source-input producer.
     precomputed_local_override_modules: HashMap<String, ParsedModuleFile>,
+    precomputed_missing_local_override_modules: HashSet<String>,
     precomputed_local_override_modules_set: bool,
     /// Parsed git/archive override MODULE.bazel files supplied by the clean
     /// DICE source-input producer after it materializes the override source.
@@ -475,6 +476,7 @@ impl MvsResolver {
             previously_selected_yanked_versions: IndexMap::new(),
             override_patch_inputs,
             precomputed_local_override_modules: HashMap::new(),
+            precomputed_missing_local_override_modules: HashSet::new(),
             precomputed_local_override_modules_set: false,
             precomputed_non_registry_override_modules: HashMap::new(),
             precomputed_non_registry_override_modules_set: false,
@@ -506,17 +508,20 @@ impl MvsResolver {
             previously_selected_yanked_versions: IndexMap::new(),
             override_patch_inputs,
             precomputed_local_override_modules: HashMap::new(),
+            precomputed_missing_local_override_modules: HashSet::new(),
             precomputed_local_override_modules_set: false,
             precomputed_non_registry_override_modules: HashMap::new(),
             precomputed_non_registry_override_modules_set: false,
         })
     }
 
-    pub fn set_precomputed_local_override_modules<I>(&mut self, modules: I)
+    pub fn set_precomputed_local_override_modules<I, M>(&mut self, modules: I, missing_modules: M)
     where
         I: IntoIterator<Item = (String, ParsedModuleFile)>,
+        M: IntoIterator<Item = String>,
     {
         self.precomputed_local_override_modules = modules.into_iter().collect();
+        self.precomputed_missing_local_override_modules = missing_modules.into_iter().collect();
         self.precomputed_local_override_modules_set = true;
     }
 
@@ -839,6 +844,7 @@ impl MvsResolver {
                         lp,
                         workspace_root,
                         &self.precomputed_local_override_modules,
+                        &self.precomputed_missing_local_override_modules,
                     )?
                 } else {
                     resolve_local_override_without_precomputed_inputs(lp, workspace_root)?
@@ -1692,9 +1698,10 @@ fn resolve_local_override_from_precomputed_inputs(
     override_info: &LocalPathOverride,
     workspace_root: &Path,
     precomputed_modules: &HashMap<String, ParsedModuleFile>,
+    precomputed_missing_module_dirs: &HashSet<String>,
 ) -> slug_error::Result<ResolvedLocalModule> {
     let module_path = workspace_root.join(&override_info.path);
-    if !module_path.exists() {
+    if precomputed_missing_module_dirs.contains(&override_info.module_name) {
         return Err(LocalResolutionError::PathNotFound(override_info.path.clone()).into());
     }
 
@@ -2272,6 +2279,7 @@ module(name = "local_lib", version = "2.0.0")
             &override_info,
             dir.path(),
             &precomputed_modules,
+            &HashSet::new(),
         )
         .unwrap();
 
@@ -2325,6 +2333,34 @@ module(name = "local_lib", version = "2.0.0")
         };
 
         let result = resolve_local_override(&override_info, dir.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_precomputed_local_override_uses_precomputed_missing_state() {
+        let dir = TempDir::new().unwrap();
+        let override_info = LocalPathOverride {
+            module_name: "dep".to_owned(),
+            path: "does/not/exist".to_owned(),
+        };
+        let precomputed_modules = HashMap::new();
+
+        let resolved = resolve_local_override_from_precomputed_inputs(
+            &override_info,
+            dir.path(),
+            &precomputed_modules,
+            &HashSet::new(),
+        )
+        .unwrap();
+        assert_eq!(resolved.name, "dep");
+        assert!(!resolved.has_module_file);
+
+        let result = resolve_local_override_from_precomputed_inputs(
+            &override_info,
+            dir.path(),
+            &precomputed_modules,
+            &HashSet::from(["dep".to_owned()]),
+        );
         assert!(result.is_err());
     }
 

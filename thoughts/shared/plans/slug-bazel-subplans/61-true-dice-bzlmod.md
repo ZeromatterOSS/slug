@@ -746,6 +746,21 @@ Current state to preserve:
   -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py`; the full Plan 61
   guardrail file passed (`156 passed in 68.72s`). `slugd` was cleaned after the
   run and no daemon processes remained.
+- 2026-05-29 local-override source-input ownership reduction:
+  `LocalOverrideModuleInputsKey` now records project-local local-override
+  directory presence through DICE project-path metadata and carries missing
+  local-override module names to the MVS resolver. The clean resolver consumes
+  that precomputed missing/present fact instead of rechecking
+  `module_path.exists()` inside
+  `resolve_local_override_from_precomputed_inputs(...)`; out-of-project local
+  override directory presence is still polled inside the named source-input key
+  and remains invalid across transactions until lower-level watched filesystem
+  support exists. Guardrails: `cargo test -p slug_common
+  local_override_module_inputs --lib`, `cargo test -p slug_bzlmod resolution
+  --lib`, `cargo test -p slug_bzlmod resolved_graph --lib`, `cargo test -p
+  slug_common clean_resolved_module_graph --lib`, `cargo test -p slug_common
+  bzlmod --lib`, `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt
+  --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1382,6 +1397,11 @@ hardening behavior around it.
      `MODULE.bazel` files directly from disk. The standalone direct local
      override resolver and convenience dependency resolver are now test-only
      and are not exported by `slug_bzlmod`.
+     Project-local local-override directory presence is now part of that
+     source-input value too, so the clean MVS resolver no longer polls
+     `module_path.exists()` after the precomputed input set has been supplied.
+     Out-of-project local-override directory presence is still directly polled
+     by the named key and marked untracked.
      Git/archive override source-input descriptors now include the same local
      patch digest as resolver fetch/extract cache paths, and the non-registry
      source-input key owns cache-miss fetch/materialization plus

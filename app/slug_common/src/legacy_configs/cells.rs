@@ -764,6 +764,29 @@ async fn read_bzlmod_file_for_module_inputs(
     ))
 }
 
+async fn local_override_module_dir_exists(
+    ctx: &mut DiceComputations<'_>,
+    project_fs: &ProjectRoot,
+    path: &Path,
+) -> slug_error::Result<(bool, BzlmodFileInputTracking)> {
+    if let Some(project_path) = project_relative_path_for_abs_path(project_fs, path) {
+        return Ok((
+            DiceFileComputations::read_project_path_metadata_if_exists(ctx, &project_path)
+                .await?
+                .is_some(),
+            BzlmodFileInputTracking::Project,
+        ));
+    }
+
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => Ok((true, BzlmodFileInputTracking::Polled)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Ok((false, BzlmodFileInputTracking::Polled))
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 fn project_relative_path_for_abs_path(
     project_fs: &ProjectRoot,
     path: &Path,
@@ -1031,6 +1054,7 @@ async fn local_override_module_inputs_digest(
     let mut has_git_overrides = false;
     let mut has_untracked_inputs = false;
     let mut parsed_modules = Vec::new();
+    let mut missing_module_dirs = Vec::new();
 
     while let Some((module_name, base, path)) = queue.pop_front() {
         let module_dir = resolve_local_override_module_dir(&base, &path)?;
@@ -1052,6 +1076,20 @@ async fn local_override_module_inputs_digest(
             hasher.update([0]);
             continue;
         }
+
+        let (module_dir_exists, module_dir_tracking) =
+            local_override_module_dir_exists(ctx, &project_fs, normalized_module_dir.as_path())
+                .await?;
+        if module_dir_tracking != BzlmodFileInputTracking::Project {
+            has_untracked_inputs = true;
+        }
+        if module_dir_exists {
+            hasher.update(b"module-dir-present");
+        } else {
+            hasher.update(b"module-dir-missing");
+            missing_module_dirs.push(module_name.clone());
+        }
+        hasher.update([0]);
 
         let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
         let (module_read, tracking) = read_bzlmod_file_for_module_inputs(
@@ -1138,6 +1176,7 @@ async fn local_override_module_inputs_digest(
     Ok(LocalOverrideModuleInputsValue {
         digest: hex::encode(hasher.finalize()),
         parsed_modules,
+        missing_module_dirs,
         has_bazel_deps,
         has_extension_usages,
         has_repo_rule_invocations,
@@ -3610,6 +3649,38 @@ use_repo(ext, "generated")
 
         assert!(second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn local_override_module_inputs_key_tracks_project_local_dir_presence()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let module_dir = fs.path().root().as_path().join("dep");
+        std::fs::create_dir_all(&module_dir).unwrap();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let key = LocalOverrideModuleInputsKey {
+            project_root,
+            overrides: vec![("dep".to_owned(), "dep".to_owned())],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let present = dice.compute(&key).await??;
+        assert!(present.missing_module_dirs.is_empty());
+
+        std::fs::remove_dir_all(&module_dir).unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let missing = dice.compute(&key).await??;
+
+        assert_eq!(missing.missing_module_dirs, vec!["dep".to_owned()]);
+        assert_ne!(present.digest, missing.digest);
         Ok(())
     }
 

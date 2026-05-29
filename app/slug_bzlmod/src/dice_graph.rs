@@ -378,6 +378,7 @@ pub struct RootModuleFileValue {
 pub struct LocalOverrideModuleInputsValue {
     pub digest: String,
     pub parsed_modules: Vec<(String, ParsedModuleFile)>,
+    pub missing_module_dirs: Vec<String>,
     pub has_bazel_deps: bool,
     pub has_extension_usages: bool,
     pub has_repo_rule_invocations: bool,
@@ -1077,6 +1078,7 @@ pub async fn resolve_graph_with_module_file_inputs(
         })?;
     resolver.set_precomputed_local_override_modules(
         local_override_inputs.parsed_modules.iter().cloned(),
+        local_override_inputs.missing_module_dirs.iter().cloned(),
     );
     let non_registry_module_dirs: HashMap<_, _> = non_registry_override_inputs
         .module_dirs
@@ -5830,6 +5832,7 @@ mod tests {
             local_override_inputs: Arc::new(LocalOverrideModuleInputsValue {
                 digest: local_digest.to_owned(),
                 parsed_modules: Vec::new(),
+                missing_module_dirs: Vec::new(),
                 has_bazel_deps: false,
                 has_extension_usages: false,
                 has_repo_rule_invocations: false,
@@ -6030,6 +6033,7 @@ mod tests {
         let local_override_inputs = LocalOverrideModuleInputsValue {
             digest: "local".to_owned(),
             parsed_modules: vec![("dep".to_owned(), dep.clone())],
+            missing_module_dirs: Vec::new(),
             has_bazel_deps: false,
             has_extension_usages: false,
             has_repo_rule_invocations: false,
