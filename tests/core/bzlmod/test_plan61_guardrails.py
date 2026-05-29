@@ -7623,6 +7623,56 @@ use_repo(which, "which_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_execute_uses_repo_env_base(buck: Buck) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext.execute uses repository_os.environ."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_execute_ext+exec_repo"
+    _write(
+        buck.cwd / "module_execute_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+exec_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _module_execute_ext_impl(module_ctx):
+    result = module_ctx.execute(["/bin/sh", "-c", "printf %s \\"$PLAN61_EXEC_ENV\\""])
+    if result.return_code != 0:
+        fail("PLAN61_MODULE_CTX_EXECUTE_FAILED")
+    if result.stdout != "from-repo-env":
+        fail("PLAN61_MODULE_CTX_EXECUTE_DID_NOT_USE_REPO_ENV")
+    exec_repo_rule(name = "exec_repo", payload = result.stdout)
+
+module_execute_ext = module_extension(
+    implementation = _module_execute_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_execute")
+
+exec_ext = use_extension("//:module_execute_ext.bzl", "module_execute_ext")
+use_repo(exec_ext, "exec_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_exec_repo",
+    srcs = ["@exec_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_exec_repo", "--repo_env=PLAN61_EXEC_ENV=from-repo-env")
+    assert (repo_dir / "data.txt").read_text() == "from-repo-env\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_fresh_module_ctx_read_watch_file_edit_invalidates_extension_result(
     buck: Buck,
 ) -> None:
@@ -7811,6 +7861,55 @@ use_repo(which, "which_repo")
     assert second["repo_materialization_miss_reason"] > first[
         "repo_materialization_miss_reason"
     ]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_repository_ctx_execute_uses_repo_env_base(buck: Buck) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext.execute uses repository_os.environ."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+repo_execute_ext+exec_repo"
+    _write(
+        buck.cwd / "repo_execute_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    result = repository_ctx.execute(["/bin/sh", "-c", "printf %s \\"$PLAN61_EXEC_ENV\\""])
+    if result.return_code != 0:
+        fail("PLAN61_REPOSITORY_CTX_EXECUTE_FAILED")
+    if result.stdout != "from-repo-env":
+        fail("PLAN61_REPOSITORY_CTX_EXECUTE_DID_NOT_USE_REPO_ENV")
+    repository_ctx.file("data.txt", result.stdout + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+exec_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _repo_execute_ext_impl(module_ctx):
+    exec_repo_rule(name = "exec_repo")
+
+repo_execute_ext = module_extension(
+    implementation = _repo_execute_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_repository_ctx_execute")
+
+exec_ext = use_extension("//:repo_execute_ext.bzl", "repo_execute_ext")
+use_repo(exec_ext, "exec_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_exec_repo",
+    srcs = ["@exec_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_exec_repo", "--repo_env=PLAN61_EXEC_ENV=from-repo-env")
+    assert (repo_dir / "data.txt").read_text() == "from-repo-env\n"
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

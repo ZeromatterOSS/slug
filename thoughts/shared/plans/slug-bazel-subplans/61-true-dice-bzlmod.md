@@ -458,6 +458,18 @@ Current state to preserve:
   `cargo build -p slug`, focused Plan 61 `which` selectors (2 passed), and full
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py` (`158 passed in 70.81s`).
+- 2026-05-29 external-context execute repo-env ownership:
+  `repository_ctx.execute(...)` and `module_ctx.execute(...)` now clear the
+  ambient Slug process environment, install the effective repo-env as the base
+  process environment, and then apply explicit `environment` overrides/removals,
+  matching Bazel's `StarlarkBaseExternalContext.execute` use of
+  `repository_os.environ`. Guardrails: focused Plan 61 execute selectors first
+  failed with `PLAN61_MODULE_CTX_EXECUTE_DID_NOT_USE_REPO_ENV` and
+  `PLAN61_REPOSITORY_CTX_EXECUTE_DID_NOT_USE_REPO_ENV`, then `cargo test -p
+  slug_interpreter_for_build --lib` (127 passed), `cargo build -p slug`,
+  focused Plan 61 execute selectors (2 passed), and full
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (`160 passed in 69.82s`).
 - 2026-05-29 repository materialization recorded-input DICE read:
   `RepoMaterializationRecordedInputsManifestContentKey` now carries workspace
   identity and calls a late-bound `RepositoryMaterializationStateReader`.
@@ -1913,6 +1925,9 @@ hardening behavior around it.
    - `module_ctx.which(...)` now uses the effective repo-env `PATH` and records
      `ENV:PATH`, so module-extension replay and generated repo specs do not
      depend on the ambient Slug process path.
+   - `repository_ctx.execute(...)` and `module_ctx.execute(...)` now use the
+     effective repo-env as their base process environment instead of inheriting
+     ambient Slug process environment variables.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,

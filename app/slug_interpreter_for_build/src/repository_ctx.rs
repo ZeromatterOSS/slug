@@ -990,6 +990,50 @@ pub(crate) fn prepare_execute_program(program: &str, work_dir: &Path) -> PathBuf
     path.to_path_buf()
 }
 
+pub(crate) fn apply_execute_environment<'v>(
+    cmd: &mut Command,
+    repo_env: &BTreeMap<String, String>,
+    environment: Option<Value<'v>>,
+) -> starlark::Result<()> {
+    cmd.env_clear();
+    for (key, val) in repo_env {
+        cmd.env(key, val);
+    }
+
+    let Some(env_val) = environment else {
+        return Ok(());
+    };
+    let Some(env_dict) = DictRef::from_value(env_val) else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "environment must be a dict"
+        )
+        .into());
+    };
+    for (k, v) in env_dict.iter() {
+        let Some(key) = k.unpack_str() else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "environment keys must be strings"
+            )
+            .into());
+        };
+        if v.is_none() {
+            cmd.env_remove(key);
+        } else if let Some(val) = v.unpack_str() {
+            cmd.env(key, val);
+        } else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "environment values must be strings or None, got {}",
+                v.get_type()
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> PathBuf {
     let path = LabelFilesystemResolver::new(workspace_root)
@@ -2350,20 +2394,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         cmd.args(cmd_args);
         cmd.current_dir(&work_dir);
 
-        // Set environment variables if provided
-        if let Some(env_val) = environment {
-            if let Some(env_dict) = starlark::values::dict::DictRef::from_value(env_val) {
-                for (k, v) in env_dict.iter() {
-                    if let Some(key) = k.unpack_str() {
-                        if v.is_none() {
-                            cmd.env_remove(key);
-                        } else if let Some(val) = v.unpack_str() {
-                            cmd.env(key, val);
-                        }
-                    }
-                }
-            }
-        }
+        apply_execute_environment(&mut cmd, this.repo_env(), environment)?;
 
         // Execute with timeout
         let output = cmd.output().map_err(|e| {

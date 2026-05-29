@@ -353,16 +353,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             cmd.current_dir(work_dir);
         }
 
-        // Set environment variables if provided
-        if let Some(env_val) = environment {
-            if let Some(env_dict) = starlark::values::dict::DictRef::from_value(env_val) {
-                for (k, v) in env_dict.iter() {
-                    if let (Some(key), Some(val)) = (k.unpack_str(), v.unpack_str()) {
-                        cmd.env(key, val);
-                    }
-                }
-            }
-        }
+        crate::repository_ctx::apply_execute_environment(&mut cmd, this.repo_env(), environment)?;
 
         let output = cmd.output().map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
