@@ -740,6 +740,12 @@ Current state to preserve:
   -p slug_common`, `cargo test -p slug_bzlmod cell_graph --lib`, `cargo test
   -p slug_common bzlmod --lib`, targeted `rg` for the removed constructor,
   `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 validation checkpoint after cell-graph API cleanup:
+  cleaned stale `slugd`, rebuilt `target/debug/slug` with `cargo build -p
+  slug`, then ran `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python
+  -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py`; the full Plan 61
+  guardrail file passed (`156 passed in 68.72s`). `slugd` was cleaned after the
+  run and no daemon processes remained.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
