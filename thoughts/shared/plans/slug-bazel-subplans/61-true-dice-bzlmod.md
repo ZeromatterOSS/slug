@@ -986,6 +986,21 @@ Current state to preserve:
   slug_bzlmod current_workspace_helpers --lib`, `cargo test -p slug_bzlmod
   cell_graph --lib`, `cargo test -p slug_common bzlmod --lib`, and `cargo test
   -p slug_bzlmod --lib`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 registered projection graph-digest provenance:
+  `RegisteredToolchainsDataValue` and
+  `RegisteredExecutionPlatformsDataValue` now carry the active
+  cell-graph/resolution digest, their keys reject stale digest reads, and clean
+  resolved-graph output plus current-workspace registration consumers use the
+  stored active digest instead of assuming the injected-projection default.
+  This makes bzlmod toolchain/platform registration reads auditable against the
+  graph digest that produced them. Guardrails: `cargo test -p slug_bzlmod
+  registered_toolchains_key_rejects_stale_resolution_digest --lib`, `cargo
+  test -p slug_bzlmod
+  registered_execution_platforms_key_rejects_stale_resolution_digest --lib`,
+  `cargo test -p slug_bzlmod current_workspace_helpers --lib`, `cargo test -p
+  slug_bzlmod cell_graph --lib`, `cargo test -p slug_common bzlmod --lib`,
+  `cargo test -p slug_bzlmod --lib`, `cargo fmt --check`, and `git diff
+  --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

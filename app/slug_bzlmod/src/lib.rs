@@ -490,6 +490,10 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             repo_mappings.with_resolution_digest(cell_graph_resolution_digest.clone());
         let resolution_facts =
             resolution_facts.with_resolution_digest(cell_graph_resolution_digest.clone());
+        let registered_toolchains =
+            registered_toolchains.with_resolution_digest(cell_graph_resolution_digest.clone());
+        let registered_execution_platforms = registered_execution_platforms
+            .with_resolution_digest(cell_graph_resolution_digest.clone());
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
         let repo_env_data = Arc::new(repo_env);
         let module_versions = Arc::new(module_versions);
@@ -660,7 +664,10 @@ pub async fn registered_toolchains_for_current_workspace(
     ctx: &mut dice::DiceComputations<'_>,
 ) -> slug_error::Result<Arc<RegisteredToolchainsValue>> {
     let data = ctx.compute(&BzlmodRegisteredToolchainsDataKey).await?;
-    let key = RegisteredToolchainsKey::for_workspace_id(data.workspace_id.clone());
+    let key = RegisteredToolchainsKey::for_workspace_id_with_resolution_digest(
+        data.workspace_id.clone(),
+        data.resolution_digest.clone(),
+    );
     ctx.compute(&key).await?
 }
 
@@ -670,7 +677,10 @@ pub async fn registered_execution_platforms_for_current_workspace(
     let data = ctx
         .compute(&BzlmodRegisteredExecutionPlatformsDataKey)
         .await?;
-    let key = RegisteredExecutionPlatformsKey::for_workspace_id(data.workspace_id.clone());
+    let key = RegisteredExecutionPlatformsKey::for_workspace_id_with_resolution_digest(
+        data.workspace_id.clone(),
+        data.resolution_digest.clone(),
+    );
     ctx.compute(&key).await?
 }
 
@@ -2132,6 +2142,86 @@ mod tests {
             .unwrap_err();
         assert!(
             err.to_string().contains("resolution facts data digest"),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn registered_toolchains_key_rejects_stale_resolution_digest() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-registered-toolchains-digest"),
+            PathBuf::from("/tmp/slug-plan61-registered-toolchains-digest-output"),
+        );
+        let registered_toolchains =
+            RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), Vec::new())
+                .with_resolution_digest(Arc::from("current-digest"));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodRegisteredToolchainsDataKey,
+            Arc::new(registered_toolchains),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let err = dice
+            .compute(
+                &RegisteredToolchainsKey::for_workspace_id_with_resolution_digest(
+                    workspace_id,
+                    Arc::from("stale-digest"),
+                ),
+            )
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("registered toolchain data digest"),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn registered_execution_platforms_key_rejects_stale_resolution_digest()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-registered-platforms-digest"),
+            PathBuf::from("/tmp/slug-plan61-registered-platforms-digest-output"),
+        );
+        let registered_execution_platforms =
+            RegisteredExecutionPlatformsDataValue::for_workspace(workspace_id.clone(), Vec::new())
+                .with_resolution_digest(Arc::from("current-digest"));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodRegisteredExecutionPlatformsDataKey,
+            Arc::new(registered_execution_platforms),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let err = dice
+            .compute(
+                &RegisteredExecutionPlatformsKey::for_workspace_id_with_resolution_digest(
+                    workspace_id,
+                    Arc::from("stale-digest"),
+                ),
+            )
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("registered execution platform data digest"),
             "{err:?}"
         );
 

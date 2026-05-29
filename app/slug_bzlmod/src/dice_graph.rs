@@ -1315,8 +1315,12 @@ pub fn clean_resolved_graph_outputs_value(
         resolution_facts: projections
             .resolution_facts
             .with_resolution_digest(cell_graph_resolution_digest.clone()),
-        registered_toolchains: projections.registered_toolchains,
-        registered_execution_platforms: projections.registered_execution_platforms,
+        registered_toolchains: projections
+            .registered_toolchains
+            .with_resolution_digest(cell_graph_resolution_digest.clone()),
+        registered_execution_platforms: projections
+            .registered_execution_platforms
+            .with_resolution_digest(cell_graph_resolution_digest.clone()),
         extension_aggregations: projections
             .extension_aggregations
             .with_declared_extension_cells(declared_extension_cells),
@@ -4812,6 +4816,16 @@ impl RegisteredToolchainsKey {
         }
     }
 
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+        }
+    }
+
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
@@ -4827,6 +4841,7 @@ pub struct RegisteredToolchainsValue {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct RegisteredToolchainsDataValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub registered_toolchains: Vec<crate::RegisteredToolchain>,
 }
 
@@ -4837,8 +4852,14 @@ impl RegisteredToolchainsDataValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             registered_toolchains,
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 }
 
@@ -4882,6 +4903,15 @@ impl Key for RegisteredToolchainsKey {
                 data.workspace_id.canonical_project_root.display()
             ));
         }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "RegisteredToolchainsKey was computed with resolution digest '{}', \
+                 but current bzlmod registered toolchain data digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
+            ));
+        }
         Ok(Arc::new(RegisteredToolchainsValue {
             workspace_id: self.workspace_id.clone(),
             registered_toolchains: data.registered_toolchains.clone(),
@@ -4915,6 +4945,16 @@ impl RegisteredExecutionPlatformsKey {
         }
     }
 
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+        }
+    }
+
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
@@ -4930,6 +4970,7 @@ pub struct RegisteredExecutionPlatformsValue {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct RegisteredExecutionPlatformsDataValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub registered_execution_platforms: Vec<String>,
 }
 
@@ -4940,8 +4981,14 @@ impl RegisteredExecutionPlatformsDataValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             registered_execution_platforms,
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 }
 
@@ -4985,6 +5032,15 @@ impl Key for RegisteredExecutionPlatformsKey {
                  but current bzlmod registered execution platform data root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
                 data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "RegisteredExecutionPlatformsKey was computed with resolution digest '{}', \
+                 but current bzlmod registered execution platform data digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
             ));
         }
         Ok(Arc::new(RegisteredExecutionPlatformsValue {
