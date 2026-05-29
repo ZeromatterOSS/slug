@@ -36,8 +36,9 @@ Current classification:
   in places where Bazel owns explicit Skyframe keys, but the old resolver bridge
   is no longer the active blocker.
 - Repository materialization recorded-input manifest content, marker/local rule
-  state, and BUILD-file layout presence now have production DICE read paths;
-  broader layout scans and output-tree state still need follow-up DICE ownership.
+  state, and BUILD-file layout probes now have production DICE read paths;
+  foreign-symlink/invocation layout scans and output-tree state still need
+  follow-up DICE ownership.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -400,6 +401,14 @@ Current state to preserve:
   invocation-specific layout validity still use direct filesystem probes.
   Guardrails:
   `cargo test -p slug_bzlmod materialization_manifest_layout_rejects_missing_declared_build_file --lib`
+  and `cargo build -p slug`.
+- 2026-05-29 repository layout invalid-label DICE read:
+  `RepoMaterializationInvalidEmptyTargetLabelKey` now carries workspace identity
+  and reads `BUILD.bazel`/`BUILD` through the late-bound production content
+  reader before scanning for Bazel-invalid empty target labels (`//:"` and
+  `//:'`). The fallback direct read remains only for low-level tests without
+  late bindings. Guardrails:
+  `cargo test -p slug_bzlmod materialization_manifest_layout_rejects_invalid_empty_target_label --lib`
   and `cargo build -p slug`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
@@ -824,10 +833,10 @@ Current state to preserve:
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks. Recorded-input manifest content,
   `.slug_repo_complete`, `.slug_repo_rule_local`, and repository
-  `BUILD.bazel`/`BUILD` presence use late-bound production DICE
-  project-file/metadata reads; remaining layout scans and output-tree state
-  still poll filesystem state until lower-level tracked filesystem keys are
-  available.
+  `BUILD.bazel`/`BUILD` presence/content probes use late-bound production DICE
+  project-file/metadata reads; remaining foreign-symlink/invocation layout
+  scans and output-tree state still poll filesystem state until lower-level
+  tracked filesystem keys are available.
 - The current SDK frontier is no longer the legacy resolution bridge. The
   generated kernel-header source path mismatch and the later
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
@@ -1383,11 +1392,12 @@ hardening behavior around it.
      now records those repo-mapping inputs, so apparent repo-name changes are
      manifest-owned replay misses instead of stale materialization hits.
    - `.slug_repo_recorded_inputs`, `.slug_repo_complete`,
-     `.slug_repo_rule_local`, and repository `BUILD.bazel`/`BUILD` presence now
-     use late-bound production DICE read/metadata paths through
+     `.slug_repo_rule_local`, and repository `BUILD.bazel`/`BUILD`
+     presence/content probes now use late-bound production DICE read/metadata
+     paths through
      `slug_external_cells`, while keeping no-late-binding direct reads as test
-     fallbacks. Remaining layout scans and output-tree state still need
-     equivalent DICE-owned readers.
+     fallbacks. Remaining foreign-symlink/invocation layout scans and
+     output-tree state still need equivalent DICE-owned readers.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

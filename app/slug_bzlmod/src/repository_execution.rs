@@ -904,8 +904,12 @@ fn repo_has_invalid_empty_target_label(repo_path: &Path) -> bool {
     ["BUILD.bazel", "BUILD"].into_iter().any(|name| {
         std::fs::read_to_string(repo_path.join(name))
             .ok()
-            .is_some_and(|content| content.contains("//:\"") || content.contains("//:'"))
+            .is_some_and(|content| build_file_has_invalid_empty_target_label(&content))
     })
+}
+
+fn build_file_has_invalid_empty_target_label(content: &str) -> bool {
+    content.contains("//:\"") || content.contains("//:'")
 }
 
 fn repo_has_foreign_top_level_symlink(repo_path: &Path, project_root: &Path) -> bool {
@@ -1226,6 +1230,7 @@ impl Key for RepoMaterializationLayoutStateKey {
 
         let invalid_empty_target_label = ctx
             .compute(&RepoMaterializationInvalidEmptyTargetLabelKey {
+                workspace_id: self.0.workspace_id.clone(),
                 repo_dir: Arc::new(repo_dir.clone()),
             })
             .await
@@ -1317,12 +1322,14 @@ impl Key for RepoMaterializationBuildFilePresenceKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "RepoMaterializationInvalidEmptyTargetLabelKey({})",
+    "RepoMaterializationInvalidEmptyTargetLabelKey({}, {})",
+    workspace_id.stable_hash(),
     repo_dir.display()
 )]
 struct RepoMaterializationInvalidEmptyTargetLabelKey {
+    workspace_id: crate::WorkspaceId,
     repo_dir: Arc<PathBuf>,
 }
 
@@ -1332,9 +1339,31 @@ impl Key for RepoMaterializationInvalidEmptyTargetLabelKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            for name in ["BUILD.bazel", "BUILD"] {
+                let content = reader
+                    .read_repo_state_file_if_exists(
+                        ctx,
+                        self.workspace_id.clone(),
+                        self.repo_dir.clone(),
+                        name,
+                    )
+                    .await
+                    .ok()
+                    .flatten();
+                if content
+                    .as_ref()
+                    .is_some_and(|content| build_file_has_invalid_empty_target_label(content))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         repo_has_invalid_empty_target_label(&self.repo_dir)
     }
 
