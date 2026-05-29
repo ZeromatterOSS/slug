@@ -3823,7 +3823,11 @@ impl BzlmodLockfileInputsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodLockfileInputsDataValue {
     pub workspace_id: WorkspaceId,
-    pub lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
+    pub lockfile_mode: crate::LockfileMode,
+    pub hidden_lockfile_path: Option<PathBuf>,
+    pub root_module_present: bool,
+    #[cfg(test)]
+    pub precomputed_lockfile_inputs: Option<Arc<BzlmodLockfileInputsValue>>,
 }
 
 impl BzlmodLockfileInputsDataValue {
@@ -3831,9 +3835,32 @@ impl BzlmodLockfileInputsDataValue {
         workspace_id: WorkspaceId,
         lockfile_inputs: Arc<BzlmodLockfileInputsValue>,
     ) -> Self {
+        let root_module_present =
+            lockfile_inputs.visible_lockfile.is_some() || lockfile_inputs.hidden_lockfile.is_some();
+        Self::for_workspace_policy(
+            workspace_id,
+            lockfile_inputs.lockfile_mode,
+            lockfile_inputs.hidden_lockfile_path.clone(),
+            root_module_present,
+            #[cfg(test)]
+            Some(lockfile_inputs),
+        )
+    }
+
+    pub fn for_workspace_policy(
+        workspace_id: WorkspaceId,
+        lockfile_mode: crate::LockfileMode,
+        hidden_lockfile_path: Option<PathBuf>,
+        root_module_present: bool,
+        #[cfg(test)] precomputed_lockfile_inputs: Option<Arc<BzlmodLockfileInputsValue>>,
+    ) -> Self {
         Self {
             workspace_id,
-            lockfile_inputs,
+            lockfile_mode,
+            hidden_lockfile_path,
+            root_module_present,
+            #[cfg(test)]
+            precomputed_lockfile_inputs,
         }
     }
 }
@@ -4218,7 +4245,17 @@ impl Key for BzlmodLockfileInputsKey {
                 data.workspace_id.canonical_project_root.display()
             ));
         }
-        Ok(data.lockfile_inputs.clone())
+        #[cfg(test)]
+        if let Some(lockfile_inputs) = data.precomputed_lockfile_inputs.as_ref() {
+            return Ok(lockfile_inputs.clone());
+        }
+        ctx.compute(&BzlmodCleanLockfileInputsKey {
+            workspace_id: self.workspace_id.clone(),
+            lockfile_mode: data.lockfile_mode,
+            hidden_lockfile_path: data.hidden_lockfile_path.clone(),
+            root_module_present: data.root_module_present,
+        })
+        .await?
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -5418,7 +5455,6 @@ mod tests {
             let mut values = test_lockfile_values()
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
-            values.clear();
             values.insert(
                 visible_path.clone(),
                 test_lockfile_value(visible_path, "visible-digest"),
@@ -5462,6 +5498,61 @@ mod tests {
             .await??;
         assert!(off_inputs.visible_lockfile.is_none());
         assert!(off_inputs.hidden_lockfile.is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lockfile_inputs_key_recomputes_from_policy_data() -> slug_error::Result<()> {
+        init_test_clean_graph_io();
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-bzlmod-lockfile-inputs-ws"),
+            PathBuf::from("/tmp/slug-bzlmod-lockfile-inputs-out"),
+        );
+        let visible_path = lockfile_path(workspace_id.canonical_project_root.as_ref());
+        let hidden_path = PathBuf::from("/tmp/slug-bzlmod-lockfile-inputs-hidden.lock");
+        {
+            let mut values = test_lockfile_values()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            values.insert(
+                visible_path.clone(),
+                test_lockfile_value(visible_path, "visible-current"),
+            );
+            values.insert(
+                hidden_path.clone(),
+                test_lockfile_value(hidden_path.clone(), "hidden-current"),
+            );
+        }
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace_policy(
+                workspace_id.clone(),
+                LockfileMode::Update,
+                Some(hidden_path),
+                true,
+                None,
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+        let inputs = dice
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(workspace_id))
+            .await??;
+
+        assert_eq!(
+            inputs.visible_lockfile_digest.as_deref(),
+            Some("visible-current")
+        );
+        assert_eq!(
+            inputs.hidden_lockfile_digest.as_deref(),
+            Some("hidden-current")
+        );
         Ok(())
     }
 

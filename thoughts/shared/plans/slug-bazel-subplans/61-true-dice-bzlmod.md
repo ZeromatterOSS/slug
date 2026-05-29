@@ -839,6 +839,15 @@ Current state to preserve:
   it consumes the replay-input value and only validates selected cache recorded
   inputs before accepting a hit. Guardrail:
   `cargo test -p slug_bzlmod extension_execution_dice::tests:: --lib`.
+- 2026-05-29 lockfile-input policy injection reduction:
+  `BzlmodLockfileInputsDataKey` no longer carries precomputed visible/hidden
+  lockfile values in production. The injected data is the lockfile policy tuple
+  (workspace, mode, hidden path, and root-module-present), and
+  `BzlmodLockfileInputsKey` recomputes the current value through
+  `BzlmodCleanLockfileInputsKey`. Low-level tests retain a test-only
+  precomputed fallback for cases that do not install the clean-graph IO binding.
+  Guardrails: `cargo test -p slug_bzlmod lockfile_inputs --lib` and
+  `cargo check -p slug_bzlmod`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1124,13 +1133,14 @@ hardening behavior around it.
      Out-of-project hidden lockfiles are still directly polled by that named
      key and invalidated across transactions until the final watched-input graph
      replaces the direct polling.
-   - The clean bzlmod graph producer gets visible/hidden lockfile values from a
-     named lockfile-input bridge key instead of producing those reads inline.
-     The resulting `BzlmodLockfileInputsValue` is still a bridge-shaped value
-     until the true lockfile policy/value graph replaces it. It is injected as
-     a named DICE input beside the direct `BzlmodCellGraphValue`, so no
-     monolithic projection payload carries lockfile-input facts. Module
-     extension replay now consumes those values through the named
+   - The clean bzlmod graph producer gets visible/hidden lockfile values from
+     `BzlmodCleanLockfileInputsKey`, and current-workspace consumers now reach
+     those same reads through `BzlmodLockfileInputsKey`. The injected
+     `BzlmodLockfileInputsDataKey` production value is now policy-only
+     (workspace, mode, hidden path, and root-module-present) instead of a
+     precomputed lockfile payload. `BzlmodLockfileInputsValue` is still a
+     bundled value shape until the true lockfile policy/value graph replaces
+     it. Module extension replay consumes those values through the named
      `ModuleExtensionReplayInputsKey`, so lockfile cache/facts selection is no
      longer embedded in `ModuleExtensionExecutionKey`.
    - DICE-backed bzlmod resolution now requires the tracked visible and hidden
