@@ -703,15 +703,21 @@ Current state to preserve:
 - 2026-05-29 empty cell-graph fallback bypass:
   explicit empty bzlmod input setup now uses an `empty-bzlmod-cell-graph`
   resolution identity and derives an empty graph through `BzlmodCellGraphKey`
-  instead of installing or reading `BzlmodCellGraphDataKey`. A focused
-  regression poisons the old fallback payload and proves current-workspace
-  helpers ignore it on empty setup. Guardrails: `cargo test -p slug_bzlmod
+  instead of installing or reading `BzlmodCellGraphDataKey`. The persisted
+  config-load path now uses the same empty identity when no root `MODULE.bazel`
+  exists while still preserving command lockfile/repo-env policy inputs. A
+  focused regression poisons the old fallback payload and proves
+  current-workspace helpers ignore it on empty setup; the persisted empty
+  output-base guardrail now also asserts the empty resolution identity.
+  Guardrails: `cargo test -p slug_bzlmod
   empty_bzlmod_inputs_do_not_read_fallback_cell_graph_data --lib`, `cargo test
   -p slug_bzlmod current_workspace_helpers --lib`, `cargo test -p slug_bzlmod
-  cell_graph --lib`, `cargo check -p slug_bzlmod -p slug_common -p
-  slug_external_cells -p slug_analysis -p slug_interpreter_for_build`,
-  `cargo test -p slug_bzlmod --lib`, `cargo fmt --check`, and `git diff
-  --check`.
+  cell_graph --lib`, `cargo test -p slug_common
+  persisted_empty_bzlmod_inputs_preserves_explicit_output_base --lib`, `cargo
+  test -p slug_common bzlmod --lib`, `cargo check -p slug_bzlmod -p
+  slug_common -p slug_external_cells -p slug_analysis -p
+  slug_interpreter_for_build`, `cargo test -p slug_bzlmod --lib`, `cargo fmt
+  --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1800,8 +1806,10 @@ hardening behavior around it.
     bypasses `BzlmodCellGraphDataKey`; that key is only a bootstrap/fallback
     input when an injected fallback graph exists. Explicit empty bzlmod setup
     uses a separate empty resolution identity and no longer installs or reads
-    that fallback key. Clean/bootstrap cell-graph assembly policy is also in
-    `slug_bzlmod` via `BzlmodCleanCellGraphBuilder`;
+    that fallback key; the persisted no-root-MODULE config-load path uses the
+    same identity while preserving command policy inputs. Clean/bootstrap
+    cell-graph assembly policy is also in `slug_bzlmod` via
+    `BzlmodCleanCellGraphBuilder`;
     `slug_common` only provides callback-style source/preseed validation around
     that builder. The old `BzlmodProjectionData` wrapper has been deleted.
    - Ensure cell graph changes invalidate analysis and package loading

@@ -2393,7 +2393,7 @@ impl BuckConfigBasedCells {
         .await
         .buck_error_context("Parsing cells")?;
         let cell_graph_resolution_digest = clean_outputs.as_ref().map_or_else(
-            || Arc::from("empty-bzlmod-cell-graph"),
+            slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest,
             |value| value.cell_graph_resolution_digest.clone(),
         );
         let resolved_graph_for_dice = clean_outputs.as_ref().map(|value| value.graph.clone());
@@ -2408,35 +2408,20 @@ impl BuckConfigBasedCells {
             key.workspace_id.clone(),
             Arc::new(key.options.repo_env.clone()),
         );
-        if clean_outputs.is_some() {
-            slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
-                updater,
-                cell_graph_resolution_digest,
-                cell_graph_for_dice,
-                resolved_graph_for_dice,
-                module_versions_for_dice,
-                lockfile_inputs_for_dice,
-                repo_env_for_dice,
-                registered_toolchains_for_dice,
-                registered_execution_platforms_for_dice,
-                extension_aggregations_for_dice,
-                resolution_facts_for_dice,
-                repo_mappings_for_dice,
-            )?;
-        } else {
-            slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs(
-                updater,
-                cell_graph_for_dice,
-                module_versions_for_dice,
-                lockfile_inputs_for_dice,
-                repo_env_for_dice,
-                registered_toolchains_for_dice,
-                registered_execution_platforms_for_dice,
-                extension_aggregations_for_dice,
-                resolution_facts_for_dice,
-                repo_mappings_for_dice,
-            )?;
-        }
+        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+            updater,
+            cell_graph_resolution_digest,
+            cell_graph_for_dice,
+            resolved_graph_for_dice,
+            module_versions_for_dice,
+            lockfile_inputs_for_dice,
+            repo_env_for_dice,
+            registered_toolchains_for_dice,
+            registered_execution_platforms_for_dice,
+            extension_aggregations_for_dice,
+            resolution_facts_for_dice,
+            repo_mappings_for_dice,
+        )?;
         Ok(configs)
     }
 }
@@ -3979,9 +3964,15 @@ use_repo(ext, "generated")
         assert!(!configs.is_bzlmod);
         let mut dice = updater.commit().await;
         let cell_graph = slug_bzlmod::bzlmod_cell_graph_for_current_workspace(&mut dice).await?;
+        let resolution_digest =
+            slug_bzlmod::bzlmod_resolution_digest_for_current_workspace(&mut dice).await?;
         assert_eq!(
             cell_graph.workspace_id.output_base.as_ref().as_path(),
             output_base.as_path()
+        );
+        assert_eq!(
+            resolution_digest,
+            slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest()
         );
         Ok(())
     }

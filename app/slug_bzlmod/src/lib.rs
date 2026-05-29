@@ -323,7 +323,7 @@ pub trait SetBzlmodDiceInputs {
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<()> {
         self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
-            Arc::from(dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST),
+            empty_bzlmod_cell_graph_resolution_digest(),
             BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone()),
             None,
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
@@ -399,6 +399,10 @@ pub trait SetBzlmodDiceInputs {
         resolution_facts: BzlmodResolutionFactsValue,
         repo_mappings: BzlmodRepoMappingsDataValue,
     ) -> slug_error::Result<()>;
+}
+
+pub fn empty_bzlmod_cell_graph_resolution_digest() -> Arc<str> {
+    Arc::from(dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST)
 }
 
 fn validate_cell_graph_workspace(
@@ -2966,7 +2970,7 @@ mod tests {
         let mut dice = updater.commit().await;
 
         let digest = bzlmod_resolution_digest_for_current_workspace(&mut dice).await?;
-        assert_eq!(digest.as_ref(), dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST);
+        assert_eq!(digest, empty_bzlmod_cell_graph_resolution_digest());
         let graph = bzlmod_cell_graph_for_current_workspace(&mut dice).await?;
         assert_eq!(graph.workspace_id, workspace_id);
         assert!(graph.cells.is_empty());
