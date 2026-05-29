@@ -1214,6 +1214,7 @@ impl Key for RepoMaterializationLayoutStateKey {
         if repo_spec_requires_build_file(repo_spec) {
             let build_file_present = ctx
                 .compute(&RepoMaterializationBuildFilePresenceKey {
+                    workspace_id: self.0.workspace_id.clone(),
                     repo_dir: Arc::new(repo_dir.clone()),
                 })
                 .await
@@ -1259,12 +1260,14 @@ impl Key for RepoMaterializationLayoutStateKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "RepoMaterializationBuildFilePresenceKey({})",
+    "RepoMaterializationBuildFilePresenceKey({}, {})",
+    workspace_id.stable_hash(),
     repo_dir.display()
 )]
 struct RepoMaterializationBuildFilePresenceKey {
+    workspace_id: crate::WorkspaceId,
     repo_dir: Arc<PathBuf>,
 }
 
@@ -1274,9 +1277,33 @@ impl Key for RepoMaterializationBuildFilePresenceKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            if reader
+                .repo_state_file_exists(
+                    ctx,
+                    self.workspace_id.clone(),
+                    self.repo_dir.clone(),
+                    "BUILD.bazel",
+                )
+                .await
+                .unwrap_or(false)
+            {
+                return true;
+            }
+            return reader
+                .repo_state_file_exists(
+                    ctx,
+                    self.workspace_id.clone(),
+                    self.repo_dir.clone(),
+                    "BUILD",
+                )
+                .await
+                .unwrap_or(false);
+        }
+
         repo_materialization_build_file_present(&self.repo_dir)
     }
 

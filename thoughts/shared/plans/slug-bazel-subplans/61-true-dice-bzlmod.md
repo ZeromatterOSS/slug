@@ -35,9 +35,9 @@ Current classification:
 - Replay correctness still has remaining repository/materialization-policy work
   in places where Bazel owns explicit Skyframe keys, but the old resolver bridge
   is no longer the active blocker.
-- Repository materialization recorded-input manifest content and marker/local
-  rule state now have production DICE read paths; layout/output-tree state
-  still needs follow-up DICE ownership.
+- Repository materialization recorded-input manifest content, marker/local rule
+  state, and BUILD-file layout presence now have production DICE read paths;
+  broader layout scans and output-tree state still need follow-up DICE ownership.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -392,6 +392,15 @@ Current state to preserve:
   (3 passed), `cargo test -p slug_external_cells` (10 passed plus doctests),
   `cargo build -p slug`, focused marker Plan 61 Python selectors (3 passed),
   and `cargo test -p slug_bzlmod` (402 passed plus doctest).
+- 2026-05-29 repository layout BUILD-file DICE metadata read:
+  `RepoMaterializationBuildFilePresenceKey` now carries workspace identity and
+  checks `BUILD.bazel`/`BUILD` through the late-bound production metadata
+  reader instead of direct `Path::exists()` polling in `slug_bzlmod`. Remaining
+  layout checks for invalid empty target labels, foreign top-level symlinks, and
+  invocation-specific layout validity still use direct filesystem probes.
+  Guardrails:
+  `cargo test -p slug_bzlmod materialization_manifest_layout_rejects_missing_declared_build_file --lib`
+  and `cargo build -p slug`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -814,9 +823,11 @@ Current state to preserve:
   `bazel_tools` alias/cell failures.
 - Repository materialization now has a named manifest key and child state for
   marker/layout/recorded-input checks. Recorded-input manifest content,
-  `.slug_repo_complete`, and `.slug_repo_rule_local` use late-bound production
-  DICE project-file/metadata reads; layout/output-tree state still polls
-  filesystem state until lower-level tracked filesystem keys are available.
+  `.slug_repo_complete`, `.slug_repo_rule_local`, and repository
+  `BUILD.bazel`/`BUILD` presence use late-bound production DICE
+  project-file/metadata reads; remaining layout scans and output-tree state
+  still poll filesystem state until lower-level tracked filesystem keys are
+  available.
 - The current SDK frontier is no longer the legacy resolution bridge. The
   generated kernel-header source path mismatch and the later
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
@@ -1371,11 +1382,12 @@ hardening behavior around it.
      external-cell repository execution. Repository-rule `Label()` construction
      now records those repo-mapping inputs, so apparent repo-name changes are
      manifest-owned replay misses instead of stale materialization hits.
-   - `.slug_repo_recorded_inputs`, `.slug_repo_complete`, and
-     `.slug_repo_rule_local` now use late-bound production DICE read/metadata
-     paths through `slug_external_cells`, while keeping no-late-binding direct
-     reads as test fallbacks. Layout/output-tree state still needs equivalent
-     DICE-owned readers.
+   - `.slug_repo_recorded_inputs`, `.slug_repo_complete`,
+     `.slug_repo_rule_local`, and repository `BUILD.bazel`/`BUILD` presence now
+     use late-bound production DICE read/metadata paths through
+     `slug_external_cells`, while keeping no-late-binding direct reads as test
+     fallbacks. Remaining layout scans and output-tree state still need
+     equivalent DICE-owned readers.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not
