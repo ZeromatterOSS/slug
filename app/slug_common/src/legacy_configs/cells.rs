@@ -562,15 +562,36 @@ async fn parse_module_with_tracked_project_includes(
     module_content: String,
     validate_extension_repo_directives: bool,
 ) -> slug_error::Result<ParsedModuleFileWithInputTracking> {
+    parse_module_with_tracked_includes(
+        ctx,
+        project_fs,
+        module_path,
+        module_content,
+        validate_extension_repo_directives,
+        true,
+    )
+    .await
+}
+
+async fn parse_module_with_tracked_includes(
+    ctx: &mut DiceComputations<'_>,
+    project_fs: &ProjectRoot,
+    module_path: &Path,
+    module_content: String,
+    validate_extension_repo_directives: bool,
+    record_events: bool,
+) -> slug_error::Result<ParsedModuleFileWithInputTracking> {
     let module_root = module_path
         .parent()
         .unwrap_or_else(|| Path::new(""))
         .to_path_buf();
-    let mut session = if validate_extension_repo_directives {
-        slug_bzlmod::ModuleFileParseSession::new(module_root.clone())
-    } else {
-        slug_bzlmod::ModuleFileParseSession::new(module_root.clone())
-            .allow_ignored_extension_repo_directives()
+    let mut session = match (validate_extension_repo_directives, record_events) {
+        (true, true) => slug_bzlmod::ModuleFileParseSession::new(module_root.clone()),
+        (false, true) => slug_bzlmod::ModuleFileParseSession::new(module_root.clone())
+            .allow_ignored_extension_repo_directives(),
+        (true, false) => slug_bzlmod::ModuleFileParseSession::new_silent(module_root.clone()),
+        (false, false) => slug_bzlmod::ModuleFileParseSession::new_silent(module_root.clone())
+            .allow_ignored_extension_repo_directives(),
     };
     let module_digest = slug_bzlmod::compute_sha256_hex(module_content.as_bytes());
     let include_labels = session.eval_segment(module_path, &module_content, module_digest)?;
@@ -626,6 +647,7 @@ async fn parse_module_with_tracked_project_includes(
     })
 }
 
+#[cfg(test)]
 fn parse_module_with_polled_includes(
     module_path: &Path,
     module_content: String,
@@ -1114,12 +1136,19 @@ async fn local_override_module_inputs_digest(
                     .await
                 } else {
                     record_polled_module_parse_if_changed(&module_bazel_path, &content_digest);
-                    parse_module_with_polled_includes(&module_bazel_path, content, false).map(
-                        |parsed_with_inputs| ParsedModuleFileWithInputTracking {
-                            parsed_with_inputs,
-                            has_untracked_inputs: true,
-                        },
+                    parse_module_with_tracked_includes(
+                        ctx,
+                        &project_fs,
+                        &module_bazel_path,
+                        content,
+                        false,
+                        false,
                     )
+                    .await
+                    .map(|mut parsed_with_inputs| {
+                        parsed_with_inputs.has_untracked_inputs = true;
+                        parsed_with_inputs
+                    })
                 }
                 .with_buck_error_context(|| {
                     format!(
@@ -3648,6 +3677,59 @@ use_repo(ext, "generated")
         std::fs::write(
             &module_path,
             "module(name = \"dep\")\nbazel_dep(name = \"other\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.has_untracked_inputs);
+        assert_ne!(first.digest, second.digest);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn local_override_module_inputs_key_repolls_out_of_project_include()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-local-override-include-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+        let module_path = external.path().join("MODULE.bazel");
+        let include_path = external.path().join("deps.MODULE.bazel");
+        std::fs::write(
+            &module_path,
+            "module(name = \"dep\")\ninclude(\"//:deps.MODULE.bazel\")\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &include_path,
+            "bazel_dep(name = \"included_dep\", version = \"1.0\")\n",
+        )
+        .unwrap();
+        let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
+        let key = LocalOverrideModuleInputsKey {
+            project_root,
+            overrides: vec![(
+                "dep".to_owned(),
+                external.path().to_string_lossy().into_owned(),
+            )],
+        };
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await??;
+        assert!(first.has_untracked_inputs);
+
+        std::fs::write(
+            &include_path,
+            "bazel_dep(name = \"included_dep\", version = \"2.0\")\n",
         )
         .unwrap();
         let mut dice = dice.into_updater().commit().await;

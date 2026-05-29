@@ -815,6 +815,18 @@ Current state to preserve:
   selectors for local override/included-module warm reuse (3 passed), and
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py` (`156 passed in 69.36s`).
+- 2026-05-29 out-of-project local-override include DICE reads:
+  `LocalOverrideModuleInputsKey` no longer parses included MODULE.bazel
+  segments with the direct `parse_module_with_polled_includes(...)` path when
+  the override module itself is outside the project. It keeps the existing
+  digest-change-only parse counter, but reads includes through the same
+  DICE child file-input key used by other out-of-project module source classes.
+  The direct polled parser is now test-only; `cargo check -p slug_common`
+  first failed at the remaining production caller after that guard was added.
+  Guardrails: `cargo check -p slug_common`, `cargo test -p slug_common
+  local_override_module_inputs --lib`, `cargo test -p slug_common bzlmod
+  --lib`, `cargo build -p slug`, focused Plan 61 out-of-project local override
+  selectors (3 passed), `cargo fmt --check`, and `git diff --check`.
 - 2026-05-29 unclassified repository-layout fallback reduction:
   `RepoMaterializationInvocationLayoutStateKey` now returns a tracked
   `layout-valid` state directly for repository rule classes with no known
@@ -1490,6 +1502,9 @@ hardening behavior around it.
      The producer avoids project path metadata when `path/MODULE.bazel` is
      present, because that file input already proves the directory exists and
      preserves warm parse cutoffs.
+     Out-of-project local-override included module segments now use the same
+     DICE child file-input key as other out-of-project module source classes;
+     direct polled include parsing remains only for test poll helpers.
      Out-of-project local-override directory presence is still directly polled
      by the named key and marked untracked.
      Git/archive override source-input descriptors now include the same local
