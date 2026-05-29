@@ -17,6 +17,7 @@ use pagable::Pagable;
 use serde::Serialize;
 use serde::Serializer;
 use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::NonDefaultProvidersName;
 use slug_core::provider::label::ProvidersLabel;
@@ -68,6 +69,9 @@ pub struct StarlarkConfiguredProvidersLabel {
     #[freeze(identity)]
     #[trace(unsafe_ignore)]
     cell_alias_resolver: Option<CellAliasResolver>,
+    #[freeze(identity)]
+    #[trace(unsafe_ignore)]
+    root_cell_name: Option<CellName>,
 }
 
 starlark_simple_value!(StarlarkConfiguredProvidersLabel);
@@ -86,6 +90,7 @@ impl StarlarkConfiguredProvidersLabel {
         StarlarkConfiguredProvidersLabel {
             label,
             cell_alias_resolver: None,
+            root_cell_name: None,
         }
     }
 
@@ -93,9 +98,18 @@ impl StarlarkConfiguredProvidersLabel {
         label: ConfiguredProvidersLabel,
         cell_alias_resolver: Option<CellAliasResolver>,
     ) -> Self {
+        Self::new_with_cell_alias_resolver_and_root(label, cell_alias_resolver, None)
+    }
+
+    pub fn new_with_cell_alias_resolver_and_root(
+        label: ConfiguredProvidersLabel,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
         StarlarkConfiguredProvidersLabel {
             label,
             cell_alias_resolver,
+            root_cell_name,
         }
     }
 
@@ -107,9 +121,13 @@ impl StarlarkConfiguredProvidersLabel {
         self.cell_alias_resolver.as_ref()
     }
 
+    pub fn root_cell_name(&self) -> Option<&CellName> {
+        self.root_cell_name.as_ref()
+    }
+
     fn bazel_workspace_name(&self) -> String {
         let cell = self.label.target().pkg().cell_name().as_str();
-        if slug_core::cells::is_root_cell_name(cell) {
+        if self.is_root_workspace_name(cell) {
             String::new()
         } else {
             self.cell_alias_resolver
@@ -118,6 +136,13 @@ impl StarlarkConfiguredProvidersLabel {
                 .map(|cell| cell.as_str().to_owned())
                 .unwrap_or_else(|| cell.to_owned())
         }
+    }
+
+    fn is_root_workspace_name(&self, cell: &str) -> bool {
+        self.root_cell_name
+            .as_ref()
+            .is_some_and(|root| root.as_str() == cell)
+            || (self.root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell))
     }
 }
 
@@ -305,9 +330,10 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
             let configured = new_target.configure_pair(this.label.target().cfg_pair().dupe());
             let new_label = ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
             Ok(heap.alloc(
-                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver_and_root(
                     new_label,
                     this.cell_alias_resolver.clone(),
+                    this.root_cell_name.clone(),
                 ),
             ))
         }
@@ -329,9 +355,10 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         let configured = new_target.configure_pair(this.label.target().cfg_pair().dupe());
         let new_label = ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
         Ok(heap.alloc(
-            StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+            StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver_and_root(
                 new_label,
                 this.cell_alias_resolver.clone(),
+                this.root_cell_name.clone(),
             ),
         ))
     }
@@ -637,6 +664,47 @@ mod tests {
             slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn configured_label_workspace_names_use_explicit_root_before_global_root()
+    -> slug_error::Result<()> {
+        let apparent = "root";
+        let canonical = "plan61_owner++configured_label+root";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
+            extension_cells: Vec::new(),
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+        };
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("workspace"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let label = ConfiguredProvidersLabel::new(
+            ConfiguredTargetLabel::testing_parse(
+                &format!("{apparent}//pkg:target"),
+                ConfigurationData::testing_new(),
+            ),
+            ProvidersName::Default,
+        );
+
+        let starlark_label =
+            StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver_and_root(
+                label.clone(),
+                Some(resolver),
+                Some(CellName::testing_new("workspace")),
+            );
+        let no_root_label =
+            StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(label, None);
+
+        assert_eq!(starlark_label.bazel_workspace_name(), canonical);
+        assert_eq!(no_root_label.bazel_workspace_name(), "");
         Ok(())
     }
 

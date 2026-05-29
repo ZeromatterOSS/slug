@@ -51,10 +51,11 @@ pub(crate) trait SourceAttrTypeExt {
         let artifact = StarlarkArtifact::new(SourceArtifact::new(path).into());
         Ok(ctx
             .heap()
-            .alloc(SourceFileTarget::new_with_cell_alias_resolver(
+            .alloc(SourceFileTarget::new_with_cell_alias_resolver_and_root(
                 label,
                 artifact,
                 ctx.cell_alias_resolver().cloned(),
+                ctx.root_cell_name().cloned(),
             )))
     }
 

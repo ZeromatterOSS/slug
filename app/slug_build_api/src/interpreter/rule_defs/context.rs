@@ -335,9 +335,10 @@ impl<'v> AnalysisContext<'v> {
     ) -> ValueTyped<'v, AnalysisContext<'v>> {
         let configured_label = label.map(|label| {
             heap.alloc_typed(
-                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver_and_root(
                     ConfiguredProvidersLabel::new(label, ProvidersName::Default),
                     cell_alias_resolver.clone(),
+                    root_cell_name.clone(),
                 ),
             )
         });

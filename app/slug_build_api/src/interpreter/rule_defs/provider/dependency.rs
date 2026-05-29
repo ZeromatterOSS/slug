@@ -16,6 +16,7 @@ use std::mem;
 use allocative::Allocative;
 use dupe::Dupe;
 use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::provider::label::ProviderName;
@@ -49,7 +50,7 @@ use starlark_map::StarlarkHasher;
 
 use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
-use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured_with_alias_resolver;
+use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured_with_alias_resolver_and_root;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfo;
 use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
@@ -93,6 +94,7 @@ pub struct SourceFileTarget {
     label: ConfiguredProvidersLabel,
     artifact: StarlarkArtifact,
     cell_alias_resolver: Option<CellAliasResolver>,
+    root_cell_name: Option<CellName>,
 }
 
 starlark::starlark_simple_value!(SourceFileTarget);
@@ -107,10 +109,20 @@ impl SourceFileTarget {
         artifact: StarlarkArtifact,
         cell_alias_resolver: Option<CellAliasResolver>,
     ) -> Self {
+        Self::new_with_cell_alias_resolver_and_root(label, artifact, cell_alias_resolver, None)
+    }
+
+    pub fn new_with_cell_alias_resolver_and_root(
+        label: ConfiguredProvidersLabel,
+        artifact: StarlarkArtifact,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
         Self {
             label,
             artifact,
             cell_alias_resolver,
+            root_cell_name,
         }
     }
 
@@ -128,9 +140,10 @@ impl SourceFileTarget {
     }
 
     fn bazel_label(&self) -> BazelLabel {
-        bazel_label_from_configured_with_alias_resolver(
+        bazel_label_from_configured_with_alias_resolver_and_root(
             &self.label,
             self.cell_alias_resolver.as_ref(),
+            self.root_cell_name.clone(),
         )
     }
 }
@@ -182,6 +195,24 @@ impl<'v> Dependency<'v> {
         execution_platform: Option<&ExecutionPlatformResolution>,
         cell_alias_resolver: Option<CellAliasResolver>,
     ) -> Self {
+        Self::new_with_cell_alias_resolver_and_root(
+            heap,
+            label,
+            provider_collection,
+            execution_platform,
+            cell_alias_resolver,
+            None,
+        )
+    }
+
+    pub fn new_with_cell_alias_resolver_and_root(
+        heap: Heap<'v>,
+        label: ConfiguredProvidersLabel,
+        provider_collection: FrozenValueTyped<'v, FrozenProviderCollection>,
+        execution_platform: Option<&ExecutionPlatformResolution>,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
         let execution_platform: ValueOfUnchecked<NoneOr<StarlarkExecutionPlatformResolution>> =
             match execution_platform {
                 Some(e) => ValueOfUnchecked::new(
@@ -191,9 +222,10 @@ impl<'v> Dependency<'v> {
             };
         Dependency {
             label: heap.alloc_typed_unchecked(
-                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver(
+                StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver_and_root(
                     label,
                     cell_alias_resolver,
+                    root_cell_name,
                 ),
             ),
             provider_collection: unsafe {
@@ -216,9 +248,10 @@ impl<'v> Dependency<'v> {
     }
 
     fn bazel_label(&self) -> BazelLabel {
-        bazel_label_from_configured_with_alias_resolver(
+        bazel_label_from_configured_with_alias_resolver_and_root(
             self.label().inner(),
             self.label().cell_alias_resolver(),
+            self.label().root_cell_name().cloned(),
         )
     }
 }
@@ -441,12 +474,13 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
             lbl.target().clone(),
             lbl.name().push(ProviderName::new(subtarget.to_owned())?),
         );
-        Ok(Dependency::new_with_cell_alias_resolver(
+        Ok(Dependency::new_with_cell_alias_resolver_and_root(
             heap,
             lbl,
             providers,
             None,
             label.cell_alias_resolver().cloned(),
+            label.root_cell_name().cloned(),
         ))
     }
 

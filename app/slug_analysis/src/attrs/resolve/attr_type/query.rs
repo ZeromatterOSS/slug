@@ -49,6 +49,7 @@ impl ConfiguredQueryAttrExt for QueryAttr<ConfiguredProvidersLabel> {
                 providers.add_heap_ref(ctx.starlark_module().frozen_heap()),
                 None,
                 ctx.cell_alias_resolver().cloned(),
+                ctx.root_cell_name().cloned(),
             ));
         }
         Ok(ctx.heap().alloc(dependencies))

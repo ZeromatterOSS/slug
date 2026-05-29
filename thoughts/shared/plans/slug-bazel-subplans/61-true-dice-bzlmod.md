@@ -1993,6 +1993,17 @@ hardening behavior around it.
      Guardrails: `cargo test -p slug_interpreter_for_build
      label_context_current_repo --lib -- --nocapture`; `cargo check -p
      slug_interpreter_for_build`.
+   - 2026-05-29 Starlark configured-label root-adapter reduction:
+     `StarlarkConfiguredProvidersLabel`, `Dependency`, and `SourceFileTarget`
+     now preserve the explicit DICE root cell alongside the runtime alias
+     resolver for Bazel-visible label fields. Normal analysis-created
+     `ctx.label`, configured label attrs, dependency attrs, query deps, and
+     source-file targets pass that owner through; no-owner labels keep the
+     legacy fallback. Guardrails: `cargo test -p slug_interpreter
+     configured_label_workspace_names --lib -- --nocapture`; `cargo test -p
+     slug_build_api dependency_label --lib -- --nocapture`; `cargo test -p
+     slug_build_api source_file_target_label --lib -- --nocapture`; `cargo
+     check -p slug_interpreter -p slug_build_api -p slug_analysis`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

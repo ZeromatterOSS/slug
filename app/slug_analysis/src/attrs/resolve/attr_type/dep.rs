@@ -51,6 +51,7 @@ pub trait DepAttrTypeExt {
         v: FrozenValueTyped<'v, FrozenProviderCollection>,
         execution_platform_resolution: Option<&ExecutionPlatformResolution>,
         cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<slug_core::cells::name::CellName>,
     ) -> Value<'v>;
 
     fn resolve_single_impl<'v>(
@@ -91,14 +92,17 @@ impl DepAttrTypeExt for DepAttrType {
         v: FrozenValueTyped<'v, FrozenProviderCollection>,
         execution_platform_resolution: Option<&ExecutionPlatformResolution>,
         cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<slug_core::cells::name::CellName>,
     ) -> Value<'v> {
-        env.heap().alloc(Dependency::new_with_cell_alias_resolver(
-            env.heap(),
-            target.clone(),
-            v,
-            execution_platform_resolution,
-            cell_alias_resolver,
-        ))
+        env.heap()
+            .alloc(Dependency::new_with_cell_alias_resolver_and_root(
+                env.heap(),
+                target.clone(),
+                v,
+                execution_platform_resolution,
+                cell_alias_resolver,
+                root_cell_name,
+            ))
     }
 
     fn resolve_single_impl<'v>(
@@ -121,6 +125,7 @@ impl DepAttrTypeExt for DepAttrType {
             dep.providers,
             execution_platform_resolution,
             ctx.cell_alias_resolver().cloned(),
+            ctx.root_cell_name().cloned(),
         ))
     }
 
