@@ -651,6 +651,12 @@ Current state to preserve:
   explicit constructor. Guardrails: `cargo check -p slug_bzlmod -p
   slug_common`, `cargo test -p slug_bzlmod cell_graph --lib`, `cargo
   fmt --check`, and `git diff --check`.
+- 2026-05-29 cell-graph data facade export removed:
+  `BzlmodCellGraphDataValue` is no longer re-exported from the public
+  `slug_bzlmod` facade. The transitional injected value remains internal to
+  `slug_bzlmod`; external crates interact through the updater APIs that install
+  named DICE inputs. Guardrails: `cargo check -p slug_bzlmod -p slug_common`
+  and targeted `rg` for public facade/use-site matches.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

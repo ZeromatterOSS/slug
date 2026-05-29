@@ -65,7 +65,7 @@ pub use dice_graph::BZLMOD_CLEAN_GRAPH_IO_IMPL;
 pub use dice_graph::BzlmodCellGraphAlias;
 pub use dice_graph::BzlmodCellGraphCell;
 use dice_graph::BzlmodCellGraphDataKey;
-pub use dice_graph::BzlmodCellGraphDataValue;
+use dice_graph::BzlmodCellGraphDataValue;
 pub use dice_graph::BzlmodCellGraphDynamicAlias;
 pub use dice_graph::BzlmodCellGraphExtensionCell;
 pub use dice_graph::BzlmodCellGraphKey;
