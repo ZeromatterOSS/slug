@@ -603,8 +603,11 @@ Current state to preserve:
   parent `WorkspaceId`; it no longer re-derives workspace/output-base identity
   from a project root. Selected lockfile cache validation, fresh extension
   recorded-input validation, and lazy extension-repo setup validation all pass
-  the current DICE workspace identity into the child key. The project-root
-  convenience constructor is test-only. Guardrails: `cargo check -p
+  the current DICE workspace identity into the child key. The key now stores a
+  required `WorkspaceId` internally, so production compute has no optional
+  no-workspace branch; the project-root convenience constructor is test-only
+  and uses the named no-project sentinel only for absent-root test fixtures.
+  Guardrails: `cargo check -p
   slug_bzlmod -p slug_external_cells`, `cargo test -p slug_bzlmod
   recorded_inputs --lib`, `cargo test -p slug_bzlmod
   lockfile_replay_validates_recorded_file --lib`, `cargo test -p
@@ -1384,10 +1387,11 @@ hardening behavior around it.
      bytes enter through `BzlmodCleanLockfileInputsKey` /
      `BzlmodLockfileInputsKey` instead of a public disk-read convenience API.
    - Module-extension recorded-input validation keys now require the parent
-     `WorkspaceId` in production. The project-root/default-output-base
-     constructor remains only for tests, so selected lockfile replay and fresh
-     extension recorded-input checks validate under the same workspace identity
-     as the parent bzlmod graph.
+     `WorkspaceId` in production, and the key stores that workspace as a
+     required field rather than optional provenance. The
+     project-root/default-output-base constructor remains only for tests, so
+     selected lockfile replay and fresh extension recorded-input checks validate
+     under the same workspace identity as the parent bzlmod graph.
    - Hidden lockfile edit and facts create/edit/delete transitions have current
      same-daemon guardrail coverage in the Plan 61 Python suite. Fact-bearing
      extension replay intentionally avoids the runtime setup reuse shortcut so
@@ -1798,7 +1802,8 @@ hardening behavior around it.
      project root are also test-only. Zero-repo-env convenience constructors
      for extension execution and materialization manifests are test-only too.
      Module extension execution and recorded-input validation keys require
-     workspace identity instead of carrying or deriving optional provenance.
+     workspace identity instead of carrying or deriving optional provenance; the
+     recorded-input key's internal workspace is no longer optional in production.
      Empty module-extension result constructors are test-only, so production
      extension results must carry the recorded-input context from fresh
      execution or replay. The remaining bzlmod projection data wrappers also

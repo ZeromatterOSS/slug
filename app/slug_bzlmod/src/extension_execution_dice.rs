@@ -1226,7 +1226,7 @@ impl ModuleExtensionResult {
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("ModuleExtensionRecordedInputsKey({})", recorded_inputs.len())]
 pub struct ModuleExtensionRecordedInputsKey {
-    workspace_id: Option<crate::WorkspaceId>,
+    workspace_id: crate::WorkspaceId,
     recorded_inputs: Arc<Vec<String>>,
     workspace_root: Option<Arc<PathBuf>>,
     repo_env: Option<Arc<BTreeMap<String, String>>>,
@@ -1242,7 +1242,7 @@ impl ModuleExtensionRecordedInputsKey {
     ) -> Self {
         Self {
             workspace_root: Some(workspace_id.canonical_project_root.clone()),
-            workspace_id: Some(workspace_id),
+            workspace_id,
             recorded_inputs: Arc::new(recorded_inputs),
             repo_env: Some(repo_env),
             repo_mappings: Some(repo_mappings),
@@ -1259,7 +1259,8 @@ impl ModuleExtensionRecordedInputsKey {
         Self {
             workspace_id: workspace_root
                 .as_deref()
-                .map(|root| crate::WorkspaceId::new(root.clone(), root.join("buck-out/v2"))),
+                .map(|root| crate::WorkspaceId::new(root.clone(), root.join("buck-out/v2")))
+                .unwrap_or_else(crate::WorkspaceId::no_project_sentinel),
             recorded_inputs: Arc::new(recorded_inputs),
             workspace_root,
             repo_env,
@@ -1273,7 +1274,7 @@ impl ModuleExtensionRecordedInputsKey {
     ) -> Self {
         Self {
             workspace_root: Some(workspace_id.canonical_project_root.clone()),
-            workspace_id: Some(workspace_id),
+            workspace_id,
             recorded_inputs: Arc::new(selected.recorded_inputs.clone()),
             repo_env: selected.repo_env.clone().map(Arc::new),
             repo_mappings: selected.repo_mappings.clone().map(Arc::new),
@@ -1302,13 +1303,11 @@ impl Key for ModuleExtensionRecordedInputsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        if let Some(workspace_id) = self.workspace_id.clone()
-            && let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get()
-        {
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
             return validate_recorded_inputs_with_dice_reader(
                 ctx,
                 *reader,
-                workspace_id,
+                self.workspace_id.clone(),
                 self.recorded_inputs.as_slice(),
                 self.repo_env.as_deref(),
                 self.repo_mappings.as_deref(),
