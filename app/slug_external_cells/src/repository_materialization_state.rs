@@ -18,7 +18,11 @@ use slug_bzlmod::WorkspaceId;
 use slug_bzlmod::record_bzlmod_event;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;
+use slug_common::file_ops::metadata::FileType;
+use slug_common::file_ops::metadata::RawPathMetadata;
+use slug_common::file_ops::metadata::RawSymlink;
 use slug_core::fs::project::ProjectRoot;
+use slug_core::fs::project_rel_path::ProjectRelativePath;
 use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_fs::paths::abs_path::AbsPath;
 
@@ -55,6 +59,19 @@ fn repo_state_project_path(
             );
             Arc::from("repo_state_unreadable")
         })
+}
+
+fn child_project_path(
+    parent: &ProjectRelativePathBuf,
+    child_name: &str,
+) -> Option<ProjectRelativePathBuf> {
+    ProjectRelativePath::new(&format!("{}/{}", parent.as_str(), child_name))
+        .ok()
+        .map(ProjectRelativePath::to_owned)
+}
+
+fn external_symlink_is_foreign(project_root: &ProjectRoot, target: &Path) -> bool {
+    !target.starts_with(project_root.root().as_path())
 }
 
 #[async_trait]
@@ -115,5 +132,68 @@ impl RepositoryMaterializationStateReader for DiceRepositoryMaterializationState
                 );
                 Arc::from("repo_state_unreadable")
             })
+    }
+
+    async fn repo_has_foreign_top_level_symlink(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        repo_dir: Arc<PathBuf>,
+    ) -> Result<bool, Arc<str>> {
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let repo_project_path = repo_state_project_path(&workspace_id, project_root, &repo_dir)?;
+
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationStateRead,
+            format!("dir_entries:{}", repo_project_path.as_str()),
+        );
+        let entries =
+            DiceFileComputations::read_project_dir_entries(ctx, repo_project_path.as_ref())
+                .await
+                .map_err(|e| {
+                    tracing::debug!(
+                        error = %e,
+                        repo_dir = %repo_dir.display(),
+                        "failed to read repository top-level entries through DICE"
+                    );
+                    Arc::from("repo_state_unreadable")
+                })?;
+
+        for (name, file_type) in entries.iter() {
+            if *file_type != FileType::Symlink {
+                continue;
+            }
+            let Some(path) = child_project_path(&repo_project_path, name) else {
+                continue;
+            };
+            record_bzlmod_event(
+                BzlmodEventKind::RepoMaterializationStateRead,
+                format!("metadata:{}", path.as_str()),
+            );
+            let metadata =
+                DiceFileComputations::read_project_path_metadata_if_exists(ctx, path.as_ref())
+                    .await
+                    .map_err(|e| {
+                        tracing::debug!(
+                            error = %e,
+                            path = %path,
+                            "failed to read repository top-level symlink metadata through DICE"
+                        );
+                        Arc::from("repo_state_unreadable")
+                    })?;
+            let Some(RawPathMetadata::Symlink {
+                to: RawSymlink::External(target),
+                ..
+            }) = metadata
+            else {
+                continue;
+            };
+            if external_symlink_is_foreign(project_root, &target.to_path_buf()) {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 }

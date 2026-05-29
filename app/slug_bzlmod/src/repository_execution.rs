@@ -88,6 +88,13 @@ pub trait RepositoryMaterializationStateReader: Send + Sync + 'static {
         repo_dir: Arc<PathBuf>,
         file_name: &'static str,
     ) -> Result<bool, Arc<str>>;
+
+    async fn repo_has_foreign_top_level_symlink(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        repo_dir: Arc<PathBuf>,
+    ) -> Result<bool, Arc<str>>;
 }
 
 /// Initialized by `slug_external_cells::init_late_bindings()`.
@@ -1241,6 +1248,7 @@ impl Key for RepoMaterializationLayoutStateKey {
 
         let foreign_top_level_symlink = ctx
             .compute(&RepoMaterializationForeignTopLevelSymlinkKey {
+                workspace_id: self.0.workspace_id.clone(),
                 repo_dir: Arc::new(repo_dir.clone()),
                 project_root: self.0.workspace_id.canonical_project_root.clone(),
             })
@@ -1377,13 +1385,15 @@ impl Key for RepoMaterializationInvalidEmptyTargetLabelKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "RepoMaterializationForeignTopLevelSymlinkKey({}, {})",
+    "RepoMaterializationForeignTopLevelSymlinkKey({}, {}, {})",
+    workspace_id.stable_hash(),
     repo_dir.display(),
     project_root.display()
 )]
 struct RepoMaterializationForeignTopLevelSymlinkKey {
+    workspace_id: crate::WorkspaceId,
     repo_dir: Arc<PathBuf>,
     project_root: Arc<PathBuf>,
 }
@@ -1394,9 +1404,20 @@ impl Key for RepoMaterializationForeignTopLevelSymlinkKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            return reader
+                .repo_has_foreign_top_level_symlink(
+                    ctx,
+                    self.workspace_id.clone(),
+                    self.repo_dir.clone(),
+                )
+                .await
+                .unwrap_or(false);
+        }
+
         repo_has_foreign_top_level_symlink(&self.repo_dir, &self.project_root)
     }
 
