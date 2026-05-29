@@ -47,6 +47,7 @@ use dice::Key;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_util::late_binding::LateBinding;
 
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::RepoMaterializationManifestKey;
@@ -63,6 +64,27 @@ use crate::repository_invocations::RepositoryInvocation;
 pub(crate) const REPO_RECORDED_INPUTS_FILE: &str = ".slug_repo_recorded_inputs";
 const REPO_RULE_LOCAL_FILE: &str = ".slug_repo_rule_local";
 const MARKER_CONTENT_PREFIX: &str = "marker-content:";
+
+/// Late-bound reader for repository materialization state files.
+///
+/// `slug_bzlmod` owns the materialization manifest keys, but the DICE file
+/// readers live in `slug_common`. This trait lets production installs read
+/// materialization state through those DICE keys without adding a crate cycle.
+#[async_trait]
+pub trait RepositoryMaterializationStateReader: Send + Sync + 'static {
+    async fn read_repo_state_file_if_exists(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        repo_dir: Arc<PathBuf>,
+        file_name: &'static str,
+    ) -> Result<Option<Arc<str>>, Arc<str>>;
+}
+
+/// Initialized by `slug_external_cells::init_late_bindings()`.
+pub static REPOSITORY_MATERIALIZATION_STATE_READER_IMPL: LateBinding<
+    &'static dyn RepositoryMaterializationStateReader,
+> = LateBinding::new("REPOSITORY_MATERIALIZATION_STATE_READER_IMPL");
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
@@ -193,7 +215,7 @@ impl RepositoryRuleResult {
 /// When this key is computed, it executes the repository rule and materializes
 /// the repository content to disk.
 #[cfg(test)]
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("RepositoryRuleKey({}, {})", name, rule_name)]
 pub struct RepositoryRuleExecutionKey {
     /// Repository name (from the `name` attribute).
@@ -1358,6 +1380,7 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
     ) -> Self::Value {
         let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
         let content_key = RepoMaterializationRecordedInputsManifestContentKey {
+            workspace_id: self.0.workspace_id.clone(),
             repo_dir: Arc::new(repo_dir),
         };
         let manifest_content = match ctx.compute(&content_key).await {
@@ -1395,12 +1418,14 @@ impl Key for RepoMaterializationRecordedInputsStateKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "RepoMaterializationRecordedInputsManifestContentKey({})",
+    "RepoMaterializationRecordedInputsManifestContentKey({}, {})",
+    workspace_id.stable_hash(),
     repo_dir.display()
 )]
 struct RepoMaterializationRecordedInputsManifestContentKey {
+    workspace_id: crate::WorkspaceId,
     repo_dir: Arc<PathBuf>,
 }
 
@@ -1410,9 +1435,20 @@ impl Key for RepoMaterializationRecordedInputsManifestContentKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            return reader
+                .read_repo_state_file_if_exists(
+                    ctx,
+                    self.workspace_id.clone(),
+                    self.repo_dir.clone(),
+                    REPO_RECORDED_INPUTS_FILE,
+                )
+                .await;
+        }
+
         let manifest_path = self.repo_dir.join(REPO_RECORDED_INPUTS_FILE);
         if !manifest_path.exists() {
             return Ok(None);

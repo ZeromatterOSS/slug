@@ -5194,6 +5194,7 @@ pub enum BzlmodEventKind {
     ExtensionReplayHit,
     ExtensionReplayMissReason,
     ExtensionSpokesCompute,
+    RepoMaterializationStateRead,
     RepoMaterializationHit,
     RepoMaterializationMissReason,
     LockfileRead,
@@ -5209,6 +5210,7 @@ impl BzlmodEventKind {
             Self::ExtensionReplayHit => "extension_replay_hit",
             Self::ExtensionReplayMissReason => "extension_replay_miss_reason",
             Self::ExtensionSpokesCompute => "extension_spokes_compute",
+            Self::RepoMaterializationStateRead => "repo_materialization_state_read",
             Self::RepoMaterializationHit => "repo_materialization_hit",
             Self::RepoMaterializationMissReason => "repo_materialization_miss_reason",
             Self::LockfileRead => "lockfile_read",
@@ -5225,6 +5227,7 @@ pub struct BzlmodEventCounters {
     pub extension_replay_hit: u64,
     pub extension_replay_miss_reason: u64,
     pub extension_spokes_compute: u64,
+    pub repo_materialization_state_read: u64,
     pub repo_materialization_hit: u64,
     pub repo_materialization_miss_reason: u64,
     pub lockfile_read: u64,
@@ -5237,6 +5240,7 @@ static EXTENSION_EVAL: AtomicU64 = AtomicU64::new(0);
 static EXTENSION_REPLAY_HIT: AtomicU64 = AtomicU64::new(0);
 static EXTENSION_REPLAY_MISS_REASON: AtomicU64 = AtomicU64::new(0);
 static EXTENSION_SPOKES_COMPUTE: AtomicU64 = AtomicU64::new(0);
+static REPO_MATERIALIZATION_STATE_READ: AtomicU64 = AtomicU64::new(0);
 static REPO_MATERIALIZATION_HIT: AtomicU64 = AtomicU64::new(0);
 static REPO_MATERIALIZATION_MISS_REASON: AtomicU64 = AtomicU64::new(0);
 static LOCKFILE_READ: AtomicU64 = AtomicU64::new(0);
@@ -5250,6 +5254,7 @@ fn counter(kind: BzlmodEventKind) -> &'static AtomicU64 {
         BzlmodEventKind::ExtensionReplayHit => &EXTENSION_REPLAY_HIT,
         BzlmodEventKind::ExtensionReplayMissReason => &EXTENSION_REPLAY_MISS_REASON,
         BzlmodEventKind::ExtensionSpokesCompute => &EXTENSION_SPOKES_COMPUTE,
+        BzlmodEventKind::RepoMaterializationStateRead => &REPO_MATERIALIZATION_STATE_READ,
         BzlmodEventKind::RepoMaterializationHit => &REPO_MATERIALIZATION_HIT,
         BzlmodEventKind::RepoMaterializationMissReason => &REPO_MATERIALIZATION_MISS_REASON,
         BzlmodEventKind::LockfileRead => &LOCKFILE_READ,
@@ -5277,6 +5282,7 @@ pub fn bzlmod_event_counters() -> BzlmodEventCounters {
         extension_replay_hit: EXTENSION_REPLAY_HIT.load(Ordering::Relaxed),
         extension_replay_miss_reason: EXTENSION_REPLAY_MISS_REASON.load(Ordering::Relaxed),
         extension_spokes_compute: EXTENSION_SPOKES_COMPUTE.load(Ordering::Relaxed),
+        repo_materialization_state_read: REPO_MATERIALIZATION_STATE_READ.load(Ordering::Relaxed),
         repo_materialization_hit: REPO_MATERIALIZATION_HIT.load(Ordering::Relaxed),
         repo_materialization_miss_reason: REPO_MATERIALIZATION_MISS_REASON.load(Ordering::Relaxed),
         lockfile_read: LOCKFILE_READ.load(Ordering::Relaxed),
@@ -6177,6 +6183,11 @@ mod tests {
                 BzlmodEventKind::ExtensionSpokesCompute,
                 |c: &BzlmodEventCounters| c.extension_spokes_compute,
                 "extension_spokes_compute",
+            ),
+            (
+                BzlmodEventKind::RepoMaterializationStateRead,
+                |c: &BzlmodEventCounters| c.repo_materialization_state_read,
+                "repo_materialization_state_read",
             ),
             (
                 BzlmodEventKind::RepoMaterializationHit,

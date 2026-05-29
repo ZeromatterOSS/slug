@@ -7676,6 +7676,9 @@ use_repo(env, "env_repo")
     assert second["repo_materialization_miss_reason"] > first[
         "repo_materialization_miss_reason"
     ]
+    assert second["repo_materialization_state_read"] > first[
+        "repo_materialization_state_read"
+    ]
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
@@ -7862,6 +7865,9 @@ use_repo(watch, "watch_repo")
     assert (repo_dir / "data.txt").read_text() == "second\n"
     assert second["repo_materialization_miss_reason"] > first[
         "repo_materialization_miss_reason"
+    ]
+    assert second["repo_materialization_state_read"] > first[
+        "repo_materialization_state_read"
     ]
 
 

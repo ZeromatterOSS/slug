@@ -29,6 +29,7 @@ mod bzlmod;
 mod extension_repo;
 mod git;
 mod local;
+mod repository_materialization_state;
 mod repository_rule;
 
 struct ConcreteExternalCellsImpl;
@@ -143,5 +144,7 @@ impl slug_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
 }
 
 pub fn init_late_bindings() {
+    slug_bzlmod::REPOSITORY_MATERIALIZATION_STATE_READER_IMPL
+        .init(&repository_materialization_state::DICE_REPOSITORY_MATERIALIZATION_STATE_READER);
     slug_common::external_cells::EXTERNAL_CELLS_IMPL.init(&ConcreteExternalCellsImpl);
 }

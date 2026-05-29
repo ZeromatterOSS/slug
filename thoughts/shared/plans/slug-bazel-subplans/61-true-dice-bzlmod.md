@@ -35,6 +35,9 @@ Current classification:
 - Replay correctness still has remaining repository/materialization-policy work
   in places where Bazel owns explicit Skyframe keys, but the old resolver bridge
   is no longer the active blocker.
+- Repository materialization recorded-input manifest content now has a
+  production DICE read path; marker/layout/output-tree state still needs
+  follow-up DICE ownership.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -362,6 +365,20 @@ Current state to preserve:
   `Label()` repo mapping, repository_ctx label read watching, recorded
   repo-mapping cache rejection, and extension-repo source mappings (4 passed),
   and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (156 passed).
+- 2026-05-29 repository materialization recorded-input DICE read:
+  `RepoMaterializationRecordedInputsManifestContentKey` now carries workspace
+  identity and calls a late-bound `RepositoryMaterializationStateReader`.
+  Production initializes that reader in `slug_external_cells`, where
+  `.slug_repo_recorded_inputs` is relativized under the current project root and
+  read with `DiceFileComputations::read_project_file_if_exists(...)` instead of
+  direct `std::fs` polling in `slug_bzlmod`. The direct filesystem path remains
+  only as a no-late-binding fallback for low-level tests. A new
+  `repo_materialization_state_read` counter is emitted by the production DICE
+  reader, and Plan 61 repository_ctx guardrails assert that it advances across
+  same-daemon rematerialization. Guardrails: `cargo test -p slug_bzlmod`
+  (402 passed plus doctest), `cargo test -p slug_external_cells` (10 passed
+  plus doctests), `cargo build -p slug`, and focused Python selectors for
+  repository_ctx repo-env and watch-label rematerialization (2 passed).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -783,8 +800,10 @@ Current state to preserve:
   `rules_cc`, `rules_rs`, `rules_license`, `crates__*`, `zstd`, and
   `bazel_tools` alias/cell failures.
 - Repository materialization now has a named manifest key and child state for
-  marker/layout/recorded-input checks, but those child reads still poll
-  filesystem state until lower-level tracked filesystem keys are available.
+  marker/layout/recorded-input checks. Recorded-input manifest content uses a
+  late-bound production DICE project-file read; marker/layout/output-tree state
+  still polls filesystem state until lower-level tracked filesystem keys are
+  available.
 - The current SDK frontier is no longer the legacy resolution bridge. The
   generated kernel-header source path mismatch and the later
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
@@ -1339,6 +1358,10 @@ hardening behavior around it.
      external-cell repository execution. Repository-rule `Label()` construction
      now records those repo-mapping inputs, so apparent repo-name changes are
      manifest-owned replay misses instead of stale materialization hits.
+   - `.slug_repo_recorded_inputs` manifest content now uses a late-bound
+     production DICE read path through `slug_external_cells`, while keeping the
+     no-late-binding direct read as a test fallback. Marker/layout/output-tree
+     state still needs equivalent DICE-owned readers.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not
