@@ -4683,9 +4683,9 @@ use_repo(ext, "generated")
             "buck-out/v2/external_cells/bzlmod/dep",
         )?);
         assert!(!default_link.exists());
-        assert!(slug_core::cells::get_dynamic_extension_cell("root+ext+repo").is_none());
-        assert!(slug_core::cells::get_dynamic_extension_cell_setup("root+ext+repo").is_none());
-        assert!(slug_core::cells::resolve_dynamic_extension_cell_alias("repo").is_none());
+        assert!(slug_core::cells::get_test_dynamic_extension_cell("root+ext+repo").is_none());
+        assert!(slug_core::cells::get_test_dynamic_extension_cell_setup("root+ext+repo").is_none());
+        assert!(slug_core::cells::resolve_test_dynamic_extension_cell_alias("repo").is_none());
         Ok(())
     }
 

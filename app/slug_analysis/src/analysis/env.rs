@@ -2401,7 +2401,7 @@ impl<'a> MetadataLabelContext<'a> {
         cell_name: &str,
     ) -> Option<String> {
         self.allow_process_global_fallbacks
-            .then(|| slug_core::cells::canonical_dynamic_extension_cell_name(cell_name))
+            .then(|| slug_core::cells::canonical_test_dynamic_extension_cell_name(cell_name))
             .flatten()
     }
 
@@ -2434,7 +2434,7 @@ impl<'a> MetadataLabelContext<'a> {
         if !self.allow_process_global_fallbacks {
             return None;
         }
-        slug_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
+        slug_core::cells::resolve_test_scoped_bzlmod_repo_alias_for_current_cell(
             owner_cell,
             apparent_cell,
         )
@@ -2442,7 +2442,10 @@ impl<'a> MetadataLabelContext<'a> {
             metadata_owner_scoped_repo_candidates(owner_cell)
                 .into_iter()
                 .find_map(|owner_module| {
-                    slug_core::cells::resolve_scoped_bzlmod_repo_alias(&owner_module, apparent_cell)
+                    slug_core::cells::resolve_test_scoped_bzlmod_repo_alias(
+                        &owner_module,
+                        apparent_cell,
+                    )
                 })
         })
     }
@@ -5697,7 +5700,7 @@ mod tests {
 
     #[test]
     fn metadata_configured_key_deduplicates_apparent_and_canonical_repo_labels() {
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             "metadata_test+ext+runtime".to_owned(),
             "/tmp/metadata_test_ext_runtime".to_owned(),
         );
@@ -5716,7 +5719,7 @@ mod tests {
 
     #[test]
     fn metadata_equivalent_configured_labels_match_across_repo_forms() {
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             "metadata_test+ext+runtime_equiv".to_owned(),
             "/tmp/metadata_test_ext_runtime_equiv".to_owned(),
         );
@@ -5740,11 +5743,11 @@ mod tests {
         let apparent = "plan61_metadata_runtime_alias";
         let canonical = "plan61_owner++metadata+generated";
         let wrong_global = "plan61_wrong_owner++metadata+generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
@@ -5797,7 +5800,7 @@ mod tests {
             snapshot,
         )?;
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
 
@@ -5816,17 +5819,17 @@ mod tests {
     fn metadata_paths_runtime_miss_ignores_global_alias() -> slug_error::Result<()> {
         let apparent = "plan61_metadata_unowned_alias";
         let wrong_global = "plan61_wrong_owner++metadata+unowned";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
         let resolver = test_bzlmod_cell_resolver(BzlmodRuntimeCellInstallSnapshot::default())?;
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
 
@@ -5845,17 +5848,17 @@ mod tests {
     fn metadata_paths_no_snapshot_resolver_miss_ignores_global_alias() -> slug_error::Result<()> {
         let apparent = "plan61_metadata_no_snapshot_alias";
         let wrong_global = "plan61_wrong_owner++metadata+no_snapshot";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
         let resolver = test_cell_resolver_without_runtime_snapshot()?;
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
 
@@ -5880,7 +5883,7 @@ mod tests {
         let owner = "plan61_owner++metadata+owner";
         let canonical = "plan61_owner++metadata+scoped";
         let wrong_global = "plan61_wrong_owner++metadata+scoped";
-        slug_core::cells::register_scoped_bzlmod_repo_alias(
+        slug_core::cells::register_test_scoped_bzlmod_repo_alias(
             "plan61_owner+".to_owned(),
             apparent.to_owned(),
             wrong_global.to_owned(),
@@ -5924,7 +5927,7 @@ mod tests {
         let apparent = "plan61_metadata_scoped_miss";
         let owner = "plan61_owner++metadata+owner_miss";
         let wrong_global = "plan61_wrong_owner++metadata+scoped_miss";
-        slug_core::cells::register_scoped_bzlmod_repo_alias(
+        slug_core::cells::register_test_scoped_bzlmod_repo_alias(
             "plan61_owner+".to_owned(),
             apparent.to_owned(),
             wrong_global.to_owned(),
@@ -6053,7 +6056,7 @@ mod tests {
         let apparent = "plan61_metadata_scoped_no_snapshot";
         let owner = "plan61_owner++metadata+owner_no_snapshot";
         let wrong_global = "plan61_wrong_owner++metadata+scoped_no_snapshot";
-        slug_core::cells::register_scoped_bzlmod_repo_alias(
+        slug_core::cells::register_test_scoped_bzlmod_repo_alias(
             "plan61_owner+".to_owned(),
             apparent.to_owned(),
             wrong_global.to_owned(),
@@ -6168,11 +6171,11 @@ mod tests {
         let apparent = "plan61_toolchain_runtime_alias";
         let canonical = "plan61_owner++toolchains+generated";
         let wrong_global = "plan61_wrong_owner++toolchains+generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
@@ -6225,7 +6228,7 @@ mod tests {
             snapshot,
         )?;
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         assert!(resolver.get(CellName::testing_new(wrong_global)).is_err());
@@ -6270,7 +6273,7 @@ mod tests {
 
         // Without a resolver-owned alias snapshot, parsing is syntactic and does
         // not consult transitional process-global alias maps.
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             "rules_rs++rules_rust+rules_rust".to_owned(),
             "rules_rust+".to_owned(),
         );
@@ -6297,11 +6300,11 @@ mod tests {
         let apparent = "plan61_impl_runtime_alias";
         let canonical = "plan61_owner++impls+generated";
         let wrong_global = "plan61_wrong_owner++impls+generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
@@ -6354,7 +6357,7 @@ mod tests {
             snapshot,
         )?;
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         assert!(resolver.get(CellName::testing_new(wrong_global)).is_err());
@@ -6382,17 +6385,17 @@ mod tests {
     {
         let apparent = "plan61_impl_unowned_alias";
         let wrong_global = "plan61_wrong_owner++impls+unowned";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
         let resolver = test_bzlmod_cell_resolver(BzlmodRuntimeCellInstallSnapshot::default())?;
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
 
@@ -6419,17 +6422,17 @@ mod tests {
     -> slug_error::Result<()> {
         let apparent = "plan61_impl_no_snapshot_alias";
         let wrong_global = "plan61_wrong_owner++impls+no_snapshot";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
         let resolver = test_cell_resolver_without_runtime_snapshot()?;
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
 

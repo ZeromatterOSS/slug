@@ -577,6 +577,7 @@ mod tests {
 
     fn runtime_resolver(apparent: &str, canonical: &str) -> slug_error::Result<CellAliasResolver> {
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -606,7 +607,7 @@ mod tests {
         let apparent = "plan61_dependency_label_runtime_alias";
         let canonical = "plan61_owner++dependency_label+generated";
         let wrong_global = "plan61_wrong_owner++dependency_label+generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -627,7 +628,7 @@ mod tests {
         assert_eq!(label.workspace_name(), canonical);
         assert_eq!(label.full(), format!("@@{canonical}//pkg:target"));
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -637,7 +638,7 @@ mod tests {
     fn dependency_label_runtime_miss_does_not_fall_back_to_globals() -> slug_error::Result<()> {
         let apparent = "plan61_dependency_label_runtime_miss";
         let wrong_global = "plan61_wrong_owner++dependency_label+unowned";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -662,7 +663,7 @@ mod tests {
         assert_eq!(label.workspace_name(), apparent);
         assert_eq!(label.full(), format!("@@{apparent}//pkg:target"));
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())

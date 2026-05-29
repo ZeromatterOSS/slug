@@ -1082,11 +1082,11 @@ mod tests {
 
     #[test]
     fn label_context_current_repo_does_not_alias_canonical_module_repo() {
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             "label_ctx_owner++ext+repo".to_owned(),
             "bazel-external/label_ctx_owner++ext+repo".to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             "label_ctx_module+".to_owned(),
             "label_ctx_owner++ext+repo".to_owned(),
         );
@@ -1112,7 +1112,7 @@ mod tests {
                 canonical_name: canonical.to_owned(),
             }],
         };
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1127,7 +1127,7 @@ mod tests {
             canonical
         );
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -1138,7 +1138,7 @@ mod tests {
     {
         let apparent = "label_ctx_current_no_snapshot_alias";
         let wrong_global = "label_ctx_current_wrong_owner++ext+miss";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1154,7 +1154,7 @@ mod tests {
             apparent
         );
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -1175,7 +1175,7 @@ mod tests {
                 canonical_name: canonical.to_owned(),
             }],
         };
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1190,7 +1190,7 @@ mod tests {
             canonical
         );
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -1201,7 +1201,7 @@ mod tests {
         let apparent = "label_ctx_runtime_miss_alias";
         let wrong_global = "label_ctx_wrong_owner++ext+miss";
         let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1248,7 +1248,7 @@ mod tests {
             }],
             dynamic_aliases: Vec::new(),
         };
-        slug_core::cells::register_scoped_bzlmod_repo_alias(
+        slug_core::cells::register_test_scoped_bzlmod_repo_alias(
             "label_ctx_owner+".to_owned(),
             apparent.to_owned(),
             wrong_global.to_owned(),
@@ -1292,7 +1292,7 @@ mod tests {
         let file_cell = "label_ctx_owner++ext+caller_miss";
         let wrong_global = "label_ctx_wrong_owner++ext+scoped_miss";
         let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
-        slug_core::cells::register_scoped_bzlmod_repo_alias(
+        slug_core::cells::register_test_scoped_bzlmod_repo_alias(
             "label_ctx_owner+".to_owned(),
             apparent.to_owned(),
             wrong_global.to_owned(),

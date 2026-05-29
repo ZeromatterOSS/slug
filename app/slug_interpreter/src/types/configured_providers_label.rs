@@ -519,11 +519,12 @@ mod tests {
             let apparent = "plan61_configured_label_runtime_alias_derived";
             let canonical = "plan61_owner++configured_label+derived";
             let wrong_global = "plan61_wrong_owner++configured_label+derived";
-            slug_core::cells::register_dynamic_extension_cell_alias(
+            slug_core::cells::register_test_dynamic_extension_cell_alias(
                 apparent.to_owned(),
                 wrong_global.to_owned(),
             );
             let snapshot = BzlmodRuntimeCellInstallSnapshot {
+                root_module_name: None,
                 extension_cells: Vec::new(),
                 scoped_aliases: Vec::new(),
                 dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -603,6 +604,7 @@ mod tests {
         let canonical = "plan61_owner++configured_label+generated";
         let wrong_global = "plan61_wrong_owner++configured_label+generated";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -610,7 +612,7 @@ mod tests {
                 canonical_name: canonical.to_owned(),
             }],
         };
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -632,7 +634,7 @@ mod tests {
 
         assert_eq!(starlark_label.bazel_workspace_name(), canonical);
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -643,7 +645,7 @@ mod tests {
     {
         let apparent = "plan61_configured_label_runtime_miss";
         let wrong_global = "plan61_wrong_owner++configured_label+unowned";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -666,7 +668,7 @@ mod tests {
         assert_eq!(starlark_label.bazel_workspace_name(), apparent);
         assert_eq!(no_owner_label.bazel_workspace_name(), apparent);
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -676,7 +678,7 @@ mod tests {
     fn configured_label_no_snapshot_resolver_miss_ignores_global_alias() -> slug_error::Result<()> {
         let apparent = "plan61_configured_label_no_snapshot_miss";
         let wrong_global = "plan61_wrong_owner++configured_label+no_snapshot";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -693,7 +695,7 @@ mod tests {
 
         assert_eq!(starlark_label.bazel_workspace_name(), apparent);
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())

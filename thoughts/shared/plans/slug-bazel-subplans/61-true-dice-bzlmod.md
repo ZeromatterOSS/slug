@@ -1540,6 +1540,20 @@ Current state to preserve:
   comparison recorded the expected mode/non-ELF hash parity with the same four
   accepted ELF output-root hash differences. This is SDK-frontier evidence, not
   a full Plan 61 replay-completeness closure condition.
+- Production-facing `slug_core::cells` dynamic generated-repo registry APIs are
+  now inert compatibility wrappers. The mutable process-global generated-cell,
+  dynamic-alias, scoped-alias, setup, and canonicalization maps moved behind
+  explicit `*_test_*` helpers used by stale-global guardrails; production
+  resolver code must use declared aliases, runtime snapshots, or resolver-owned
+  cell paths. Validation: `cargo check -p slug_core -p slug_common -p
+  slug_interpreter_for_build -p slug_analysis -p slug_build_api -p
+  slug_transition -p slug_execute`; `cargo test -p slug_core cells --lib --
+  --test-threads=1`; `cargo test -p slug_common bzlmod --lib`; `cargo test -p
+  slug_analysis --lib`; `cargo test -p slug_build_api --lib`; `cargo test -p
+  slug_interpreter_for_build --lib`; `cargo test -p slug_transition --lib`;
+  focused `slug_core` build-setting/deferred tests, `slug_execute` artifact-path
+  tests, and `slug_interpreter` configured-label tests; `cargo fmt --check`; and
+  `git diff --check`.
 
 What future workers should keep in this file:
 
@@ -1881,6 +1895,12 @@ hardening behavior around it.
      no-op builds can reuse the current setup without a process-global bridge
      cache. If that identity is stale, or if replay inputs carry facts, lookup
      falls back to the current extension-spokes DICE producer.
+   - Production-facing dynamic generated-repo registry functions are now no-op
+     compatibility wrappers, and all mutable generated-cell/alias/setup access is
+     behind explicitly named test helpers. This removes the remaining public
+     production API for seeding or resolving bzlmod generated repos through
+     process-global maps; stale-global guardrails still seed those maps through
+     test-only names to prove resolver-owned runtime snapshots win.
 - Dynamic generated-repo cell maps are now scoped by the active transitional
   workspace identity, including output base when replayed from a bzlmod cell
   graph, but they remain process-global maps rather than a DICE-owned

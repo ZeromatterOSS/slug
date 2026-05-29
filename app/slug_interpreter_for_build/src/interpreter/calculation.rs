@@ -511,7 +511,7 @@ mod tests {
                 canonical_name: canonical.to_owned(),
             }],
         };
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -531,7 +531,7 @@ mod tests {
 
         assert_eq!(canonical, path.cell().as_str());
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -541,7 +541,7 @@ mod tests {
     fn bzlmod_eval_import_cell_path_runtime_miss_ignores_global_alias() -> slug_error::Result<()> {
         let apparent = "eval_import_runtime_miss_alias";
         let wrong_global = "eval_wrong_owner++ext+missing";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -561,7 +561,7 @@ mod tests {
 
         assert_eq!(apparent, path.cell().as_str());
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -572,7 +572,7 @@ mod tests {
     {
         let apparent = "eval_import_legacy_alias";
         let wrong_global = "eval_owner++ext+legacy_generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -588,7 +588,7 @@ mod tests {
 
         assert_eq!(apparent, path.cell().as_str());
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())

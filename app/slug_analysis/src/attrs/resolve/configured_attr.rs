@@ -587,7 +587,7 @@ mod tests {
     -> slug_error::Result<()> {
         let apparent = "plan61_source_path_apparent";
         let stale_global = "stale_owner++source_path+apparent";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             stale_global.to_owned(),
         );
@@ -598,7 +598,7 @@ mod tests {
 
         assert_eq!(canonical_pkg.cell_name().as_str(), apparent);
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(stale_global)
         );
         Ok(())

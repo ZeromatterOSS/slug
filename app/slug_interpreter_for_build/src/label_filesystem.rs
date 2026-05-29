@@ -229,11 +229,11 @@ mod tests {
         let project_root = temp.path();
         let apparent = "label_fs_resolver_missing_alias";
         let wrong_global = "label_fs_wrong_owner++ext+generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );

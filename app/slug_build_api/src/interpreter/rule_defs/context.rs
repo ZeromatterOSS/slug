@@ -1651,6 +1651,7 @@ mod tests {
         let apparent = "analysis_ctx_runtime_alias";
         let canonical = "owner++ext+analysis_ctx_runtime_alias";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -1675,7 +1676,7 @@ mod tests {
     fn analysis_context_repo_name_runtime_miss_is_authoritative() -> slug_error::Result<()> {
         let apparent = "analysis_ctx_runtime_miss";
         let wrong_global = "wrong_owner++ext+analysis_ctx_runtime_miss";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1690,7 +1691,7 @@ mod tests {
             apparent
         );
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -1701,7 +1702,7 @@ mod tests {
     {
         let apparent = "analysis_ctx_no_snapshot_miss";
         let wrong_global = "wrong_owner++ext+analysis_ctx_no_snapshot_miss";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1712,7 +1713,7 @@ mod tests {
             apparent
         );
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -1722,14 +1723,14 @@ mod tests {
     fn analysis_context_repo_name_without_owner_ignores_global_alias() {
         let apparent = "analysis_ctx_without_owner";
         let wrong_global = "wrong_owner++ext+analysis_ctx_without_owner";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
 
         assert_eq!(canonical_bazel_repo_name_for_cell(apparent, None), apparent);
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
     }

@@ -138,7 +138,7 @@ mod tests {
         crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         let apparent = "rules_rs++rules_rust+rules_rust";
         let wrong_global = "rules_rust+";
-        crate::cells::register_dynamic_extension_cell_alias(
+        crate::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -151,7 +151,7 @@ mod tests {
         assert_eq!(label.target().pkg().cell_name().as_str(), apparent);
         assert_eq!(label.target().name().as_str(), "bootstrap_setting");
         assert_eq!(
-            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            crate::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
     }
@@ -175,7 +175,7 @@ mod tests {
                 canonical_name: canonical.to_owned(),
             }],
         };
-        crate::cells::register_dynamic_extension_cell_alias(
+        crate::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -192,7 +192,7 @@ mod tests {
 
         assert_eq!(label.target().pkg().cell_name().as_str(), canonical);
         assert_eq!(
-            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            crate::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -208,7 +208,7 @@ mod tests {
         let apparent = "plan61_build_setting_runtime_miss";
         let wrong_global = "plan61_wrong_owner++settings+generated";
         let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
-        crate::cells::register_dynamic_extension_cell_alias(
+        crate::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -225,7 +225,7 @@ mod tests {
 
         assert_eq!(label.target().pkg().cell_name().as_str(), apparent);
         assert_eq!(
-            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            crate::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -241,7 +241,7 @@ mod tests {
         crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         let apparent = "plan61_build_setting_no_snapshot_miss";
         let wrong_global = "plan61_wrong_owner++settings+no_snapshot";
-        crate::cells::register_dynamic_extension_cell_alias(
+        crate::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -254,7 +254,7 @@ mod tests {
 
         assert_eq!(label.target().pkg().cell_name().as_str(), apparent);
         assert_eq!(
-            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            crate::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -296,7 +296,7 @@ mod tests {
             scoped_aliases: Vec::new(),
             dynamic_aliases: Vec::new(),
         };
-        crate::cells::register_dynamic_extension_cell_alias(
+        crate::cells::register_test_dynamic_extension_cell_alias(
             canonical.to_owned(),
             wrong_global.to_owned(),
         );
@@ -313,7 +313,7 @@ mod tests {
 
         assert_eq!(label.target().pkg().cell_name().as_str(), canonical);
         assert_eq!(
-            crate::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref(),
+            crate::cells::resolve_test_dynamic_extension_cell_alias(canonical).as_deref(),
             Some(wrong_global)
         );
         Ok(())

@@ -1261,11 +1261,12 @@ mod tests {
         let apparent = "plan61_transition_runtime_alias";
         let canonical = "plan61_owner++settings+generated";
         let wrong_global = "plan61_wrong_owner++settings+generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -1287,7 +1288,7 @@ mod tests {
 
         assert_eq!(label.target().pkg().cell_name().as_str(), canonical);
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())

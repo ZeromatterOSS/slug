@@ -1733,14 +1733,14 @@ mod tests {
     -> slug_error::Result<()> {
         let apparent = "plan61_build_setting_legacy_alias";
         let wrong_global = "plan61_wrong_owner++settings+legacy_generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
         let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
 
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         assert_eq!(
@@ -1769,7 +1769,7 @@ mod tests {
                 canonical_name: canonical.to_owned(),
             }],
         };
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1780,7 +1780,7 @@ mod tests {
         )?;
 
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         assert_eq!(
@@ -1796,7 +1796,7 @@ mod tests {
         let apparent = "plan61_build_setting_unowned_alias";
         let wrong_global = "plan61_wrong_owner++settings+wrong_generated";
         let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -1807,7 +1807,7 @@ mod tests {
         )?;
 
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         assert_eq!(

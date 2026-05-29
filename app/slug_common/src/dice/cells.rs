@@ -313,7 +313,7 @@ mod tests {
     use slug_core::cells::instance::CellInstance;
     use slug_core::cells::name::CellName;
     use slug_core::cells::nested::NestedCells;
-    use slug_core::cells::register_dynamic_extension_cell_alias;
+    use slug_core::cells::register_test_dynamic_extension_cell_alias;
     use slug_core::cells::reset_dynamic_bzlmod_state_for_project_root;
 
     use super::*;
@@ -343,7 +343,10 @@ mod tests {
 
         let canonical = "owner++ext+generated";
         let stale_global = "stale_owner++ext+generated";
-        register_dynamic_extension_cell_alias("stale_alias".to_owned(), stale_global.to_owned());
+        register_test_dynamic_extension_cell_alias(
+            "stale_alias".to_owned(),
+            stale_global.to_owned(),
+        );
         let setup = ExtensionRepoCellSetup {
             canonical_name: Arc::from(canonical),
             extension_id: Arc::from("@owner//:ext.bzl%ext"),

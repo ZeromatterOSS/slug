@@ -569,7 +569,7 @@ mod tests {
         slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp);
         let apparent = "plan61_artifact_path_cell";
         let wrong_global = "plan61_wrong_owner++artifact+path_cell";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );

@@ -3597,7 +3597,7 @@ mod tests {
                 .join("file.txt")
         );
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent),
             None
         );
     }
@@ -3609,11 +3609,11 @@ mod tests {
         let working_dir = workspace_root.join("repo_work");
         let apparent = "repo_ctx_missing_resolver_alias";
         let wrong_global = "repo_ctx_wrong_owner++ext+generated";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
-        slug_core::cells::register_dynamic_extension_cell(
+        slug_core::cells::register_test_dynamic_extension_cell(
             wrong_global.to_owned(),
             format!("bazel-external/{wrong_global}"),
         );
@@ -3634,7 +3634,7 @@ mod tests {
             "{err:?}"
         );
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
     }

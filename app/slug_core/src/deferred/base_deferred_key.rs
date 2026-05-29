@@ -421,14 +421,14 @@ mod tests {
         crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         let apparent = "plan61_output_cell";
         let wrong_global = "plan61_wrong_owner++output+cell";
-        crate::cells::register_dynamic_extension_cell_alias(
+        crate::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
 
         assert_eq!(bazel_output_cell_name(apparent), apparent);
         assert_eq!(
-            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            crate::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
     }
@@ -441,7 +441,7 @@ mod tests {
         crate::cells::reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
         let apparent = "plan61_output_path_cell";
         let wrong_global = "plan61_wrong_owner++output+path_cell";
-        crate::cells::register_dynamic_extension_cell_alias(
+        crate::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -470,7 +470,7 @@ mod tests {
         );
         assert!(!path.as_str().contains(wrong_global), "{path}");
         assert_eq!(
-            crate::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            crate::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())

@@ -334,6 +334,7 @@ mod tests {
         let apparent = "analysis_ctx_label_runtime_alias";
         let canonical = "owner++ext+analysis_ctx_label_runtime_alias";
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
             extension_cells: Vec::new(),
             scoped_aliases: Vec::new(),
             dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
@@ -365,7 +366,7 @@ mod tests {
             std::env::temp_dir().join(format!("slug-build-api-bazel-label-{}", std::process::id()));
         std::fs::create_dir_all(&tmp)?;
         slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp);
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -383,7 +384,7 @@ mod tests {
         assert_eq!(bazel_label.workspace_name(), apparent);
         assert_eq!(bazel_label.full(), format!("@@{apparent}//pkg:flag"));
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
@@ -393,7 +394,7 @@ mod tests {
     fn configured_label_no_snapshot_resolver_miss_ignores_global_alias() -> slug_error::Result<()> {
         let apparent = "analysis_ctx_label_no_snapshot_miss";
         let wrong_global = "wrong_owner++ext+analysis_ctx_label_no_snapshot_miss";
-        slug_core::cells::register_dynamic_extension_cell_alias(
+        slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),
         );
@@ -407,7 +408,7 @@ mod tests {
         assert_eq!(bazel_label.workspace_name(), apparent);
         assert_eq!(bazel_label.full(), format!("@@{apparent}//pkg:flag"));
         assert_eq!(
-            slug_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref(),
+            slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(wrong_global)
         );
         Ok(())
