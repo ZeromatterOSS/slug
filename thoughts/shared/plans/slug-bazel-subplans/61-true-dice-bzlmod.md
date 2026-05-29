@@ -1060,6 +1060,17 @@ Current state to preserve:
   constructors are test-only for stale/injected fallback fixtures. Guardrails:
   `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`, `cargo
   test -p slug_bzlmod cell_graph --lib`, and `cargo fmt --check`.
+- 2026-05-29 projection updater digest validation:
+  `SetBzlmodDiceInputs` no longer rewrites bzlmod projection payload digests to
+  the active cell-graph digest at injection time. Module versions, lockfile
+  inputs, repo-env, registered toolchains/platforms, extension aggregations,
+  resolution facts, and repo mappings must already carry the active graph
+  digest, and the updater rejects mismatches before installing those DICE
+  inputs. Empty setup and clean config-load fallback construction now pass the
+  explicit empty/clean graph digest through each projection value. Guardrails:
+  `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`, `cargo
+  test -p slug_bzlmod cell_graph --lib`, `cargo test -p slug_external_cells
+  extension_repo --lib`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -2271,7 +2282,9 @@ hardening behavior around it.
      read keys are test-only, so production consumers must name the active
      resolution digest instead of silently choosing the injected projection
      digest. The remaining bzlmod projection data wrappers also require
-     workspace provenance instead of accepting absent provenance.
+     workspace provenance instead of accepting absent provenance, and the
+     updater validates that every projection payload already carries the active
+     graph digest instead of rewriting that provenance at injection time.
      The legacy resolver entry point requires an explicit workspace identity too.
      The outer parse helper also requires callers to choose the empty-projection
      workspace identity explicitly.

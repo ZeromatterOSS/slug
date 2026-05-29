@@ -2428,6 +2428,10 @@ impl BuckConfigBasedCells {
                 "Using clean bzlmod resolved graph data for DICE injections"
             );
         }
+        let cell_graph_resolution_digest = clean_outputs.as_ref().map_or_else(
+            slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest,
+            |value| value.cell_graph_resolution_digest.clone(),
+        );
         let empty_cell_graph_for_dice =
             slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(key.workspace_id.clone());
         let cell_graph_for_dice = if slug_bzlmod::MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok() {
@@ -2454,12 +2458,14 @@ impl BuckConfigBasedCells {
                         slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
                             key.workspace_id.clone(),
                             Arc::new(HashMap::new()),
-                        ),
+                        )
+                        .with_resolution_digest(cell_graph_resolution_digest.clone()),
                         slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
                             key.workspace_id.clone(),
                             indexmap::IndexMap::new(),
                             indexmap::IndexMap::new(),
-                        ),
+                        )
+                        .with_resolution_digest(cell_graph_resolution_digest.clone()),
                     )
                 },
                 |value| {
@@ -2476,11 +2482,13 @@ impl BuckConfigBasedCells {
                         slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
                             key.workspace_id.clone(),
                             Vec::new(),
-                        ),
+                        )
+                        .with_resolution_digest(cell_graph_resolution_digest.clone()),
                         slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
                             key.workspace_id.clone(),
                             Vec::new(),
-                        ),
+                        )
+                        .with_resolution_digest(cell_graph_resolution_digest.clone()),
                     )
                 },
                 |value| {
@@ -2498,6 +2506,7 @@ impl BuckConfigBasedCells {
                         String::new(),
                         Arc::new(HashMap::new()),
                     )
+                    .with_resolution_digest(cell_graph_resolution_digest.clone())
                 },
                 |value| value.extension_aggregations.clone(),
             );
@@ -2508,6 +2517,7 @@ impl BuckConfigBasedCells {
                     Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
                     Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
                 )
+                .with_resolution_digest(cell_graph_resolution_digest.clone())
             },
             |value| value.repo_mappings.clone(),
         );
@@ -2522,10 +2532,6 @@ impl BuckConfigBasedCells {
         )
         .await
         .buck_error_context("Parsing cells")?;
-        let cell_graph_resolution_digest = clean_outputs.as_ref().map_or_else(
-            slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest,
-            |value| value.cell_graph_resolution_digest.clone(),
-        );
         let resolved_graph_for_dice = clean_outputs.as_ref().map(|value| value.graph.clone());
         let lockfile_inputs_for_dice =
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace_policy(
@@ -2533,11 +2539,13 @@ impl BuckConfigBasedCells {
                 key.options.lockfile_mode,
                 key.options.hidden_lockfile_path.clone(),
                 clean_outputs.is_some(),
-            );
+            )
+            .with_resolution_digest(cell_graph_resolution_digest.clone());
         let repo_env_for_dice = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             key.workspace_id.clone(),
             Arc::new(key.options.repo_env.clone()),
-        );
+        )
+        .with_resolution_digest(cell_graph_resolution_digest.clone());
         slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
             updater,
             cell_graph_resolution_digest,

@@ -1202,10 +1202,12 @@ mod tests {
         repo_env.insert("TOKEN".to_owned(), "current".to_owned());
         let cell_graph =
             slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
+        let resolution_digest = slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest();
         let repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             workspace_id.clone(),
             Arc::new(repo_env),
-        );
+        )
+        .with_resolution_digest(resolution_digest.clone());
 
         let dice = dice::testing::DiceBuilder::new()
             .build(dice::UserComputationData::new())
@@ -1214,43 +1216,50 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         updater.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
-            slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest(),
+            resolution_digest.clone(),
             cell_graph,
             None,
             slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(std::collections::HashMap::new()),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace_policy(
                 workspace_id.clone(),
                 slug_bzlmod::LockfileMode::Update,
                 None,
                 false,
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             repo_env,
             slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(
                 workspace_id.clone(),
                 Vec::new(),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             slug_bzlmod::RegisteredExecutionPlatformsDataValue::for_workspace(
                 workspace_id.clone(),
                 Vec::new(),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             slug_bzlmod::BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
                 String::new(),
                 Arc::new(std::collections::HashMap::new()),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             slug_bzlmod::BzlmodResolutionFactsValue::for_workspace(
                 workspace_id.clone(),
                 Default::default(),
                 Default::default(),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(slug_bzlmod::RepoMappingSnapshot::new()),
                 Arc::new(slug_bzlmod::RepoMappingOverrides::new()),
-            ),
+            )
+            .with_resolution_digest(resolution_digest),
         )?;
         let mut dice = updater.commit().await;
 

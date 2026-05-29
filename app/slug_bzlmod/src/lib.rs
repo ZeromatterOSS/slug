@@ -328,39 +328,48 @@ pub trait SetBzlmodDiceInputs {
         &mut self,
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<()> {
+        let resolution_digest = empty_bzlmod_cell_graph_resolution_digest();
         self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
-            empty_bzlmod_cell_graph_resolution_digest(),
+            resolution_digest.clone(),
             BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone()),
             None,
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
                 String::new(),
                 Arc::new(HashMap::new()),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             BzlmodLockfileInputsDataValue::for_workspace_policy(
                 workspace_id.clone(),
                 LockfileMode::Update,
                 None,
                 false,
-            ),
-            BzlmodRepoEnvDataValue::for_workspace(workspace_id.clone(), Arc::new(BTreeMap::new())),
-            RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
-            RegisteredExecutionPlatformsDataValue::for_workspace(workspace_id.clone(), Vec::new()),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
+            BzlmodRepoEnvDataValue::for_workspace(workspace_id.clone(), Arc::new(BTreeMap::new()))
+                .with_resolution_digest(resolution_digest.clone()),
+            RegisteredToolchainsDataValue::for_workspace(workspace_id.clone(), Vec::new())
+                .with_resolution_digest(resolution_digest.clone()),
+            RegisteredExecutionPlatformsDataValue::for_workspace(workspace_id.clone(), Vec::new())
+                .with_resolution_digest(resolution_digest.clone()),
             BzlmodExtensionAggregationsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
                 String::new(),
                 Arc::new(HashMap::new()),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             BzlmodResolutionFactsValue::for_workspace(
                 workspace_id.clone(),
                 indexmap::IndexMap::new(),
                 indexmap::IndexMap::new(),
-            ),
+            )
+            .with_resolution_digest(resolution_digest.clone()),
             BzlmodRepoMappingsDataValue::for_workspace(
                 workspace_id,
                 Arc::new(RepoMappingSnapshot::new()),
                 Arc::new(RepoMappingOverrides::new()),
-            ),
+            )
+            .with_resolution_digest(resolution_digest),
         )
     }
 
@@ -415,6 +424,24 @@ fn validate_cell_graph_root_module_name(
             field,
             data_root_module_name,
             cell_graph_root_module_name
+        ));
+    }
+    Ok(())
+}
+
+fn validate_projection_resolution_digest(
+    field: &str,
+    expected: &Arc<str>,
+    actual: &str,
+) -> slug_error::Result<()> {
+    if actual != expected.as_ref() {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "Bzlmod projection {} carries resolution digest '{}', \
+             but the active cell graph resolution digest is '{}'",
+            field,
+            actual,
+            expected
         ));
     }
     Ok(())
@@ -486,22 +513,47 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             cell_graph_workspace_id,
             &repo_mappings.workspace_id,
         )?;
+        validate_projection_resolution_digest(
+            "module-version data",
+            &cell_graph_resolution_digest,
+            module_versions.resolution_digest.as_ref(),
+        )?;
+        validate_projection_resolution_digest(
+            "registered-toolchain data",
+            &cell_graph_resolution_digest,
+            registered_toolchains.resolution_digest.as_ref(),
+        )?;
+        validate_projection_resolution_digest(
+            "registered-execution-platform data",
+            &cell_graph_resolution_digest,
+            registered_execution_platforms.resolution_digest.as_ref(),
+        )?;
+        validate_projection_resolution_digest(
+            "extension-aggregation data",
+            &cell_graph_resolution_digest,
+            extension_aggregations.resolution_digest.as_ref(),
+        )?;
+        validate_projection_resolution_digest(
+            "lockfile-input data",
+            &cell_graph_resolution_digest,
+            lockfile_inputs.resolution_digest.as_ref(),
+        )?;
+        validate_projection_resolution_digest(
+            "repo-env data",
+            &cell_graph_resolution_digest,
+            repo_env.resolution_digest.as_ref(),
+        )?;
+        validate_projection_resolution_digest(
+            "resolution-facts data",
+            &cell_graph_resolution_digest,
+            resolution_facts.resolution_digest.as_ref(),
+        )?;
+        validate_projection_resolution_digest(
+            "repo-mapping data",
+            &cell_graph_resolution_digest,
+            repo_mappings.resolution_digest.as_ref(),
+        )?;
 
-        let module_versions =
-            module_versions.with_resolution_digest(cell_graph_resolution_digest.clone());
-        let repo_env = repo_env.with_resolution_digest(cell_graph_resolution_digest.clone());
-        let repo_mappings =
-            repo_mappings.with_resolution_digest(cell_graph_resolution_digest.clone());
-        let resolution_facts =
-            resolution_facts.with_resolution_digest(cell_graph_resolution_digest.clone());
-        let registered_toolchains =
-            registered_toolchains.with_resolution_digest(cell_graph_resolution_digest.clone());
-        let registered_execution_platforms = registered_execution_platforms
-            .with_resolution_digest(cell_graph_resolution_digest.clone());
-        let extension_aggregations =
-            extension_aggregations.with_resolution_digest(cell_graph_resolution_digest.clone());
-        let lockfile_inputs =
-            lockfile_inputs.with_resolution_digest(cell_graph_resolution_digest.clone());
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
         let repo_env_data = Arc::new(repo_env);
         let module_versions = Arc::new(module_versions);
@@ -1597,6 +1649,76 @@ mod tests {
             )
             .unwrap_err();
         assert!(err.to_string().contains("repo-mapping data"), "{err:?}");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_bzlmod_cell_graph_data_rejects_mismatched_projection_resolution_digest()
+    -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-projection-resolution-digest-workspace"),
+            PathBuf::from("/tmp/slug-plan61-projection-resolution-digest-output-base"),
+        );
+        let active_digest: Arc<str> = Arc::from("active-resolution-digest");
+        let stale_digest: Arc<str> = Arc::from("stale-resolution-digest");
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        let data = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
+        let err =
+            SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+                &mut updater,
+                active_digest.clone(),
+                data,
+                None,
+                empty_module_versions(workspace_id.clone()).with_resolution_digest(stale_digest),
+                BzlmodLockfileInputsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BzlmodLockfileInputsValue::default()),
+                )
+                .with_resolution_digest(active_digest.clone()),
+                BzlmodRepoEnvDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(BTreeMap::new()),
+                )
+                .with_resolution_digest(active_digest.clone()),
+                empty_registered_toolchains(workspace_id.clone())
+                    .with_resolution_digest(active_digest.clone()),
+                empty_registered_execution_platforms(workspace_id.clone())
+                    .with_resolution_digest(active_digest.clone()),
+                empty_extension_aggregations(workspace_id.clone())
+                    .with_resolution_digest(active_digest.clone()),
+                BzlmodResolutionFactsValue::for_workspace(
+                    workspace_id.clone(),
+                    indexmap::IndexMap::new(),
+                    indexmap::IndexMap::new(),
+                )
+                .with_resolution_digest(active_digest.clone()),
+                BzlmodRepoMappingsDataValue::for_workspace(
+                    workspace_id,
+                    Arc::new(RepoMappingSnapshot::new()),
+                    Arc::new(RepoMappingOverrides::new()),
+                )
+                .with_resolution_digest(active_digest),
+            )
+            .unwrap_err();
+
+        assert!(
+            err.to_string().contains(
+                "module-version data carries resolution digest 'stale-resolution-digest'"
+            ),
+            "{err:?}"
+        );
+        assert!(
+            err.to_string()
+                .contains("active cell graph resolution digest is 'active-resolution-digest'"),
+            "{err:?}"
+        );
 
         Ok(())
     }
