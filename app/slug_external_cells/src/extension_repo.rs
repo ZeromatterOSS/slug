@@ -1130,9 +1130,11 @@ mod tests {
                 workspace_id.clone(),
                 Arc::new(std::collections::HashMap::new()),
             ),
-            slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace(
+            slug_bzlmod::BzlmodLockfileInputsDataValue::for_workspace_policy(
                 workspace_id.clone(),
-                Arc::new(slug_bzlmod::BzlmodLockfileInputsValue::default()),
+                slug_bzlmod::LockfileMode::Update,
+                None,
+                false,
             ),
             repo_env,
             slug_bzlmod::RegisteredToolchainsDataValue::for_workspace(

@@ -454,6 +454,17 @@ Current state to preserve:
   `cargo test -p slug_external_cells repository_materialization_state --lib`,
   `cargo build -p slug`, and focused Plan 61 corrupted output-digest Python
   selector.
+- 2026-05-29 repository materialization no-reader fallback reduction:
+  production manifest state keys no longer fall back to direct repo-state
+  filesystem reads when the late-bound `RepositoryMaterializationStateReader`
+  is unavailable. Recorded-input manifest content, rule-local state, completion
+  marker content, output digest, BUILD presence/content probes,
+  foreign-symlink probes, and invocation-layout fallback now return
+  conservative invalid/unreadable states in non-test builds; the direct
+  filesystem fallback remains only for low-level tests without late bindings.
+  Guardrails: `cargo check -p slug_bzlmod`, `cargo test -p slug_bzlmod
+  materialization_manifest --lib`, and `cargo test -p slug_external_cells
+  --lib`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1465,11 +1476,14 @@ hardening behavior around it.
      presence/content probes now use late-bound production DICE read/metadata
      paths through
      `slug_external_cells`, while keeping no-late-binding direct reads as test
-     fallbacks. Foreign top-level symlink detection now uses DICE project dir
+     fallbacks; non-test no-reader cases now produce conservative
+     invalid/unreadable manifest states instead of direct filesystem polling.
+     Foreign top-level symlink detection now uses DICE project dir
      entries/metadata in production. Invocation-specific layout probes for the
      known git/local/llvm repository classes use DICE metadata/content/dir-entry
-     reads too. Output-tree digest checks use DICE metadata, directory-entry,
-     and byte-content reads.
+     reads too, and no-reader production fallback is invalid rather than a
+     direct layout probe. Output-tree digest checks use DICE metadata,
+     directory-entry, and byte-content reads.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

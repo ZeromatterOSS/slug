@@ -849,6 +849,7 @@ fn repo_materialization_marker_content_state_for_key(
     )
 }
 
+#[cfg(test)]
 fn repo_materialization_marker_content_state(
     repo_spec_local: bool,
     repo_rule_local: bool,
@@ -870,6 +871,7 @@ fn repo_materialization_marker_content_state(
     }
 }
 
+#[cfg(test)]
 fn repo_materialization_rule_local_state(repo_dir: &Path) -> bool {
     repo_dir.join(REPO_RULE_LOCAL_FILE).exists()
 }
@@ -908,10 +910,12 @@ fn repo_materialization_layout_state_for_key(key: &RepoMaterializationManifestKe
     repo_materialization_invocation_layout_state(canonical_name, repo_spec, &repo_dir)
 }
 
+#[cfg(test)]
 fn repo_materialization_build_file_present(repo_dir: &Path) -> bool {
     repo_dir.join("BUILD.bazel").exists() || repo_dir.join("BUILD").exists()
 }
 
+#[cfg(test)]
 fn repo_materialization_invocation_layout_state(
     canonical_name: &str,
     repo_spec: &RepoSpec,
@@ -936,6 +940,7 @@ fn repo_materialization_invocation_layout_state_value(valid: bool) -> Arc<str> {
     }
 }
 
+#[cfg(test)]
 fn repo_materialization_invocation_layout_state_fallback(
     canonical_name: &str,
     repo_spec: &RepoSpec,
@@ -948,6 +953,7 @@ fn repo_materialization_invocation_layout_state_fallback(
     ))
 }
 
+#[cfg(test)]
 fn repo_has_invalid_empty_target_label(repo_path: &Path) -> bool {
     ["BUILD.bazel", "BUILD"].into_iter().any(|name| {
         std::fs::read_to_string(repo_path.join(name))
@@ -960,6 +966,7 @@ fn build_file_has_invalid_empty_target_label(content: &str) -> bool {
     content.contains("//:\"") || content.contains("//:'")
 }
 
+#[cfg(test)]
 fn repo_has_foreign_top_level_symlink(repo_path: &Path, project_root: &Path) -> bool {
     let Ok(entries) = std::fs::read_dir(repo_path) else {
         return false;
@@ -1132,7 +1139,14 @@ impl Key for RepoMaterializationRuleLocalStateKey {
                 .unwrap_or(true);
         }
 
-        repo_materialization_rule_local_state(&self.repo_dir)
+        #[cfg(test)]
+        {
+            repo_materialization_rule_local_state(&self.repo_dir)
+        }
+        #[cfg(not(test))]
+        {
+            true
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1191,7 +1205,16 @@ impl Key for RepoMaterializationMarkerContentKey {
             };
         }
 
-        Arc::from(repo_materialization_marker_content_state(false, false, &self.repo_dir).as_str())
+        #[cfg(test)]
+        {
+            Arc::from(
+                repo_materialization_marker_content_state(false, false, &self.repo_dir).as_str(),
+            )
+        }
+        #[cfg(not(test))]
+        {
+            Arc::from("marker-unreadable:repository materialization state reader unavailable")
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1230,12 +1253,21 @@ impl Key for RepoMaterializationOutputDigestKey {
                 .await;
         }
 
-        crate::repository_executor::repository_output_digest(&self.repo_dir)
-            .map(|digest| Arc::from(digest.as_str()))
-            .map_err(|e| {
-                let reason = e.to_string();
-                Arc::from(reason.as_str())
-            })
+        #[cfg(test)]
+        {
+            crate::repository_executor::repository_output_digest(&self.repo_dir)
+                .map(|digest| Arc::from(digest.as_str()))
+                .map_err(|e| {
+                    let reason = e.to_string();
+                    Arc::from(reason.as_str())
+                })
+        }
+        #[cfg(not(test))]
+        {
+            Err(Arc::from(
+                "repository materialization state reader unavailable",
+            ))
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1370,7 +1402,14 @@ impl Key for RepoMaterializationBuildFilePresenceKey {
                 .unwrap_or(false);
         }
 
-        repo_materialization_build_file_present(&self.repo_dir)
+        #[cfg(test)]
+        {
+            repo_materialization_build_file_present(&self.repo_dir)
+        }
+        #[cfg(not(test))]
+        {
+            false
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1425,7 +1464,14 @@ impl Key for RepoMaterializationInvalidEmptyTargetLabelKey {
             return false;
         }
 
-        repo_has_invalid_empty_target_label(&self.repo_dir)
+        #[cfg(test)]
+        {
+            repo_has_invalid_empty_target_label(&self.repo_dir)
+        }
+        #[cfg(not(test))]
+        {
+            true
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1471,7 +1517,14 @@ impl Key for RepoMaterializationForeignTopLevelSymlinkKey {
                 .unwrap_or(false);
         }
 
-        repo_has_foreign_top_level_symlink(&self.repo_dir, &self.project_root)
+        #[cfg(test)]
+        {
+            repo_has_foreign_top_level_symlink(&self.repo_dir, &self.project_root)
+        }
+        #[cfg(not(test))]
+        {
+            true
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1714,11 +1767,20 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
         match repo_spec_to_invocation(canonical_name, repo_spec) {
             Ok(invocation) => {
                 let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() else {
-                    return repo_materialization_invocation_layout_state_fallback(
-                        canonical_name,
-                        repo_spec,
-                        &repo_dir,
-                    );
+                    #[cfg(test)]
+                    {
+                        return repo_materialization_invocation_layout_state_fallback(
+                            canonical_name,
+                            repo_spec,
+                            &repo_dir,
+                        );
+                    }
+                    #[cfg(not(test))]
+                    {
+                        return Arc::from(
+                            "layout-invalid:repository-materialization-state-reader-unavailable",
+                        );
+                    }
                 };
                 let workspace_id = self.0.workspace_id.clone();
                 let layout_valid = match invocation.rule_name.as_str() {
@@ -1770,10 +1832,17 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
                     ),
                 }
                 .unwrap_or_else(|_| {
-                    crate::repository_executor::repo_layout_is_valid_for_invocation(
-                        &invocation,
-                        &repo_dir,
-                    )
+                    #[cfg(test)]
+                    {
+                        crate::repository_executor::repo_layout_is_valid_for_invocation(
+                            &invocation,
+                            &repo_dir,
+                        )
+                    }
+                    #[cfg(not(test))]
+                    {
+                        false
+                    }
                 });
                 repo_materialization_invocation_layout_state_value(layout_valid)
             }
@@ -1888,13 +1957,20 @@ impl Key for RepoMaterializationRecordedInputsManifestContentKey {
                 .map_err(|_| Arc::from("recorded_inputs_unreadable"));
         }
 
-        let manifest_path = self.repo_dir.join(REPO_RECORDED_INPUTS_FILE);
-        if !manifest_path.exists() {
-            return Ok(None);
+        #[cfg(test)]
+        {
+            let manifest_path = self.repo_dir.join(REPO_RECORDED_INPUTS_FILE);
+            if !manifest_path.exists() {
+                return Ok(None);
+            }
+            std::fs::read_to_string(&manifest_path)
+                .map(|content| Some(Arc::from(content.as_str())))
+                .map_err(|_| Arc::from("recorded_inputs_unreadable"))
         }
-        std::fs::read_to_string(&manifest_path)
-            .map(|content| Some(Arc::from(content.as_str())))
-            .map_err(|_| Arc::from("recorded_inputs_unreadable"))
+        #[cfg(not(test))]
+        {
+            Err(Arc::from("recorded_inputs_reader_unavailable"))
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
