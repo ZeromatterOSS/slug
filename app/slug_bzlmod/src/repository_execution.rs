@@ -62,6 +62,7 @@ use crate::repository_invocations::AttrValue;
 use crate::repository_invocations::RepositoryInvocation;
 
 pub(crate) const REPO_RECORDED_INPUTS_FILE: &str = ".slug_repo_recorded_inputs";
+const REPO_COMPLETE_MARKER_FILE: &str = ".slug_repo_complete";
 const REPO_RULE_LOCAL_FILE: &str = ".slug_repo_rule_local";
 const MARKER_CONTENT_PREFIX: &str = "marker-content:";
 
@@ -79,6 +80,14 @@ pub trait RepositoryMaterializationStateReader: Send + Sync + 'static {
         repo_dir: Arc<PathBuf>,
         file_name: &'static str,
     ) -> Result<Option<Arc<str>>, Arc<str>>;
+
+    async fn repo_state_file_exists(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        repo_dir: Arc<PathBuf>,
+        file_name: &'static str,
+    ) -> Result<bool, Arc<str>>;
 }
 
 /// Initialized by `slug_external_cells::init_late_bindings()`.
@@ -982,11 +991,13 @@ impl Key for RepoMaterializationMarkerStateKey {
         let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
         let repo_rule_local = ctx
             .compute(&RepoMaterializationRuleLocalStateKey {
+                workspace_id: self.0.workspace_id.clone(),
                 repo_dir: Arc::new(repo_dir.clone()),
             })
             .await
             .unwrap_or(false);
         let content_key = RepoMaterializationMarkerContentKey {
+            workspace_id: self.0.workspace_id.clone(),
             repo_spec_local: self.0.repo_spec.local,
             repo_rule_local,
             repo_dir: Arc::new(repo_dir.clone()),
@@ -1036,9 +1047,14 @@ impl Key for RepoMaterializationMarkerStateKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
-#[display("RepoMaterializationRuleLocalStateKey({})", repo_dir.display())]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "RepoMaterializationRuleLocalStateKey({}, {})",
+    workspace_id.stable_hash(),
+    repo_dir.display()
+)]
 struct RepoMaterializationRuleLocalStateKey {
+    workspace_id: crate::WorkspaceId,
     repo_dir: Arc<PathBuf>,
 }
 
@@ -1048,9 +1064,21 @@ impl Key for RepoMaterializationRuleLocalStateKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            return reader
+                .repo_state_file_exists(
+                    ctx,
+                    self.workspace_id.clone(),
+                    self.repo_dir.clone(),
+                    REPO_RULE_LOCAL_FILE,
+                )
+                .await
+                .unwrap_or(true);
+        }
+
         repo_materialization_rule_local_state(&self.repo_dir)
     }
 
@@ -1064,14 +1092,16 @@ impl Key for RepoMaterializationRuleLocalStateKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "RepoMaterializationMarkerContentKey({}, {}, {})",
+    "RepoMaterializationMarkerContentKey({}, {}, {}, {})",
+    workspace_id.stable_hash(),
     repo_spec_local,
     repo_rule_local,
     repo_dir.display()
 )]
 struct RepoMaterializationMarkerContentKey {
+    workspace_id: crate::WorkspaceId,
     repo_spec_local: bool,
     repo_rule_local: bool,
     repo_dir: Arc<PathBuf>,
@@ -1083,17 +1113,32 @@ impl Key for RepoMaterializationMarkerContentKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Arc::from(
-            repo_materialization_marker_content_state(
-                self.repo_spec_local,
-                self.repo_rule_local,
-                &self.repo_dir,
-            )
-            .as_str(),
-        )
+        if self.repo_spec_local || self.repo_rule_local {
+            return Arc::from("local-rule");
+        }
+
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            return match reader
+                .read_repo_state_file_if_exists(
+                    ctx,
+                    self.workspace_id.clone(),
+                    self.repo_dir.clone(),
+                    REPO_COMPLETE_MARKER_FILE,
+                )
+                .await
+            {
+                Ok(Some(marker)) => {
+                    Arc::from(format!("{MARKER_CONTENT_PREFIX}{}", marker.trim()).as_str())
+                }
+                Ok(None) => Arc::from("marker-absent"),
+                Err(reason) => Arc::from(format!("marker-unreadable:{reason}").as_str()),
+            };
+        }
+
+        Arc::from(repo_materialization_marker_content_state(false, false, &self.repo_dir).as_str())
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1446,7 +1491,8 @@ impl Key for RepoMaterializationRecordedInputsManifestContentKey {
                     self.repo_dir.clone(),
                     REPO_RECORDED_INPUTS_FILE,
                 )
-                .await;
+                .await
+                .map_err(|_| Arc::from("recorded_inputs_unreadable"));
         }
 
         let manifest_path = self.repo_dir.join(REPO_RECORDED_INPUTS_FILE);

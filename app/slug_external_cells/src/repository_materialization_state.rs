@@ -6,6 +6,7 @@
  * License, Version 2.0 found in the LICENSE-APACHE file in the root directory.
  */
 
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -17,12 +18,44 @@ use slug_bzlmod::WorkspaceId;
 use slug_bzlmod::record_bzlmod_event;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;
+use slug_core::fs::project::ProjectRoot;
+use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_fs::paths::abs_path::AbsPath;
 
 pub(crate) static DICE_REPOSITORY_MATERIALIZATION_STATE_READER:
     DiceRepositoryMaterializationStateReader = DiceRepositoryMaterializationStateReader;
 
 pub(crate) struct DiceRepositoryMaterializationStateReader;
+
+fn repo_state_project_path(
+    workspace_id: &WorkspaceId,
+    project_root: &ProjectRoot,
+    state_path: &Path,
+) -> Result<ProjectRelativePathBuf, Arc<str>> {
+    if !workspace_id.canonical_project_root.as_os_str().is_empty()
+        && workspace_id.canonical_project_root.as_path() != project_root.root().as_path()
+    {
+        tracing::debug!(
+            workspace_root = %workspace_id.canonical_project_root.display(),
+            dice_root = %project_root.root().display(),
+            state_path = %state_path.display(),
+            "repository materialization state root mismatch"
+        );
+        return Err(Arc::from("repo_state_unreadable"));
+    }
+
+    AbsPath::new(state_path)
+        .ok()
+        .and_then(|path| project_root.relativize_any(path).ok())
+        .ok_or_else(|| {
+            tracing::debug!(
+                state_path = %state_path.display(),
+                project_root = %project_root.root().display(),
+                "repository materialization state path is not project-relative"
+            );
+            Arc::from("repo_state_unreadable")
+        })
+}
 
 #[async_trait]
 impl RepositoryMaterializationStateReader for DiceRepositoryMaterializationStateReader {
@@ -36,34 +69,11 @@ impl RepositoryMaterializationStateReader for DiceRepositoryMaterializationState
         let state_path = repo_dir.join(file_name);
         let io = ctx.global_data().get_io_provider();
         let project_root = io.project_root();
-
-        if !workspace_id.canonical_project_root.as_os_str().is_empty()
-            && workspace_id.canonical_project_root.as_path() != project_root.root().as_path()
-        {
-            tracing::debug!(
-                workspace_root = %workspace_id.canonical_project_root.display(),
-                dice_root = %project_root.root().display(),
-                state_path = %state_path.display(),
-                "repository materialization state root mismatch"
-            );
-            return Err(Arc::from("recorded_inputs_unreadable"));
-        }
-
-        let project_path = AbsPath::new(&state_path)
-            .ok()
-            .and_then(|path| project_root.relativize_any(path).ok())
-            .ok_or_else(|| {
-                tracing::debug!(
-                    state_path = %state_path.display(),
-                    project_root = %project_root.root().display(),
-                    "repository materialization state path is not project-relative"
-                );
-                Arc::from("recorded_inputs_unreadable")
-            })?;
+        let project_path = repo_state_project_path(&workspace_id, project_root, &state_path)?;
 
         record_bzlmod_event(
             BzlmodEventKind::RepoMaterializationStateRead,
-            project_path.as_str(),
+            format!("read:{}", project_path.as_str()),
         );
         DiceFileComputations::read_project_file_if_exists(ctx, project_path.as_ref())
             .await
@@ -74,7 +84,36 @@ impl RepositoryMaterializationStateReader for DiceRepositoryMaterializationState
                     state_path = %state_path.display(),
                     "failed to read repository materialization state through DICE"
                 );
-                Arc::from("recorded_inputs_unreadable")
+                Arc::from("repo_state_unreadable")
+            })
+    }
+
+    async fn repo_state_file_exists(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        repo_dir: Arc<PathBuf>,
+        file_name: &'static str,
+    ) -> Result<bool, Arc<str>> {
+        let state_path = repo_dir.join(file_name);
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let project_path = repo_state_project_path(&workspace_id, project_root, &state_path)?;
+
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationStateRead,
+            format!("metadata:{}", project_path.as_str()),
+        );
+        DiceFileComputations::read_project_path_metadata_if_exists(ctx, project_path.as_ref())
+            .await
+            .map(|metadata| metadata.is_some())
+            .map_err(|e| {
+                tracing::debug!(
+                    error = %e,
+                    state_path = %state_path.display(),
+                    "failed to read repository materialization state metadata through DICE"
+                );
+                Arc::from("repo_state_unreadable")
             })
     }
 }

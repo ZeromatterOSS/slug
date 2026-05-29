@@ -35,9 +35,9 @@ Current classification:
 - Replay correctness still has remaining repository/materialization-policy work
   in places where Bazel owns explicit Skyframe keys, but the old resolver bridge
   is no longer the active blocker.
-- Repository materialization recorded-input manifest content now has a
-  production DICE read path; marker/layout/output-tree state still needs
-  follow-up DICE ownership.
+- Repository materialization recorded-input manifest content and marker/local
+  rule state now have production DICE read paths; layout/output-tree state
+  still needs follow-up DICE ownership.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -379,6 +379,19 @@ Current state to preserve:
   (402 passed plus doctest), `cargo test -p slug_external_cells` (10 passed
   plus doctests), `cargo build -p slug`, and focused Python selectors for
   repository_ctx repo-env and watch-label rematerialization (2 passed).
+- 2026-05-29 repository materialization marker/local-state DICE read:
+  the same late-bound `RepositoryMaterializationStateReader` now exposes a
+  DICE-backed metadata/existence method. `RepoMaterializationRuleLocalStateKey`
+  checks `.slug_repo_rule_local` through
+  `DiceFileComputations::read_project_path_metadata_if_exists(...)`, and
+  `RepoMaterializationMarkerContentKey` reads `.slug_repo_complete` through
+  `DiceFileComputations::read_project_file_if_exists(...)`. The no-late-binding
+  direct filesystem path remains a low-level-test fallback. Output-tree digest
+  and layout scans are still direct filesystem probes and remain separate
+  follow-up work. Guardrails: focused marker/local-state `slug_bzlmod` tests
+  (3 passed), `cargo test -p slug_external_cells` (10 passed plus doctests),
+  `cargo build -p slug`, focused marker Plan 61 Python selectors (3 passed),
+  and `cargo test -p slug_bzlmod` (402 passed plus doctest).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -800,10 +813,10 @@ Current state to preserve:
   `rules_cc`, `rules_rs`, `rules_license`, `crates__*`, `zstd`, and
   `bazel_tools` alias/cell failures.
 - Repository materialization now has a named manifest key and child state for
-  marker/layout/recorded-input checks. Recorded-input manifest content uses a
-  late-bound production DICE project-file read; marker/layout/output-tree state
-  still polls filesystem state until lower-level tracked filesystem keys are
-  available.
+  marker/layout/recorded-input checks. Recorded-input manifest content,
+  `.slug_repo_complete`, and `.slug_repo_rule_local` use late-bound production
+  DICE project-file/metadata reads; layout/output-tree state still polls
+  filesystem state until lower-level tracked filesystem keys are available.
 - The current SDK frontier is no longer the legacy resolution bridge. The
   generated kernel-header source path mismatch and the later
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
@@ -1358,10 +1371,11 @@ hardening behavior around it.
      external-cell repository execution. Repository-rule `Label()` construction
      now records those repo-mapping inputs, so apparent repo-name changes are
      manifest-owned replay misses instead of stale materialization hits.
-   - `.slug_repo_recorded_inputs` manifest content now uses a late-bound
-     production DICE read path through `slug_external_cells`, while keeping the
-     no-late-binding direct read as a test fallback. Marker/layout/output-tree
-     state still needs equivalent DICE-owned readers.
+   - `.slug_repo_recorded_inputs`, `.slug_repo_complete`, and
+     `.slug_repo_rule_local` now use late-bound production DICE read/metadata
+     paths through `slug_external_cells`, while keeping no-late-binding direct
+     reads as test fallbacks. Layout/output-tree state still needs equivalent
+     DICE-owned readers.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not
