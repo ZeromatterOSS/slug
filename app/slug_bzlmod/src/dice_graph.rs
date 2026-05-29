@@ -2939,29 +2939,39 @@ impl Key for BzlmodCurrentCellGraphKey {
             }));
         }
 
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        if data.workspace_id != module_sources.workspace_id {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodCurrentCellGraphKey found module-source data for project root '{}', \
+        #[cfg(not(test))]
+        {
+            return Err(injected_cell_graph_fallback_disabled_error(
+                "BzlmodCurrentCellGraphKey",
+            ));
+        }
+
+        #[cfg(test)]
+        {
+            let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+            if data.workspace_id != module_sources.workspace_id {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodCurrentCellGraphKey found module-source data for project root '{}', \
                  but fallback cell graph data for project root '{}'",
-                module_sources.workspace_id.canonical_project_root.display(),
-                data.workspace_id.canonical_project_root.display()
-            ));
-        }
-        if data.resolution_digest != module_sources.resolution_digest {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "BzlmodCurrentCellGraphKey found module-source digest '{}', \
+                    module_sources.workspace_id.canonical_project_root.display(),
+                    data.workspace_id.canonical_project_root.display()
+                ));
+            }
+            if data.resolution_digest != module_sources.resolution_digest {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "BzlmodCurrentCellGraphKey found module-source digest '{}', \
                  but fallback cell graph digest '{}'",
-                module_sources.resolution_digest,
-                data.resolution_digest
-            ));
+                    module_sources.resolution_digest,
+                    data.resolution_digest
+                ));
+            }
+            Ok(Arc::new(BzlmodCurrentCellGraphValue {
+                workspace_id: data.workspace_id.clone(),
+                resolution_digest: data.resolution_digest.clone(),
+            }))
         }
-        Ok(Arc::new(BzlmodCurrentCellGraphValue {
-            workspace_id: data.workspace_id.clone(),
-            resolution_digest: data.resolution_digest.clone(),
-        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3057,16 +3067,27 @@ impl Key for BzlmodFallbackCellGraphKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
-        validate_cell_graph_payload(
-            "BzlmodFallbackCellGraphKey",
-            &self.workspace_id,
-            &self.resolution_digest,
-            &data,
-        )?;
-        Ok(Arc::new(BzlmodFallbackCellGraphValue {
-            fallback_cell_graph: data.fallback_cell_graph.dupe(),
-        }))
+        #[cfg(not(test))]
+        {
+            let _ = ctx;
+            return Err(injected_cell_graph_fallback_disabled_error(
+                "BzlmodFallbackCellGraphKey",
+            ));
+        }
+
+        #[cfg(test)]
+        {
+            let data = ctx.compute(&BzlmodCellGraphDataKey).await?;
+            validate_cell_graph_payload(
+                "BzlmodFallbackCellGraphKey",
+                &self.workspace_id,
+                &self.resolution_digest,
+                &data,
+            )?;
+            Ok(Arc::new(BzlmodFallbackCellGraphValue {
+                fallback_cell_graph: data.fallback_cell_graph.dupe(),
+            }))
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3396,6 +3417,7 @@ impl Key for BzlmodResidualModuleSymlinksKey {
     }
 }
 
+#[cfg(test)]
 fn validate_cell_graph_payload(
     key_name: &str,
     workspace_id: &WorkspaceId,
@@ -3423,6 +3445,15 @@ fn validate_cell_graph_payload(
         ));
     }
     Ok(())
+}
+
+#[cfg(not(test))]
+fn injected_cell_graph_fallback_disabled_error(key_name: &str) -> slug_error::Error {
+    slug_error::slug_error!(
+        slug_error::ErrorTag::Tier0,
+        "{} cannot use injected bzlmod cell graph fallback in non-test builds",
+        key_name
+    )
 }
 
 fn should_use_clean_resolution_data(resolution_digest: &str) -> bool {
