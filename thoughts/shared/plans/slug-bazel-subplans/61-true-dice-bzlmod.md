@@ -949,6 +949,20 @@ Current state to preserve:
   test -p slug_bzlmod cell_graph --lib`, `cargo test -p slug_common bzlmod
   --lib`, `cargo test -p slug_bzlmod --lib`, `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 repo-mapping graph-digest provenance:
+  `BzlmodRepoMappingsDataValue` now carries the active cell-graph/resolution
+  digest, `BzlmodRepoMappingsKey` rejects stale digest reads, and cell-graph,
+  extension-spoke, spoke materialization, extension-repo execution, and
+  current-workspace repo-mapping consumers request the active digest instead of
+  silently using the injected-projection default. This makes repo-mapping DICE
+  hits auditable by graph digest and removes another anonymous injected
+  projection edge from the production bzlmod graph. Guardrails: `cargo test -p
+  slug_bzlmod repo_mappings_key_rejects_stale_resolution_digest --lib`, `cargo
+  test -p slug_bzlmod current_workspace_helpers --lib`, `cargo test -p
+  slug_bzlmod repo_mapping --lib`, `cargo test -p slug_bzlmod cell_graph
+  --lib`, `cargo test -p slug_common bzlmod --lib`, `cargo test -p
+  slug_external_cells extension_repo --lib`, `cargo test -p slug_bzlmod --lib`,
+  `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

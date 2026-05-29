@@ -485,6 +485,8 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
 
         let module_versions =
             module_versions.with_resolution_digest(cell_graph_resolution_digest.clone());
+        let repo_mappings =
+            repo_mappings.with_resolution_digest(cell_graph_resolution_digest.clone());
         let lockfile_inputs_data = Arc::new(lockfile_inputs);
         let repo_env_data = Arc::new(repo_env);
         let module_versions = Arc::new(module_versions);
@@ -572,6 +574,38 @@ pub async fn module_versions_for_current_workspace(
     let key = ModuleVersionsKey::for_workspace_id_with_resolution_digest(
         data.workspace_id.clone(),
         data.resolution_digest.clone(),
+    );
+    ctx.compute(&key).await?
+}
+
+pub async fn bzlmod_repo_mappings_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<Arc<BzlmodRepoMappingsDataValue>> {
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    let key = BzlmodRepoMappingsKey::for_workspace_id_with_resolution_digest(
+        current.workspace_id.clone(),
+        current.resolution_digest.clone(),
+    );
+    ctx.compute(&key).await?
+}
+
+pub async fn bzlmod_repo_mappings_for_workspace_id(
+    ctx: &mut dice::DiceComputations<'_>,
+    workspace_id: WorkspaceId,
+) -> slug_error::Result<Arc<BzlmodRepoMappingsDataValue>> {
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    if current.workspace_id != workspace_id {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "bzlmod repo mappings requested for project root '{}', \
+             but current bzlmod cell graph root is '{}'",
+            workspace_id.canonical_project_root.display(),
+            current.workspace_id.canonical_project_root.display()
+        ));
+    }
+    let key = BzlmodRepoMappingsKey::for_workspace_id_with_resolution_digest(
+        workspace_id,
+        current.resolution_digest.clone(),
     );
     ctx.compute(&key).await?
 }
@@ -711,11 +745,7 @@ async fn validate_lockfile_extension_replay_for_extension(
     let repo_env = ctx
         .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
         .await??;
-    let repo_mappings = ctx
-        .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-            workspace_id.clone(),
-        ))
-        .await??;
+    let repo_mappings = bzlmod_repo_mappings_for_workspace_id(ctx, workspace_id.clone()).await?;
 
     for lockfile_value in [
         lockfile_inputs.visible_lockfile.as_ref(),
@@ -1953,6 +1983,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn repo_mappings_key_rejects_stale_resolution_digest() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-repo-mappings-digest"),
+            PathBuf::from("/tmp/slug-plan61-repo-mappings-digest-output"),
+        );
+        let repo_mappings = BzlmodRepoMappingsDataValue::for_workspace(
+            workspace_id.clone(),
+            Arc::new(RepoMappingSnapshot::new()),
+            Arc::new(RepoMappingOverrides::new()),
+        )
+        .with_resolution_digest(Arc::from("current-digest"));
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(BzlmodRepoMappingsDataKey, Arc::new(repo_mappings))])?;
+        let mut dice = updater.commit().await;
+
+        let err = dice
+            .compute(
+                &BzlmodRepoMappingsKey::for_workspace_id_with_resolution_digest(
+                    workspace_id,
+                    Arc::from("stale-digest"),
+                ),
+            )
+            .await?
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("repo mapping data digest"),
+            "{err:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn cell_graph_key_uses_module_data_root_name() -> slug_error::Result<()> {
         let workspace_id = WorkspaceId::new(
             PathBuf::from("/tmp/slug-plan61-cell-graph-module-root"),
@@ -2595,11 +2664,14 @@ mod tests {
         )])?;
         updater.changed_to(vec![(
             BzlmodRepoMappingsDataKey,
-            Arc::new(BzlmodRepoMappingsDataValue::for_workspace(
-                workspace_id.clone(),
-                Arc::new(RepoMappingSnapshot::new()),
-                Arc::new(RepoMappingOverrides::new()),
-            )),
+            Arc::new(
+                BzlmodRepoMappingsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(RepoMappingSnapshot::new()),
+                    Arc::new(RepoMappingOverrides::new()),
+                )
+                .with_resolution_digest(resolution_digest.clone()),
+            ),
         )])?;
         updater.changed_to(vec![(
             BzlmodResolutionFactsDataKey,
@@ -2875,19 +2947,26 @@ mod tests {
             .await;
         let mut updater = dice.into_updater();
         updater.set_empty_bzlmod_dice_inputs_for_workspace(workspace_id.clone())?;
+        let empty_resolution_digest = empty_bzlmod_cell_graph_resolution_digest();
         let dice = updater.commit().await;
 
         let mut updater = dice.into_updater();
         updater.changed_to(vec![(
             BzlmodModuleVersionsDataKey,
-            Arc::new(BzlmodModuleVersionsDataValue::for_workspace(
-                other_workspace_id.clone(),
-                Arc::new(HashMap::new()),
-            )),
+            Arc::new(
+                BzlmodModuleVersionsDataValue::for_workspace(
+                    other_workspace_id.clone(),
+                    Arc::new(HashMap::new()),
+                )
+                .with_resolution_digest(empty_resolution_digest.clone()),
+            ),
         )])?;
         let mut dice = updater.commit().await;
         let err = dice
-            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id.clone()))
+            .compute(&ModuleVersionsKey::for_workspace_id_with_resolution_digest(
+                workspace_id.clone(),
+                empty_resolution_digest.clone(),
+            ))
             .await?
             .unwrap_err();
         assert!(
@@ -2898,10 +2977,13 @@ mod tests {
         let mut updater = dice.into_updater();
         updater.changed_to(vec![(
             BzlmodModuleVersionsDataKey,
-            Arc::new(BzlmodModuleVersionsDataValue::for_workspace(
-                workspace_id.clone(),
-                Arc::new(HashMap::new()),
-            )),
+            Arc::new(
+                BzlmodModuleVersionsDataValue::for_workspace(
+                    workspace_id.clone(),
+                    Arc::new(HashMap::new()),
+                )
+                .with_resolution_digest(empty_resolution_digest.clone()),
+            ),
         )])?;
         updater.changed_to(vec![(
             BzlmodResolutionFactsDataKey,
@@ -2913,7 +2995,10 @@ mod tests {
         )])?;
         let mut dice = updater.commit().await;
         let err = dice
-            .compute(&ModuleVersionsKey::for_workspace_id(workspace_id.clone()))
+            .compute(&ModuleVersionsKey::for_workspace_id_with_resolution_digest(
+                workspace_id.clone(),
+                empty_resolution_digest,
+            ))
             .await?
             .unwrap_err();
         assert!(

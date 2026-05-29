@@ -67,7 +67,6 @@ use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
 use crate::dice_graph::BzlmodLockfileInputsKey;
 use crate::dice_graph::BzlmodLockfileInputsValue;
 use crate::dice_graph::BzlmodRepoEnvKey;
-use crate::dice_graph::BzlmodRepoMappingsKey;
 use crate::dice_graph::ExtensionBzlTransitiveDigestKey;
 use crate::dice_graph::ExtensionIdByCanonicalRepoKey;
 use crate::dice_graph::ExtensionSpoke;
@@ -494,11 +493,8 @@ async fn extension_spokes_identity_for_aggregation(
     aggregation: &BzlmodExtensionAggregationValue,
     bzl_transitive_digest: &ExtensionBzlTransitiveDigestValue,
 ) -> slug_error::Result<Arc<ExtensionSpokesIdentityValue>> {
-    let repo_mappings = ctx
-        .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-            workspace_id.clone(),
-        ))
-        .await??;
+    let repo_mappings =
+        crate::bzlmod_repo_mappings_for_workspace_id(ctx, workspace_id.clone()).await?;
     let repo_env = ctx
         .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
         .await??;

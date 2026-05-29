@@ -181,11 +181,8 @@ async fn spoke_execution_key(
         }
     };
     if let Some(spoke) = spokes.by_canonical_or_internal_name(canonical_name) {
-        let repo_mappings = ctx
-            .compute(&crate::BzlmodRepoMappingsKey::for_workspace_id(
-                workspace_id.clone(),
-            ))
-            .await??;
+        let repo_mappings =
+            crate::bzlmod_repo_mappings_for_workspace_id(ctx, workspace_id.clone()).await?;
         let repo_mappings = merged_repo_mappings(
             repo_mappings.repo_mappings.as_ref(),
             spokes.recorded_input_repo_mappings.as_ref(),

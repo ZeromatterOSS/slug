@@ -610,25 +610,12 @@ async fn repo_mappings_for_extension_repo_execution(
     workspace_id: &slug_bzlmod::WorkspaceId,
     setup: &ExtensionRepoCellSetup,
 ) -> slug_error::Result<Arc<slug_bzlmod::RepoMappingSnapshot>> {
-    match ctx
-        .compute(&slug_bzlmod::BzlmodRepoMappingsKey::for_workspace_id(
-            workspace_id.clone(),
-        ))
-        .await
-    {
-        Ok(Ok(repo_mappings)) => Ok(repo_mappings.repo_mappings.clone()),
-        Ok(Err(e)) => Err(ExtensionRepoError::MaterializationFailed {
-            canonical_name: setup.canonical_name.to_string(),
-            reason: format!(
-                "Current bzlmod repo-mapping lookup failed: {}",
-                diagnostic_summary(&e)
-            ),
-        }
-        .into()),
+    match slug_bzlmod::bzlmod_repo_mappings_for_workspace_id(ctx, workspace_id.clone()).await {
+        Ok(repo_mappings) => Ok(repo_mappings.repo_mappings.clone()),
         Err(e) => Err(ExtensionRepoError::MaterializationFailed {
             canonical_name: setup.canonical_name.to_string(),
             reason: format!(
-                "DICE error while reading current bzlmod repo mappings: {}",
+                "Current bzlmod repo-mapping lookup failed: {}",
                 diagnostic_summary(&e)
             ),
         }

@@ -1311,14 +1311,14 @@ pub fn clean_resolved_graph_outputs_value(
         cell_graph_resolution_digest: cell_graph_resolution_digest.clone(),
         module_versions: projections
             .module_versions
-            .with_resolution_digest(cell_graph_resolution_digest),
+            .with_resolution_digest(cell_graph_resolution_digest.clone()),
         resolution_facts: projections.resolution_facts,
         registered_toolchains: projections.registered_toolchains,
         registered_execution_platforms: projections.registered_execution_platforms,
         extension_aggregations: projections
             .extension_aggregations
             .with_declared_extension_cells(declared_extension_cells),
-        repo_mappings,
+        repo_mappings: repo_mappings.with_resolution_digest(cell_graph_resolution_digest),
         cell_graph,
     }
 }
@@ -3137,9 +3137,12 @@ impl Key for BzlmodCellDefinitionsKey {
                 ))
                 .await??;
             let repo_mappings = ctx
-                .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-                    self.workspace_id.clone(),
-                ))
+                .compute(
+                    &BzlmodRepoMappingsKey::for_workspace_id_with_resolution_digest(
+                        self.workspace_id.clone(),
+                        self.resolution_digest.clone(),
+                    ),
+                )
                 .await??;
             return Ok(Arc::new(module_cells_from_module_sources(
                 &self.workspace_id,
@@ -3213,9 +3216,12 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
                 ))
                 .await??;
             let repo_mappings = ctx
-                .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-                    self.workspace_id.clone(),
-                ))
+                .compute(
+                    &BzlmodRepoMappingsKey::for_workspace_id_with_resolution_digest(
+                        self.workspace_id.clone(),
+                        self.resolution_digest.clone(),
+                    ),
+                )
                 .await??;
             return match extension_cells_from_spokes(
                 ctx,
@@ -3535,9 +3541,12 @@ impl Key for BzlmodCellGraphKey {
             ))
             .await??;
         let repo_mappings = ctx
-            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
+            .compute(
+                &BzlmodRepoMappingsKey::for_workspace_id_with_resolution_digest(
+                    self.workspace_id.clone(),
+                    self.resolution_digest.clone(),
+                ),
+            )
             .await??;
         let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
         if extension_aggregations.workspace_id != self.workspace_id {
@@ -4061,6 +4070,16 @@ impl BzlmodRepoMappingsKey {
         }
     }
 
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+        }
+    }
+
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
@@ -4162,6 +4181,7 @@ impl BzlmodModuleVersionsDataValue {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodRepoMappingsDataValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
     pub declared_root_aliases: Arc<Vec<BzlmodCellGraphAlias>>,
@@ -4177,12 +4197,18 @@ impl BzlmodRepoMappingsDataValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             repo_mappings,
             repo_mapping_overrides,
             declared_root_aliases: Arc::new(Vec::new()),
             declared_scoped_aliases: Arc::new(Vec::new()),
             declared_dynamic_aliases: Arc::new(Vec::new()),
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 
     pub fn with_declared_aliases(
@@ -4461,6 +4487,15 @@ impl Key for BzlmodRepoMappingsKey {
                  but current bzlmod repo mapping data root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
                 data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodRepoMappingsKey was computed with resolution digest '{}', \
+                 but current bzlmod repo mapping data digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
             ));
         }
         Ok(data)

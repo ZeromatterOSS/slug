@@ -3430,11 +3430,8 @@ use_repo(ext, "generated")
         assert_eq!(extension_aggregations.root_module_name, "root");
         assert_eq!(extension_aggregations.extension_aggregations.len(), 1);
 
-        let repo_mappings = dice
-            .compute(&slug_bzlmod::BzlmodRepoMappingsKey::for_workspace_id(
-                module_versions.workspace_id.clone(),
-            ))
-            .await??;
+        let repo_mappings =
+            slug_bzlmod::bzlmod_repo_mappings_for_current_workspace(&mut dice).await?;
         assert_eq!(
             repo_mappings
                 .repo_mappings
