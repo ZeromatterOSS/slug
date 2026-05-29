@@ -1308,8 +1308,10 @@ pub fn clean_resolved_graph_outputs_value(
     BzlmodResolvedGraphOutputsValue {
         graph: Arc::new(graph),
         graph_digest: Arc::from(graph_digest.as_str()),
-        cell_graph_resolution_digest,
-        module_versions: projections.module_versions,
+        cell_graph_resolution_digest: cell_graph_resolution_digest.clone(),
+        module_versions: projections
+            .module_versions
+            .with_resolution_digest(cell_graph_resolution_digest),
         resolution_facts: projections.resolution_facts,
         registered_toolchains: projections.registered_toolchains,
         registered_execution_platforms: projections.registered_execution_platforms,
@@ -3129,8 +3131,9 @@ impl Key for BzlmodCellDefinitionsKey {
                 })
                 .await??;
             let module_versions = ctx
-                .compute(&ModuleVersionsKey::for_workspace_id(
+                .compute(&ModuleVersionsKey::for_workspace_id_with_resolution_digest(
                     self.workspace_id.clone(),
+                    self.resolution_digest.clone(),
                 ))
                 .await??;
             let repo_mappings = ctx
@@ -3526,8 +3529,9 @@ impl Key for BzlmodCellGraphKey {
             })
             .await??;
         let module_versions = ctx
-            .compute(&ModuleVersionsKey::for_workspace_id(
+            .compute(&ModuleVersionsKey::for_workspace_id_with_resolution_digest(
                 self.workspace_id.clone(),
+                self.resolution_digest.clone(),
             ))
             .await??;
         let repo_mappings = ctx
@@ -3901,6 +3905,16 @@ impl ModuleVersionsKey {
         }
     }
 
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
+        }
+    }
+
     #[cfg(test)]
     pub fn for_project_root(project_root: PathBuf) -> Self {
         Self::for_workspace_id(WorkspaceId::for_project_root(project_root))
@@ -4113,6 +4127,7 @@ impl BzlmodResolutionFactsKey {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodModuleVersionsDataValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub root_module_name: String,
     pub module_versions: Arc<HashMap<String, String>>,
 }
@@ -4132,9 +4147,15 @@ impl BzlmodModuleVersionsDataValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             root_module_name,
             module_versions,
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 }
 
@@ -4502,25 +4523,38 @@ impl Key for ModuleVersionsKey {
                 data.workspace_id.canonical_project_root.display()
             ));
         }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "ModuleVersionsKey was computed with resolution digest '{}', \
+                 but current bzlmod module versions data digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
+            ));
+        }
         let lockfile_inputs = ctx
-            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
+            .compute(&BzlmodLockfileInputsKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
             .await??;
         let repo_env = ctx
-            .compute(&BzlmodRepoEnvKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
+            .compute(&BzlmodRepoEnvKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
             .await??;
         let repo_mappings = ctx
-            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
+            .compute(&BzlmodRepoMappingsKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
             .await??;
         let resolution_facts = ctx
-            .compute(&BzlmodResolutionFactsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
+            .compute(&BzlmodResolutionFactsKey {
+                workspace_id: self.workspace_id.clone(),
+                resolution_digest: self.resolution_digest.clone(),
+            })
             .await??;
         Ok(Arc::new(ModuleVersionsValue {
             workspace_id: data.workspace_id.clone(),

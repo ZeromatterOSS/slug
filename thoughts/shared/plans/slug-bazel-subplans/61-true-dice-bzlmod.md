@@ -937,6 +937,18 @@ Current state to preserve:
   `buck-out/sdk-parity-20260529-070936` / Slug execroot paths. This satisfies
   the SDK frontier parity check for the bridge-burn-down revision, with exact
   ELF byte parity left as the already-accepted output-root design item.
+- 2026-05-29 module-version graph-digest provenance:
+  `BzlmodModuleVersionsDataValue` now carries the active cell-graph/resolution
+  digest, `ModuleVersionsKey` rejects stale digest reads, and cell-graph plus
+  current-workspace module-version consumers request the active digest instead
+  of silently using the injected-projection default. This reduces the remaining
+  injected projection surface by making module-version DICE hits auditable by
+  graph digest; the module-version invalidation child keys for lockfile inputs,
+  repo-env, repo mappings, and resolution facts now use that same digest.
+  Guardrails: `cargo test -p slug_bzlmod module_versions_key --lib`, `cargo
+  test -p slug_bzlmod cell_graph --lib`, `cargo test -p slug_common bzlmod
+  --lib`, `cargo test -p slug_bzlmod --lib`, `cargo fmt --check`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
