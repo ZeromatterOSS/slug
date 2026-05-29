@@ -48,9 +48,13 @@ use dice::Key;
 use dupe::Dupe;
 use fxhash::FxHashMap;
 use serde::Serialize;
+#[cfg(test)]
 use starlark::syntax::AstModule;
+#[cfg(test)]
 use starlark::syntax::Dialect;
+#[cfg(test)]
 use starlark_syntax::syntax::ast::AstStmt;
+#[cfg(test)]
 use starlark_syntax::syntax::ast::StmtP;
 
 use crate::BzlmodExtensionAggregationValue;
@@ -2275,17 +2279,6 @@ pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(hash)
 }
 
-pub fn compute_bzl_transitive_digest_from_file_contents(
-    extension_id: &str,
-    file_contents: &BTreeMap<String, String>,
-) -> String {
-    let file_states = file_contents
-        .iter()
-        .map(|(path, content)| (path.clone(), Ok(content.clone())))
-        .collect();
-    compute_bzl_transitive_digest_from_file_states(extension_id, &file_states)
-}
-
 pub fn compute_bzl_transitive_digest_from_file_states(
     extension_id: &str,
     file_states: &BTreeMap<String, Result<String, String>>,
@@ -2394,14 +2387,16 @@ fn compute_fallback_scanned_bzl_transitive_digest_for_project_with_repo_mappings
     base64::engine::general_purpose::STANDARD.encode(hash)
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BzlLoadLocation {
+struct BzlLoadLocation {
     pub path: PathBuf,
     pub repo: String,
     pub package: String,
 }
 
-pub fn extension_bzl_location_under_project(
+#[cfg(test)]
+fn extension_bzl_location_under_project(
     extension_id: &str,
     project_root: &Path,
     repo_mappings: Option<&RepoMappingSnapshot>,
@@ -2410,7 +2405,8 @@ pub fn extension_bzl_location_under_project(
     label_bzl_location_under_project(label, project_root, None, repo_mappings)
 }
 
-pub fn label_bzl_location_under_project(
+#[cfg(test)]
+fn label_bzl_location_under_project(
     label: &str,
     project_root: &Path,
     current: Option<&BzlLoadLocation>,
@@ -2519,6 +2515,7 @@ pub fn label_bzl_location_under_project(
     }
 }
 
+#[cfg(test)]
 fn bzl_location_for_repo(
     repo: &str,
     package: &str,
@@ -2528,6 +2525,7 @@ fn bzl_location_for_repo(
     bzl_location_for_repo_impl(repo, package, name, project_root, false)
 }
 
+#[cfg(test)]
 fn missing_bzl_location_for_repo(
     repo: &str,
     package: &str,
@@ -2537,6 +2535,7 @@ fn missing_bzl_location_for_repo(
     bzl_location_for_repo_impl(repo, package, name, project_root, true)
 }
 
+#[cfg(test)]
 fn bzl_location_for_repo_impl(
     repo: &str,
     package: &str,
@@ -2571,6 +2570,7 @@ fn bzl_location_for_repo_impl(
     include_missing.then_some(first_missing).flatten()
 }
 
+#[cfg(test)]
 fn project_bzl_location(project_root: &Path, package: &str, name: &str) -> BzlLoadLocation {
     let mut path = project_root.to_path_buf();
     if !package.is_empty() {
@@ -2584,6 +2584,7 @@ fn project_bzl_location(project_root: &Path, package: &str, name: &str) -> BzlLo
     }
 }
 
+#[cfg(test)]
 fn external_repo_candidates(repo: &str) -> Vec<String> {
     if repo.is_empty() || repo == "_main" {
         return Vec::new();
@@ -2597,6 +2598,7 @@ fn external_repo_candidates(repo: &str) -> Vec<String> {
     candidates
 }
 
+#[cfg(test)]
 fn mapped_repo_for_apparent(
     repo_mappings: &RepoMappingSnapshot,
     current_repo: &str,
@@ -2606,6 +2608,7 @@ fn mapped_repo_for_apparent(
         .and_then(|mapping| mapping.get(apparent_repo).cloned())
 }
 
+#[cfg(test)]
 fn mapping_for_source_repo<'a>(
     repo_mappings: &'a RepoMappingSnapshot,
     current_repo: &str,
@@ -2618,6 +2621,7 @@ fn mapping_for_source_repo<'a>(
     None
 }
 
+#[cfg(test)]
 fn source_repo_mapping_candidates(current_repo: &str) -> Vec<String> {
     let mut candidates = Vec::new();
     push_unique_candidate(&mut candidates, current_repo.to_owned());
@@ -2635,12 +2639,14 @@ fn source_repo_mapping_candidates(current_repo: &str) -> Vec<String> {
     candidates
 }
 
+#[cfg(test)]
 fn push_unique_candidate(candidates: &mut Vec<String>, candidate: String) {
     if !candidates.contains(&candidate) {
         candidates.push(candidate);
     }
 }
 
+#[cfg(test)]
 fn split_bzl_label_target(target: &str) -> Option<(&str, &str)> {
     target.split_once(':')
 }
@@ -2684,7 +2690,8 @@ fn collect_bzl_transitive_files(
     }
 }
 
-pub fn literal_loads(path: &Path, content: &str) -> Vec<String> {
+#[cfg(test)]
+fn literal_loads(path: &Path, content: &str) -> Vec<String> {
     let filename = path.to_string_lossy().into_owned();
     let Ok(ast) = AstModule::parse(&filename, content.to_owned(), &Dialect::Standard) else {
         return Vec::new();
@@ -2694,6 +2701,7 @@ pub fn literal_loads(path: &Path, content: &str) -> Vec<String> {
     loads
 }
 
+#[cfg(test)]
 fn collect_literal_loads_from_stmt(stmt: &AstStmt, loads: &mut Vec<String>) {
     match &stmt.node {
         StmtP::Statements(stmts) => {

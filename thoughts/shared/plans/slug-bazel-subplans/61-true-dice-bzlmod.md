@@ -352,6 +352,16 @@ Current state to preserve:
   `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
   `cargo test -p slug_bzlmod project_bzl_digest --lib`,
   `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 fallback `.bzl` scanner support made test-only:
+  `BzlLoadLocation`, project-root `.bzl` location helpers, literal-load AST
+  scanning helpers, and the old file-content digest convenience wrapper are no
+  longer exported by `slug_bzlmod` or compiled into non-test production code.
+  The production extension replay surface remains the DICE loaded-graph digest
+  (`ExtensionBzlTransitiveDigestKey` plus
+  `compute_bzl_transitive_digest_from_file_states(...)` from the interpreter
+  executor). Guardrails: `cargo check -p slug_bzlmod`, `cargo test -p
+  slug_bzlmod project_bzl_digest --lib`, `cargo fmt --check`, targeted `rg`
+  for the removed public scanner exports, and `git diff --check`.
 - 2026-05-29 mapped external fallback digest repair:
   `FallbackScannedExtensionBzlDigestKey` now threads the root module name so
   root-module extension labels still resolve to the project, while non-root
@@ -1299,8 +1309,9 @@ hardening behavior around it.
      replay instead of falling back to a transitional scanner. Loaded graph file
      content is read through DICE `ReadFileKey` dependencies, including
      bzlmod module symlink cells. The direct filesystem scanner helper is
-     test-only in `slug_bzlmod`; the production fallback-scanned bridge and
-     lockfile preseed bridge are removed.
+     test-only in `slug_bzlmod`; its project-root location and literal-load
+     helpers are no longer exported or production-compiled. The production
+     fallback-scanned bridge and lockfile preseed bridge are removed.
    - Keep the current external `bazel-external/<repo>` and mapped literal-load
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.
