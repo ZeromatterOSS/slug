@@ -322,8 +322,10 @@ pub trait SetBzlmodDiceInputs {
         &mut self,
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<()> {
-        self.set_bzlmod_cell_graph_data_with_inputs(
+        self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+            Arc::from(dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST),
             BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone()),
+            None,
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
                 String::new(),
@@ -536,12 +538,14 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
         let repo_mappings = Arc::new(repo_mappings);
         let extension_aggregations = Arc::new(extension_aggregations);
         let cell_graph_workspace_id = cell_graph_workspace_id.clone();
-        let fallback_cell_graph =
-            if resolved_graph.is_some() && MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok() {
-                None
-            } else {
-                Some(Arc::new(cell_graph))
-            };
+        let fallback_cell_graph = if cell_graph_resolution_digest.as_ref()
+            == dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST
+            || (resolved_graph.is_some() && MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok())
+        {
+            None
+        } else {
+            Some(Arc::new(cell_graph))
+        };
         let cell_graph_data = fallback_cell_graph.clone().map(|fallback_cell_graph| {
             Arc::new(
                 BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
@@ -2927,6 +2931,47 @@ mod tests {
             module_versions.workspace_id,
             WorkspaceId::for_project_root(project_root)
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn empty_bzlmod_inputs_do_not_read_fallback_cell_graph_data() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-empty-current-workspace-helper"),
+            PathBuf::from("/tmp/slug-plan61-empty-current-workspace-output-base"),
+        );
+        let stale_workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-plan61-empty-current-workspace-stale"),
+            PathBuf::from("/tmp/slug-plan61-empty-current-workspace-stale-output-base"),
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_empty_bzlmod_dice_inputs_for_workspace(workspace_id.clone())?;
+        updater.changed_to(vec![(
+            BzlmodCellGraphDataKey,
+            Arc::new(BzlmodCellGraphDataValue::for_workspace(
+                stale_workspace_id.clone(),
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+                    stale_workspace_id,
+                )),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let digest = bzlmod_resolution_digest_for_current_workspace(&mut dice).await?;
+        assert_eq!(digest.as_ref(), dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST);
+        let graph = bzlmod_cell_graph_for_current_workspace(&mut dice).await?;
+        assert_eq!(graph.workspace_id, workspace_id);
+        assert!(graph.cells.is_empty());
+        assert!(graph.extension_cells.is_empty());
+        assert!(graph.module_symlinks.is_empty());
 
         Ok(())
     }

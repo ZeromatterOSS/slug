@@ -363,6 +363,7 @@ pub fn repo_env_policy_digest(repo_env: &BTreeMap<String, String>) -> String {
 }
 
 pub(crate) const INJECTED_BZLMOD_PROJECTION_DIGEST: &str = "injected-bzlmod-projection";
+pub(crate) const EMPTY_BZLMOD_CELL_GRAPH_DIGEST: &str = "empty-bzlmod-cell-graph";
 
 /// DICE-owned root `MODULE.bazel` read/parse result.
 #[derive(Clone, Debug, Allocative)]
@@ -3084,6 +3085,9 @@ impl Key for BzlmodCellDefinitionsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if should_use_empty_bzlmod_cell_graph(&self.resolution_digest) {
+            return Ok(Arc::new(Vec::new()));
+        }
         if should_use_clean_resolution_data(&self.resolution_digest) {
             let module_sources = ctx
                 .compute(&BzlmodModuleSourcesKey {
@@ -3144,6 +3148,9 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if should_use_empty_bzlmod_cell_graph(&self.resolution_digest) {
+            return Ok(Arc::new(Vec::new()));
+        }
         let extension_aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
         if extension_aggregations.workspace_id != self.workspace_id {
             return Err(slug_error::slug_error!(
@@ -3333,6 +3340,9 @@ impl Key for BzlmodResidualModuleSymlinksKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if should_use_empty_bzlmod_cell_graph(&self.resolution_digest) {
+            return Ok(Arc::new(Vec::new()));
+        }
         if should_use_clean_resolution_data(&self.resolution_digest) {
             let module_sources = ctx
                 .compute(&BzlmodModuleSourcesKey {
@@ -3399,6 +3409,11 @@ fn validate_cell_graph_payload(
 
 fn should_use_clean_resolution_data(resolution_digest: &str) -> bool {
     resolution_digest != INJECTED_BZLMOD_PROJECTION_DIGEST
+        && resolution_digest != EMPTY_BZLMOD_CELL_GRAPH_DIGEST
+}
+
+fn should_use_empty_bzlmod_cell_graph(resolution_digest: &str) -> bool {
+    resolution_digest == EMPTY_BZLMOD_CELL_GRAPH_DIGEST
 }
 
 fn validate_module_sources_payload(
