@@ -229,18 +229,22 @@ lockfile policy keys. Validation passed with focused cell-graph tests and
 **Bridge surface reduced**: extension repository runtime cells now preserve the
 real DICE-produced spoke setup instead of forcing a fresh extension lookup after
 the static placeholder cell has been installed. `ExtensionRepoCellSetup` carries
-the producing extension `.bzl` transitive digest and recorded-input list,
-resolver-local runtime cells can overlay static placeholder extension cells, and
-`extension_repo::get_file_ops_delegate` reuses the stored `RepoSpec` when the
-digest and recorded inputs are still current. This keeps the missing-lockfile
-warm no-op path from re-entering extension evaluation while still rejecting
-stale `.bzl`, repo-env, repo-mapping, and watched-input state through the named
-DICE keys. Intended owner: `BzlmodCellGraphKey`, `ModuleExtensionReplayInputKey`,
-and `RepoSpecKey`. Focused validation passed with `cargo test -p slug_core
-bzlmod_resolver_runtime_spoke_overlays_static_placeholder_extension_cell`,
-`cargo check -p slug_core -p slug_common -p slug_external_cells -p slug_bzlmod
--p slug_interpreter_for_build`, `cargo build -p slug`, and focused Plan 61
-Python replay/invalidation selectors (`5 passed, 151 deselected`).
+the producing extension `.bzl` transitive digest, usages digest, replay-input
+identity digest, repo-env/mapping digests, and recorded-input list; resolver-local
+runtime cells can overlay static placeholder extension cells; and
+`extension_repo::get_file_ops_delegate` reuses the stored `RepoSpec` only when the
+current DICE identity still matches. Fact-carrying replay inputs still enter the
+extension-spokes producer so hidden-lockfile fact create/edit/delete transitions
+remain observable. This keeps the missing-lockfile warm no-op path from
+re-entering extension evaluation while still rejecting stale `.bzl`, repo-env,
+repo-mapping, lockfile replay, facts, and watched-input state through named DICE
+keys. Intended owner: `BzlmodCellGraphKey`, `ModuleExtensionReplayInputKey`, and
+`RepoSpecKey`. Validation: `cargo build -p slug`; focused Plan 61 selectors for
+missing-lockfile no-op reuse, hidden lockfile edit, hidden facts, and tag attr
+edit (`4 passed`); `cargo test -p slug_bzlmod` (405 passed plus doctest);
+`cargo test -p slug_common bzlmod` (15 passed); `cargo test -p
+slug_external_cells` (10 passed plus doctests); and
+`pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (156 passed).
 
 ## Current Checkpoint
 
@@ -284,10 +288,23 @@ Current state to preserve:
   `@crates__serde-1.0.228` to
   `rules_rs++crate+crates__serde-1.0.228`, and
   `//lib/zm_allocator:zm_allocator` builds. The current focused replay subset
-  is `3 failed, 2 passed`: the mapped external edit/delete replay selectors
-  pass, while hidden lockfile edit, hidden facts edit, and extension tag attr
-  edit still replay stale state. Treat those three as the next replay input
-  blockers, not as regressions from this alias-provider slice.
+  at that checkpoint was `3 failed, 2 passed`: mapped external edit/delete
+  replay selectors passed, while hidden lockfile edit, hidden facts edit, and
+  extension tag attr edit still replayed stale state. Those blockers were closed
+  by the extension-spoke setup identity slice below.
+- 2026-05-29 extension-spoke setup identity slice: `ExtensionSpokesKey` now uses
+  DICE-computed identity inputs for usages, replay inputs, repo env, repo
+  mappings, and mapping overrides instead of recomputing aggregation data inside
+  the key. Runtime extension repo setup stores the same identity, and
+  `extension_repo::get_file_ops_delegate` skips re-registering spokes only when
+  the current DICE identity and recorded inputs still match. Fact-bearing replay
+  inputs deliberately bypass that shortcut so hidden lockfile facts still drive
+  observable extension-spoke invalidation. Guardrails: `cargo build -p slug`;
+  focused Plan 61 selectors for missing-lockfile no-op reuse, hidden lockfile
+  edit, hidden facts, and tag attr edit (`4 passed`); `cargo test -p
+  slug_bzlmod` (405 passed plus doctest); `cargo test -p slug_common bzlmod`
+  (15 passed); `cargo test -p slug_external_cells` (10 passed plus doctests);
+  and `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (156 passed).
 - 2026-05-28 probe: simply passing an empty digest map to lockfile spoke
   preseed is not viable. `test_valid_lockfile_replay_materializes_generated_repo_without_extension_eval`
   still passed, but `test_lockfile_replay_recorded_file_input_edit_rejects_cache`
@@ -1101,19 +1118,19 @@ hardening behavior around it.
      DICE-produced `RepoSpec` metadata when extension execution has produced
      spokes; warm missing-lockfile no-op builds reuse that setup instead of
      re-entering extension evaluation.
-   - Current evidence for the latest runtime alias-provider slice:
-     `cargo fmt`; `cargo test -p slug_common bzlmod` (15 passed);
-     `cargo test -p slug_core bzlmod_runtime_snapshot_` (9 passed);
-     `cargo test -p slug_analysis metadata_owner_scoped_internal_alias_uses_runtime_snapshot_without_root_alias_conflict`
-     (1 passed); `cargo build -p slug`; Kuro uquery for
+   - Current evidence for the latest extension-spoke setup identity slice:
+     `cargo build -p slug`; focused Plan 61 selectors for missing-lockfile no-op
+     reuse, hidden lockfile edit, hidden facts, and extension tag attr edit (`4
+     passed`); `cargo test -p slug_bzlmod` (405 passed plus doctest); `cargo
+     test -p slug_common bzlmod` (15 passed); `cargo test -p
+     slug_external_cells` (10 passed plus doctests); and
+     `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+     tests/core/bzlmod/test_plan61_guardrails.py` (156 passed). Prior runtime
+     alias-provider evidence remains useful frontier context: Kuro uquery for
      `deps(@crates//:serde-1.0.228, 1)` resolves the generated serde repo to
-     `rules_rs++crate+crates__serde-1.0.228`; and Kuro
-     `//lib/zm_allocator:zm_allocator` reaches `BUILD SUCCEEDED` with no grep
+     `rules_rs++crate+crates__serde-1.0.228`, and Kuro
+     `//lib/zm_allocator:zm_allocator` reached `BUILD SUCCEEDED` with no grep
      matches for `StableCrateId` or the old `gen/crates__serde-1.0.228` path.
-     `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q`
-     on the five focused replay selectors currently reports `3 failed, 2
-     passed`: mapped external edit/delete pass; hidden lockfile edit, hidden
-     facts edit, and extension tag attr edit remain open replay blockers.
    - Prove warm reuse by DICE cutoffs, not by a process-global bridge cache.
      The process-global fast path, projection bridge key, and direct cell-graph
      parser are removed; remaining proof belongs on the named graph, replay,
@@ -1197,6 +1214,10 @@ hardening behavior around it.
      it. Module extension replay consumes those values through the named
      `ModuleExtensionReplayInputsKey`, so lockfile cache/facts selection is no
      longer embedded in `ModuleExtensionExecutionKey`.
+   - Hidden lockfile edit and facts create/edit/delete transitions have current
+     same-daemon guardrail coverage in the Plan 61 Python suite. Fact-bearing
+     extension replay intentionally avoids the runtime setup reuse shortcut so
+     `module_ctx.facts` changes still reach the extension-spokes producer.
    - DICE-backed bzlmod resolution now requires the tracked visible and hidden
      lockfile values when lockfile mode/path policy says those inputs are
      active, instead of silently falling back to a direct lockfile read inside
@@ -1250,8 +1271,14 @@ hardening behavior around it.
      instead of process-global dynamic maps. Alias compatibility fallback still
      uses process-global transitional plumbing.
    - Extension repo execution/materialization keys now preserve the workspace
-  identity and output base, but generated repo cell graph ownership and
-  final materialization state are still not fully DICE-owned.
+     identity and output base, but generated repo cell graph ownership and
+     final materialization state are still not fully DICE-owned.
+   - Runtime extension repo setup now stores the DICE-produced spoke identity
+     (extension `.bzl` digest, usages digest, replay-input digest,
+     repo-env/mapping digests, and recorded inputs) so warm missing-lockfile
+     no-op builds can reuse the current setup without a process-global bridge
+     cache. If that identity is stale, or if replay inputs carry facts, lookup
+     falls back to the current extension-spokes DICE producer.
 - Dynamic generated-repo cell maps are now scoped by the active transitional
   workspace identity, including output base when replayed from a bzlmod cell
   graph, but they remain process-global maps rather than a DICE-owned

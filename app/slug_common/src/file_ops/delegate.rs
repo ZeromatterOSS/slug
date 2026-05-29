@@ -16,6 +16,7 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_core::cells::external::ExternalCellOrigin;
 use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePath;
 use slug_core::cells::unchecked_cell_rel_path::UncheckedCellRelativePath;
@@ -40,6 +41,8 @@ use crate::ignores::file_ignores::FileIgnoreResult;
 /// Note: Everything in this mini-module exists only so that it can be replaced by a `TestFileOps`
 /// in unittests
 mod keys {
+    use std::sync::Arc;
+
     use allocative::Allocative;
     use derive_more::Display;
     use dupe::Dupe;
@@ -56,7 +59,11 @@ mod keys {
     }
 
     #[derive(Dupe, Clone, Allocative)]
-    pub(crate) struct FileOpsValue(#[allocative(skip)] pub FileOpsDelegateWithIgnores);
+    pub(crate) struct FileOpsValue {
+        #[allocative(skip)]
+        pub delegate: FileOpsDelegateWithIgnores,
+        pub semantic_token: Option<Arc<str>>,
+    }
 }
 
 #[async_trait]
@@ -111,7 +118,12 @@ impl Key for FileOpsKey {
             None
         };
 
+        let mut semantic_token = None;
         let out = if let Some(origin) = cells.get(self.cell)?.external() {
+            if matches!(origin, ExternalCellOrigin::ExtensionRepo(_)) && ctx.is_bzlmod().await? {
+                semantic_token =
+                    Some(slug_bzlmod::bzlmod_resolution_digest_for_current_workspace(ctx).await?);
+            }
             let delegate = EXTERNAL_CELLS_IMPL
                 .get()?
                 .get_file_ops_delegate(ctx, self.cell, origin.dupe())
@@ -125,12 +137,15 @@ impl Key for FileOpsKey {
             FileOpsDelegateWithIgnores::new(ignores, Arc::new(delegate))
         };
 
-        Ok(FileOpsValue(out))
+        Ok(FileOpsValue {
+            delegate: out,
+            semantic_token,
+        })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         match (x, y) {
-            (Ok(x), Ok(y)) => x.0 == y.0,
+            (Ok(x), Ok(y)) => x.delegate == y.delegate && x.semantic_token == y.semantic_token,
             _ => false,
         }
     }
@@ -151,7 +166,7 @@ pub(crate) async fn get_delegated_file_ops(
             check_ignores,
         })
         .await??
-        .0)
+        .delegate)
 }
 
 #[derive(Clone, Dupe)]

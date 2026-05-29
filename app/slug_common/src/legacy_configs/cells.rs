@@ -105,6 +105,14 @@ fn runtime_extension_setup_from_cell_graph(
         spec_hash: Arc::from(cell.spec_hash.as_str()),
         repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
         repo_env_json: Arc::from(cell.repo_env_json.as_str()),
+        extension_usages_digest: Arc::from(cell.extension_usages_digest.as_str()),
+        extension_replay_inputs_identity_digest: Arc::from(
+            cell.extension_replay_inputs_identity_digest.as_str(),
+        ),
+        extension_repo_mappings_digest: Arc::from(cell.extension_repo_mappings_digest.as_str()),
+        extension_repo_mapping_overrides_digest: Arc::from(
+            cell.extension_repo_mapping_overrides_digest.as_str(),
+        ),
         extension_bzl_transitive_digest: Arc::from(cell.extension_bzl_transitive_digest.as_str()),
         extension_recorded_inputs_json: Arc::from(cell.extension_recorded_inputs_json.as_str()),
         materialized: cell.materialized,
@@ -2386,7 +2394,7 @@ impl BuckConfigBasedCells {
         .buck_error_context("Parsing cells")?;
         let cell_graph_resolution_digest = clean_outputs.as_ref().map_or_else(
             || Arc::from("empty-bzlmod-cell-graph"),
-            |value| value.graph_digest.clone(),
+            |value| value.cell_graph_resolution_digest.clone(),
         );
         let resolved_graph_for_dice = clean_outputs.as_ref().map(|value| value.graph.clone());
         let lockfile_inputs_for_dice =
@@ -4328,6 +4336,10 @@ use_repo(ext, "generated")
                     spec_hash: "eager-hash".to_owned(),
                     repo_spec_json: "{}".to_owned(),
                     repo_env_json: r#"{"K":"V"}"#.to_owned(),
+                    extension_usages_digest: String::new(),
+                    extension_replay_inputs_identity_digest: String::new(),
+                    extension_repo_mappings_digest: String::new(),
+                    extension_repo_mapping_overrides_digest: String::new(),
                     extension_bzl_transitive_digest: String::new(),
                     extension_recorded_inputs_json: String::new(),
                     materialized: true,
@@ -4341,6 +4353,10 @@ use_repo(ext, "generated")
                     spec_hash: "lazy-hash".to_owned(),
                     repo_spec_json: "{}".to_owned(),
                     repo_env_json: r#"{"K":"V"}"#.to_owned(),
+                    extension_usages_digest: String::new(),
+                    extension_replay_inputs_identity_digest: String::new(),
+                    extension_repo_mappings_digest: String::new(),
+                    extension_repo_mapping_overrides_digest: String::new(),
                     extension_bzl_transitive_digest: String::new(),
                     extension_recorded_inputs_json: String::new(),
                     materialized: false,
@@ -4401,6 +4417,10 @@ use_repo(ext, "generated")
                 spec_hash: "repo-hash".to_owned(),
                 repo_spec_json: "{}".to_owned(),
                 repo_env_json: "{}".to_owned(),
+                extension_usages_digest: String::new(),
+                extension_replay_inputs_identity_digest: String::new(),
+                extension_repo_mappings_digest: String::new(),
+                extension_repo_mapping_overrides_digest: String::new(),
                 extension_bzl_transitive_digest: String::new(),
                 extension_recorded_inputs_json: String::new(),
                 materialized: false,

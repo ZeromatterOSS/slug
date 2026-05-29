@@ -140,15 +140,18 @@ impl TestFileOps {
     }
 
     pub fn mock_in_cell(&self, cell: CellName, builder: DiceBuilder) -> DiceBuilder {
-        let data = Ok(FileOpsValue(FileOpsDelegateWithIgnores::new(
-            None,
-            Arc::new(TestCellFileOps(
-                cell,
-                Self {
-                    entries: Arc::clone(&self.entries),
-                },
-            )),
-        )));
+        let data = Ok(FileOpsValue {
+            delegate: FileOpsDelegateWithIgnores::new(
+                None,
+                Arc::new(TestCellFileOps(
+                    cell,
+                    Self {
+                        entries: Arc::clone(&self.entries),
+                    },
+                )),
+            ),
+            semantic_token: None,
+        });
         builder
             .mock_and_return(
                 FileOpsKey {

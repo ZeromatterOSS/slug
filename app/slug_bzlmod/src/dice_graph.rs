@@ -565,6 +565,7 @@ impl Key for BzlmodResolvedModuleGraphKey {
                 match (x.outputs.as_ref(), y.outputs.as_ref()) {
                     (Some(x), Some(y)) => {
                         x.graph_digest == y.graph_digest
+                            && x.cell_graph_resolution_digest == y.cell_graph_resolution_digest
                             && x.module_versions == y.module_versions
                             && x.resolution_facts == y.resolution_facts
                             && x.registered_toolchains == y.registered_toolchains
@@ -578,6 +579,13 @@ impl Key for BzlmodResolvedModuleGraphKey {
                 }
             }
             _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.lockfile_inputs.has_untracked_inputs(),
+            Err(_) => false,
         }
     }
 }
@@ -1258,6 +1266,7 @@ pub fn resolved_graph_projection_values(
 
 pub fn clean_resolved_graph_outputs_value(
     workspace_id: WorkspaceId,
+    cell_graph_resolution_digest: Arc<str>,
     root_module: &ParsedModuleFile,
     parsed_modules: &[(String, ParsedModuleFile)],
     graph: ResolvedGraph,
@@ -1296,6 +1305,7 @@ pub fn clean_resolved_graph_outputs_value(
     BzlmodResolvedGraphOutputsValue {
         graph: Arc::new(graph),
         graph_digest: Arc::from(graph_digest.as_str()),
+        cell_graph_resolution_digest,
         module_versions: projections.module_versions,
         resolution_facts: projections.resolution_facts,
         registered_toolchains: projections.registered_toolchains,
@@ -1438,8 +1448,10 @@ async fn compute_bzlmod_resolved_module_graph(
         .await?;
     builder.install_precomputed_extension_mapping_rows();
     let cell_graph = builder.finish()?;
+    let cell_graph_resolution_digest = Arc::from(inputs.identity_digest_with_key(key).as_str());
     let outputs = clean_resolved_graph_outputs_value(
         key.workspace_id.clone(),
+        cell_graph_resolution_digest,
         &parsed,
         &parsed_modules,
         graph,
@@ -1773,6 +1785,16 @@ impl BzlmodLockfileInputsValue {
         hash_lockfile_content_identity(&self.visible_lockfile, state);
         hash_lockfile_content_identity(&self.hidden_lockfile, state);
     }
+
+    pub fn has_untracked_inputs(&self) -> bool {
+        self.visible_lockfile
+            .as_ref()
+            .is_some_and(|value| !value.tracked_by_dice)
+            || self
+                .hidden_lockfile
+                .as_ref()
+                .is_some_and(|value| !value.tracked_by_dice)
+    }
 }
 
 impl Default for BzlmodLockfileInputsValue {
@@ -1851,7 +1873,10 @@ impl Key for BzlmodCleanLockfileInputsKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+        match x {
+            Ok(value) => !value.has_untracked_inputs(),
+            Err(_) => false,
+        }
     }
 }
 
@@ -1965,6 +1990,10 @@ pub struct BzlmodCellGraphExtensionCell {
     pub spec_hash: String,
     pub repo_spec_json: String,
     pub repo_env_json: String,
+    pub extension_usages_digest: String,
+    pub extension_replay_inputs_identity_digest: String,
+    pub extension_repo_mappings_digest: String,
+    pub extension_repo_mapping_overrides_digest: String,
     pub extension_bzl_transitive_digest: String,
     pub extension_recorded_inputs_json: String,
     pub materialized: bool,
@@ -2356,6 +2385,10 @@ impl BzlmodCleanCellGraphBuilder {
                 spec_hash: cell.spec_hash,
                 repo_spec_json: cell.repo_spec_json,
                 repo_env_json: self.repo_env_json.clone(),
+                extension_usages_digest: String::new(),
+                extension_replay_inputs_identity_digest: String::new(),
+                extension_repo_mappings_digest: String::new(),
+                extension_repo_mapping_overrides_digest: String::new(),
                 extension_bzl_transitive_digest: String::new(),
                 extension_recorded_inputs_json: String::new(),
                 materialized: false,
@@ -2933,6 +2966,7 @@ pub struct BzlmodResolvedGraphOutputsValue {
     #[allocative(skip)]
     pub graph: Arc<ResolvedGraph>,
     pub graph_digest: Arc<str>,
+    pub cell_graph_resolution_digest: Arc<str>,
     pub module_versions: BzlmodModuleVersionsDataValue,
     pub resolution_facts: BzlmodResolutionFactsValue,
     pub registered_toolchains: RegisteredToolchainsDataValue,
@@ -3246,6 +3280,14 @@ async fn extension_cells_from_spokes(
                 spec_hash: spoke.spec_hash.to_string(),
                 repo_spec_json: spoke.repo_spec_json.to_string(),
                 repo_env_json: repo_env_json.clone(),
+                extension_usages_digest: spokes.usages_digest.to_string(),
+                extension_replay_inputs_identity_digest: spokes
+                    .replay_inputs_identity_digest
+                    .to_string(),
+                extension_repo_mappings_digest: spokes.repo_mappings_digest.to_string(),
+                extension_repo_mapping_overrides_digest: spokes
+                    .repo_mapping_overrides_digest
+                    .to_string(),
                 extension_bzl_transitive_digest: spokes.bzl_transitive_digest.to_string(),
                 extension_recorded_inputs_json: serde_json::to_string(
                     spokes.recorded_inputs.as_ref(),
@@ -4272,6 +4314,13 @@ impl Key for BzlmodLockfileInputsKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        match x {
+            Ok(value) => !value.has_untracked_inputs(),
+            Err(_) => false,
+        }
+    }
 }
 
 #[async_trait]
@@ -4853,17 +4902,57 @@ impl BzlmodExtensionAggregationKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Debug, Display, Allocative)]
 #[display(
-    "ExtensionSpokesKey({}, {}, {})",
+    "ExtensionSpokesKey({}, {}, {}, {}, {})",
     workspace_id.stable_hash(),
     extension_id,
-    bzl_transitive_digest
+    bzl_transitive_digest,
+    usages_digest,
+    replay_inputs_identity_digest
 )]
 pub struct ExtensionSpokesKey {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
     pub bzl_transitive_digest: Arc<str>,
+    pub usages_digest: Arc<str>,
+    pub root_module_name: Arc<str>,
+    #[allocative(skip)]
+    pub aggregated: Arc<AggregatedExtension>,
+    pub replay_inputs_identity_digest: Arc<str>,
+    pub repo_env: Arc<BTreeMap<String, String>>,
+    pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
+    pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+}
+
+impl PartialEq for ExtensionSpokesKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.workspace_id == other.workspace_id
+            && self.extension_id == other.extension_id
+            && self.bzl_transitive_digest == other.bzl_transitive_digest
+            && self.usages_digest == other.usages_digest
+            && self.root_module_name == other.root_module_name
+            && self.replay_inputs_identity_digest == other.replay_inputs_identity_digest
+            && self.repo_env == other.repo_env
+            && self.repo_mappings == other.repo_mappings
+            && self.repo_mapping_overrides == other.repo_mapping_overrides
+    }
+}
+
+impl Eq for ExtensionSpokesKey {}
+
+impl Hash for ExtensionSpokesKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.workspace_id.hash(state);
+        self.extension_id.hash(state);
+        self.bzl_transitive_digest.hash(state);
+        self.usages_digest.hash(state);
+        self.root_module_name.hash(state);
+        self.replay_inputs_identity_digest.hash(state);
+        self.repo_env.hash(state);
+        self.repo_mappings.hash(state);
+        self.repo_mapping_overrides.hash(state);
+    }
 }
 
 impl ExtensionSpokesKey {
@@ -4876,10 +4965,44 @@ impl ExtensionSpokesKey {
         extension_id: &str,
         bzl_transitive_digest: &str,
     ) -> Self {
+        Self::for_workspace_id_with_inputs(
+            workspace_id,
+            extension_id,
+            bzl_transitive_digest,
+            "",
+            "",
+            "",
+            Arc::new(AggregatedExtension::default()),
+            Arc::new(BTreeMap::new()),
+            Arc::new(crate::RepoMappingSnapshot::new()),
+            Arc::new(crate::RepoMappingOverrides::new()),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn for_workspace_id_with_inputs(
+        workspace_id: WorkspaceId,
+        extension_id: &str,
+        bzl_transitive_digest: &str,
+        usages_digest: &str,
+        root_module_name: &str,
+        replay_inputs_identity_digest: &str,
+        aggregated: Arc<AggregatedExtension>,
+        repo_env: Arc<BTreeMap<String, String>>,
+        repo_mappings: Arc<crate::RepoMappingSnapshot>,
+        repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+    ) -> Self {
         Self {
             workspace_id,
             extension_id: Arc::from(extension_id),
             bzl_transitive_digest: Arc::from(bzl_transitive_digest),
+            usages_digest: Arc::from(usages_digest),
+            root_module_name: Arc::from(root_module_name),
+            replay_inputs_identity_digest: Arc::from(replay_inputs_identity_digest),
+            aggregated,
+            repo_env,
+            repo_mappings,
+            repo_mapping_overrides,
         }
     }
 
@@ -4973,6 +5096,10 @@ pub struct ExtensionSpokesValue {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
     pub bzl_transitive_digest: Arc<str>,
+    pub usages_digest: Arc<str>,
+    pub replay_inputs_identity_digest: Arc<str>,
+    pub repo_mappings_digest: Arc<str>,
+    pub repo_mapping_overrides_digest: Arc<str>,
     pub project_root: Arc<PathBuf>,
     pub repo_env: Arc<BTreeMap<String, String>>,
     pub spokes: BTreeMap<String, ExtensionSpoke>,
@@ -5004,6 +5131,18 @@ impl ExtensionSpokesValue {
 
     pub fn recorded_inputs(&self) -> &[String] {
         self.recorded_inputs.as_slice()
+    }
+
+    pub fn recorded_inputs_current(&self) -> bool {
+        crate::lockfile::validate_recorded_inputs_current(
+            self.recorded_inputs.as_slice(),
+            self.recorded_input_workspace_root
+                .as_deref()
+                .map(PathBuf::as_path),
+            Some(self.recorded_input_repo_env.as_ref()),
+            Some(self.recorded_input_repo_mappings.as_ref()),
+        )
+        .is_ok()
     }
 }
 
@@ -5455,6 +5594,15 @@ mod tests {
         })
     }
 
+    fn test_polled_lockfile_value(path: PathBuf, digest: &str) -> Arc<LockfileContentValue> {
+        Arc::new(LockfileContentValue {
+            path: Arc::new(path),
+            digest: Some(digest.to_owned()),
+            tracked_by_dice: false,
+            lockfile: None,
+        })
+    }
+
     #[tokio::test]
     async fn clean_lockfile_inputs_key_owns_mode_and_paths() -> slug_error::Result<()> {
         init_test_clean_graph_io();
@@ -5564,6 +5712,78 @@ mod tests {
         assert_eq!(
             inputs.hidden_lockfile_digest.as_deref(),
             Some("hidden-current")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lockfile_inputs_key_rechecks_untracked_hidden_lockfile() -> slug_error::Result<()> {
+        init_test_clean_graph_io();
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-bzlmod-lockfile-untracked-ws"),
+            PathBuf::from("/tmp/slug-bzlmod-lockfile-untracked-out"),
+        );
+        let visible_path = lockfile_path(workspace_id.canonical_project_root.as_ref());
+        let hidden_path = PathBuf::from("/tmp/slug-bzlmod-lockfile-untracked-hidden.lock");
+        {
+            let mut values = test_lockfile_values()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            values.insert(
+                visible_path.clone(),
+                test_lockfile_value(visible_path, "visible-current"),
+            );
+            values.insert(
+                hidden_path.clone(),
+                test_polled_lockfile_value(hidden_path.clone(), "hidden-first"),
+            );
+        }
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            BzlmodLockfileInputsDataKey,
+            Arc::new(BzlmodLockfileInputsDataValue::for_workspace_policy(
+                workspace_id.clone(),
+                LockfileMode::Update,
+                Some(hidden_path.clone()),
+                true,
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+        let first = dice
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                workspace_id.clone(),
+            ))
+            .await??;
+        assert_eq!(
+            first.hidden_lockfile_digest.as_deref(),
+            Some("hidden-first")
+        );
+        assert!(!<BzlmodLockfileInputsKey as Key>::validity(&Ok(
+            first.clone()
+        )));
+
+        {
+            let mut values = test_lockfile_values()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            values.insert(
+                hidden_path.clone(),
+                test_polled_lockfile_value(hidden_path, "hidden-second"),
+            );
+        }
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(workspace_id))
+            .await??;
+        assert_eq!(
+            second.hidden_lockfile_digest.as_deref(),
+            Some("hidden-second")
         );
         Ok(())
     }
@@ -5983,6 +6203,7 @@ mod tests {
 
         let outputs = clean_resolved_graph_outputs_value(
             workspace_id.clone(),
+            Arc::from("test-cell-graph-resolution-digest"),
             &root,
             &parsed_modules,
             graph,
@@ -5991,6 +6212,10 @@ mod tests {
         );
 
         assert_eq!(outputs.graph_digest.as_ref(), expected_digest.as_str());
+        assert_eq!(
+            outputs.cell_graph_resolution_digest.as_ref(),
+            "test-cell-graph-resolution-digest"
+        );
         assert_eq!(outputs.module_versions.workspace_id, workspace_id);
         assert_eq!(
             outputs

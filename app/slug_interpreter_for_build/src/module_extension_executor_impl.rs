@@ -701,6 +701,10 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                     ),
                     repo_spec_json: Arc::from(repo_spec_json.as_str()),
                     repo_env_json: Arc::from(repo_env_json.as_str()),
+                    extension_usages_digest: Arc::from(""),
+                    extension_replay_inputs_identity_digest: Arc::from(""),
+                    extension_repo_mappings_digest: Arc::from(""),
+                    extension_repo_mapping_overrides_digest: Arc::from(""),
                     extension_bzl_transitive_digest: bzl_transitive_digest.clone(),
                     extension_recorded_inputs_json: Arc::from(
                         serde_json::to_string(&output.recorded_inputs)

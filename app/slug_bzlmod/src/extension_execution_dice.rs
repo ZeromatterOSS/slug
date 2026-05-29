@@ -47,6 +47,7 @@ use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
 use fxhash::FxHashMap;
+use serde::Serialize;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 use starlark_syntax::syntax::ast::AstStmt;
@@ -62,7 +63,6 @@ use crate::dice_graph::BzlmodExtensionAggregationsDataKey;
 use crate::dice_graph::BzlmodLockfileInputsKey;
 use crate::dice_graph::BzlmodLockfileInputsValue;
 use crate::dice_graph::BzlmodRepoEnvKey;
-use crate::dice_graph::BzlmodRepoMappingsDataValue;
 use crate::dice_graph::BzlmodRepoMappingsKey;
 use crate::dice_graph::ExtensionBzlTransitiveDigestKey;
 use crate::dice_graph::ExtensionIdByCanonicalRepoKey;
@@ -77,16 +77,35 @@ use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
 use crate::lockfile::LockfileMode;
 use crate::lockfile::SelectedExtensionCache;
+use crate::lockfile::compute_sha256_hex;
 use crate::lockfile::validate_recorded_inputs_current;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 use crate::module_extension_executor::ModuleExtensionMetadata;
 use crate::repo_spec::RepoSpec;
 
+fn stable_json_digest<T: Serialize>(value: &T) -> String {
+    let json = serde_json::to_string(value).unwrap_or_else(|_| "<json-error>".to_owned());
+    compute_sha256_hex(json.as_bytes())
+}
+
+fn stable_json_string<T: Serialize>(value: &T, fallback: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| fallback.to_owned())
+}
+
+pub fn repo_mappings_identity_digest(repo_mappings: &RepoMappingSnapshot) -> String {
+    stable_json_digest(repo_mappings)
+}
+
+pub fn repo_mapping_overrides_identity_digest(overrides: &RepoMappingOverrides) -> String {
+    stable_json_digest(overrides)
+}
+
 fn create_extension_execution_key_from_aggregation(
     aggregation: &BzlmodExtensionAggregationValue,
     repo_env: &BTreeMap<String, String>,
     replay_inputs: Arc<ModuleExtensionReplayInputsValue>,
-    repo_mappings: &BzlmodRepoMappingsDataValue,
+    repo_mappings: &RepoMappingSnapshot,
+    repo_mapping_overrides: &RepoMappingOverrides,
     bzl_transitive_digest: Arc<str>,
 ) -> ModuleExtensionExecutionKey {
     ModuleExtensionExecutionKey::new_with_replay_inputs_and_bzl_digest(
@@ -99,8 +118,8 @@ fn create_extension_execution_key_from_aggregation(
             .clone(),
         replay_inputs,
         repo_env.clone(),
-        repo_mappings.repo_mappings.as_ref().clone(),
-        repo_mappings.repo_mapping_overrides.as_ref().clone(),
+        repo_mappings.clone(),
+        repo_mapping_overrides.clone(),
         bzl_transitive_digest,
         aggregation.workspace_id.clone(),
     )
@@ -287,6 +306,10 @@ impl ModuleExtensionReplayInputsValue {
     fn identity_digest(&self) -> &str {
         &self.identity_digest
     }
+
+    fn has_facts(&self) -> bool {
+        self.workspace_lockfile_facts_present || self.prior_facts != empty_facts()
+    }
 }
 
 fn selected_extension_cache_identity(
@@ -421,26 +444,6 @@ fn owning_module_matches(canonical_owner: &str, extension_owner: &str) -> bool {
             && extension_owner.strip_suffix('+') == Some(canonical_owner.trim_end_matches('+')))
 }
 
-fn ensure_extension_aggregation_workspace(
-    workspace_id: &crate::WorkspaceId,
-    aggregation: &BzlmodExtensionAggregationValue,
-    key_name: &str,
-    subject: &str,
-) -> slug_error::Result<()> {
-    if &aggregation.workspace_id != workspace_id {
-        return Err(slug_error::slug_error!(
-            slug_error::ErrorTag::Tier0,
-            "{} for '{}' was computed with project root '{}', \
-             but current bzlmod extension aggregation root is '{}'",
-            key_name,
-            subject,
-            workspace_id.canonical_project_root.display(),
-            aggregation.workspace_id.canonical_project_root.display()
-        ));
-    }
-    Ok(())
-}
-
 fn ensure_extension_aggregations_data_workspace(
     workspace_id: &crate::WorkspaceId,
     aggregations: &BzlmodExtensionAggregationsDataValue,
@@ -461,27 +464,136 @@ fn ensure_extension_aggregations_data_workspace(
     Ok(())
 }
 
-fn extension_spokes_recorded_inputs_current(spokes: &ExtensionSpokesValue) -> bool {
-    validate_recorded_inputs_current(
-        spokes.recorded_inputs.as_slice(),
-        spokes
-            .recorded_input_workspace_root
-            .as_deref()
-            .map(PathBuf::as_path),
-        Some(spokes.recorded_input_repo_env.as_ref()),
-        Some(spokes.recorded_input_repo_mappings.as_ref()),
-    )
-    .is_ok()
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct ExtensionSpokesIdentityValue {
+    pub workspace_id: crate::WorkspaceId,
+    pub extension_id: Arc<str>,
+    pub bzl_transitive_digest: Arc<str>,
+    pub usages_digest: Arc<str>,
+    pub root_module_name: Arc<str>,
+    #[allocative(skip)]
+    pub(crate) aggregated: Arc<AggregatedExtension>,
+    pub replay_inputs_identity_digest: Arc<str>,
+    pub replay_inputs_have_facts: bool,
+    pub repo_env_json: Arc<str>,
+    pub repo_mappings_digest: Arc<str>,
+    pub repo_mapping_overrides_digest: Arc<str>,
+    pub repo_env: Arc<BTreeMap<String, String>>,
+    pub repo_mappings: Arc<RepoMappingSnapshot>,
+    pub repo_mapping_overrides: Arc<RepoMappingOverrides>,
 }
 
-fn optional_extension_spokes_validity(
-    value: &slug_error::Result<Option<Arc<ExtensionSpokesValue>>>,
-) -> bool {
-    match value {
-        Ok(Some(spokes)) => extension_spokes_recorded_inputs_current(spokes.as_ref()),
-        Ok(None) => true,
-        Err(_) => false,
-    }
+async fn extension_spokes_identity_for_aggregation(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: &crate::WorkspaceId,
+    aggregation: &BzlmodExtensionAggregationValue,
+    bzl_transitive_digest: &ExtensionBzlTransitiveDigestValue,
+) -> slug_error::Result<Arc<ExtensionSpokesIdentityValue>> {
+    let repo_mappings = ctx
+        .compute(&BzlmodRepoMappingsKey::for_workspace_id(
+            workspace_id.clone(),
+        ))
+        .await??;
+    let repo_env = ctx
+        .compute(&BzlmodRepoEnvKey::for_workspace_id(workspace_id.clone()))
+        .await??;
+    let usages_digest = compute_extension_input_hash(aggregation.aggregated.as_ref());
+    let replay_inputs = ctx
+        .compute(&ModuleExtensionReplayInputsKey {
+            workspace_id: workspace_id.clone(),
+            extension_id: aggregation.extension_id.clone(),
+            bzl_transitive_digest: Arc::from(bzl_transitive_digest.digest()),
+            usages_digest: Arc::from(usages_digest.as_str()),
+            project_root: Some(Arc::new(
+                workspace_id.canonical_project_root.as_ref().clone(),
+            )),
+            root_module_name: aggregation.root_module_name.clone(),
+            repo_env: repo_env.clone(),
+            repo_mappings: repo_mappings.repo_mappings.clone(),
+            repo_mapping_overrides: repo_mappings.repo_mapping_overrides.clone(),
+        })
+        .await??;
+
+    Ok(Arc::new(ExtensionSpokesIdentityValue {
+        workspace_id: workspace_id.clone(),
+        extension_id: aggregation.extension_id.clone(),
+        bzl_transitive_digest: Arc::from(bzl_transitive_digest.digest()),
+        usages_digest: Arc::from(usages_digest.as_str()),
+        root_module_name: aggregation.root_module_name.clone(),
+        aggregated: aggregation.aggregated.clone(),
+        replay_inputs_identity_digest: Arc::from(replay_inputs.identity_digest()),
+        replay_inputs_have_facts: replay_inputs.has_facts(),
+        repo_env_json: Arc::from(stable_json_string(repo_env.as_ref(), "{}").as_str()),
+        repo_mappings_digest: Arc::from(
+            repo_mappings_identity_digest(repo_mappings.repo_mappings.as_ref()).as_str(),
+        ),
+        repo_mapping_overrides_digest: Arc::from(
+            repo_mapping_overrides_identity_digest(repo_mappings.repo_mapping_overrides.as_ref())
+                .as_str(),
+        ),
+        repo_env,
+        repo_mappings: repo_mappings.repo_mappings.clone(),
+        repo_mapping_overrides: repo_mappings.repo_mapping_overrides.clone(),
+    }))
+}
+
+pub async fn extension_spokes_identity_for_workspace(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: &crate::WorkspaceId,
+    extension_id: &str,
+) -> slug_error::Result<Option<Arc<ExtensionSpokesIdentityValue>>> {
+    let aggregation = ctx
+        .compute(&BzlmodExtensionAggregationKey {
+            workspace_id: workspace_id.clone(),
+            extension_id: Arc::from(extension_id),
+        })
+        .await??;
+    let Some(aggregation) = aggregation else {
+        return Ok(None);
+    };
+    let bzl_transitive_digest = ctx
+        .compute(&ExtensionBzlTransitiveDigestKey {
+            workspace_id: workspace_id.clone(),
+            extension_id: Arc::from(extension_id),
+            allow_missing_loads: false,
+        })
+        .await??;
+    Ok(Some(
+        extension_spokes_identity_for_aggregation(
+            ctx,
+            workspace_id,
+            aggregation.as_ref(),
+            bzl_transitive_digest.as_ref(),
+        )
+        .await?,
+    ))
+}
+
+async fn extension_spokes_key_for_aggregation(
+    ctx: &mut DiceComputations<'_>,
+    workspace_id: &crate::WorkspaceId,
+    aggregation: &BzlmodExtensionAggregationValue,
+    bzl_transitive_digest: &ExtensionBzlTransitiveDigestValue,
+) -> slug_error::Result<ExtensionSpokesKey> {
+    let identity = extension_spokes_identity_for_aggregation(
+        ctx,
+        workspace_id,
+        aggregation,
+        bzl_transitive_digest,
+    )
+    .await?;
+    Ok(ExtensionSpokesKey::for_workspace_id_with_inputs(
+        workspace_id.clone(),
+        identity.extension_id.as_ref(),
+        identity.bzl_transitive_digest.as_ref(),
+        identity.usages_digest.as_ref(),
+        identity.root_module_name.as_ref(),
+        identity.replay_inputs_identity_digest.as_ref(),
+        identity.aggregated.clone(),
+        identity.repo_env.clone(),
+        identity.repo_mappings.clone(),
+        identity.repo_mapping_overrides.clone(),
+    ))
 }
 
 #[async_trait]
@@ -617,9 +729,9 @@ impl Key for ExtensionSpokesByExtensionIdKey {
                 extension_id: self.extension_id.clone(),
             })
             .await??;
-        if aggregation.is_none() {
+        let Some(aggregation) = aggregation else {
             return Ok(None);
-        }
+        };
         let bzl_transitive_digest = ctx
             .compute(&ExtensionBzlTransitiveDigestKey {
                 workspace_id: self.workspace_id.clone(),
@@ -627,11 +739,13 @@ impl Key for ExtensionSpokesByExtensionIdKey {
                 allow_missing_loads: false,
             })
             .await??;
-        let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
-            self.workspace_id.clone(),
-            &self.extension_id,
-            bzl_transitive_digest.digest(),
-        );
+        let spokes_key = extension_spokes_key_for_aggregation(
+            ctx,
+            &self.workspace_id,
+            aggregation.as_ref(),
+            bzl_transitive_digest.as_ref(),
+        )
+        .await?;
 
         match ctx.compute(&spokes_key).await {
             Ok(Ok(spokes)) => Ok(Some(spokes)),
@@ -652,8 +766,8 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        optional_extension_spokes_validity(x)
+    fn validity(_x: &Self::Value) -> bool {
+        false
     }
 }
 
@@ -721,11 +835,22 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
                 allow_missing_loads: false,
             })
             .await??;
-        let spokes_key = ExtensionSpokesKey::for_workspace_id_with_digest(
-            self.workspace_id.clone(),
-            extension_id.as_ref(),
-            bzl_transitive_digest.digest(),
-        );
+        let aggregation = ctx
+            .compute(&BzlmodExtensionAggregationKey {
+                workspace_id: self.workspace_id.clone(),
+                extension_id,
+            })
+            .await??;
+        let Some(aggregation) = aggregation else {
+            return Ok(None);
+        };
+        let spokes_key = extension_spokes_key_for_aggregation(
+            ctx,
+            &self.workspace_id,
+            aggregation.as_ref(),
+            bzl_transitive_digest.as_ref(),
+        )
+        .await?;
 
         match ctx.compute(&spokes_key).await {
             Ok(Ok(spokes)) => Ok(Some(spokes)),
@@ -746,8 +871,8 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        optional_extension_spokes_validity(x)
+    fn validity(_x: &Self::Value) -> bool {
+        false
     }
 }
 
@@ -760,57 +885,54 @@ impl Key for ExtensionSpokesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let aggregation = ctx
-            .compute(&BzlmodExtensionAggregationKey {
-                workspace_id: self.workspace_id.clone(),
-                extension_id: self.extension_id.clone(),
-            })
-            .await??;
-        let Some(aggregation) = aggregation else {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "Extension '{}' not found while computing generated repo spokes",
-                self.extension_id
-            ));
+        let aggregation = BzlmodExtensionAggregationValue {
+            workspace_id: self.workspace_id.clone(),
+            extension_id: self.extension_id.clone(),
+            aggregated: self.aggregated.clone(),
+            root_module_name: self.root_module_name.clone(),
         };
-        let repo_mappings = ctx
-            .compute(&BzlmodRepoMappingsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
-        let repo_env = ctx
-            .compute(&BzlmodRepoEnvKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
-        ensure_extension_aggregation_workspace(
-            &self.workspace_id,
-            aggregation.as_ref(),
-            "ExtensionSpokesKey",
-            &self.extension_id,
-        )?;
+        let usages_digest = compute_extension_input_hash(aggregation.aggregated.as_ref());
+        if !self.usages_digest.is_empty() && self.usages_digest.as_ref() != usages_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "Extension '{}' aggregation digest changed while computing generated repo spokes: expected {}, got {}",
+                self.extension_id,
+                self.usages_digest,
+                usages_digest
+            ));
+        }
         let replay_inputs = ctx
             .compute(&ModuleExtensionReplayInputsKey {
                 workspace_id: self.workspace_id.clone(),
                 extension_id: self.extension_id.clone(),
                 bzl_transitive_digest: self.bzl_transitive_digest.clone(),
-                usages_digest: Arc::from(
-                    compute_extension_input_hash(aggregation.aggregated.as_ref()).as_str(),
-                ),
+                usages_digest: Arc::from(usages_digest.as_str()),
                 project_root: Some(Arc::new(
                     self.workspace_id.canonical_project_root.as_ref().clone(),
                 )),
-                root_module_name: aggregation.root_module_name.clone(),
-                repo_env: repo_env.clone(),
-                repo_mappings: repo_mappings.repo_mappings.clone(),
-                repo_mapping_overrides: repo_mappings.repo_mapping_overrides.clone(),
+                root_module_name: self.root_module_name.clone(),
+                repo_env: self.repo_env.clone(),
+                repo_mappings: self.repo_mappings.clone(),
+                repo_mapping_overrides: self.repo_mapping_overrides.clone(),
             })
             .await??;
+        if !self.replay_inputs_identity_digest.is_empty()
+            && self.replay_inputs_identity_digest.as_ref() != replay_inputs.identity_digest()
+        {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "Extension '{}' replay input digest changed while computing generated repo spokes: expected {}, got {}",
+                self.extension_id,
+                self.replay_inputs_identity_digest,
+                replay_inputs.identity_digest()
+            ));
+        }
         let extension_key = create_extension_execution_key_from_aggregation(
-            aggregation.as_ref(),
-            repo_env.as_ref(),
+            &aggregation,
+            self.repo_env.as_ref(),
             replay_inputs,
-            repo_mappings.as_ref(),
+            self.repo_mappings.as_ref(),
+            self.repo_mapping_overrides.as_ref(),
             self.bzl_transitive_digest.clone(),
         );
         record_bzlmod_event(
@@ -854,8 +976,17 @@ impl Key for ExtensionSpokesKey {
             workspace_id: self.workspace_id.clone(),
             extension_id: self.extension_id.clone(),
             bzl_transitive_digest: self.bzl_transitive_digest.clone(),
+            usages_digest: self.usages_digest.clone(),
+            replay_inputs_identity_digest: self.replay_inputs_identity_digest.clone(),
+            repo_mappings_digest: Arc::from(
+                repo_mappings_identity_digest(self.repo_mappings.as_ref()).as_str(),
+            ),
+            repo_mapping_overrides_digest: Arc::from(
+                repo_mapping_overrides_identity_digest(self.repo_mapping_overrides.as_ref())
+                    .as_str(),
+            ),
             project_root: self.workspace_id.canonical_project_root.clone(),
-            repo_env: repo_env.clone(),
+            repo_env: self.repo_env.clone(),
             spokes,
             recorded_inputs: Arc::new(result.recorded_inputs.clone()),
             recorded_input_workspace_root: result.recorded_input_context.workspace_root.clone(),
@@ -872,10 +1003,9 @@ impl Key for ExtensionSpokesKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(spokes) => extension_spokes_recorded_inputs_current(spokes.as_ref()),
-            Err(_) => false,
-        }
+        x.as_ref()
+            .map(|spokes| spokes.recorded_inputs_current())
+            .unwrap_or(false)
     }
 }
 
@@ -2730,7 +2860,7 @@ mod tests {
     }
 
     #[test]
-    fn extension_spokes_lookup_keys_cache_after_digest_dependency() {
+    fn extension_spokes_lookup_keys_recompute_replay_inputs() {
         let missing_extension: slug_error::Result<Option<Arc<ExtensionSpokesValue>>> = Ok(None);
         let failed_lookup: slug_error::Result<Option<Arc<ExtensionSpokesValue>>> = Err(
             slug_error::slug_error!(slug_error::ErrorTag::Tier0, "lookup failed"),
@@ -2771,10 +2901,10 @@ mod tests {
         assert!(!<ExtensionIdByCanonicalRepoKey as Key>::validity(
             &failed_canonical_owner
         ));
-        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &missing_extension
         ));
-        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &missing_extension
         ));
         assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
@@ -3159,7 +3289,8 @@ mod tests {
             &aggregation,
             &repo_env,
             replay_inputs,
-            &repo_mappings,
+            repo_mappings.repo_mappings.as_ref(),
+            repo_mappings.repo_mapping_overrides.as_ref(),
             Arc::from("digest-from-dice-key"),
         );
 
@@ -3350,7 +3481,7 @@ mod tests {
     }
 
     #[test]
-    fn extension_spokes_validity_rejects_fresh_recorded_input_edit() {
+    fn extension_spokes_validity_rechecks_replay_inputs() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let watched = temp_dir.path().join("watched.txt");
         std::fs::write(&watched, "first\n").unwrap();
@@ -3359,6 +3490,10 @@ mod tests {
             workspace_id: workspace_id.clone(),
             extension_id: Arc::from("@@root//:ext.bzl%ext"),
             bzl_transitive_digest: Arc::from("digest"),
+            usages_digest: Arc::from("usages"),
+            replay_inputs_identity_digest: Arc::from("replay"),
+            repo_mappings_digest: Arc::from("repo-mappings"),
+            repo_mapping_overrides_digest: Arc::from("repo-mapping-overrides"),
             project_root: workspace_id.canonical_project_root.clone(),
             repo_env: Arc::new(BTreeMap::new()),
             spokes: BTreeMap::new(),
@@ -3376,10 +3511,10 @@ mod tests {
         let optional_value = Ok(Some(value.as_ref().unwrap().clone()));
 
         assert!(<ExtensionSpokesKey as Key>::validity(&value));
-        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &optional_value
         ));
-        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &optional_value
         ));
 

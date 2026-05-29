@@ -131,6 +131,15 @@ pub struct ExtensionRepoCellSetup {
     /// JSON-serialized repository environment captured when this generated
     /// repository cell was registered.
     pub repo_env_json: Arc<str>,
+    /// Digest of the aggregated module-extension usages that produced this
+    /// setup.
+    pub extension_usages_digest: Arc<str>,
+    /// Digest of the DICE-selected replay inputs that produced this setup.
+    pub extension_replay_inputs_identity_digest: Arc<str>,
+    /// Digest of the repository mapping snapshot used for extension execution.
+    pub extension_repo_mappings_digest: Arc<str>,
+    /// Digest of the root override_repo rows used for extension execution.
+    pub extension_repo_mapping_overrides_digest: Arc<str>,
     /// Digest of the module extension implementation load graph that produced
     /// this setup.
     pub extension_bzl_transitive_digest: Arc<str>,

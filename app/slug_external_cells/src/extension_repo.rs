@@ -452,6 +452,10 @@ async fn ensure_extension_spokes_registered(
             extension_id,
             spoke,
             &spokes.repo_env,
+            spokes.usages_digest.as_ref(),
+            spokes.replay_inputs_identity_digest.as_ref(),
+            spokes.repo_mappings_digest.as_ref(),
+            spokes.repo_mapping_overrides_digest.as_ref(),
             spokes.bzl_transitive_digest.as_ref(),
             spokes.recorded_inputs(),
         );
@@ -495,6 +499,10 @@ fn extension_repo_cell_setup_from_spoke(
     extension_id: &str,
     spoke: &slug_bzlmod::ExtensionSpoke,
     repo_env: &std::collections::BTreeMap<String, String>,
+    extension_usages_digest: &str,
+    extension_replay_inputs_identity_digest: &str,
+    extension_repo_mappings_digest: &str,
+    extension_repo_mapping_overrides_digest: &str,
     extension_bzl_transitive_digest: &str,
     extension_recorded_inputs: &[String],
 ) -> ExtensionRepoCellSetup {
@@ -508,6 +516,14 @@ fn extension_repo_cell_setup_from_spoke(
             serde_json::to_string(repo_env)
                 .unwrap_or_else(|_| "{}".to_owned())
                 .as_str(),
+        ),
+        extension_usages_digest: std::sync::Arc::from(extension_usages_digest),
+        extension_replay_inputs_identity_digest: std::sync::Arc::from(
+            extension_replay_inputs_identity_digest,
+        ),
+        extension_repo_mappings_digest: std::sync::Arc::from(extension_repo_mappings_digest),
+        extension_repo_mapping_overrides_digest: std::sync::Arc::from(
+            extension_repo_mapping_overrides_digest,
         ),
         extension_bzl_transitive_digest: std::sync::Arc::from(extension_bzl_transitive_digest),
         extension_recorded_inputs_json: std::sync::Arc::from(
@@ -624,21 +640,38 @@ async fn setup_extension_inputs_current(
     ctx: &mut DiceComputations<'_>,
     workspace_id: &slug_bzlmod::WorkspaceId,
     setup: &ExtensionRepoCellSetup,
-    project_root: &std::path::Path,
-    repo_env: Arc<std::collections::BTreeMap<String, String>>,
-    repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
 ) -> slug_error::Result<bool> {
-    if setup.repo_spec_json.is_empty() || setup.extension_bzl_transitive_digest.is_empty() {
+    if setup.repo_spec_json.is_empty()
+        || setup.extension_bzl_transitive_digest.is_empty()
+        || setup.extension_usages_digest.is_empty()
+        || setup.extension_replay_inputs_identity_digest.is_empty()
+        || setup.extension_repo_mappings_digest.is_empty()
+        || setup.extension_repo_mapping_overrides_digest.is_empty()
+    {
         return Ok(false);
     }
-    let current_digest = ctx
-        .compute(&slug_bzlmod::ExtensionBzlTransitiveDigestKey {
-            workspace_id: workspace_id.clone(),
-            extension_id: setup.extension_id.clone(),
-            allow_missing_loads: false,
-        })
-        .await??;
-    if current_digest.digest() != setup.extension_bzl_transitive_digest.as_ref() {
+
+    let Some(identity) = slug_bzlmod::extension_spokes_identity_for_workspace(
+        ctx,
+        workspace_id,
+        setup.extension_id.as_ref(),
+    )
+    .await?
+    else {
+        return Ok(false);
+    };
+    if identity.bzl_transitive_digest.as_ref() != setup.extension_bzl_transitive_digest.as_ref()
+        || identity.usages_digest.as_ref() != setup.extension_usages_digest.as_ref()
+        || identity.replay_inputs_identity_digest.as_ref()
+            != setup.extension_replay_inputs_identity_digest.as_ref()
+        || identity.repo_env_json.as_ref() != setup.repo_env_json.as_ref()
+        || identity.repo_mappings_digest.as_ref() != setup.extension_repo_mappings_digest.as_ref()
+        || identity.repo_mapping_overrides_digest.as_ref()
+            != setup.extension_repo_mapping_overrides_digest.as_ref()
+    {
+        return Ok(false);
+    }
+    if identity.replay_inputs_have_facts {
         return Ok(false);
     }
 
@@ -656,9 +689,11 @@ async fn setup_extension_inputs_current(
     };
     let recorded_inputs_key = slug_bzlmod::ModuleExtensionRecordedInputsKey::new(
         recorded_inputs,
-        Some(Arc::new(project_root.to_path_buf())),
-        Some(repo_env),
-        Some(repo_mappings),
+        Some(Arc::new(
+            workspace_id.canonical_project_root.as_ref().clone(),
+        )),
+        Some(identity.repo_env.clone()),
+        Some(identity.repo_mappings.clone()),
     );
     match ctx.compute(&recorded_inputs_key).await? {
         Ok(()) => Ok(true),
@@ -713,15 +748,8 @@ pub(crate) async fn get_file_ops_delegate(
     let repo_mappings =
         repo_mappings_for_extension_repo_execution(ctx, &extension_lookup_workspace_id, &setup)
             .await?;
-    let setup_inputs_current = setup_extension_inputs_current(
-        ctx,
-        &extension_lookup_workspace_id,
-        &setup,
-        project_root.root().as_path(),
-        repo_env.clone(),
-        repo_mappings.clone(),
-    )
-    .await?;
+    let setup_inputs_current =
+        setup_extension_inputs_current(ctx, &extension_lookup_workspace_id, &setup).await?;
     let registered_spokes = if setup_inputs_current {
         None
     } else {
@@ -1249,6 +1277,10 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from(r#"{"TOKEN":"stale"}"#),
+            extension_usages_digest: Arc::from(""),
+            extension_replay_inputs_identity_digest: Arc::from(""),
+            extension_repo_mappings_digest: Arc::from(""),
+            extension_repo_mapping_overrides_digest: Arc::from(""),
             extension_bzl_transitive_digest: Arc::from(""),
             extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
@@ -1303,6 +1335,10 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_usages_digest: Arc::from(""),
+            extension_replay_inputs_identity_digest: Arc::from(""),
+            extension_repo_mappings_digest: Arc::from(""),
+            extension_repo_mapping_overrides_digest: Arc::from(""),
             extension_bzl_transitive_digest: Arc::from(""),
             extension_recorded_inputs_json: Arc::from(""),
             materialized: true,
@@ -1419,6 +1455,10 @@ mod tests {
             spec_hash: Arc::from(""),
             repo_spec_json: Arc::from(""),
             repo_env_json: Arc::from(""),
+            extension_usages_digest: Arc::from(""),
+            extension_replay_inputs_identity_digest: Arc::from(""),
+            extension_repo_mappings_digest: Arc::from(""),
+            extension_repo_mapping_overrides_digest: Arc::from(""),
             extension_bzl_transitive_digest: Arc::from(""),
             extension_recorded_inputs_json: Arc::from(""),
             materialized: false,

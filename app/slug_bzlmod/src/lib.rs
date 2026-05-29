@@ -181,6 +181,7 @@ pub use dice_graph::resolved_graph_projection_values;
 pub use dice_graph::resolved_module_sources_from_graph;
 pub use dice_graph::selected_bzlmod_cell_name_for_dep;
 pub use extension_execution_dice::BzlLoadLocation;
+pub use extension_execution_dice::ExtensionSpokesIdentityValue;
 pub use extension_execution_dice::ModuleExtensionError;
 pub use extension_execution_dice::ModuleExtensionExecutionKey;
 pub use extension_execution_dice::ModuleExtensionRecordedInputsKey;
@@ -189,10 +190,13 @@ pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::compute_bzl_transitive_digest_from_file_contents;
 pub use extension_execution_dice::compute_bzl_transitive_digest_from_file_states;
 pub use extension_execution_dice::extension_bzl_location_under_project;
+pub use extension_execution_dice::extension_spokes_identity_for_workspace;
 pub use extension_execution_dice::extract_extension_name;
 pub use extension_execution_dice::extract_owning_module;
 pub use extension_execution_dice::label_bzl_location_under_project;
 pub use extension_execution_dice::literal_loads;
+pub use extension_execution_dice::repo_mapping_overrides_identity_digest;
+pub use extension_execution_dice::repo_mappings_identity_digest;
 pub use extension_execution_dice::selected_cache_recorded_inputs_current;
 pub use extensions::AggregatedExtension;
 pub use extensions::ExtensionResult;
@@ -662,6 +666,13 @@ pub async fn bzlmod_cell_graph_for_current_workspace(
 ) -> slug_error::Result<Arc<BzlmodCellGraphValue>> {
     let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
     bzlmod_cell_graph_for_workspace_id(ctx, current.workspace_id.clone()).await
+}
+
+pub async fn bzlmod_resolution_digest_for_current_workspace(
+    ctx: &mut dice::DiceComputations<'_>,
+) -> slug_error::Result<Arc<str>> {
+    let current = ctx.compute(&BzlmodCurrentCellGraphKey).await??;
+    Ok(current.resolution_digest.clone())
 }
 
 pub async fn bzlmod_cell_graph_for_workspace_id(
