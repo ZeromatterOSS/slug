@@ -27,6 +27,7 @@ use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use static_assertions::assert_eq_size;
 use strong_hash::StrongHash;
 
+use crate::cells::name::CellName;
 use crate::content_hash::ContentBasedPathHash;
 use crate::fs::buck_out_path::BuckOutPathKind;
 use crate::fs::project_rel_path::ProjectRelativePath;
@@ -164,6 +165,7 @@ impl BaseDeferredKey {
         fully_hash_path: bool,
         path_resolution_method: BuckOutPathKind,
         content_hash: Option<&ContentBasedPathHash>,
+        root_cell_name: Option<CellName>,
     ) -> slug_error::Result<ProjectRelativePathBuf> {
         match self {
             BaseDeferredKey::TargetLabel(target) => {
@@ -199,7 +201,10 @@ impl BaseDeferredKey {
 
                 if matches!(path_resolution_method, BuckOutPathKind::BazelOutput) {
                     let cell_name_str = target.pkg().cell_name().as_str();
-                    let is_root = crate::cells::is_root_cell_name(cell_name_str);
+                    let is_root = root_cell_name
+                        .is_some_and(|root| target.pkg().cell_name() == root)
+                        || (root_cell_name.is_none()
+                            && crate::cells::is_root_cell_name(cell_name_str));
                     let output_cell_name = bazel_output_cell_name(cell_name_str);
                     let path_has_external_prefix =
                         has_bazel_external_prefix(path, &output_cell_name);
@@ -460,6 +465,7 @@ mod tests {
             ForwardRelativePath::unchecked_new("out.txt"),
             false,
             BuckOutPathKind::Configuration,
+            None,
             None,
         )?;
 

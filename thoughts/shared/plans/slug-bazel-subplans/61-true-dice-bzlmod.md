@@ -1932,6 +1932,12 @@ hardening behavior around it.
      generic callers, but the bzlmod cell-graph path uses graph-owned root
      identity. Validation: focused `slug_core` symlink test plus affected-crate
      checks.
+   - 2026-05-29 output-path root-adapter reduction: `ArtifactFs` now installs the
+     active `CellResolver` root cell on `BuckOutPathResolver`, and
+     `BazelOutput` path formatting uses that resolver-owned root identity before
+     falling back to the legacy process-global root helper for generic callers.
+     Guardrail: `cargo test -p slug_core
+     artifact_fs_bazel_output_uses_resolver_root_cell --lib -- --nocapture`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

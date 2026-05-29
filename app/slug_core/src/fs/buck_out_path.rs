@@ -22,6 +22,7 @@ use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
 use crate::category::CategoryRef;
 use crate::cells::external::ExternalCellOrigin;
+use crate::cells::name::CellName;
 use crate::cells::paths::CellRelativePath;
 use crate::content_hash::ContentBasedPathHash;
 use crate::deferred::base_deferred_key::BaseDeferredKey;
@@ -282,13 +283,22 @@ impl BuckOutTestPath {
 #[derive(Clone, Allocative)]
 pub struct BuckOutPathResolver {
     buck_out_v2: ProjectRelativePathBuf,
+    root_cell_name: Option<CellName>,
 }
 
 impl BuckOutPathResolver {
     /// creates a 'BuckOutPathResolver' that will resolve outputs to the provided buck-out root.
     /// If not set, buck_out defaults to "buck-out/v2"
     pub fn new(buck_out_v2: ProjectRelativePathBuf) -> Self {
-        BuckOutPathResolver { buck_out_v2 }
+        BuckOutPathResolver {
+            buck_out_v2,
+            root_cell_name: None,
+        }
+    }
+
+    pub fn with_root_cell_name(mut self, root_cell_name: CellName) -> Self {
+        self.root_cell_name = Some(root_cell_name);
+        self
     }
 
     /// Returns the buck-out root.
@@ -491,6 +501,7 @@ impl BuckOutPathResolver {
             fully_hash_path,
             path_resolution_method,
             content_hash,
+            self.root_cell_name,
         )
     }
 
@@ -521,6 +532,7 @@ mod tests {
     use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
     use crate::category::CategoryRef;
+    use crate::cells::BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK;
     use crate::cells::CellResolver;
     use crate::cells::cell_root_path::CellRootPathBuf;
     use crate::cells::name::CellName;
@@ -653,6 +665,55 @@ mod tests {
         assert!(
             expected_scratch_path.is_match(resolved_scratch_path.as_str()),
             "{expected_scratch_path}.is_match({resolved_scratch_path})"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn artifact_fs_bazel_output_uses_resolver_root_cell() -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let root_cell = CellName::testing_new("actual_root");
+        let resolver =
+            CellResolver::testing_with_name_and_path(root_cell, CellRootPathBuf::testing_new(""));
+        let _stale_global_resolver = CellResolver::testing_with_name_and_path(
+            CellName::testing_new("stale_root"),
+            CellRootPathBuf::testing_new(""),
+        );
+        let artifact_fs = ArtifactFs::new(
+            resolver,
+            BuckOutPathResolver::new(ProjectRelativePathBuf::unchecked_new("buck-out".into())),
+            ProjectRoot::new_unchecked(
+                AbsNormPathBuf::new(
+                    Path::new(if cfg!(windows) {
+                        "C:\\project"
+                    } else {
+                        "/project"
+                    })
+                    .to_owned(),
+                )
+                .unwrap(),
+            ),
+        );
+
+        let pkg = PackageLabel::new(root_cell, CellRelativePath::unchecked_new("pkg"))?;
+        let target = TargetLabel::new(pkg, TargetNameRef::unchecked_new("target-name"));
+        let cfg_target = target.configure(ConfigurationData::testing_new());
+        let owner = BaseDeferredKey::TargetLabel(cfg_target);
+
+        let resolved = artifact_fs.resolve_build(
+            &BuildArtifactPath::new(
+                owner,
+                ForwardRelativePathBuf::unchecked_new("out.h".to_owned()),
+                BuckOutPathKind::BazelOutput,
+            ),
+            None,
+        )?;
+
+        assert!(resolved.as_str().starts_with("buck-out/gen/actual_root/"));
+        assert!(resolved.as_str().ends_with("/pkg/out.h"), "{resolved}");
+        assert!(
+            !resolved.as_str().contains("/external/actual_root/"),
+            "{resolved}"
         );
         Ok(())
     }

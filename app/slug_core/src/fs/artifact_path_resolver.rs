@@ -32,6 +32,8 @@ impl ArtifactFs {
         buck_out_path_resolver: BuckOutPathResolver,
         project_filesystem: ProjectRoot,
     ) -> Self {
+        let buck_out_path_resolver =
+            buck_out_path_resolver.with_root_cell_name(buck_path_resolver.root_cell());
         Self {
             cell_resolver: buck_path_resolver,
             buck_out_path_resolver,
