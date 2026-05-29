@@ -329,9 +329,10 @@ pub trait SetBzlmodDiceInputs {
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<()> {
         let resolution_digest = empty_bzlmod_cell_graph_resolution_digest();
-        self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+        self.set_bzlmod_projection_data_with_inputs_digest_and_resolved_graph(
             resolution_digest.clone(),
-            BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone()),
+            workspace_id.clone(),
+            String::new(),
             None,
             BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
@@ -373,6 +374,23 @@ pub trait SetBzlmodDiceInputs {
         )
     }
 
+    fn set_bzlmod_projection_data_with_inputs_digest_and_resolved_graph(
+        &mut self,
+        cell_graph_resolution_digest: Arc<str>,
+        workspace_id: WorkspaceId,
+        root_module_name: String,
+        resolved_graph: Option<Arc<ResolvedGraph>>,
+        module_versions: BzlmodModuleVersionsDataValue,
+        lockfile_inputs: BzlmodLockfileInputsDataValue,
+        repo_env: BzlmodRepoEnvDataValue,
+        registered_toolchains: RegisteredToolchainsDataValue,
+        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+        extension_aggregations: BzlmodExtensionAggregationsDataValue,
+        resolution_facts: BzlmodResolutionFactsValue,
+        repo_mappings: BzlmodRepoMappingsDataValue,
+    ) -> slug_error::Result<()>;
+
+    #[cfg(test)]
     fn set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
         &mut self,
         cell_graph_resolution_digest: Arc<str>,
@@ -447,7 +465,217 @@ fn validate_projection_resolution_digest(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn set_bzlmod_projection_data_with_inputs(
+    updater: &mut dice::DiceTransactionUpdater,
+    cell_graph_resolution_digest: Arc<str>,
+    workspace_id: WorkspaceId,
+    root_module_name: String,
+    resolved_graph: Option<Arc<ResolvedGraph>>,
+    fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
+    module_versions: BzlmodModuleVersionsDataValue,
+    lockfile_inputs: BzlmodLockfileInputsDataValue,
+    repo_env: BzlmodRepoEnvDataValue,
+    registered_toolchains: RegisteredToolchainsDataValue,
+    registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+    extension_aggregations: BzlmodExtensionAggregationsDataValue,
+    resolution_facts: BzlmodResolutionFactsValue,
+    repo_mappings: BzlmodRepoMappingsDataValue,
+) -> slug_error::Result<()> {
+    validate_cell_graph_workspace(
+        "module-version data",
+        &workspace_id,
+        &module_versions.workspace_id,
+    )?;
+    validate_cell_graph_root_module_name(
+        "module-version data",
+        &root_module_name,
+        &module_versions.root_module_name,
+    )?;
+    validate_cell_graph_workspace(
+        "registered-toolchain data",
+        &workspace_id,
+        &registered_toolchains.workspace_id,
+    )?;
+    validate_cell_graph_workspace(
+        "registered-execution-platform data",
+        &workspace_id,
+        &registered_execution_platforms.workspace_id,
+    )?;
+    validate_cell_graph_workspace(
+        "extension-aggregation data",
+        &workspace_id,
+        &extension_aggregations.workspace_id,
+    )?;
+    validate_cell_graph_root_module_name(
+        "extension-aggregation data",
+        &root_module_name,
+        &extension_aggregations.root_module_name,
+    )?;
+    validate_cell_graph_workspace(
+        "lockfile-input data",
+        &workspace_id,
+        &lockfile_inputs.workspace_id,
+    )?;
+    validate_cell_graph_workspace("repo-env data", &workspace_id, &repo_env.workspace_id)?;
+    validate_cell_graph_workspace(
+        "resolution-facts data",
+        &workspace_id,
+        &resolution_facts.workspace_id,
+    )?;
+    validate_cell_graph_workspace(
+        "repo-mapping data",
+        &workspace_id,
+        &repo_mappings.workspace_id,
+    )?;
+    validate_projection_resolution_digest(
+        "module-version data",
+        &cell_graph_resolution_digest,
+        module_versions.resolution_digest.as_ref(),
+    )?;
+    validate_projection_resolution_digest(
+        "registered-toolchain data",
+        &cell_graph_resolution_digest,
+        registered_toolchains.resolution_digest.as_ref(),
+    )?;
+    validate_projection_resolution_digest(
+        "registered-execution-platform data",
+        &cell_graph_resolution_digest,
+        registered_execution_platforms.resolution_digest.as_ref(),
+    )?;
+    validate_projection_resolution_digest(
+        "extension-aggregation data",
+        &cell_graph_resolution_digest,
+        extension_aggregations.resolution_digest.as_ref(),
+    )?;
+    validate_projection_resolution_digest(
+        "lockfile-input data",
+        &cell_graph_resolution_digest,
+        lockfile_inputs.resolution_digest.as_ref(),
+    )?;
+    validate_projection_resolution_digest(
+        "repo-env data",
+        &cell_graph_resolution_digest,
+        repo_env.resolution_digest.as_ref(),
+    )?;
+    validate_projection_resolution_digest(
+        "resolution-facts data",
+        &cell_graph_resolution_digest,
+        resolution_facts.resolution_digest.as_ref(),
+    )?;
+    validate_projection_resolution_digest(
+        "repo-mapping data",
+        &cell_graph_resolution_digest,
+        repo_mappings.resolution_digest.as_ref(),
+    )?;
+
+    let lockfile_inputs_data = Arc::new(lockfile_inputs);
+    let repo_env_data = Arc::new(repo_env);
+    let module_versions = Arc::new(module_versions);
+    let resolution_facts = Arc::new(resolution_facts);
+    let repo_mappings = Arc::new(repo_mappings);
+    let extension_aggregations = Arc::new(extension_aggregations);
+    #[cfg(not(test))]
+    let is_empty_cell_graph =
+        cell_graph_resolution_digest.as_ref() == dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST;
+    #[cfg(not(test))]
+    if !is_empty_cell_graph && resolved_graph.is_none() {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "Bzlmod cell graph setup requires resolved-graph provenance"
+        ));
+    }
+    #[cfg(not(test))]
+    if resolved_graph.is_some() && MODULE_EXTENSION_EXECUTOR_IMPL.get().is_err() {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "Bzlmod clean cell graph setup requires the module extension executor"
+        ));
+    }
+    #[cfg(not(test))]
+    let _ = fallback_cell_graph;
+    #[cfg(test)]
+    let cell_graph_data = fallback_cell_graph.map(|fallback_cell_graph| {
+        Arc::new(
+            BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
+                workspace_id.clone(),
+                cell_graph_resolution_digest.clone(),
+                Some(fallback_cell_graph),
+            ),
+        )
+    });
+    let module_sources = Arc::new(BzlmodModuleSourcesDataValue::for_workspace(
+        workspace_id.clone(),
+        cell_graph_resolution_digest,
+        Arc::new(
+            resolved_graph
+                .as_deref()
+                .map(resolved_module_sources_from_graph)
+                .unwrap_or_default(),
+        ),
+    ));
+    let registered_toolchains = Arc::new(registered_toolchains);
+    let registered_execution_platforms = Arc::new(registered_execution_platforms);
+    updater.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
+    updater.changed_to(vec![(
+        BzlmodRegisteredToolchainsDataKey,
+        registered_toolchains,
+    )])?;
+    updater.changed_to(vec![(
+        BzlmodRegisteredExecutionPlatformsDataKey,
+        registered_execution_platforms,
+    )])?;
+    updater.changed_to(vec![(BzlmodRepoMappingsDataKey, repo_mappings)])?;
+    updater.changed_to(vec![(BzlmodLockfileInputsDataKey, lockfile_inputs_data)])?;
+    updater.changed_to(vec![(BzlmodRepoEnvDataKey, repo_env_data)])?;
+    updater.changed_to(vec![(BzlmodResolutionFactsDataKey, resolution_facts)])?;
+    updater.changed_to(vec![(
+        BzlmodExtensionAggregationsDataKey,
+        extension_aggregations,
+    )])?;
+    #[cfg(test)]
+    if let Some(cell_graph_data) = cell_graph_data {
+        updater.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
+    }
+    updater.changed_to(vec![(BzlmodModuleSourcesDataKey, module_sources)])?;
+    Ok(())
+}
+
 impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
+    fn set_bzlmod_projection_data_with_inputs_digest_and_resolved_graph(
+        &mut self,
+        cell_graph_resolution_digest: Arc<str>,
+        workspace_id: WorkspaceId,
+        root_module_name: String,
+        resolved_graph: Option<Arc<ResolvedGraph>>,
+        module_versions: BzlmodModuleVersionsDataValue,
+        lockfile_inputs: BzlmodLockfileInputsDataValue,
+        repo_env: BzlmodRepoEnvDataValue,
+        registered_toolchains: RegisteredToolchainsDataValue,
+        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+        extension_aggregations: BzlmodExtensionAggregationsDataValue,
+        resolution_facts: BzlmodResolutionFactsValue,
+        repo_mappings: BzlmodRepoMappingsDataValue,
+    ) -> slug_error::Result<()> {
+        set_bzlmod_projection_data_with_inputs(
+            self,
+            cell_graph_resolution_digest,
+            workspace_id,
+            root_module_name,
+            resolved_graph,
+            None,
+            module_versions,
+            lockfile_inputs,
+            repo_env,
+            registered_toolchains,
+            registered_execution_platforms,
+            extension_aggregations,
+            resolution_facts,
+            repo_mappings,
+        )
+    }
+
+    #[cfg(test)]
     fn set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
         &mut self,
         cell_graph_resolution_digest: Arc<str>,
@@ -462,175 +690,31 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
         resolution_facts: BzlmodResolutionFactsValue,
         repo_mappings: BzlmodRepoMappingsDataValue,
     ) -> slug_error::Result<()> {
-        let cell_graph_workspace_id = &cell_graph.workspace_id;
-        validate_cell_graph_workspace(
-            "module-version data",
-            cell_graph_workspace_id,
-            &module_versions.workspace_id,
-        )?;
-        validate_cell_graph_root_module_name(
-            "module-version data",
-            &cell_graph.root_module_name,
-            &module_versions.root_module_name,
-        )?;
-        validate_cell_graph_workspace(
-            "registered-toolchain data",
-            cell_graph_workspace_id,
-            &registered_toolchains.workspace_id,
-        )?;
-        validate_cell_graph_workspace(
-            "registered-execution-platform data",
-            cell_graph_workspace_id,
-            &registered_execution_platforms.workspace_id,
-        )?;
-        validate_cell_graph_workspace(
-            "extension-aggregation data",
-            cell_graph_workspace_id,
-            &extension_aggregations.workspace_id,
-        )?;
-        validate_cell_graph_root_module_name(
-            "extension-aggregation data",
-            &cell_graph.root_module_name,
-            &extension_aggregations.root_module_name,
-        )?;
-        validate_cell_graph_workspace(
-            "lockfile-input data",
-            cell_graph_workspace_id,
-            &lockfile_inputs.workspace_id,
-        )?;
-        validate_cell_graph_workspace(
-            "repo-env data",
-            cell_graph_workspace_id,
-            &repo_env.workspace_id,
-        )?;
-        validate_cell_graph_workspace(
-            "resolution-facts data",
-            cell_graph_workspace_id,
-            &resolution_facts.workspace_id,
-        )?;
-        validate_cell_graph_workspace(
-            "repo-mapping data",
-            cell_graph_workspace_id,
-            &repo_mappings.workspace_id,
-        )?;
-        validate_projection_resolution_digest(
-            "module-version data",
-            &cell_graph_resolution_digest,
-            module_versions.resolution_digest.as_ref(),
-        )?;
-        validate_projection_resolution_digest(
-            "registered-toolchain data",
-            &cell_graph_resolution_digest,
-            registered_toolchains.resolution_digest.as_ref(),
-        )?;
-        validate_projection_resolution_digest(
-            "registered-execution-platform data",
-            &cell_graph_resolution_digest,
-            registered_execution_platforms.resolution_digest.as_ref(),
-        )?;
-        validate_projection_resolution_digest(
-            "extension-aggregation data",
-            &cell_graph_resolution_digest,
-            extension_aggregations.resolution_digest.as_ref(),
-        )?;
-        validate_projection_resolution_digest(
-            "lockfile-input data",
-            &cell_graph_resolution_digest,
-            lockfile_inputs.resolution_digest.as_ref(),
-        )?;
-        validate_projection_resolution_digest(
-            "repo-env data",
-            &cell_graph_resolution_digest,
-            repo_env.resolution_digest.as_ref(),
-        )?;
-        validate_projection_resolution_digest(
-            "resolution-facts data",
-            &cell_graph_resolution_digest,
-            resolution_facts.resolution_digest.as_ref(),
-        )?;
-        validate_projection_resolution_digest(
-            "repo-mapping data",
-            &cell_graph_resolution_digest,
-            repo_mappings.resolution_digest.as_ref(),
-        )?;
-
-        let lockfile_inputs_data = Arc::new(lockfile_inputs);
-        let repo_env_data = Arc::new(repo_env);
-        let module_versions = Arc::new(module_versions);
-        let resolution_facts = Arc::new(resolution_facts);
-        let repo_mappings = Arc::new(repo_mappings);
-        let extension_aggregations = Arc::new(extension_aggregations);
-        let cell_graph_workspace_id = cell_graph_workspace_id.clone();
         let is_empty_cell_graph =
             cell_graph_resolution_digest.as_ref() == dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST;
-        let module_extension_executor_installed = MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok();
-        #[cfg(not(test))]
-        if !is_empty_cell_graph && resolved_graph.is_none() {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "Bzlmod cell graph setup requires resolved-graph provenance"
-            ));
-        }
-        #[cfg(not(test))]
-        if resolved_graph.is_some() && !module_extension_executor_installed {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "Bzlmod clean cell graph setup requires the module extension executor"
-            ));
-        }
-        #[cfg(test)]
         let fallback_cell_graph = if is_empty_cell_graph
-            || (resolved_graph.is_some() && module_extension_executor_installed)
+            || (resolved_graph.is_some() && MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok())
         {
             None
         } else {
-            Some(Arc::new(cell_graph))
+            Some(Arc::new(cell_graph.clone()))
         };
-        #[cfg(test)]
-        let cell_graph_data = fallback_cell_graph.clone().map(|fallback_cell_graph| {
-            Arc::new(
-                BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
-                    cell_graph_workspace_id.clone(),
-                    cell_graph_resolution_digest.clone(),
-                    Some(fallback_cell_graph),
-                ),
-            )
-        });
-        let module_sources = Arc::new(BzlmodModuleSourcesDataValue::for_workspace(
-            cell_graph_workspace_id.clone(),
+        set_bzlmod_projection_data_with_inputs(
+            self,
             cell_graph_resolution_digest,
-            Arc::new(
-                resolved_graph
-                    .as_deref()
-                    .map(resolved_module_sources_from_graph)
-                    .unwrap_or_default(),
-            ),
-        ));
-        let registered_toolchains = Arc::new(registered_toolchains);
-        let registered_execution_platforms = Arc::new(registered_execution_platforms);
-        self.changed_to(vec![(BzlmodModuleVersionsDataKey, module_versions)])?;
-        self.changed_to(vec![(
-            BzlmodRegisteredToolchainsDataKey,
+            cell_graph.workspace_id,
+            cell_graph.root_module_name,
+            resolved_graph,
+            fallback_cell_graph,
+            module_versions,
+            lockfile_inputs,
+            repo_env,
             registered_toolchains,
-        )])?;
-        self.changed_to(vec![(
-            BzlmodRegisteredExecutionPlatformsDataKey,
             registered_execution_platforms,
-        )])?;
-        self.changed_to(vec![(BzlmodRepoMappingsDataKey, repo_mappings)])?;
-        self.changed_to(vec![(BzlmodLockfileInputsDataKey, lockfile_inputs_data)])?;
-        self.changed_to(vec![(BzlmodRepoEnvDataKey, repo_env_data)])?;
-        self.changed_to(vec![(BzlmodResolutionFactsDataKey, resolution_facts)])?;
-        self.changed_to(vec![(
-            BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
-        )])?;
-        #[cfg(test)]
-        if let Some(cell_graph_data) = cell_graph_data {
-            self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
-        }
-        self.changed_to(vec![(BzlmodModuleSourcesDataKey, module_sources)])?;
-        Ok(())
+            resolution_facts,
+            repo_mappings,
+        )
     }
 }
 

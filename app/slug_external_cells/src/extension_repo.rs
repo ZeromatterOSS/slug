@@ -1200,8 +1200,6 @@ mod tests {
         let workspace_id = slug_bzlmod::WorkspaceId::new(project_root, output_base);
         let mut repo_env = std::collections::BTreeMap::new();
         repo_env.insert("TOKEN".to_owned(), "current".to_owned());
-        let cell_graph =
-            slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
         let resolution_digest = slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest();
         let repo_env = slug_bzlmod::BzlmodRepoEnvDataValue::for_workspace(
             workspace_id.clone(),
@@ -1215,9 +1213,10 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+        updater.set_bzlmod_projection_data_with_inputs_digest_and_resolved_graph(
             resolution_digest.clone(),
-            cell_graph,
+            workspace_id.clone(),
+            String::new(),
             None,
             slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
                 workspace_id.clone(),

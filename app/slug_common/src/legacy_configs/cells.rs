@@ -2432,25 +2432,9 @@ impl BuckConfigBasedCells {
             slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest,
             |value| value.cell_graph_resolution_digest.clone(),
         );
-        let empty_cell_graph_for_dice =
-            slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(key.workspace_id.clone());
-        let cell_graph_for_dice = if slug_bzlmod::MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok() {
-            clean_outputs.as_ref().map_or_else(
-                || empty_cell_graph_for_dice.clone(),
-                |value| {
-                    let mut cell_graph = slug_bzlmod::BzlmodCellGraphValue::empty_for_workspace(
-                        key.workspace_id.clone(),
-                    );
-                    cell_graph.root_module_name = value.module_versions.root_module_name.clone();
-                    cell_graph
-                },
-            )
-        } else {
-            clean_outputs.as_ref().map_or_else(
-                || empty_cell_graph_for_dice.clone(),
-                |value| value.cell_graph.clone(),
-            )
-        };
+        let root_module_name_for_dice = clean_outputs.as_ref().map_or_else(String::new, |value| {
+            value.module_versions.root_module_name.clone()
+        });
         let (module_versions_for_dice, resolution_facts_for_dice) =
             clean_outputs.as_ref().map_or_else(
                 || {
@@ -2546,10 +2530,11 @@ impl BuckConfigBasedCells {
             Arc::new(key.options.repo_env.clone()),
         )
         .with_resolution_digest(cell_graph_resolution_digest.clone());
-        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+        slug_bzlmod::SetBzlmodDiceInputs::set_bzlmod_projection_data_with_inputs_digest_and_resolved_graph(
             updater,
             cell_graph_resolution_digest,
-            cell_graph_for_dice,
+            key.workspace_id.clone(),
+            root_module_name_for_dice,
             resolved_graph_for_dice,
             module_versions_for_dice,
             lockfile_inputs_for_dice,

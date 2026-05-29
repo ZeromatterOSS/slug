@@ -1071,6 +1071,17 @@ Current state to preserve:
   `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`, `cargo
   test -p slug_bzlmod cell_graph --lib`, `cargo test -p slug_external_cells
   extension_repo --lib`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 production updater graph-payload removal:
+  Production `SetBzlmodDiceInputs` no longer accepts a `BzlmodCellGraphValue`
+  payload just to install projection inputs. Callers pass explicit
+  `WorkspaceId`, root-module name, active graph digest, and optional resolved
+  graph provenance; the full-cell-graph injection helper remains available only
+  to in-crate tests that exercise the injected fallback graph path. Persisted
+  config-load no longer manufactures a throwaway `BzlmodCellGraphValue` for the
+  updater when the clean cell graph already comes from DICE. Guardrails:
+  `cargo check -p slug_bzlmod -p slug_common -p slug_external_cells`, `cargo
+  test -p slug_bzlmod cell_graph --lib`, `cargo test -p slug_external_cells
+  extension_repo --lib`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -2284,7 +2295,10 @@ hardening behavior around it.
      digest. The remaining bzlmod projection data wrappers also require
      workspace provenance instead of accepting absent provenance, and the
      updater validates that every projection payload already carries the active
-     graph digest instead of rewriting that provenance at injection time.
+     graph digest instead of rewriting that provenance at injection time. The
+     production updater entry point takes explicit workspace/root identity
+     instead of a `BzlmodCellGraphValue`; the full-graph updater helper is
+     test-only for injected fallback graph fixtures.
      The legacy resolver entry point requires an explicit workspace identity too.
      The outer parse helper also requires callers to choose the empty-projection
      workspace identity explicitly.
