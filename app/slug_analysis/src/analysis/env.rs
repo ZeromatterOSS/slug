@@ -2359,6 +2359,15 @@ impl<'a> MetadataLabelContext<'a> {
             .unwrap_or_else(|| cell_name.to_owned())
     }
 
+    fn is_root_cell(&self, cell_name: &str) -> bool {
+        if let Some(cell_resolver) = self.cell_resolver {
+            return CellName::unchecked_new(cell_name)
+                .ok()
+                .is_some_and(|cell| cell_resolver.is_root_cell(cell));
+        }
+        slug_core::cells::is_root_cell_name(cell_name)
+    }
+
     fn scoped_dynamic_extension_cell_name(
         &self,
         owner_cell: &str,
@@ -2560,7 +2569,7 @@ fn metadata_path_for_label(
     let cfg_hash = target_cfg.output_hash().as_str();
     let cell_relative_path = label.pkg().cell_relative_path().as_str();
     let target_name = label.name().as_str();
-    if slug_core::cells::is_root_cell_name(cell_name) {
+    if metadata_ctx.is_root_cell(cell_name) {
         if cell_relative_path.is_empty() {
             format!(
                 "{}/gen/{}/{}/{}",
@@ -2598,7 +2607,7 @@ fn metadata_source_path_for_label(
     let external_cell_name = metadata_ctx.external_cell_name(cell_name);
     let cell_relative_path = label.pkg().cell_relative_path().as_str();
     let target_name = label.name().as_str();
-    if slug_core::cells::is_root_cell_name(cell_name) {
+    if metadata_ctx.is_root_cell(cell_name) {
         if cell_relative_path.is_empty() {
             target_name.to_owned()
         } else {
@@ -5875,6 +5884,44 @@ mod tests {
 
         let legacy_path = metadata_path_for_label(&label, &cfg, MetadataLabelContext::empty());
         assert!(legacy_path.contains(&format!("external/{wrong_global}/pkg/lib")));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_paths_use_resolver_root_cell() -> slug_error::Result<()> {
+        let root = CellName::testing_new("actual_metadata_root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let root_aliases = CellAliasResolver::new(root, HashMap::new())?;
+        let resolver =
+            CellResolver::new_without_root_alias_cell_lookup(vec![root_instance], root_aliases)?;
+        let metadata_ctx = MetadataLabelContext::new(Some(&resolver));
+        let cfg = slug_core::configuration::data::ConfigurationData::testing_new();
+
+        let root_label = TargetLabel::testing_parse("actual_metadata_root//pkg:lib");
+        let root_path = metadata_path_for_label(&root_label, &cfg, metadata_ctx);
+        assert!(!root_path.contains("/external/"), "{root_path}");
+        assert!(root_path.ends_with("/pkg/lib"), "{root_path}");
+        assert_eq!(
+            metadata_source_path_for_label(&root_label, metadata_ctx),
+            "pkg/lib"
+        );
+
+        let legacy_root_label = TargetLabel::testing_parse("root//pkg:lib");
+        let legacy_root_path = metadata_path_for_label(&legacy_root_label, &cfg, metadata_ctx);
+        assert!(
+            legacy_root_path.contains("/external/root/pkg/lib"),
+            "{legacy_root_path}"
+        );
+        assert_eq!(
+            metadata_source_path_for_label(&legacy_root_label, metadata_ctx),
+            "external/root/pkg/lib"
+        );
         Ok(())
     }
 

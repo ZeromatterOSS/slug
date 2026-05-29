@@ -1958,6 +1958,13 @@ hardening behavior around it.
      -p slug_build_api configured_label_uses_explicit_root_cell --lib --
      --nocapture`; `cargo test -p slug_build_api bazel_label --lib --
      --nocapture`; `cargo check -p slug_build_api`.
+   - 2026-05-29 metadata path root-adapter reduction: metadata output/source
+     path formatting now asks `MetadataLabelContext`'s `CellResolver` whether a
+     target cell is root instead of using the process-global root helper when a
+     resolver is present. No-resolver metadata formatting keeps the legacy
+     fallback. Guardrails: `cargo test -p slug_analysis
+     metadata_paths_use_resolver_root_cell --lib -- --nocapture`; `cargo check
+     -p slug_analysis`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and
