@@ -392,30 +392,33 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Vec<RepositoryPath>> {
         let _ = parse_repository_ctx_watch_mode(watch)?;
         let abs_path = this.absolute_path();
-        if abs_path.is_dir() {
-            this.maybe_record_dirents_input(watch)?;
-            let entries: Vec<RepositoryPath> = std::fs::read_dir(&abs_path)
-                .map_err(|e| {
-                    starlark::Error::from(slug_error::slug_error!(
-                        slug_error::ErrorTag::Input,
-                        "Failed to read directory: {}",
-                        e
-                    ))
-                })?
-                .filter_map(|entry| entry.ok())
-                .map(|entry| {
-                    let child_path = abs_path.join(entry.file_name());
-                    RepositoryPath {
-                        path: child_path.to_string_lossy().to_string(),
-                        base_dir: None,
-                        watch_context: this.watch_context.clone(),
-                    }
-                })
-                .collect();
-            Ok(entries)
-        } else {
-            Ok(Vec::new())
+        if !abs_path.is_dir() {
+            return Err(starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "can't readdir(), not a directory: {}",
+                abs_path.display()
+            )));
         }
+        this.maybe_record_dirents_input(watch)?;
+        let entries: Vec<RepositoryPath> = std::fs::read_dir(&abs_path)
+            .map_err(|e| {
+                starlark::Error::from(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "Failed to read directory: {}",
+                    e
+                ))
+            })?
+            .filter_map(|entry| entry.ok())
+            .map(|entry| {
+                let child_path = abs_path.join(entry.file_name());
+                RepositoryPath {
+                    path: child_path.to_string_lossy().to_string(),
+                    base_dir: None,
+                    watch_context: this.watch_context.clone(),
+                }
+            })
+            .collect();
+        Ok(entries)
     }
 
     /// Get the realpath.
@@ -3296,6 +3299,11 @@ pub fn register_repository_ctx_types(builder: &mut GlobalsBuilder) {
 
 #[cfg(test)]
 mod tests {
+    use starlark::environment::Globals;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
     use tempfile::TempDir;
 
     use super::*;
@@ -3464,6 +3472,36 @@ mod tests {
         let child = RepositoryPath::with_base_dir("subdir/file.txt".to_owned(), base_dir);
         let child_path = temp_dir.path().join("subdir").join("file.txt");
         assert_eq!(format!("{child}"), child_path.to_string_lossy());
+    }
+
+    #[test]
+    fn test_repository_path_readdir_rejects_non_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("file.txt");
+        std::fs::write(&file_path, "payload").unwrap();
+        let base_dir = Arc::new(temp_dir.path().to_path_buf());
+
+        let module = Module::new();
+        module.set(
+            "path",
+            module.heap().alloc(RepositoryPath::with_base_dir(
+                "file.txt".to_owned(),
+                base_dir,
+            )),
+        );
+        let ast = AstModule::parse(
+            "repository_path_readdir.star",
+            "path.readdir()".to_owned(),
+            &Dialect::Standard,
+        )
+        .unwrap();
+        let mut eval = Evaluator::new(&module);
+        let err = eval.eval_module(ast, &Globals::standard()).unwrap_err();
+
+        assert!(
+            err.to_string().contains("can't readdir(), not a directory"),
+            "{err}"
+        );
     }
 
     #[test]

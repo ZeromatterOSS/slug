@@ -2243,6 +2243,14 @@ hardening behavior around it.
      context-backed module and repository paths. Directory entry creation under
      a label-resolved directory re-executes module extensions and rematerializes
      Starlark repositories through the recorded-input manifest.
+   - 2026-05-29 repository path readdir parity: `repository_path.readdir()` now
+     rejects non-directory paths instead of returning an empty list, matching
+     Bazel 9 `StarlarkPath.readdir` in
+     `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkPath.java`.
+     This keeps repository rules from silently skipping the `Dirents` replay
+     surface on invalid inputs. Validation: `cargo test -p
+     slug_interpreter_for_build test_repository_path_readdir_rejects_non_directory
+     --lib -- --nocapture`.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
