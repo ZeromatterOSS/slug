@@ -268,12 +268,12 @@ Current state to preserve:
   inputs, and materialization polling still need follow-up.
 - SDK frontier evidence is positive but not a closure condition. The latest
   post-bridge-burn-down Slug smoke built
-  `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` successfully on 2026-05-29;
-  a fresh Bazel 9.0.1 output comparison for this exact Slug revision is the
-  next correctness check. Historical parity evidence had Slug and Bazel 9.0.1
-  both building the target with matching modes and non-ELF hashes; the accepted
-  remaining differences were ELF output-root strings in `bin/zm`,
-  `bin/zerobuf`, `bin/zerosystem`, and `lib/libzeromatter_ffi.so`.
+  `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` successfully on 2026-05-29,
+  and the fresh Bazel 9.0.1 comparison for that output matched the historical
+  parity shape: directory/file manifests and modes match, all non-ELF hashes
+  match, and the accepted remaining differences are ELF output-root strings in
+  `bin/zm`, `bin/zerobuf`, `bin/zerosystem`, and
+  `lib/libzeromatter_ffi.so`.
 - The last recorded full Plan 61 Python guardrail in the archive passed after
   rebuilding `target/debug/slug`, but future workers must rerun the focused
   owner tests for their slice rather than relying on that snapshot.
@@ -915,8 +915,28 @@ Current state to preserve:
   Slug metrics reported 8360 local commands, `load=23.8s`, `analyze=18.8s`,
   `execute=25m02s`, `materialize=25m02s`, and `total=25m33s`. No `slugd`
   process remained after cleanup. This proves the current SDK frontier is past
-  the legacy resolution bridge, but Plan 61 remains open until the fresh Bazel
-  9.0.1 manifest/mode/hash comparison is recorded.
+  the legacy resolution bridge; Plan 61 remains open for the replay-completeness
+  and lockfile/materialization guardrails beyond SDK frontier parity.
+- 2026-05-29 fresh Bazel 9.0.1 output comparison after bridge burn-down:
+  `bazel build //sdk:sdk_contents` under `/var/mnt/dev/zeromatter-kuro`
+  completed with `STATUS=0` and `bazel 9.0.1`
+  (`/tmp/bazel-sdk-contents-20260529-073925.log`; 7432 action-cache hits,
+  elapsed 7.702s). The Slug output tree was
+  `buck-out/sdk-parity-20260529-070936/gen/reactor/2215414805206cf2/sdk/sdk_contents`;
+  the Bazel output tree was `bazel-bin/sdk/sdk_contents`. Manifests:
+  `/tmp/slug-plan61-current-{bazel,slug}-modes-20260529.txt`,
+  `/tmp/slug-plan61-current-{bazel,slug}-sha-20260529.txt`, and filtered
+  non-ELF hash manifests
+  `/tmp/slug-plan61-current-{bazel,slug}-sha-nonelf-20260529.txt`.
+  `diff -u` on the mode manifests produced no diff; `diff -u` on the filtered
+  non-ELF hash manifests produced no diff. The full hash diff was limited to
+  `bin/zm`, `bin/zerobuf`, `bin/zerosystem`, and
+  `lib/libzeromatter_ffi.so`. `strings -a` on those files showed the expected
+  output-root/debug metadata class: Bazel embeds `bazel-out` /
+  `.bazel-cache/.../execroot`, while Slug embeds
+  `buck-out/sdk-parity-20260529-070936` / Slug execroot paths. This satisfies
+  the SDK frontier parity check for the bridge-burn-down revision, with exact
+  ELF byte parity left as the already-accepted output-root design item.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1371,9 +1391,10 @@ Current state to preserve:
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
   fixed by resolver-backed source-artifact package canonicalization. The latest
   2026-05-29 Slug SDK smoke reached `BUILD SUCCEEDED` in 25m33s
-  (`/tmp/sdk-parity-20260529-070936.log`); this is frontier evidence, not a
-  Plan 61 closure condition until the fresh Bazel 9.0.1 output comparison is
-  recorded.
+  (`/tmp/sdk-parity-20260529-070936.log`), and the fresh Bazel 9.0.1
+  comparison recorded the expected mode/non-ELF hash parity with the same four
+  accepted ELF output-root hash differences. This is SDK-frontier evidence, not
+  a full Plan 61 replay-completeness closure condition.
 
 What future workers should keep in this file:
 
