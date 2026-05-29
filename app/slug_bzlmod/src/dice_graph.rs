@@ -2784,7 +2784,7 @@ pub(crate) struct BzlmodCellGraphDataValue {
 
 impl BzlmodCellGraphDataValue {
     #[cfg(test)]
-    pub fn for_workspace(
+    pub(crate) fn for_workspace(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
         cell_graph: Arc<BzlmodCellGraphValue>,
@@ -2797,7 +2797,7 @@ impl BzlmodCellGraphDataValue {
     }
 
     #[cfg(test)]
-    pub fn for_workspace_with_resolved_graph(
+    pub(crate) fn for_workspace_with_resolved_graph(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
         cell_graph: Arc<BzlmodCellGraphValue>,
@@ -2810,7 +2810,7 @@ impl BzlmodCellGraphDataValue {
         )
     }
 
-    pub fn for_workspace_with_resolved_graph_and_fallback(
+    pub(crate) fn for_workspace_with_resolved_graph_and_fallback(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
         fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
@@ -2878,7 +2878,7 @@ pub(crate) struct BzlmodModuleSourcesDataValue {
 }
 
 impl BzlmodModuleSourcesDataValue {
-    pub fn for_workspace(
+    pub(crate) fn for_workspace(
         workspace_id: WorkspaceId,
         resolution_digest: Arc<str>,
         modules: Arc<Vec<BzlmodResolvedModuleSource>>,
