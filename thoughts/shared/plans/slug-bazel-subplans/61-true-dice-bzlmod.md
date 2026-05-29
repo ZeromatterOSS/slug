@@ -497,8 +497,9 @@ Current state to preserve:
   and symlink-target probes. `RepoMaterializationInvocationLayoutStateKey` uses
   them for `local_repository`, `new_local_repository`, and
   `_llvm_subproject_repository`, including generated BUILD-file content checks
-  for `new_local_repository`. The legacy layout helper remains only as a
-  no-late-binding/read-error fallback and for unclassified rule classes.
+  for `new_local_repository`. Unclassified rule classes now return tracked
+  `layout-valid` directly; the legacy layout helper remains only as a
+  no-late-binding/read-error fallback for known layout-probe classes.
   Guardrails: focused `slug_bzlmod` local/new-local/llvm layout tests,
   `cargo test -p slug_external_cells repository_materialization_state --lib`,
   `cargo build -p slug`, and focused Plan 61 corrupted local-repo layout Python
@@ -761,6 +762,18 @@ Current state to preserve:
   slug_common clean_resolved_module_graph --lib`, `cargo test -p slug_common
   bzlmod --lib`, `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt
   --check`, and `git diff --check`.
+- 2026-05-29 unclassified repository-layout fallback reduction:
+  `RepoMaterializationInvocationLayoutStateKey` now returns a tracked
+  `layout-valid` state directly for repository rule classes with no known
+  layout probe instead of routing through the legacy synchronous layout helper.
+  Reader-backed probes remain for `git_repository`, `new_git_repository`,
+  `local_repository`, `new_local_repository`, and
+  `_llvm_subproject_repository`; the test-only no-reader fallback still covers
+  those known probe classes in low-level tests. Guardrails: `cargo test -p
+  slug_bzlmod
+  unclassified_invocation_layout_state_is_tracked_without_legacy_probe --lib`,
+  `cargo test -p slug_bzlmod materialization_manifest --lib`, `cargo check -p
+  slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

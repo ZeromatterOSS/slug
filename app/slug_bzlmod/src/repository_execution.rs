@@ -984,6 +984,17 @@ fn repo_materialization_invocation_layout_state_fallback(
     ))
 }
 
+fn repo_rule_has_known_layout_probe(rule_name: &str) -> bool {
+    matches!(
+        rule_name,
+        "git_repository"
+            | "new_git_repository"
+            | "local_repository"
+            | "new_local_repository"
+            | "_llvm_subproject_repository"
+    )
+}
+
 #[cfg(test)]
 fn repo_has_invalid_empty_target_label(repo_path: &Path) -> bool {
     ["BUILD.bazel", "BUILD"].into_iter().any(|name| {
@@ -1902,6 +1913,11 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
         let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
         match repo_spec_to_invocation(canonical_name, repo_spec) {
             Ok(invocation) => {
+                if !repo_rule_has_known_layout_probe(invocation.rule_name.as_str()) {
+                    return RepoMaterializationStateValue::tracked(
+                        repo_materialization_invocation_layout_state_value(true),
+                    );
+                }
                 let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() else {
                     #[cfg(test)]
                     {
@@ -1968,12 +1984,7 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
                         .await
                         .unwrap_or(false),
                     ),
-                    _ => RepoMaterializationStateValue::untracked(
-                        crate::repository_executor::repo_layout_is_valid_for_invocation(
-                            &invocation,
-                            &repo_dir,
-                        ),
-                    ),
+                    _ => unreachable!("unclassified repository rules returned before reader probe"),
                 };
                 RepoMaterializationStateValue::with_tracking(
                     repo_materialization_invocation_layout_state_value(layout_valid.value),
@@ -3700,6 +3711,32 @@ mod tests {
         let second = dice.compute(&key).await.unwrap().unwrap();
         assert_ne!(first.digest, second.digest);
         assert_eq!(second.layout_state.as_ref(), "layout-valid");
+    }
+
+    #[tokio::test]
+    async fn unclassified_invocation_layout_state_is_tracked_without_legacy_probe() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root,
+            "_main+ext+custom_repo",
+            Arc::new(RepoSpec::new(
+                "@@example//:repo.bzl%custom_repository".to_owned(),
+            )),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let state = dice
+            .compute(&RepoMaterializationInvocationLayoutStateKey(key))
+            .await
+            .unwrap();
+
+        assert_eq!(state.value.as_ref(), "layout-valid");
+        assert!(state.tracked_by_dice);
     }
 
     #[tokio::test]
