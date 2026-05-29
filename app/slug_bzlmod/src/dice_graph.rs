@@ -1312,7 +1312,9 @@ pub fn clean_resolved_graph_outputs_value(
         module_versions: projections
             .module_versions
             .with_resolution_digest(cell_graph_resolution_digest.clone()),
-        resolution_facts: projections.resolution_facts,
+        resolution_facts: projections
+            .resolution_facts
+            .with_resolution_digest(cell_graph_resolution_digest.clone()),
         registered_toolchains: projections.registered_toolchains,
         registered_execution_platforms: projections.registered_execution_platforms,
         extension_aggregations: projections
@@ -4118,6 +4120,7 @@ pub struct BzlmodModuleVersionsInvalidation {
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodResolutionFactsValue {
     pub workspace_id: WorkspaceId,
+    pub resolution_digest: Arc<str>,
     pub registry_file_hashes: indexmap::IndexMap<String, String>,
     pub selected_yanked_versions: indexmap::IndexMap<String, String>,
 }
@@ -4130,9 +4133,15 @@ impl BzlmodResolutionFactsValue {
     ) -> Self {
         Self {
             workspace_id,
+            resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             registry_file_hashes,
             selected_yanked_versions,
         }
+    }
+
+    pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
+        self.resolution_digest = resolution_digest;
+        self
     }
 }
 
@@ -4152,6 +4161,16 @@ impl BzlmodResolutionFactsKey {
         Self {
             workspace_id,
             resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
+        }
+    }
+
+    pub fn for_workspace_id_with_resolution_digest(
+        workspace_id: WorkspaceId,
+        resolution_digest: Arc<str>,
+    ) -> Self {
+        Self {
+            workspace_id,
+            resolution_digest,
         }
     }
 
@@ -4553,6 +4572,15 @@ impl Key for BzlmodResolutionFactsKey {
                  but current bzlmod resolution facts data root is '{}'",
                 self.workspace_id.canonical_project_root.display(),
                 data.workspace_id.canonical_project_root.display()
+            ));
+        }
+        if data.resolution_digest != self.resolution_digest {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "BzlmodResolutionFactsKey was computed with resolution digest '{}', \
+                 but current bzlmod resolution facts data digest is '{}'",
+                self.resolution_digest,
+                data.resolution_digest
             ));
         }
         Ok(data)

@@ -3401,11 +3401,8 @@ use_repo(ext, "generated")
         assert_eq!(module_versions.module_versions.as_ref(), &expected_versions);
         assert_eq!(module_versions.invalidation.root_module_name, "root");
 
-        let resolution_facts = dice
-            .compute(&slug_bzlmod::BzlmodResolutionFactsKey::for_workspace_id(
-                module_versions.workspace_id.clone(),
-            ))
-            .await??;
+        let resolution_facts =
+            slug_bzlmod::bzlmod_resolution_facts_for_current_workspace(&mut dice).await?;
         assert!(resolution_facts.registry_file_hashes.is_empty());
         assert!(resolution_facts.selected_yanked_versions.is_empty());
 

@@ -975,6 +975,17 @@ Current state to preserve:
   slug_bzlmod cell_graph --lib`, `cargo test -p slug_common bzlmod --lib`,
   `cargo test -p slug_external_cells extension_repo --lib`, and `cargo test -p
   slug_bzlmod --lib`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 resolution-facts graph-digest provenance:
+  `BzlmodResolutionFactsValue` now carries the active cell-graph/resolution
+  digest, `BzlmodResolutionFactsKey` rejects stale digest reads, and clean
+  resolved-graph output plus current-workspace resolution-fact consumers use
+  the active digest. Module-version invalidation can now consume registry-file
+  hashes and selected-yanked-version facts only through facts that match the
+  graph digest requesting them. Guardrails: `cargo test -p slug_bzlmod
+  resolution_facts_key_rejects_stale_resolution_digest --lib`, `cargo test -p
+  slug_bzlmod current_workspace_helpers --lib`, `cargo test -p slug_bzlmod
+  cell_graph --lib`, `cargo test -p slug_common bzlmod --lib`, and `cargo test
+  -p slug_bzlmod --lib`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
