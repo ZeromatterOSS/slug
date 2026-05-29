@@ -322,6 +322,16 @@ Current state to preserve:
   replay pytest set (9 passed), `cargo test -p slug_interpreter_for_build
   --lib` (125 passed), and
   `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (155 passed).
+- 2026-05-29 repository recorded-input conflict handling:
+  `repository_ctx` now matches Bazel's keyed recorded-input behavior from
+  `StarlarkBaseExternalContext.recordInputWithValue(...)`: duplicate inputs
+  with the same value are serialized once, while the same input identity with a
+  different value fails during repository-rule execution instead of writing a
+  permanently stale recorded-input manifest. The materialization marker
+  corruption guardrails were also tightened to prove same-daemon invalidation
+  rather than relying on a daemon restart. Guardrails: `cargo test -p
+  slug_interpreter_for_build --lib` (126 passed), `cargo build -p slug`, and
+  focused same-daemon marker pytest selectors (2 passed).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1289,6 +1299,10 @@ hardening behavior around it.
      metadata/digest DICE dependencies instead of UTF-8 source reads, so binary
      edits inside a watched tree rematerialize the generated repository in the
      same daemon.
+   - Repository recorded inputs now use Bazel-style keyed semantics: duplicate
+     same-value inputs are deduplicated, and conflicting values for the same
+     input identity fail during repository-rule execution rather than producing
+     an invalid manifest.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

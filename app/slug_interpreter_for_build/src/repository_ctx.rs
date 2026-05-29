@@ -841,6 +841,30 @@ impl RepositoryContext {
                 "repository_ctx recorded input lock poisoned"
             ))
         })?;
+        let (identity, value) = split_recorded_input(&recorded).ok_or_else(|| {
+            starlark::Error::from(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "malformed recorded input '{}'",
+                recorded
+            ))
+        })?;
+        if let Some(existing) = inputs
+            .iter()
+            .find(|input| split_recorded_input(input).is_some_and(|(key, _)| key == identity))
+        {
+            let (_, existing_value) = split_recorded_input(existing).expect("checked above");
+            if existing_value == value {
+                return Ok(());
+            }
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "Conflicting values recorded for input {}: '{}' vs '{}'",
+                identity,
+                existing_value,
+                value
+            )
+            .into());
+        }
         inputs.push(recorded);
         Ok(())
     }
@@ -855,6 +879,14 @@ impl RepositoryContext {
         inputs.push(input);
         Ok(())
     }
+}
+
+fn split_recorded_input(recorded: &str) -> Option<(&str, &str)> {
+    let (identity, value) = recorded.split_once(' ')?;
+    if identity.is_empty() {
+        return None;
+    }
+    Some((identity, value))
 }
 
 // ============================================================================
@@ -3086,6 +3118,22 @@ mod tests {
         let inputs = ctx.recorded_inputs().unwrap();
         assert!(inputs.contains(&"ENV:PLAN61_REPO_ENV from-context".to_owned()));
         assert!(inputs.contains(&"ENV:PLAN61_REPO_ENV_MISSING \\0".to_owned()));
+    }
+
+    #[test]
+    fn test_repository_context_rejects_conflicting_recorded_input_values() {
+        let temp_dir = TempDir::new().unwrap();
+        let watched = temp_dir.path().join("watched.txt");
+        std::fs::write(&watched, "first\n").unwrap();
+
+        let ctx = RepositoryContext::stub("test_repo");
+        ctx.record_file_input(&watched).unwrap();
+        ctx.record_file_input(&watched).unwrap();
+        assert_eq!(ctx.recorded_inputs().unwrap().len(), 1);
+
+        std::fs::write(&watched, "second\n").unwrap();
+        let err = ctx.record_file_input(&watched).unwrap_err();
+        assert!(err.to_string().contains("Conflicting values recorded"));
     }
 
     #[test]

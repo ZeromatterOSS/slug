@@ -9964,7 +9964,6 @@ repo(
     materialized_file.unlink()
     _write(materialized_file, "corrupted materialized output\n")
 
-    await buck.kill()
     await buck.build("//:uses_corrupt_repo")
 
     assert materialized_file.is_symlink()
@@ -10023,7 +10022,6 @@ use_repo(ext, "output_digest_repo")
 
     _write(materialized_file, "corrupted materialized output\n")
 
-    await buck.kill()
     before_refetch = await _bzlmod_counters(buck)
     await buck.build("//:uses_output_digest_repo")
     after_refetch = await _bzlmod_counters(buck)
