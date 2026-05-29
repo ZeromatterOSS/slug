@@ -271,6 +271,8 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -307,6 +309,8 @@ mod tests {
             spec_hash: Arc::from("sha256-sibling"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         resolver.register_bzlmod_runtime_extension_cell(

@@ -131,6 +131,13 @@ pub struct ExtensionRepoCellSetup {
     /// JSON-serialized repository environment captured when this generated
     /// repository cell was registered.
     pub repo_env_json: Arc<str>,
+    /// Digest of the module extension implementation load graph that produced
+    /// this setup.
+    pub extension_bzl_transitive_digest: Arc<str>,
+    /// JSON-serialized module-extension recorded inputs that must remain
+    /// current before the setup can be reused without re-evaluating the
+    /// extension.
+    pub extension_recorded_inputs_json: Arc<str>,
     /// Whether this repo has been materialized yet.
     /// When false, accessing the repo triggers lazy execution.
     pub materialized: bool,

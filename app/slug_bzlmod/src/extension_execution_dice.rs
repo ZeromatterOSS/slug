@@ -853,6 +853,7 @@ impl Key for ExtensionSpokesKey {
         Ok(Arc::new(ExtensionSpokesValue {
             workspace_id: self.workspace_id.clone(),
             extension_id: self.extension_id.clone(),
+            bzl_transitive_digest: self.bzl_transitive_digest.clone(),
             project_root: self.workspace_id.canonical_project_root.clone(),
             repo_env: repo_env.clone(),
             spokes,
@@ -1111,6 +1112,20 @@ pub struct ModuleExtensionRecordedInputsKey {
 }
 
 impl ModuleExtensionRecordedInputsKey {
+    pub fn new(
+        recorded_inputs: Vec<String>,
+        workspace_root: Option<Arc<PathBuf>>,
+        repo_env: Option<Arc<BTreeMap<String, String>>>,
+        repo_mappings: Option<Arc<RepoMappingSnapshot>>,
+    ) -> Self {
+        Self {
+            recorded_inputs: Arc::new(recorded_inputs),
+            workspace_root,
+            repo_env,
+            repo_mappings,
+        }
+    }
+
     fn from_selected_cache(selected: &SelectedExtensionCache) -> Self {
         Self {
             recorded_inputs: Arc::new(selected.recorded_inputs.clone()),
@@ -1547,37 +1562,7 @@ impl ModuleExtensionExecutionKey {
         self.project_root.as_ref().map(|p| p.as_ref())
     }
 
-    async fn validate_fresh_recorded_inputs_dependency(
-        &self,
-        ctx: &mut DiceComputations<'_>,
-        recorded_inputs: Vec<String>,
-    ) -> slug_error::Result<Vec<String>> {
-        if recorded_inputs.is_empty() {
-            return Ok(recorded_inputs);
-        }
-        let key = ModuleExtensionRecordedInputsKey {
-            recorded_inputs: Arc::new(recorded_inputs),
-            workspace_root: self.project_root.clone(),
-            repo_env: Some(self.repo_env.clone()),
-            repo_mappings: Some(self.repo_mappings.clone()),
-        };
-        match ctx.compute(&key).await {
-            Ok(Ok(())) => Ok(key.recorded_inputs.as_ref().clone()),
-            Ok(Err(reason)) => Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "Fresh module extension '{}' recorded stale input: {}",
-                self.extension_id,
-                reason
-            )),
-            Err(e) => Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Tier0,
-                "DICE compute failed while validating fresh recorded inputs for '{}': {}",
-                self.extension_id,
-                e
-            )),
-        }
-    }
-
+    #[cfg(test)]
     fn execution_workspace_id(&self) -> crate::WorkspaceId {
         self.workspace_id.clone()
     }
@@ -1661,6 +1646,221 @@ pub async fn selected_cache_recorded_inputs_current(
     }
 }
 
+async fn validate_fresh_recorded_inputs_dependency(
+    ctx: &mut DiceComputations<'_>,
+    extension_id: &str,
+    recorded_inputs: Vec<String>,
+    workspace_root: Option<Arc<PathBuf>>,
+    repo_env: Arc<BTreeMap<String, String>>,
+    repo_mappings: Arc<RepoMappingSnapshot>,
+) -> slug_error::Result<Vec<String>> {
+    if recorded_inputs.is_empty() {
+        return Ok(recorded_inputs);
+    }
+    let key = ModuleExtensionRecordedInputsKey {
+        recorded_inputs: Arc::new(recorded_inputs),
+        workspace_root,
+        repo_env: Some(repo_env),
+        repo_mappings: Some(repo_mappings),
+    };
+    match ctx.compute(&key).await {
+        Ok(Ok(())) => Ok(key.recorded_inputs.as_ref().clone()),
+        Ok(Err(reason)) => Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "Fresh module extension '{}' recorded stale input: {}",
+            extension_id,
+            reason
+        )),
+        Err(e) => Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "DICE compute failed while validating fresh recorded inputs for '{}': {}",
+            extension_id,
+            e
+        )),
+    }
+}
+
+#[derive(Clone, Debug, Display, Allocative)]
+#[display("ModuleExtensionFreshEvalKey({})", extension_id)]
+struct ModuleExtensionFreshEvalKey {
+    extension_id: Arc<str>,
+    input_hash: Arc<str>,
+    bzl_transitive_digest: Arc<str>,
+    aggregated: Arc<AggregatedExtension>,
+    root_module_name: Arc<str>,
+    project_root: Option<Arc<PathBuf>>,
+    workspace_id: crate::WorkspaceId,
+    #[allocative(skip)]
+    prior_facts: Arc<serde_json::Value>,
+    repo_env: Arc<BTreeMap<String, String>>,
+    repo_mappings: Arc<RepoMappingSnapshot>,
+    repo_mapping_overrides: Arc<RepoMappingOverrides>,
+}
+
+impl ModuleExtensionFreshEvalKey {
+    fn from_execution_key(
+        key: &ModuleExtensionExecutionKey,
+        prior_facts: Arc<serde_json::Value>,
+    ) -> Self {
+        Self {
+            extension_id: key.extension_id.clone(),
+            input_hash: key.input_hash.clone(),
+            bzl_transitive_digest: key.bzl_transitive_digest.clone(),
+            aggregated: key.aggregated.clone(),
+            root_module_name: key.root_module_name.clone(),
+            project_root: key.project_root.clone(),
+            workspace_id: key.workspace_id.clone(),
+            prior_facts,
+            repo_env: key.repo_env.clone(),
+            repo_mappings: key.repo_mappings.clone(),
+            repo_mapping_overrides: key.repo_mapping_overrides.clone(),
+        }
+    }
+}
+
+impl std::hash::Hash for ModuleExtensionFreshEvalKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.extension_id.hash(state);
+        self.input_hash.hash(state);
+        self.bzl_transitive_digest.hash(state);
+        self.root_module_name.hash(state);
+        self.project_root.hash(state);
+        self.workspace_id.hash(state);
+        facts_identity(&self.prior_facts).hash(state);
+        self.repo_env.hash(state);
+        self.repo_mappings.hash(state);
+        self.repo_mapping_overrides.hash(state);
+    }
+}
+
+impl PartialEq for ModuleExtensionFreshEvalKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.extension_id == other.extension_id
+            && self.input_hash == other.input_hash
+            && self.bzl_transitive_digest == other.bzl_transitive_digest
+            && self.root_module_name == other.root_module_name
+            && self.project_root == other.project_root
+            && self.workspace_id == other.workspace_id
+            && facts_identity(&self.prior_facts) == facts_identity(&other.prior_facts)
+            && self.repo_env == other.repo_env
+            && self.repo_mappings == other.repo_mappings
+            && self.repo_mapping_overrides == other.repo_mapping_overrides
+    }
+}
+
+impl Eq for ModuleExtensionFreshEvalKey {}
+
+#[async_trait]
+impl Key for ModuleExtensionFreshEvalKey {
+    type Value = slug_error::Result<Arc<ModuleExtensionResult>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let module_count = self.aggregated.tags_by_module.len();
+        let tag_count: usize = self
+            .aggregated
+            .tags_by_module
+            .values()
+            .map(|v| v.len())
+            .sum();
+        tracing::debug!(
+            "Extension '{}' used by {} module(s) with {} total tag(s)",
+            self.extension_id,
+            module_count,
+            tag_count
+        );
+
+        record_bzlmod_event(BzlmodEventKind::ExtensionEval, self.extension_id.as_ref());
+        let temp_dir = create_temp_extension_dir(&self.extension_id)?;
+
+        let execution_result = match MODULE_EXTENSION_EXECUTOR_IMPL.get() {
+            Ok(executor) => {
+                executor
+                    .execute_extension(
+                        ctx,
+                        &self.aggregated,
+                        &self.root_module_name,
+                        &temp_dir,
+                        self.prior_facts.as_ref().clone(),
+                        self.repo_env.clone(),
+                        self.bzl_transitive_digest.clone(),
+                        self.workspace_id.clone(),
+                    )
+                    .await
+            }
+            Err(e) => Err(ModuleExtensionError::ExecutionFailed {
+                extension_id: self.extension_id.to_string(),
+                reason: format!("module extension executor is not initialized: {e}"),
+            }
+            .into()),
+        };
+
+        if temp_dir.exists() {
+            if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
+                tracing::warn!(
+                    "Failed to clean up temp dir for extension '{}': {}",
+                    self.extension_id,
+                    e
+                );
+            }
+        }
+
+        let mut output = execution_result?;
+        output.recorded_inputs = validate_fresh_recorded_inputs_dependency(
+            ctx,
+            &self.extension_id,
+            output.recorded_inputs,
+            self.project_root.clone(),
+            self.repo_env.clone(),
+            self.repo_mappings.clone(),
+        )
+        .await?;
+        tracing::debug!(
+            "Extension '{}' recorded {} input(s)",
+            self.extension_id,
+            output.recorded_inputs.len()
+        );
+
+        let result = ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
+            self.extension_id.clone(),
+            self.input_hash.to_string(),
+            output.generated_repo_specs.clone(),
+            &self.root_module_name,
+            output.metadata.clone(),
+            output.recorded_inputs.clone(),
+            ModuleExtensionRecordedInputContext::new(
+                self.project_root.as_deref().cloned(),
+                self.repo_env.as_ref().clone(),
+                self.repo_mappings.as_ref().clone(),
+            ),
+        );
+
+        tracing::info!(
+            "Extension '{}' generated {} repository specs",
+            self.extension_id,
+            result.repo_count()
+        );
+
+        Ok(Arc::new(result))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.as_ref()
+            .map(|result| result.recorded_inputs_current())
+            .unwrap_or(false)
+    }
+}
+
 #[async_trait]
 impl Key for ModuleExtensionExecutionKey {
     type Value = slug_error::Result<Arc<ModuleExtensionResult>>;
@@ -1723,105 +1923,20 @@ impl Key for ModuleExtensionExecutionKey {
             return Ok(Arc::new(result));
         }
 
-        // Log the modules that use this extension
-        let module_count = self.aggregated.tags_by_module.len();
-        let tag_count: usize = self
-            .aggregated
-            .tags_by_module
-            .values()
-            .map(|v| v.len())
-            .sum();
-        tracing::debug!(
-            "Extension '{}' used by {} module(s) with {} total tag(s)",
-            self.extension_id,
-            module_count,
-            tag_count
-        );
-
-        // 2. Create temporary working directory for module_ctx I/O
-        let workspace_id = self.execution_workspace_id();
-        record_bzlmod_event(BzlmodEventKind::ExtensionEval, self.extension_id.as_ref());
-        let temp_dir = create_temp_extension_dir(&self.extension_id)?;
-
-        // 3-5. Execute extension via late binding to slug_interpreter_for_build
-        //
-        // The late binding pattern allows us to call into slug_interpreter_for_build
-        // without a direct dependency. The implementation:
-        // - Loads the extension's .bzl file via Starlark interpreter
-        // - Builds module_ctx from aggregated tags using build_module_context()
-        // - Executes extension.implementation(module_ctx) in Starlark
-        // - Captures RepoSpecs from repository rule invocations
-        let execution_result = match MODULE_EXTENSION_EXECUTOR_IMPL.get() {
-            Ok(executor) => {
-                executor
-                    .execute_extension(
-                        ctx,
-                        &self.aggregated,
-                        &self.root_module_name,
-                        &temp_dir,
-                        prior_facts,
-                        self.repo_env.clone(),
-                        workspace_id,
-                    )
-                    .await
-            }
-            Err(e) => Err(ModuleExtensionError::ExecutionFailed {
-                extension_id: self.extension_id.to_string(),
-                reason: format!("module extension executor is not initialized: {e}"),
-            }
-            .into()),
-        };
-
-        // 6. Clean up temporary working directory
-        if temp_dir.exists() {
-            if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
-                tracing::warn!(
-                    "Failed to clean up temp dir for extension '{}': {}",
-                    self.extension_id,
-                    e
-                );
-            }
-        }
-
-        // Check for execution errors
-        let mut output = execution_result?;
-        output.recorded_inputs = self
-            .validate_fresh_recorded_inputs_dependency(ctx, output.recorded_inputs)
-            .await?;
-        tracing::debug!(
-            "Extension '{}' recorded {} input(s)",
-            self.extension_id,
-            output.recorded_inputs.len()
-        );
+        let result = ctx
+            .compute(&ModuleExtensionFreshEvalKey::from_execution_key(
+                self,
+                Arc::new(prior_facts),
+            ))
+            .await??;
         validate_error_mode_facts(
             &self.extension_id,
             self.replay_inputs.lockfile_mode,
-            &output.metadata.facts,
+            &result.metadata.facts,
             &workspace_lockfile_facts,
         )?;
 
-        // 7. Build result with canonical names
-        let result = ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
-            self.extension_id.clone(),
-            self.input_hash.to_string(),
-            output.generated_repo_specs.clone(),
-            &self.root_module_name,
-            output.metadata.clone(),
-            output.recorded_inputs.clone(),
-            ModuleExtensionRecordedInputContext::new(
-                self.project_root.as_deref().cloned(),
-                self.repo_env.as_ref().clone(),
-                self.repo_mappings.as_ref().clone(),
-            ),
-        );
-
-        tracing::info!(
-            "Extension '{}' generated {} repository specs",
-            self.extension_id,
-            result.repo_count()
-        );
-
-        Ok(Arc::new(result))
+        Ok(result)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3243,6 +3358,7 @@ mod tests {
         let value = Ok(Arc::new(ExtensionSpokesValue {
             workspace_id: workspace_id.clone(),
             extension_id: Arc::from("@@root//:ext.bzl%ext"),
+            bzl_transitive_digest: Arc::from("digest"),
             project_root: workspace_id.canonical_project_root.clone(),
             repo_env: Arc::new(BTreeMap::new()),
             spokes: BTreeMap::new(),

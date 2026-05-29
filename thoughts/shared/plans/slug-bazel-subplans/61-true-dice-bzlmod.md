@@ -226,6 +226,22 @@ Intended owner remains `BzlmodCellGraphKey` derived from `BzlmodWorkspaceKey`,
 lockfile policy keys. Validation passed with focused cell-graph tests and
 `cargo test -p slug_bzlmod`.
 
+**Bridge surface reduced**: extension repository runtime cells now preserve the
+real DICE-produced spoke setup instead of forcing a fresh extension lookup after
+the static placeholder cell has been installed. `ExtensionRepoCellSetup` carries
+the producing extension `.bzl` transitive digest and recorded-input list,
+resolver-local runtime cells can overlay static placeholder extension cells, and
+`extension_repo::get_file_ops_delegate` reuses the stored `RepoSpec` when the
+digest and recorded inputs are still current. This keeps the missing-lockfile
+warm no-op path from re-entering extension evaluation while still rejecting
+stale `.bzl`, repo-env, repo-mapping, and watched-input state through the named
+DICE keys. Intended owner: `BzlmodCellGraphKey`, `ModuleExtensionReplayInputKey`,
+and `RepoSpecKey`. Focused validation passed with `cargo test -p slug_core
+bzlmod_resolver_runtime_spoke_overlays_static_placeholder_extension_cell`,
+`cargo check -p slug_core -p slug_common -p slug_external_cells -p slug_bzlmod
+-p slug_interpreter_for_build`, `cargo build -p slug`, and focused Plan 61
+Python replay/invalidation selectors (`5 passed, 151 deselected`).
+
 ## Current Checkpoint
 
 Historical slice logs and detailed validation transcripts now live in
@@ -1065,7 +1081,11 @@ hardening behavior around it.
      errors before extension eval on missing loaded files. `buck audit cell`
      uses tolerant replay validation to hash missing-load states and prove
      cache hits/misses without executing extensions. Recorded inputs are
-     validated through `ModuleExtensionRecordedInputsKey`.
+     validated through `ModuleExtensionRecordedInputsKey`. Runtime extension
+     repo cells now overlay static placeholder cells with the real
+     DICE-produced `RepoSpec` metadata when extension execution has produced
+     spokes; warm missing-lockfile no-op builds reuse that setup instead of
+     re-entering extension evaluation.
    - Current evidence:
      `cargo build -p slug`;
      `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (155 passed);

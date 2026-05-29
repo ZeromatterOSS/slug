@@ -2502,6 +2502,8 @@ mod tests {
                 spec_hash: "tool-hash".to_owned(),
                 repo_spec_json: "{}".to_owned(),
                 repo_env_json: "{}".to_owned(),
+                extension_bzl_transitive_digest: String::new(),
+                extension_recorded_inputs_json: String::new(),
                 materialized: true,
                 lazy: false,
             }]),

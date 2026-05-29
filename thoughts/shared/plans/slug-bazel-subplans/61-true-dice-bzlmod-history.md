@@ -4186,3 +4186,19 @@ What did not work or remains risky:
   valid when every Bazel-relevant input is represented in the key or in a
   tracked dependency edge; removing the process-global bridge cache is only one
   step while the legacy resolver key still wraps an opaque graph.
+- 2026-05-29 runtime extension repo overlay slice: the missing-lockfile
+  same-daemon warm-reuse guardrail was still incrementing `extension_eval`
+  because file ops received the static placeholder extension cell setup
+  (`repo_spec_json` empty) even after DICE extension execution registered the
+  real spoke setup. `ExtensionRepoCellSetup` and `BzlmodCellGraphExtensionCell`
+  now carry the producing extension `.bzl` transitive digest and recorded-input
+  list; `CellResolver::register_bzlmod_runtime_extension_cell` may overlay a
+  static placeholder extension cell with a resolver-local graph-owned dynamic
+  cell; and `extension_repo::get_file_ops_delegate` reuses stored `RepoSpec`
+  metadata only when the digest and `ModuleExtensionRecordedInputsKey` say it is
+  current. Focused validation passed with `cargo test -p slug_core
+  bzlmod_resolver_runtime_spoke_overlays_static_placeholder_extension_cell`,
+  `cargo check -p slug_core -p slug_common -p slug_external_cells -p
+  slug_bzlmod -p slug_interpreter_for_build`, `cargo build -p slug`, and the
+  explicit-binary Plan 61 replay/invalidation selector (`5 passed, 151
+  deselected`).

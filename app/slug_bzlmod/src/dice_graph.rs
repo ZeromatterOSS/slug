@@ -1965,6 +1965,8 @@ pub struct BzlmodCellGraphExtensionCell {
     pub spec_hash: String,
     pub repo_spec_json: String,
     pub repo_env_json: String,
+    pub extension_bzl_transitive_digest: String,
+    pub extension_recorded_inputs_json: String,
     pub materialized: bool,
     pub lazy: bool,
 }
@@ -2354,6 +2356,8 @@ impl BzlmodCleanCellGraphBuilder {
                 spec_hash: cell.spec_hash,
                 repo_spec_json: cell.repo_spec_json,
                 repo_env_json: self.repo_env_json.clone(),
+                extension_bzl_transitive_digest: String::new(),
+                extension_recorded_inputs_json: String::new(),
                 materialized: false,
                 lazy: false,
             });
@@ -3242,6 +3246,11 @@ async fn extension_cells_from_spokes(
                 spec_hash: spoke.spec_hash.to_string(),
                 repo_spec_json: spoke.repo_spec_json.to_string(),
                 repo_env_json: repo_env_json.clone(),
+                extension_bzl_transitive_digest: spokes.bzl_transitive_digest.to_string(),
+                extension_recorded_inputs_json: serde_json::to_string(
+                    spokes.recorded_inputs.as_ref(),
+                )
+                .unwrap_or_else(|_| "[]".to_owned()),
                 materialized: false,
                 lazy: false,
             });
@@ -4963,6 +4972,7 @@ pub struct ExtensionSpoke {
 pub struct ExtensionSpokesValue {
     pub workspace_id: WorkspaceId,
     pub extension_id: Arc<str>,
+    pub bzl_transitive_digest: Arc<str>,
     pub project_root: Arc<PathBuf>,
     pub repo_env: Arc<BTreeMap<String, String>>,
     pub spokes: BTreeMap<String, ExtensionSpoke>,
@@ -4990,6 +5000,10 @@ impl ExtensionSpokesValue {
 
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionSpoke> {
         self.spokes.values()
+    }
+
+    pub fn recorded_inputs(&self) -> &[String] {
+        self.recorded_inputs.as_slice()
     }
 }
 

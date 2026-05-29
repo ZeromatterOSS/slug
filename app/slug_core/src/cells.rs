@@ -2445,6 +2445,22 @@ impl CellResolver {
     /// Get a `Cell` from the `CellMap`
     pub fn get(&self, cell: CellName) -> slug_error::Result<&CellInstance> {
         if let Some(instance) = self.0.cells.get(&cell) {
+            if let Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(static_setup)) =
+                instance.external()
+                && let Ok(dynamic) = self.0.dynamic_cells.read()
+                && let Some(dynamic_instance) = dynamic
+                    .get(&cell)
+                    .and_then(|entry| self.dynamic_cell_instance_for_lookup(entry))
+                && matches!(
+                    dynamic_instance.external(),
+                    Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(
+                        dynamic_setup
+                    )) if dynamic_setup != static_setup
+                )
+            {
+                drop(dynamic);
+                return self.get_or_create_dynamic_cell(cell);
+            }
             return Ok(instance);
         }
 
@@ -2685,30 +2701,39 @@ impl CellResolver {
     ) -> slug_error::Result<()> {
         let cell = CellName::unchecked_new(name)?;
         let internal_alias = CellName::unchecked_new(setup.internal_name.as_ref()).ok();
-        if self.0.cells.contains_key(&cell) {
-            return Ok(());
+        if let Some(existing) = self.0.cells.get(&cell) {
+            if let Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(existing_setup)) =
+                existing.external()
+            {
+                if existing_setup == &setup {
+                    return Ok(());
+                }
+            } else {
+                return Ok(());
+            }
         }
-        if self
-            .0
-            .dynamic_cells
-            .read()
-            .ok()
-            .and_then(|dynamic| {
-                dynamic
-                    .get(&cell)
-                    .and_then(|entry| self.dynamic_cell_instance_for_lookup(entry))
-                    .map(|_| ())
-            })
-            .is_some()
-        {
-            return Ok(());
+        if let Some(existing) = self.0.dynamic_cells.read().ok().and_then(|dynamic| {
+            dynamic
+                .get(&cell)
+                .and_then(|entry| self.dynamic_cell_instance_for_lookup(entry))
+                .cloned()
+        }) {
+            if let Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(existing_setup)) =
+                existing.external()
+            {
+                if existing_setup == &setup {
+                    return Ok(());
+                }
+            } else {
+                return Ok(());
+            }
         }
 
         let rel_path = ProjectRelativePath::new(path)?;
         let cell_path = CellRootPathBuf::new(rel_path.to_owned());
         let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
         let external = Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(
-            setup,
+            setup.clone(),
         ));
         let instance = CellInstance::new(cell, cell_path, external, nested)?;
         ensure_external_symlink(cell.as_str(), path);
@@ -2724,9 +2749,21 @@ impl CellResolver {
             && internal_alias != cell
             && !self.0.cells.contains_key(&internal_alias)
         {
-            dynamic
-                .entry(internal_alias)
-                .or_insert_with(|| DynamicCellInstance::graph_owned(instance));
+            let should_insert_alias = match dynamic
+                .get(&internal_alias)
+                .and_then(|entry| self.dynamic_cell_instance_for_lookup(entry))
+            {
+                Some(existing) => matches!(
+                    existing.external(),
+                    Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(
+                        existing_setup
+                    )) if existing_setup != &setup
+                ),
+                None => true,
+            };
+            if should_insert_alias {
+                dynamic.insert(internal_alias, DynamicCellInstance::graph_owned(instance));
+            }
         }
         Ok(())
     }
@@ -3235,6 +3272,8 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let sibling_setup = crate::cells::external::ExtensionRepoCellSetup {
@@ -3244,6 +3283,8 @@ mod tests {
             spec_hash: Arc::from("sha256-sibling"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -3381,6 +3422,8 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -3647,6 +3690,8 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -3686,6 +3731,8 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -3721,6 +3768,8 @@ mod tests {
             spec_hash: Arc::from("sha256-generated"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let sibling_setup = crate::cells::external::ExtensionRepoCellSetup {
@@ -3730,6 +3779,8 @@ mod tests {
             spec_hash: Arc::from("sha256-sibling"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -3884,6 +3935,8 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -3948,6 +4001,8 @@ mod tests {
             spec_hash: Arc::from("sha256-late"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         resolver.register_bzlmod_runtime_extension_cell(late_canonical, &late_path, late_setup)?;
@@ -3979,6 +4034,8 @@ mod tests {
             spec_hash: Arc::from("sha256-sibling"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
 
@@ -4006,6 +4063,83 @@ mod tests {
                 .as_str(),
             canonical
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_resolver_runtime_spoke_overlays_static_placeholder_extension_cell()
+    -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let canonical = "owner++ext+generated";
+        let placeholder_setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from(""),
+            repo_spec_json: Arc::from(""),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let real_setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-generated"),
+            repo_spec_json: Arc::from(r#"{"rule":"repo"}"#),
+            repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from("bzl-digest"),
+            extension_recorded_inputs_json: Arc::from("[]"),
+            materialized: false,
+        };
+        let cell_name = CellName::testing_new(canonical);
+        let cell_path = CellRootPathBuf::testing_new(&format!("bazel-external/{canonical}"));
+        let placeholder_instance = CellInstance::new(
+            cell_name,
+            cell_path.clone(),
+            Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(
+                placeholder_setup,
+            )),
+            NestedCells::from_cell_roots(&[], &cell_path),
+        )?;
+        let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance, placeholder_instance],
+            root_aliases,
+            snapshot,
+        )?;
+
+        resolver.register_bzlmod_runtime_extension_cell(
+            canonical,
+            &format!("bazel-external/{canonical}"),
+            real_setup.clone(),
+        )?;
+
+        let cell = resolver.get(cell_name)?;
+        assert!(matches!(
+            cell.external(),
+            Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(origin))
+                if origin == &real_setup
+        ));
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().join("after"));
 
         Ok(())
     }
@@ -4056,6 +4190,8 @@ mod tests {
             spec_hash: Arc::from("sha256-test"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let canonical_path = format!("bazel-external/{canonical}");
@@ -4157,6 +4293,8 @@ mod tests {
             spec_hash: Arc::from("sha256-a"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from(r#"{"REPO_ENV":"A"}"#),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
 

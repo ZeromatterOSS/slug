@@ -2538,6 +2538,8 @@ mod tests {
                 spec_hash: String::new(),
                 repo_spec_json: String::new(),
                 repo_env_json: String::new(),
+                extension_bzl_transitive_digest: String::new(),
+                extension_recorded_inputs_json: String::new(),
                 materialized: false,
                 lazy: false,
             }]);

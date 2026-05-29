@@ -5755,6 +5755,8 @@ mod tests {
             spec_hash: Arc::from("sha256-plan61-metadata-runtime-alias"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -6081,6 +6083,8 @@ mod tests {
             spec_hash: Arc::from("sha256-plan61-toolchain-runtime-alias"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {
@@ -6203,6 +6207,8 @@ mod tests {
             spec_hash: Arc::from("sha256-plan61-impl-runtime-alias"),
             repo_spec_json: Arc::from("{}"),
             repo_env_json: Arc::from("{}"),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
             materialized: false,
         };
         let snapshot = BzlmodRuntimeCellInstallSnapshot {

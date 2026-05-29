@@ -49,8 +49,13 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::Display;
 use dice::DiceComputations;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use slug_bzlmod::AggregatedExtension;
 use slug_bzlmod::ExtensionExecutionOutput;
 use slug_bzlmod::ModuleExtensionExecutorImpl;
@@ -68,6 +73,7 @@ use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePathBuf;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
+use slug_interpreter::file_loader::LoadedModule;
 use slug_interpreter::load_module::InterpreterCalculation;
 use slug_interpreter::paths::module::OwnedStarlarkModulePath;
 use slug_interpreter::paths::module::StarlarkModulePath;
@@ -101,6 +107,62 @@ enum ExtensionExecutionError {
 
     #[error("Extension cell '{cell}' not found")]
     CellNotFound { cell: String },
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "ModuleExtensionLoadedModuleKey({}, {}, {})",
+    workspace_id.stable_hash,
+    extension_bzl_file,
+    bzl_transitive_digest
+)]
+struct ModuleExtensionLoadedModuleKey {
+    workspace_id: WorkspaceId,
+    extension_bzl_file: Arc<str>,
+    bzl_transitive_digest: Arc<str>,
+}
+
+#[derive(Debug, Allocative)]
+struct ModuleExtensionLoadedModuleValue {
+    loaded_module: LoadedModule,
+    bzl_transitive_digest: Arc<str>,
+}
+
+#[async_trait]
+impl Key for ModuleExtensionLoadedModuleKey {
+    type Value = slug_error::Result<Arc<ModuleExtensionLoadedModuleValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let cell_resolver = ctx.get_cell_resolver().await?;
+        let import_path = parse_bzlmod_bzl_path(&self.extension_bzl_file, &cell_resolver)?;
+        let loaded_module = ctx
+            .get_loaded_module(StarlarkModulePath::LoadFile(&import_path))
+            .await
+            .buck_error_context(format!(
+                "Loading extension bzl file: {}",
+                self.extension_bzl_file
+            ))?;
+
+        Ok(Arc::new(ModuleExtensionLoadedModuleValue {
+            loaded_module,
+            bzl_transitive_digest: self.bzl_transitive_digest.clone(),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.bzl_transitive_digest == y.bzl_transitive_digest,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 /// Parse a bzlmod-style bzl file path into an ImportPath.
@@ -336,38 +398,37 @@ impl ConcreteModuleExtensionExecutor {
         ctx: &mut DiceComputations<'_>,
         aggregated: &AggregatedExtension,
         workspace_id: WorkspaceId,
+        bzl_transitive_digest: Arc<str>,
         mut module_ctx: crate::module_ctx::ModuleContext,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
-        // 1. Get the cell resolver to parse the bzl path
-        let cell_resolver = ctx.get_cell_resolver().await?;
-
-        // 2. Parse the bzl path
-        let import_path = parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
+        // 1. Load the module through a stable extension-specific DICE key.
+        // The generic interpreter load key cannot compare Starlark modules for
+        // equality, while extension execution already has a strict transitive
+        // implementation digest as its semantic input.
+        let loaded_module = ctx
+            .compute(&ModuleExtensionLoadedModuleKey {
+                workspace_id: workspace_id.clone(),
+                extension_bzl_file: Arc::from(aggregated.extension_bzl_file.as_str()),
+                bzl_transitive_digest,
+            })
+            .await??
+            .loaded_module
+            .dupe();
 
         tracing::debug!(
-            "Extension execution: bzl_file='{}' -> import_path='{}' (cell='{}')",
+            "Extension execution: bzl_file='{}' -> module_path='{}'",
             aggregated.extension_bzl_file,
-            import_path,
-            import_path.cell()
+            loaded_module.path()
         );
 
-        // 3. Load the module via DICE
-        let loaded_module = ctx
-            .get_loaded_module(StarlarkModulePath::LoadFile(&import_path))
-            .await
-            .buck_error_context(format!(
-                "Loading extension bzl file: {}",
-                aggregated.extension_bzl_file
-            ))?;
-
-        // 4. Get the extension value from the module
+        // 2. Get the extension value from the module
         let ext_value = loaded_module
             .env()
             .get_any_visibility(&aggregated.extension_name)
             .map_err(|e| from_any_with_tag(e, slug_error::ErrorTag::Input))?
             .0;
 
-        // 5. Downcast to FrozenStarlarkModuleExtension
+        // 3. Downcast to FrozenStarlarkModuleExtension
         let frozen_extension: OwnedFrozenValueTyped<FrozenStarlarkModuleExtension> = ext_value
             .downcast_starlark()
             .map_err(|_| ExtensionExecutionError::NotAModuleExtension {
@@ -377,7 +438,7 @@ impl ConcreteModuleExtensionExecutor {
 
         tracing::debug!("Found extension '{}' in module", frozen_extension.name());
 
-        // 5b. Extract tag class defaults and apply to module_ctx
+        // 3b. Extract tag class defaults and apply to module_ctx
         // This ensures missing tag attributes get their declared default values
         // (e.g., attr.string_list_dict(default={}) → {} instead of None)
         {
@@ -417,7 +478,7 @@ impl ConcreteModuleExtensionExecutor {
             }
         }
 
-        // 6. Execute with RepoSpec capture registry active.
+        // 4. Execute with RepoSpec capture registry active.
         //
         // Plan 36: also stash a thread-local pointer to `ctx` so that
         // `mctx.path(Label)` / `mctx.read(Label)` calls inside the eval
@@ -514,6 +575,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
         repo_env: Arc<BTreeMap<String, String>>,
+        bzl_transitive_digest: Arc<str>,
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
         tracing::debug!(
@@ -585,7 +647,13 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         }
 
         let output = self
-            .try_execute_starlark(ctx, aggregated, workspace_id, module_ctx)
+            .try_execute_starlark(
+                ctx,
+                aggregated,
+                workspace_id,
+                bzl_transitive_digest.clone(),
+                module_ctx,
+            )
             .await
             .buck_error_context(format!(
                 "module extension '{}' failed",
@@ -633,6 +701,12 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                     ),
                     repo_spec_json: Arc::from(repo_spec_json.as_str()),
                     repo_env_json: Arc::from(repo_env_json.as_str()),
+                    extension_bzl_transitive_digest: bzl_transitive_digest.clone(),
+                    extension_recorded_inputs_json: Arc::from(
+                        serde_json::to_string(&output.recorded_inputs)
+                            .unwrap_or_else(|_| "[]".to_owned())
+                            .as_str(),
+                    ),
                     materialized: false,
                 };
                 cell_resolver.register_bzlmod_runtime_extension_cell(

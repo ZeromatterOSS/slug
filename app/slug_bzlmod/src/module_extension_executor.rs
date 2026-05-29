@@ -112,6 +112,7 @@ pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
     /// * `aggregated` - Aggregated extension data from all modules
     /// * `root_module_name` - Name of the root module (for `module_ctx.modules` ordering)
     /// * `working_dir` - Temporary working directory for `module_ctx` I/O operations
+    /// * `bzl_transitive_digest` - Digest of the extension implementation `.bzl` load graph
     ///
     /// # Returns
     ///
@@ -125,6 +126,7 @@ pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
         working_dir: &PathBuf,
         prior_facts: serde_json::Value,
         repo_env: Arc<BTreeMap<String, String>>,
+        bzl_transitive_digest: Arc<str>,
         workspace_id: WorkspaceId,
     ) -> slug_error::Result<ExtensionExecutionOutput>;
 }
