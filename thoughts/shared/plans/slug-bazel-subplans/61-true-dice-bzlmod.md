@@ -664,6 +664,13 @@ Current state to preserve:
   updater APIs. Guardrails: `cargo check -p slug_bzlmod -p slug_common`,
   `cargo test -p slug_bzlmod cell_graph --lib`, `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 module-source injection made crate-private:
+  `BzlmodModuleSourcesDataKey` and `BzlmodModuleSourcesDataValue` are no longer
+  public module/facade items. The clean graph producer still injects the
+  module-source projection internally, but external crates cannot depend on the
+  transient payload type directly. Guardrails: `cargo check -p slug_bzlmod -p
+  slug_common`, targeted `rg` for public use-sites, `cargo test -p
+  slug_bzlmod cell_graph --lib`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

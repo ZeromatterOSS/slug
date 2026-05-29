@@ -2871,10 +2871,10 @@ pub fn resolved_graph_cell_names(graph: &ResolvedGraph) -> Vec<String> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-pub struct BzlmodModuleSourcesDataValue {
-    pub workspace_id: WorkspaceId,
-    pub resolution_digest: Arc<str>,
-    pub modules: Arc<Vec<BzlmodResolvedModuleSource>>,
+pub(crate) struct BzlmodModuleSourcesDataValue {
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) resolution_digest: Arc<str>,
+    pub(crate) modules: Arc<Vec<BzlmodResolvedModuleSource>>,
 }
 
 impl BzlmodModuleSourcesDataValue {
@@ -2893,7 +2893,7 @@ impl BzlmodModuleSourcesDataValue {
 
 #[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodModuleSourcesDataKey")]
-pub struct BzlmodModuleSourcesDataKey;
+pub(crate) struct BzlmodModuleSourcesDataKey;
 
 impl dice::InjectedKey for BzlmodModuleSourcesDataKey {
     type Value = Arc<BzlmodModuleSourcesDataValue>;
