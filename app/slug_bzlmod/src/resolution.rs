@@ -429,6 +429,17 @@ pub struct MvsResolver {
     /// source-input producer.
     precomputed_local_override_modules: HashMap<String, ParsedModuleFile>,
     precomputed_local_override_modules_set: bool,
+    /// Parsed git/archive override MODULE.bazel files supplied by the clean
+    /// DICE source-input producer after it materializes the override source.
+    precomputed_non_registry_override_modules:
+        HashMap<String, PrecomputedNonRegistryOverrideModule>,
+    precomputed_non_registry_override_modules_set: bool,
+}
+
+#[derive(Clone)]
+struct PrecomputedNonRegistryOverrideModule {
+    module_dir: PathBuf,
+    parsed: ParsedModuleFile,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -464,6 +475,8 @@ impl MvsResolver {
             override_patch_inputs,
             precomputed_local_override_modules: HashMap::new(),
             precomputed_local_override_modules_set: false,
+            precomputed_non_registry_override_modules: HashMap::new(),
+            precomputed_non_registry_override_modules_set: false,
         })
     }
 
@@ -493,6 +506,8 @@ impl MvsResolver {
             override_patch_inputs,
             precomputed_local_override_modules: HashMap::new(),
             precomputed_local_override_modules_set: false,
+            precomputed_non_registry_override_modules: HashMap::new(),
+            precomputed_non_registry_override_modules_set: false,
         })
     }
 
@@ -502,6 +517,22 @@ impl MvsResolver {
     {
         self.precomputed_local_override_modules = modules.into_iter().collect();
         self.precomputed_local_override_modules_set = true;
+    }
+
+    pub fn set_precomputed_non_registry_override_modules<I>(&mut self, modules: I)
+    where
+        I: IntoIterator<Item = (String, PathBuf, ParsedModuleFile)>,
+    {
+        self.precomputed_non_registry_override_modules = modules
+            .into_iter()
+            .map(|(module_name, module_dir, parsed)| {
+                (
+                    module_name,
+                    PrecomputedNonRegistryOverrideModule { module_dir, parsed },
+                )
+            })
+            .collect();
+        self.precomputed_non_registry_override_modules_set = true;
     }
 
     /// Configure Bazel yanked-version policy for this command.
@@ -823,192 +854,48 @@ impl MvsResolver {
                     .insert(lp.module_name.clone(), discovered);
             }
             Override::Git(g) => {
-                // Fetch the git repo to a cache directory and parse its MODULE.bazel
-                let patch_digest =
-                    crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
-                        &g.patches,
-                        g.patch_strip,
-                        &self.override_patch_inputs,
-                    )
-                    .with_buck_error_context(|| {
-                        format!(
-                            "Failed to fingerprint patches for git override '{}'",
-                            g.module_name
-                        )
-                    })?;
-                let dest_dir = self
-                    .cache
-                    .git_override_dir_with_patch_digest(g, patch_digest.as_deref());
-                let complete_marker = dest_dir.join(".complete");
-
-                if !complete_marker.exists() {
-                    tracing::info!(
-                        "Fetching git override for {} from {} at {}",
-                        g.module_name,
-                        g.remote,
-                        g.commit
-                    );
-                    if dest_dir.exists() {
-                        let _ = std::fs::remove_dir_all(&dest_dir);
-                    }
-                    std::fs::create_dir_all(&dest_dir)
-                        .buck_error_context("Failed to create git override dir")?;
-
-                    let source_info = crate::registry::SourceInfo {
-                        source_type: Some("git_repository".to_string()),
-                        url: None,
-                        urls: None,
-                        integrity: None,
-                        strip_prefix: None,
-                        overlay: crate::registry::RegistryFileMap::new(),
-                        patches: crate::registry::RegistryFileMap::new(),
-                        patch_strip: g.patch_strip,
-                        remote: Some(g.remote.clone()),
-                        commit: Some(g.commit.clone()),
-                        shallow_since: g.shallow_since.clone(),
-                    };
-
-                    self.source_fetcher
-                        .fetch_git_direct(&source_info, &dest_dir)
-                        .await?;
-                    crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
-                        &dest_dir,
-                        &g.patches,
-                        g.patch_strip,
-                        &self.override_patch_inputs,
-                    )
-                    .with_buck_error_context(|| {
-                        format!(
-                            "Failed to apply patches for git override '{}'",
-                            g.module_name
-                        )
-                    })?;
-                    std::fs::write(&complete_marker, "")
-                        .buck_error_context("Failed to write git override marker")?;
-                } else {
-                    tracing::debug!("Using cached git override for {}", g.module_name);
-                }
-
-                // Parse MODULE.bazel from the fetched source
-                let module_bazel_path = dest_dir.join("MODULE.bazel");
-                let parsed_module = if module_bazel_path.exists() {
-                    let parsed = parse_non_root_module_bazel(&module_bazel_path)
-                        .with_buck_error_context(|| {
-                            format!(
-                                "Failed to parse MODULE.bazel for git override '{}'",
-                                g.module_name
-                            )
-                        })?;
-                    parsed.module
-                } else {
-                    let mut module = Module::empty();
-                    module.name = g.module_name.clone();
-                    module
-                };
+                let resolved = resolve_non_registry_override_from_precomputed_inputs(
+                    &g.module_name,
+                    &self.precomputed_non_registry_override_modules,
+                    self.precomputed_non_registry_override_modules_set,
+                )?;
 
                 let version = Version::empty();
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&g.module_name, version.as_str()),
-                    compatibility_level: parsed_module.compatibility_level,
-                    module: parsed_module,
+                    compatibility_level: resolved.module.compatibility_level,
+                    module: resolved.module,
                     source: ModuleSource::Git {
                         remote: g.remote.clone(),
                         commit: g.commit.clone(),
                         shallow_since: g.shallow_since.clone(),
                         patches: g.patches.clone(),
                         patch_strip: g.patch_strip,
-                        fetched_path: Some(dest_dir),
+                        fetched_path: Some(resolved.module_dir),
                     },
                 };
                 self.overridden_modules
                     .insert(g.module_name.clone(), discovered);
             }
             Override::Archive(a) => {
-                // Fetch the archive to a cache directory and parse its MODULE.bazel
-                let patch_digest =
-                    crate::fetch::SourceFetcher::local_override_patch_digest_with_inputs(
-                        &a.patches,
-                        a.patch_strip,
-                        &self.override_patch_inputs,
-                    )
-                    .with_buck_error_context(|| {
-                        format!(
-                            "Failed to fingerprint patches for archive override '{}'",
-                            a.module_name
-                        )
-                    })?;
-                let dest_dir = self
-                    .cache
-                    .archive_override_dir_with_patch_digest(a, patch_digest.as_deref());
-                let complete_marker = dest_dir.join(".complete");
-
-                if !complete_marker.exists() {
-                    tracing::info!(
-                        "Fetching archive override for {} from {:?}",
-                        a.module_name,
-                        a.urls
-                    );
-                    if dest_dir.exists() {
-                        let _ = std::fs::remove_dir_all(&dest_dir);
-                    }
-                    std::fs::create_dir_all(&dest_dir)
-                        .buck_error_context("Failed to create archive override dir")?;
-
-                    self.source_fetcher
-                        .fetch_archive_direct(
-                            &a.urls,
-                            a.integrity.as_deref(),
-                            a.strip_prefix.as_deref(),
-                            &dest_dir,
-                        )
-                        .await?;
-                    crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
-                        &dest_dir,
-                        &a.patches,
-                        a.patch_strip,
-                        &self.override_patch_inputs,
-                    )
-                    .with_buck_error_context(|| {
-                        format!(
-                            "Failed to apply patches for archive override '{}'",
-                            a.module_name
-                        )
-                    })?;
-                    std::fs::write(&complete_marker, "")
-                        .buck_error_context("Failed to write archive override marker")?;
-                } else {
-                    tracing::debug!("Using cached archive override for {}", a.module_name);
-                }
-
-                // Parse MODULE.bazel from the fetched source
-                let module_bazel_path = dest_dir.join("MODULE.bazel");
-                let parsed_module = if module_bazel_path.exists() {
-                    let parsed = parse_non_root_module_bazel(&module_bazel_path)
-                        .with_buck_error_context(|| {
-                            format!(
-                                "Failed to parse MODULE.bazel for archive override '{}'",
-                                a.module_name
-                            )
-                        })?;
-                    parsed.module
-                } else {
-                    let mut module = Module::empty();
-                    module.name = a.module_name.clone();
-                    module
-                };
+                let resolved = resolve_non_registry_override_from_precomputed_inputs(
+                    &a.module_name,
+                    &self.precomputed_non_registry_override_modules,
+                    self.precomputed_non_registry_override_modules_set,
+                )?;
 
                 let version = Version::empty();
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&a.module_name, version.as_str()),
-                    compatibility_level: parsed_module.compatibility_level,
-                    module: parsed_module,
+                    compatibility_level: resolved.module.compatibility_level,
+                    module: resolved.module,
                     source: ModuleSource::Archive {
                         urls: a.urls.clone(),
                         integrity: a.integrity.clone(),
                         strip_prefix: a.strip_prefix.clone(),
                         patches: a.patches.clone(),
                         patch_strip: a.patch_strip,
-                        fetched_path: Some(dest_dir),
+                        fetched_path: Some(resolved.module_dir),
                     },
                 };
                 self.overridden_modules
@@ -1833,6 +1720,37 @@ fn resolve_local_override_from_precomputed_inputs(
     })
 }
 
+struct ResolvedNonRegistryOverrideModule {
+    module_dir: PathBuf,
+    module: Module,
+}
+
+fn resolve_non_registry_override_from_precomputed_inputs(
+    module_name: &str,
+    precomputed_modules: &HashMap<String, PrecomputedNonRegistryOverrideModule>,
+    precomputed_modules_set: bool,
+) -> slug_error::Result<ResolvedNonRegistryOverrideModule> {
+    if !precomputed_modules_set {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Tier0,
+            "DICE bzlmod non-registry override resolution for '{}' requires precomputed git/archive override MODULE.bazel inputs",
+            module_name
+        ));
+    }
+    let Some(precomputed) = precomputed_modules.get(module_name) else {
+        return Err(LocalResolutionError::MissingModuleBazel(format!(
+            "DICE bzlmod non-registry override resolution for '{}' requires precomputed git/archive override MODULE.bazel inputs",
+            module_name
+        ))
+        .into());
+    };
+
+    Ok(ResolvedNonRegistryOverrideModule {
+        module_dir: precomputed.module_dir.clone(),
+        module: precomputed.parsed.module.clone(),
+    })
+}
+
 fn resolve_local_override_without_precomputed_inputs(
     override_info: &LocalPathOverride,
     workspace_root: &Path,
@@ -2354,6 +2272,40 @@ module(name = "local_lib", version = "2.0.0")
         assert_eq!(resolved.version.as_str(), "2.0.0");
         assert_eq!(resolved.module.compatibility_level, 3);
         assert!(resolved.has_module_file);
+    }
+
+    #[test]
+    fn test_resolve_non_registry_module_from_precomputed_inputs() {
+        let dir = TempDir::new().unwrap();
+        let module_dir = dir.path().join("git_dep");
+        fs::create_dir_all(&module_dir).unwrap();
+        let mut parsed = ParsedModuleFile {
+            module: Module::new("git_dep".to_owned(), Version::empty()),
+            has_module_directive: true,
+            extension_usages: Vec::new(),
+            repo_rule_invocations: Vec::new(),
+            registered_toolchains: Vec::new(),
+            registered_execution_platforms: Vec::new(),
+        };
+        parsed.module.compatibility_level = 2;
+        let precomputed_modules = HashMap::from([(
+            "git_dep".to_owned(),
+            PrecomputedNonRegistryOverrideModule {
+                module_dir: module_dir.clone(),
+                parsed,
+            },
+        )]);
+
+        let resolved = resolve_non_registry_override_from_precomputed_inputs(
+            "git_dep",
+            &precomputed_modules,
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(resolved.module_dir, module_dir);
+        assert_eq!(resolved.module.name, "git_dep");
+        assert_eq!(resolved.module.compatibility_level, 2);
     }
 
     #[test]

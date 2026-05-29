@@ -37,7 +37,7 @@ use crate::cache::ModuleCache;
 use crate::integrity::verify_integrity;
 use crate::registry::SourceInfo;
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 pub struct OverridePatchInput {
     pub label: String,
     pub path: PathBuf,
@@ -45,7 +45,7 @@ pub struct OverridePatchInput {
     pub content: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Allocative)]
 pub struct OverridePatchInputs {
     pub digest: String,
     pub inputs: Vec<OverridePatchInput>,

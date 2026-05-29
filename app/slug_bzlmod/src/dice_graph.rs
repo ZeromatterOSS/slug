@@ -51,6 +51,7 @@ use crate::lockfile::LockfileMode;
 use crate::lockfile::lockfile_path;
 use crate::parser::ModuleFileInputDigest;
 use crate::parser::validate_parsed_root_extension_repo_directives;
+use crate::registry::SourceInfo;
 use crate::repo_spec::RepoSpec;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
@@ -387,8 +388,49 @@ pub struct LocalOverrideModuleInputsValue {
 pub struct NonRegistryOverrideModuleInputsValue {
     pub digest: String,
     pub parsed_modules: Vec<(String, ParsedModuleFile)>,
+    pub module_dirs: Vec<(String, PathBuf)>,
     pub has_inputs: bool,
     pub has_untracked_inputs: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+pub struct NonRegistryOverrideModuleInput {
+    pub module_name: String,
+    pub module_dir: PathBuf,
+    pub source: NonRegistryOverrideModuleSource,
+}
+
+impl NonRegistryOverrideModuleInput {
+    pub fn kind(&self) -> &'static str {
+        self.source.kind()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+pub enum NonRegistryOverrideModuleSource {
+    Git {
+        remote: String,
+        commit: String,
+        shallow_since: Option<String>,
+        patches: Vec<String>,
+        patch_strip: u32,
+    },
+    Archive {
+        urls: Vec<String>,
+        integrity: Option<String>,
+        strip_prefix: Option<String>,
+        patches: Vec<String>,
+        patch_strip: u32,
+    },
+}
+
+impl NonRegistryOverrideModuleSource {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Git { .. } => "git override",
+            Self::Archive { .. } => "archive override",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
@@ -646,11 +688,11 @@ pub fn override_patch_labels_from_module(
     (main_repo_name, labels.into_iter().collect())
 }
 
-pub fn non_registry_override_module_dirs_from_root_module(
+pub fn non_registry_override_module_inputs_from_root_module(
     root_module_file: &RootModuleFileValue,
     ignore_dev_dependency: bool,
     override_patch_inputs: &crate::OverridePatchInputs,
-) -> slug_error::Result<Vec<(String, PathBuf)>> {
+) -> slug_error::Result<Vec<NonRegistryOverrideModuleInput>> {
     let Some(parsed) = &root_module_file.parsed else {
         return Ok(Vec::new());
     };
@@ -662,7 +704,7 @@ pub fn non_registry_override_module_dirs_from_root_module(
         return Ok(Vec::new());
     }
     let cache = ModuleCache::new()?;
-    let mut dirs = Vec::new();
+    let mut inputs = Vec::new();
     for override_ in &active_overrides {
         match override_ {
             Override::Git(git) => {
@@ -672,10 +714,18 @@ pub fn non_registry_override_module_dirs_from_root_module(
                         git.patch_strip,
                         override_patch_inputs,
                     )?;
-                dirs.push((
-                    git.module_name.clone(),
-                    cache.git_override_dir_with_patch_digest(git, patch_digest.as_deref()),
-                ));
+                inputs.push(NonRegistryOverrideModuleInput {
+                    module_name: git.module_name.clone(),
+                    module_dir: cache
+                        .git_override_dir_with_patch_digest(git, patch_digest.as_deref()),
+                    source: NonRegistryOverrideModuleSource::Git {
+                        remote: git.remote.clone(),
+                        commit: git.commit.clone(),
+                        shallow_since: git.shallow_since.clone(),
+                        patches: git.patches.clone(),
+                        patch_strip: git.patch_strip,
+                    },
+                });
             }
             Override::Archive(archive) => {
                 let patch_digest =
@@ -684,15 +734,140 @@ pub fn non_registry_override_module_dirs_from_root_module(
                         archive.patch_strip,
                         override_patch_inputs,
                     )?;
-                dirs.push((
-                    archive.module_name.clone(),
-                    cache.archive_override_dir_with_patch_digest(archive, patch_digest.as_deref()),
-                ));
+                inputs.push(NonRegistryOverrideModuleInput {
+                    module_name: archive.module_name.clone(),
+                    module_dir: cache
+                        .archive_override_dir_with_patch_digest(archive, patch_digest.as_deref()),
+                    source: NonRegistryOverrideModuleSource::Archive {
+                        urls: archive.urls.clone(),
+                        integrity: archive.integrity.clone(),
+                        strip_prefix: archive.strip_prefix.clone(),
+                        patches: archive.patches.clone(),
+                        patch_strip: archive.patch_strip,
+                    },
+                });
             }
             _ => {}
         }
     }
-    Ok(dirs)
+    Ok(inputs)
+}
+
+pub async fn materialize_non_registry_override_module_input(
+    input: &NonRegistryOverrideModuleInput,
+    override_patch_inputs: &crate::OverridePatchInputs,
+) -> slug_error::Result<()> {
+    let complete_marker = input.module_dir.join(".complete");
+    if complete_marker.exists() {
+        tracing::debug!(
+            "Using cached {} source for {} at {:?}",
+            input.kind(),
+            input.module_name,
+            input.module_dir
+        );
+        return Ok(());
+    }
+
+    if input.module_dir.exists() {
+        let _ = std::fs::remove_dir_all(&input.module_dir);
+    }
+    std::fs::create_dir_all(&input.module_dir).with_buck_error_context(|| {
+        format!(
+            "Failed to create {} cache directory for '{}' at {:?}",
+            input.kind(),
+            input.module_name,
+            input.module_dir
+        )
+    })?;
+
+    let cache = ModuleCache::new()?;
+    let source_fetcher = crate::fetch::SourceFetcher::new(cache).await?;
+    match &input.source {
+        NonRegistryOverrideModuleSource::Git {
+            remote,
+            commit,
+            shallow_since,
+            patches,
+            patch_strip,
+        } => {
+            tracing::info!(
+                "Fetching git override for {} from {} at {}",
+                input.module_name,
+                remote,
+                commit
+            );
+            let source_info = SourceInfo {
+                source_type: Some("git_repository".to_owned()),
+                url: None,
+                urls: None,
+                integrity: None,
+                strip_prefix: None,
+                overlay: crate::registry::RegistryFileMap::new(),
+                patches: crate::registry::RegistryFileMap::new(),
+                patch_strip: *patch_strip,
+                remote: Some(remote.clone()),
+                commit: Some(commit.clone()),
+                shallow_since: shallow_since.clone(),
+            };
+            source_fetcher
+                .fetch_git_direct(&source_info, &input.module_dir)
+                .await?;
+            crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
+                &input.module_dir,
+                patches,
+                *patch_strip,
+                override_patch_inputs,
+            )
+            .with_buck_error_context(|| {
+                format!(
+                    "Failed to apply patches for git override '{}'",
+                    input.module_name
+                )
+            })?;
+        }
+        NonRegistryOverrideModuleSource::Archive {
+            urls,
+            integrity,
+            strip_prefix,
+            patches,
+            patch_strip,
+        } => {
+            tracing::info!(
+                "Fetching archive override for {} from {:?}",
+                input.module_name,
+                urls
+            );
+            source_fetcher
+                .fetch_archive_direct(
+                    urls,
+                    integrity.as_deref(),
+                    strip_prefix.as_deref(),
+                    &input.module_dir,
+                )
+                .await?;
+            crate::fetch::SourceFetcher::apply_local_override_patches_with_inputs(
+                &input.module_dir,
+                patches,
+                *patch_strip,
+                override_patch_inputs,
+            )
+            .with_buck_error_context(|| {
+                format!(
+                    "Failed to apply patches for archive override '{}'",
+                    input.module_name
+                )
+            })?;
+        }
+    }
+    std::fs::write(&complete_marker, "").with_buck_error_context(|| {
+        format!(
+            "Failed to write {} completion marker for '{}' at {:?}",
+            input.kind(),
+            input.module_name,
+            complete_marker
+        )
+    })?;
+    Ok(())
 }
 
 /// The module name used by the canonical rules_python Bazel module. Matched
@@ -903,6 +1078,26 @@ pub async fn resolve_graph_with_module_file_inputs(
     resolver.set_precomputed_local_override_modules(
         local_override_inputs.parsed_modules.iter().cloned(),
     );
+    let non_registry_module_dirs: HashMap<_, _> = non_registry_override_inputs
+        .module_dirs
+        .iter()
+        .map(|(name, module_dir)| (name.as_str(), module_dir))
+        .collect();
+    let precomputed_non_registry_modules = non_registry_override_inputs
+        .parsed_modules
+        .iter()
+        .map(|(name, parsed)| {
+            let Some(module_dir) = non_registry_module_dirs.get(name.as_str()) else {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "DICE bzlmod non-registry override inputs for '{}' are missing the materialized module directory",
+                    name
+                ));
+            };
+            Ok((name.clone(), (*module_dir).clone(), parsed.clone()))
+        })
+        .collect::<slug_error::Result<Vec<_>>>()?;
+    resolver.set_precomputed_non_registry_override_modules(precomputed_non_registry_modules);
     if let Some(lockfile) = visible_lockfile {
         resolver.set_yanked_version_policy(
             allowed_yanked_versions,
@@ -5229,6 +5424,7 @@ mod tests {
             non_registry_override_inputs: Arc::new(NonRegistryOverrideModuleInputsValue {
                 digest: "non-registry".to_owned(),
                 parsed_modules: Vec::new(),
+                module_dirs: Vec::new(),
                 has_inputs: false,
                 has_untracked_inputs: false,
             }),
@@ -5443,6 +5639,7 @@ mod tests {
             &NonRegistryOverrideModuleInputsValue {
                 digest: "non-registry".to_owned(),
                 parsed_modules: Vec::new(),
+                module_dirs: Vec::new(),
                 has_inputs: false,
                 has_untracked_inputs: false,
             },
@@ -5470,7 +5667,7 @@ mod tests {
     }
 
     #[test]
-    fn non_registry_override_dirs_include_patch_digest() {
+    fn non_registry_override_inputs_include_patch_digest() {
         let mut root = parsed_module("root");
         let git = GitOverride {
             module_name: "dep".to_owned(),
@@ -5506,16 +5703,25 @@ mod tests {
             .unwrap();
         let cache = ModuleCache::new().unwrap();
 
-        let dirs =
-            non_registry_override_module_dirs_from_root_module(&root_value, false, &patch_inputs)
+        let inputs =
+            non_registry_override_module_inputs_from_root_module(&root_value, false, &patch_inputs)
                 .unwrap();
 
-        assert_eq!(dirs.len(), 1);
-        assert_eq!(dirs[0].0, "dep");
+        assert_eq!(inputs.len(), 1);
+        assert_eq!(inputs[0].module_name, "dep");
         assert_eq!(
-            dirs[0].1,
+            inputs[0].module_dir,
             cache.git_override_dir_with_patch_digest(&git, expected_patch_digest.as_deref())
         );
+        assert!(matches!(
+            inputs[0].source,
+            NonRegistryOverrideModuleSource::Git {
+                ref remote,
+                ref commit,
+                patch_strip,
+                ..
+            } if remote == &git.remote && commit == &git.commit && patch_strip == git.patch_strip
+        ));
     }
 
     #[test]

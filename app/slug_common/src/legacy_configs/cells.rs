@@ -1623,7 +1623,8 @@ struct LocalOverrideModuleInputsKey {
 #[display("NonRegistryOverrideModuleInputsKey({})", project_root.display())]
 struct NonRegistryOverrideModuleInputsKey {
     project_root: AbsNormPathBuf,
-    overrides: Vec<(String, PathBuf)>,
+    overrides: Vec<slug_bzlmod::NonRegistryOverrideModuleInput>,
+    override_patch_inputs: Arc<slug_bzlmod::OverridePatchInputs>,
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -1639,7 +1640,7 @@ struct LocalOverrideModuleInputsPollKey {
 #[cfg(test)]
 struct NonRegistryOverrideModuleInputsPollKey {
     project_root: AbsNormPathBuf,
-    overrides: Vec<(String, PathBuf)>,
+    overrides: Vec<slug_bzlmod::NonRegistryOverrideModuleInput>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
@@ -1696,14 +1697,6 @@ struct OverridePatchInputsKey {
     project_root: AbsNormPathBuf,
     main_repo_name: Option<String>,
     patch_labels: Vec<String>,
-}
-
-fn non_registry_override_kind(module_dir: &Path) -> &'static str {
-    match module_dir.file_name().and_then(|name| name.to_str()) {
-        Some(name) if name.starts_with("git-") => "git override",
-        Some(name) if name.starts_with("archive-") => "archive override",
-        _ => "non-registry override",
-    }
 }
 
 async fn local_override_module_inputs_digest(
@@ -1939,26 +1932,45 @@ fn local_override_inputs_poll_digest(
 async fn non_registry_override_module_inputs_digest(
     ctx: &mut DiceComputations<'_>,
     project_root: &AbsNormPathBuf,
-    overrides: &[(String, PathBuf)],
+    overrides: &[slug_bzlmod::NonRegistryOverrideModuleInput],
+    override_patch_inputs: &slug_bzlmod::OverridePatchInputs,
 ) -> slug_error::Result<NonRegistryOverrideModuleInputsValue> {
     let project_fs = ProjectRoot::new_unchecked(project_root.clone());
     let mut hasher = Sha256::new();
-    hasher.update(b"non-registry-override-module-inputs-v1");
+    hasher.update(b"non-registry-override-module-inputs-v2");
+    hasher.update([0]);
+    hasher.update(override_patch_inputs.digest.as_bytes());
     hasher.update([0]);
     let mut has_untracked_inputs = false;
     let mut parsed_modules = Vec::new();
+    let mut module_dirs = Vec::new();
 
-    for (module_name, module_dir) in overrides {
-        let normalized_module_dir = match module_dir.as_path().canonicalize() {
+    for input in overrides {
+        slug_bzlmod::materialize_non_registry_override_module_input(input, override_patch_inputs)
+            .await
+            .with_buck_error_context(|| {
+                format!(
+                    "Failed to materialize {} source for '{}'",
+                    input.kind(),
+                    input.module_name
+                )
+            })?;
+        let normalized_module_dir = match input.module_dir.as_path().canonicalize() {
             Ok(canonical) => AbsNormPathBuf::try_from(canonical)?,
-            Err(_) => AbsNormPathBuf::try_from(normalize_path_lexically(module_dir.clone()))?,
+            Err(_) => AbsNormPathBuf::try_from(normalize_path_lexically(input.module_dir.clone()))?,
         };
-        let override_kind = non_registry_override_kind(normalized_module_dir.as_path());
+        let override_kind = input.kind();
         let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
-        hasher.update(module_name.as_bytes());
+        hasher.update(input.module_name.as_bytes());
         hasher.update([0]);
         hasher.update(normalized_module_dir.to_string_lossy().as_bytes());
         hasher.update([0]);
+        hasher.update(format!("{:?}", input.source).as_bytes());
+        hasher.update([0]);
+        module_dirs.push((
+            input.module_name.clone(),
+            normalized_module_dir.as_path().to_path_buf(),
+        ));
 
         let (module_read, tracking) =
             read_bzlmod_file_for_module_inputs(ctx, &project_fs, &module_bazel_path)
@@ -1966,7 +1978,7 @@ async fn non_registry_override_module_inputs_digest(
                 .with_buck_error_context(|| {
                     format!(
                         "Failed to parse MODULE.bazel for {} '{}' at {:?}: expected valid UTF-8",
-                        override_kind, module_name, module_bazel_path
+                        override_kind, input.module_name, module_bazel_path
                     )
                 })?;
         if tracking != BzlmodFileInputTracking::Project {
@@ -1989,24 +2001,37 @@ async fn non_registry_override_module_inputs_digest(
                 .with_buck_error_context(|| {
                     format!(
                         "Failed to parse MODULE.bazel for {} '{}' at {:?}",
-                        override_kind, module_name, module_bazel_path
+                        override_kind, input.module_name, module_bazel_path
                     )
                 })?;
                 has_untracked_inputs |= parsed_with_inputs.has_untracked_inputs;
-                for input in &parsed_with_inputs.parsed_with_inputs.inputs {
-                    hasher.update(input.path.to_string_lossy().as_bytes());
+                for file_input in &parsed_with_inputs.parsed_with_inputs.inputs {
+                    hasher.update(file_input.path.to_string_lossy().as_bytes());
                     hasher.update([0]);
-                    hasher.update(input.digest.as_bytes());
+                    hasher.update(file_input.digest.as_bytes());
                     hasher.update([0]);
                 }
                 parsed_modules.push((
-                    module_name.clone(),
+                    input.module_name.clone(),
                     parsed_with_inputs.parsed_with_inputs.parsed,
                 ));
             }
             None => {
                 hasher.update(b"missing");
                 hasher.update([0]);
+                let mut module = slug_bzlmod::Module::empty();
+                module.name = input.module_name.clone();
+                parsed_modules.push((
+                    input.module_name.clone(),
+                    slug_bzlmod::ParsedModuleFile {
+                        module,
+                        has_module_directive: false,
+                        extension_usages: Vec::new(),
+                        repo_rule_invocations: Vec::new(),
+                        registered_toolchains: Vec::new(),
+                        registered_execution_platforms: Vec::new(),
+                    },
+                ));
             }
         }
     }
@@ -2014,6 +2039,7 @@ async fn non_registry_override_module_inputs_digest(
     Ok(NonRegistryOverrideModuleInputsValue {
         digest: hex::encode(hasher.finalize()),
         parsed_modules,
+        module_dirs,
         has_inputs: !overrides.is_empty(),
         has_untracked_inputs,
     })
@@ -2077,22 +2103,24 @@ async fn override_patch_inputs(
 #[cfg(test)]
 fn non_registry_override_inputs_poll_digest(
     project_fs: &ProjectRoot,
-    overrides: &[(String, PathBuf)],
+    overrides: &[slug_bzlmod::NonRegistryOverrideModuleInput],
 ) -> slug_error::Result<BzlmodInputsPollValue> {
     let mut hasher = Sha256::new();
     hasher.update(b"non-registry-override-module-inputs-poll-v1");
     hasher.update([0]);
     let mut has_polled_inputs = false;
 
-    for (module_name, module_dir) in overrides {
-        let normalized_module_dir = match module_dir.as_path().canonicalize() {
+    for input in overrides {
+        let normalized_module_dir = match input.module_dir.as_path().canonicalize() {
             Ok(canonical) => AbsNormPathBuf::try_from(canonical)?,
-            Err(_) => AbsNormPathBuf::try_from(normalize_path_lexically(module_dir.clone()))?,
+            Err(_) => AbsNormPathBuf::try_from(normalize_path_lexically(input.module_dir.clone()))?,
         };
-        let override_kind = non_registry_override_kind(normalized_module_dir.as_path());
-        hasher.update(module_name.as_bytes());
+        let override_kind = input.kind();
+        hasher.update(input.module_name.as_bytes());
         hasher.update([0]);
         hasher.update(normalized_module_dir.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(format!("{:?}", input.source).as_bytes());
         hasher.update([0]);
 
         if project_relative_path_for_abs_path(project_fs, normalized_module_dir.as_path()).is_some()
@@ -2115,7 +2143,7 @@ fn non_registry_override_inputs_poll_digest(
                         .with_buck_error_context(|| {
                             format!(
                                 "Failed to parse MODULE.bazel for {} '{}' at {:?}",
-                                override_kind, module_name, module_bazel_path
+                                override_kind, input.module_name, module_bazel_path
                             )
                         })?;
                 for input in &parsed_with_inputs.inputs {
@@ -2462,9 +2490,14 @@ impl Key for NonRegistryOverrideModuleInputsKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        non_registry_override_module_inputs_digest(ctx, &self.project_root, &self.overrides)
-            .await
-            .map(Arc::new)
+        non_registry_override_module_inputs_digest(
+            ctx,
+            &self.project_root,
+            &self.overrides,
+            self.override_patch_inputs.as_ref(),
+        )
+        .await
+        .map(Arc::new)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3171,7 +3204,7 @@ async fn compute_bzlmod_resolved_module_graph_inputs(
         })
         .await?
         .buck_error_context("Computing override patch inputs for clean bzlmod graph")?;
-    let non_registry_overrides = slug_bzlmod::non_registry_override_module_dirs_from_root_module(
+    let non_registry_overrides = slug_bzlmod::non_registry_override_module_inputs_from_root_module(
         root_module_file.as_ref(),
         key.options.ignore_dev_dependency,
         override_patch_inputs.as_ref(),
@@ -3180,6 +3213,7 @@ async fn compute_bzlmod_resolved_module_graph_inputs(
         .compute(&NonRegistryOverrideModuleInputsKey {
             project_root: project_root.clone(),
             overrides: non_registry_overrides,
+            override_patch_inputs: override_patch_inputs.clone(),
         })
         .await?
         .buck_error_context(
@@ -3713,6 +3747,23 @@ mod tests {
 
     use super::*;
     use crate::dice::data::testing::SetTestingIoProvider;
+
+    fn non_registry_git_input(
+        module_name: &str,
+        module_dir: PathBuf,
+    ) -> slug_bzlmod::NonRegistryOverrideModuleInput {
+        slug_bzlmod::NonRegistryOverrideModuleInput {
+            module_name: module_name.to_owned(),
+            module_dir,
+            source: slug_bzlmod::NonRegistryOverrideModuleSource::Git {
+                remote: "https://example.invalid/dep.git".to_owned(),
+                commit: "abcdef".to_owned(),
+                shallow_since: None,
+                patches: Vec::new(),
+                patch_strip: 0,
+            },
+        }
+    }
 
     fn lockfile_value(path: &str, digest: &str) -> Arc<slug_bzlmod::LockfileContentValue> {
         Arc::new(slug_bzlmod::LockfileContentValue {
@@ -4250,7 +4301,7 @@ use_repo(ext, "generated")
         let module_path = external.path().join("MODULE.bazel");
         std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
         let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
-        let overrides = vec![("dep".to_owned(), external.path().to_path_buf())];
+        let overrides = vec![non_registry_git_input("dep", external.path().to_path_buf())];
         let key = NonRegistryOverrideModuleInputsPollKey {
             project_root: project_root.clone(),
             overrides: overrides.clone(),
@@ -4336,10 +4387,12 @@ use_repo(ext, "generated")
             .unwrap();
         let module_path = external.path().join("MODULE.bazel");
         std::fs::write(&module_path, "module(name = \"dep\")\n").unwrap();
+        std::fs::write(external.path().join(".complete"), "").unwrap();
         let project_root = AbsNormPathBuf::try_from(fs.path().root().to_path_buf())?;
         let key = NonRegistryOverrideModuleInputsKey {
             project_root,
-            overrides: vec![("dep".to_owned(), external.path().to_path_buf())],
+            overrides: vec![non_registry_git_input("dep", external.path().to_path_buf())],
+            override_patch_inputs: Arc::new(slug_bzlmod::OverridePatchInputs::default()),
         };
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
@@ -4992,11 +5045,12 @@ use_repo(ext, "generated")
                 .get(CellName::unchecked_new("dep+")?)
                 .is_ok()
         );
-        assert!(
+        assert_eq!(
             configs
                 .cell_resolver
                 .get(CellName::unchecked_new("dep")?)
-                .is_err()
+                .map(|cell| cell.name().as_str().to_owned())?,
+            "dep+"
         );
         assert_eq!(
             configs

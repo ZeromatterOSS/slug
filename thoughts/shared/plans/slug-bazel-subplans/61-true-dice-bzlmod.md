@@ -611,10 +611,10 @@ Current state to preserve:
   MVS discovery use that precomputed value instead of reparsing the local
   override `MODULE.bazel` from disk. A missing precomputed local-override input
   is now a production error in the MVS path, with the old direct parser fallback
-  retained only for tests. The remaining direct non-root parser hits are
-  git/archive override cache parsing and the public non-DICE local override
-  helper; git/archive need a patch-digest-aware source-input slice before the
-  direct parse can be removed safely. Guardrail:
+  retained only for tests. At this checkpoint the remaining direct non-root
+  parser hits were git/archive override cache parsing and the public non-DICE
+  local override helper; git/archive needed a patch-digest-aware source-input
+  slice before the direct parse could be removed safely. Guardrail:
   `cargo test -p slug_bzlmod test_resolve_local_module_from_precomputed_inputs --lib && cargo test -p slug_bzlmod resolve_graph_with_module_file_inputs_uses_tracked_local_overrides --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - 2026-05-28 non-registry override input paths include patch identity:
   `NonRegistryOverrideModuleInputsKey` now receives git/archive override cache
@@ -623,7 +623,22 @@ Current state to preserve:
   git/archive direct parser with DICE source inputs: the input key now observes
   the patch-digested source tree instead of the unpatched cache directory.
   Guardrail:
-  `cargo test -p slug_bzlmod non_registry_override_dirs_include_patch_digest --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
+  `cargo test -p slug_bzlmod non_registry_override_inputs_include_patch_digest --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-29 git/archive override MVS parse uses DICE source inputs:
+  `NonRegistryOverrideModuleInputsKey` now receives git/archive source
+  descriptors, materializes/fetches the patch-digested override source when the
+  cache is missing, parses the override `MODULE.bazel`, and records the
+  materialized module directory with the parsed module. Clean MVS resolution
+  now consumes that precomputed git/archive module input and errors if the
+  production non-registry override path is entered without it. The old
+  git/archive fetch-plus-direct-parse block was removed from `MvsResolver`;
+  the remaining `parse_non_root_module_bazel(...)` hit in `resolution.rs` is
+  the standalone non-DICE local override helper. The bzlmod cell-resolver test
+  was also updated to assert the current resolver-owned apparent alias behavior
+  (`get("dep")` returns the canonical `dep+` cell instance). Guardrail:
+  `cargo test -p slug_bzlmod --lib && cargo test -p slug_common bzlmod --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && cargo fmt --check && git diff --check`; search evidence:
+  `rg -n "parse_non_root_module_bazel\\(" app/slug_bzlmod/src/resolution.rs app/slug_common/src/legacy_configs/cells.rs app/slug_bzlmod/src/dice_graph.rs`
+  reports only the standalone local override helper.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -914,10 +929,11 @@ hardening behavior around it.
      Local-path overrides resolved during clean MVS discovery now also consume
      the precomputed local override module inputs rather than reparsing their
      `MODULE.bazel` files directly from disk.
-     Git/archive override source-input paths now include the same local patch
-     digest as resolver fetch/extract cache paths, but MVS still directly
-     parses those fetched `MODULE.bazel` files after a cache miss/fetch.
-      `NonRootModuleFilesKey` exists with same-key recompute guardrails, and
+     Git/archive override source-input descriptors now include the same local
+     patch digest as resolver fetch/extract cache paths, and the non-registry
+     source-input key owns cache-miss fetch/materialization plus
+     `MODULE.bazel` parsing before MVS consumes the precomputed module input.
+     `NonRootModuleFilesKey` exists with same-key recompute guardrails, and
       is now wired into the clean resolved-graph producer. Registry and
       git/archive override `MODULE.bazel` files discovered during MVS resolution
       are read through `NonRootModuleFilesKey` instead of direct
