@@ -1971,6 +1971,14 @@ hardening behavior around it.
      helper. Guardrails: `cargo test -p slug_analysis
      platform_label_uses_explicit_root_cell --lib -- --nocapture`; `cargo check
      -p slug_analysis`.
+   - 2026-05-29 source-package root-adapter reduction: configured
+     `SourceFile` attrs and native filegroup/genrule source collection now
+     receive the DICE `CellResolver` root cell alongside the resolver-owned
+     runtime alias snapshot before canonicalizing source `PackageLabel`s. This
+     prevents a stale process-global root spelling such as `root` from
+     suppressing bzlmod runtime alias canonicalization. Guardrails: `cargo test
+     -p slug_analysis source_file_package --lib -- --nocapture`; `cargo check
+     -p slug_analysis`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and

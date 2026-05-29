@@ -15,6 +15,7 @@ use slug_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineAr
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::provider::label::ConfiguredProvidersLabel;
 use slug_core::target::configured_target_label::ConfiguredTargetLabel;
@@ -79,6 +80,10 @@ pub trait AttrResolutionContext<'v> {
     fn execution_platform_resolution(&self) -> &ExecutionPlatformResolution;
 
     fn cell_alias_resolver(&self) -> Option<&CellAliasResolver> {
+        None
+    }
+
+    fn root_cell_name(&self) -> Option<&CellName> {
         None
     }
 }

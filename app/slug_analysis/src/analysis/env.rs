@@ -350,6 +350,7 @@ pub struct RuleAnalysisAttrResolutionContext<'v> {
     pub query_results: HashMap<String, Arc<AnalysisQueryResult>>,
     pub execution_platform_resolution: ExecutionPlatformResolution,
     pub cell_alias_resolver: Option<slug_core::cells::CellAliasResolver>,
+    pub root_cell_name: Option<CellName>,
 }
 
 impl<'v> AttrResolutionContext<'v> for &'_ RuleAnalysisAttrResolutionContext<'v> {
@@ -385,6 +386,10 @@ impl<'v> AttrResolutionContext<'v> for &'_ RuleAnalysisAttrResolutionContext<'v>
 
     fn cell_alias_resolver(&self) -> Option<&slug_core::cells::CellAliasResolver> {
         self.cell_alias_resolver.as_ref()
+    }
+
+    fn root_cell_name(&self) -> Option<&CellName> {
+        self.root_cell_name.as_ref()
     }
 }
 
@@ -3860,6 +3865,7 @@ async fn run_analysis_with_env_underlying(
                     query_results: analysis_env.query_results,
                     execution_platform_resolution: node.execution_platform_resolution().clone(),
                     cell_alias_resolver: analysis_cell_alias_resolver.clone(),
+                    root_cell_name: analysis_root_cell_name.clone(),
                 };
 
                 Ok((

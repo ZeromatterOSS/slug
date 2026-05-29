@@ -16,6 +16,7 @@ use slug_build_api::actions::query::CONFIGURED_ATTR_TO_VALUE;
 use slug_build_api::actions::query::PackageLabelOption;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::pair::Configuration;
 use slug_core::package::PackageLabel;
 use slug_core::package::package_relative_path::PackageRelativePath;
@@ -236,7 +237,11 @@ fn resolve_single_impl<'v>(
         ConfiguredAttr::Arg(arg) => arg.resolve(ctx, pkg),
         ConfiguredAttr::Query(query) => query.resolve(ctx),
         ConfiguredAttr::SourceFile(s) => {
-            let pkg = canonical_source_package_for_bzlmod_runtime(pkg, ctx.cell_alias_resolver())?;
+            let pkg = canonical_source_package_for_bzlmod_runtime(
+                pkg,
+                ctx.cell_alias_resolver(),
+                ctx.root_cell_name(),
+            )?;
             let path = SourcePath::new(pkg, s.path().dupe());
             match source_file_target_cfg {
                 Some(cfg_pair) => SourceAttrType::resolve_single_file_target(ctx, path, cfg_pair),
@@ -251,12 +256,15 @@ fn resolve_single_impl<'v>(
 pub(crate) fn canonical_source_package_for_bzlmod_runtime(
     pkg: PackageLabel,
     cell_alias_resolver: Option<&CellAliasResolver>,
+    root_cell_name: Option<&CellName>,
 ) -> slug_error::Result<PackageLabel> {
     let Some(cell_alias_resolver) = cell_alias_resolver else {
         return Ok(pkg);
     };
     let cell_name = pkg.cell_name();
-    if slug_core::cells::is_root_cell_name(cell_name.as_str()) {
+    if root_cell_name.is_some_and(|root| root == &cell_name)
+        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name.as_str()))
+    {
         return Ok(pkg);
     }
     let Some(canonical_cell) =
@@ -572,7 +580,8 @@ mod tests {
         )?;
         let pkg = PackageLabel::testing_parse(&format!("{apparent}//include/asm-generic"));
 
-        let canonical_pkg = canonical_source_package_for_bzlmod_runtime(pkg, Some(&resolver))?;
+        let canonical_pkg =
+            canonical_source_package_for_bzlmod_runtime(pkg, Some(&resolver), None)?;
 
         assert_eq!(canonical_pkg.cell_name().as_str(), canonical);
         assert_eq!(
@@ -594,13 +603,45 @@ mod tests {
         let resolver = CellAliasResolver::new(CellName::testing_new("root"), HashMap::new())?;
         let pkg = PackageLabel::testing_parse(&format!("{apparent}//pkg"));
 
-        let canonical_pkg = canonical_source_package_for_bzlmod_runtime(pkg, Some(&resolver))?;
+        let canonical_pkg =
+            canonical_source_package_for_bzlmod_runtime(pkg, Some(&resolver), None)?;
 
         assert_eq!(canonical_pkg.cell_name().as_str(), apparent);
         assert_eq!(
             slug_core::cells::resolve_test_dynamic_extension_cell_alias(apparent).as_deref(),
             Some(stale_global)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn source_file_package_uses_explicit_root_instead_of_process_global_root()
+    -> slug_error::Result<()> {
+        let apparent = "root";
+        let canonical = "owner++repo+root";
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            dynamic_aliases: vec![BzlmodRuntimeDynamicAlias {
+                apparent_name: apparent.to_owned(),
+                canonical_name: canonical.to_owned(),
+            }],
+            ..Default::default()
+        };
+        let resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            CellName::testing_new("workspace"),
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let explicit_root = CellName::testing_new("workspace");
+        let pkg = PackageLabel::testing_parse(&format!("{apparent}//pkg"));
+
+        let canonical_pkg = canonical_source_package_for_bzlmod_runtime(
+            pkg,
+            Some(&resolver),
+            Some(&explicit_root),
+        )?;
+
+        assert_eq!(canonical_pkg.cell_name().as_str(), canonical);
+        assert_eq!(canonical_pkg.cell_relative_path().as_str(), "pkg");
         Ok(())
     }
 }
