@@ -762,6 +762,18 @@ Current state to preserve:
   slug_common clean_resolved_module_graph --lib`, `cargo test -p slug_common
   bzlmod --lib`, `cargo check -p slug_bzlmod -p slug_common`, `cargo fmt
   --check`, and `git diff --check`.
+- 2026-05-29 local-override warm-parse cutoff repair:
+  directory-presence tracking was narrowed so a present
+  `path/MODULE.bazel` proves the override directory exists without depending
+  on `ProjectPathMetadataKey`, whose validity intentionally re-polls. The
+  metadata read remains only for the missing-`MODULE.bazel` case so missing
+  local override directories are still carried to clean MVS resolution, while
+  warm same-daemon audits no longer reparse unchanged project-local local
+  override modules. Guardrails: `cargo test -p slug_common
+  local_override_module_inputs --lib`, `cargo build -p slug`, focused Plan 61
+  selectors for local override/included-module warm reuse (3 passed), and
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py` (`156 passed in 69.36s`).
 - 2026-05-29 unclassified repository-layout fallback reduction:
   `RepoMaterializationInvocationLayoutStateKey` now returns a tracked
   `layout-valid` state directly for repository rule classes with no known
@@ -1434,6 +1446,9 @@ hardening behavior around it.
      Project-local local-override directory presence is now part of that
      source-input value too, so the clean MVS resolver no longer polls
      `module_path.exists()` after the precomputed input set has been supplied.
+     The producer avoids project path metadata when `path/MODULE.bazel` is
+     present, because that file input already proves the directory exists and
+     preserves warm parse cutoffs.
      Out-of-project local-override directory presence is still directly polled
      by the named key and marked untracked.
      Git/archive override source-input descriptors now include the same local

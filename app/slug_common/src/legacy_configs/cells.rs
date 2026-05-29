@@ -1077,20 +1077,6 @@ async fn local_override_module_inputs_digest(
             continue;
         }
 
-        let (module_dir_exists, module_dir_tracking) =
-            local_override_module_dir_exists(ctx, &project_fs, normalized_module_dir.as_path())
-                .await?;
-        if module_dir_tracking != BzlmodFileInputTracking::Project {
-            has_untracked_inputs = true;
-        }
-        if module_dir_exists {
-            hasher.update(b"module-dir-present");
-        } else {
-            hasher.update(b"module-dir-missing");
-            missing_module_dirs.push(module_name.clone());
-        }
-        hasher.update([0]);
-
         let module_bazel_path = normalized_module_dir.as_path().join("MODULE.bazel");
         let (module_read, tracking) = read_bzlmod_file_for_module_inputs(
             ctx,
@@ -1109,6 +1095,10 @@ async fn local_override_module_inputs_digest(
         }
         match module_read {
             Some((content, content_digest)) => {
+                // A present MODULE.bazel proves the override directory exists without
+                // depending on project path metadata, which is deliberately re-polled.
+                hasher.update(b"module-dir-present");
+                hasher.update([0]);
                 hasher.update(b"present");
                 hasher.update([0]);
                 hasher.update(content_digest.as_bytes());
@@ -1167,6 +1157,22 @@ async fn local_override_module_inputs_digest(
                 parsed_modules.push((module_name.clone(), parsed));
             }
             None => {
+                let (module_dir_exists, module_dir_tracking) = local_override_module_dir_exists(
+                    ctx,
+                    &project_fs,
+                    normalized_module_dir.as_path(),
+                )
+                .await?;
+                if module_dir_tracking != BzlmodFileInputTracking::Project {
+                    has_untracked_inputs = true;
+                }
+                if module_dir_exists {
+                    hasher.update(b"module-dir-present");
+                } else {
+                    hasher.update(b"module-dir-missing");
+                    missing_module_dirs.push(module_name.clone());
+                }
+                hasher.update([0]);
                 hasher.update(b"missing");
                 hasher.update([0]);
             }
