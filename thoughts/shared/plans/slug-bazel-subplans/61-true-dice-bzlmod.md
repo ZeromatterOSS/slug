@@ -589,6 +589,14 @@ Current state to preserve:
   filesystem-backed input keys, non-root module reads, and preseed callbacks.
   Guardrail:
   `cargo test -p slug_bzlmod clean_resolved_graph_outputs --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 clean resolved-module graph key moved to `slug_bzlmod`:
+  `BzlmodResolvedModuleGraphKey`, `BzlmodResolvedModuleGraphValue`, and the
+  clean resolved-graph `Key` implementation now live in `slug_bzlmod`.
+  `slug_common` installs `BzlmodCleanGraphIo` only for project-file source
+  inputs, non-root module-file reads, and lockfile preseed validation. It no
+  longer owns the graph compute function or the clean cell-graph build helper.
+  Guardrail:
+  `cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo test -p slug_common local_override_module_inputs_key_repolls_same_out_of_project_key --lib && cargo test -p slug_common non_root_module_files_key_repolls_same_out_of_project_key --lib && cargo test -p slug_common registry_file_inputs_key_repolls_same_out_of_project_key --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1283,11 +1291,12 @@ hardening behavior around it.
      passed as separate named injections. The full resolved graph injection has
      been removed; production now injects the narrower
      `BzlmodModuleSourcesDataKey` projection addressed by the clean
-     resolved-graph digest. Clean cell-graph assembly has moved to
-     `slug_bzlmod`, but the remaining transitional API is that production still
-     computes the full clean resolved graph in `slug_common` and then injects
-     its projections, rather than having `slug_bzlmod` compute the graph
-     directly from DICE source-input dependencies.
+     resolved-graph digest. Clean cell-graph assembly and the clean
+     resolved-module graph key now live in `slug_bzlmod`; production computes
+     the graph through `slug_bzlmod::BzlmodResolvedModuleGraphKey`.
+     `slug_common` remains only as the late-bound project-file/preseed IO
+     provider until those filesystem-backed source-input dependencies are
+     modeled behind lower-level bzlmod APIs.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being
