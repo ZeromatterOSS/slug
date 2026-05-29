@@ -605,6 +605,15 @@ Current state to preserve:
   `BzlmodCleanGraphIo::compute_lockfile_content` until lockfile file reads move
   behind lower-level bzlmod filesystem inputs. Guardrail:
   `cargo test -p slug_bzlmod lockfile_inputs --lib && cargo test -p slug_common bzlmod_lockfile_inputs --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 local override MVS parse uses DICE inputs:
+  Clean graph resolution now passes the `LocalOverrideModuleInputsValue`
+  parsed-module set into `MvsResolver`, and local-path overrides resolved during
+  MVS discovery use that precomputed value instead of reparsing the local
+  override `MODULE.bazel` from disk. The remaining direct non-root parser hits
+  are git/archive override cache parsing and the public non-DICE local override
+  helper; git/archive need a patch-digest-aware source-input slice before the
+  direct parse can be removed safely. Guardrail:
+  `cargo test -p slug_bzlmod test_resolve_local_module_from_precomputed_inputs --lib && cargo test -p slug_bzlmod resolve_graph_with_module_file_inputs_uses_tracked_local_overrides --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -892,6 +901,9 @@ hardening behavior around it.
      cached git/archive override `MODULE.bazel` files are observed inside
      named DICE keys. The DICE-backed resolver now rejects missing tracked root
      module input instead of direct-parsing the root module in the DICE path.
+     Local-path overrides resolved during clean MVS discovery now also consume
+     the precomputed local override module inputs rather than reparsing their
+     `MODULE.bazel` files directly from disk.
       `NonRootModuleFilesKey` exists with same-key recompute guardrails, and
       is now wired into the clean resolved-graph producer. Registry and
       git/archive override `MODULE.bazel` files discovered during MVS resolution

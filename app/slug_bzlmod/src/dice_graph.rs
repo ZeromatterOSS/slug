@@ -879,6 +879,9 @@ pub async fn resolve_graph_with_module_file_inputs(
                 parsed.module.name
             )
         })?;
+    resolver.set_precomputed_local_override_modules(
+        local_override_inputs.parsed_modules.iter().cloned(),
+    );
     if let Some(lockfile) = visible_lockfile {
         resolver.set_yanked_version_policy(
             allowed_yanked_versions,

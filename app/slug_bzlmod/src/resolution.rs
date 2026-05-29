@@ -40,6 +40,7 @@ use crate::types::LocalPathOverride;
 use crate::types::Module;
 use crate::types::MultipleVersionOverride;
 use crate::types::Override;
+use crate::types::ParsedModuleFile;
 use crate::types::SingleVersionOverride;
 use crate::version::Version;
 
@@ -424,6 +425,10 @@ pub struct MvsResolver {
     previously_selected_yanked_versions: IndexMap<String, String>,
     /// Root-local override patch files read by the DICE bzlmod graph producer.
     override_patch_inputs: Arc<crate::OverridePatchInputs>,
+    /// Parsed local override MODULE.bazel files supplied by the clean DICE
+    /// source-input producer.
+    precomputed_local_override_modules: HashMap<String, ParsedModuleFile>,
+    precomputed_local_override_modules_set: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -457,6 +462,8 @@ impl MvsResolver {
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
             override_patch_inputs,
+            precomputed_local_override_modules: HashMap::new(),
+            precomputed_local_override_modules_set: false,
         })
     }
 
@@ -484,7 +491,17 @@ impl MvsResolver {
             known_registry_file_hashes: IndexMap::new(),
             previously_selected_yanked_versions: IndexMap::new(),
             override_patch_inputs,
+            precomputed_local_override_modules: HashMap::new(),
+            precomputed_local_override_modules_set: false,
         })
+    }
+
+    pub fn set_precomputed_local_override_modules<I>(&mut self, modules: I)
+    where
+        I: IntoIterator<Item = (String, ParsedModuleFile)>,
+    {
+        self.precomputed_local_override_modules = modules.into_iter().collect();
+        self.precomputed_local_override_modules_set = true;
     }
 
     /// Configure Bazel yanked-version policy for this command.
@@ -785,7 +802,15 @@ impl MvsResolver {
     ) -> slug_error::Result<()> {
         match override_ {
             Override::LocalPath(lp) => {
-                let resolved = resolve_local_override(lp, workspace_root)?;
+                let resolved = if self.precomputed_local_override_modules_set {
+                    resolve_local_override_from_precomputed_inputs(
+                        lp,
+                        workspace_root,
+                        &self.precomputed_local_override_modules,
+                    )?
+                } else {
+                    resolve_local_override(lp, workspace_root)?
+                };
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&lp.module_name, resolved.version.as_str()),
                     compatibility_level: resolved.module.compatibility_level,
@@ -1772,6 +1797,42 @@ pub fn resolve_local_override(
     })
 }
 
+fn resolve_local_override_from_precomputed_inputs(
+    override_info: &LocalPathOverride,
+    workspace_root: &Path,
+    precomputed_modules: &HashMap<String, ParsedModuleFile>,
+) -> slug_error::Result<ResolvedLocalModule> {
+    let module_path = workspace_root.join(&override_info.path);
+    if !module_path.exists() {
+        return Err(LocalResolutionError::PathNotFound(override_info.path.clone()).into());
+    }
+
+    let (parsed_module, has_module_file) = precomputed_modules
+        .get(&override_info.module_name)
+        .map(|parsed| (parsed.module.clone(), parsed.has_module_directive))
+        .unwrap_or_else(|| {
+            let mut module = Module::empty();
+            module.name = override_info.module_name.clone();
+            (module, false)
+        });
+    let name = if parsed_module.name.is_empty() {
+        override_info.module_name.clone()
+    } else {
+        parsed_module.name.clone()
+    };
+
+    Ok(ResolvedLocalModule {
+        name,
+        version: parsed_module.version.clone(),
+        absolute_path: module_path
+            .canonicalize()
+            .unwrap_or_else(|_| module_path.clone()),
+        relative_path: override_info.path.clone(),
+        module: parsed_module,
+        has_module_file,
+    })
+}
+
 /// Resolve all local path overrides from a module.
 ///
 /// This function takes the overrides from a parsed MODULE.bazel file and resolves
@@ -2238,6 +2299,41 @@ module(name = "local_lib", version = "2.0.0")
         assert_eq!(resolved.name, "my_local");
         assert!(!resolved.has_module_file);
         assert!(resolved.version.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_local_module_from_precomputed_inputs() {
+        let dir = TempDir::new().unwrap();
+        let local_dir = dir.path().join("my_local");
+        fs::create_dir_all(&local_dir).unwrap();
+        fs::write(local_dir.join("BUILD.bazel"), "# Build").unwrap();
+
+        let override_info = LocalPathOverride {
+            module_name: "my_local".to_owned(),
+            path: "my_local".to_owned(),
+        };
+        let mut parsed = ParsedModuleFile {
+            module: Module::new("my_local".to_owned(), Version::parse("2.0.0").unwrap()),
+            has_module_directive: true,
+            extension_usages: Vec::new(),
+            repo_rule_invocations: Vec::new(),
+            registered_toolchains: Vec::new(),
+            registered_execution_platforms: Vec::new(),
+        };
+        parsed.module.compatibility_level = 3;
+        let precomputed_modules = HashMap::from([("my_local".to_owned(), parsed)]);
+
+        let resolved = resolve_local_override_from_precomputed_inputs(
+            &override_info,
+            dir.path(),
+            &precomputed_modules,
+        )
+        .unwrap();
+
+        assert_eq!(resolved.name, "my_local");
+        assert_eq!(resolved.version.as_str(), "2.0.0");
+        assert_eq!(resolved.module.compatibility_level, 3);
+        assert!(resolved.has_module_file);
     }
 
     #[test]
