@@ -657,6 +657,13 @@ Current state to preserve:
   `slug_bzlmod`; external crates interact through the updater APIs that install
   named DICE inputs. Guardrails: `cargo check -p slug_bzlmod -p slug_common`
   and targeted `rg` for public facade/use-site matches.
+- 2026-05-29 cell-graph data value made crate-private:
+  `slug_bzlmod::dice_graph::BzlmodCellGraphDataValue` is no longer a public
+  module item. The transitional fallback value is now private to
+  `slug_bzlmod`, while external callers continue using public cell-graph and
+  updater APIs. Guardrails: `cargo check -p slug_bzlmod -p slug_common`,
+  `cargo test -p slug_bzlmod cell_graph --lib`, `cargo fmt --check`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

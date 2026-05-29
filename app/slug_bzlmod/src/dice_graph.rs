@@ -2775,7 +2775,7 @@ fn dynamic_alias_for_generated_override(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-pub struct BzlmodCellGraphDataValue {
+pub(crate) struct BzlmodCellGraphDataValue {
     pub(crate) workspace_id: WorkspaceId,
     pub(crate) resolution_digest: Arc<str>,
     #[allocative(skip)]
