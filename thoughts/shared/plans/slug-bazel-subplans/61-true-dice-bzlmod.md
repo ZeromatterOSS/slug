@@ -266,11 +266,14 @@ Current state to preserve:
   temporary DICE instance before parsing cells. The old fallback scanner and
   lockfile preseed bridge are gone; lockfile policy, repository-rule replay
   inputs, and materialization polling still need follow-up.
-- SDK frontier evidence is positive but not a closure condition: Slug and Bazel
-  9.0.1 have both built `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents`, with
-  matching modes and non-ELF hashes. The accepted remaining differences are ELF
-  output-root strings in `bin/zm`, `bin/zerobuf`, `bin/zerosystem`, and
-  `lib/libzeromatter_ffi.so`.
+- SDK frontier evidence is positive but not a closure condition. The latest
+  post-bridge-burn-down Slug smoke built
+  `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` successfully on 2026-05-29;
+  a fresh Bazel 9.0.1 output comparison for this exact Slug revision is the
+  next correctness check. Historical parity evidence had Slug and Bazel 9.0.1
+  both building the target with matching modes and non-ELF hashes; the accepted
+  remaining differences were ELF output-root strings in `bin/zm`,
+  `bin/zerobuf`, `bin/zerosystem`, and `lib/libzeromatter_ffi.so`.
 - The last recorded full Plan 61 Python guardrail in the archive passed after
   rebuilding `target/debug/slug`, but future workers must rerun the focused
   owner tests for their slice rather than relying on that snapshot.
@@ -903,6 +906,17 @@ Current state to preserve:
   failures; it timed out at 300s while local execution was still making
   progress, with pending actions falling from roughly 1400 LLVM/Rust actions to
   42 (`/tmp/sdk-narrow-20260529-070233.log`).
+- 2026-05-29 full Kuro SDK smoke after external recorded-input fix:
+  `/var/mnt/dev/slug/target/debug/slug --isolation-dir
+  sdk-parity-20260529-070936 build //sdk:sdk_contents` under
+  `/var/mnt/dev/zeromatter-kuro` reached `BUILD SUCCEEDED`
+  (`/tmp/sdk-parity-20260529-070936.log`). `memory_smoke.sh` reported
+  `elapsed_s=1544`, `peak_rss_kib=10353616`, and `final_rss_kib=941712`;
+  Slug metrics reported 8360 local commands, `load=23.8s`, `analyze=18.8s`,
+  `execute=25m02s`, `materialize=25m02s`, and `total=25m33s`. No `slugd`
+  process remained after cleanup. This proves the current SDK frontier is past
+  the legacy resolution bridge, but Plan 61 remains open until the fresh Bazel
+  9.0.1 manifest/mode/hash comparison is recorded.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1356,8 +1370,10 @@ Current state to preserve:
   generated kernel-header source path mismatch and the later
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
   fixed by resolver-backed source-artifact package canonicalization. The latest
-  Slug SDK smoke reached `BUILD SUCCEEDED`; this is frontier evidence, not a
-  Plan 61 closure condition.
+  2026-05-29 Slug SDK smoke reached `BUILD SUCCEEDED` in 25m33s
+  (`/tmp/sdk-parity-20260529-070936.log`); this is frontier evidence, not a
+  Plan 61 closure condition until the fresh Bazel 9.0.1 output comparison is
+  recorded.
 
 What future workers should keep in this file:
 
