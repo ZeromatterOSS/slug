@@ -2862,8 +2862,10 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_cell_graph_data_with_inputs(
+        updater.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+            Arc::from(crate::dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
             cell_graph,
+            None,
             crate::BzlmodModuleVersionsDataValue::for_workspace_with_root_module_name(
                 workspace_id.clone(),
                 "root".to_owned(),

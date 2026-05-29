@@ -718,6 +718,19 @@ Current state to preserve:
   slug_common -p slug_external_cells -p slug_analysis -p
   slug_interpreter_for_build`, `cargo test -p slug_bzlmod --lib`, `cargo fmt
   --check`, and `git diff --check`.
+- 2026-05-29 implicit injected cell-graph updater removed:
+  `SetBzlmodDiceInputs` no longer exposes the public
+  `set_bzlmod_cell_graph_data_with_inputs(...)` convenience that silently chose
+  the injected projection digest and omitted resolved-graph provenance.
+  Production callers already use the explicit digest/provenance updater; the
+  remaining injected fallback setup is confined to a private `slug_bzlmod` test
+  helper. External-cell and repository-label tests now call the explicit updater
+  directly. Guardrails: `cargo check -p slug_bzlmod -p slug_common -p
+  slug_external_cells`, `cargo test -p slug_bzlmod cell_graph --lib`, `cargo
+  test -p slug_bzlmod repository_label_resolution_key_projects_cell_graph_paths
+  --lib`, `cargo test -p slug_external_cells
+  extension_repo_setup_repo_env_uses_current_dice_repo_env --lib`, targeted `rg`
+  for the removed public helper, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1851,8 +1864,10 @@ hardening behavior around it.
      Zero-repo-mapping materialization conveniences are test-only as well, so
      production repository replay must carry the current repo-mapping snapshot.
      The digest-only updater helper that omitted resolved-graph provenance is
-     removed; remaining non-empty graph injection must choose either the named
-     injected digest path or the resolved-graph-carrying path explicitly.
+     removed, and the generic updater helper that silently selected the
+     injected projection digest is gone from the public trait. Remaining
+     non-empty graph injection must choose either the named injected digest path
+     or the resolved-graph-carrying path explicitly.
      Module extension execution and recorded-input validation keys require
      workspace identity instead of carrying or deriving optional provenance; the
      recorded-input key's internal workspace is no longer optional in production.

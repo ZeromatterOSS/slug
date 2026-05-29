@@ -358,33 +358,6 @@ pub trait SetBzlmodDiceInputs {
         )
     }
 
-    fn set_bzlmod_cell_graph_data_with_inputs(
-        &mut self,
-        cell_graph: BzlmodCellGraphValue,
-        module_versions: BzlmodModuleVersionsDataValue,
-        lockfile_inputs: BzlmodLockfileInputsDataValue,
-        repo_env: BzlmodRepoEnvDataValue,
-        registered_toolchains: RegisteredToolchainsDataValue,
-        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
-        extension_aggregations: BzlmodExtensionAggregationsDataValue,
-        resolution_facts: BzlmodResolutionFactsValue,
-        repo_mappings: BzlmodRepoMappingsDataValue,
-    ) -> slug_error::Result<()> {
-        self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
-            Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
-            cell_graph,
-            None,
-            module_versions,
-            lockfile_inputs,
-            repo_env,
-            registered_toolchains,
-            registered_execution_platforms,
-            extension_aggregations,
-            resolution_facts,
-            repo_mappings,
-        )
-    }
-
     fn set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
         &mut self,
         cell_graph_resolution_digest: Arc<str>,
@@ -442,33 +415,6 @@ fn validate_cell_graph_root_module_name(
 }
 
 impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
-    fn set_bzlmod_cell_graph_data_with_inputs(
-        &mut self,
-        cell_graph: BzlmodCellGraphValue,
-        module_versions: BzlmodModuleVersionsDataValue,
-        lockfile_inputs: BzlmodLockfileInputsDataValue,
-        repo_env: BzlmodRepoEnvDataValue,
-        registered_toolchains: RegisteredToolchainsDataValue,
-        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
-        extension_aggregations: BzlmodExtensionAggregationsDataValue,
-        resolution_facts: BzlmodResolutionFactsValue,
-        repo_mappings: BzlmodRepoMappingsDataValue,
-    ) -> slug_error::Result<()> {
-        self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
-            Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
-            cell_graph,
-            None,
-            module_versions,
-            lockfile_inputs,
-            repo_env,
-            registered_toolchains,
-            registered_execution_platforms,
-            extension_aggregations,
-            resolution_facts,
-            repo_mappings,
-        )
-    }
-
     fn set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
         &mut self,
         cell_graph_resolution_digest: Arc<str>,
@@ -847,6 +793,51 @@ mod tests {
             root_module_name.to_owned(),
             Arc::new(HashMap::new()),
         )
+    }
+
+    trait TestSetBzlmodDiceInputs {
+        fn set_bzlmod_cell_graph_data_with_inputs(
+            &mut self,
+            cell_graph: BzlmodCellGraphValue,
+            module_versions: BzlmodModuleVersionsDataValue,
+            lockfile_inputs: BzlmodLockfileInputsDataValue,
+            repo_env: BzlmodRepoEnvDataValue,
+            registered_toolchains: RegisteredToolchainsDataValue,
+            registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+            extension_aggregations: BzlmodExtensionAggregationsDataValue,
+            resolution_facts: BzlmodResolutionFactsValue,
+            repo_mappings: BzlmodRepoMappingsDataValue,
+        ) -> slug_error::Result<()>;
+    }
+
+    impl TestSetBzlmodDiceInputs for dice::DiceTransactionUpdater {
+        fn set_bzlmod_cell_graph_data_with_inputs(
+            &mut self,
+            cell_graph: BzlmodCellGraphValue,
+            module_versions: BzlmodModuleVersionsDataValue,
+            lockfile_inputs: BzlmodLockfileInputsDataValue,
+            repo_env: BzlmodRepoEnvDataValue,
+            registered_toolchains: RegisteredToolchainsDataValue,
+            registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
+            extension_aggregations: BzlmodExtensionAggregationsDataValue,
+            resolution_facts: BzlmodResolutionFactsValue,
+            repo_mappings: BzlmodRepoMappingsDataValue,
+        ) -> slug_error::Result<()> {
+            SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+                self,
+                Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+                cell_graph,
+                None,
+                module_versions,
+                lockfile_inputs,
+                repo_env,
+                registered_toolchains,
+                registered_execution_platforms,
+                extension_aggregations,
+                resolution_facts,
+                repo_mappings,
+            )
+        }
     }
 
     #[tokio::test]

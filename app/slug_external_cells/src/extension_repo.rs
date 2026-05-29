@@ -1229,8 +1229,10 @@ mod tests {
             .commit()
             .await;
         let mut updater = dice.into_updater();
-        updater.set_bzlmod_cell_graph_data_with_inputs(
+        updater.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
+            slug_bzlmod::empty_bzlmod_cell_graph_resolution_digest(),
             cell_graph,
+            None,
             slug_bzlmod::BzlmodModuleVersionsDataValue::for_workspace(
                 workspace_id.clone(),
                 Arc::new(std::collections::HashMap::new()),
