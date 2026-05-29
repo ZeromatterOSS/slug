@@ -7980,6 +7980,137 @@ use_repo(label_ops, "label_ops_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_template_label_edit_reexecutes_extension(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext maybeWatch records template files."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_template_ext+template_repo"
+    _write(buck.cwd / "template.txt", "first\n")
+    _write(
+        buck.cwd / "module_template_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+template_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _module_template_ext_impl(module_ctx):
+    module_ctx.template("generated.txt", Label("//:template.txt"), substitutions = {})
+    template_repo_rule(name = "template_repo", payload = module_ctx.read("generated.txt"))
+
+module_template_ext = module_extension(
+    implementation = _module_template_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_template_input")
+
+template = use_extension("//:module_template_ext.bzl", "module_template_ext")
+use_repo(template, "template_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_template_repo",
+    srcs = ["@template_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_template_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    _write(buck.cwd / "template.txt", "second\n")
+    await buck.build("//:uses_template_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_patch_label_edit_reexecutes_extension(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext maybeWatch records patch files."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+module_patch_ext+patch_repo"
+    _write(
+        buck.cwd / "change.patch",
+        """--- generated.txt
++++ generated.txt
+@@ -1 +1 @@
+-before
++first
+""",
+    )
+    _write(
+        buck.cwd / "module_patch_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+patch_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _module_patch_ext_impl(module_ctx):
+    module_ctx.file("generated.txt", content = "before\\n")
+    module_ctx.patch(Label("//:change.patch"), strip = 0)
+    patch_repo_rule(name = "patch_repo", payload = module_ctx.read("generated.txt"))
+
+module_patch_ext = module_extension(
+    implementation = _module_patch_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_patch_input")
+
+patch_ext = use_extension("//:module_patch_ext.bzl", "module_patch_ext")
+use_repo(patch_ext, "patch_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_patch_repo",
+    srcs = ["@patch_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_patch_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "first\n"
+
+    _write(
+        buck.cwd / "change.patch",
+        """--- generated.txt
++++ generated.txt
+@@ -1 +1 @@
+-before
++second
+""",
+    )
+    await buck.build("//:uses_patch_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "second\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_watch_tree_label_fails_directly_for_non_directory(
     buck: Buck,
 ) -> None:

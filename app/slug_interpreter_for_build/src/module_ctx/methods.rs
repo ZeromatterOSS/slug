@@ -727,10 +727,13 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] template: Value<'v>,
         #[starlark(require = named)] substitutions: Option<Value<'v>>,
         #[starlark(require = named, default = false)] executable: bool,
+        #[starlark(require = named, default = "auto")] watch_template: &str,
     ) -> starlark::Result<Value<'v>> {
+        let should_watch = ShouldWatch::parse(watch_template)?;
         let path_str = path.unpack_str().unwrap_or("");
         let template_path = resolve_module_ctx_input_path(this, template, "module_ctx.template()")?;
 
+        this.maybe_record_file_input(&template_path, should_watch)?;
         let mut content = std::fs::read_to_string(&template_path).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -790,7 +793,9 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         this: &ModuleContext,
         #[starlark(require = pos)] patch_file: Value<'v>,
         #[starlark(require = named, default = 0)] strip: i32,
+        #[starlark(require = named, default = "auto")] watch_patch: &str,
     ) -> starlark::Result<Value<'v>> {
+        let should_watch = ShouldWatch::parse(watch_patch)?;
         let patch_path = resolve_module_ctx_input_path(this, patch_file, "module_ctx.patch()")?;
         let Some(ref working_dir) = this.working_dir else {
             return Err(slug_error::slug_error!(
@@ -799,6 +804,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             )
             .into());
         };
+        this.maybe_record_file_input(&patch_path, should_watch)?;
         apply_unified_patch(&patch_path, strip, working_dir.as_ref()).map_err(|e| {
             starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,

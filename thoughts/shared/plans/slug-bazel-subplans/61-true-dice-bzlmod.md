@@ -470,6 +470,19 @@ Current state to preserve:
   focused Plan 61 execute selectors (2 passed), and full
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py` (`160 passed in 69.82s`).
+- 2026-05-29 module_ctx template/patch recorded-input ownership:
+  `module_ctx.template(..., Label(...))` and
+  `module_ctx.patch(Label(...))` now accept Bazel-shaped `watch_template` /
+  `watch_patch` parameters, default them to `auto`, and record the resolved
+  input file before reading or applying it. This moves those label-taking
+  module-extension operations onto the same recorded-input replay surface as
+  `module_ctx.read(...)` and `module_ctx.extract(...)`; editing the template or
+  patch now forces extension re-execution instead of reusing stale generated
+  repo specs. Guardrails: the new Plan 61 selectors first failed with stale
+  `first\n` output after editing `template.txt`/`change.patch`, then `cargo
+  check -p slug_interpreter_for_build`, `cargo build -p slug`, focused Plan 61
+  module_ctx template/patch/label-operation selectors (3 passed), and `cargo
+  test -p slug_interpreter_for_build --lib` (127 passed).
 - 2026-05-29 repository materialization recorded-input DICE read:
   `RepoMaterializationRecordedInputsManifestContentKey` now carries workspace
   identity and calls a late-bound `RepositoryMaterializationStateReader`.
@@ -1943,6 +1956,10 @@ hardening behavior around it.
    - `repository_ctx.execute(...)` and `module_ctx.execute(...)` now use the
      effective repo-env as their base process environment instead of inheriting
      ambient Slug process environment variables.
+   - `module_ctx.template(..., Label(...))` and
+     `module_ctx.patch(Label(...))` now record their source template/patch
+     files with default `auto` watch semantics, so same-daemon edits invalidate
+     module-extension replay before stale generated repo specs are reused.
 
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
