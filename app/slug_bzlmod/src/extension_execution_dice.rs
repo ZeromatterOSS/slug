@@ -34,6 +34,7 @@ use std::collections::BTreeMap;
 #[cfg(test)]
 use std::collections::BTreeSet;
 use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -84,11 +85,11 @@ use crate::repo_spec::RepoSpec;
 fn create_extension_execution_key_from_aggregation(
     aggregation: &BzlmodExtensionAggregationValue,
     repo_env: &BTreeMap<String, String>,
-    lockfile_inputs: &BzlmodLockfileInputsValue,
+    replay_inputs: Arc<ModuleExtensionReplayInputsValue>,
     repo_mappings: &BzlmodRepoMappingsDataValue,
     bzl_transitive_digest: Arc<str>,
 ) -> ModuleExtensionExecutionKey {
-    ModuleExtensionExecutionKey::new_with_tracked_lockfiles_and_bzl_digest(
+    ModuleExtensionExecutionKey::new_with_replay_inputs_and_bzl_digest(
         aggregation.aggregated.as_ref().clone(),
         aggregation.root_module_name.to_string(),
         aggregation
@@ -96,17 +97,292 @@ fn create_extension_execution_key_from_aggregation(
             .canonical_project_root
             .as_ref()
             .clone(),
-        lockfile_inputs.visible_lockfile_digest.clone(),
-        lockfile_inputs.hidden_lockfile_digest.clone(),
-        lockfile_inputs.visible_lockfile.clone(),
-        lockfile_inputs.hidden_lockfile.clone(),
-        lockfile_inputs.lockfile_mode,
+        replay_inputs,
         repo_env.clone(),
         repo_mappings.repo_mappings.as_ref().clone(),
         repo_mappings.repo_mapping_overrides.as_ref().clone(),
         bzl_transitive_digest,
         aggregation.workspace_id.clone(),
     )
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+struct SelectedExtensionCacheIdentity {
+    source: crate::dice_graph::LockfileContentKind,
+    selected_key: String,
+    repo_specs_digest: String,
+    recorded_inputs: Vec<String>,
+    workspace_root: Option<PathBuf>,
+    repo_env: Option<BTreeMap<String, String>>,
+    repo_mappings: Option<RepoMappingSnapshot>,
+}
+
+#[derive(Clone, Debug, Allocative)]
+pub struct ModuleExtensionReplayInputsValue {
+    pub lockfile_mode: LockfileMode,
+    #[allocative(skip)]
+    pub prior_facts: serde_json::Value,
+    #[allocative(skip)]
+    pub workspace_lockfile_facts: serde_json::Value,
+    pub workspace_lockfile_facts_present: bool,
+    #[allocative(skip)]
+    pub selected_cache: Option<SelectedExtensionCache>,
+    selected_cache_identity: Option<SelectedExtensionCacheIdentity>,
+    identity_digest: Arc<str>,
+}
+
+impl ModuleExtensionReplayInputsValue {
+    #[cfg(test)]
+    fn empty(lockfile_mode: LockfileMode) -> Arc<Self> {
+        Self::from_parts(
+            lockfile_mode,
+            empty_facts(),
+            empty_facts(),
+            false,
+            None,
+            None,
+        )
+    }
+
+    fn from_lockfile_inputs(
+        extension_id: &str,
+        bzl_transitive_digest: &str,
+        usages_digest: &str,
+        project_root: Option<&Path>,
+        root_module_name: &str,
+        repo_env: &BTreeMap<String, String>,
+        repo_mappings: &RepoMappingSnapshot,
+        repo_mapping_overrides: &RepoMappingOverrides,
+        lockfile_inputs: &BzlmodLockfileInputsValue,
+    ) -> slug_error::Result<Arc<Self>> {
+        let mut prior_facts = empty_facts();
+        let mut workspace_lockfile_facts = empty_facts();
+        let mut workspace_lockfile_facts_present = false;
+        let mut selected_cache = None;
+        let mut selected_cache_identity = None;
+
+        if lockfile_inputs.lockfile_mode != LockfileMode::Off {
+            if let Some(project_root) = project_root
+                && let Some(lockfile_value) = &lockfile_inputs.visible_lockfile
+            {
+                if let Some(lockfile) = lockfile_value.lockfile.as_ref() {
+                    verify_observed_lockfile_digest(
+                        lockfile_value,
+                        lockfile_inputs.visible_lockfile_digest.as_deref(),
+                        "workspace lockfile",
+                    )?;
+                    if let Some(facts) = lockfile.get_extension_facts(extension_id) {
+                        prior_facts = facts.clone();
+                        workspace_lockfile_facts = facts;
+                        workspace_lockfile_facts_present = true;
+                    }
+                    match lockfile.select_extension_cache_for_workspace(
+                        extension_id,
+                        bzl_transitive_digest,
+                        usages_digest,
+                        Some(project_root),
+                        Some(repo_env),
+                        Some(repo_mappings),
+                        Some(root_module_name),
+                        Some(repo_mapping_overrides),
+                    ) {
+                        Some(cache) => {
+                            selected_cache_identity = Some(selected_extension_cache_identity(
+                                crate::dice_graph::LockfileContentKind::Workspace,
+                                &cache,
+                            ));
+                            selected_cache = Some(cache);
+                        }
+                        None => {
+                            record_bzlmod_event(
+                                BzlmodEventKind::ExtensionReplayMissReason,
+                                format!("{extension_id}:digest_or_entry_miss"),
+                            );
+                            tracing::debug!(
+                                "Extension '{}' cache MISS: digests don't match",
+                                extension_id
+                            );
+                        }
+                    }
+                } else {
+                    record_bzlmod_event(
+                        BzlmodEventKind::ExtensionReplayMissReason,
+                        format!("{extension_id}:lockfile_absent_or_unreadable"),
+                    );
+                }
+            }
+
+            if selected_cache.is_none()
+                && let Some(lockfile_value) = &lockfile_inputs.hidden_lockfile
+                && let Some(lockfile) = lockfile_value.lockfile.as_ref()
+            {
+                verify_observed_lockfile_digest(
+                    lockfile_value,
+                    lockfile_inputs.hidden_lockfile_digest.as_deref(),
+                    "hidden lockfile",
+                )?;
+                if !workspace_lockfile_facts_present {
+                    prior_facts = lockfile
+                        .get_extension_facts(extension_id)
+                        .unwrap_or_else(empty_facts);
+                }
+                if let Some(cache) = lockfile.select_extension_cache_for_workspace(
+                    extension_id,
+                    bzl_transitive_digest,
+                    usages_digest,
+                    project_root,
+                    Some(repo_env),
+                    Some(repo_mappings),
+                    Some(root_module_name),
+                    Some(repo_mapping_overrides),
+                ) {
+                    selected_cache_identity = Some(selected_extension_cache_identity(
+                        crate::dice_graph::LockfileContentKind::Hidden,
+                        &cache,
+                    ));
+                    selected_cache = Some(cache);
+                }
+            }
+        }
+
+        Ok(Self::from_parts(
+            lockfile_inputs.lockfile_mode,
+            prior_facts,
+            workspace_lockfile_facts,
+            workspace_lockfile_facts_present,
+            selected_cache,
+            selected_cache_identity,
+        ))
+    }
+
+    fn from_parts(
+        lockfile_mode: LockfileMode,
+        prior_facts: serde_json::Value,
+        workspace_lockfile_facts: serde_json::Value,
+        workspace_lockfile_facts_present: bool,
+        selected_cache: Option<SelectedExtensionCache>,
+        selected_cache_identity: Option<SelectedExtensionCacheIdentity>,
+    ) -> Arc<Self> {
+        let identity_digest = Arc::from(
+            module_extension_replay_inputs_identity_digest(
+                lockfile_mode,
+                &prior_facts,
+                &workspace_lockfile_facts,
+                workspace_lockfile_facts_present,
+                &selected_cache_identity,
+            )
+            .as_str(),
+        );
+        Arc::new(Self {
+            lockfile_mode,
+            prior_facts,
+            workspace_lockfile_facts,
+            workspace_lockfile_facts_present,
+            selected_cache,
+            selected_cache_identity,
+            identity_digest,
+        })
+    }
+
+    fn identity_digest(&self) -> &str {
+        &self.identity_digest
+    }
+}
+
+fn selected_extension_cache_identity(
+    source: crate::dice_graph::LockfileContentKind,
+    cache: &SelectedExtensionCache,
+) -> SelectedExtensionCacheIdentity {
+    SelectedExtensionCacheIdentity {
+        source,
+        selected_key: cache.selected_key.clone(),
+        repo_specs_digest: selected_extension_cache_repo_specs_digest(cache),
+        recorded_inputs: cache.recorded_inputs.clone(),
+        workspace_root: cache.workspace_root.clone(),
+        repo_env: cache.repo_env.clone(),
+        repo_mappings: cache.repo_mappings.clone(),
+    }
+}
+
+fn selected_extension_cache_repo_specs_digest(cache: &SelectedExtensionCache) -> String {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    let mut repo_specs: Vec<_> = cache.repo_specs.iter().collect();
+    repo_specs.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (name, spec) in repo_specs {
+        name.hash(&mut hasher);
+        let spec_json = serde_json::to_string(spec).unwrap_or_else(|_| format!("{spec:?}"));
+        spec_json.hash(&mut hasher);
+    }
+    format!("{:016x}", hasher.finish())
+}
+
+fn facts_identity(value: &serde_json::Value) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| value.to_string())
+}
+
+fn module_extension_replay_inputs_identity_digest(
+    lockfile_mode: LockfileMode,
+    prior_facts: &serde_json::Value,
+    workspace_lockfile_facts: &serde_json::Value,
+    workspace_lockfile_facts_present: bool,
+    selected_cache_identity: &Option<SelectedExtensionCacheIdentity>,
+) -> String {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    lockfile_mode.hash(&mut hasher);
+    facts_identity(prior_facts).hash(&mut hasher);
+    facts_identity(workspace_lockfile_facts).hash(&mut hasher);
+    workspace_lockfile_facts_present.hash(&mut hasher);
+    selected_cache_identity.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display("ModuleExtensionReplayInputsKey({})", extension_id)]
+pub struct ModuleExtensionReplayInputsKey {
+    pub workspace_id: crate::WorkspaceId,
+    pub extension_id: Arc<str>,
+    pub bzl_transitive_digest: Arc<str>,
+    pub usages_digest: Arc<str>,
+    pub project_root: Option<Arc<PathBuf>>,
+    pub root_module_name: Arc<str>,
+    pub repo_env: Arc<BTreeMap<String, String>>,
+    pub repo_mappings: Arc<RepoMappingSnapshot>,
+    pub repo_mapping_overrides: Arc<RepoMappingOverrides>,
+}
+
+#[async_trait]
+impl Key for ModuleExtensionReplayInputsKey {
+    type Value = slug_error::Result<Arc<ModuleExtensionReplayInputsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let lockfile_inputs = ctx
+            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
+                self.workspace_id.clone(),
+            ))
+            .await??;
+        ModuleExtensionReplayInputsValue::from_lockfile_inputs(
+            &self.extension_id,
+            &self.bzl_transitive_digest,
+            &self.usages_digest,
+            self.project_root.as_deref().map(|path| path.as_path()),
+            &self.root_module_name,
+            self.repo_env.as_ref(),
+            self.repo_mappings.as_ref(),
+            self.repo_mapping_overrides.as_ref(),
+            lockfile_inputs.as_ref(),
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.identity_digest() == y.identity_digest(),
+            _ => false,
+        }
+    }
 }
 
 fn extension_id_for_canonical_repo<'a>(
@@ -507,21 +783,33 @@ impl Key for ExtensionSpokesKey {
                 self.workspace_id.clone(),
             ))
             .await??;
-        let lockfile_inputs = ctx
-            .compute(&BzlmodLockfileInputsKey::for_workspace_id(
-                self.workspace_id.clone(),
-            ))
-            .await??;
         ensure_extension_aggregation_workspace(
             &self.workspace_id,
             aggregation.as_ref(),
             "ExtensionSpokesKey",
             &self.extension_id,
         )?;
+        let replay_inputs = ctx
+            .compute(&ModuleExtensionReplayInputsKey {
+                workspace_id: self.workspace_id.clone(),
+                extension_id: self.extension_id.clone(),
+                bzl_transitive_digest: self.bzl_transitive_digest.clone(),
+                usages_digest: Arc::from(
+                    compute_extension_input_hash(aggregation.aggregated.as_ref()).as_str(),
+                ),
+                project_root: Some(Arc::new(
+                    self.workspace_id.canonical_project_root.as_ref().clone(),
+                )),
+                root_module_name: aggregation.root_module_name.clone(),
+                repo_env: repo_env.clone(),
+                repo_mappings: repo_mappings.repo_mappings.clone(),
+                repo_mapping_overrides: repo_mappings.repo_mapping_overrides.clone(),
+            })
+            .await??;
         let extension_key = create_extension_execution_key_from_aggregation(
             aggregation.as_ref(),
             repo_env.as_ref(),
-            lockfile_inputs.as_ref(),
+            replay_inputs,
             repo_mappings.as_ref(),
             self.bzl_transitive_digest.clone(),
         );
@@ -934,25 +1222,11 @@ pub struct ModuleExtensionExecutionKey {
     /// the parent DICE key instead of re-deriving it from project root.
     pub workspace_id: crate::WorkspaceId,
 
-    /// Digest of the visible workspace lockfile as observed during command
-    /// startup. This keeps successful extension evaluations reusable inside
-    /// DICE while still changing key identity when the lockfile changes.
-    pub visible_lockfile_digest: Option<Arc<str>>,
-
-    /// Digest of the hidden lockfile as observed during command startup.
-    pub hidden_lockfile_digest: Option<Arc<str>>,
-
-    /// Tracked visible workspace lockfile value computed before legacy bzlmod resolution.
-    pub visible_lockfile: Option<Arc<LockfileContentValue>>,
-
-    /// Tracked hidden/output-base lockfile value computed before legacy bzlmod resolution.
-    pub hidden_lockfile: Option<Arc<LockfileContentValue>>,
-
-    /// Lockfile policy for extension replay reads.
+    /// DICE-owned replay inputs selected from the visible/hidden lockfiles.
     ///
-    /// This is part of the key identity because Bazel lockfile mode changes
-    /// whether replay data can be read at all.
-    pub lockfile_mode: LockfileMode,
+    /// Lockfile cache/facts selection must happen before extension execution so
+    /// a DICE hit cannot skip replay invalidation or reopen lockfiles here.
+    pub replay_inputs: Arc<ModuleExtensionReplayInputsValue>,
 
     /// Effective Bazel repository environment used for ENV recorded-input replay.
     pub repo_env: Arc<BTreeMap<String, String>>,
@@ -973,11 +1247,7 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
         self.root_module_name.hash(state);
         self.project_root.hash(state);
         self.workspace_id.hash(state);
-        self.visible_lockfile_digest.hash(state);
-        self.hidden_lockfile_digest.hash(state);
-        hash_lockfile_content_identity(&self.visible_lockfile, state);
-        hash_lockfile_content_identity(&self.hidden_lockfile, state);
-        self.lockfile_mode.hash(state);
+        self.replay_inputs.identity_digest().hash(state);
         self.repo_env.hash(state);
         self.repo_mappings.hash(state);
         self.repo_mapping_overrides.hash(state);
@@ -993,11 +1263,7 @@ impl PartialEq for ModuleExtensionExecutionKey {
             && self.root_module_name == other.root_module_name
             && self.project_root == other.project_root
             && self.workspace_id == other.workspace_id
-            && self.visible_lockfile_digest == other.visible_lockfile_digest
-            && self.hidden_lockfile_digest == other.hidden_lockfile_digest
-            && lockfile_content_identity_eq(&self.visible_lockfile, &other.visible_lockfile)
-            && lockfile_content_identity_eq(&self.hidden_lockfile, &other.hidden_lockfile)
-            && self.lockfile_mode == other.lockfile_mode
+            && self.replay_inputs.identity_digest() == other.replay_inputs.identity_digest()
             && self.repo_env == other.repo_env
             && self.repo_mappings == other.repo_mappings
             && self.repo_mapping_overrides == other.repo_mapping_overrides
@@ -1005,35 +1271,6 @@ impl PartialEq for ModuleExtensionExecutionKey {
 }
 
 impl Eq for ModuleExtensionExecutionKey {}
-
-fn lockfile_content_identity_eq(
-    left: &Option<Arc<LockfileContentValue>>,
-    right: &Option<Arc<LockfileContentValue>>,
-) -> bool {
-    match (left, right) {
-        (Some(left), Some(right)) => match (&left.digest, &right.digest) {
-            (Some(_), Some(_)) => left.path == right.path && left.digest == right.digest,
-            (None, None) => left.path == right.path,
-            _ => false,
-        },
-        (None, None) => true,
-        _ => false,
-    }
-}
-
-fn hash_lockfile_content_identity<H: std::hash::Hasher>(
-    value: &Option<Arc<LockfileContentValue>>,
-    state: &mut H,
-) {
-    match value {
-        Some(value) => {
-            true.hash(state);
-            value.path.hash(state);
-            value.digest.hash(state);
-        }
-        None => false.hash(state),
-    }
-}
 
 // Manual Dupe implementation
 impl Dupe for ModuleExtensionExecutionKey {
@@ -1046,11 +1283,7 @@ impl Dupe for ModuleExtensionExecutionKey {
             root_module_name: self.root_module_name.dupe(),
             project_root: self.project_root.clone(),
             workspace_id: self.workspace_id.clone(),
-            visible_lockfile_digest: self.visible_lockfile_digest.clone(),
-            hidden_lockfile_digest: self.hidden_lockfile_digest.clone(),
-            visible_lockfile: self.visible_lockfile.clone(),
-            hidden_lockfile: self.hidden_lockfile.clone(),
-            lockfile_mode: self.lockfile_mode,
+            replay_inputs: self.replay_inputs.clone(),
             repo_env: self.repo_env.clone(),
             repo_mappings: self.repo_mappings.clone(),
             repo_mapping_overrides: self.repo_mapping_overrides.clone(),
@@ -1074,11 +1307,7 @@ impl ModuleExtensionExecutionKey {
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: None,
             workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
-            visible_lockfile_digest: None,
-            hidden_lockfile_digest: None,
-            visible_lockfile: None,
-            hidden_lockfile: None,
-            lockfile_mode: LockfileMode::Update,
+            replay_inputs: ModuleExtensionReplayInputsValue::empty(LockfileMode::Update),
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
             repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
@@ -1164,6 +1393,7 @@ impl ModuleExtensionExecutionKey {
         )
     }
 
+    #[cfg(test)]
     fn new_with_tracked_lockfiles_and_bzl_digest(
         aggregated: AggregatedExtension,
         root_module_name: String,
@@ -1173,6 +1403,53 @@ impl ModuleExtensionExecutionKey {
         visible_lockfile: Option<Arc<LockfileContentValue>>,
         hidden_lockfile: Option<Arc<LockfileContentValue>>,
         lockfile_mode: LockfileMode,
+        repo_env: BTreeMap<String, String>,
+        repo_mappings: RepoMappingSnapshot,
+        repo_mapping_overrides: RepoMappingOverrides,
+        bzl_transitive_digest: Arc<str>,
+        workspace_id: crate::WorkspaceId,
+    ) -> Self {
+        let lockfile_inputs = BzlmodLockfileInputsValue::from_values(
+            hidden_lockfile
+                .as_ref()
+                .map(|value| value.path.as_ref().clone()),
+            visible_lockfile,
+            hidden_lockfile,
+            lockfile_mode,
+        );
+        let mut lockfile_inputs = lockfile_inputs;
+        lockfile_inputs.visible_lockfile_digest = visible_lockfile_digest;
+        lockfile_inputs.hidden_lockfile_digest = hidden_lockfile_digest;
+        let replay_inputs = ModuleExtensionReplayInputsValue::from_lockfile_inputs(
+            aggregated.extension_id.as_str(),
+            &bzl_transitive_digest,
+            compute_extension_input_hash(&aggregated).as_str(),
+            Some(project_root.as_path()),
+            &root_module_name,
+            &repo_env,
+            &repo_mappings,
+            &repo_mapping_overrides,
+            &lockfile_inputs,
+        )
+        .unwrap_or_else(|_| ModuleExtensionReplayInputsValue::empty(lockfile_mode));
+        Self::new_with_replay_inputs_and_bzl_digest(
+            aggregated,
+            root_module_name,
+            project_root,
+            replay_inputs,
+            repo_env,
+            repo_mappings,
+            repo_mapping_overrides,
+            bzl_transitive_digest,
+            workspace_id,
+        )
+    }
+
+    fn new_with_replay_inputs_and_bzl_digest(
+        aggregated: AggregatedExtension,
+        root_module_name: String,
+        project_root: PathBuf,
+        replay_inputs: Arc<ModuleExtensionReplayInputsValue>,
         repo_env: BTreeMap<String, String>,
         repo_mappings: RepoMappingSnapshot,
         repo_mapping_overrides: RepoMappingOverrides,
@@ -1189,11 +1466,7 @@ impl ModuleExtensionExecutionKey {
             root_module_name: Arc::from(root_module_name.as_str()),
             project_root: Some(Arc::new(project_root)),
             workspace_id,
-            visible_lockfile_digest: visible_lockfile_digest.map(Arc::from),
-            hidden_lockfile_digest: hidden_lockfile_digest.map(Arc::from),
-            visible_lockfile,
-            hidden_lockfile,
-            lockfile_mode,
+            replay_inputs,
             repo_env: Arc::new(repo_env),
             repo_mappings: Arc::new(repo_mappings),
             repo_mapping_overrides: Arc::new(repo_mapping_overrides),
@@ -1208,8 +1481,8 @@ impl ModuleExtensionExecutionKey {
         aggregated: Arc<AggregatedExtension>,
         root_module_name: Arc<str>,
         project_root: Arc<PathBuf>,
-        visible_lockfile_digest: Option<Arc<str>>,
-        hidden_lockfile_digest: Option<Arc<str>>,
+        _visible_lockfile_digest: Option<Arc<str>>,
+        _hidden_lockfile_digest: Option<Arc<str>>,
         lockfile_mode: LockfileMode,
         repo_env: Arc<BTreeMap<String, String>>,
         repo_mappings: Arc<RepoMappingSnapshot>,
@@ -1232,11 +1505,7 @@ impl ModuleExtensionExecutionKey {
             root_module_name,
             project_root: Some(project_root),
             workspace_id,
-            visible_lockfile_digest,
-            hidden_lockfile_digest,
-            visible_lockfile: None,
-            hidden_lockfile: None,
-            lockfile_mode,
+            replay_inputs: ModuleExtensionReplayInputsValue::empty(lockfile_mode),
             repo_env,
             repo_mappings,
             repo_mapping_overrides,
@@ -1256,11 +1525,7 @@ impl ModuleExtensionExecutionKey {
             root_module_name: Arc::from("_main"),
             project_root: None,
             workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
-            visible_lockfile_digest: None,
-            hidden_lockfile_digest: None,
-            visible_lockfile: None,
-            hidden_lockfile: None,
-            lockfile_mode: LockfileMode::Update,
+            replay_inputs: ModuleExtensionReplayInputsValue::empty(LockfileMode::Update),
             repo_env: Arc::new(BTreeMap::new()),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
             repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
@@ -1411,155 +1676,51 @@ impl Key for ModuleExtensionExecutionKey {
             self.input_hash
         );
 
-        // The `.bzl` transitive digest is part of key identity. Do not compute
-        // it here, or a DICE hit could skip Bazel's replay invalidation check.
-        let bzl_transitive_digest = self.bzl_transitive_digest.to_string();
-        let usages_digest = self.input_hash.to_string();
-        let mut prior_facts = empty_facts();
-        let mut workspace_lockfile_facts = empty_facts();
-        let mut workspace_lockfile_facts_present = false;
+        let prior_facts = self.replay_inputs.prior_facts.clone();
+        let workspace_lockfile_facts = self.replay_inputs.workspace_lockfile_facts.clone();
 
-        // 1. Consume lockfile facts from the Plan 61 lockfile content values.
-        //    These values were computed by the DICE-backed config path before
-        //    legacy bzlmod resolution; extension replay must not reopen the
-        //    lockfiles here.
-        if self.lockfile_mode != LockfileMode::Off
-            && let Some(project_root) = &self.project_root
-            && let Some(lockfile_value) = &self.visible_lockfile
+        // 1. Consume replay inputs selected by `ModuleExtensionReplayInputsKey`.
+        //    Extension execution must not reopen lockfiles or decide which
+        //    visible/hidden entry applies; it only validates recorded inputs
+        //    before accepting a selected cache hit.
+        if let Some(selected_cache) = self.replay_inputs.selected_cache.clone()
+            && selected_cache_recorded_inputs_current(ctx, &self.extension_id, &selected_cache)
+                .await?
         {
-            if let Some(lockfile) = lockfile_value.lockfile.as_ref() {
-                verify_observed_lockfile_digest(
-                    lockfile_value,
-                    self.visible_lockfile_digest.as_deref(),
-                    "workspace lockfile",
-                )?;
-                if let Some(facts) = lockfile.get_extension_facts(&self.extension_id) {
-                    prior_facts = facts.clone();
-                    workspace_lockfile_facts = facts;
-                    workspace_lockfile_facts_present = true;
-                }
-                match lockfile.select_extension_cache_for_workspace(
-                    &self.extension_id,
-                    &bzl_transitive_digest,
-                    &usages_digest,
-                    Some(project_root),
-                    Some(self.repo_env.as_ref()),
-                    Some(self.repo_mappings.as_ref()),
-                    Some(self.root_module_name()),
-                    Some(self.repo_mapping_overrides.as_ref()),
-                ) {
-                    Some(selected_cache) => {
-                        if selected_cache_recorded_inputs_current(
-                            ctx,
-                            &self.extension_id,
-                            &selected_cache,
-                        )
-                        .await?
-                        {
-                            tracing::info!(
-                                "Extension '{}' cache HIT: using {} cached repo specs",
-                                self.extension_id,
-                                selected_cache.repo_specs.len()
-                            );
-                            selected_cache.record_hit(&self.extension_id);
-
-                            let recorded_input_context =
-                                ModuleExtensionRecordedInputContext::from_selected_cache(
-                                    &selected_cache,
-                                );
-                            let result =
-                                ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
-                                    self.extension_id.clone(),
-                                    self.input_hash.to_string(),
-                                    selected_cache.repo_specs,
-                                    &self.root_module_name,
-                                    ModuleExtensionMetadata {
-                                        facts: prior_facts.clone(),
-                                    },
-                                    selected_cache.recorded_inputs.clone(),
-                                    recorded_input_context,
-                                );
-
-                            return Ok(Arc::new(result));
-                        }
-                    }
-                    None => {
-                        record_bzlmod_event(
-                            BzlmodEventKind::ExtensionReplayMissReason,
-                            format!("{}:digest_or_entry_miss", self.extension_id),
-                        );
-                        tracing::debug!(
-                            "Extension '{}' cache MISS: digests don't match",
-                            self.extension_id
-                        );
-                    }
-                }
-            } else {
-                record_bzlmod_event(
-                    BzlmodEventKind::ExtensionReplayMissReason,
-                    format!("{}:lockfile_absent_or_unreadable", self.extension_id),
-                );
+            let source = self
+                .replay_inputs
+                .selected_cache_identity
+                .as_ref()
+                .map(|identity| identity.source);
+            match source {
+                Some(crate::dice_graph::LockfileContentKind::Hidden) => tracing::info!(
+                    "Extension '{}' hidden lockfile cache HIT: using {} cached repo specs",
+                    self.extension_id,
+                    selected_cache.repo_specs.len()
+                ),
+                _ => tracing::info!(
+                    "Extension '{}' cache HIT: using {} cached repo specs",
+                    self.extension_id,
+                    selected_cache.repo_specs.len()
+                ),
             }
-        }
-        if self.lockfile_mode != LockfileMode::Off
-            && let Some(lockfile_value) = &self.hidden_lockfile
-        {
-            if let Some(lockfile) = lockfile_value.lockfile.as_ref() {
-                verify_observed_lockfile_digest(
-                    lockfile_value,
-                    self.hidden_lockfile_digest.as_deref(),
-                    "hidden lockfile",
-                )?;
-                if !workspace_lockfile_facts_present {
-                    prior_facts = lockfile
-                        .get_extension_facts(&self.extension_id)
-                        .unwrap_or_else(empty_facts);
-                }
-                if let Some(selected_cache) = lockfile.select_extension_cache_for_workspace(
-                    &self.extension_id,
-                    &bzl_transitive_digest,
-                    &usages_digest,
-                    self.project_root.as_deref().map(|p| p.as_path()),
-                    Some(self.repo_env.as_ref()),
-                    Some(self.repo_mappings.as_ref()),
-                    Some(self.root_module_name()),
-                    Some(self.repo_mapping_overrides.as_ref()),
-                ) {
-                    if selected_cache_recorded_inputs_current(
-                        ctx,
-                        &self.extension_id,
-                        &selected_cache,
-                    )
-                    .await?
-                    {
-                        tracing::info!(
-                            "Extension '{}' hidden lockfile cache HIT: using {} cached repo specs",
-                            self.extension_id,
-                            selected_cache.repo_specs.len()
-                        );
-                        selected_cache.record_hit(&self.extension_id);
+            selected_cache.record_hit(&self.extension_id);
 
-                        let recorded_input_context =
-                            ModuleExtensionRecordedInputContext::from_selected_cache(
-                                &selected_cache,
-                            );
-                        let result =
-                            ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
-                                self.extension_id.clone(),
-                                self.input_hash.to_string(),
-                                selected_cache.repo_specs,
-                                &self.root_module_name,
-                                ModuleExtensionMetadata {
-                                    facts: prior_facts.clone(),
-                                },
-                                selected_cache.recorded_inputs.clone(),
-                                recorded_input_context,
-                            );
+            let recorded_input_context =
+                ModuleExtensionRecordedInputContext::from_selected_cache(&selected_cache);
+            let result = ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
+                self.extension_id.clone(),
+                self.input_hash.to_string(),
+                selected_cache.repo_specs,
+                &self.root_module_name,
+                ModuleExtensionMetadata {
+                    facts: prior_facts.clone(),
+                },
+                selected_cache.recorded_inputs.clone(),
+                recorded_input_context,
+            );
 
-                        return Ok(Arc::new(result));
-                    }
-                }
-            }
+            return Ok(Arc::new(result));
         }
 
         // Log the modules that use this extension
@@ -1634,7 +1795,7 @@ impl Key for ModuleExtensionExecutionKey {
         );
         validate_error_mode_facts(
             &self.extension_id,
-            self.lockfile_mode,
+            self.replay_inputs.lockfile_mode,
             &output.metadata.facts,
             &workspace_lockfile_facts,
         )?;
@@ -2819,7 +2980,8 @@ mod tests {
     }
 
     #[test]
-    fn extension_execution_key_from_aggregation_uses_repo_env_and_lockfile_data() {
+    fn extension_execution_key_from_aggregation_uses_repo_env_and_lockfile_data()
+    -> slug_error::Result<()> {
         use crate::BzlmodExtensionAggregationsDataValue;
         use crate::BzlmodLockfileInputsValue;
         use crate::BzlmodRepoMappingsDataValue;
@@ -2867,28 +3029,58 @@ mod tests {
             aggregated: Arc::new(data.extension_aggregations[&extension_id].clone()),
             root_module_name: Arc::from("root"),
         };
+        let replay_inputs = ModuleExtensionReplayInputsValue::from_lockfile_inputs(
+            &extension_id,
+            "digest-from-dice-key",
+            compute_extension_input_hash(aggregation.aggregated.as_ref()).as_str(),
+            Some(project_root.as_path()),
+            &aggregation.root_module_name,
+            &repo_env,
+            repo_mappings.repo_mappings.as_ref(),
+            repo_mappings.repo_mapping_overrides.as_ref(),
+            &lockfile_inputs,
+        )?;
         let key = create_extension_execution_key_from_aggregation(
             &aggregation,
             &repo_env,
-            &lockfile_inputs,
+            replay_inputs,
             &repo_mappings,
             Arc::from("digest-from-dice-key"),
         );
 
         assert_eq!(
-            key.hidden_lockfile
+            key.replay_inputs
+                .selected_cache_identity
+                .as_ref()
+                .map(|identity| identity.source),
+            None
+        );
+        assert_eq!(key.replay_inputs.lockfile_mode, LockfileMode::Error);
+        assert_eq!(
+            key.replay_inputs.identity_digest(),
+            ModuleExtensionReplayInputsValue::from_lockfile_inputs(
+                &extension_id,
+                "digest-from-dice-key",
+                compute_extension_input_hash(aggregation.aggregated.as_ref()).as_str(),
+                Some(project_root.as_path()),
+                &aggregation.root_module_name,
+                &repo_env,
+                repo_mappings.repo_mappings.as_ref(),
+                repo_mappings.repo_mapping_overrides.as_ref(),
+                &lockfile_inputs,
+            )?
+            .identity_digest()
+        );
+        assert_eq!(key.repo_env.as_ref(), &repo_env);
+        assert_eq!(key.bzl_transitive_digest.as_ref(), "digest-from-dice-key");
+        assert_eq!(
+            lockfile_inputs
+                .hidden_lockfile
                 .as_ref()
                 .map(|value| value.path.as_ref()),
             Some(&hidden_lockfile_path)
         );
-        assert_eq!(
-            key.visible_lockfile_digest.as_deref(),
-            Some("visible-digest")
-        );
-        assert_eq!(key.hidden_lockfile_digest.as_deref(), Some("hidden-digest"));
-        assert_eq!(key.lockfile_mode, LockfileMode::Error);
-        assert_eq!(key.repo_env.as_ref(), &repo_env);
-        assert_eq!(key.bzl_transitive_digest.as_ref(), "digest-from-dice-key");
+        Ok(())
     }
 
     #[tokio::test]
@@ -2926,6 +3118,86 @@ mod tests {
             "{validation:?}"
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn module_extension_replay_inputs_key_selects_visible_cache_and_facts()
+    -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-replay-inputs-key");
+        let workspace_id = crate::WorkspaceId::for_project_root(project_root.clone());
+        let aggregated = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+        let extension_id = aggregated.extension_id.clone();
+        let usages_digest = compute_extension_input_hash(&aggregated);
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        let mut lockfile = crate::lockfile::Lockfile::new();
+        lockfile.set_extension_cache(
+            extension_id.clone(),
+            "bzl-digest".to_owned(),
+            usages_digest.clone(),
+            &repo_specs,
+        );
+        lockfile.set_extension_facts(
+            extension_id.clone(),
+            serde_json::json!({"resource": "from-visible"}),
+        );
+        let visible_lockfile = Arc::new(LockfileContentValue {
+            path: Arc::new(project_root.join("MODULE.bazel.lock")),
+            digest: Some("visible-lockfile-digest".to_owned()),
+            tracked_by_dice: true,
+            lockfile: Some(Arc::new(lockfile)),
+        });
+        let lockfile_inputs = Arc::new(BzlmodLockfileInputsValue::from_values(
+            None,
+            Some(visible_lockfile),
+            None,
+            LockfileMode::Update,
+        ));
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            crate::BzlmodLockfileInputsDataKey,
+            Arc::new(crate::BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                lockfile_inputs,
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let replay_inputs = dice
+            .compute(&ModuleExtensionReplayInputsKey {
+                workspace_id,
+                extension_id: Arc::from(extension_id.as_str()),
+                bzl_transitive_digest: Arc::from("bzl-digest"),
+                usages_digest: Arc::from(usages_digest.as_str()),
+                project_root: Some(Arc::new(project_root)),
+                root_module_name: Arc::from("_main"),
+                repo_env: Arc::new(BTreeMap::new()),
+                repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
+                repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
+            })
+            .await??;
+
+        assert_eq!(
+            replay_inputs
+                .prior_facts
+                .get("resource")
+                .and_then(serde_json::Value::as_str),
+            Some("from-visible")
+        );
+        assert!(replay_inputs.selected_cache.is_some());
+        assert_eq!(
+            replay_inputs
+                .selected_cache_identity
+                .as_ref()
+                .map(|identity| identity.source),
+            Some(crate::dice_graph::LockfileContentKind::Workspace)
+        );
         Ok(())
     }
 
@@ -3811,15 +4083,29 @@ mod tests {
     }
 
     #[test]
-    fn test_tracked_lockfile_value_identity_is_in_hash_and_eq() {
+    fn test_replay_inputs_identity_is_in_hash_and_eq() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::Hash;
         use std::hash::Hasher;
 
         use crate::extensions::AggregatedExtension;
 
+        fn visible_lockfile_with_fact(marker: &str) -> Arc<LockfileContentValue> {
+            let mut lockfile = crate::lockfile::Lockfile::new();
+            lockfile.set_extension_facts(
+                "@@mod//ext.bzl%ext".to_owned(),
+                serde_json::json!({ "marker": marker }),
+            );
+            Arc::new(LockfileContentValue {
+                path: Arc::new(PathBuf::from("/project/MODULE.bazel.lock")),
+                digest: Some(format!("visible-digest-{marker}")),
+                tracked_by_dice: true,
+                lockfile: Some(Arc::new(lockfile)),
+            })
+        }
+
         fn key_with_visible_lockfile(
-            visible_lockfile: Option<Arc<LockfileContentValue>>,
+            visible_lockfile: Arc<LockfileContentValue>,
         ) -> ModuleExtensionExecutionKey {
             let project_root = PathBuf::from("/project");
             let workspace_id = crate::WorkspaceId::for_project_root(project_root.clone());
@@ -3827,9 +4113,9 @@ mod tests {
                 AggregatedExtension::new("@@mod//ext.bzl", "ext"),
                 "_main".to_owned(),
                 project_root,
-                Some("visible-digest".to_owned()),
+                visible_lockfile.digest.clone(),
                 None,
-                visible_lockfile,
+                Some(visible_lockfile),
                 None,
                 LockfileMode::Update,
                 BTreeMap::new(),
@@ -3840,57 +4126,16 @@ mod tests {
             )
         }
 
-        let tracked_lockfile = Arc::new(LockfileContentValue {
-            path: Arc::new(PathBuf::from("/project/MODULE.bazel.lock")),
-            digest: Some("visible-digest".to_owned()),
-            tracked_by_dice: true,
-            lockfile: Some(Arc::new(crate::lockfile::Lockfile::new())),
-        });
-        let other_path_same_digest = Arc::new(LockfileContentValue {
-            path: Arc::new(PathBuf::from("/other/MODULE.bazel.lock")),
-            digest: Some("visible-digest".to_owned()),
-            tracked_by_dice: true,
-            lockfile: Some(Arc::new(crate::lockfile::Lockfile::new())),
-        });
-        let missing_at_path = Arc::new(LockfileContentValue {
-            path: Arc::new(PathBuf::from("/project/missing.lock")),
-            digest: None,
-            tracked_by_dice: true,
-            lockfile: None,
-        });
-        let missing_at_other_path = Arc::new(LockfileContentValue {
-            path: Arc::new(PathBuf::from("/other/missing.lock")),
-            digest: None,
-            tracked_by_dice: true,
-            lockfile: None,
-        });
+        let first = key_with_visible_lockfile(visible_lockfile_with_fact("first"));
+        let second = key_with_visible_lockfile(visible_lockfile_with_fact("second"));
 
-        let with_value = key_with_visible_lockfile(Some(tracked_lockfile));
-        let missing_value = key_with_visible_lockfile(None);
-        let other_path = key_with_visible_lockfile(Some(other_path_same_digest));
-        let missing_path = key_with_visible_lockfile(Some(missing_at_path));
-        let missing_other_path = key_with_visible_lockfile(Some(missing_at_other_path));
+        assert_ne!(first, second);
 
-        assert_ne!(with_value, missing_value);
-        assert_ne!(with_value, other_path);
-        assert_ne!(missing_path, missing_other_path);
-
-        let mut with_value_hasher = DefaultHasher::new();
-        let mut missing_value_hasher = DefaultHasher::new();
-        let mut other_path_hasher = DefaultHasher::new();
-        let mut missing_path_hasher = DefaultHasher::new();
-        let mut missing_other_path_hasher = DefaultHasher::new();
-        with_value.hash(&mut with_value_hasher);
-        missing_value.hash(&mut missing_value_hasher);
-        other_path.hash(&mut other_path_hasher);
-        missing_path.hash(&mut missing_path_hasher);
-        missing_other_path.hash(&mut missing_other_path_hasher);
-        assert_ne!(with_value_hasher.finish(), missing_value_hasher.finish());
-        assert_ne!(with_value_hasher.finish(), other_path_hasher.finish());
-        assert_ne!(
-            missing_path_hasher.finish(),
-            missing_other_path_hasher.finish()
-        );
+        let mut first_hasher = DefaultHasher::new();
+        let mut second_hasher = DefaultHasher::new();
+        first.hash(&mut first_hasher);
+        second.hash(&mut second_hasher);
+        assert_ne!(first_hasher.finish(), second_hasher.finish());
     }
 
     #[test]

@@ -832,6 +832,13 @@ Current state to preserve:
   `cargo test -p slug_bzlmod local_module --lib`,
   `cargo test -p slug_common clean_resolved_module_graph --lib`,
   `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 module-extension replay input key boundary:
+  `ModuleExtensionReplayInputsKey` now selects visible/hidden lockfile cache
+  entries and facts before `ModuleExtensionExecutionKey` runs. Extension
+  execution no longer reopens lockfiles or decides which lockfile entry applies;
+  it consumes the replay-input value and only validates selected cache recorded
+  inputs before accepting a hit. Guardrail:
+  `cargo test -p slug_bzlmod extension_execution_dice::tests:: --lib`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1122,7 +1129,10 @@ hardening behavior around it.
      The resulting `BzlmodLockfileInputsValue` is still a bridge-shaped value
      until the true lockfile policy/value graph replaces it. It is injected as
      a named DICE input beside the direct `BzlmodCellGraphValue`, so no
-     monolithic projection payload carries lockfile-input facts.
+     monolithic projection payload carries lockfile-input facts. Module
+     extension replay now consumes those values through the named
+     `ModuleExtensionReplayInputsKey`, so lockfile cache/facts selection is no
+     longer embedded in `ModuleExtensionExecutionKey`.
    - DICE-backed bzlmod resolution now requires the tracked visible and hidden
      lockfile values when lockfile mode/path policy says those inputs are
      active, instead of silently falling back to a direct lockfile read inside
