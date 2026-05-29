@@ -32,6 +32,7 @@ use crate::fetch::SourceFetcher;
 use crate::lockfile::LockfileMode;
 use crate::module_names::invalid_bazel_module_name_message;
 use crate::module_names::is_valid_bazel_module_name;
+#[cfg(test)]
 use crate::parser::parse_non_root_module_bazel;
 use crate::parser::parse_non_root_module_bazel_content;
 use crate::registry::RegistryClient;
@@ -1591,6 +1592,7 @@ pub struct ResolvedLocalModule {
 
 /// Result of resolving local path overrides.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[cfg(test)]
 pub struct ResolvedLocalModules {
     /// Map from module name to resolved module information.
     pub modules: HashMap<String, ResolvedLocalModule>,
@@ -1599,6 +1601,7 @@ pub struct ResolvedLocalModules {
     pub resolution_order: Vec<String>,
 }
 
+#[cfg(test)]
 impl ResolvedLocalModules {
     /// Creates an empty resolution result.
     pub fn empty() -> Self {
@@ -1634,6 +1637,7 @@ impl ResolvedLocalModules {
 /// # Returns
 ///
 /// A `ResolvedLocalModule` containing the parsed module information.
+#[cfg(test)]
 pub fn resolve_local_override(
     override_info: &LocalPathOverride,
     workspace_root: &Path,
@@ -1798,6 +1802,7 @@ fn resolve_local_override_without_precomputed_inputs(
 ///     println!("Local module: {} at {:?}", name, module.absolute_path);
 /// }
 /// ```
+#[cfg(test)]
 pub fn resolve_local_modules(
     overrides: &[Override],
     workspace_root: &Path,
@@ -1875,6 +1880,7 @@ pub struct LocalModuleCellInfo {
     pub path: Arc<str>,
 }
 
+#[cfg(test)]
 impl ResolvedLocalModules {
     /// Convert resolved modules to cell registration information.
     ///
@@ -2144,6 +2150,7 @@ impl RemoteModuleResolver {
 /// Convenience function to resolve all dependencies (both local and remote).
 ///
 /// This is the main entry point for dependency resolution.
+#[cfg(test)]
 pub async fn resolve_all_dependencies(
     root_module: &Module,
     workspace_root: &Path,

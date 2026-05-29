@@ -628,7 +628,7 @@ Current state to preserve:
   override `MODULE.bazel` from disk. A missing precomputed local-override input
   is now a production error in the MVS path, with the old direct parser fallback
   retained only for tests. At this checkpoint the remaining direct non-root
-  parser hits were git/archive override cache parsing and the public non-DICE
+  parser hits were git/archive override cache parsing and the standalone direct
   local override helper; git/archive needed a patch-digest-aware source-input
   slice before the direct parse could be removed safely. Guardrail:
   `cargo test -p slug_bzlmod test_resolve_local_module_from_precomputed_inputs --lib && cargo test -p slug_bzlmod resolve_graph_with_module_file_inputs_uses_tracked_local_overrides --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
@@ -655,6 +655,16 @@ Current state to preserve:
   `cargo test -p slug_bzlmod --lib && cargo test -p slug_common bzlmod --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && cargo fmt --check && git diff --check`; search evidence:
   `rg -n "parse_non_root_module_bazel\\(" app/slug_bzlmod/src/resolution.rs app/slug_common/src/legacy_configs/cells.rs app/slug_bzlmod/src/dice_graph.rs`
   reports only the standalone local override helper.
+- 2026-05-29 direct local override API reduction: the standalone direct local
+  override resolver and its `resolve_all_dependencies` convenience wrapper are
+  no longer exported by `slug_bzlmod` and now compile only for `slug_bzlmod`
+  tests. Production MVS already required precomputed
+  `LocalOverrideModuleInputs` for local overrides; this removes the remaining
+  production-compiled direct `parse_non_root_module_bazel(...)` local override
+  helper. Validation:
+  `cargo test -p slug_bzlmod local_module --lib`,
+  `cargo test -p slug_common clean_resolved_module_graph --lib`,
+  `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -944,7 +954,9 @@ hardening behavior around it.
      module input instead of direct-parsing the root module in the DICE path.
      Local-path overrides resolved during clean MVS discovery now also consume
      the precomputed local override module inputs rather than reparsing their
-     `MODULE.bazel` files directly from disk.
+     `MODULE.bazel` files directly from disk. The standalone direct local
+     override resolver and convenience dependency resolver are now test-only
+     and are not exported by `slug_bzlmod`.
      Git/archive override source-input descriptors now include the same local
      patch digest as resolver fetch/extract cache paths, and the non-registry
      source-input key owns cache-miss fetch/materialization plus
