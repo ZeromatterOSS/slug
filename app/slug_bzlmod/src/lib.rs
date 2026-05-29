@@ -383,20 +383,6 @@ pub trait SetBzlmodDiceInputs {
         )
     }
 
-    fn set_bzlmod_cell_graph_data_with_inputs_and_digest(
-        &mut self,
-        cell_graph_resolution_digest: Arc<str>,
-        cell_graph: BzlmodCellGraphValue,
-        module_versions: BzlmodModuleVersionsDataValue,
-        lockfile_inputs: BzlmodLockfileInputsDataValue,
-        repo_env: BzlmodRepoEnvDataValue,
-        registered_toolchains: RegisteredToolchainsDataValue,
-        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
-        extension_aggregations: BzlmodExtensionAggregationsDataValue,
-        resolution_facts: BzlmodResolutionFactsValue,
-        repo_mappings: BzlmodRepoMappingsDataValue,
-    ) -> slug_error::Result<()>;
-
     fn set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
         &mut self,
         cell_graph_resolution_digest: Arc<str>,
@@ -464,34 +450,6 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
     ) -> slug_error::Result<()> {
         self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
             Arc::from(dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
-            cell_graph,
-            None,
-            module_versions,
-            lockfile_inputs,
-            repo_env,
-            registered_toolchains,
-            registered_execution_platforms,
-            extension_aggregations,
-            resolution_facts,
-            repo_mappings,
-        )
-    }
-
-    fn set_bzlmod_cell_graph_data_with_inputs_and_digest(
-        &mut self,
-        cell_graph_resolution_digest: Arc<str>,
-        cell_graph: BzlmodCellGraphValue,
-        module_versions: BzlmodModuleVersionsDataValue,
-        lockfile_inputs: BzlmodLockfileInputsDataValue,
-        repo_env: BzlmodRepoEnvDataValue,
-        registered_toolchains: RegisteredToolchainsDataValue,
-        registered_execution_platforms: RegisteredExecutionPlatformsDataValue,
-        extension_aggregations: BzlmodExtensionAggregationsDataValue,
-        resolution_facts: BzlmodResolutionFactsValue,
-        repo_mappings: BzlmodRepoMappingsDataValue,
-    ) -> slug_error::Result<()> {
-        self.set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(
-            cell_graph_resolution_digest,
             cell_graph,
             None,
             module_versions,

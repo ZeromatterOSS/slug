@@ -684,6 +684,17 @@ Current state to preserve:
   slug_bzlmod materialization_manifest --lib`, `cargo test -p
   slug_external_cells extension_repo --lib`, `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 digest-only cell-graph updater API removed:
+  `SetBzlmodDiceInputs::set_bzlmod_cell_graph_data_with_inputs_and_digest(...)`
+  is gone. Callers must either use the explicit transitional injected digest
+  helper or pass the resolved graph through
+  `set_bzlmod_cell_graph_data_with_inputs_digest_and_resolved_graph(...)`;
+  there is no longer a public entry point that installs a non-injected digest
+  while omitting the graph provenance. Guardrails: `cargo check -p slug_bzlmod
+  -p slug_common -p slug_external_cells -p slug_analysis -p
+  slug_interpreter_for_build`, targeted `rg` for the removed method, `cargo
+  test -p slug_bzlmod cell_graph --lib`, `cargo fmt --check`, and
+  `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1812,6 +1823,9 @@ hardening behavior around it.
      for extension execution and materialization manifests are test-only too.
      Zero-repo-mapping materialization conveniences are test-only as well, so
      production repository replay must carry the current repo-mapping snapshot.
+     The digest-only updater helper that omitted resolved-graph provenance is
+     removed; remaining non-empty graph injection must choose either the named
+     injected digest path or the resolved-graph-carrying path explicitly.
      Module extension execution and recorded-input validation keys require
      workspace identity instead of carrying or deriving optional provenance; the
      recorded-input key's internal workspace is no longer optional in production.
