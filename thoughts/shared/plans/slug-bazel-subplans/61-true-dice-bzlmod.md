@@ -1910,189 +1910,26 @@ hardening behavior around it.
      production API for seeding or resolving bzlmod generated repos through
      process-global maps; stale-global guardrails still seed those maps through
      test-only names to prove resolver-owned runtime snapshots win.
-- Dynamic generated-repo cell maps are now scoped by the active transitional
-  workspace identity, including output base when replayed from a bzlmod cell
-  graph, but they remain process-global maps rather than a DICE-owned
-  `BzlmodCellGraphKey`. Resolver-local promoted dynamic cells from graph
-  snapshots and current extension-spoke values are graph-owned, and direct
-  resolver lookup no longer materializes runtime snapshot cells by internal
-  generated repo name, but directory scans and alias-compatibility maps are
-  still process-local lookup accelerators rather than DICE inputs.
-  Directory-scan fallbacks are disabled once the active transitional scope
-  includes an output base.
-- Module extension and repository-context label path resolution now receive
-  resolver-owned cell path maps from the active cell resolver, and those maps are
-  authoritative when present. `module_ctx.path(Label(...))`,
-  `repository_ctx.path(Label(...))`, repository path-like APIs, and the
-  `repository_ctx.path(Label(...))` lazy materialization trigger no longer fill a
-  resolver-owned miss from process-global dynamic aliases, directory scans, or a
-  synthetic workspace-root path. `module_ctx` Label-taking methods now require
-  that resolver-owned map rather than falling back when it is absent, and
-  `repository_ctx` path-like label resolution always uses the context's explicit
-  cell-path map. The remaining bridge is the producer: the map is still derived
-  from a legacy-produced cell graph rather than a true `BzlmodCellGraphKey`.
-- Native repository-rule `build_file`/`patches` label resolution can now receive
-  a resolver-owned cell path map from the bzlmod cell graph, and the normal
-  executor path now requires that map instead of retaining a
-  `bazel-external` directory-scan fallback. Patch resolution preserves the
-  existing non-fatal repository-rule behavior by warning and continuing after
-  resolution errors. The remaining bridge is the producer: the cell graph value
-  supplying those paths is still legacy-produced via `BzlmodCellGraphDataKey`
-  instead of derived from true DICE module/repo/spec keys.
-- Bzlmod load-path wrong-cell equivalence and load-path canonicalization,
-  toolchain implementation label parsing, metadata label parsing, and C++
-  toolchain metadata/action-path formatting can now use declared aliases and
-  runtime aliases/cells from the active cell alias resolver instead of consulting
-  process-global dynamic aliases. Load-path canonicalization, `Label()`
-  explicit/owner-scoped repo canonicalization, and toolchain implementation
-  label parsing no longer consult process-global dynamic aliases on resolverless
-  or no-runtime-snapshot resolver misses; production metadata/C++ metadata
-  contexts now make the same miss behavior owner-only, with process-global
-  metadata fallback kept only in test-only compatibility contexts.
-- `config_setting(flag_values = ...)` build-setting lookup now also uses the
-  active cell alias resolver for bzlmod repo-spelling normalization before
-  consulting process-global dynamic aliases.
-- Bazel-style transition input/output build-setting label parsing now also uses
-  the active cell alias resolver, so transition-produced settings no longer
-  need process-global generated-repo aliases when a runtime snapshot is
-  available.
-- Generic build-setting label parsing now uses only a caller-supplied active
-  cell alias resolver for bzlmod repo-spelling normalization; resolverless and
-  no-runtime-snapshot misses keep the apparent repo spelling instead of
-  consulting process-global generated-repo aliases.
-- Configured provider `Label` values exposed through normal analysis `ctx.attr`,
-  dependency objects, query-result dependencies, source-file targets, derived
-  same-package/relative labels, subtargets, and `ctx.label` now carry the
-  active cell alias resolver. Their Bazel-visible workspace/repo stringification
-  uses only declared aliases and runtime aliases from that resolver;
-  resolverless and no-runtime-snapshot misses keep the apparent cell spelling
-  instead of consulting process-global dynamic aliases. The remaining bridge is
-  the producer: the resolver snapshot is still derived from legacy-produced cell
-  graph data rather than a true `BzlmodCellGraphKey`.
-- Target-owned output path formatting now uses the configured target label's
-  stored package cell name directly instead of process-global bzlmod
-  alias/module canonicalization. The remaining bridge is the producer: those
-  labels still ultimately come from the legacy-produced cell graph until
-  `BzlmodCellGraphKey` is true graph-owned data.
-- Clean review of the output-path slice found two remaining ownership leaks:
-  `ArtifactPath` still asked process-global bzlmod alias state to canonicalize
-  external repo names, and bzlmod module cells/repo-mapping targets could still
-  be stored under apparent module names such as `b` while Bazel's canonical
-  module repository is `b+`. This slice burns down the output/file-path and
-  repo-mapping bridge surface by making `ArtifactPath` consume the stored label
-  cell name, storing resolved bzlmod module cells under
-  `bazel_canonical_module_repo_name`, canonicalizing repo-mapping target values
-  to selected graph cell names, and resolving placeholder labels through the
-  active alias owner before preserving apparent names as a compatibility
-  fallback. The intended owner is `BzlmodCellGraphKey` plus `RepoMappingKey`;
-  the current owner remains `BzlmodCellGraphValue` /
-  `BzlmodCellGraphDataKey` until the cell graph is derived from true module,
-  resolution, and repo-mapping DICE producers. Before evidence included
-  `ArtifactPath`'s `canonical_external_cell_name` process-global call,
-  `CellName::unchecked_new(name)` / `CellName::unchecked_new(module_name)` for
-  bzlmod module cells, and focused Plan 61 failures on `b//...` dependency keys
-  while the known cell was `b+`. After evidence: targeted searches for
-  `slug_core::cells::canonical_bazel_repo_name_for_cell` /
-  `canonical_external_cell_name` in output-path formatting and
-  `CellName::unchecked_new(name|module_name)` in bzlmod cell creation return no
-  hits; searches show `canonicalize_repo_mapping_snapshot_targets` and
-  placeholder `resolve_declared_or_runtime_alias(cell_alias)` in the owner path.
-  Validation passed with focused `slug_common` canonical-module tests, the
-  focused `slug_execute` artifact-path regression, focused
-  `slug_interpreter_for_build` placeholder-label regressions, affected-crate
-  `cargo check`, `cargo build -p slug`, the explicit-binary Plan 61 selector for
-  explicit module repo names and scoped/root alias leakage (`3 passed, 152
-  deselected`), `cargo fmt --check`, and `git diff --check`.
-- Follow-up clean reviews found that `override_repo()` / `inject_repo()` target
-  values could still be persisted as root-visible apparent aliases in
-  `RepoMappingOverrides`, in `BzlmodRepoMapping::for_module()` snapshot rows,
-  and in the pre-projection replay-summary lockfile lookup path before being
-  copied into extension-generated repo mappings. This slice canonicalizes the
-  shared repo-mapping state through selected graph cell names when graph data is
-  available, then through the root repo mapping's alias closure, before the
-  mappings feed `add_extension_generated_repo_mappings`,
-  `BzlmodRepoMappingsDataValue`, replay-summary hashing, or lockfile cache
-  lookup. Bridge surface reduced: root override/inject mapping rows no longer
-  preserve apparent root aliases such as `helper_alias`; the projection path
-  stores graph-owned cells such as `dep+`, while the pre-projection replay
-  summary at least removes the apparent alias before true graph data exists.
-  The intended owner is still `RepoMappingKey` plus `BzlmodCellGraphKey`; this
-  keeps the transitional projection's stored repo mappings aligned with that
-  shape. Validation passed with focused `cargo test -p slug_common repo_mapping
-  -- --nocapture`, `cargo check -p slug_common -p slug_bzlmod`, `cargo build -p
-  slug`, and the explicit-binary Plan 61 selector for inject/override repo
-  mapping and root alias leakage (`4 passed, 151 deselected`), plus `cargo fmt
-  --check` and `git diff --check`.
-- The remaining public `slug_core::cells::canonical_bazel_repo_name_for_cell`
-  process-global helper and the unused resolver method that could still call it
-  on no-runtime-snapshot misses are deleted. Bridge surface reduced: callers
-  can no longer ask `slug_core` to canonicalize arbitrary cell names through
-  process-global dynamic alias/module scans; Starlark-visible output and action
-  path formatting keeps its private resolver-owned helper that only consumes
-  declared/runtime aliases from the active `CellAliasResolver`. The intended
-  owner remains `BzlmodCellGraphKey` plus `RepoMappingKey`; until then the
-  narrow compatibility scanners stay behind explicitly named module/dynamic
-  helpers rather than a generic canonicalization API. Before evidence:
-  `rg -n "canonical_bazel_repo_name_for_cell|canonical_bzlmod_repo_name_for_cell" app/slug_core/src/cells.rs`
-  found the public helper, resolver method, and tests. After evidence: the same
-  search has no hits in `slug_core`; remaining hits are the private
-  `slug_build_api` resolver-owned helper. Validation passed with focused
-  `cargo test -p slug_core canonical_bzlmod_module_cell_name_uses_empty_version_module_suffix -- --nocapture`
-  and `cargo check -p slug_core -p slug_build_api`.
-- `CellResolver::get` root-alias lookup now uses only resolver-owned declared
-  aliases and runtime aliases/cells, so no-snapshot misses no longer consult
-  process-global generated-repo aliases during ordinary unknown-cell lookup.
-- Path-to-cell projection now checks graph-owned dynamic cells and the
-  resolver-owned runtime snapshot before root-scoped process-global dynamic
-  cells; when a resolver-owned bzlmod runtime snapshot is present, root-scoped
-  process-global dynamic cells are no longer consulted for path projection
-  misses. Bridge surface reduced: a stale process-global dynamic cell cannot
-  classify `bazel-external/<repo>/...` paths for a resolver whose graph snapshot
-  does not own that repo. The intended owner is `BzlmodCellGraphKey` via the
-  resolver-owned runtime snapshot; the final cell graph is still injected from
-  legacy-produced data. Validation passed with focused `cargo test -p slug_core
-  get_cell_path_ -- --nocapture`, `cargo check -p slug_core`, `cargo fmt
-  --check`, and `git diff --check`.
-- Runtime-snapshot `CellResolver` name lookup now follows the same ownership
-  boundary as path projection: resolver-local graph-owned dynamic cells remain
-  valid, but root-scoped process-global dynamic cells are ignored whenever a
-  resolver-owned runtime snapshot exists. Bridge surface reduced: a stale
-  root-scoped dynamic cell can no longer satisfy either
-  `CellResolver::get(name)` or `get_cell_path(path)` for a resolver whose
-  `BzlmodCellGraphKey`-backed runtime snapshot does not own that generated repo.
-  The remaining bridge is still the producer: the runtime snapshot is injected
-  from legacy-produced cell graph data. Validation passed with focused
-  `cargo test -p slug_core
-  get_cell_path_with_runtime_snapshot_rejects_root_scoped_dynamic_cell_miss --
-  --nocapture`.
-- Lazy extension repository path classification now reads the resolver's
-  runtime cell graph snapshot before process-global dynamic discovery, but the
-  graph is still injected from legacy-produced data.
-- Temporary root-cell and non-root cell-name adapters are scoped by the same
-  transitional workspace adapter when available, but remain process-global
-  compatibility adapters.
-- `BzlmodCellGraphDataKey` now names the legacy-produced cell graph in DICE,
-     including bundled bzlmod cells, and resolver assembly, runtime
-     installation, module-version projection, and extension-aggregation
-     projection consume that value. Registered toolchain/platform projection
-     keys use their own workspace-checked injected data, while
-     current-workspace helpers still use the cell graph to choose the active
-     workspace. The deferred registered-toolchain pool and markers now depend on
-     the same workspace/list signature as eager loading before process-global
-     reuse, but this remains transitional until the installed lookup registry is
-     a DICE-owned value. Toolchain resolution, target-setting pre-processing,
-     and registered-toolchain package loading now receive caller/resolver-owned
-     snapshots before process-global fallback, but the snapshot producers are
-     still transitional rather than DICE-owned values. Runtime module-symlink
-     replay now writes under that graph's workspace output base, and
-     extension-repo symlink replay uses the same graph output base, but the
-     graph itself is still legacy-produced and runtime registration remains
-     process-global transitional plumbing.
-  - Current-workspace helper identity now comes from
-    `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
-    module versions, registered toolchains, registered execution platforms, and
-    workspace identity. Stale projection payloads are rejected under the current
-    graph identity instead of selecting a different "current" workspace.
+   - Historical alias/path/repo-mapping burn-down logs live in
+     [61-true-dice-bzlmod-history.md](./61-true-dice-bzlmod-history.md). The
+     current code no longer has production `BzlmodCellGraphDataKey` injection or
+     production mutable generated-repo registry lookups; both are test-only
+     compatibility surfaces used by stale-global guardrails.
+   - Resolver-owned runtime snapshots now cover module/repository label paths,
+     load-path equivalence, Starlark-visible label stringification, toolchain
+     and metadata label parsing, repo-mapping canonicalization, and normal
+     `CellResolver::get` / path projection before any test-only process-global
+     fallback can run.
+   - Remaining item-5 work is narrower: replace temporary root/external
+     cell-name adapters (`is_root_cell_name`, `get_external_cell_names`, and
+     symlink helpers that consult them) with resolver or cell-graph-owned root
+     knowledge where path formatting still lacks an explicit owner, and finish
+     making materialized repository output state a DICE value under item 7.
+   - Current-workspace helper identity now comes from
+     `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
+     module versions, registered toolchains, registered execution platforms, and
+     workspace identity. Stale projection payloads are rejected under the current
+     graph identity instead of selecting a different "current" workspace.
    - Ensure two workspaces and two command policies cannot share generated repo
      state by accident.
 
@@ -2255,33 +2092,20 @@ hardening behavior around it.
 8. Make the bzlmod cell graph a DICE value.
    - Derive module cells, extension-generated cells, aliases, scoped mappings,
      external symlinks, and bundled repos from DICE values.
-   - `BzlmodCellGraphDataKey` currently exposes injected graph data rather than
-     computing the graph itself. The production payload is now derived from the
-     clean resolved-graph producer and carries that producer's graph digest.
-     The returned graph's root module name is derived from `ModuleVersionsKey`;
-    root aliases, scoped aliases, and dynamic aliases are derived from
-    `BzlmodRepoMappingsKey`; module symlinks are derived from module cell setup
-    where possible. Module cells are derived by `BzlmodCellDefinitionsKey` from
-    `BzlmodModuleSourcesKey` when clean resolution data is available; empty and
-    bootstrap paths still fall back to the injected vector. Residual
-    out-of-project local-override symlinks are derived from that same
-    module-source projection when available. Extension cells are derived from
-    DICE extension spokes when the
-    extension executor is installed; bootstrap no-executor paths still fall back
-    to the injected vector. Persisted config-load injects an empty legacy cell
-    graph identity when that executor is installed, and `BzlmodCellGraphDataValue`
-    carries no fallback graph in that production case. The full resolved graph
-    is no longer injected into `slug_bzlmod`; the cell-graph data payload no
-    longer bundles it. Clean-digest production cell graph computation now
-    bypasses `BzlmodCellGraphDataKey`; that key is only a bootstrap/fallback
-    input when an injected fallback graph exists. Explicit empty bzlmod setup
-    uses a separate empty resolution identity and no longer installs or reads
-    that fallback key; the persisted no-root-MODULE config-load path uses the
-    same identity while preserving command policy inputs. Clean/bootstrap
-    cell-graph assembly policy is also in `slug_bzlmod` via
-    `BzlmodCleanCellGraphBuilder`;
-    `slug_common` only provides callback-style source/preseed validation around
-    that builder. The old `BzlmodProjectionData` wrapper has been deleted.
+   - Production `BzlmodCellGraphKey` now computes the graph from named bzlmod
+     keys: root module name from `ModuleVersionsKey`, aliases from
+     `BzlmodRepoMappingsKey`, module cells from `BzlmodCellDefinitionsKey` /
+     `BzlmodModuleSourcesKey`, residual symlinks from module-source projection,
+     and extension cells from DICE extension spokes when the executor is
+     installed. `BzlmodCellGraphDataKey` is compiled only for tests now, and
+     clean-digest production graph computation bypasses it.
+   - Clean/bootstrap cell-graph assembly policy lives in `slug_bzlmod` through
+     `BzlmodCleanCellGraphBuilder`; `slug_common` only provides callback-style
+     source and preseed validation around that builder. The old
+     `BzlmodProjectionData` wrapper and full resolved-graph injection are
+     deleted. Remaining item-8 work is proving same-daemon invalidation through
+     downstream analysis/package-loading consumers and removing any bootstrap
+     paths that still need empty/manual graph setup.
    - Ensure cell graph changes invalidate analysis and package loading
      correctly in the same daemon.
    - Prove apparent aliases do not leak across module scopes.
