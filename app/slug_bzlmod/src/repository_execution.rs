@@ -890,6 +890,7 @@ fn repo_materialization_build_file_present(repo_dir: &Path) -> bool {
     repo_dir.join("BUILD.bazel").exists() || repo_dir.join("BUILD").exists()
 }
 
+#[cfg(test)]
 fn repo_materialization_invocation_layout_state(
     canonical_name: &str,
     repo_spec: &RepoSpec,
@@ -1453,16 +1454,49 @@ impl Key for RepoMaterializationInvocationLayoutStateKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         let canonical_name = self.0.canonical_repo.as_ref();
         let repo_spec = self.0.repo_spec.as_ref();
         let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
-        Arc::from(
-            repo_materialization_invocation_layout_state(canonical_name, repo_spec, &repo_dir)
-                .as_str(),
-        )
+        match repo_spec_to_invocation(canonical_name, repo_spec) {
+            Ok(invocation)
+                if matches!(
+                    invocation.rule_name.as_str(),
+                    "git_repository" | "new_git_repository"
+                ) =>
+            {
+                let git_dir_present =
+                    if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+                        reader
+                            .repo_state_file_exists(
+                                ctx,
+                                self.0.workspace_id.clone(),
+                                Arc::new(repo_dir),
+                                ".git",
+                            )
+                            .await
+                            .unwrap_or(false)
+                    } else {
+                        repo_dir.join(".git").exists()
+                    };
+                match git_dir_present {
+                    true => Arc::from("layout-valid"),
+                    false => Arc::from("layout-invalid"),
+                }
+            }
+            Ok(invocation) => {
+                match crate::repository_executor::repo_layout_is_valid_for_invocation(
+                    &invocation,
+                    &repo_dir,
+                ) {
+                    true => Arc::from("layout-valid"),
+                    false => Arc::from("layout-invalid"),
+                }
+            }
+            Err(e) => Arc::from(format!("layout-unclassifiable:{e}").as_str()),
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
