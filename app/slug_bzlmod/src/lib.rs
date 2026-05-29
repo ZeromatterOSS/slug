@@ -488,9 +488,17 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
         let repo_mappings = Arc::new(repo_mappings);
         let extension_aggregations = Arc::new(extension_aggregations);
         let cell_graph_workspace_id = cell_graph_workspace_id.clone();
+        let module_extension_executor_installed = MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok();
+        #[cfg(not(test))]
+        if resolved_graph.is_some() && !module_extension_executor_installed {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "Bzlmod clean cell graph setup requires the module extension executor"
+            ));
+        }
         let fallback_cell_graph = if cell_graph_resolution_digest.as_ref()
             == dice_graph::EMPTY_BZLMOD_CELL_GRAPH_DIGEST
-            || (resolved_graph.is_some() && MODULE_EXTENSION_EXECUTOR_IMPL.get().is_ok())
+            || (resolved_graph.is_some() && module_extension_executor_installed)
         {
             None
         } else {
