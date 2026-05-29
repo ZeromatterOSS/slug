@@ -160,6 +160,7 @@ pub use dice_graph::bzlmod_event_counters;
 pub use dice_graph::bzlmod_resolved_graph_digest;
 pub use dice_graph::canonicalize_repo_mapping_overrides_targets;
 pub use dice_graph::canonicalize_repo_mapping_snapshot_targets;
+pub use dice_graph::clean_resolved_graph_outputs_value;
 pub use dice_graph::collect_bzlmod_registered_items;
 pub use dice_graph::graph_owned_repo_mapping_state;
 pub use dice_graph::local_overrides_from_root_module;

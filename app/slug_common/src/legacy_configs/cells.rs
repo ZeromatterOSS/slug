@@ -163,6 +163,7 @@ fn runtime_cell_install_snapshot(
     snapshot
 }
 
+#[cfg(test)]
 fn cell_name_strs<'a>(
     cells: &'a [(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
 ) -> Vec<&'a str> {
@@ -3775,41 +3776,6 @@ async fn compute_bzlmod_resolved_module_graph(
             &[],
         );
     }
-    let mut clean_cells = Vec::new();
-    let mut sorted_graph_modules: Vec<_> = graph.modules.iter().collect();
-    sorted_graph_modules.sort_by(|left, right| left.0.cmp(right.0));
-    for (module_name, module_info) in sorted_graph_modules {
-        let canonical_repo =
-            slug_bzlmod::bazel_canonical_module_repo_name(module_name, &module_info.version);
-        let external_path = format!("bazel-external/{canonical_repo}");
-        clean_cells.push((
-            CellName::unchecked_new(&canonical_repo)?,
-            CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned()),
-            None,
-        ));
-    }
-
-    let projections = slug_bzlmod::resolved_graph_projection_values(
-        key.workspace_id.clone(),
-        &parsed,
-        &parsed_modules,
-        &graph,
-        key.options.ignore_dev_dependency,
-    );
-    let clean_cell_names = cell_name_strs(&clean_cells);
-    let (repo_mapping_snapshot, repo_mapping_overrides) =
-        slug_bzlmod::graph_owned_repo_mapping_state(
-            &parsed_modules,
-            &projections.module_versions.root_module_name,
-            key.options.ignore_dev_dependency,
-            &clean_cell_names,
-            Some(&graph),
-        );
-    let repo_mappings = slug_bzlmod::BzlmodRepoMappingsDataValue::for_workspace(
-        key.workspace_id.clone(),
-        Arc::new(repo_mapping_snapshot),
-        Arc::new(repo_mapping_overrides),
-    );
     let cell_graph = BuckConfigBasedCells::build_bzlmod_cell_graph_from_clean_resolution(
         &project_fs,
         &key.project_root,
@@ -3823,21 +3789,18 @@ async fn compute_bzlmod_resolved_module_graph(
         dice_ctx,
     )
     .await?;
-    let graph_digest = slug_bzlmod::bzlmod_resolved_graph_digest(&graph);
+    let outputs = slug_bzlmod::clean_resolved_graph_outputs_value(
+        key.workspace_id.clone(),
+        &parsed,
+        &parsed_modules,
+        graph,
+        key.options.ignore_dev_dependency,
+        cell_graph,
+    );
     record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs);
     Ok(Arc::new(BzlmodResolvedModuleGraphValue {
         lockfile_inputs: inputs.lockfile_inputs,
-        outputs: Arc::new(Some(slug_bzlmod::BzlmodResolvedGraphOutputsValue {
-            graph: Arc::new(graph),
-            graph_digest: Arc::from(graph_digest.as_str()),
-            module_versions: projections.module_versions,
-            resolution_facts: projections.resolution_facts,
-            registered_toolchains: projections.registered_toolchains,
-            registered_execution_platforms: projections.registered_execution_platforms,
-            extension_aggregations: projections.extension_aggregations,
-            repo_mappings,
-            cell_graph,
-        })),
+        outputs: Arc::new(Some(outputs)),
     }))
 }
 

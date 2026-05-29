@@ -929,6 +929,50 @@ pub fn resolved_graph_projection_values(
     }
 }
 
+pub fn clean_resolved_graph_outputs_value(
+    workspace_id: WorkspaceId,
+    root_module: &ParsedModuleFile,
+    parsed_modules: &[(String, ParsedModuleFile)],
+    graph: ResolvedGraph,
+    ignore_dev_dependency: bool,
+    cell_graph: BzlmodCellGraphValue,
+) -> BzlmodResolvedGraphOutputsValue {
+    let projections = resolved_graph_projection_values(
+        workspace_id.clone(),
+        root_module,
+        parsed_modules,
+        &graph,
+        ignore_dev_dependency,
+    );
+    let clean_cell_names = resolved_graph_cell_names(&graph);
+    let clean_cell_name_refs: Vec<_> = clean_cell_names.iter().map(String::as_str).collect();
+    let (repo_mapping_snapshot, repo_mapping_overrides) = graph_owned_repo_mapping_state(
+        parsed_modules,
+        &projections.module_versions.root_module_name,
+        ignore_dev_dependency,
+        &clean_cell_name_refs,
+        Some(&graph),
+    );
+    let repo_mappings = BzlmodRepoMappingsDataValue::for_workspace(
+        workspace_id,
+        Arc::new(repo_mapping_snapshot),
+        Arc::new(repo_mapping_overrides),
+    );
+    let graph_digest = bzlmod_resolved_graph_digest(&graph);
+
+    BzlmodResolvedGraphOutputsValue {
+        graph: Arc::new(graph),
+        graph_digest: Arc::from(graph_digest.as_str()),
+        module_versions: projections.module_versions,
+        resolution_facts: projections.resolution_facts,
+        registered_toolchains: projections.registered_toolchains,
+        registered_execution_platforms: projections.registered_execution_platforms,
+        extension_aggregations: projections.extension_aggregations,
+        repo_mappings,
+        cell_graph,
+    }
+}
+
 pub fn repo_mapping_snapshot_for_modules(
     parsed_modules: &[(String, ParsedModuleFile)],
     root_module_name: &str,
@@ -2254,6 +2298,17 @@ pub fn resolved_module_sources_from_graph(
             version: module_info.version.clone(),
             source: module_info.source.clone(),
             source_path: module_info.source_path.clone(),
+        })
+        .collect()
+}
+
+pub fn resolved_graph_cell_names(graph: &ResolvedGraph) -> Vec<String> {
+    let mut modules: Vec<_> = graph.modules.iter().collect();
+    modules.sort_by(|left, right| left.0.cmp(right.0));
+    modules
+        .into_iter()
+        .map(|(module_name, module_info)| {
+            bazel_canonical_module_repo_name(module_name, &module_info.version)
         })
         .collect()
 }
@@ -4944,6 +4999,53 @@ mod tests {
                 .map(String::as_str),
             Some("sha256")
         );
+    }
+
+    #[test]
+    fn clean_resolved_graph_outputs_value_packages_projection_and_graph_digest() {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/project"),
+            PathBuf::from("/tmp/output-base"),
+        );
+        let root = parsed_module("root");
+        let mut graph = ResolvedGraph::default();
+        graph.modules.insert(
+            "dep".to_owned(),
+            ResolvedModuleInfo {
+                name: "dep".to_owned(),
+                version: "1.0".to_owned(),
+                compatibility_level: 0,
+                dependencies: HashMap::new(),
+                source: ModuleSource::Registry {
+                    url: "https://registry.example".to_owned(),
+                },
+                source_path: Some(PathBuf::from("/tmp/dep")),
+            },
+        );
+        let expected_digest = bzlmod_resolved_graph_digest(&graph);
+        let parsed_modules = vec![("root".to_owned(), root.clone())];
+        let cell_graph = BzlmodCellGraphValue::empty_for_workspace(workspace_id.clone());
+
+        let outputs = clean_resolved_graph_outputs_value(
+            workspace_id.clone(),
+            &root,
+            &parsed_modules,
+            graph,
+            false,
+            cell_graph,
+        );
+
+        assert_eq!(outputs.graph_digest.as_ref(), expected_digest.as_str());
+        assert_eq!(outputs.module_versions.workspace_id, workspace_id);
+        assert_eq!(
+            outputs
+                .module_versions
+                .module_versions
+                .get("dep")
+                .map(String::as_str),
+            Some("1.0")
+        );
+        assert!(outputs.graph.modules.contains_key("dep"));
     }
 
     #[test]
