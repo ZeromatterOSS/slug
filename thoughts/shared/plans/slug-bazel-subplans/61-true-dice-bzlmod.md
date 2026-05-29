@@ -577,6 +577,17 @@ Current state to preserve:
   61 extension lockfile replay selectors for recorded file/dirents/dirtree,
   env, and repo mappings (`6 passed, 150 deselected`), `cargo fmt --check`, and
   `git diff --check`.
+- 2026-05-29 synchronous lockfile recorded-input replay API made test-only:
+  `Lockfile::get_extension_cache*`, `LockfileExtensionData::recorded_inputs_current`,
+  `SelectedExtensionCache::recorded_inputs_current`, and the direct
+  `validate_recorded_inputs_current(...)` replay validator are no longer
+  compiled into non-test `slug_bzlmod`. Production code must select a cache
+  entry with `select_extension_cache_for_workspace(...)` and validate it
+  through `ModuleExtensionRecordedInputsKey` / the late-bound DICE recorded
+  input reader before recording a replay hit. Guardrails: `cargo check -p
+  slug_bzlmod`, `cargo test -p slug_bzlmod recorded_inputs --lib`,
+  `cargo test -p slug_bzlmod lockfile_replay_validates_recorded_file --lib`,
+  and `cargo test -p slug_bzlmod lockfile --lib`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -1281,6 +1292,10 @@ hardening behavior around it.
      it. Module extension replay consumes those values through the named
      `ModuleExtensionReplayInputsKey`, so lockfile cache/facts selection is no
      longer embedded in `ModuleExtensionExecutionKey`.
+   - Synchronous lockfile replay acceptance helpers that validate recorded
+     inputs by polling the filesystem are test-only. Production lockfile cache
+     consumers must select cache entries and then validate recorded inputs
+     through the DICE-backed recorded-input child key before accepting replay.
    - Hidden lockfile edit and facts create/edit/delete transitions have current
      same-daemon guardrail coverage in the Plan 61 Python suite. Fact-bearing
      extension replay intentionally avoids the runtime setup reuse shortcut so

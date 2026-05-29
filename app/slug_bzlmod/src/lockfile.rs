@@ -265,6 +265,7 @@ impl LockfileExtensionData {
 
     /// Check that recorded extension inputs still match current filesystem
     /// state. Unsupported recorded input kinds are conservative replay misses.
+    #[cfg(test)]
     pub fn recorded_inputs_current(
         &self,
         workspace_root: Option<&Path>,
@@ -347,6 +348,7 @@ pub fn recorded_repo_mapping_input(
 }
 
 /// Validate recorded inputs against current filesystem/env/repo-mapping state.
+#[cfg(test)]
 pub fn validate_recorded_inputs_current(
     recorded_inputs: &[String],
     workspace_root: Option<&Path>,
@@ -371,6 +373,7 @@ pub struct SelectedExtensionCache {
 }
 
 impl SelectedExtensionCache {
+    #[cfg(test)]
     pub(crate) fn recorded_inputs_current(&self) -> Result<(), String> {
         validate_recorded_inputs_current(
             &self.recorded_inputs,
@@ -500,6 +503,7 @@ pub enum RecordedDirtreeEntryState {
     Other,
 }
 
+#[cfg(test)]
 fn validate_recorded_inputs_for_replay(
     recorded_inputs: &[String],
     workspace_root: Option<&Path>,
@@ -601,6 +605,7 @@ pub(crate) fn recorded_input_changed_reason_with_values(
     )
 }
 
+#[cfg(test)]
 fn resolve_recorded_path(path: &Path, workspace_root: Option<&Path>) -> Result<PathBuf, String> {
     if path.is_absolute() {
         return Ok(path.to_path_buf());
@@ -1094,6 +1099,7 @@ impl Lockfile {
     /// # Returns
     ///
     /// The cached generated repo specs if valid, or None if cache miss.
+    #[cfg(test)]
     pub fn get_extension_cache(
         &self,
         extension_id: &str,
@@ -1112,6 +1118,7 @@ impl Lockfile {
         )
     }
 
+    #[cfg(test)]
     pub fn get_extension_cache_for_workspace(
         &self,
         extension_id: &str,
