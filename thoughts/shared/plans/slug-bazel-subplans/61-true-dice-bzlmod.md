@@ -609,8 +609,10 @@ Current state to preserve:
   Clean graph resolution now passes the `LocalOverrideModuleInputsValue`
   parsed-module set into `MvsResolver`, and local-path overrides resolved during
   MVS discovery use that precomputed value instead of reparsing the local
-  override `MODULE.bazel` from disk. The remaining direct non-root parser hits
-  are git/archive override cache parsing and the public non-DICE local override
+  override `MODULE.bazel` from disk. A missing precomputed local-override input
+  is now a production error in the MVS path, with the old direct parser fallback
+  retained only for tests. The remaining direct non-root parser hits are
+  git/archive override cache parsing and the public non-DICE local override
   helper; git/archive need a patch-digest-aware source-input slice before the
   direct parse can be removed safely. Guardrail:
   `cargo test -p slug_bzlmod test_resolve_local_module_from_precomputed_inputs --lib && cargo test -p slug_bzlmod resolve_graph_with_module_file_inputs_uses_tracked_local_overrides --lib && cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.

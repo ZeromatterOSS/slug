@@ -809,7 +809,7 @@ impl MvsResolver {
                         &self.precomputed_local_override_modules,
                     )?
                 } else {
-                    resolve_local_override(lp, workspace_root)?
+                    resolve_local_override_without_precomputed_inputs(lp, workspace_root)?
                 };
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&lp.module_name, resolved.version.as_str()),
@@ -1831,6 +1831,26 @@ fn resolve_local_override_from_precomputed_inputs(
         module: parsed_module,
         has_module_file,
     })
+}
+
+fn resolve_local_override_without_precomputed_inputs(
+    override_info: &LocalPathOverride,
+    workspace_root: &Path,
+) -> slug_error::Result<ResolvedLocalModule> {
+    #[cfg(test)]
+    {
+        return resolve_local_override(override_info, workspace_root);
+    }
+
+    #[cfg(not(test))]
+    {
+        let _ = workspace_root;
+        Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "DICE bzlmod local override resolution for '{}' requires precomputed local override MODULE.bazel inputs",
+            override_info.module_name
+        ))
+    }
 }
 
 /// Resolve all local path overrides from a module.
