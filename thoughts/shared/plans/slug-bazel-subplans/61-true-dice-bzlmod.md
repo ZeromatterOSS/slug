@@ -38,8 +38,8 @@ Current classification:
 - Repository materialization recorded-input manifest content, marker/local rule
   state, BUILD-file layout probes, foreign top-level symlink detection, and
   invocation-specific layout probes for the known git/local/llvm repository
-  classes now have production DICE read paths; output-tree state still needs
-  follow-up DICE ownership.
+  classes now have production DICE read paths. Output-tree digest checks now
+  use DICE-owned metadata, directory-entry, and byte reads.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -437,10 +437,23 @@ Current state to preserve:
   `_llvm_subproject_repository`, including generated BUILD-file content checks
   for `new_local_repository`. The legacy layout helper remains only as a
   no-late-binding/read-error fallback and for unclassified rule classes.
-  Output-tree digest hashing is still direct filesystem work. Guardrails:
-  focused `slug_bzlmod` local/new-local/llvm layout tests, `cargo test -p
-  slug_external_cells repository_materialization_state --lib`, `cargo build -p
-  slug`, and focused Plan 61 corrupted local-repo layout Python selector.
+  Guardrails: focused `slug_bzlmod` local/new-local/llvm layout tests,
+  `cargo test -p slug_external_cells repository_materialization_state --lib`,
+  `cargo build -p slug`, and focused Plan 61 corrupted local-repo layout Python
+  selector.
+- 2026-05-29 repository output-digest DICE byte read:
+  `RepoMaterializationOutputDigestKey` now carries workspace identity and asks
+  the late-bound materialization state reader to compute the recursive output
+  digest through DICE project metadata, directory-entry, and byte-content
+  reads. `slug_common` now has a byte-oriented project-file DICE key so binary
+  repository outputs do not have to pass through the UTF-8 file reader. The
+  direct digest helper remains for fresh marker writing and no-late-binding
+  tests. Guardrails: `cargo test -p slug_common file_ops --lib`, `cargo check
+  -p slug_eden`, `cargo test -p slug_bzlmod
+  materialization_manifest_key_observes_marker_output_digest_dependency --lib`,
+  `cargo test -p slug_external_cells repository_materialization_state --lib`,
+  `cargo build -p slug`, and focused Plan 61 corrupted output-digest Python
+  selector.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
@@ -868,8 +881,8 @@ Current state to preserve:
   project-file/metadata reads. Foreign top-level symlink detection uses DICE
   project directory entries and symlink metadata. Invocation-specific layout
   probes for the known git/local/llvm repository classes now use late-bound DICE
-  metadata/content/dir-entry reads. Output-tree state still polls filesystem
-  state until lower-level tracked byte/digest keys are available.
+  metadata/content/dir-entry reads. Output-tree digest checks use late-bound
+  DICE metadata, directory-entry, and byte-content reads.
 - The current SDK frontier is no longer the legacy resolution bridge. The
   generated kernel-header source path mismatch and the later
   `crates__zerocopy-0.8.42` build-script `Cargo.toml` runfiles miss are both
@@ -1432,7 +1445,8 @@ hardening behavior around it.
      fallbacks. Foreign top-level symlink detection now uses DICE project dir
      entries/metadata in production. Invocation-specific layout probes for the
      known git/local/llvm repository classes use DICE metadata/content/dir-entry
-     reads too. Output-tree state still needs an equivalent DICE-owned reader.
+     reads too. Output-tree digest checks use DICE metadata, directory-entry,
+     and byte-content reads.
    - `repository_ctx.download*`, `module_ctx.download*`, and native
      `http_archive`/`http_file`/`http_jar` cache lookups now include
      `canonical_id` restrictions, so checksum-identical cache entries are not

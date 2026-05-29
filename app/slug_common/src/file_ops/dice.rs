@@ -143,6 +143,18 @@ impl DiceFileComputations {
         .await
     }
 
+    /// Reads project-relative file bytes without going through a cell resolver.
+    ///
+    /// This is for bootstrap/materialization inputs that are project-root
+    /// relative and may not be valid UTF-8.
+    pub async fn read_project_file_bytes_if_exists(
+        ctx: &mut DiceComputations<'_>,
+        path: &ProjectRelativePath,
+    ) -> slug_error::Result<Option<Arc<Vec<u8>>>> {
+        ctx.compute(&ProjectReadFileBytesKey(Arc::new(path.to_owned())))
+            .await?
+    }
+
     /// Reads project-relative path metadata without going through a cell resolver.
     ///
     /// This is for bootstrap inputs that define the cell graph itself, such as
@@ -270,6 +282,7 @@ fn read_dir_entry_stats(entries: &[SimpleDirEntry]) -> (usize, usize, usize, usi
 pub struct FileChangeTracker {
     files_to_dirty: HashSet<ReadFileKey>,
     project_files_to_dirty: HashSet<ProjectReadFileKey>,
+    project_file_bytes_to_dirty: HashSet<ProjectReadFileBytesKey>,
     project_paths_to_dirty: HashSet<ProjectPathMetadataKey>,
     project_files_requiring_pre_config_commit: bool,
     dirs_to_dirty: HashSet<ReadDirKey>,
@@ -284,6 +297,7 @@ impl FileChangeTracker {
         Self {
             files_to_dirty: Default::default(),
             project_files_to_dirty: Default::default(),
+            project_file_bytes_to_dirty: Default::default(),
             project_paths_to_dirty: Default::default(),
             project_files_requiring_pre_config_commit: false,
             dirs_to_dirty: Default::default(),
@@ -305,6 +319,7 @@ impl FileChangeTracker {
 
         ctx.changed(self.files_to_dirty)?;
         ctx.changed(self.project_files_to_dirty)?;
+        ctx.changed(self.project_file_bytes_to_dirty)?;
         ctx.changed(self.project_paths_to_dirty)?;
         ctx.changed(self.dirs_to_dirty)?;
         ctx.changed(self.paths_to_dirty)?;
@@ -368,6 +383,8 @@ impl FileChangeTracker {
         self.project_files_requiring_pre_config_commit = true;
         self.project_files_to_dirty
             .insert(ProjectReadFileKey(Arc::new(path.clone())));
+        self.project_file_bytes_to_dirty
+            .insert(ProjectReadFileBytesKey(Arc::new(path.clone())));
         self.project_paths_to_dirty
             .insert(ProjectPathMetadataKey(Arc::new(path)));
     }
@@ -488,6 +505,41 @@ impl Key for ProjectReadFileKey {
     }
 
     fn equality(_: &Self::Value, _: &Self::Value) -> bool {
+        false
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
+
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("ProjectReadFileBytesKey({})", _0)]
+struct ProjectReadFileBytesKey(Arc<ProjectRelativePathBuf>);
+
+#[async_trait]
+impl Key for ProjectReadFileBytesKey {
+    type Value = slug_error::Result<Option<Arc<Vec<u8>>>>;
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.global_data()
+            .get_io_provider()
+            .read_file_bytes_if_exists(self.0.as_ref().to_owned())
+            .await
+            .map(|content| content.map(Arc::new))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(_x: &Self::Value) -> bool {
         false
     }
 

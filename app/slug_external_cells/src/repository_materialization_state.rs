@@ -11,7 +11,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use base64::Engine;
 use dice::DiceComputations;
+use sha2::Digest;
+use sha2::Sha256;
 use slug_bzlmod::BzlmodEventKind;
 use slug_bzlmod::RepositoryMaterializationStateReader;
 use slug_bzlmod::WorkspaceId;
@@ -92,6 +95,99 @@ fn symlink_target_matches_expected(
         RawSymlink::Relative(target, _) => project_root.root().as_path().join(target.as_str()),
     };
     actual_target == expected_target
+}
+
+fn hash_path_bytes(path: &Path, hasher: &mut Sha256) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        hasher.update(path.as_os_str().as_bytes());
+    }
+    #[cfg(not(unix))]
+    {
+        hasher.update(path.to_string_lossy().as_bytes());
+    }
+}
+
+fn repo_output_digest_error(
+    path: &ProjectRelativePath,
+    reason: impl std::fmt::Display,
+) -> Arc<str> {
+    Arc::from(format!("failed to digest repository output '{}': {reason}", path).as_str())
+}
+
+async fn hash_repository_output_entry(
+    ctx: &mut DiceComputations<'_>,
+    project_path: ProjectRelativePathBuf,
+    relative_path: PathBuf,
+    hasher: &mut Sha256,
+) -> Result<(), Arc<str>> {
+    let mut stack = vec![(project_path, relative_path)];
+    while let Some((project_path, relative_path)) = stack.pop() {
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationStateRead,
+            format!("metadata:{}", project_path.as_str()),
+        );
+        let metadata =
+            DiceFileComputations::read_project_path_metadata_if_exists(ctx, project_path.as_ref())
+                .await
+                .map_err(|e| repo_output_digest_error(project_path.as_ref(), e))?
+                .ok_or_else(|| repo_output_digest_error(project_path.as_ref(), "missing path"))?;
+
+        hash_path_bytes(&relative_path, hasher);
+        match metadata {
+            RawPathMetadata::Symlink { to, .. } => {
+                hasher.update(b"L");
+                match to {
+                    RawSymlink::External(target) => {
+                        hash_path_bytes(&target.to_path_buf(), hasher);
+                    }
+                    RawSymlink::Relative(_, target) => {
+                        hash_path_bytes(Path::new(target.target().as_str()), hasher);
+                    }
+                }
+            }
+            RawPathMetadata::Directory => {
+                hasher.update(b"D");
+                record_bzlmod_event(
+                    BzlmodEventKind::RepoMaterializationStateRead,
+                    format!("dir_entries:{}", project_path.as_str()),
+                );
+                let entries =
+                    DiceFileComputations::read_project_dir_entries(ctx, project_path.as_ref())
+                        .await
+                        .map_err(|e| repo_output_digest_error(project_path.as_ref(), e))?;
+                for (name, _) in entries.iter().rev() {
+                    if name == ".slug_repo_complete" || name == ".slug_repo_recorded_inputs" {
+                        continue;
+                    }
+                    let child_project_path =
+                        child_project_path(&project_path, name).ok_or_else(|| {
+                            repo_output_digest_error(project_path.as_ref(), "invalid child path")
+                        })?;
+                    stack.push((child_project_path, relative_path.join(name)));
+                }
+            }
+            RawPathMetadata::File(_) => {
+                hasher.update(b"F");
+                record_bzlmod_event(
+                    BzlmodEventKind::RepoMaterializationStateRead,
+                    format!("read_bytes:{}", project_path.as_str()),
+                );
+                let content = DiceFileComputations::read_project_file_bytes_if_exists(
+                    ctx,
+                    project_path.as_ref(),
+                )
+                .await
+                .map_err(|e| repo_output_digest_error(project_path.as_ref(), e))?
+                .ok_or_else(|| repo_output_digest_error(project_path.as_ref(), "missing file"))?;
+                hasher.update((content.len() as u64).to_le_bytes());
+                hasher.update(content.as_slice());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[async_trait]
@@ -273,6 +369,28 @@ impl RepositoryMaterializationStateReader for DiceRepositoryMaterializationState
             project_root,
             metadata,
             &expected_target,
+        ))
+    }
+
+    async fn repo_output_digest(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: WorkspaceId,
+        repo_dir: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>> {
+        let io = ctx.global_data().get_io_provider();
+        let project_root = io.project_root();
+        let repo_project_path = repo_state_project_path(&workspace_id, project_root, &repo_dir)?;
+
+        let mut hasher = Sha256::new();
+        hash_repository_output_entry(ctx, repo_project_path, PathBuf::new(), &mut hasher).await?;
+        let hash = hasher.finalize();
+        Ok(Arc::from(
+            format!(
+                "sha256-{}",
+                base64::engine::general_purpose::STANDARD.encode(hash)
+            )
+            .as_str(),
         ))
     }
 }

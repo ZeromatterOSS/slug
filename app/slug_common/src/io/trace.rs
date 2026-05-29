@@ -125,6 +125,17 @@ impl IoProvider for TracingIoProvider {
         Ok(res)
     }
 
+    async fn read_file_bytes_if_exists_impl(
+        &self,
+        path: ProjectRelativePathBuf,
+    ) -> slug_error::Result<Option<Vec<u8>>> {
+        let res = self.io.read_file_bytes_if_exists_impl(path.clone()).await?;
+        if res.is_some() {
+            self.add_project_path(path);
+        }
+        Ok(res)
+    }
+
     /// Combination of read_file_if_exists from underlying fs struct and reading
     /// the metadata. This is done so we get accurate path classification (e.g.
     /// if the path is a real file/dir or a symlink pointing somewhere else).

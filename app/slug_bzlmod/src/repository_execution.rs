@@ -110,6 +110,13 @@ pub trait RepositoryMaterializationStateReader: Send + Sync + 'static {
         symlink_path: Arc<PathBuf>,
         expected_target: Arc<PathBuf>,
     ) -> Result<bool, Arc<str>>;
+
+    async fn repo_output_digest(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        workspace_id: crate::WorkspaceId,
+        repo_dir: Arc<PathBuf>,
+    ) -> Result<Arc<str>, Arc<str>>;
 }
 
 /// Initialized by `slug_external_cells::init_late_bindings()`.
@@ -1063,6 +1070,7 @@ impl Key for RepoMaterializationMarkerStateKey {
             return Arc::from(format!("marker:{marker}").as_str());
         };
         let output_digest_key = RepoMaterializationOutputDigestKey {
+            workspace_id: self.0.workspace_id.clone(),
             repo_dir: Arc::new(repo_dir),
         };
         match ctx.compute(&output_digest_key).await {
@@ -1196,9 +1204,14 @@ impl Key for RepoMaterializationMarkerContentKey {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
-#[display("RepoMaterializationOutputDigestKey({})", repo_dir.display())]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "RepoMaterializationOutputDigestKey({}, {})",
+    workspace_id.stable_hash(),
+    repo_dir.display()
+)]
 struct RepoMaterializationOutputDigestKey {
+    workspace_id: crate::WorkspaceId,
     repo_dir: Arc<PathBuf>,
 }
 
@@ -1208,9 +1221,15 @@ impl Key for RepoMaterializationOutputDigestKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Ok(reader) = REPOSITORY_MATERIALIZATION_STATE_READER_IMPL.get() {
+            return reader
+                .repo_output_digest(ctx, self.workspace_id.clone(), self.repo_dir.clone())
+                .await;
+        }
+
         crate::repository_executor::repository_output_digest(&self.repo_dir)
             .map(|digest| Arc::from(digest.as_str()))
             .map_err(|e| {

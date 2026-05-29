@@ -121,6 +121,20 @@ impl IoProvider for FsIoProvider {
             .map_err(|e| IoError::categorize_for_source_file(e).into())
     }
 
+    async fn read_file_bytes_if_exists_impl(
+        &self,
+        path: ProjectRelativePathBuf,
+    ) -> slug_error::Result<Option<Vec<u8>>> {
+        let path = self.fs.resolve(&path);
+
+        static SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(100));
+        let _permit = SEMAPHORE.acquire().await.unwrap();
+
+        tokio::task::spawn_blocking(move || fs_util::read_if_exists(path))
+            .await?
+            .map_err(|e| IoError::categorize_for_source_file(e).into())
+    }
+
     async fn read_dir_impl(
         &self,
         path: ProjectRelativePathBuf,

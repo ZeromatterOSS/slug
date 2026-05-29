@@ -406,6 +406,71 @@ impl EdenIoProvider {
             Err(e) => Err(e.into()),
         }
     }
+
+    async fn read_file_bytes_if_exists_impl(
+        &self,
+        path: ProjectRelativePathBuf,
+    ) -> slug_error::Result<Option<Vec<u8>>> {
+        let _guard = IoCounterKey::Read.guard();
+        let params = GetFileContentRequest {
+            mount: MountId {
+                mountPoint: self.manager.get_mount_point(),
+                ..Default::default()
+            },
+            filePath: self.manager.project_path_as_eden_path(path.as_ref()),
+            sync: no_sync(),
+            ..Default::default()
+        };
+
+        let res = self
+            .manager
+            .with_eden(|eden| {
+                tracing::trace!("getFileContent({})", path);
+                eden.getFileContent(&params)
+            })
+            .await;
+
+        match res {
+            Ok(res) => match res.blob {
+                ScmBlobOrError::blob(content) => Ok(Some(content)),
+                ScmBlobOrError::error(err) => {
+                    let eden_error = EdenError::from(err);
+                    match eden_error {
+                        EdenError::PosixError { code, .. } if code == libc::ENOENT => {
+                            tracing::debug!("getFileContent({}): File Not Found", path);
+                            Ok(None)
+                        }
+                        EdenError::PosixError { error, code } if code == libc::EFBIG => {
+                            soft_error!(
+                                "eden_thrift_size_limit_exceeded",
+                                slug_error::slug_error!(
+                                    slug_error::ErrorTag::Input,
+                                    "File size exceeded Thrift message limit of 2GB, falling back to regular file I/O.
+                                    Set env var `BUCK2_DISABLE_EDEN_THRIFT_READ=true` if this is constantly an issue: {:#}",
+                                    error
+                                ),
+                            )
+                            .ok();
+
+                            self.fs.read_file_bytes_if_exists_impl(path).await
+                        }
+                        EdenError::PosixError { code, .. }
+                            if code == libc::EINVAL || code == libc::ENOTDIR =>
+                        {
+                            self.fs.read_file_bytes_if_exists_impl(path).await
+                        }
+                        _ => Err(eden_error.into()),
+                    }
+                }
+                ScmBlobOrError::UnknownField(code) => Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::IoEdenUnknownField,
+                    "Eden getFileContent thrift call failed with unknown field code: {}",
+                    code
+                )),
+            },
+            Err(e) => Err(e.into()),
+        }
+    }
 }
 
 #[async_trait]
@@ -454,6 +519,21 @@ impl IoProvider for EdenIoProvider {
             // Don't tag as IoEden because it uses regular file I/O.
             // TODO(minglunli): Can remove this arm if Eden Thrift API is better and stable
             self.fs.read_file_if_exists_impl(path).await
+        }
+    }
+
+    async fn read_file_bytes_if_exists_impl(
+        &self,
+        path: ProjectRelativePathBuf,
+    ) -> slug_error::Result<Option<Vec<u8>>> {
+        if slug_env!("BUCK2_ENABLE_EDEN_THRIFT_READ", bool).unwrap_or(false)
+            || self.use_eden_thrift_read
+        {
+            self.read_file_bytes_if_exists_impl(path)
+                .await
+                .tag(ErrorTag::IoEden)
+        } else {
+            self.fs.read_file_bytes_if_exists_impl(path).await
         }
     }
 

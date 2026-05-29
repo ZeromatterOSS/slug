@@ -59,6 +59,11 @@ pub trait IoProvider: Allocative + Send + Sync {
         path: ProjectRelativePathBuf,
     ) -> slug_error::Result<Option<String>>;
 
+    async fn read_file_bytes_if_exists_impl(
+        &self,
+        path: ProjectRelativePathBuf,
+    ) -> slug_error::Result<Option<Vec<u8>>>;
+
     async fn read_dir_impl(
         &self,
         path: ProjectRelativePathBuf,
@@ -89,6 +94,15 @@ impl dyn IoProvider + '_ {
         path: ProjectRelativePathBuf,
     ) -> slug_error::Result<Option<String>> {
         self.read_file_if_exists_impl(path)
+            .await
+            .tag(ErrorTag::IoSource)
+    }
+
+    pub async fn read_file_bytes_if_exists(
+        &self,
+        path: ProjectRelativePathBuf,
+    ) -> slug_error::Result<Option<Vec<u8>>> {
+        self.read_file_bytes_if_exists_impl(path)
             .await
             .tag(ErrorTag::IoSource)
     }
