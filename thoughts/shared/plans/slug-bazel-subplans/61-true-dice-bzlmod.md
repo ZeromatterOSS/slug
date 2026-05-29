@@ -790,9 +790,10 @@ Current state to preserve:
   `BzlmodCurrentCellGraphKey` and `BzlmodFallbackCellGraphKey` now error in
   non-test builds if asked to use the injected bzlmod cell-graph fallback
   digest, instead of reading `BzlmodCellGraphDataKey`. Test builds still keep
-  the fallback path for low-level no-late-binding coverage. Guardrails: `cargo
-  test -p slug_bzlmod cell_graph --lib`, `cargo check -p slug_bzlmod`, `cargo
-  fmt --check`, and `git diff --check`.
+  the fallback path for low-level no-late-binding coverage, and
+  `BzlmodCellGraphDataKey` / `BzlmodCellGraphDataValue` are now compiled only
+  for tests. Guardrails: `cargo test -p slug_bzlmod cell_graph --lib`, `cargo
+  check -p slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs

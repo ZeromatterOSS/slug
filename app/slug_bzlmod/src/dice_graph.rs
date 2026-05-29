@@ -2783,6 +2783,7 @@ fn dynamic_alias_for_generated_override(
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub(crate) struct BzlmodCellGraphDataValue {
     pub(crate) workspace_id: WorkspaceId,
@@ -2791,6 +2792,7 @@ pub(crate) struct BzlmodCellGraphDataValue {
     pub(crate) fallback_cell_graph: Option<Arc<BzlmodCellGraphValue>>,
 }
 
+#[cfg(test)]
 impl BzlmodCellGraphDataValue {
     #[cfg(test)]
     pub(crate) fn for_workspace(
@@ -2832,10 +2834,12 @@ impl BzlmodCellGraphDataValue {
     }
 }
 
+#[cfg(test)]
 #[derive(derive_more::Display, Debug, Hash, Eq, Clone, PartialEq, Allocative)]
 #[display("BzlmodCellGraphDataKey")]
 pub(crate) struct BzlmodCellGraphDataKey;
 
+#[cfg(test)]
 impl dice::InjectedKey for BzlmodCellGraphDataKey {
     type Value = Arc<BzlmodCellGraphDataValue>;
 

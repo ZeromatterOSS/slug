@@ -64,7 +64,9 @@ pub use cache::ModuleCache;
 pub use dice_graph::BZLMOD_CLEAN_GRAPH_IO_IMPL;
 pub use dice_graph::BzlmodCellGraphAlias;
 pub use dice_graph::BzlmodCellGraphCell;
+#[cfg(test)]
 use dice_graph::BzlmodCellGraphDataKey;
+#[cfg(test)]
 use dice_graph::BzlmodCellGraphDataValue;
 pub use dice_graph::BzlmodCellGraphDynamicAlias;
 pub use dice_graph::BzlmodCellGraphExtensionCell;
@@ -505,6 +507,7 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
                 "Bzlmod clean cell graph setup requires the module extension executor"
             ));
         }
+        #[cfg(test)]
         let fallback_cell_graph = if is_empty_cell_graph
             || (resolved_graph.is_some() && module_extension_executor_installed)
         {
@@ -512,6 +515,7 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
         } else {
             Some(Arc::new(cell_graph))
         };
+        #[cfg(test)]
         let cell_graph_data = fallback_cell_graph.clone().map(|fallback_cell_graph| {
             Arc::new(
                 BzlmodCellGraphDataValue::for_workspace_with_resolved_graph_and_fallback(
@@ -550,6 +554,7 @@ impl SetBzlmodDiceInputs for dice::DiceTransactionUpdater {
             BzlmodExtensionAggregationsDataKey,
             extension_aggregations,
         )])?;
+        #[cfg(test)]
         if let Some(cell_graph_data) = cell_graph_data {
             self.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
         }
