@@ -15,9 +15,8 @@ graph from DICE-owned bzlmod producers, and installs the command resolver from
 `BzlmodCellGraphValue`.
 
 The plan is still not a replay-complete DICE/Skyframe implementation. Remaining
-work is now in extension/repository replay inputs, repository materialization
-manifests, direct `.bzl` input tracking, and lockfile policy edges, not in
-keeping the old resolution bridge alive.
+work is now in repository replay inputs, repository materialization manifests,
+and lockfile policy edges, not in keeping the old resolution bridge alive.
 
 Do not mark this plan complete because `//sdk:sdk_contents` passes, because the
 current guardrail file passes, or because a warm daemon smoke reuses the
@@ -33,9 +32,9 @@ Current classification:
   producers; `BzlmodProjectionBridgeDiceKey`, the standalone direct cell-graph
   parser, lockfile-seeded extension-cell preseed, and the fallback-scanned
   extension digest bridge are removed from production code.
-- Replay correctness still has remaining direct-read/materialization-policy
-  work in places where Bazel owns explicit Skyframe keys, but the old resolver
-  bridge is no longer the active blocker.
+- Replay correctness still has remaining repository/materialization-policy work
+  in places where Bazel owns explicit Skyframe keys, but the old resolver bridge
+  is no longer the active blocker.
 
 The plan can only be closed when bzlmod module-file parsing, module resolution,
 repo mapping, extension aggregation, extension replay inputs, repository specs,
@@ -236,8 +235,8 @@ Current state to preserve:
   producers for resolved graph data and `BzlmodCellGraphValue`. Direct
   no-updater bootstrap/completion callers build the same clean graph through a
   temporary DICE instance before parsing cells. The old fallback scanner and
-  lockfile preseed bridge are gone; lockfile policy, loaded `.bzl` input
-  ownership, and materialization polling still need follow-up.
+  lockfile preseed bridge are gone; lockfile policy, repository-rule replay
+  inputs, and materialization polling still need follow-up.
 - SDK frontier evidence is positive but not a closure condition: Slug and Bazel
   9.0.1 have both built `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents`, with
   matching modes and non-ELF hashes. The accepted remaining differences are ELF
@@ -250,8 +249,9 @@ Current state to preserve:
   `ExtensionBzlTransitiveDigestKey` over the parsed loaded Starlark graph.
   `buck audit cell` uses the same graph traversal in tolerant validation mode
   so it can prove missing-load create/delete replay misses without executing
-  extensions. Lockfile preseed no longer seeds extension cells from cached
-  lockfile specs.
+  extensions. Loaded `.bzl` digest reads now use DICE `ReadFileKey` dependencies
+  for root, mapped external, and bzlmod module symlink cells. Lockfile preseed no
+  longer seeds extension cells from cached lockfile specs.
 - 2026-05-28 probe: simply passing an empty digest map to lockfile spoke
   preseed is not viable. `test_valid_lockfile_replay_materializes_generated_repo_without_extension_eval`
   still passed, but `test_lockfile_replay_recorded_file_input_edit_rejects_cache`
@@ -309,6 +309,18 @@ Current state to preserve:
   `cargo test -p slug_common clean_resolved_module_graph --lib`,
   `cargo build -p slug`, focused mapped-external replay pytest cases, focused
   missing-load creation pytest case, and
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (155 passed).
+- 2026-05-29 loaded `.bzl` graph file reads moved fully behind DICE:
+  `read_loaded_bzl_file_for_digest(...)` no longer special-cases bzlmod module
+  cells such as `bazel-external/<module>+` with direct `std::fs` reads. It reads
+  every loaded `CellPath` through `DiceFileComputations::read_file`, preserving
+  `ReadFileKey` invalidation for edits, creates, and deletes. Tolerant
+  audit-mode replay still hashes missing files with the Bazel-shaped
+  `No such file or directory (os error 2)` sentinel, while strict build replay
+  keeps the user-facing `File not found: <path>` failure before extension eval.
+  Guardrails: `cargo build -p slug`, focused root/transitive/mapped-external
+  replay pytest set (9 passed), `cargo test -p slug_interpreter_for_build
+  --lib` (125 passed), and
   `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (155 passed).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
@@ -994,23 +1006,22 @@ hardening behavior around it.
      interpreter-side loaded graph digest when an aggregation exists;
      Slug's implicit `@slug_builtins` autoload is excluded from the Bazel
      lockfile digest, and missing-load cases now fail through the loader before
-     replay instead of falling back to the transitional scanner. Non-DICE
-     bootstrap/preseed callers still use the transitional scanner. The direct
-     filesystem scanner helper is now test-only in `slug_bzlmod`; production
-     preseed uses the named tracked scanner key in `slug_common` until this
-     bootstrap cycle is removed. Loaded-graph digest values and tracked
-     fallback-scanner digest values are transaction-valid.
+     replay instead of falling back to a transitional scanner. Loaded graph file
+     content is read through DICE `ReadFileKey` dependencies, including
+     bzlmod module symlink cells. The direct filesystem scanner helper is
+     test-only in `slug_bzlmod`; the production fallback-scanned bridge and
+     lockfile preseed bridge are removed.
    - Keep the current external `bazel-external/<repo>` and mapped literal-load
      digest coverage while replacing it with file digest changes from the
      actual loader graph, load failures, and deleted files.
-   - Lockfile spoke pre-seeding uses the tracked project-file digest producer
-     when DICE inputs are available, including deterministic project-local
-     missing-file digest state without a direct filesystem read;
-     `ExtensionBzlTransitiveDigestKey` now errors on real executor load
-     failures, while non-DICE bootstrap/preseed callers still use the scanner
-     directly.
+   - Replay validation now hashes deterministic missing-file digest state
+     without a direct filesystem read; `ExtensionBzlTransitiveDigestKey` now
+     errors on real executor load failures before extension eval.
    - Reject replay when any loaded implementation file changes, not only
      literal loads that the transitional scanner can find.
+   - Status: complete for module-extension replay digest ownership. Remaining
+     `.bzl` replay work is repository-rule/spec input tracking and is tracked in
+     item 7 below.
 
 5. Move extension spoke and generated repo registration out of process globals.
    - Represent generated repo specs, sibling spokes, seeded cells, and

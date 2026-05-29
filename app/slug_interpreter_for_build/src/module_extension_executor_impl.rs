@@ -60,13 +60,12 @@ use slug_bzlmod::with_repo_spec_registry;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::file_ops::dice::DiceFileComputations;
-use slug_common::file_ops::error::FileReadErrorContext;
+use slug_common::file_ops::error::FileReadError;
 use slug_core::bzl::ImportPath;
 use slug_core::cells::build_file_cell::BuildFileCell;
 use slug_core::cells::cell_path::CellPath;
 use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePathBuf;
-use slug_core::fs::project_rel_path::ProjectRelativePathBuf;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_interpreter::load_module::InterpreterCalculation;
@@ -211,6 +210,8 @@ pub(crate) fn parse_bzlmod_bzl_path(
 /// This struct is registered via late binding at program startup.
 pub struct ConcreteModuleExtensionExecutor;
 
+const MISSING_FILE_DIGEST_ERROR: &str = "No such file or directory (os error 2)";
+
 fn record_declared_extension_environ(
     module_ctx: &crate::module_ctx::ModuleContext,
     environ: &[String],
@@ -233,25 +234,13 @@ fn record_declared_extension_environ(
 
 async fn read_loaded_bzl_file_for_digest(
     ctx: &mut DiceComputations<'_>,
-    project_root: &PathBuf,
-    project_relative: &ProjectRelativePathBuf,
     cell_path: &CellPath,
 ) -> Result<String, String> {
-    if is_bzlmod_module_cell_name(cell_path.cell().as_str()) {
-        return std::fs::read_to_string(project_root.join(project_relative.as_str()))
-            .map_err(|e| e.to_string());
+    match DiceFileComputations::read_file(ctx, cell_path.as_ref()).await {
+        Ok(content) => Ok(content),
+        Err(FileReadError::NotFound(_)) => Err(MISSING_FILE_DIGEST_ERROR.to_owned()),
+        Err(error) => Err(error.without_package_context_information().to_string()),
     }
-    DiceFileComputations::read_file(ctx, cell_path.as_ref())
-        .await
-        .without_package_context_information()
-        .map_err(|e| e.to_string())
-}
-
-fn is_bzlmod_module_cell_name(cell: &str) -> bool {
-    cell.ends_with('+')
-        && !cell.starts_with('+')
-        && !cell.starts_with("_main+")
-        && !cell.contains("++")
 }
 
 impl ConcreteModuleExtensionExecutor {
@@ -263,12 +252,6 @@ impl ConcreteModuleExtensionExecutor {
         allow_missing_loads: bool,
     ) -> slug_error::Result<String> {
         let cell_resolver = ctx.get_cell_resolver().await?;
-        let project_root = ctx
-            .global_data()
-            .get_io_provider()
-            .project_root()
-            .root()
-            .to_path_buf();
         let import_path = parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
         let root_path = OwnedStarlarkModulePath::new(StarlarkModulePath::LoadFile(&import_path));
 
@@ -292,9 +275,7 @@ impl ConcreteModuleExtensionExecutor {
             let cell = cell_resolver.get(cell_path.cell())?;
             let project_relative = cell.path().join(cell_path.path());
 
-            let content =
-                read_loaded_bzl_file_for_digest(ctx, &project_root, &project_relative, cell_path)
-                    .await;
+            let content = read_loaded_bzl_file_for_digest(ctx, cell_path).await;
             let content = match content {
                 Ok(content) => content,
                 Err(error) => {
