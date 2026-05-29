@@ -35,7 +35,6 @@ use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
 use slug_common::external_symlink::ExternalSymlink;
 use slug_common::file_ops::delegate::FileOpsDelegate;
-use slug_common::file_ops::dice::DiceFileComputations;
 use slug_common::file_ops::dice::ReadFileProxy;
 use slug_common::file_ops::metadata::FileMetadata;
 use slug_common::file_ops::metadata::FileType;
@@ -50,7 +49,6 @@ use slug_core::cells::paths::CellRelativePath;
 use slug_core::cells::paths::CellRelativePathBuf;
 use slug_execute::digest_config::DigestConfig;
 use slug_execute::digest_config::HasDigestConfig;
-use slug_fs::paths::abs_path::AbsPath;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
 /// Error for extension repos.
@@ -102,43 +100,6 @@ fn diagnostic_summary(error: impl Display) -> String {
         &rendered[..idx],
         omitted
     )
-}
-
-async fn materialized_extension_repo_exists(
-    ctx: &mut DiceComputations<'_>,
-    project_root: &slug_core::fs::project::ProjectRoot,
-    source_path: &Path,
-    canonical_name: &str,
-) -> slug_error::Result<bool> {
-    let project_path = AbsPath::new(source_path)
-        .ok()
-        .and_then(|path| project_root.relativize_any(path).ok())
-        .ok_or_else(|| ExtensionRepoError::MaterializationFailed {
-            canonical_name: canonical_name.to_owned(),
-            reason: format!(
-                "Repository path '{}' is not under the active project root",
-                source_path.display()
-            ),
-        })?;
-
-    slug_bzlmod::record_bzlmod_event(
-        slug_bzlmod::BzlmodEventKind::RepoMaterializationStateRead,
-        format!("metadata:{}", project_path.as_str()),
-    );
-    DiceFileComputations::read_project_path_metadata_if_exists(ctx, project_path.as_ref())
-        .await
-        .map(|metadata| metadata.is_some())
-        .map_err(|e| {
-            ExtensionRepoError::MaterializationFailed {
-                canonical_name: canonical_name.to_owned(),
-                reason: format!(
-                    "Failed to read repository materialization metadata '{}': {}",
-                    source_path.display(),
-                    e
-                ),
-            }
-            .into()
-        })
 }
 
 fn repo_names_summary<'a>(repo_names: impl Iterator<Item = &'a str>) -> String {
@@ -744,11 +705,7 @@ pub(crate) async fn get_file_ops_delegate(
 
     // Compute the expected path for the materialized repository
     let io = ctx.global_data().get_io_provider();
-    let project_root = io.project_root();
-    let project_root_path = project_root.root().to_path_buf();
-    let source_path = project_root_path
-        .join("bazel-external")
-        .join(setup.canonical_name.as_ref());
+    let project_root_path = io.project_root().root().to_path_buf();
 
     // Make sure every sibling spoke of this extension is registered on the
     // current resolver. Necessary on warm builds where `.slug_repo_complete`
@@ -824,13 +781,14 @@ pub(crate) async fn get_file_ops_delegate(
             repo_env.clone(),
             repo_mappings.clone(),
         );
-        match ctx.compute(&key).await {
+        let repo_result = match ctx.compute(&key).await {
             Ok(Ok(repo_result)) => {
                 tracing::debug!(
                     "Validated extension repo '{}' at {:?}",
                     setup.canonical_name,
                     repo_result.repo_path
                 );
+                repo_result
             }
             Ok(Err(e)) => {
                 return Err(ExtensionRepoError::MaterializationFailed {
@@ -849,27 +807,13 @@ pub(crate) async fn get_file_ops_delegate(
                 }
                 .into());
             }
-        }
-        if !materialized_extension_repo_exists(
-            ctx,
-            project_root,
-            &source_path,
-            setup.canonical_name.as_ref(),
-        )
-        .await?
-        {
-            return Err(ExtensionRepoError::MaterializationFailed {
-                canonical_name: setup.canonical_name.to_string(),
-                reason: "Repository not found after repo rule execution".to_owned(),
-            }
-            .into());
-        }
+        };
         return Ok(file_ops_delegate_for_materialized_extension_repo(
             cell_name,
             &project_root_path,
             &extension_lookup_workspace_id,
             &setup,
-            source_path,
+            repo_result.repo_path.clone(),
             digest_config,
         ));
     }
@@ -925,13 +869,14 @@ pub(crate) async fn get_file_ops_delegate(
                         repo_env.clone(),
                         repo_mappings.clone(),
                     );
-                match ctx.compute(&key).await {
+                let repo_result = match ctx.compute(&key).await {
                     Ok(Ok(repo_result)) => {
                         tracing::info!(
                             "Materialized use_repo_rule repo '{}' at {:?}",
                             setup.canonical_name,
                             repo_result.repo_path
                         );
+                        repo_result
                     }
                     Ok(Err(e)) => {
                         return Err(ExtensionRepoError::MaterializationFailed {
@@ -953,29 +898,15 @@ pub(crate) async fn get_file_ops_delegate(
                         }
                         .into());
                     }
-                }
+                };
                 // Skip the extension execution path below
-                if !materialized_extension_repo_exists(
-                    ctx,
-                    project_root,
-                    &source_path,
-                    setup.canonical_name.as_ref(),
-                )
-                .await?
-                {
-                    return Err(ExtensionRepoError::MaterializationFailed {
-                        canonical_name: setup.canonical_name.to_string(),
-                        reason: "Repository not found after use_repo_rule execution".to_owned(),
-                    }
-                    .into());
-                }
                 // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
                 return Ok(file_ops_delegate_for_materialized_extension_repo(
                     cell_name,
                     &project_root_path,
                     &extension_lookup_workspace_id,
                     &setup,
-                    source_path,
+                    repo_result.repo_path.clone(),
                     digest_config,
                 ));
             }
@@ -1038,14 +969,15 @@ pub(crate) async fn get_file_ops_delegate(
         repo_mappings.clone(),
     );
 
-    // Execute via DICE to materialize the repository
-    match ctx.compute(&key).await {
+    // Execute via DICE to materialize the repository.
+    let repo_result = match ctx.compute(&key).await {
         Ok(Ok(repo_result)) => {
             tracing::info!(
                 "Successfully materialized extension repo '{}' at {:?}",
                 setup.canonical_name,
                 repo_result.repo_path
             );
+            repo_result
         }
         Ok(Err(e)) => {
             return Err(ExtensionRepoError::MaterializationFailed {
@@ -1064,30 +996,14 @@ pub(crate) async fn get_file_ops_delegate(
             }
             .into());
         }
-    }
-
-    // At this point, the repository should exist on disk
-    if !materialized_extension_repo_exists(
-        ctx,
-        project_root,
-        &source_path,
-        setup.canonical_name.as_ref(),
-    )
-    .await?
-    {
-        return Err(ExtensionRepoError::MaterializationFailed {
-            canonical_name: setup.canonical_name.to_string(),
-            reason: "Repository not found after materialization".to_owned(),
-        }
-        .into());
-    }
+    };
 
     Ok(file_ops_delegate_for_materialized_extension_repo(
         cell_name,
         &project_root_path,
         &extension_lookup_workspace_id,
         &setup,
-        source_path,
+        repo_result.repo_path.clone(),
         digest_config,
     ))
 }
@@ -1217,44 +1133,6 @@ pub(crate) async fn copy_to_destination(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn materialized_extension_repo_exists_uses_dice_project_metadata()
-    -> slug_error::Result<()> {
-        use dice::UserComputationData;
-        use slug_common::dice::data::testing::SetTestingIoProvider;
-        use slug_core::fs::project::ProjectRootTemp;
-
-        let fs = ProjectRootTemp::new()?;
-        let repo_path = fs
-            .path()
-            .root()
-            .as_path()
-            .join("bazel-external")
-            .join("_main+ext+repo");
-        let dice = dice::testing::DiceBuilder::new()
-            .set_data(|data| data.set_testing_io_provider(&fs))
-            .build(UserComputationData::new())
-            .unwrap()
-            .commit()
-            .await;
-        let mut dice = dice;
-
-        assert!(
-            !materialized_extension_repo_exists(&mut dice, fs.path(), &repo_path, "_main+ext+repo")
-                .await?
-        );
-
-        std::fs::create_dir_all(&repo_path)?;
-        let mut dice = dice.into_updater().commit().await;
-
-        assert!(
-            materialized_extension_repo_exists(&mut dice, fs.path(), &repo_path, "_main+ext+repo")
-                .await?
-        );
-
-        Ok(())
-    }
 
     #[tokio::test]
     async fn extension_spoke_lookup_uses_injected_workspace_identity() -> slug_error::Result<()> {

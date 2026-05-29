@@ -2174,18 +2174,21 @@ hardening behavior around it.
      surface on invalid inputs. Validation: `cargo test -p
      slug_interpreter_for_build test_repository_path_readdir_rejects_non_directory
      --lib -- --nocapture`.
-   - 2026-05-29 extension-repo delegate existence DICE read:
+   - 2026-05-29 extension-repo delegate post-execution path:
      `extension_repo::get_file_ops_delegate(...)` no longer calls direct
      `Path::exists()` after repo-rule, `use_repo_rule`, or extension-spoke
-     materialization. Those post-execution repository-presence checks now
-     read `bazel-external/<repo>` metadata through
-     `DiceFileComputations::read_project_path_metadata_if_exists(...)` and
-     emit `repo_materialization_state_read`, leaving the materialization
-     manifest/DICE reader path as the authority for extension-repo reuse.
-     Guardrails: `cargo test -p slug_external_cells
-     materialized_extension_repo_exists_uses_dice_project_metadata --lib -- --nocapture`;
-     `cargo test -p slug_external_cells --lib`; `cargo check -p
-     slug_external_cells`.
+     materialization. The first attempt to make those post-execution checks use
+     DICE project metadata exposed a same-transaction stale-negative case:
+     `RepoMaterializationManifestKey` can read `bazel-external/<repo>` as
+     missing before the execution key materializes it. Post-execution delegate
+     creation now trusts the successful `ExtensionRepoExecutionKey` DICE result
+     and its `repo_path`; the materialization manifest/DICE reader path remains
+     the pre-execution reuse authority. Guardrails: `cargo test -p
+     slug_external_cells --lib`; `cargo build -p slug`; focused rerun of the 9
+     affected Plan 61 guardrails (9 passed); full
+     `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+     tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (178 passed in
+     88.51s).
    - 2026-05-29 native repository marker shortcut made test-only:
      `repository_executor` no longer production-compiles the legacy
      marker/layout reuse branch or its direct synchronous layout probes. Normal
