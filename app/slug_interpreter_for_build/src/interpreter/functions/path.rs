@@ -123,11 +123,13 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
     ///
     /// See: https://bazel.build/rules/lib/globals/build#repo_name
     fn repo_name(eval: &mut Evaluator) -> starlark::Result<String> {
-        let cell_name = BuildContext::from_context(eval)?.cell_info().name().name();
+        let build_ctx = BuildContext::from_context(eval)?;
+        let cell_name = build_ctx.cell_info().name().name();
         let name_str = cell_name.as_str();
+        let is_root = build_ctx.cell_resolver().root_cell() == cell_name;
         // In Bazel, the root repository has repo_name() == "" (empty string).
         // External repos return their canonical name.
-        if slug_core::cells::is_root_cell_name(name_str) {
+        if is_root {
             Ok(String::new())
         } else {
             Ok(name_str.to_owned())
@@ -141,9 +143,11 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         // In Bazel, repository_name() returns "@" for the root repository
         // and "@<repo_name>" for external repositories.
         // In practice, most users do `repository_name()[1:]` to drop the leading `@`.
-        let cell_name = BuildContext::from_context(eval)?.cell_info().name().name();
+        let build_ctx = BuildContext::from_context(eval)?;
+        let cell_name = build_ctx.cell_info().name().name();
         let name_str = cell_name.as_str();
-        if slug_core::cells::is_root_cell_name(name_str) {
+        let is_root = build_ctx.cell_resolver().root_cell() == cell_name;
+        if is_root {
             Ok("@".to_owned())
         } else {
             Ok(format!("@{}", name_str))

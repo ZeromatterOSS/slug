@@ -1986,6 +1986,13 @@ hardening behavior around it.
      helper in test/no-owner contexts. Guardrails: `cargo test -p
      slug_interpreter_for_build module_context --lib -- --nocapture`; `cargo
      check -p slug_interpreter_for_build`.
+   - 2026-05-29 BUILD/native Starlark repo-name root-adapter reduction:
+     BUILD-file `repo_name()` / `repository_name()` and native `Label(...)`
+     repo-context canonicalization now use the active `BuildContext`
+     `CellResolver` root cell before any no-context legacy helper fallback.
+     Guardrails: `cargo test -p slug_interpreter_for_build
+     label_context_current_repo --lib -- --nocapture`; `cargo check -p
+     slug_interpreter_for_build`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and
