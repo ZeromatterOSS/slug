@@ -104,22 +104,23 @@ So Phase A (poll-diff) closes items 2/3 with no change to the non-negotiable. Ph
   `ctx.rs` injection. Behavior-preserving (registry empty until A.3 wires the
   reads). slug_common suite green (130 passed; pre-existing `persisted_cell_graph`
   executor-ordering failure also fails on HEAD).
-- **A.3 cutover: validated, not yet landed.** A prototype of A.3 (route the 3
-  cells.rs out-of-project helpers through the watched keys, return tracked, delete
-  the `validity=false` bridge) was implemented and **passed the full Plan 61 pytest
-  suite (178)** — the mechanism works end-to-end (hidden-lockfile/override edits
-  observed same-daemon). It was reverted to land A.1+A.2 clean. Re-landing A.3
-  requires updating the unit tests that encode the old untracked-poll semantics:
-  `local_override_module_inputs_key_repolls_*` (3), `non_registry_override_..._repolls_same`,
-  `non_root_module_files_key_repolls_same`, and `bzlmod_clean_lockfile_inputs_key_tracks_hidden_lockfile_fail_open`
-  — each needs: set the registry in `DiceData` (`set_watched_abs_input_registry`),
-  flip `assert!(x.has_untracked_inputs)` → `assert!(!x.has_untracked_inputs)`, and
-  call `inject_watched_abs_changes` between the edit and the re-read (see the
-  rewritten `out_of_project_module_include_reads_are_watched_and_invalidate` for the
-  pattern). The facts guardrail `test_hidden_lockfile_facts_create_edit_delete_are_observed`
-  also needs its over-strict eval-count proxy on the restore step relaxed to a
-  build-outcome assertion (restoring to a previously-evaluated facts state is a
-  correct DICE cache hit). `persisted_cell_graph` is a pre-existing unrelated flake.
+- **A.3 cutover: LANDED** (commit `36a20ab0`). The out-of-project branches of
+  `read_bzlmod_file_for_module_inputs`, `local_override_module_dir_exists`, and
+  `read_text_file_for_project_input` now read through the cacheable `WatchedAbs*`
+  keys and report tracked (`BzlmodFileInputTracking::Project`); local/git/archive
+  override module + include files and the out-of-project hidden lockfile no longer
+  set `has_untracked_inputs`/`tracked_by_dice=false`. The `Polled` tracking variant
+  is removed; `AbsoluteTextFileInputKey` + helpers are `cfg(test)`-only;
+  `AbsolutePathMetadataInputKey` deleted. Unit tests moved to the watched model
+  (registry in `DiceData` + `inject_watched_abs_changes` between edit and re-read);
+  the hidden-facts guardrail restore step relaxed to a build-outcome assertion.
+  Verified: slug_common 130, slug_bzlmod 423, slug_external_cells 13, `cargo build
+  -p slug`, fmt/diff clean, Plan 61 pytest **178 passed**. `persisted_cell_graph`
+  is a pre-existing unrelated executor-ordering flake (fails on HEAD too).
+- **Remaining (item-2 follow-on, NOT in this sub-plan):** the synchronous direct
+  `read_absolute_text_file_input` reads in the non-DICE module-parse paths
+  (cells.rs ~687/1334/1583/1642) are still untracked; route them through DICE or the
+  watched keys in a later slice. Phase B (inotify, perf only) also remains optional.
 
 ## Phase A — Bazel-parity poll-diff (closes items 2/3, strict-compliant)
 

@@ -718,29 +718,34 @@ fn push_pending_include_labels(
     }
 }
 
+/// How a bzlmod input file was read. `Project` = tracked through a DICE file key
+/// (in-project `ProjectReadFileKey` or out-of-project `WatchedAbsFileKey`, both
+/// invalidated by DICE). The legacy untracked-poll variant has been removed now
+/// that out-of-project reads are watched (Plan 61 sub-plan 02 Phase A).
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 enum BzlmodFileInputTracking {
     Project,
-    Polled,
 }
 
+// Legacy out-of-project poll key (validity=false). Production out-of-project reads
+// now go through the cacheable `WatchedAbsFileKey` in `slug_common::file_ops::dice`
+// (invalidated by the per-command re-stat-diff). Retained test-only to document the
+// old poll semantics.
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
 struct AbsoluteTextFileInputValue {
     content: Option<String>,
     digest: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
-struct AbsolutePathMetadataInputValue {
-    exists: bool,
-}
-
+#[cfg(test)]
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display("AbsoluteTextFileInputKey({})", path.display())]
 struct AbsoluteTextFileInputKey {
     path: Arc<PathBuf>,
 }
 
+#[cfg(test)]
 #[async_trait]
 impl Key for AbsoluteTextFileInputKey {
     type Value = slug_error::Result<Arc<AbsoluteTextFileInputValue>>;
@@ -761,42 +766,6 @@ impl Key for AbsoluteTextFileInputKey {
     }
 
     fn validity(_x: &Self::Value) -> bool {
-        // Out-of-project bzlmod inputs still poll disk directly in this child
-        // key until a lower-level watched filesystem key is available.
-        false
-    }
-}
-
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display("AbsolutePathMetadataInputKey({})", path.display())]
-struct AbsolutePathMetadataInputKey {
-    path: Arc<PathBuf>,
-}
-
-#[async_trait]
-impl Key for AbsolutePathMetadataInputKey {
-    type Value = slug_error::Result<Arc<AbsolutePathMetadataInputValue>>;
-
-    async fn compute(
-        &self,
-        _ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        Ok(Arc::new(read_absolute_path_metadata_input_value(
-            &self.path,
-        )?))
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        match (x, y) {
-            (Ok(x), Ok(y)) => x == y,
-            _ => false,
-        }
-    }
-
-    fn validity(_x: &Self::Value) -> bool {
-        // This names the out-of-project path dependency in DICE, but still
-        // repolls until Slug has a watched absolute-path filesystem key.
         false
     }
 }
@@ -817,14 +786,16 @@ async fn read_bzlmod_file_for_module_inputs(
         return Ok((Some((content, digest)), BzlmodFileInputTracking::Project));
     }
 
-    let input = read_absolute_text_file_input_via_dice(ctx, path).await?;
+    // Out-of-project: tracked via a cacheable watched-abs DICE input, invalidated by
+    // the per-command re-stat-diff (Plan 61 sub-plan 02). No longer an untracked poll.
+    let input = DiceFileComputations::read_watched_abs_file_if_exists(ctx, path).await?;
     Ok((
         input
             .content
             .clone()
             .zip(input.digest.clone())
             .map(|(content, digest)| (content, digest)),
-        BzlmodFileInputTracking::Polled,
+        BzlmodFileInputTracking::Project,
     ))
 }
 
@@ -842,8 +813,9 @@ async fn local_override_module_dir_exists(
         ));
     }
 
-    let input = read_absolute_path_metadata_input_via_dice(ctx, path).await?;
-    Ok((input.exists, BzlmodFileInputTracking::Polled))
+    // Out-of-project: tracked via a cacheable watched-abs DICE input.
+    let input = DiceFileComputations::read_watched_abs_path_metadata_if_exists(ctx, path).await?;
+    Ok((input.exists, BzlmodFileInputTracking::Project))
 }
 
 fn project_relative_path_for_abs_path(
@@ -867,10 +839,12 @@ async fn read_text_file_for_project_input(
         ));
     }
 
-    let input = read_absolute_text_file_input_via_dice(ctx, path).await?;
-    Ok((input.content.clone(), BzlmodFileInputTracking::Polled))
+    // Out-of-project: tracked via a cacheable watched-abs DICE input.
+    let input = DiceFileComputations::read_watched_abs_file_if_exists(ctx, path).await?;
+    Ok((input.content.clone(), BzlmodFileInputTracking::Project))
 }
 
+#[cfg(test)]
 async fn read_absolute_text_file_input_via_dice(
     ctx: &mut DiceComputations<'_>,
     path: &Path,
@@ -881,33 +855,12 @@ async fn read_absolute_text_file_input_via_dice(
     .await?
 }
 
-async fn read_absolute_path_metadata_input_via_dice(
-    ctx: &mut DiceComputations<'_>,
-    path: &Path,
-) -> slug_error::Result<Arc<AbsolutePathMetadataInputValue>> {
-    ctx.compute(&AbsolutePathMetadataInputKey {
-        path: Arc::new(path.to_path_buf()),
-    })
-    .await?
-}
-
+#[cfg(test)]
 fn read_absolute_text_file_input_value(
     path: &Path,
 ) -> slug_error::Result<AbsoluteTextFileInputValue> {
     let (content, digest) = read_absolute_text_file_input(path)?;
     Ok(AbsoluteTextFileInputValue { content, digest })
-}
-
-fn read_absolute_path_metadata_input_value(
-    path: &Path,
-) -> slug_error::Result<AbsolutePathMetadataInputValue> {
-    match std::fs::symlink_metadata(path) {
-        Ok(_) => Ok(AbsolutePathMetadataInputValue { exists: true }),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Ok(AbsolutePathMetadataInputValue { exists: false })
-        }
-        Err(e) => Err(e.into()),
-    }
 }
 
 fn read_absolute_text_file_input(
@@ -3125,7 +3078,10 @@ mod tests {
     use slug_core::fs::project::ProjectRootTemp;
 
     use super::*;
+    use crate::dice::data::SetWatchedAbsInputRegistry;
     use crate::dice::data::testing::SetTestingIoProvider;
+    use crate::file_ops::watched_abs::WatchedAbsInputRegistry;
+    use crate::file_ops::watched_abs::inject_watched_abs_changes;
 
     fn non_registry_git_input(
         module_name: &str,
@@ -3552,7 +3508,8 @@ use_repo(ext, "generated")
     }
 
     #[tokio::test]
-    async fn out_of_project_module_include_reads_use_polled_text_key() -> slug_error::Result<()> {
+    async fn out_of_project_module_include_reads_are_watched_and_invalidate()
+    -> slug_error::Result<()> {
         let project = tempfile::Builder::new()
             .prefix("slug-plan61-project-")
             .tempdir_in("/var/mnt/dev")
@@ -3576,7 +3533,11 @@ use_repo(ext, "generated")
             "bazel_dep(name = \"dep\", version = \"1.0\")\n",
         )
         .unwrap();
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
         let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_watched_abs_input_registry(registry.dupe());
+            })
             .build(UserComputationData::new())
             .unwrap()
             .commit()
@@ -3584,7 +3545,8 @@ use_repo(ext, "generated")
 
         let (module_read, tracking) =
             read_bzlmod_file_for_module_inputs(&mut dice, &project_root, &module_path).await?;
-        assert_eq!(tracking, BzlmodFileInputTracking::Polled);
+        // Out-of-project reads are now tracked through a watched DICE input.
+        assert_eq!(tracking, BzlmodFileInputTracking::Project);
         let (module_content, _) = module_read.expect("external MODULE should exist");
         let parsed = parse_module_with_tracked_project_includes(
             &mut dice,
@@ -3597,15 +3559,24 @@ use_repo(ext, "generated")
         let first_digest =
             slug_bzlmod::module_file_inputs_digest(&parsed.parsed_with_inputs.inputs);
 
+        // Edit the out-of-project include and simulate the per-command re-stat-diff
+        // (the daemon runs this in `DiceCommandUpdater::update`); it invalidates the
+        // watched key so the re-read observes the change.
         std::fs::write(
             &include_path,
             "bazel_dep(name = \"dep\", version = \"2.0\")\n",
         )
         .unwrap();
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        let injected = inject_watched_abs_changes(&registry, &mut updater)?;
+        assert!(
+            injected,
+            "re-stat-diff should observe the out-of-project include edit"
+        );
+        let mut dice = updater.commit().await;
         let (module_read, tracking) =
             read_bzlmod_file_for_module_inputs(&mut dice, &project_root, &module_path).await?;
-        assert_eq!(tracking, BzlmodFileInputTracking::Polled);
+        assert_eq!(tracking, BzlmodFileInputTracking::Project);
         let (module_content, _) = module_read.expect("external MODULE should exist");
         let parsed = parse_module_with_tracked_project_includes(
             &mut dice,
@@ -3708,7 +3679,7 @@ use_repo(ext, "generated")
     }
 
     #[tokio::test]
-    async fn local_override_module_inputs_key_repolls_same_out_of_project_key()
+    async fn local_override_module_inputs_key_is_watched_for_out_of_project_module()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         let external = tempfile::Builder::new()
@@ -3725,9 +3696,11 @@ use_repo(ext, "generated")
                 external.path().to_string_lossy().into_owned(),
             )],
         };
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
                 data.set_testing_io_provider(&fs);
+                data.set_watched_abs_input_registry(registry.dupe());
             })
             .build(UserComputationData::new())
             .unwrap()
@@ -3735,7 +3708,8 @@ use_repo(ext, "generated")
             .await;
 
         let first = dice.compute(&key).await??;
-        assert!(first.has_untracked_inputs);
+        // Out-of-project override module reads are tracked, not untracked polls.
+        assert!(!first.has_untracked_inputs);
         assert!(<LocalOverrideModuleInputsKey as Key>::validity(&Ok(
             first.clone()
         )));
@@ -3745,16 +3719,18 @@ use_repo(ext, "generated")
             "module(name = \"dep\")\nbazel_dep(name = \"other\", version = \"1.0\")\n",
         )
         .unwrap();
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        inject_watched_abs_changes(&registry, &mut updater)?;
+        let mut dice = updater.commit().await;
         let second = dice.compute(&key).await??;
 
-        assert!(second.has_untracked_inputs);
+        assert!(!second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
         Ok(())
     }
 
     #[tokio::test]
-    async fn local_override_module_inputs_key_repolls_out_of_project_missing_dir()
+    async fn local_override_module_inputs_key_is_watched_for_out_of_project_missing_dir()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         let external = tempfile::Builder::new()
@@ -3767,9 +3743,11 @@ use_repo(ext, "generated")
             project_root,
             overrides: vec![("dep".to_owned(), module_dir.to_string_lossy().into_owned())],
         };
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
                 data.set_testing_io_provider(&fs);
+                data.set_watched_abs_input_registry(registry.dupe());
             })
             .build(UserComputationData::new())
             .unwrap()
@@ -3777,21 +3755,23 @@ use_repo(ext, "generated")
             .await;
 
         let first = dice.compute(&key).await??;
-        assert!(first.has_untracked_inputs);
+        assert!(!first.has_untracked_inputs);
         assert_eq!(first.missing_module_dirs, vec!["dep".to_owned()]);
 
         std::fs::create_dir(&module_dir).unwrap();
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        inject_watched_abs_changes(&registry, &mut updater)?;
+        let mut dice = updater.commit().await;
         let second = dice.compute(&key).await??;
 
-        assert!(second.has_untracked_inputs);
+        assert!(!second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
         assert!(second.missing_module_dirs.is_empty());
         Ok(())
     }
 
     #[tokio::test]
-    async fn local_override_module_inputs_key_repolls_out_of_project_include()
+    async fn local_override_module_inputs_key_is_watched_for_out_of_project_include()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         let external = tempfile::Builder::new()
@@ -3818,9 +3798,11 @@ use_repo(ext, "generated")
                 external.path().to_string_lossy().into_owned(),
             )],
         };
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
                 data.set_testing_io_provider(&fs);
+                data.set_watched_abs_input_registry(registry.dupe());
             })
             .build(UserComputationData::new())
             .unwrap()
@@ -3828,17 +3810,19 @@ use_repo(ext, "generated")
             .await;
 
         let first = dice.compute(&key).await??;
-        assert!(first.has_untracked_inputs);
+        assert!(!first.has_untracked_inputs);
 
         std::fs::write(
             &include_path,
             "bazel_dep(name = \"included_dep\", version = \"2.0\")\n",
         )
         .unwrap();
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        inject_watched_abs_changes(&registry, &mut updater)?;
+        let mut dice = updater.commit().await;
         let second = dice.compute(&key).await??;
 
-        assert!(second.has_untracked_inputs);
+        assert!(!second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
         Ok(())
     }
@@ -3892,9 +3876,11 @@ use_repo(ext, "generated")
             overrides: vec![non_registry_git_input("dep", external.path().to_path_buf())],
             override_patch_inputs: Arc::new(slug_bzlmod::OverridePatchInputs::default()),
         };
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
                 data.set_testing_io_provider(&fs);
+                data.set_watched_abs_input_registry(registry.dupe());
             })
             .build(UserComputationData::new())
             .unwrap()
@@ -3902,7 +3888,7 @@ use_repo(ext, "generated")
             .await;
 
         let first = dice.compute(&key).await??;
-        assert!(first.has_untracked_inputs);
+        assert!(!first.has_untracked_inputs);
         assert!(<NonRegistryOverrideModuleInputsKey as Key>::validity(&Ok(
             first.clone()
         )));
@@ -3912,10 +3898,12 @@ use_repo(ext, "generated")
             "module(name = \"dep\")\nbazel_dep(name = \"other\", version = \"1.0\")\n",
         )
         .unwrap();
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        inject_watched_abs_changes(&registry, &mut updater)?;
+        let mut dice = updater.commit().await;
         let second = dice.compute(&key).await??;
 
-        assert!(second.has_untracked_inputs);
+        assert!(!second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
         Ok(())
     }
@@ -4184,9 +4172,11 @@ use_repo(ext, "generated")
                 module_bazel_path: module_path.clone(),
             }],
         };
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
                 data.set_testing_io_provider(&fs);
+                data.set_watched_abs_input_registry(registry.dupe());
             })
             .build(UserComputationData::new())
             .unwrap()
@@ -4194,16 +4184,17 @@ use_repo(ext, "generated")
             .await;
 
         let first = dice.compute(&key).await??;
-        assert!(first.has_untracked_inputs);
-        assert!(!<NonRootModuleFilesKey as Key>::validity(
-            &Ok(first.clone())
-        ));
+        // Out-of-project non-root module files are now tracked, so the key is valid.
+        assert!(!first.has_untracked_inputs);
+        assert!(<NonRootModuleFilesKey as Key>::validity(&Ok(first.clone())));
 
         std::fs::write(&module_path, "module(name = \"dep\", version = \"2.0\")\n").unwrap();
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        inject_watched_abs_changes(&registry, &mut updater)?;
+        let mut dice = updater.commit().await;
         let second = dice.compute(&key).await??;
 
-        assert!(second.has_untracked_inputs);
+        assert!(!second.has_untracked_inputs);
         assert_ne!(first.digest, second.digest);
         Ok(())
     }
@@ -4857,9 +4848,11 @@ use_repo(ext, "generated")
             .unwrap();
         let hidden_path = hidden_dir.path().join("MODULE.bazel.lock");
         std::fs::write(&hidden_path, minimal_lockfile_json("hidden")).unwrap();
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
         let mut dice = DiceBuilder::new()
             .set_data(|data| {
                 data.set_testing_io_provider(&fs);
+                data.set_watched_abs_input_registry(registry.dupe());
             })
             .build(UserComputationData::new())
             .unwrap()
@@ -4875,8 +4868,9 @@ use_repo(ext, "generated")
         )
         .await?;
         assert!(first.hidden_lockfile_digest.is_some());
+        // The out-of-project hidden lockfile is now tracked through a watched DICE input.
         assert!(
-            !first
+            first
                 .hidden_lockfile
                 .as_ref()
                 .expect("hidden lockfile value should be present")
@@ -4884,7 +4878,9 @@ use_repo(ext, "generated")
         );
 
         std::fs::write(&hidden_path, "{ this is not json }\n").unwrap();
-        let mut dice = dice.into_updater().commit().await;
+        let mut updater = dice.into_updater();
+        inject_watched_abs_changes(&registry, &mut updater)?;
+        let mut dice = updater.commit().await;
         let invalid = compute_bzlmod_clean_lockfile_inputs(
             &mut dice,
             fs.path(),
