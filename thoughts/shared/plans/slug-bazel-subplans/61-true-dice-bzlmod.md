@@ -597,6 +597,14 @@ Current state to preserve:
   longer owns the graph compute function or the clean cell-graph build helper.
   Guardrail:
   `cargo test -p slug_bzlmod resolved_graph --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo test -p slug_common bzlmod_lockfile_inputs_identity_includes_hidden_lockfile_content --lib && cargo test -p slug_common local_override_module_inputs_key_repolls_same_out_of_project_key --lib && cargo test -p slug_common non_root_module_files_key_repolls_same_out_of_project_key --lib && cargo test -p slug_common registry_file_inputs_key_repolls_same_out_of_project_key --lib && cargo build -p slug && git diff --check`.
+- 2026-05-28 clean lockfile input policy moved to `slug_bzlmod`:
+  `BzlmodCleanLockfileInputsKey` now owns clean graph lockfile mode,
+  root-module-present, visible path, hidden path, and identity/equality policy.
+  `slug_common` no longer owns `BzlmodLockfileInputsBridgeKey`; it only
+  supplies tracked visible/hidden lockfile content through
+  `BzlmodCleanGraphIo::compute_lockfile_content` until lockfile file reads move
+  behind lower-level bzlmod filesystem inputs. Guardrail:
+  `cargo test -p slug_bzlmod lockfile_inputs --lib && cargo test -p slug_common bzlmod_lockfile_inputs --lib && cargo test -p slug_common clean_resolved_module_graph --lib && cargo build -p slug && git diff --check`.
 - `slug_core` process-global dynamic bzlmod directory scanning is now test-only;
   production binaries must use resolver/runtime graph data or explicit dynamic
   registrations instead of scanning `bazel-external` for aliases.
@@ -1294,9 +1302,10 @@ hardening behavior around it.
      resolved-graph digest. Clean cell-graph assembly and the clean
      resolved-module graph key now live in `slug_bzlmod`; production computes
      the graph through `slug_bzlmod::BzlmodResolvedModuleGraphKey`.
-     `slug_common` remains only as the late-bound project-file/preseed IO
-     provider until those filesystem-backed source-input dependencies are
-     modeled behind lower-level bzlmod APIs.
+     Clean lockfile input policy also lives in `slug_bzlmod`; `slug_common`
+     remains only as the late-bound project-file, lockfile-content, non-root
+     module-file, and preseed IO provider until those filesystem-backed
+     source-input dependencies are modeled behind lower-level bzlmod APIs.
    - Generic empty session/projection construction is removed from production
      paths. Remaining empty bzlmod-input construction must explicitly carry
      workspace identity while direct bootstrap/completion parsing is being

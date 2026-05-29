@@ -753,20 +753,6 @@ struct TrackedLockfileContentKey {
     path: Arc<PathBuf>,
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
-#[display(
-    "BzlmodLockfileInputsBridgeKey({}, {:?})",
-    workspace_id.stable_hash(),
-    lockfile_mode
-)]
-struct BzlmodLockfileInputsBridgeKey {
-    project_root: AbsNormPathBuf,
-    workspace_id: slug_bzlmod::WorkspaceId,
-    lockfile_mode: slug_bzlmod::LockfileMode,
-    hidden_lockfile_path: Option<PathBuf>,
-    root_module_present: bool,
-}
-
 #[async_trait]
 impl Key for TrackedLockfileContentKey {
     type Value = slug_error::Result<Arc<slug_bzlmod::LockfileContentValue>>;
@@ -828,73 +814,6 @@ impl Key for TrackedLockfileContentKey {
             Ok(value) => value.tracked_by_dice,
             Err(_) => false,
         }
-    }
-}
-
-#[async_trait]
-impl Key for BzlmodLockfileInputsBridgeKey {
-    type Value = slug_error::Result<Arc<slug_bzlmod::BzlmodLockfileInputsValue>>;
-
-    async fn compute(
-        &self,
-        ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        if !self.root_module_present || self.lockfile_mode == slug_bzlmod::LockfileMode::Off {
-            return Ok(Arc::new(
-                slug_bzlmod::BzlmodLockfileInputsValue::from_values(
-                    self.hidden_lockfile_path.clone(),
-                    None,
-                    None,
-                    self.lockfile_mode,
-                ),
-            ));
-        }
-
-        let project_fs = ProjectRoot::new_unchecked(self.project_root.clone());
-        let visible_path = slug_bzlmod::lockfile_path(project_fs.root().as_path());
-        let visible_lockfile = ctx
-            .compute(&TrackedLockfileContentKey {
-                project_root: self.project_root.clone(),
-                kind: slug_bzlmod::LockfileContentKind::Workspace,
-                path: Arc::new(visible_path),
-            })
-            .await?
-            .buck_error_context("Computing visible MODULE.bazel.lock for bzlmod resolution")?;
-        let hidden_lockfile = match &self.hidden_lockfile_path {
-            Some(path) => Some(
-                ctx.compute(&TrackedLockfileContentKey {
-                    project_root: self.project_root.clone(),
-                    kind: slug_bzlmod::LockfileContentKind::Hidden,
-                    path: Arc::new(path.clone()),
-                })
-                .await?
-                .buck_error_context(
-                    "Computing hidden MODULE.bazel lockfile for bzlmod resolution",
-                )?,
-            ),
-            None => None,
-        };
-
-        Ok(Arc::new(
-            slug_bzlmod::BzlmodLockfileInputsValue::from_values(
-                self.hidden_lockfile_path.clone(),
-                Some(visible_lockfile),
-                hidden_lockfile,
-                self.lockfile_mode,
-            ),
-        ))
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        match (x, y) {
-            (Ok(x), Ok(y)) => x.identity_eq(y),
-            _ => false,
-        }
-    }
-
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
     }
 }
 
@@ -3220,8 +3139,7 @@ async fn compute_bzlmod_resolved_module_graph_inputs(
         .await?
         .buck_error_context("Computing root MODULE.bazel for clean bzlmod graph")?;
     let lockfile_inputs = dice_ctx
-        .compute(&BzlmodLockfileInputsBridgeKey {
-            project_root: project_root.clone(),
+        .compute(&slug_bzlmod::BzlmodCleanLockfileInputsKey {
             workspace_id,
             lockfile_mode: key.options.lockfile_mode,
             hidden_lockfile_path: key.options.hidden_lockfile_path.clone(),
@@ -3407,6 +3325,31 @@ impl slug_bzlmod::BzlmodCleanGraphIo for CommonBzlmodCleanGraphIo {
         }
 
         Ok(())
+    }
+
+    async fn compute_lockfile_content(
+        &self,
+        workspace_id: &slug_bzlmod::WorkspaceId,
+        kind: slug_bzlmod::LockfileContentKind,
+        path: Arc<PathBuf>,
+        ctx: &mut DiceComputations<'_>,
+    ) -> slug_error::Result<Arc<slug_bzlmod::LockfileContentValue>> {
+        let project_root =
+            AbsNormPathBuf::try_from(workspace_id.canonical_project_root.as_ref().clone())?;
+        ctx.compute(&TrackedLockfileContentKey {
+            project_root,
+            kind,
+            path,
+        })
+        .await?
+        .with_buck_error_context(|| match kind {
+            slug_bzlmod::LockfileContentKind::Workspace => {
+                "Computing visible MODULE.bazel.lock for bzlmod resolution".to_owned()
+            }
+            slug_bzlmod::LockfileContentKind::Hidden => {
+                "Computing hidden MODULE.bazel lockfile for bzlmod resolution".to_owned()
+            }
+        })
     }
 }
 
@@ -3805,7 +3748,7 @@ mod tests {
         )
     }
 
-    async fn compute_bzlmod_lockfile_inputs_bridge(
+    async fn compute_bzlmod_clean_lockfile_inputs(
         dice: &mut DiceComputations<'_>,
         project_fs: &ProjectRoot,
         lockfile_mode: slug_bzlmod::LockfileMode,
@@ -3813,8 +3756,8 @@ mod tests {
         root_module_present: bool,
     ) -> slug_error::Result<Arc<slug_bzlmod::BzlmodLockfileInputsValue>> {
         let project_root = project_fs.root().to_path_buf();
-        dice.compute(&BzlmodLockfileInputsBridgeKey {
-            project_root: AbsNormPathBuf::try_from(project_root.clone())?,
+        init_bzlmod_clean_graph_io_impl();
+        dice.compute(&slug_bzlmod::BzlmodCleanLockfileInputsKey {
             workspace_id: slug_bzlmod::WorkspaceId::new(
                 project_root.clone(),
                 project_root.join("buck-out/v2"),
@@ -5528,8 +5471,8 @@ ext = module_extension(implementation = _impl)
     }
 
     #[tokio::test]
-    async fn bzlmod_lockfile_inputs_bridge_tracks_visible_lockfile_edits() -> slug_error::Result<()>
-    {
+    async fn bzlmod_clean_lockfile_inputs_key_tracks_visible_lockfile_edits()
+    -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
         fs.write_file("MODULE.bazel.lock", &minimal_lockfile_json("first"));
@@ -5542,7 +5485,7 @@ ext = module_extension(implementation = _impl)
             .commit()
             .await;
 
-        let first = compute_bzlmod_lockfile_inputs_bridge(
+        let first = compute_bzlmod_clean_lockfile_inputs(
             &mut dice,
             fs.path(),
             slug_bzlmod::LockfileMode::Update,
@@ -5570,7 +5513,7 @@ ext = module_extension(implementation = _impl)
         ));
         changes.write_to_dice(&mut updater)?;
         let mut dice = updater.commit().await;
-        let second = compute_bzlmod_lockfile_inputs_bridge(
+        let second = compute_bzlmod_clean_lockfile_inputs(
             &mut dice,
             fs.path(),
             slug_bzlmod::LockfileMode::Update,
@@ -5591,7 +5534,7 @@ ext = module_extension(implementation = _impl)
     }
 
     #[tokio::test]
-    async fn bzlmod_lockfile_inputs_bridge_tracks_hidden_lockfile_fail_open()
+    async fn bzlmod_clean_lockfile_inputs_key_tracks_hidden_lockfile_fail_open()
     -> slug_error::Result<()> {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
@@ -5611,7 +5554,7 @@ ext = module_extension(implementation = _impl)
             .commit()
             .await;
 
-        let first = compute_bzlmod_lockfile_inputs_bridge(
+        let first = compute_bzlmod_clean_lockfile_inputs(
             &mut dice,
             fs.path(),
             slug_bzlmod::LockfileMode::Update,
@@ -5630,7 +5573,7 @@ ext = module_extension(implementation = _impl)
 
         std::fs::write(&hidden_path, "{ this is not json }\n").unwrap();
         let mut dice = dice.into_updater().commit().await;
-        let invalid = compute_bzlmod_lockfile_inputs_bridge(
+        let invalid = compute_bzlmod_clean_lockfile_inputs(
             &mut dice,
             fs.path(),
             slug_bzlmod::LockfileMode::Update,
@@ -5652,7 +5595,8 @@ ext = module_extension(implementation = _impl)
     }
 
     #[tokio::test]
-    async fn bzlmod_lockfile_inputs_bridge_mode_off_reads_no_lockfiles() -> slug_error::Result<()> {
+    async fn bzlmod_clean_lockfile_inputs_key_mode_off_reads_no_lockfiles() -> slug_error::Result<()>
+    {
         let fs = ProjectRootTemp::new()?;
         fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
         fs.write_file("MODULE.bazel.lock", "{ this is not json }\n");
@@ -5665,7 +5609,7 @@ ext = module_extension(implementation = _impl)
             .commit()
             .await;
 
-        let inputs = compute_bzlmod_lockfile_inputs_bridge(
+        let inputs = compute_bzlmod_clean_lockfile_inputs(
             &mut dice,
             fs.path(),
             slug_bzlmod::LockfileMode::Off,

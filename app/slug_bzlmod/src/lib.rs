@@ -75,6 +75,7 @@ pub use dice_graph::BzlmodCellGraphScopedAlias;
 pub use dice_graph::BzlmodCellGraphValue;
 pub use dice_graph::BzlmodCleanCellGraphBuilder;
 pub use dice_graph::BzlmodCleanGraphIo;
+pub use dice_graph::BzlmodCleanLockfileInputsKey;
 pub use dice_graph::BzlmodCommandPolicyKey;
 pub use dice_graph::BzlmodCommandPolicyValue;
 use dice_graph::BzlmodCurrentCellGraphKey;

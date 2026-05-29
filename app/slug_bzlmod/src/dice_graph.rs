@@ -48,6 +48,7 @@ use crate::extensions::AggregatedExtension;
 use crate::extensions::aggregate_extensions_with_policy;
 use crate::lockfile::Lockfile;
 use crate::lockfile::LockfileMode;
+use crate::lockfile::lockfile_path;
 use crate::parser::ModuleFileInputDigest;
 use crate::parser::validate_parsed_root_extension_repo_directives;
 use crate::repo_spec::RepoSpec;
@@ -478,6 +479,14 @@ pub trait BzlmodCleanGraphIo: Send + Sync + 'static {
         visible_lockfile: Option<&Lockfile>,
         hidden_lockfile: Option<&Lockfile>,
     ) -> slug_error::Result<()>;
+
+    async fn compute_lockfile_content(
+        &self,
+        workspace_id: &WorkspaceId,
+        kind: LockfileContentKind,
+        path: Arc<PathBuf>,
+        ctx: &mut DiceComputations<'_>,
+    ) -> slug_error::Result<Arc<LockfileContentValue>>;
 }
 
 pub static BZLMOD_CLEAN_GRAPH_IO_IMPL: LateBinding<&'static dyn BzlmodCleanGraphIo> =
@@ -1478,7 +1487,7 @@ pub struct LocalOverrideSourceKey {
     pub module_file_digest: Arc<str>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Allocative)]
 pub enum LockfileContentKind {
     Workspace,
     Hidden,
@@ -1543,6 +1552,80 @@ impl BzlmodLockfileInputsValue {
 impl Default for BzlmodLockfileInputsValue {
     fn default() -> Self {
         Self::from_values(None, None, None, crate::LockfileMode::Update)
+    }
+}
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
+#[display(
+    "BzlmodCleanLockfileInputsKey({}, {:?})",
+    workspace_id.stable_hash(),
+    lockfile_mode
+)]
+pub struct BzlmodCleanLockfileInputsKey {
+    pub workspace_id: WorkspaceId,
+    pub lockfile_mode: crate::LockfileMode,
+    pub hidden_lockfile_path: Option<PathBuf>,
+    pub root_module_present: bool,
+}
+
+#[async_trait]
+impl Key for BzlmodCleanLockfileInputsKey {
+    type Value = slug_error::Result<Arc<BzlmodLockfileInputsValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        if !self.root_module_present || self.lockfile_mode == crate::LockfileMode::Off {
+            return Ok(Arc::new(BzlmodLockfileInputsValue::from_values(
+                self.hidden_lockfile_path.clone(),
+                None,
+                None,
+                self.lockfile_mode,
+            )));
+        }
+
+        let io = *BZLMOD_CLEAN_GRAPH_IO_IMPL.get()?;
+        let visible_path = lockfile_path(self.workspace_id.canonical_project_root.as_ref());
+        let visible_lockfile = io
+            .compute_lockfile_content(
+                &self.workspace_id,
+                LockfileContentKind::Workspace,
+                Arc::new(visible_path),
+                ctx,
+            )
+            .await?;
+        let hidden_lockfile = match &self.hidden_lockfile_path {
+            Some(path) => Some(
+                io.compute_lockfile_content(
+                    &self.workspace_id,
+                    LockfileContentKind::Hidden,
+                    Arc::new(path.clone()),
+                    ctx,
+                )
+                .await?,
+            ),
+            None => None,
+        };
+
+        Ok(Arc::new(BzlmodLockfileInputsValue::from_values(
+            self.hidden_lockfile_path.clone(),
+            Some(visible_lockfile),
+            hidden_lockfile,
+            self.lockfile_mode,
+        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.identity_eq(y),
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -4899,6 +4982,10 @@ pub fn bzlmod_event_counters() -> BzlmodEventCounters {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Once;
+
+    use async_trait::async_trait;
+
     use super::*;
     use crate::types::BazelDep;
     use crate::types::ExtensionUsage;
@@ -4932,6 +5019,150 @@ mod tests {
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
         }
+    }
+
+    struct TestCleanGraphIo;
+
+    static TEST_CLEAN_GRAPH_IO: TestCleanGraphIo = TestCleanGraphIo;
+    static INIT_TEST_CLEAN_GRAPH_IO: Once = Once::new();
+    static TEST_LOCKFILE_VALUES: OnceLock<Mutex<HashMap<PathBuf, Arc<LockfileContentValue>>>> =
+        OnceLock::new();
+
+    fn init_test_clean_graph_io() {
+        INIT_TEST_CLEAN_GRAPH_IO.call_once(|| {
+            BZLMOD_CLEAN_GRAPH_IO_IMPL.init(&TEST_CLEAN_GRAPH_IO);
+        });
+    }
+
+    fn test_lockfile_values() -> &'static Mutex<HashMap<PathBuf, Arc<LockfileContentValue>>> {
+        TEST_LOCKFILE_VALUES.get_or_init(|| Mutex::new(HashMap::new()))
+    }
+
+    #[async_trait]
+    impl BzlmodCleanGraphIo for TestCleanGraphIo {
+        async fn compute_source_inputs(
+            &self,
+            _key: &BzlmodResolvedModuleGraphKey,
+            _ctx: &mut DiceComputations<'_>,
+        ) -> slug_error::Result<BzlmodResolvedGraphSourceInputsValue> {
+            Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "test clean graph IO does not provide source inputs"
+            ))
+        }
+
+        async fn compute_non_root_module_files(
+            &self,
+            _key: &BzlmodResolvedModuleGraphKey,
+            _ctx: &mut DiceComputations<'_>,
+            _inputs: Vec<NonRootModuleFileInput>,
+            _root_module_name: &str,
+        ) -> slug_error::Result<Arc<NonRootModuleFilesValue>> {
+            Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Tier0,
+                "test clean graph IO does not provide non-root module files"
+            ))
+        }
+
+        async fn append_lockfile_seeded_extension_cells(
+            &self,
+            _key: &BzlmodResolvedModuleGraphKey,
+            _ctx: &mut DiceComputations<'_>,
+            _builder: &mut BzlmodCleanCellGraphBuilder,
+            _visible_lockfile: Option<&Lockfile>,
+            _hidden_lockfile: Option<&Lockfile>,
+        ) -> slug_error::Result<()> {
+            Ok(())
+        }
+
+        async fn compute_lockfile_content(
+            &self,
+            _workspace_id: &WorkspaceId,
+            _kind: LockfileContentKind,
+            path: Arc<PathBuf>,
+            _ctx: &mut DiceComputations<'_>,
+        ) -> slug_error::Result<Arc<LockfileContentValue>> {
+            let values = test_lockfile_values()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            Ok(values.get(path.as_ref()).cloned().unwrap_or_else(|| {
+                Arc::new(LockfileContentValue {
+                    path,
+                    digest: None,
+                    tracked_by_dice: false,
+                    lockfile: None,
+                })
+            }))
+        }
+    }
+
+    fn test_lockfile_value(path: PathBuf, digest: &str) -> Arc<LockfileContentValue> {
+        Arc::new(LockfileContentValue {
+            path: Arc::new(path),
+            digest: Some(digest.to_owned()),
+            tracked_by_dice: true,
+            lockfile: None,
+        })
+    }
+
+    #[tokio::test]
+    async fn clean_lockfile_inputs_key_owns_mode_and_paths() -> slug_error::Result<()> {
+        init_test_clean_graph_io();
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-bzlmod-clean-lockfile-ws"),
+            PathBuf::from("/tmp/slug-bzlmod-clean-lockfile-out"),
+        );
+        let visible_path = lockfile_path(workspace_id.canonical_project_root.as_ref());
+        let hidden_path = PathBuf::from("/tmp/slug-bzlmod-clean-hidden.lock");
+        {
+            let mut values = test_lockfile_values()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            values.clear();
+            values.insert(
+                visible_path.clone(),
+                test_lockfile_value(visible_path, "visible-digest"),
+            );
+            values.insert(
+                hidden_path.clone(),
+                test_lockfile_value(hidden_path.clone(), "hidden-digest"),
+            );
+        }
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut dice = dice;
+        let inputs = dice
+            .compute(&BzlmodCleanLockfileInputsKey {
+                workspace_id: workspace_id.clone(),
+                lockfile_mode: LockfileMode::Update,
+                hidden_lockfile_path: Some(hidden_path.clone()),
+                root_module_present: true,
+            })
+            .await??;
+        assert_eq!(
+            inputs.visible_lockfile_digest.as_deref(),
+            Some("visible-digest")
+        );
+        assert_eq!(
+            inputs.hidden_lockfile_digest.as_deref(),
+            Some("hidden-digest")
+        );
+
+        let off_inputs = dice
+            .compute(&BzlmodCleanLockfileInputsKey {
+                workspace_id,
+                lockfile_mode: LockfileMode::Off,
+                hidden_lockfile_path: Some(hidden_path),
+                root_module_present: true,
+            })
+            .await??;
+        assert!(off_inputs.visible_lockfile.is_none());
+        assert!(off_inputs.hidden_lockfile.is_none());
+        Ok(())
     }
 
     #[derive(Hash)]
