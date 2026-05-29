@@ -835,19 +835,27 @@ fn hash_bzlmod_resolution_options_policy<H: std::hash::Hasher>(
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
 #[display(
-    "TrackedScannedExtensionBzlDigestKey({}, {})",
+    "TrackedScannedExtensionBzlDigestKey({}, {}, {})",
     project_root.display(),
+    root_module_name,
     extension_id
 )]
 struct FallbackScannedExtensionBzlDigestKey {
     project_root: AbsNormPathBuf,
+    root_module_name: Arc<str>,
     extension_id: Arc<str>,
     repo_mappings: Arc<slug_bzlmod::RepoMappingSnapshot>,
 }
 
+#[derive(Clone, Dupe, Debug, PartialEq, Eq, Allocative)]
+struct FallbackScannedExtensionBzlDigestValue {
+    digest: Arc<str>,
+    cache_safe: bool,
+}
+
 #[async_trait]
 impl Key for FallbackScannedExtensionBzlDigestKey {
-    type Value = slug_error::Result<Arc<str>>;
+    type Value = slug_error::Result<FallbackScannedExtensionBzlDigestValue>;
 
     async fn compute(
         &self,
@@ -858,10 +866,14 @@ impl Key for FallbackScannedExtensionBzlDigestKey {
             ctx,
             self.extension_id.as_ref(),
             self.project_root.as_path(),
+            self.root_module_name.as_ref(),
             self.repo_mappings.as_ref(),
         )
         .await
-        .map(|digest| Arc::from(digest.as_str()))
+        .map(|value| FallbackScannedExtensionBzlDigestValue {
+            digest: Arc::from(value.digest.as_str()),
+            cache_safe: value.cache_safe,
+        })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -872,8 +884,19 @@ impl Key for FallbackScannedExtensionBzlDigestKey {
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+        match x {
+            Ok(value) => value.cache_safe,
+            Err(_) => false,
+        }
     }
+}
+
+const FALLBACK_SCANNED_BZL_MISSING_CONTENT: &str =
+    "read_error:No such file or directory (os error 2)";
+
+struct TrackedScannedExtensionBzlDigestValue {
+    digest: String,
+    cache_safe: bool,
 }
 
 fn tracked_project_bzl_location(
@@ -906,6 +929,18 @@ fn tracked_external_repo_candidate(repo: &str) -> String {
     }
 }
 
+fn tracked_root_repo_for_label(repo: &str, root_module_name: &str) -> bool {
+    repo.is_empty() || repo == "_main" || (!root_module_name.is_empty() && repo == root_module_name)
+}
+
+fn tracked_project_repo_for_unmapped_label(repo: &str, root_module_name: &str) -> String {
+    if tracked_root_repo_for_label(repo, root_module_name) {
+        String::new()
+    } else {
+        tracked_external_repo_candidate(repo)
+    }
+}
+
 fn tracked_mapping_for_source_repo<'a>(
     repo_mappings: &'a slug_bzlmod::RepoMappingSnapshot,
     current_repo: &str,
@@ -935,21 +970,19 @@ fn tracked_split_bzl_label_target(target: &str) -> Option<(&str, &str)> {
 fn tracked_label_bzl_location_under_project(
     label: &str,
     project_root: &Path,
+    root_module_name: &str,
     current: Option<&slug_bzlmod::BzlLoadLocation>,
     repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
 ) -> Option<slug_bzlmod::BzlLoadLocation> {
     if let Some(rest) = label.strip_prefix("@@") {
         let (repo, target) = rest.split_once("//")?;
         let (pkg, name) = tracked_split_bzl_label_target(target)?;
-        if !repo.contains('+') {
-            return Some(tracked_project_bzl_location(project_root, "", pkg, name));
-        }
-        return Some(tracked_project_bzl_location(
-            project_root,
-            &tracked_external_repo_candidate(repo),
-            pkg,
-            name,
-        ));
+        let repo = if repo.contains('+') {
+            tracked_external_repo_candidate(repo)
+        } else {
+            tracked_project_repo_for_unmapped_label(repo, root_module_name)
+        };
+        return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
     }
     if let Some(rest) = label.strip_prefix('@') {
         let (repo, target) = rest.split_once("//")?;
@@ -959,9 +992,9 @@ fn tracked_label_bzl_location_under_project(
         } else if let Some(current) = current {
             tracked_mapping_for_source_repo(repo_mappings, &current.repo)
                 .and_then(|mapping| mapping.get(repo).cloned())
-                .unwrap_or_default()
+                .unwrap_or_else(|| tracked_project_repo_for_unmapped_label(repo, root_module_name))
         } else {
-            String::new()
+            tracked_project_repo_for_unmapped_label(repo, root_module_name)
         };
         return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
     }
@@ -992,9 +1025,9 @@ fn tracked_label_bzl_location_under_project(
         } else if let Some(current) = current {
             tracked_mapping_for_source_repo(repo_mappings, &current.repo)
                 .and_then(|mapping| mapping.get(repo).cloned())
-                .unwrap_or_default()
+                .unwrap_or_else(|| tracked_project_repo_for_unmapped_label(repo, root_module_name))
         } else {
-            String::new()
+            tracked_project_repo_for_unmapped_label(repo, root_module_name)
         };
         return Some(tracked_project_bzl_location(project_root, &repo, pkg, name));
     }
@@ -1012,46 +1045,83 @@ async fn tracked_read_bzl_location(
     ctx: &mut DiceComputations<'_>,
     project_root: &Path,
     location: &slug_bzlmod::BzlLoadLocation,
-) -> slug_error::Result<Option<(String, String)>> {
+) -> slug_error::Result<Option<(String, String, bool)>> {
     let Ok(rel) = location.path.strip_prefix(project_root) else {
         return Ok(None);
     };
     let rel = rel.to_string_lossy();
     let project_path = ProjectRelativePath::new(rel.as_ref())?;
     register_bzlmod_config_project_file(project_path.to_owned());
+    let cache_safe = tracked_bzl_location_cache_safe(ctx, location).await?;
     let content = DiceFileComputations::read_project_file_if_exists(ctx, project_path).await?;
     Ok(Some((
         rel.into_owned(),
-        content.unwrap_or_else(|| "read_error:missing".to_owned()),
+        content.unwrap_or_else(|| FALLBACK_SCANNED_BZL_MISSING_CONTENT.to_owned()),
+        cache_safe,
     )))
+}
+
+async fn tracked_bzl_location_cache_safe(
+    ctx: &mut DiceComputations<'_>,
+    location: &slug_bzlmod::BzlLoadLocation,
+) -> slug_error::Result<bool> {
+    if location.repo.is_empty() || location.repo == "_main" {
+        return Ok(true);
+    }
+    let repo_root_rel = format!("bazel-external/{}", location.repo);
+    let repo_root_path = ProjectRelativePath::new(repo_root_rel.as_str())?.to_owned();
+    register_bzlmod_config_project_file(repo_root_path.clone());
+    let Some(metadata) =
+        DiceFileComputations::read_project_path_metadata_if_exists(ctx, repo_root_path.as_ref())
+            .await?
+    else {
+        return Ok(false);
+    };
+    Ok(matches!(metadata, RawPathMetadata::Directory))
 }
 
 async fn tracked_scanned_extension_bzl_digest(
     ctx: &mut DiceComputations<'_>,
     extension_id: &str,
     project_root: &Path,
+    root_module_name: &str,
     repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
-) -> slug_error::Result<String> {
+) -> slug_error::Result<TrackedScannedExtensionBzlDigestValue> {
     let label = extension_id.split('%').next().unwrap_or(extension_id);
-    let Some(root_location) =
-        tracked_label_bzl_location_under_project(label, project_root, None, repo_mappings)
-    else {
-        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    let Some(root_location) = tracked_label_bzl_location_under_project(
+        label,
+        project_root,
+        root_module_name,
+        None,
+        repo_mappings,
+    ) else {
+        return Ok(TrackedScannedExtensionBzlDigestValue {
+            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
+            cache_safe: true,
+        });
     };
 
-    let Some((root_rel, root_content)) =
+    let Some((root_rel, root_content, root_cache_safe)) =
         tracked_read_bzl_location(ctx, project_root, &root_location).await?
     else {
-        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+        return Ok(TrackedScannedExtensionBzlDigestValue {
+            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
+            cache_safe: true,
+        });
     };
-    if root_content == "read_error:missing" {
-        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+    if root_content == FALLBACK_SCANNED_BZL_MISSING_CONTENT {
+        return Ok(TrackedScannedExtensionBzlDigestValue {
+            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
+            cache_safe: false,
+        });
     }
 
     let mut seen_locations = BTreeSet::new();
     let mut file_contents = BTreeMap::new();
-    let mut queue = VecDeque::from([(root_location, root_rel, root_content)]);
-    while let Some((location, rel, content)) = queue.pop_front() {
+    let mut cache_safe = root_cache_safe;
+    let mut queue = VecDeque::from([(root_location, root_rel, root_content, root_cache_safe)]);
+    while let Some((location, rel, content, location_cache_safe)) = queue.pop_front() {
+        cache_safe &= location_cache_safe;
         let key = (
             location.path.clone(),
             location.repo.clone(),
@@ -1061,13 +1131,15 @@ async fn tracked_scanned_extension_bzl_digest(
             continue;
         }
         file_contents.insert(rel, content.clone());
-        if content == "read_error:missing" {
+        if content == FALLBACK_SCANNED_BZL_MISSING_CONTENT {
+            cache_safe = false;
             continue;
         }
         for load in slug_bzlmod::literal_loads(&location.path, &content) {
             let Some(load_location) = tracked_label_bzl_location_under_project(
                 &load,
                 project_root,
+                root_module_name,
                 Some(&location),
                 repo_mappings,
             ) else {
@@ -1076,36 +1148,48 @@ async fn tracked_scanned_extension_bzl_digest(
             if !load_location.path.starts_with(project_root) {
                 continue;
             }
-            if let Some((load_rel, load_content)) =
+            if let Some((load_rel, load_content, load_cache_safe)) =
                 tracked_read_bzl_location(ctx, project_root, &load_location).await?
             {
-                queue.push_back((load_location, load_rel, load_content));
+                queue.push_back((load_location, load_rel, load_content, load_cache_safe));
             }
         }
     }
 
     if file_contents.is_empty() {
-        return Ok(slug_bzlmod::compute_bzl_transitive_digest(extension_id));
+        return Ok(TrackedScannedExtensionBzlDigestValue {
+            digest: slug_bzlmod::compute_bzl_transitive_digest(extension_id),
+            cache_safe,
+        });
     }
-    Ok(slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(extension_id, &file_contents))
+    Ok(TrackedScannedExtensionBzlDigestValue {
+        digest: slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
+            extension_id,
+            &file_contents,
+        ),
+        cache_safe,
+    })
 }
 
 async fn fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
     ctx: &mut DiceComputations<'_>,
     project_root: &AbsNormPathBuf,
+    root_module_name: &str,
     aggregated: &HashMap<String, slug_bzlmod::AggregatedExtension>,
     repo_mappings: &slug_bzlmod::RepoMappingSnapshot,
 ) -> slug_error::Result<HashMap<String, String>> {
     let repo_mappings = Arc::new(repo_mappings.clone());
+    let root_module_name = Arc::<str>::from(root_module_name);
     let mut digests = HashMap::new();
     for extension_id in aggregated.keys() {
         let key = FallbackScannedExtensionBzlDigestKey {
             project_root: project_root.clone(),
+            root_module_name: root_module_name.clone(),
             extension_id: Arc::from(extension_id.as_str()),
             repo_mappings: repo_mappings.clone(),
         };
         let digest = ctx.compute(&key).await??;
-        digests.insert(extension_id.clone(), digest.to_string());
+        digests.insert(extension_id.clone(), digest.digest.to_string());
     }
     Ok(digests)
 }
@@ -3305,6 +3389,7 @@ impl slug_bzlmod::BzlmodCleanGraphIo for CommonBzlmodCleanGraphIo {
                 fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
                     ctx,
                     &project_root,
+                    builder.root_module_name(),
                     builder.extension_aggregations(),
                     builder.repo_mappings(),
                 )
@@ -3334,6 +3419,7 @@ impl slug_bzlmod::BzlmodCleanGraphIo for CommonBzlmodCleanGraphIo {
                 fallback_scanned_extension_bzl_digests_for_lockfile_preseed(
                     ctx,
                     &project_root,
+                    builder.root_module_name(),
                     builder.extension_aggregations(),
                     builder.repo_mappings(),
                 )
@@ -5288,13 +5374,89 @@ ext = module_extension(implementation = _impl)
         let fallback_scanned = dice
             .compute(&FallbackScannedExtensionBzlDigestKey {
                 project_root: AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?,
+                root_module_name: Arc::from("root"),
                 extension_id: Arc::from(extension_id),
                 repo_mappings: Arc::new(repo_mappings.clone()),
             })
             .await??;
 
-        assert_eq!(fallback_scanned.as_ref(), expected);
+        assert_eq!(fallback_scanned.digest.as_ref(), expected);
         assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+            &Ok(fallback_scanned)
+        ));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn fallback_scanned_extension_bzl_digest_marks_external_symlink_load_uncacheable()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let external = tempfile::Builder::new()
+            .prefix("slug-plan61-external-bzl-")
+            .tempdir()?;
+        let owner_dir = external.path().join("owner");
+        let helper_dir = external.path().join("helper");
+        std::fs::create_dir_all(&owner_dir)?;
+        std::fs::create_dir_all(&helper_dir)?;
+        let ext_content = r#"
+load("@helper_alias//:helper.bzl", "HELPER")
+
+def _impl(module_ctx):
+    pass
+
+ext = module_extension(implementation = _impl)
+"#;
+        let helper_content = "HELPER = 'mapped external symlink'\n";
+        std::fs::write(owner_dir.join("replay_ext.bzl"), ext_content)?;
+        std::fs::write(helper_dir.join("helper.bzl"), helper_content)?;
+        std::fs::create_dir_all(fs.path().root().as_path().join("bazel-external"))?;
+        std::os::unix::fs::symlink(
+            &owner_dir,
+            fs.path().root().as_path().join("bazel-external/owner+"),
+        )?;
+        std::os::unix::fs::symlink(
+            &helper_dir,
+            fs.path().root().as_path().join("bazel-external/helper+"),
+        )?;
+
+        let extension_id = "@owner//:replay_ext.bzl%ext";
+        let repo_mappings = slug_bzlmod::RepoMappingSnapshot::from([(
+            "owner".to_owned(),
+            BTreeMap::from([("helper_alias".to_owned(), "helper+".to_owned())]),
+        )]);
+        let expected = slug_bzlmod::compute_bzl_transitive_digest_from_file_contents(
+            extension_id,
+            &BTreeMap::from([
+                (
+                    "bazel-external/helper+/helper.bzl".to_owned(),
+                    helper_content.to_owned(),
+                ),
+                (
+                    "bazel-external/owner+/replay_ext.bzl".to_owned(),
+                    ext_content.to_owned(),
+                ),
+            ]),
+        );
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let fallback_scanned = dice
+            .compute(&FallbackScannedExtensionBzlDigestKey {
+                project_root: AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?,
+                root_module_name: Arc::from("root"),
+                extension_id: Arc::from(extension_id),
+                repo_mappings: Arc::new(repo_mappings),
+            })
+            .await??;
+
+        assert_eq!(fallback_scanned.digest.as_ref(), expected);
+        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned)
         ));
         Ok(())
@@ -5320,12 +5482,16 @@ ext = module_extension(implementation = _impl)
             extension_id,
             &BTreeMap::from([
                 ("ext.bzl".to_owned(), ext_content.to_owned()),
-                ("helper.bzl".to_owned(), "read_error:missing".to_owned()),
+                (
+                    "helper.bzl".to_owned(),
+                    FALLBACK_SCANNED_BZL_MISSING_CONTENT.to_owned(),
+                ),
             ]),
         );
         let project_root = AbsNormPathBuf::try_from(fs.path().root().as_path().to_path_buf())?;
         let key = FallbackScannedExtensionBzlDigestKey {
             project_root: project_root.clone(),
+            root_module_name: Arc::from("root"),
             extension_id: Arc::from(extension_id),
             repo_mappings: Arc::new(repo_mappings.clone()),
         };
@@ -5340,11 +5506,11 @@ ext = module_extension(implementation = _impl)
 
         let fallback_scanned_missing = dice.compute(&key).await??;
         assert_ne!(
-            fallback_scanned_missing.as_ref(),
+            fallback_scanned_missing.digest.as_ref(),
             slug_bzlmod::compute_bzl_transitive_digest(extension_id)
         );
-        assert_eq!(fallback_scanned_missing.as_ref(), expected_missing);
-        assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
+        assert_eq!(fallback_scanned_missing.digest.as_ref(), expected_missing);
+        assert!(!<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_missing.clone())
         ));
 
@@ -5367,13 +5533,14 @@ ext = module_extension(implementation = _impl)
         let fallback_scanned_created = dice
             .compute(&FallbackScannedExtensionBzlDigestKey {
                 project_root,
+                root_module_name: Arc::from("root"),
                 extension_id: Arc::from(extension_id),
                 repo_mappings: Arc::new(repo_mappings),
             })
             .await??;
 
         assert_ne!(fallback_scanned_missing, fallback_scanned_created);
-        assert_eq!(fallback_scanned_created.as_ref(), expected_created);
+        assert_eq!(fallback_scanned_created.digest.as_ref(), expected_created);
         assert!(<FallbackScannedExtensionBzlDigestKey as Key>::validity(
             &Ok(fallback_scanned_created)
         ));

@@ -287,6 +287,21 @@ Current state to preserve:
   `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
   `cargo test -p slug_bzlmod project_bzl_digest --lib`,
   `cargo check -p slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 mapped external fallback digest repair:
+  `FallbackScannedExtensionBzlDigestKey` now threads the root module name so
+  root-module extension labels still resolve to the project, while non-root
+  `@repo//...` and `@@repo//...` extension labels resolve through
+  `bazel-external/<repo>+`. The key also matches the legacy/Bazel-shaped
+  missing-load `read_error:<os error>` digest bytes and marks digests that
+  traverse missing `.bzl` files or `bazel-external` symlink roots as
+  transaction-unsafe, forcing same-daemon lockfile preseed to recheck local
+  override changes instead of replaying stale symlink-target contents.
+  Guardrails:
+  `cargo test -p slug_common fallback_scanned_extension_bzl_digest --lib`,
+  `cargo test -p slug_common clean_resolved_module_graph --lib`,
+  `cargo build -p slug`, focused mapped-external replay pytest cases, focused
+  missing-load creation pytest case, and
+  `pytest -q tests/core/bzlmod/test_plan61_guardrails.py` (155 passed).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
