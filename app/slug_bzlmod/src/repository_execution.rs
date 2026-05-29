@@ -2178,20 +2178,151 @@ struct RepoMaterializationRecordedInputsValidationKey {
     repo_mappings: Arc<crate::RepoMappingSnapshot>,
 }
 
-fn resolve_repo_materialization_recorded_path(
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum RepoMaterializationRecordedPathCandidate {
+    Path(PathBuf),
+    BzlmodModuleSourceVersions {
+        module_dir: PathBuf,
+        repo_relative: String,
+    },
+}
+
+fn add_unique_recorded_path_candidate(
+    candidates: &mut Vec<RepoMaterializationRecordedPathCandidate>,
+    path: PathBuf,
+) {
+    let candidate = RepoMaterializationRecordedPathCandidate::Path(path);
+    if !candidates.iter().any(|existing| existing == &candidate) {
+        candidates.push(candidate);
+    }
+}
+
+fn add_unique_bzlmod_module_source_version_candidate(
+    candidates: &mut Vec<RepoMaterializationRecordedPathCandidate>,
+    module_dir: PathBuf,
+    repo_relative: &str,
+) {
+    let candidate = RepoMaterializationRecordedPathCandidate::BzlmodModuleSourceVersions {
+        module_dir,
+        repo_relative: repo_relative.to_owned(),
+    };
+    if !candidates.iter().any(|existing| existing == &candidate) {
+        candidates.push(candidate);
+    }
+}
+
+fn add_external_repo_recorded_path_candidates(
+    candidates: &mut Vec<RepoMaterializationRecordedPathCandidate>,
+    workspace_id: &crate::WorkspaceId,
+    repo: &str,
+    repo_relative: &str,
+) {
+    add_unique_recorded_path_candidate(
+        candidates,
+        workspace_id
+            .canonical_project_root
+            .join("bazel-external")
+            .join(repo)
+            .join(repo_relative),
+    );
+    add_unique_recorded_path_candidate(
+        candidates,
+        workspace_id
+            .output_base
+            .join("external_cells/bzlmod")
+            .join(repo)
+            .join(repo_relative),
+    );
+    if let Some(module_name) = repo.strip_suffix('+')
+        && !module_name.contains('+')
+    {
+        let module_dir = workspace_id
+            .output_base
+            .join("external_cells/bzlmod")
+            .join(module_name);
+        add_unique_recorded_path_candidate(
+            candidates,
+            module_dir.clone().join("override").join(repo_relative),
+        );
+        add_unique_bzlmod_module_source_version_candidate(candidates, module_dir, repo_relative);
+    }
+}
+
+fn resolve_repo_materialization_recorded_paths(
     path: &Path,
     workspace_id: &crate::WorkspaceId,
-) -> Result<PathBuf, String> {
+) -> Result<Vec<RepoMaterializationRecordedPathCandidate>, String> {
     if path.is_absolute() {
-        return Ok(path.to_path_buf());
+        return Ok(vec![RepoMaterializationRecordedPathCandidate::Path(
+            path.to_path_buf(),
+        )]);
     }
     let raw = path.to_string_lossy();
     for prefix in ["@@//", "@//", "//"] {
         if let Some(rest) = raw.strip_prefix(prefix) {
-            return Ok(workspace_id.canonical_project_root.join(rest));
+            return Ok(vec![RepoMaterializationRecordedPathCandidate::Path(
+                workspace_id.canonical_project_root.join(rest),
+            )]);
+        }
+    }
+    if let Some(rest) = raw.strip_prefix("@@") {
+        let mut candidates = Vec::new();
+        if let Some(exact_separator) = rest.find("//") {
+            let exact_repo = &rest[..exact_separator];
+            let exact_repo_relative = &rest[exact_separator + 2..];
+            if !exact_repo.is_empty() {
+                add_external_repo_recorded_path_candidates(
+                    &mut candidates,
+                    workspace_id,
+                    exact_repo,
+                    exact_repo_relative,
+                );
+            }
+        }
+        if let Some(legacy_separator) = rest.rfind("+//") {
+            let legacy_repo = &rest[..legacy_separator];
+            let legacy_repo_relative = &rest[legacy_separator + 3..];
+            if !legacy_repo.is_empty() {
+                add_external_repo_recorded_path_candidates(
+                    &mut candidates,
+                    workspace_id,
+                    legacy_repo,
+                    legacy_repo_relative,
+                );
+            }
+        }
+        if !candidates.is_empty() {
+            return Ok(candidates);
         }
     }
     Err("recorded_input_unsupported".to_owned())
+}
+
+async fn expand_repo_materialization_recorded_path_candidate(
+    ctx: &mut DiceComputations<'_>,
+    reader: &'static dyn RepositoryMaterializationStateReader,
+    workspace_id: crate::WorkspaceId,
+    candidate: RepoMaterializationRecordedPathCandidate,
+) -> Vec<PathBuf> {
+    match candidate {
+        RepoMaterializationRecordedPathCandidate::Path(path) => vec![path],
+        RepoMaterializationRecordedPathCandidate::BzlmodModuleSourceVersions {
+            module_dir,
+            repo_relative,
+        } => {
+            let entries = match reader
+                .repo_dir_entry_names(ctx, workspace_id, Arc::new(module_dir.clone()))
+                .await
+            {
+                Ok(entries) => entries,
+                Err(_) => return Vec::new(),
+            };
+            entries
+                .iter()
+                .map(|entry| module_dir.join(entry).join(&repo_relative))
+                .collect()
+        }
+    }
 }
 
 pub(crate) async fn validate_recorded_inputs_with_dice_reader(
@@ -2202,81 +2333,135 @@ pub(crate) async fn validate_recorded_inputs_with_dice_reader(
     repo_env: Option<&BTreeMap<String, String>>,
     repo_mappings: Option<&crate::RepoMappingSnapshot>,
 ) -> Result<(), Arc<str>> {
-    for raw in recorded_inputs {
+    'inputs: for raw in recorded_inputs {
         let Some((input, old_value)) = parse_recorded_input_with_value(raw) else {
             return Err(Arc::from("recorded_input_malformed"));
         };
         match input {
             RecordedInput::File(path) => {
-                let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
-                    Ok(path) => path,
+                let paths = match resolve_repo_materialization_recorded_paths(&path, &workspace_id)
+                {
+                    Ok(paths) => paths,
                     Err(reason) => return Err(reason.into()),
                 };
                 let Some(old_value) = old_value else {
                     return Err(Arc::from("recorded_input_malformed"));
                 };
-                let current = match reader
-                    .repo_recorded_file_marker_value(
+                let mut first_current = None;
+                for candidate in paths {
+                    let expanded_paths = expand_repo_materialization_recorded_path_candidate(
                         ctx,
+                        reader,
                         workspace_id.clone(),
-                        Arc::new(path.clone()),
+                        candidate,
                     )
-                    .await
-                {
-                    Ok(value) => value,
-                    Err(_) => return Err(Arc::from("recorded_input_stat_failed")),
-                };
-                if current.as_ref() != old_value {
+                    .await;
+                    for path in expanded_paths {
+                        let current = match reader
+                            .repo_recorded_file_marker_value(
+                                ctx,
+                                workspace_id.clone(),
+                                Arc::new(path.clone()),
+                            )
+                            .await
+                        {
+                            Ok(value) => value,
+                            Err(_) => continue,
+                        };
+                        if current.as_ref() == old_value {
+                            continue 'inputs;
+                        }
+                        first_current.get_or_insert(current);
+                    }
+                }
+                if let Some(current) = first_current {
                     return Err(Arc::from(recorded_input_changed_reason_with_values(
                         raw, &old_value, &current,
                     )));
                 }
+                return Err(Arc::from("recorded_input_stat_failed"));
             }
             RecordedInput::Dirents(path) => {
-                let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
-                    Ok(path) => path,
+                let paths = match resolve_repo_materialization_recorded_paths(&path, &workspace_id)
+                {
+                    Ok(paths) => paths,
                     Err(reason) => return Err(reason.into()),
                 };
                 let Some(old_value) = old_value else {
                     return Err(Arc::from("recorded_input_malformed"));
                 };
-                let current = match reader
-                    .repo_recorded_dirents_marker_value(
+                let mut read_candidate = false;
+                for candidate in paths {
+                    let expanded_paths = expand_repo_materialization_recorded_path_candidate(
                         ctx,
+                        reader,
                         workspace_id.clone(),
-                        Arc::new(path.clone()),
+                        candidate,
                     )
-                    .await
-                {
-                    Ok(value) => value,
-                    Err(_) => return Err(Arc::from("recorded_input_stat_failed")),
-                };
-                if current.as_ref() != old_value {
+                    .await;
+                    for path in expanded_paths {
+                        let current = match reader
+                            .repo_recorded_dirents_marker_value(
+                                ctx,
+                                workspace_id.clone(),
+                                Arc::new(path.clone()),
+                            )
+                            .await
+                        {
+                            Ok(value) => value,
+                            Err(_) => continue,
+                        };
+                        read_candidate = true;
+                        if current.as_ref() == old_value {
+                            continue 'inputs;
+                        }
+                    }
+                }
+                if read_candidate {
                     return Err(Arc::from(recorded_input_changed_reason(raw)));
                 }
+                return Err(Arc::from("recorded_input_stat_failed"));
             }
             RecordedInput::DirTree(path) => {
-                let path = match resolve_repo_materialization_recorded_path(&path, &workspace_id) {
-                    Ok(path) => path,
+                let paths = match resolve_repo_materialization_recorded_paths(&path, &workspace_id)
+                {
+                    Ok(paths) => paths,
                     Err(reason) => return Err(reason.into()),
                 };
                 let Some(old_value) = old_value else {
                     return Err(Arc::from("recorded_input_malformed"));
                 };
-                let current = match reader
-                    .repo_recorded_dirtree_marker_value(
+                let mut read_candidate = false;
+                for candidate in paths {
+                    let expanded_paths = expand_repo_materialization_recorded_path_candidate(
                         ctx,
+                        reader,
                         workspace_id.clone(),
-                        Arc::new(path.clone()),
+                        candidate,
                     )
-                    .await
-                {
-                    Ok(value) => value,
-                    Err(_) => return Err(Arc::from("recorded_input_stat_failed")),
-                };
-                if current.as_ref() != old_value {
+                    .await;
+                    for path in expanded_paths {
+                        let current = match reader
+                            .repo_recorded_dirtree_marker_value(
+                                ctx,
+                                workspace_id.clone(),
+                                Arc::new(path.clone()),
+                            )
+                            .await
+                        {
+                            Ok(value) => value,
+                            Err(_) => continue,
+                        };
+                        read_candidate = true;
+                        if current.as_ref() == old_value {
+                            continue 'inputs;
+                        }
+                    }
+                }
+                if read_candidate {
                     return Err(Arc::from(recorded_input_changed_reason(raw)));
                 }
+                return Err(Arc::from("recorded_input_stat_failed"));
             }
             RecordedInput::Env(name) => {
                 let Some(repo_env) = repo_env else {
@@ -2801,6 +2986,95 @@ mod tests {
         let err = repository_rule_execution_key_unimplemented_error("test_repo", "http_archive");
         assert!(err.to_string().contains("has no implementation"));
         assert!(err.to_string().contains("http_archive"));
+    }
+
+    #[test]
+    fn repo_materialization_recorded_paths_resolve_workspace_paths() {
+        let workspace_id = crate::WorkspaceId::new(
+            PathBuf::from("/tmp/slug-recorded-paths"),
+            PathBuf::from("/tmp/slug-recorded-paths/buck-out"),
+        );
+
+        let resolved = resolve_repo_materialization_recorded_paths(
+            Path::new("@@//tools/build_defs/repo:http.bzl"),
+            &workspace_id,
+        )
+        .unwrap();
+
+        assert_eq!(
+            resolved,
+            vec![RepoMaterializationRecordedPathCandidate::Path(
+                PathBuf::from("/tmp/slug-recorded-paths/tools/build_defs/repo:http.bzl")
+            )]
+        );
+    }
+
+    #[test]
+    fn repo_materialization_recorded_paths_resolve_external_repo_candidates() {
+        let workspace_id = crate::WorkspaceId::new(
+            PathBuf::from("/tmp/slug-recorded-paths"),
+            PathBuf::from("/tmp/slug-recorded-paths/buck-out"),
+        );
+        let path = |path: &str| RepoMaterializationRecordedPathCandidate::Path(PathBuf::from(path));
+        let versioned = |module_dir: &str, repo_relative: &str| {
+            RepoMaterializationRecordedPathCandidate::BzlmodModuleSourceVersions {
+                module_dir: PathBuf::from(module_dir),
+                repo_relative: repo_relative.to_owned(),
+            }
+        };
+
+        let resolved = resolve_repo_materialization_recorded_paths(
+            Path::new("@@rules_rs+//tools/rust_analyzer/Cargo.lock"),
+            &workspace_id,
+        )
+        .unwrap();
+        assert_eq!(
+            resolved,
+            vec![
+                path(
+                    "/tmp/slug-recorded-paths/bazel-external/rules_rs+/tools/rust_analyzer/Cargo.lock"
+                ),
+                path(
+                    "/tmp/slug-recorded-paths/buck-out/external_cells/bzlmod/rules_rs+/tools/rust_analyzer/Cargo.lock"
+                ),
+                path(
+                    "/tmp/slug-recorded-paths/buck-out/external_cells/bzlmod/rules_rs/override/tools/rust_analyzer/Cargo.lock"
+                ),
+                versioned(
+                    "/tmp/slug-recorded-paths/buck-out/external_cells/bzlmod/rules_rs",
+                    "tools/rust_analyzer/Cargo.lock"
+                ),
+                path(
+                    "/tmp/slug-recorded-paths/bazel-external/rules_rs/tools/rust_analyzer/Cargo.lock"
+                ),
+                path(
+                    "/tmp/slug-recorded-paths/buck-out/external_cells/bzlmod/rules_rs/tools/rust_analyzer/Cargo.lock"
+                ),
+            ]
+        );
+
+        let resolved = resolve_repo_materialization_recorded_paths(
+            Path::new("@@rules_rs++crate+crates__zerocopy-0.8.42+//Cargo.toml"),
+            &workspace_id,
+        )
+        .unwrap();
+        assert_eq!(
+            resolved,
+            vec![
+                path(
+                    "/tmp/slug-recorded-paths/bazel-external/rules_rs++crate+crates__zerocopy-0.8.42+/Cargo.toml"
+                ),
+                path(
+                    "/tmp/slug-recorded-paths/buck-out/external_cells/bzlmod/rules_rs++crate+crates__zerocopy-0.8.42+/Cargo.toml"
+                ),
+                path(
+                    "/tmp/slug-recorded-paths/bazel-external/rules_rs++crate+crates__zerocopy-0.8.42/Cargo.toml"
+                ),
+                path(
+                    "/tmp/slug-recorded-paths/buck-out/external_cells/bzlmod/rules_rs++crate+crates__zerocopy-0.8.42/Cargo.toml"
+                ),
+            ]
+        );
     }
 
     #[test]

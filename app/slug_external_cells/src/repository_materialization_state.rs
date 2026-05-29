@@ -42,8 +42,11 @@ fn repo_state_project_path(
     project_root: &ProjectRoot,
     state_path: &Path,
 ) -> Result<ProjectRelativePathBuf, Arc<str>> {
+    let workspace_root = workspace_id.canonical_project_root.as_path();
+    let dice_root = project_root.root().as_path();
     if !workspace_id.canonical_project_root.as_os_str().is_empty()
-        && workspace_id.canonical_project_root.as_path() != project_root.root().as_path()
+        && workspace_root != dice_root
+        && !workspace_root.starts_with(dice_root)
     {
         tracing::debug!(
             workspace_root = %workspace_id.canonical_project_root.display(),
@@ -583,6 +586,39 @@ mod tests {
             .split_once(' ')
             .map(|(_, value)| value.to_owned())
             .expect("recorded input has value")
+    }
+
+    #[test]
+    fn repo_state_project_path_accepts_nested_workspace_roots() {
+        let fs = ProjectRootTemp::new().unwrap();
+        let root = fs.path().root().as_path().to_path_buf();
+        let nested_root = root.join("buck-out/external_cells/bzlmod/rules_rs/override");
+        let state_path = nested_root.join("rs/extensions.bzl");
+        let workspace_id =
+            WorkspaceId::new(nested_root.clone(), nested_root.join("buck-out/custom"));
+
+        let project_path = repo_state_project_path(&workspace_id, fs.path(), &state_path).unwrap();
+
+        assert_eq!(
+            project_path.as_str(),
+            "buck-out/external_cells/bzlmod/rules_rs/override/rs/extensions.bzl"
+        );
+    }
+
+    #[test]
+    fn repo_state_project_path_rejects_foreign_workspace_roots() {
+        let fs = ProjectRootTemp::new().unwrap();
+        let root = fs.path().root().as_path().to_path_buf();
+        let foreign_root = root
+            .parent()
+            .expect("temp project has parent")
+            .join("foreign-workspace");
+        let workspace_id = WorkspaceId::new(foreign_root.clone(), foreign_root.join("buck-out"));
+
+        let err = repo_state_project_path(&workspace_id, fs.path(), &root.join("watched.txt"))
+            .unwrap_err();
+
+        assert_eq!(err.as_ref(), "repo_state_unreadable");
     }
 
     #[tokio::test]

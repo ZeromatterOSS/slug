@@ -883,6 +883,26 @@ Current state to preserve:
   `BzlmodCellGraphDataKey` / `BzlmodCellGraphDataValue` are now compiled only
   for tests. Guardrails: `cargo test -p slug_bzlmod cell_graph --lib`, `cargo
   check -p slug_bzlmod`, `cargo fmt --check`, and `git diff --check`.
+- 2026-05-29 external recorded-input replay path resolution:
+  production `RepoMaterializationRecordedInputsValidationKey` now resolves
+  external-repo `FILE` / `DIRENTS` / `DIRTREE` recorded paths through ordered
+  DICE-read candidates instead of treating them as unsupported or choosing a
+  path with direct `exists()` checks. Candidates cover Bazel-shaped
+  `bazel-external/<repo>`, output-base `external_cells/bzlmod/<repo>`,
+  local-override module source trees, and registry module version directories;
+  version-directory expansion reads the module source directory entries through
+  the repository materialization state reader. The state reader now accepts
+  workspace roots nested under the active project root while still rejecting
+  genuinely foreign roots. Guardrails: `cargo test -p slug_bzlmod
+  repo_materialization_recorded_paths --lib`, `cargo test -p slug_bzlmod
+  recorded_inputs --lib`, `cargo test -p slug_external_cells
+  repository_materialization_state --lib`, and `cargo build -p slug`. Kuro
+  narrow smoke `target/debug/slug --isolation-dir
+  sdk-narrow-20260529-070233 build //sdk/config_install:config_install`
+  advanced past the previous `@rules_rs` / `@llvm` fresh recorded-input replay
+  failures; it timed out at 300s while local execution was still making
+  progress, with pending actions falling from roughly 1400 LLVM/Rust actions to
+  42 (`/tmp/sdk-narrow-20260529-070233.log`).
 - 2026-05-28 preseed replay validation reduction: persisted config-load
   preseed now selects lockfile extension caches with
   `select_extension_cache_for_workspace(...)`, validates recorded inputs
