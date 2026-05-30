@@ -1424,10 +1424,19 @@ fn resolve_symlink_chain(path: &std::path::Path) -> Option<std::path::PathBuf> {
 }
 
 pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
-    let project_root = match dynamic_project_root() {
-        Some(root) => root,
-        None => return,
-    };
+    if let Some(project_root) = dynamic_project_root() {
+        ensure_external_symlink_with_root(project_root, cell_name, cell_path);
+    }
+}
+
+/// Like `ensure_external_symlink` but with an explicit owned project root, so
+/// production callers (the bzlmod cell-graph install and resolver runtime-cell
+/// creation) avoid the process-global `dynamic_project_root()` read (Plan 61 item 5).
+pub fn ensure_external_symlink_with_root(
+    project_root: std::path::PathBuf,
+    cell_name: &str,
+    cell_path: &str,
+) {
     let filesystem_fallback_allowed = dynamic_bzlmod_directory_scan_allowed();
     let external_dir = project_root.join("external");
     let link_path = external_dir.join(cell_name);
@@ -1557,14 +1566,25 @@ pub fn ensure_external_symlinks_for_cells_with_root_cell(
     let Some(project_root) = dynamic_project_root() else {
         return;
     };
+    ensure_external_symlinks_for_cells_with_project_root(project_root, root_cell_name, cells);
+}
+
+/// Like `ensure_external_symlinks_for_cells_with_root_cell` but with an explicit
+/// project root, so the production bzlmod cell-graph install avoids the process-global
+/// `dynamic_project_root()` read (Plan 61 item 5).
+pub fn ensure_external_symlinks_for_cells_with_project_root(
+    project_root: std::path::PathBuf,
+    root_cell_name: Option<&str>,
+    cells: &[(impl AsRef<str>, impl AsRef<str>)],
+) {
     for (cell_name, cell_path) in cells {
         let name = cell_name.as_ref();
         let path = cell_path.as_ref();
         if !is_root_cell_name_for_context(name, root_cell_name) && !path.is_empty() {
-            ensure_external_symlink(name, path);
+            ensure_external_symlink_with_root(project_root.clone(), name, path);
             let action_name = action_external_cell_name(&project_root, name, path);
             if action_name != name {
-                ensure_external_symlink(&action_name, path);
+                ensure_external_symlink_with_root(project_root.clone(), &action_name, path);
             }
         }
     }
@@ -2451,6 +2471,11 @@ struct CellResolverInternals {
     root_cell: CellName,
     root_cell_alias_resolver: CellAliasResolver,
     resolve_root_alias_cell_names: bool,
+    /// Absolute project root, when this resolver was built for a bzlmod workspace.
+    /// Lets resolver-owned runtime-cell creation install `external/` symlinks without
+    /// reading the process-global `dynamic_project_root()` (Plan 61 item 5). `None`
+    /// for non-bzlmod / test resolvers, which fall back to the global helper.
+    project_root: Option<std::path::PathBuf>,
 }
 
 #[derive(Debug)]
@@ -2508,14 +2533,14 @@ impl CellResolver {
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
     ) -> slug_error::Result<CellResolver> {
-        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, true, None)
+        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, true, None, None)
     }
 
     pub fn new_without_root_alias_cell_lookup(
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
     ) -> slug_error::Result<CellResolver> {
-        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, false, None)
+        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, false, None, None)
     }
 
     pub fn new_bzlmod_with_runtime_cell_snapshot(
@@ -2528,6 +2553,25 @@ impl CellResolver {
             root_cell_alias_resolver,
             false,
             Some(Arc::new(runtime_cell_snapshot)),
+            None,
+        )
+    }
+
+    /// Production bzlmod constructor that records the absolute project root so
+    /// resolver-owned runtime-cell creation installs `external/` symlinks without
+    /// reading the process-global `dynamic_project_root()` (Plan 61 item 5).
+    pub fn new_bzlmod_with_runtime_cell_snapshot_and_project_root(
+        cells: Vec<CellInstance>,
+        root_cell_alias_resolver: CellAliasResolver,
+        runtime_cell_snapshot: BzlmodRuntimeCellInstallSnapshot,
+        project_root: Option<std::path::PathBuf>,
+    ) -> slug_error::Result<CellResolver> {
+        Self::new_with_root_alias_cell_lookup(
+            cells,
+            root_cell_alias_resolver,
+            false,
+            Some(Arc::new(runtime_cell_snapshot)),
+            project_root,
         )
     }
 
@@ -2536,6 +2580,7 @@ impl CellResolver {
         root_cell_alias_resolver: CellAliasResolver,
         resolve_root_alias_cell_names: bool,
         bzlmod_runtime_cell_snapshot: Option<Arc<BzlmodRuntimeCellInstallSnapshot>>,
+        project_root: Option<std::path::PathBuf>,
     ) -> slug_error::Result<CellResolver> {
         let input_cell_count = cells.len();
         let mut path_mappings: SequenceTrie<FileNameBuf, CellName> = SequenceTrie::new();
@@ -2600,6 +2645,7 @@ impl CellResolver {
             path_mappings,
             root_cell_alias_resolver,
             resolve_root_alias_cell_names,
+            project_root,
         })))
     }
 
@@ -2829,6 +2875,19 @@ impl CellResolver {
         (external_repo == canonical_name).then_some(instance)
     }
 
+    /// Install the `external/<cell>` symlink for a resolver-owned runtime cell.
+    /// Uses the resolver's recorded project root (Plan 61 item 5) so production
+    /// runtime-cell creation does not read the process-global `dynamic_project_root()`;
+    /// resolvers without a recorded root (non-bzlmod / test) fall back to the global.
+    fn install_runtime_cell_symlink(&self, cell_name: &str, cell_path: &str) {
+        match &self.0.project_root {
+            Some(project_root) => {
+                ensure_external_symlink_with_root(project_root.clone(), cell_name, cell_path)
+            }
+            None => ensure_external_symlink(cell_name, cell_path),
+        }
+    }
+
     fn get_or_create_bzlmod_runtime_cell(
         &self,
         cell: CellName,
@@ -2841,7 +2900,7 @@ impl CellResolver {
             runtime_cell.setup.dupe(),
         ));
         let instance = CellInstance::new(cell, cell_path, external, nested)?;
-        ensure_external_symlink(cell.as_str(), &runtime_cell.path);
+        self.install_runtime_cell_symlink(cell.as_str(), &runtime_cell.path);
         if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
             dynamic.insert(cell, DynamicCellInstance::graph_owned(instance));
         }
@@ -2897,7 +2956,7 @@ impl CellResolver {
             setup.clone(),
         ));
         let instance = CellInstance::new(cell, cell_path, external, nested)?;
-        ensure_external_symlink(cell.as_str(), path);
+        self.install_runtime_cell_symlink(cell.as_str(), path);
         let mut dynamic = self.0.dynamic_cells.write().map_err(|_| {
             slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
