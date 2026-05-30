@@ -277,6 +277,58 @@ content-addressed Bazel-parity behavior, in-project edit/delete detection kept).
 
 ## Current Checkpoint
 
+### 2026-05-29 session handoff (cross-machine)
+
+Six commits merged to `main` (tip `227cefd0`), all verified
+(`slug_bzlmod` 423, `slug_common` 130, `slug_external_cells` 13,
+`cargo build -p slug`, `cargo fmt`, Plan 61 pytest **178**). Pre-existing
+unrelated test failures `slug_common persisted_cell_graph_injects_clean_root_module_version_data`
+and `slug_core pattern::pattern::tests::test_relaxed` also fail on prior `main`
+(global-executor / environment ordering — NOT caused by this work; ignore).
+
+Landed this session:
+- **Item 2 (registry):** out-of-project registry cache files content-addressed by
+  the lockfile-recorded checksum (sub-plan `61-01-registry-content-addressing.md`).
+- **Items 2+3 (out-of-project module/override/hidden-lockfile reads):** now tracked
+  via cacheable `WatchedAbsFileKey`/`WatchedAbsPathMetadataKey` +
+  `WatchedAbsInputRegistry` + a per-command re-stat-diff
+  (`inject_watched_abs_changes`, the Bazel `ExternalDirtinessChecker` analog)
+  injected in `slug_server/src/ctx.rs`. Sub-plan
+  `61-02-watched-absolute-path-inputs.md` (Phase A done; Phase B inotify is a
+  deferred perf-only follow-on, HELD per request).
+- **Item 7 (marker trust):** `.slug_repo_complete` no longer written for
+  `repo_spec.local` repos (the reuse predicate already excludes them).
+- **Item 5 (cell-symlink-setup process-global):** `CellResolver` now carries an
+  optional `project_root` (new ctor
+  `new_bzlmod_with_runtime_cell_snapshot_and_project_root`, threaded from the
+  workspace `ProjectRoot` through `make_bzlmod_cell_resolver`); resolver
+  runtime-cell creation + the cell-graph symlink install loop use it instead of
+  the process-global `dynamic_project_root()`.
+
+Remaining (next-up, none a quick slice — see `61-01`/`61-02` Status sections for
+detail):
+- **Item 5 tail:** delete the `ROOT_CELL_NAME` / `EXTERNAL_CELL_NAMES`
+  process-globals (slug_core `cells.rs:129/133`, written by the resolver
+  ctor ~2621/2624). Blocked on converting their pub adapter readers
+  (`is_root_cell_name` / `get_external_cell_names` / `is_known_external_cell_name`)
+  at ~25 call sites across 13 files / 7 crates to take a resolver — a wholesale
+  cross-crate campaign; partial conversion does NOT shrink the bridge. Other
+  remaining `dynamic_project_root()` reads (`host_llvm_toolchain_bin`,
+  Windows cargo-manifest, kernel-headers scan) are out of item-5 scope
+  (host-toolchain helpers); `repository_ctx.rs` ctor read is already `#[cfg(test)]`.
+- **Item 6:** `use_extension(isolate=True)` — needs Bazel's
+  `(owning_module, export_name)` isolation key so isolated usages get a distinct
+  `extension_id` (`types.rs:393` is currently just `"{bzl}%{name}"`); removing the
+  `globals.rs:1013` error without that is a correctness bug. M-L feature.
+- **Item 7:** `RepoMaterializationManifestKey` to own the full repository
+  output-tree identity (replace remaining marker trust). L.
+
+Workflow tooling for this plan lives in `.claude/workflows/`
+(`plan61-burn-down.js` survey/rank orchestrator — `MAX_AUTO=0` = survey-only;
+`plan61-propose-slice.js`, `plan61-implement-slice.js`). NOTE: the
+`plan61-implement-slice` agent has drifted off-spec on this codebase before;
+prefer implementing correctness-critical slices directly (TDD) over auto-running it.
+
 Historical slice logs and detailed validation transcripts now live in
 [61-true-dice-bzlmod-history.md](./61-true-dice-bzlmod-history.md). Future
 workers should read this main plan first and open the history file only when
