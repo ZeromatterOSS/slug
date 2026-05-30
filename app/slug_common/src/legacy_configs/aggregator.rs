@@ -132,20 +132,26 @@ impl CellsAggregator {
     }
 
     pub(crate) fn make_cell_resolver(self) -> slug_error::Result<CellResolver> {
-        self.make_cell_resolver_with_root_alias_cell_lookup(true, None)
+        self.make_cell_resolver_with_root_alias_cell_lookup(true, None, None)
     }
 
     pub(crate) fn make_bzlmod_cell_resolver(
         self,
         runtime_cell_snapshot: BzlmodRuntimeCellInstallSnapshot,
+        project_root: Option<std::path::PathBuf>,
     ) -> slug_error::Result<CellResolver> {
-        self.make_cell_resolver_with_root_alias_cell_lookup(false, Some(runtime_cell_snapshot))
+        self.make_cell_resolver_with_root_alias_cell_lookup(
+            false,
+            Some(runtime_cell_snapshot),
+            project_root,
+        )
     }
 
     fn make_cell_resolver_with_root_alias_cell_lookup(
         self,
         resolve_root_alias_cell_names: bool,
         bzlmod_runtime_cell_snapshot: Option<BzlmodRuntimeCellInstallSnapshot>,
+        project_root: Option<std::path::PathBuf>,
     ) -> slug_error::Result<CellResolver> {
         let all_cell_roots_for_nested_cells: Vec<_> = self
             .cell_infos
@@ -185,10 +191,11 @@ impl CellsAggregator {
         );
 
         match bzlmod_runtime_cell_snapshot {
-            Some(snapshot) => CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            Some(snapshot) => CellResolver::new_bzlmod_with_runtime_cell_snapshot_and_project_root(
                 instances,
                 root_cell_alias_resolver,
                 snapshot,
+                project_root,
             ),
             None if resolve_root_alias_cell_names => {
                 CellResolver::new(instances, root_cell_alias_resolver)

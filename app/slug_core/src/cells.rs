@@ -3470,6 +3470,87 @@ mod tests {
     }
 
     #[test]
+    fn bzlmod_resolver_runtime_cell_symlink_uses_recorded_project_root_not_global()
+    -> slug_error::Result<()> {
+        let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
+        let resolver_root = tempfile::tempdir()?;
+        let global_root = tempfile::tempdir()?;
+        // Point the process-global project root somewhere ELSE to prove the resolver
+        // does not consult it when installing the runtime-cell symlink (Plan 61 item 5).
+        reset_dynamic_bzlmod_state_for_project_root(global_root.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let root_path = CellRootPathBuf::testing_new("");
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+        )?;
+        let canonical = "owner++ext+generated";
+        let setup = crate::cells::external::ExtensionRepoCellSetup {
+            canonical_name: Arc::from(canonical),
+            extension_id: Arc::from("@owner//:ext.bzl%ext"),
+            internal_name: Arc::from("generated"),
+            spec_hash: Arc::from("sha256-test"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_usages_digest: Arc::from(""),
+            extension_replay_inputs_identity_digest: Arc::from(""),
+            extension_repo_mappings_digest: Arc::from(""),
+            extension_repo_mapping_overrides_digest: Arc::from(""),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: None,
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: canonical.to_owned(),
+                internal_name: "generated".to_owned(),
+                path: format!("bazel-external/{canonical}"),
+                setup,
+            }],
+            scoped_aliases: Vec::new(),
+            dynamic_aliases: Vec::new(),
+        };
+        let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            HashMap::new(),
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot_and_project_root(
+            vec![root_instance],
+            root_aliases,
+            snapshot,
+            Some(resolver_root.path().to_path_buf()),
+        )?;
+
+        // Looking up the runtime extension cell triggers symlink installation.
+        let _ = resolver.get(CellName::testing_new(canonical))?;
+
+        assert!(
+            resolver_root
+                .path()
+                .join("external")
+                .join(canonical)
+                .symlink_metadata()
+                .is_ok(),
+            "external/ symlink should be installed under the resolver's recorded project root"
+        );
+        assert!(
+            global_root
+                .path()
+                .join("external")
+                .join(canonical)
+                .symlink_metadata()
+                .is_err(),
+            "external/ symlink must NOT be installed under the process-global project root"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn bzlmod_resolver_uses_runtime_snapshot_for_lazy_extension_cell() -> slug_error::Result<()> {
         let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir()?;

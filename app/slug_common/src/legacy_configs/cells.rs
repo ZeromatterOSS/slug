@@ -297,7 +297,11 @@ fn replay_bzlmod_runtime_state(
                 .map(|cell| (cell.canonical_name.clone(), cell.path.clone())),
         )
         .collect();
-    slug_core::cells::ensure_external_symlinks_for_cells_with_root_cell(
+    // Plan 61 item 5: install symlinks with the explicit workspace root instead of
+    // reading the process-global dynamic_project_root().
+    let project_root_path = project_root.root().as_path().to_path_buf();
+    slug_core::cells::ensure_external_symlinks_for_cells_with_project_root(
+        project_root_path.clone(),
         Some(cell_graph.root_module_name.as_str()),
         &cell_pairs,
     );
@@ -308,14 +312,22 @@ fn replay_bzlmod_runtime_state(
             .iter()
             .find(|cell| cell.name == alias.target_name)
         {
-            slug_core::cells::ensure_external_symlink(alias_str, cell.path.as_str());
+            slug_core::cells::ensure_external_symlink_with_root(
+                project_root_path.clone(),
+                alias_str,
+                cell.path.as_str(),
+            );
         } else if let Some(cell) = cell_graph
             .extension_cells
             .iter()
             .filter(|cell| !cell.lazy)
             .find(|cell| cell.canonical_name == alias.target_name)
         {
-            slug_core::cells::ensure_external_symlink(alias_str, cell.path.as_str());
+            slug_core::cells::ensure_external_symlink_with_root(
+                project_root_path.clone(),
+                alias_str,
+                cell.path.as_str(),
+            );
         }
     }
     slug_core::cells::repair_external_symlink_targets(project_root.root().as_path());
@@ -399,7 +411,10 @@ fn cell_resolver_from_bzlmod_cell_graph(
         aggregator.mark_external_cell(name, ExternalCellOrigin::ExtensionRepo(setup))?;
     }
 
-    aggregator.make_bzlmod_cell_resolver(runtime_cell_snapshot)
+    aggregator.make_bzlmod_cell_resolver(
+        runtime_cell_snapshot,
+        Some(project_fs.root().as_path().to_path_buf()),
+    )
 }
 
 // Instrumentation-only caches used by Plan 61 guardrails to distinguish a
@@ -2919,8 +2934,10 @@ impl BuckConfigBasedCells {
         }
 
         let cell_resolver = if has_module_bazel {
-            aggregator
-                .make_bzlmod_cell_resolver(bzlmod_runtime_cell_snapshot.unwrap_or_default())?
+            aggregator.make_bzlmod_cell_resolver(
+                bzlmod_runtime_cell_snapshot.unwrap_or_default(),
+                project_fs.map(|fs| fs.root().as_path().to_path_buf()),
+            )?
         } else {
             aggregator.make_cell_resolver()?
         };
