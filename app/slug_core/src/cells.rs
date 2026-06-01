@@ -1594,7 +1594,17 @@ fn is_root_cell_name_for_context(cell_name: &str, explicit_root_cell_name: Optio
     cell_name.is_empty()
         || cell_name == "root"
         || explicit_root_cell_name.is_some_and(|root| root == cell_name)
-        || (explicit_root_cell_name.is_none() && is_root_cell_name(cell_name))
+        || {
+            #[cfg(test)]
+            {
+                explicit_root_cell_name.is_none() && is_root_cell_name(cell_name)
+            }
+
+            #[cfg(not(test))]
+            {
+                false
+            }
+        }
 }
 
 /// Look up a dynamically-registered extension repo cell path.

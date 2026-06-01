@@ -320,8 +320,18 @@ fn scoped_canonical_repo_name_for_label_context_with_alias_resolver(
 }
 
 fn is_root_repo_for_label_context(cell_name: &str, root_cell_name: Option<&str>) -> bool {
-    root_cell_name.is_some_and(|root| root == cell_name)
-        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name))
+    if root_cell_name.is_some_and(|root| root == cell_name) {
+        return true;
+    }
+
+    #[cfg(test)]
+    {
+        if root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name) {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Register Bazel-specific module-level globals.

@@ -201,10 +201,19 @@ impl BaseDeferredKey {
 
                 if matches!(path_resolution_method, BuckOutPathKind::BazelOutput) {
                     let cell_name_str = target.pkg().cell_name().as_str();
-                    let is_root = root_cell_name
-                        .is_some_and(|root| target.pkg().cell_name() == root)
-                        || (root_cell_name.is_none()
-                            && crate::cells::is_root_cell_name(cell_name_str));
+                    let is_root =
+                        root_cell_name.is_some_and(|root| target.pkg().cell_name() == root) || {
+                            #[cfg(test)]
+                            {
+                                root_cell_name.is_none()
+                                    && crate::cells::is_root_cell_name(cell_name_str)
+                            }
+
+                            #[cfg(not(test))]
+                            {
+                                false
+                            }
+                        };
                     let output_cell_name = bazel_output_cell_name(cell_name_str);
                     let path_has_external_prefix =
                         has_bazel_external_prefix(path, &output_cell_name);

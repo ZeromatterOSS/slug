@@ -72,7 +72,17 @@ fn is_root_workspace_name_for_context(
 ) -> bool {
     workspace_name.is_empty()
         || root_cell_name.is_some_and(|root| root.as_str() == workspace_name)
-        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(workspace_name))
+        || {
+            #[cfg(test)]
+            {
+                root_cell_name.is_none() && slug_core::cells::is_root_cell_name(workspace_name)
+            }
+
+            #[cfg(not(test))]
+            {
+                false
+            }
+        }
 }
 
 /// A Bazel-compatible Label value returned by `Label()` and `ctx.package_relative_label()`.
@@ -321,6 +331,9 @@ mod tests {
 
     use super::*;
 
+    static DYNAMIC_BZLMOD_STATE_TEST_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
+        std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
+
     #[test]
     fn bare_repo_label_defaults_target_to_repo_name() {
         let label = BazelLabel::parse("@zstd");
@@ -413,6 +426,7 @@ mod tests {
 
     #[test]
     fn configured_label_runtime_miss_is_authoritative() -> slug_error::Result<()> {
+        let _guard = DYNAMIC_BZLMOD_STATE_TEST_LOCK.lock().unwrap();
         let apparent = "analysis_ctx_label_runtime_miss";
         let wrong_global = "wrong_owner++ext+analysis_ctx_label_runtime_miss";
         let tmp =
@@ -445,8 +459,15 @@ mod tests {
 
     #[test]
     fn configured_label_no_snapshot_resolver_miss_ignores_global_alias() -> slug_error::Result<()> {
+        let _guard = DYNAMIC_BZLMOD_STATE_TEST_LOCK.lock().unwrap();
         let apparent = "analysis_ctx_label_no_snapshot_miss";
         let wrong_global = "wrong_owner++ext+analysis_ctx_label_no_snapshot_miss";
+        let tmp = std::env::temp_dir().join(format!(
+            "slug-build-api-bazel-label-no-snapshot-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&tmp)?;
+        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp);
         slug_core::cells::register_test_dynamic_extension_cell_alias(
             apparent.to_owned(),
             wrong_global.to_owned(),

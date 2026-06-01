@@ -139,10 +139,22 @@ impl StarlarkConfiguredProvidersLabel {
     }
 
     fn is_root_workspace_name(&self, cell: &str) -> bool {
-        self.root_cell_name
+        if self
+            .root_cell_name
             .as_ref()
             .is_some_and(|root| root.as_str() == cell)
-            || (self.root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell))
+        {
+            return true;
+        }
+
+        #[cfg(test)]
+        {
+            if self.root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 

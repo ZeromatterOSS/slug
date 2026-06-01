@@ -263,11 +263,17 @@ pub(crate) fn canonical_source_package_for_bzlmod_runtime(
         return Ok(pkg);
     };
     let cell_name = pkg.cell_name();
-    if root_cell_name.is_some_and(|root| root == &cell_name)
-        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name.as_str()))
-    {
+    if root_cell_name.is_some_and(|root| root == &cell_name) {
         return Ok(pkg);
     }
+
+    #[cfg(test)]
+    {
+        if root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name.as_str()) {
+            return Ok(pkg);
+        }
+    }
+
     let Some(canonical_cell) =
         cell_alias_resolver.resolve_declared_or_runtime_alias(cell_name.as_str())
     else {

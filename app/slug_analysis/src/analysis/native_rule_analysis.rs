@@ -1308,13 +1308,18 @@ fn analyze_platform(
 
 fn bazel_platform_label(target: &TargetLabel, root_cell_name: Option<CellName>) -> String {
     let cell_name = target.pkg().cell_name();
-    if root_cell_name.is_some_and(|root| root == cell_name)
-        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name.as_str()))
-    {
-        format!("//{}:{}", target.pkg().cell_relative_path(), target.name())
-    } else {
-        target.to_string()
+    if root_cell_name.is_some_and(|root| root == cell_name) {
+        return format!("//{}:{}", target.pkg().cell_relative_path(), target.name());
     }
+
+    #[cfg(test)]
+    {
+        if root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name.as_str()) {
+            return format!("//{}:{}", target.pkg().cell_relative_path(), target.name());
+        }
+    }
+
+    target.to_string()
 }
 
 /// Analyze a `test_suite` target.

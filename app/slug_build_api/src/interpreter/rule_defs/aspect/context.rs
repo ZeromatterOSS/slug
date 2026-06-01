@@ -390,11 +390,16 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
 }
 
 fn aspect_workspace_name_for_cell(cell_name: &str, root_cell_name: Option<CellName>) -> String {
-    if root_cell_name.is_some_and(|root| root.as_str() == cell_name)
-        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name))
-    {
+    if root_cell_name.is_some_and(|root| root.as_str() == cell_name) {
         "_main".to_owned()
     } else {
+        #[cfg(test)]
+        {
+            if root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name) {
+                return "_main".to_owned();
+            }
+        }
+
         cell_name.to_owned()
     }
 }

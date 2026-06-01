@@ -2038,6 +2038,19 @@ hardening behavior around it.
      under tests for no-owner guardrails. Guardrails: `cargo test -p
      slug_build_api analysis_context_repo_name --lib -- --nocapture`; `cargo
      check -p slug_build_api`.
+   - 2026-06-01 explicit-root helper fallback audit: platform labels,
+     configured source packages, configured-label/BazelLabel workspace names,
+     aspect workspace names, BUILD/native label context repo names, and
+     Bazel-output deferred paths now keep process-global root fallback behind
+     test-only branches when an explicit DICE root can be supplied. The
+     BazelLabel stale-global tests now serialize their dynamic bzlmod fixture
+     state so the guardrail selector is not order-dependent. Guardrails:
+     production `cargo check -p slug_core -p slug_analysis -p slug_interpreter
+     -p slug_build_api -p slug_interpreter_for_build`; focused selectors for
+     `platform_label_uses_explicit_root_cell`, `source_file_package`,
+     `configured_label_workspace_names`, `aspect_workspace_name_uses_explicit_root_cell`,
+     `bazel_label`, `label_context_current_repo`, and
+     `artifact_fs_bazel_output_uses_resolver_root_cell`.
    - 2026-05-29 aspect-context root-adapter reduction: DICE aspect execution now
      passes the active `CellResolver` root cell into `AspectContext`, and aspect
      `ctx.workspace_name` uses that explicit root identity. The standalone
