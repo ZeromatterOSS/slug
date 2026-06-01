@@ -220,6 +220,7 @@ impl ModuleContext {
     /// This enables `module_ctx.path(Label)` and `module_ctx.execute([Label, ...])`
     /// to resolve Label arguments to filesystem paths. The cell_paths map is built
     /// from the CellResolver before entering Starlark evaluation.
+    #[cfg(test)]
     pub fn with_label_resolution(
         mut self,
         project_root: PathBuf,
@@ -483,10 +484,22 @@ impl ModuleContext {
     }
 
     fn is_root_cell_name(&self, cell_name: &str) -> bool {
-        self.root_cell_name
+        if self
+            .root_cell_name
             .as_deref()
             .is_some_and(|root| root == cell_name)
-            || (self.root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name))
+        {
+            return true;
+        }
+
+        #[cfg(test)]
+        {
+            if self.root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name) {
+                return true;
+            }
+        }
+
+        false
     }
 
     pub fn record_env_input(&self, name: &str) -> starlark::Result<()> {

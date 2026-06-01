@@ -2075,6 +2075,14 @@ hardening behavior around it.
      helper in test/no-owner contexts. Guardrails: `cargo test -p
      slug_interpreter_for_build module_context --lib -- --nocapture`; `cargo
      check -p slug_interpreter_for_build`.
+   - 2026-06-01 module_ctx no-root label-resolution helper made test-only:
+     production `ModuleContext` root classification now only uses the explicit
+     root cell installed by `with_label_resolution_and_root_cell(...)`; the
+     no-root `with_label_resolution(...)` helper and process-global root
+     fallback remain available only to tests. This keeps module-extension
+     recorded-input path spelling tied to the active resolver instead of
+     `ROOT_CELL_NAME`. Guardrails: `cargo test -p slug_interpreter_for_build
+     module_ctx --lib`; `cargo check -p slug_interpreter_for_build`.
    - 2026-05-29 BUILD/native Starlark repo-name root-adapter reduction:
      BUILD-file `repo_name()` / `repository_name()` and native `Label(...)`
      repo-context canonicalization now use the active `BuildContext`
