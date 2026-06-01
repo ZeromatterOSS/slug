@@ -2370,7 +2370,17 @@ impl<'a> MetadataLabelContext<'a> {
                 .ok()
                 .is_some_and(|cell| cell_resolver.is_root_cell(cell));
         }
-        slug_core::cells::is_root_cell_name(cell_name)
+
+        #[cfg(test)]
+        {
+            return self.allow_process_global_fallbacks
+                && slug_core::cells::is_root_cell_name(cell_name);
+        }
+
+        #[cfg(not(test))]
+        {
+            false
+        }
     }
 
     fn scoped_dynamic_extension_cell_name(

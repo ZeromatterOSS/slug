@@ -2067,8 +2067,9 @@ hardening behavior around it.
    - 2026-05-29 metadata path root-adapter reduction: metadata output/source
      path formatting now asks `MetadataLabelContext`'s `CellResolver` whether a
      target cell is root instead of using the process-global root helper when a
-     resolver is present. No-resolver metadata formatting keeps the legacy
-     fallback. Guardrails: `cargo test -p slug_analysis
+     resolver is present. As of 2026-06-01, the no-resolver process-global root
+     fallback is test-only and gated by the metadata context's explicit test
+     fallback flag. Guardrails: `cargo test -p slug_analysis
      metadata_paths_use_resolver_root_cell --lib -- --nocapture`; `cargo check
      -p slug_analysis`.
    - 2026-05-29 native platform root-adapter reduction: native `platform()`
