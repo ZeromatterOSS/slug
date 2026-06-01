@@ -1662,8 +1662,18 @@ fn canonical_bazel_repo_name_for_cell(
 }
 
 fn is_root_cell_for_context(cell_name: &str, root_cell_name: Option<CellName>) -> bool {
-    root_cell_name.is_some_and(|root| root.as_str() == cell_name)
-        || (root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name))
+    if root_cell_name.is_some_and(|root| root.as_str() == cell_name) {
+        return true;
+    }
+
+    #[cfg(test)]
+    {
+        if root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name) {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]

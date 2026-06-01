@@ -2032,6 +2032,12 @@ hardening behavior around it.
      fallback inside the shared formatting helper. Guardrails: `cargo test -p
      slug_build_api analysis_context_repo_name --lib -- --nocapture`; `cargo
      check -p slug_analysis -p slug_build_api`.
+   - 2026-06-01 analysis-context no-owner fallback narrowed: production
+     analysis-context root classification now requires the explicit DICE root
+     cell; the process-global `ROOT_CELL_NAME` fallback remains available only
+     under tests for no-owner guardrails. Guardrails: `cargo test -p
+     slug_build_api analysis_context_repo_name --lib -- --nocapture`; `cargo
+     check -p slug_build_api`.
    - 2026-05-29 aspect-context root-adapter reduction: DICE aspect execution now
      passes the active `CellResolver` root cell into `AspectContext`, and aspect
      `ctx.workspace_name` uses that explicit root identity. The standalone
