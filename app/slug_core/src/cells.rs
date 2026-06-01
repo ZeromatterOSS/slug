@@ -3011,6 +3011,10 @@ impl CellResolver {
             .expect("Should have had a root cell")
     }
 
+    pub fn project_root(&self) -> Option<&std::path::Path> {
+        self.0.project_root.as_deref()
+    }
+
     pub fn root_cell_cell_alias_resolver(&self) -> &CellAliasResolver {
         &self.0.root_cell_alias_resolver
     }

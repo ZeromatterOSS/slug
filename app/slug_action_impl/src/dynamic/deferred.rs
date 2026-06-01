@@ -253,6 +253,7 @@ async fn execute_lambda(
                             self_key.owner().configured_label(),
                             None,
                             analysis_root_cell_name,
+                            None,
                             dynamic_lambda_ctx_data.lambda.plugins()?,
                             dynamic_lambda_ctx_data.registry,
                             dynamic_lambda_ctx_data.digest_config,

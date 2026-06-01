@@ -10,6 +10,8 @@
 
 //! Host platform detection and compiler path helpers shared across cc_common.
 
+use std::path::Path;
+
 use crate::interpreter::rule_defs::cc_common::msvc_detect::get_msvc_tool_paths;
 
 /// Detect whether the compiler is MSVC (cl.exe) based on the compiler path.
@@ -44,6 +46,48 @@ pub(crate) fn resolve_windows_compiler(bare_path: &str) -> String {
         }
     }
     bare_path.to_owned()
+}
+
+fn llvm_toolchain_platform_suffix() -> Option<String> {
+    let os = match std::env::consts::OS {
+        "linux" => "linux",
+        "macos" => "darwin",
+        _ => return None,
+    };
+    let arch = match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        _ => return None,
+    };
+    Some(format!("-{os}-{arch}"))
+}
+
+pub(crate) fn host_llvm_toolchain_bin_for_project_root(
+    project_root: Option<&Path>,
+    tool: &str,
+) -> Option<String> {
+    let root = project_root?;
+    let suffix = llvm_toolchain_platform_suffix()?;
+    let external = root.join("bazel-external");
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(&external).ok()?.flatten() {
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else {
+            continue;
+        };
+        let is_llvm_toolchain = name.starts_with("llvm-toolchain-minimal-")
+            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-")
+            || name.starts_with("llvm++http_archive+llvm-toolchain-minimal-");
+        if !is_llvm_toolchain || !name.ends_with(&suffix) {
+            continue;
+        }
+        let path = entry.path().join("bin").join(tool);
+        if path.is_file() {
+            candidates.push(path.to_string_lossy().into_owned());
+        }
+    }
+    candidates.sort();
+    candidates.into_iter().next()
 }
 
 /// Choose the appropriate include flag for a directory path.
@@ -124,6 +168,43 @@ pub(crate) fn normalize_external_cells_path(path: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn write_toolchain(root: &Path, name: &str, tool: &str) -> std::io::Result<std::path::PathBuf> {
+        let bin = root.join("bazel-external").join(name).join("bin");
+        std::fs::create_dir_all(&bin)?;
+        let path = bin.join(tool);
+        std::fs::write(&path, [])?;
+        Ok(path)
+    }
+
+    #[test]
+    fn host_llvm_toolchain_bin_uses_explicit_project_root() -> std::io::Result<()> {
+        let Some(suffix) = llvm_toolchain_platform_suffix() else {
+            return Ok(());
+        };
+        let project_root = tempfile::tempdir()?;
+        let other_root = tempfile::tempdir()?;
+        let expected = write_toolchain(
+            project_root.path(),
+            &format!("llvm++http_archive+llvm-toolchain-minimal-22.1.0{suffix}"),
+            "clang",
+        )?;
+        write_toolchain(
+            other_root.path(),
+            &format!("llvm++http_archive+llvm-toolchain-minimal-0.0.0{suffix}"),
+            "clang",
+        )?;
+
+        assert_eq!(
+            host_llvm_toolchain_bin_for_project_root(Some(project_root.path()), "clang"),
+            Some(expected.to_string_lossy().into_owned())
+        );
+        assert_eq!(
+            host_llvm_toolchain_bin_for_project_root(None, "clang"),
+            None
+        );
+        Ok(())
+    }
 
     #[test]
     fn context_include_flags_preserve_explicit_include_kind() {

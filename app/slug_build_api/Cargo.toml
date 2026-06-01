@@ -77,3 +77,4 @@ dice_futures = { workspace = true }
 [dev-dependencies]
 slug_certs = { workspace = true }
 slug_wrapper_common = { workspace = true }
+tempfile = { workspace = true }

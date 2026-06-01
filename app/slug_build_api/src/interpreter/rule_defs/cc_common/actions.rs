@@ -76,6 +76,7 @@ use crate::interpreter::rule_defs::cc_common::feature_config::CcToolchainFeature
 use crate::interpreter::rule_defs::cc_common::feature_config::CcWithFeatureSet;
 use crate::interpreter::rule_defs::cc_common::feature_config::FeatureConfiguration;
 use crate::interpreter::rule_defs::cc_common::feature_config::combine_cc_with_feature_sets;
+use crate::interpreter::rule_defs::cc_common::host::host_llvm_toolchain_bin_for_project_root;
 use crate::interpreter::rule_defs::cc_common::host::include_flag_for_context_attr;
 use crate::interpreter::rule_defs::cc_common::host::include_flag_for_dir_impl;
 use crate::interpreter::rule_defs::cc_common::host::is_msvc_compiler;
@@ -103,6 +104,7 @@ use crate::interpreter::rule_defs::cc_common::providers::LibraryToLinkGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkerInputStubGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkingContextWithInputsGen;
 use crate::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
+use crate::interpreter::rule_defs::context::current_rule_project_root;
 use crate::interpreter::rule_defs::depset::depset_summary;
 use crate::interpreter::rule_defs::depset::depset_to_artifact_inputs;
 use crate::interpreter::rule_defs::depset::depset_to_list;
@@ -226,38 +228,8 @@ fn cc_declare_and_symlink<'v>(
 }
 
 fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
-    let root = slug_core::cells::get_dynamic_project_root()?;
-    let os = match std::env::consts::OS {
-        "linux" => "linux",
-        "macos" => "darwin",
-        _ => return None,
-    };
-    let arch = match std::env::consts::ARCH {
-        "x86_64" => "amd64",
-        "aarch64" => "arm64",
-        _ => return None,
-    };
-    let suffix = format!("-{os}-{arch}");
-    let external = root.join("bazel-external");
-    let mut candidates = Vec::new();
-    for entry in std::fs::read_dir(&external).ok()?.flatten() {
-        let file_name = entry.file_name();
-        let Some(name) = file_name.to_str() else {
-            continue;
-        };
-        let is_llvm_toolchain = name.starts_with("llvm-toolchain-minimal-")
-            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-")
-            || name.starts_with("llvm++http_archive+llvm-toolchain-minimal-");
-        if !is_llvm_toolchain || !name.ends_with(&suffix) {
-            continue;
-        }
-        let path = entry.path().join("bin").join(tool);
-        if path.is_file() {
-            candidates.push(path.to_string_lossy().into_owned());
-        }
-    }
-    candidates.sort();
-    candidates.into_iter().next()
+    let project_root = current_rule_project_root();
+    host_llvm_toolchain_bin_for_project_root(project_root.as_deref(), tool)
 }
 
 fn has_host_llvm_toolchain() -> bool {
@@ -502,7 +474,7 @@ fn llvm_musl_compile_default_args() -> Vec<String> {
     .map(str::to_owned)
     .collect::<Vec<_>>();
 
-    let Some(root) = slug_core::cells::get_dynamic_project_root() else {
+    let Some(root) = current_rule_project_root() else {
         return args;
     };
     let external = root.join("bazel-external");

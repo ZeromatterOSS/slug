@@ -76,6 +76,7 @@ use crate::analysis::registry::AnalysisRegistry;
 use crate::artifact_groups::ArtifactGroup;
 use crate::artifact_groups::InputSymlink;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
+use crate::interpreter::rule_ctx_storage::get_current_rule_ctx;
 use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured_with_alias_resolver_and_root;
@@ -84,6 +85,7 @@ use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::cc_common::CcToolchainVariablesGen;
 use crate::interpreter::rule_defs::cc_common::CtxCheatArtifactStub;
 use crate::interpreter::rule_defs::cc_common::FeatureConfiguration;
+use crate::interpreter::rule_defs::cc_common::host_llvm_toolchain_bin_for_project_root;
 use crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArgLike;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
@@ -229,6 +231,9 @@ pub struct AnalysisContext<'v> {
     #[trace(unsafe_ignore)]
     cell_alias_resolver: Option<CellAliasResolver>,
     root_cell_name: Option<CellName>,
+    #[trace(unsafe_ignore)]
+    #[allocative(skip)]
+    project_root: Option<std::path::PathBuf>,
     plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
     /// Cached outputs for Bazel-compatible ctx.outputs access.
     /// This is computed lazily on first access and cached thereafter.
@@ -266,6 +271,7 @@ impl<'v> AnalysisContext<'v> {
         label: Option<ValueTyped<'v, BazelLabel>>,
         cell_alias_resolver: Option<CellAliasResolver>,
         root_cell_name: Option<CellName>,
+        project_root: Option<std::path::PathBuf>,
         plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
@@ -283,6 +289,7 @@ impl<'v> AnalysisContext<'v> {
             label,
             cell_alias_resolver,
             root_cell_name,
+            project_root,
             plugins,
             outputs: RefCell::new(None),
             rule_outputs,
@@ -322,12 +329,17 @@ impl<'v> AnalysisContext<'v> {
         self.actions
     }
 
+    pub fn project_root(&self) -> Option<&std::path::Path> {
+        self.project_root.as_deref()
+    }
+
     pub fn prepare(
         heap: Heap<'v>,
         attrs: Option<ValueOfUnchecked<'v, StructRef<'static>>>,
         label: Option<ConfiguredTargetLabel>,
         cell_alias_resolver: Option<CellAliasResolver>,
         root_cell_name: Option<CellName>,
+        project_root: Option<std::path::PathBuf>,
         plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
@@ -357,6 +369,7 @@ impl<'v> AnalysisContext<'v> {
             bazel_label,
             cell_alias_resolver,
             root_cell_name,
+            project_root,
             plugins,
             registry,
             digest_config,
@@ -2482,39 +2495,17 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
     }
 }
 
+pub(crate) fn current_rule_project_root<'v>() -> Option<std::path::PathBuf> {
+    get_current_rule_ctx::<'v>().and_then(|ctx_val| {
+        ctx_val
+            .downcast_ref::<AnalysisContext<'v>>()
+            .and_then(|ctx| ctx.project_root().map(std::path::Path::to_path_buf))
+    })
+}
+
 fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
-    let root = slug_core::cells::get_dynamic_project_root()?;
-    let os = match std::env::consts::OS {
-        "linux" => "linux",
-        "macos" => "darwin",
-        _ => return None,
-    };
-    let arch = match std::env::consts::ARCH {
-        "x86_64" => "amd64",
-        "aarch64" => "arm64",
-        _ => return None,
-    };
-    let suffix = format!("-{os}-{arch}");
-    let external = root.join("bazel-external");
-    let mut candidates = Vec::new();
-    for entry in std::fs::read_dir(&external).ok()?.flatten() {
-        let file_name = entry.file_name();
-        let Some(name) = file_name.to_str() else {
-            continue;
-        };
-        let is_llvm_toolchain = name.starts_with("llvm-toolchain-minimal-")
-            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-")
-            || name.starts_with("llvm++http_archive+llvm-toolchain-minimal-");
-        if !is_llvm_toolchain || !name.ends_with(&suffix) {
-            continue;
-        }
-        let path = entry.path().join("bin").join(tool);
-        if path.is_file() {
-            candidates.push(path.to_string_lossy().into_owned());
-        }
-    }
-    candidates.sort();
-    candidates.into_iter().next()
+    let project_root = current_rule_project_root();
+    host_llvm_toolchain_bin_for_project_root(project_root.as_deref(), tool)
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]

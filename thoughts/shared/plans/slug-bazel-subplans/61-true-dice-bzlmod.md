@@ -2119,7 +2119,7 @@ hardening behavior around it.
      slug_build_api dependency_label --lib -- --nocapture`; `cargo test -p
      slug_build_api source_file_target_label --lib -- --nocapture`; `cargo
      check -p slug_interpreter -p slug_build_api -p slug_analysis`.
-   - 2026-05-29 repository_ctx constructor root fallback made test-only:
+  - 2026-05-29 repository_ctx constructor root fallback made test-only:
      the `RepositoryContext::new(...)` constructor that falls back to
      `slug_core::cells::get_dynamic_project_root()` is now compiled only for
      tests. Production Starlark repository-rule execution already uses
@@ -2127,6 +2127,16 @@ hardening behavior around it.
      removes a dormant process-global root fallback from the production
      repository-rule API. Guardrail: `cargo check -p
      slug_interpreter_for_build`.
+   - 2026-06-01 cc_common project-root adapter reduction: `CellResolver` now
+     exposes its recorded project root to analysis, `AnalysisContext` carries
+     that DICE-owned root during rule implementation, and the
+     cc_common/CcToolchainInfo LLVM-toolchain probes scan `bazel-external` only
+     from that current rule context. Without an analysis context they fall back
+     to system tool defaults instead of reading the process-global
+     `dynamic_project_root()`. Guardrails: `cargo test -p slug_build_api
+     host_llvm_toolchain_bin_uses_explicit_project_root --lib -- --nocapture`;
+     `cargo test -p slug_build_api cc_common --lib -- --nocapture`; `cargo
+     check -p slug_core -p slug_build_api -p slug_analysis`.
    - Current-workspace helper identity now comes from
      `BzlmodCurrentCellGraphKey` instead of individual projection data keys for
      module versions, registered toolchains, registered execution platforms, and
