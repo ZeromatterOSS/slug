@@ -1862,12 +1862,10 @@ hardening behavior around it.
      locked supported non-file registry entries are now fetched through the
      registry client before checksum validation, matching Bazel's registry fetch
      shape while preserving strict behavior for `file:` registries and
-     unsupported paths. Out-of-root cache paths are
-     directly observed inside
-     `RegistryFileInputsKey` and force same-key recompute through
-     `has_untracked_inputs` while the final watched-input graph is still
-     pending. Locked
-     registry `source.json`
+     unsupported paths. Out-of-root checksum-pinned http(s) registry cache blobs
+     are content-addressed by the lockfile's `registry_file_hashes`; other
+     supported registry cache reads use project or watched-absolute DICE inputs.
+     Locked registry `source.json`
      checksum, parse/UTF-8 failure, and create/delete transitions now have
      same-daemon guardrails, locked registry `MODULE.bazel` parse/UTF-8
      failure and create/delete transitions have same-daemon guardrails, and locked
@@ -1902,9 +1900,9 @@ hardening behavior around it.
    - Visible workspace lockfile bytes now use tracked project-file DICE inputs;
      hidden/output-base lockfile content is no longer carried as an observed
      payload or precomputed poll digest into `TrackedLockfileContentKey`.
-     Out-of-project hidden lockfiles are still directly polled by that named
-     key and invalidated across transactions until the final watched-input graph
-     replaces the direct polling.
+     Out-of-project hidden lockfiles now use watched absolute DICE reads through
+     `read_text_file_for_project_input(...)`, preserving hidden-lockfile
+     fail-open semantics without a direct poll helper.
    - The clean bzlmod graph producer gets visible/hidden lockfile values from
      `BzlmodCleanLockfileInputsKey`, and current-workspace consumers now reach
      those same reads through `BzlmodLockfileInputsKey`. The injected
