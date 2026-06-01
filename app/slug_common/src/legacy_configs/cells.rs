@@ -878,6 +878,23 @@ fn read_absolute_text_file_input_value(
     Ok(AbsoluteTextFileInputValue { content, digest })
 }
 
+fn read_content_addressed_registry_cache_file(path: &Path) -> slug_error::Result<Option<String>> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+    String::from_utf8(bytes).map(Some).map_err(|e| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "Failed to read checksum-pinned registry cache file at {:?} as UTF-8: {}",
+            path,
+            e
+        )
+    })
+}
+
+#[cfg(test)]
 fn read_absolute_text_file_input(
     path: &Path,
 ) -> slug_error::Result<(Option<String>, Option<String>)> {
@@ -2120,7 +2137,8 @@ impl Key for RegistryFileInputsKey {
             hasher.update([0]);
             // http(s) registry files are checksum-pinned by the lockfile's
             // registry_file_hashes (a tracked DICE input). For OUT-OF-PROJECT cache
-            // files the on-disk blob is therefore content-addressed: read it directly
+            // files the on-disk blob is therefore content-addressed: read that
+            // checksum-pinned cache blob directly
             // (no per-transaction DICE poll dependency via the validity=false
             // AbsoluteTextFileInputKey) so this compute only re-runs when the recorded
             // hash changes, not every transaction. Mirrors Bazel's RegistryFunction,
@@ -2133,8 +2151,7 @@ impl Key for RegistryFileInputsKey {
             let is_out_of_project =
                 project_relative_path_for_abs_path(&project_fs, &path).is_none();
             let content = if is_checksum_pinned && is_out_of_project {
-                let (content, _digest) = read_absolute_text_file_input(&path)?;
-                content
+                read_content_addressed_registry_cache_file(&path)?
             } else {
                 let (content, tracking) =
                     read_text_file_for_project_input(ctx, &project_fs, &path).await?;

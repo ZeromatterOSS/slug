@@ -149,6 +149,19 @@ fetched module files, and `RegistryFunction` constructs registries from lockfile
 -p slug_common registry_file_inputs`, and `pytest -q
 tests/core/bzlmod/test_plan61_guardrails.py`.
 
+**Bridge surface narrowed**: the remaining production direct read for
+out-of-project http(s) registry cache blobs is now named
+`read_content_addressed_registry_cache_file(...)`, and is only used by
+`RegistryFileInputsKey` after the lockfile's `registry_file_hashes` has supplied
+the checksum identity. The generic validity=false
+`read_absolute_text_file_input(...)` poll helper is now test-only, along with
+the legacy poll keys that exercise old invalidation semantics. This does not
+make arbitrary out-of-project bzlmod inputs acceptable; it documents the
+checksum-pinned registry-cache exception and leaves other bzlmod source inputs
+on DICE-backed project/watched-absolute reads. Validated with `cargo test -p
+slug_common registry_file_inputs --lib`, `cargo test -p slug_common bzlmod
+--lib`, and `cargo check -p slug_common`.
+
 **Bridge surface reduced**: extension-generated repositories now resolve their
 owning module's self alias from the runtime snapshot path instead of depending
 on process-global scoped alias fallback. For a generated repo such as
