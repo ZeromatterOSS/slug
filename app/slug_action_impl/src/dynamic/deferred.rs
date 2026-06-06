@@ -739,9 +739,13 @@ pub fn dynamic_lambda_ctx_data<'v>(
 
     let dynamic_lambda = dynamic_lambda.add_heap_ref(env.frozen_heap());
 
-    let mut registry = AnalysisRegistry::new_from_owner_and_deferred(
+    let mut registry = AnalysisRegistry::new_from_owner_and_deferred_with_attrs_and_root_cell_name(
         dynamic_lambda.static_fields.execution_platform.dupe(),
         DeferredHolderKey::DynamicLambda(self_key),
+        std::sync::Arc::new(std::collections::BTreeMap::new()),
+        std::sync::Arc::from(Vec::<String>::new()),
+        std::sync::Arc::new(std::collections::HashMap::new()),
+        Some(artifact_fs.cell_resolver().root_cell()),
     )?;
 
     let spec = match &dynamic_lambda.attr_values {

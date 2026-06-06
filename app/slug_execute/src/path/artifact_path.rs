@@ -16,7 +16,7 @@ use std::sync::RwLock;
 
 use either::Either;
 use gazebo::cell::ARef;
-use slug_core::cells::is_root_cell_name;
+use slug_core::cells::name::CellName;
 use slug_core::content_hash::ContentBasedPathHash;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_core::fs::artifact_path_resolver::ArtifactFs;
@@ -68,6 +68,23 @@ fn has_bazel_external_prefix(path: &ForwardRelativePath, cell_name: &str) -> boo
     path.as_str()
         .strip_prefix("external/")
         .is_some_and(|rest| rest == cell_name || rest.starts_with(&format!("{cell_name}/")))
+}
+
+fn artifact_cell_is_root(cell_name: &str, root_cell_name: Option<CellName>) -> bool {
+    cell_name.is_empty()
+        || cell_name == "root"
+        || root_cell_name.is_some_and(|root| root.as_str() == cell_name)
+        || {
+            #[cfg(test)]
+            {
+                root_cell_name.is_none() && slug_core::cells::is_root_cell_name(cell_name)
+            }
+
+            #[cfg(not(test))]
+            {
+                false
+            }
+        }
 }
 
 impl ArtifactPath<'_> {
@@ -164,7 +181,7 @@ impl ArtifactPath<'_> {
                         let pkg_rel = label.pkg().cell_relative_path().as_str();
                         let rule_local_str = rule_local.as_str();
                         let prefixed = match (
-                            is_root_cell_name(cell_name.as_str()),
+                            artifact_cell_is_root(cell_name.as_str(), buck_out.root_cell_name()),
                             pkg_rel.is_empty(),
                             rule_local_str.is_empty(),
                         ) {
@@ -207,7 +224,7 @@ impl ArtifactPath<'_> {
                 } else {
                     format!("{}/{}", pkg_path.as_str(), in_pkg.as_str())
                 };
-                if is_root_cell_name(cell_name.as_str()) {
+                if artifact_cell_is_root(cell_name.as_str(), source.root_cell_name()) {
                     let buf = ForwardRelativePathBuf::unchecked_new(cell_rel);
                     f(buf.as_ref())
                 } else {
@@ -248,7 +265,7 @@ impl ArtifactPath<'_> {
                         None => ForwardRelativePath::empty(),
                     };
                     f(path)
-                } else if is_root_cell_name(cell_name.as_str()) {
+                } else if artifact_cell_is_root(cell_name.as_str(), source.root_cell_name()) {
                     // Main repo: use cell-relative path (package/file)
                     let base = pkg_path.join(file_rel);
                     let full = base.join(self.projected_path);
@@ -329,7 +346,7 @@ impl ArtifactPath<'_> {
                         slug_core::fs::buck_out_path::BuckOutPathKind::BazelOutput
                     ) {
                         let joined = artifact_path.join(self.projected_path);
-                        let is_root = slug_core::cells::is_root_cell_name(cell_name);
+                        let is_root = artifact_cell_is_root(cell_name, buck_out.root_cell_name());
                         let has_external_prefix =
                             has_bazel_external_prefix(&joined, &external_cell_name);
                         if has_external_prefix {
@@ -423,7 +440,7 @@ impl ArtifactPath<'_> {
                     .join(buck.path());
                 let path = cell_relative.join_cow(self.projected_path);
 
-                if !slug_core::cells::is_root_cell_name(cell_name) {
+                if !artifact_cell_is_root(cell_name, buck.root_cell_name()) {
                     let full_path = format!("external/{}/{}", external_cell_name, path);
                     let full_path_buf = ForwardRelativePathBuf::unchecked_new(full_path);
                     f(&full_path_buf)
@@ -459,7 +476,7 @@ impl ArtifactPath<'_> {
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
                     let external_cell_name = stored_external_cell_name(cell_name);
-                    let is_root = slug_core::cells::is_root_cell_name(cell_name);
+                    let is_root = artifact_cell_is_root(cell_name, buck_out.root_cell_name());
                     let root_path = if is_root {
                         format!("{}/gen/{}/{}", buck_out_root, external_cell_name, cfg_hash)
                     } else {
@@ -547,8 +564,11 @@ impl fmt::Display for ArtifactPath<'_> {
 
 #[cfg(test)]
 mod tests {
+    use dupe::Dupe;
     use either::Either;
     use gazebo::cell::ARef;
+    use slug_core::cells::CellResolver;
+    use slug_core::cells::cell_root_path::CellRootPathBuf;
     use slug_core::cells::name::CellName;
     use slug_core::cells::paths::CellRelativePath;
     use slug_core::configuration::data::ConfigurationData;
@@ -556,10 +576,13 @@ mod tests {
     use slug_core::fs::buck_out_path::BuckOutPathKind;
     use slug_core::fs::buck_out_path::BuildArtifactPath;
     use slug_core::package::PackageLabel;
+    use slug_core::package::package_relative_path::PackageRelativePath;
+    use slug_core::package::source_path::SourcePath;
     use slug_core::target::label::label::TargetLabel;
     use slug_core::target::name::TargetNameRef;
     use slug_fs::paths::forward_rel_path::ForwardRelativePath;
     use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
+    use slug_util::arc_str::ArcS;
 
     use super::ArtifactPath;
 
@@ -607,6 +630,69 @@ mod tests {
             "{root_path}"
         );
         assert!(!root_path.contains(wrong_global), "{root_path}");
+        Ok(())
+    }
+
+    #[test]
+    fn artifact_paths_use_explicit_root_cell_when_global_root_is_stale() -> slug_error::Result<()> {
+        let tmp =
+            std::env::temp_dir().join(format!("slug-artifact-root-path-{}", std::process::id()));
+        slug_core::cells::reset_dynamic_bzlmod_state_for_project_root(tmp);
+        let actual_root = CellName::testing_new("plan61_actual_root");
+        let stale_root = CellName::testing_new("plan61_stale_root");
+        let _stale_resolver =
+            CellResolver::testing_with_name_and_path(stale_root, CellRootPathBuf::testing_new(""));
+
+        let pkg = PackageLabel::new(actual_root, CellRelativePath::unchecked_new("pkg"))?;
+        let target = TargetLabel::new(pkg.dupe(), TargetNameRef::unchecked_new("target"))
+            .configure(ConfigurationData::testing_new());
+        let build_path = BuildArtifactPath::with_root_cell_name(
+            BaseDeferredKey::TargetLabel(target),
+            ForwardRelativePathBuf::unchecked_new("out.h".to_owned()),
+            BuckOutPathKind::BazelOutput,
+            Some(actual_root),
+        );
+        let build_artifact = ArtifactPath {
+            base_path: Either::Left(ARef::new_ptr(&build_path)),
+            projected_path: ForwardRelativePath::empty(),
+            hidden_components_count: 0,
+        };
+
+        let source_path = SourcePath::new_with_root_cell_name(
+            pkg,
+            ArcS::from(PackageRelativePath::new("src/lib.rs")?),
+            Some(actual_root),
+        );
+        let source_artifact = ArtifactPath {
+            base_path: Either::Right(source_path.as_ref()),
+            projected_path: ForwardRelativePath::empty(),
+            hidden_components_count: 0,
+        };
+
+        let build_full = build_artifact.with_full_path(|path| path.as_str().to_owned());
+        let build_root = build_artifact.with_root_path(|path| path.as_str().to_owned());
+        let build_short = build_artifact.with_short_path(|path| path.as_str().to_owned());
+        let source_full = source_artifact.with_full_path(|path| path.as_str().to_owned());
+        let source_short = source_artifact.with_short_path(|path| path.as_str().to_owned());
+        let source_display = source_artifact.with_display_path(|path| path.as_str().to_owned());
+
+        assert!(
+            build_full.contains("/gen/plan61_actual_root/"),
+            "{build_full}"
+        );
+        assert!(build_full.ends_with("/pkg/out.h"), "{build_full}");
+        assert!(
+            !build_full.contains("/external/plan61_actual_root/"),
+            "{build_full}"
+        );
+        assert!(
+            build_root.starts_with("buck-out/v2/gen/plan61_actual_root/"),
+            "{build_root}"
+        );
+        assert_eq!(build_short, "pkg/out.h");
+        assert_eq!(source_full, "pkg/src/lib.rs");
+        assert_eq!(source_short, "pkg/src/lib.rs");
+        assert_eq!(source_display, "pkg/src/lib.rs");
         Ok(())
     }
 }

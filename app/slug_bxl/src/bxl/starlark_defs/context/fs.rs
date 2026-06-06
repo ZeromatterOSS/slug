@@ -350,7 +350,11 @@ fn fs_operations(builder: &mut MethodsBuilder) {
 
                     let package_relative_path =
                         PackageRelativePath::new(forward_relative_path.as_path())?;
-                    Ok(SourcePath::new(package_label, package_relative_path.into()))
+                    Ok(SourcePath::new_with_root_cell_name(
+                        package_label,
+                        package_relative_path.into(),
+                        Some(this.ctx.cell_resolver().root_cell()),
+                    ))
                 }
                 .boxed_local()
             })

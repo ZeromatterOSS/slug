@@ -243,7 +243,11 @@ fn resolve_single_impl<'v>(
                 ctx.cell_alias_resolver(),
                 ctx.root_cell_name(),
             )?;
-            let path = SourcePath::new(pkg, s.path().dupe());
+            let path = SourcePath::new_with_root_cell_name(
+                pkg,
+                s.path().dupe(),
+                ctx.root_cell_name().cloned(),
+            );
             match source_file_target_cfg {
                 Some(cfg_pair) => SourceAttrType::resolve_single_file_target(ctx, path, cfg_pair),
                 None => Ok(SourceAttrType::resolve_single_file(ctx, path)),

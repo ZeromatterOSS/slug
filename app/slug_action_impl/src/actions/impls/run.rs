@@ -1033,7 +1033,7 @@ impl RunAction {
         extra_env: &mut Vec<(String, String)>,
     ) -> slug_error::Result<()> {
         if let Some(metadata_param) = &self.inner.metadata_param {
-            let path = BuildArtifactPath::new(
+            let path = BuildArtifactPath::with_root_cell_name(
                 ctx.target().owner().dupe(),
                 metadata_param.path.clone(),
                 if self.all_outputs_are_content_based() {
@@ -1041,6 +1041,7 @@ impl RunAction {
                 } else {
                     BuckOutPathKind::Configuration
                 },
+                Some(fs.cell_resolver().root_cell()),
             );
 
             let artifact_inputs: Vec<&ArtifactGroupValues> = visitor

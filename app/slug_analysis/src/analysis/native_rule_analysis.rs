@@ -323,8 +323,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
         NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
         NativeRuleKind::AnalysisTest => analyze_analysis_test(target),
-        NativeRuleKind::Genquery => analyze_genquery(target),
-        NativeRuleKind::StarlarkDocExtract => analyze_genquery(target), // stub: empty output file
+        NativeRuleKind::Genquery => analyze_genquery(target, root_cell_name.as_ref()),
+        NativeRuleKind::StarlarkDocExtract => analyze_genquery(target, root_cell_name.as_ref()), // stub: empty output file
         NativeRuleKind::XcodeConfig => analyze_xcode_config(target),
         NativeRuleKind::Removed(removed) => analyze_removed_rule(target, *removed),
     }
@@ -433,11 +433,12 @@ fn analyze_genrule(
     let mut output_starlark: Vec<FrozenValue> = Vec::with_capacity(out_names.len());
 
     for out_name in &out_names {
-        let path = BuildArtifactPath::new(
+        let path = BuildArtifactPath::with_root_cell_name(
             BaseDeferredKey::TargetLabel(target.dupe()),
             ForwardRelativePathBuf::new(out_name.clone())
                 .with_buck_error_context(|| format!("Invalid genrule output path: {}", out_name))?,
             BuckOutPathKind::Configuration,
+            root_cell_name.cloned(),
         );
         let ba = BuildArtifact::new(path, action_key.dupe(), OutputType::File)?;
         let starlark_ba = heap.alloc_simple(StarlarkArtifact::new(Artifact::from(ba.dupe())));
@@ -689,8 +690,11 @@ fn collect_source_file_location_mappings_recursive(
                 cell_alias_resolver,
                 root_cell_name,
             )?;
-            let source_artifact =
-                SourceArtifact::new(SourcePath::new(source_pkg, file_path.clone()));
+            let source_artifact = SourceArtifact::new(SourcePath::new_with_root_cell_name(
+                source_pkg,
+                file_path.clone(),
+                root_cell_name.cloned(),
+            ));
             out.push((
                 label_key,
                 vec![ArtifactGroup::Artifact(Artifact::from(source_artifact))],
@@ -737,8 +741,11 @@ fn collect_artifact_groups_from_configured_attr(
                 root_cell_name,
             )?;
             for path in coerced_path.inputs() {
-                let source_artifact =
-                    SourceArtifact::new(SourcePath::new(source_pkg.dupe(), path.dupe()));
+                let source_artifact = SourceArtifact::new(SourcePath::new_with_root_cell_name(
+                    source_pkg.dupe(),
+                    path.dupe(),
+                    root_cell_name.cloned(),
+                ));
                 out.push(ArtifactGroup::Artifact(Artifact::from(source_artifact)));
             }
         }
@@ -1047,8 +1054,11 @@ fn collect_source_files_from_configured_attr(
                 root_cell_name,
             )?;
             for path in coerced_path.inputs() {
-                let source_artifact =
-                    SourceArtifact::new(SourcePath::new(source_pkg.dupe(), path.dupe()));
+                let source_artifact = SourceArtifact::new(SourcePath::new_with_root_cell_name(
+                    source_pkg.dupe(),
+                    path.dupe(),
+                    root_cell_name.cloned(),
+                ));
                 let artifact = Artifact::from(source_artifact);
                 let starlark_artifact = heap.alloc_simple(StarlarkArtifact::new(artifact));
                 out.push(starlark_artifact);
@@ -1371,17 +1381,21 @@ fn analyze_analysis_test(target: &ConfiguredTargetLabel) -> slug_error::Result<A
 ///
 /// In Bazel: `genquery(name="deps", expression="deps(//foo:bar)", scope=["//foo:bar"])`
 /// produces a file `deps` containing one label per line.
-fn analyze_genquery(target: &ConfiguredTargetLabel) -> slug_error::Result<AnalysisResult> {
+fn analyze_genquery(
+    target: &ConfiguredTargetLabel,
+    root_cell_name: Option<&CellName>,
+) -> slug_error::Result<AnalysisResult> {
     let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
     let action_key = ActionKey::new(self_key.dupe(), ActionIndex::new(0));
 
     // The output file is named after the rule (same as the target name)
     let output_name = target.name().as_str().to_owned();
-    let path = BuildArtifactPath::new(
+    let path = BuildArtifactPath::with_root_cell_name(
         BaseDeferredKey::TargetLabel(target.dupe()),
         ForwardRelativePathBuf::new(output_name.clone())
             .with_buck_error_context(|| format!("Invalid genquery output path: {}", output_name))?,
         BuckOutPathKind::Configuration,
+        root_cell_name.cloned(),
     );
     let output_artifact = BuildArtifact::new(path, action_key.dupe(), OutputType::File)?;
 

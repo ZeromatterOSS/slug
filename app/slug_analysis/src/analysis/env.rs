@@ -4027,12 +4027,13 @@ async fn run_analysis_with_env_underlying(
                 })
                 .collect();
 
-        let registry = AnalysisRegistry::new_from_owner_and_deferred_with_attrs(
+        let registry = AnalysisRegistry::new_from_owner_and_deferred_with_attrs_and_root_cell_name(
             analysis_env.execution_platform.dupe(),
             DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(node.label().dupe())),
             target_exec_properties,
             valid_exec_group_names,
             Arc::new(group_platforms),
+            analysis_root_cell_name,
         )?;
 
         // Build ResolvedToolchains from the resolution result.

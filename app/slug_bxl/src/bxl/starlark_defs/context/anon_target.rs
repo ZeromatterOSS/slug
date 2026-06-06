@@ -268,10 +268,17 @@ async fn eval_bxl_for_anon_target_inner(
             eval.set_soft_error_handler(&SlugStarlarkSoftErrorHandler);
             eval.extra_mut = Some(&mut extra);
 
-            let analysis_registry = AnalysisRegistry::new_from_owner(
-                anon_target.dupe().base_deferred_key(),
-                execution_platform.clone(),
-            )?;
+            let analysis_registry =
+                AnalysisRegistry::new_from_owner_and_deferred_with_attrs_and_root_cell_name(
+                    execution_platform.clone(),
+                    slug_core::deferred::key::DeferredHolderKey::Base(
+                        anon_target.dupe().base_deferred_key(),
+                    ),
+                    std::sync::Arc::new(std::collections::BTreeMap::new()),
+                    std::sync::Arc::from(Vec::<String>::new()),
+                    std::sync::Arc::new(std::collections::HashMap::new()),
+                    Some(bxl_ctx_core_data.cell_resolver().root_cell()),
+                )?;
 
             let attributes =
                 anon_target.resolve_attrs(&env, dependents_analyses, execution_platform.clone())?;

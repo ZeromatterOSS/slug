@@ -23,6 +23,7 @@ use slug_artifact::artifact::artifact_type::DeclaredArtifact;
 use slug_artifact::artifact::artifact_type::OutputArtifact;
 use slug_artifact::artifact::build_artifact::BuildArtifact;
 use slug_core::category::Category;
+use slug_core::cells::name::CellName;
 use slug_core::deferred::key::DeferredHolderKey;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
 use slug_core::execution_types::executor_config::CommandExecutorConfig;
@@ -91,6 +92,7 @@ pub struct ActionsRegistry<'v> {
     /// kwarg merges on top of whichever base was selected here.
     group_platforms: Arc<HashMap<String, ExecutionPlatformResolution>>,
     claimed_output_paths: DirectoryBuilder<Option<FileSpan>, NoDigest>,
+    root_cell_name: Option<CellName>,
     /// Bazel-compat: map from path string → artifact so duplicate declare_file calls return same artifact.
     path_to_artifact: SmallMap<String, DeclaredArtifact<'v>>,
 }
@@ -127,6 +129,24 @@ impl<'v> ActionsRegistry<'v> {
         valid_exec_group_names: Arc<[String]>,
         group_platforms: Arc<HashMap<String, ExecutionPlatformResolution>>,
     ) -> Self {
+        Self::new_with_attrs_and_root_cell_name(
+            owner,
+            execution_platform,
+            target_exec_properties,
+            valid_exec_group_names,
+            group_platforms,
+            None,
+        )
+    }
+
+    pub fn new_with_attrs_and_root_cell_name(
+        owner: DeferredHolderKey,
+        execution_platform: ExecutionPlatformResolution,
+        target_exec_properties: Arc<std::collections::BTreeMap<String, String>>,
+        valid_exec_group_names: Arc<[String]>,
+        group_platforms: Arc<HashMap<String, ExecutionPlatformResolution>>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
         Self {
             owner,
             artifacts: Default::default(),
@@ -137,6 +157,7 @@ impl<'v> ActionsRegistry<'v> {
             valid_exec_group_names,
             group_platforms,
             claimed_output_paths: DirectoryBuilder::empty(),
+            root_cell_name,
             path_to_artifact: SmallMap::new(),
         }
     }
@@ -263,10 +284,11 @@ impl<'v> ActionsRegistry<'v> {
             return Ok(existing.dupe());
         }
         self.claim_output_path(&path, declaration_location)?;
-        let out_path = BuildArtifactPath::with_dynamic_actions_action_key(
+        let out_path = BuildArtifactPath::with_dynamic_actions_action_key_and_root_cell_name(
             self.owner.dupe(),
             path,
             path_resolution_method,
+            self.root_cell_name,
         );
         let declared = DeclaredArtifact::new(out_path, output_type, hidden, heap);
         if !self.artifacts.insert(declared.dupe()) {

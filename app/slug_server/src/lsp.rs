@@ -470,6 +470,7 @@ impl<'a> BuckLspContext<'a> {
             })
             .await?;
         let cell_resolver = artifact_fs.cell_resolver();
+        let root_cell_name = cell_resolver.root_cell();
         match ParsedPattern::<ProvidersPatternExtra>::parse_not_relaxed(
             literal,
             if dir_with_allowed_relative_dirs.has_allowed_relative_dir() {
@@ -490,7 +491,11 @@ impl<'a> BuckLspContext<'a> {
                                 // In the case of external cells, we need to actually materialize
                                 // this thing on disk, so treat it like a source artifact
                                 let buildfile: &PackageRelativePath = listing.buildfile().as_ref();
-                                let source_path = SourcePath::new(package.dupe(), buildfile.into());
+                                let source_path = SourcePath::new_with_root_cell_name(
+                                    package.dupe(),
+                                    buildfile.into(),
+                                    Some(root_cell_name),
+                                );
                                 let relative_path =
                                     artifact_fs.resolve_source(source_path.as_ref())?;
                                 let path = self.fs.resolve(&relative_path);

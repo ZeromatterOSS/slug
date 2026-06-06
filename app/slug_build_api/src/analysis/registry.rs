@@ -25,6 +25,7 @@ use slug_artifact::actions::key::ActionKey;
 use slug_artifact::artifact::artifact_type::DeclaredArtifact;
 use slug_artifact::artifact::artifact_type::OutputArtifact;
 use slug_artifact::artifact::build_artifact::BuildArtifact;
+use slug_core::cells::name::CellName;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_core::deferred::key::DeferredHolderKey;
 use slug_core::execution_types::execution::ExecutionPlatformResolution;
@@ -163,13 +164,32 @@ impl<'v> AnalysisRegistry<'v> {
         valid_exec_group_names: std::sync::Arc<[String]>,
         group_platforms: std::sync::Arc<HashMap<String, ExecutionPlatformResolution>>,
     ) -> slug_error::Result<Self> {
+        Self::new_from_owner_and_deferred_with_attrs_and_root_cell_name(
+            execution_platform,
+            self_key,
+            target_exec_properties,
+            valid_exec_group_names,
+            group_platforms,
+            None,
+        )
+    }
+
+    pub fn new_from_owner_and_deferred_with_attrs_and_root_cell_name(
+        execution_platform: ExecutionPlatformResolution,
+        self_key: DeferredHolderKey,
+        target_exec_properties: std::sync::Arc<std::collections::BTreeMap<String, String>>,
+        valid_exec_group_names: std::sync::Arc<[String]>,
+        group_platforms: std::sync::Arc<HashMap<String, ExecutionPlatformResolution>>,
+        root_cell_name: Option<CellName>,
+    ) -> slug_error::Result<Self> {
         Ok(AnalysisRegistry {
-            actions: ActionsRegistry::new_with_attrs(
+            actions: ActionsRegistry::new_with_attrs_and_root_cell_name(
                 self_key.dupe(),
                 execution_platform.dupe(),
                 target_exec_properties,
                 valid_exec_group_names,
                 group_platforms,
+                root_cell_name,
             ),
             anon_targets: (ANON_TARGET_REGISTRY_NEW.get()?)(PhantomData, execution_platform),
             analysis_value_storage: AnalysisValueStorage::new(self_key),

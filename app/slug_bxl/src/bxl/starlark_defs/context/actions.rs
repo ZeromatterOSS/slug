@@ -164,12 +164,19 @@ pub(crate) fn validate_action_instantiation(
         return Err(BxlActionsError::RegistryAlreadyCreated.into());
     } else {
         let execution_platform = bxl_execution_resolution.resolved_execution.clone();
-        let analysis_registry = AnalysisRegistry::new_from_owner(
-            this.current_bxl()
-                .dupe()
-                .into_base_deferred_key(bxl_execution_resolution.clone()),
-            execution_platform,
-        )?;
+        let analysis_registry =
+            AnalysisRegistry::new_from_owner_and_deferred_with_attrs_and_root_cell_name(
+                execution_platform,
+                DeferredHolderKey::Base(
+                    this.current_bxl()
+                        .dupe()
+                        .into_base_deferred_key(bxl_execution_resolution.clone()),
+                ),
+                std::sync::Arc::new(std::collections::BTreeMap::new()),
+                std::sync::Arc::from(Vec::<String>::new()),
+                std::sync::Arc::new(std::collections::HashMap::new()),
+                Some(this.cell_resolver().root_cell()),
+            )?;
 
         *registry = Some(analysis_registry);
     }

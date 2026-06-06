@@ -14,6 +14,7 @@ use dupe::Dupe;
 use slug_util::arc_str::ArcS;
 
 use crate::cells::cell_path::CellPath;
+use crate::cells::name::CellName;
 use crate::package::PackageLabel;
 use crate::package::package_relative_path::PackageRelativePath;
 
@@ -34,12 +35,30 @@ use crate::package::package_relative_path::PackageRelativePath;
 pub struct SourcePath {
     pkg: PackageLabel,
     path: ArcS<PackageRelativePath>,
+    root_cell_name: Option<CellName>,
 }
 
 impl SourcePath {
     #[inline]
     pub fn new(pkg: PackageLabel, path: ArcS<PackageRelativePath>) -> Self {
-        SourcePath { pkg, path }
+        SourcePath {
+            pkg,
+            path,
+            root_cell_name: None,
+        }
+    }
+
+    #[inline]
+    pub fn new_with_root_cell_name(
+        pkg: PackageLabel,
+        path: ArcS<PackageRelativePath>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        SourcePath {
+            pkg,
+            path,
+            root_cell_name,
+        }
     }
 
     /// This is slow, but OK to use in tests.
@@ -70,6 +89,7 @@ impl SourcePath {
         SourcePathRef {
             pkg: self.pkg.dupe(),
             path: &self.path,
+            root_cell_name: self.root_cell_name,
         }
     }
 }
@@ -79,12 +99,30 @@ impl SourcePath {
 pub struct SourcePathRef<'a> {
     pkg: PackageLabel,
     path: &'a ArcS<PackageRelativePath>,
+    root_cell_name: Option<CellName>,
 }
 
 impl<'a> SourcePathRef<'a> {
     #[inline]
     pub fn new(pkg: PackageLabel, path: &'a ArcS<PackageRelativePath>) -> SourcePathRef<'a> {
-        SourcePathRef { pkg, path }
+        SourcePathRef {
+            pkg,
+            path,
+            root_cell_name: None,
+        }
+    }
+
+    #[inline]
+    pub fn new_with_root_cell_name(
+        pkg: PackageLabel,
+        path: &'a ArcS<PackageRelativePath>,
+        root_cell_name: Option<CellName>,
+    ) -> SourcePathRef<'a> {
+        SourcePathRef {
+            pkg,
+            path,
+            root_cell_name,
+        }
     }
 
     #[inline]
@@ -95,6 +133,11 @@ impl<'a> SourcePathRef<'a> {
     #[inline]
     pub fn path(&self) -> &PackageRelativePath {
         self.path
+    }
+
+    #[inline]
+    pub fn root_cell_name(&self) -> Option<CellName> {
+        self.root_cell_name
     }
 
     #[inline]
@@ -109,6 +152,7 @@ impl<'a> SourcePathRef<'a> {
         SourcePath {
             pkg: self.pkg.dupe(),
             path: self.path.dupe(),
+            root_cell_name: self.root_cell_name,
         }
     }
 }

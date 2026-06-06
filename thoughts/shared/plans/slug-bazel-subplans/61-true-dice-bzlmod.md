@@ -317,16 +317,28 @@ Landed this session:
   workspace `ProjectRoot` through `make_bzlmod_cell_resolver`); resolver
   runtime-cell creation + the cell-graph symlink install loop use it instead of
   the process-global `dynamic_project_root()`.
+- **Item 5 (artifact path root-cell process-global):** build/source artifact
+  path data now carries an optional resolver-owned root cell stamp. Rule
+  analysis, aspects, BXL action/fs paths, native genrule/genquery outputs, run
+  metadata outputs, dynamic lambdas, and LSP source materialization stamp paths
+  from their owning resolver/`ArtifactFs`, and `ArtifactPath` short/display/full/root
+  formatting no longer has production direct calls to the root-cell process
+  global. Validation: focused `slug_execute` stale-global artifact path
+  regression, `cargo test -p slug_execute artifact_path --lib -- --nocapture`,
+  and touched-crate `cargo check -p slug_core -p slug_execute -p slug_build_api
+  -p slug_analysis -p slug_anon_target -p slug_action_impl -p slug_bxl -p
+  slug_server`.
 
 Remaining (next-up, none a quick slice — see `61-01`/`61-02` Status sections for
 detail):
 - **Item 5 tail:** delete the `ROOT_CELL_NAME` / `EXTERNAL_CELL_NAMES`
   process-globals (slug_core `cells.rs:129/133`, written by the resolver
-  ctor ~2621/2624). Blocked on converting their pub adapter readers
+  ctor ~2621/2624). Artifact path formatting now consumes explicit root stamps
+  for owner-aware production paths, but the pub adapter readers
   (`is_root_cell_name` / `get_external_cell_names` / `is_known_external_cell_name`)
-  at ~25 call sites across 13 files / 7 crates to take a resolver — a wholesale
-  cross-crate campaign; partial conversion does NOT shrink the bridge. Other
-  remaining `dynamic_project_root()` reads (`host_llvm_toolchain_bin`,
+  still need conversion across the remaining label/context/node helpers before
+  the process-global bridge can be deleted. Other remaining
+  `dynamic_project_root()` reads (`host_llvm_toolchain_bin`,
   Windows cargo-manifest, kernel-headers scan) are out of item-5 scope
   (host-toolchain helpers); `repository_ctx.rs` ctor read is already `#[cfg(test)]`.
 - **Item 6:** `use_extension(isolate=True)` — needs Bazel's

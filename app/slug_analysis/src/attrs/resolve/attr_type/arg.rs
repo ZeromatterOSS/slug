@@ -148,7 +148,11 @@ fn resolve_configured_macro<'v>(
             Ok(ResolvedMacro::ArgLike(FrozenCommandLineArg::new(run_info)?))
         }
         ConfiguredMacro::Source(p) => {
-            let buck_path = SourcePath::new(pkg.dupe(), p.path().dupe());
+            let buck_path = SourcePath::new_with_root_cell_name(
+                pkg.dupe(),
+                p.path().dupe(),
+                ctx.root_cell_name().cloned(),
+            );
             Ok(ResolvedMacro::Source(SourceArtifact::new(buck_path).into()))
         }
         ConfiguredMacro::UserUnkeyedPlaceholder(name) => {

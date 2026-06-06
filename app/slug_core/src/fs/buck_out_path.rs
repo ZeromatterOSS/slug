@@ -107,6 +107,10 @@ struct BuildArtifactPathData {
     path: Box<ForwardRelativePath>,
     /// How the path is resolved
     path_resolution_method: BuckOutPathKind,
+    /// Resolver-owned root cell name for formatting Bazel-style root vs.
+    /// external artifact paths. `None` is kept for bootstrap/test callers that
+    /// do not have a resolver owner yet.
+    root_cell_name: Option<CellName>,
 }
 
 /// Represents a resolvable path corresponding to outputs of rules that are part
@@ -147,10 +151,39 @@ impl BuildArtifactPath {
         path: ForwardRelativePathBuf,
         path_resolution_method: BuckOutPathKind,
     ) -> Self {
+        Self::with_dynamic_actions_action_key_and_root_cell_name(
+            owner,
+            path,
+            path_resolution_method,
+            None,
+        )
+    }
+
+    pub fn with_root_cell_name(
+        owner: BaseDeferredKey,
+        path: ForwardRelativePathBuf,
+        path_resolution_method: BuckOutPathKind,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        Self::with_dynamic_actions_action_key_and_root_cell_name(
+            DeferredHolderKey::Base(owner),
+            path,
+            path_resolution_method,
+            root_cell_name,
+        )
+    }
+
+    pub fn with_dynamic_actions_action_key_and_root_cell_name(
+        owner: DeferredHolderKey,
+        path: ForwardRelativePathBuf,
+        path_resolution_method: BuckOutPathKind,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
         BuildArtifactPath(Arc::new(BuildArtifactPathData {
             owner,
             path: path.into_box(),
             path_resolution_method,
+            root_cell_name,
         }))
     }
 
@@ -168,6 +201,10 @@ impl BuildArtifactPath {
 
     pub fn path_resolution_method(&self) -> BuckOutPathKind {
         self.0.path_resolution_method
+    }
+
+    pub fn root_cell_name(&self) -> Option<CellName> {
+        self.0.root_cell_name
     }
 
     pub fn is_content_based_path(&self) -> bool {

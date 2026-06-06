@@ -440,10 +440,15 @@ impl AnonTargetKey {
                     self.0
                         .resolve_attrs(&env, dependents_analyses, exec_resolution.clone())?;
 
-                let registry = AnalysisRegistry::new_from_owner(
-                    BaseDeferredKey::AnonTarget(self.0.dupe()),
-                    exec_resolution,
-                )?;
+                let registry =
+                    AnalysisRegistry::new_from_owner_and_deferred_with_attrs_and_root_cell_name(
+                        exec_resolution,
+                        DeferredHolderKey::Base(BaseDeferredKey::AnonTarget(self.0.dupe())),
+                        std::sync::Arc::new(std::collections::BTreeMap::new()),
+                        std::sync::Arc::from(Vec::<String>::new()),
+                        std::sync::Arc::new(std::collections::HashMap::new()),
+                        None,
+                    )?;
 
                 let ctx = AnalysisContext::prepare(
                     eval.heap(),

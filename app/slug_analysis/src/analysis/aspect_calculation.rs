@@ -701,9 +701,16 @@ async fn execute_aspect(
                     aspect_type: aspect_type_for_registry.dupe(),
                 },
             );
-            let registry = AnalysisRegistry::new_from_owner(
-                BaseDeferredKey::Aspect(aspect_deferred_key),
+            let aspect_root_cell_name = Some(ctx.get_cell_resolver().await?.root_cell());
+            let registry = AnalysisRegistry::new_from_owner_and_deferred_with_attrs_and_root_cell_name(
                 execution_platform,
+                slug_core::deferred::key::DeferredHolderKey::Base(BaseDeferredKey::Aspect(
+                    aspect_deferred_key,
+                )),
+                std::sync::Arc::new(std::collections::BTreeMap::new()),
+                std::sync::Arc::from(Vec::<String>::new()),
+                std::sync::Arc::new(std::collections::HashMap::new()),
+                aspect_root_cell_name,
             )?;
 
             // 6. Set up Starlark evaluator
@@ -711,7 +718,6 @@ async fn execute_aspect(
             let eval_provider = StarlarkEvaluatorProvider::new(ctx, eval_kind).await?;
             let mut reentrant_eval =
                 eval_provider.make_reentrant_evaluator(&env, cancellations.into())?;
-            let aspect_root_cell_name = Some(ctx.get_cell_resolver().await?.root_cell());
 
             // 7. Execute aspect implementation function (inlined from run_aspect_basic)
             let (aspect_context, provider_collection) = reentrant_eval.with_evaluator(|eval| {
