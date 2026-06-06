@@ -77,6 +77,9 @@ pub struct ModuleContext {
     modules: Vec<SerializedModule>,
     /// Whether the root module has a non-dev dependency on this extension.
     root_module_has_non_dev_dependency: bool,
+    /// Whether this extension execution is for an isolated use_extension()
+    /// instance.
+    is_isolated: bool,
     /// TEMPORARY working directory for I/O during extension evaluation.
     /// This is deleted when the extension completes - NOT the repository output.
     /// Use `with_temp_working_dir()` to set this.
@@ -147,6 +150,7 @@ impl ModuleContext {
         Self {
             modules: serialized_modules,
             root_module_has_non_dev_dependency,
+            is_isolated: false,
             working_dir: None,
             delete_on_close: true,
             project_root: None,
@@ -166,6 +170,7 @@ impl ModuleContext {
         Self {
             modules,
             root_module_has_non_dev_dependency,
+            is_isolated: false,
             working_dir: None,
             delete_on_close: true,
             project_root: None,
@@ -182,6 +187,7 @@ impl ModuleContext {
         Self {
             modules: Vec::new(),
             root_module_has_non_dev_dependency: false,
+            is_isolated: false,
             working_dir: None,
             delete_on_close: true,
             project_root: None,
@@ -212,6 +218,11 @@ impl ModuleContext {
     pub fn with_temp_working_dir(mut self, dir: PathBuf) -> Self {
         self.working_dir = Some(Arc::new(dir));
         self.delete_on_close = true; // Ensure this is always true
+        self
+    }
+
+    pub fn with_isolated(mut self, is_isolated: bool) -> Self {
+        self.is_isolated = is_isolated;
         self
     }
 
@@ -589,7 +600,7 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
                 Some(Value::new_bool(self.root_module_has_non_dev_dependency))
             }
             // Whether this extension is isolated (Bazel 7.1+)
-            "is_isolated" => Some(Value::new_bool(false)),
+            "is_isolated" => Some(Value::new_bool(self.is_isolated)),
             // Root module's direct (non-dev) bazel_dep labels
             "root_module_direct_deps" => Some(Value::new_none()),
             // Root module's direct dev bazel_dep labels

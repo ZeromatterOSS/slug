@@ -84,6 +84,12 @@ pub struct AggregatedExtension {
     /// The extension name.
     pub extension_name: String,
 
+    /// Whether this aggregation represents one isolated extension usage.
+    pub isolated: bool,
+
+    /// Bazel isolation key when `isolated` is true.
+    pub isolation_key: Option<String>,
+
     /// Tags grouped by module that applied them.
     /// Key is module name, value is the tags from that module.
     pub tags_by_module: HashMap<String, Vec<ExtensionTag>>,
@@ -99,6 +105,8 @@ impl AggregatedExtension {
             extension_id: format!("{}%{}", bzl_file, name),
             extension_bzl_file: bzl_file.to_string(),
             extension_name: name.to_string(),
+            isolated: false,
+            isolation_key: None,
             tags_by_module: HashMap::new(),
             imported_repos: Vec::new(),
         }
@@ -173,11 +181,7 @@ pub fn aggregate_extensions_with_policy(
             // AggregatedExtension; otherwise the consumer's tags + root-ness
             // live in one entry and the owner's in another, and whichever
             // the executor happens to look up is missing half the data.
-            let ext_id = canonical_extension_id(
-                &usage.extension_bzl_file,
-                &usage.extension_name,
-                module_name,
-            );
+            let ext_id = canonical_extension_id_for_usage(usage, module_name);
 
             let agg = aggregated.entry(ext_id.clone()).or_insert_with(|| {
                 let resolved_bzl_file =
@@ -188,6 +192,8 @@ pub fn aggregate_extensions_with_policy(
                     };
                 let mut ext = AggregatedExtension::new(&resolved_bzl_file, &usage.extension_name);
                 ext.extension_id = ext_id.clone();
+                ext.isolated = usage.isolate;
+                ext.isolation_key = usage.isolation_key.clone();
                 ext
             });
 
@@ -234,6 +240,27 @@ pub fn canonical_extension_id(
         extension_bzl_file.to_owned()
     };
     format!("{resolved}%{extension_name}")
+}
+
+/// Build the canonical extension id for a concrete `use_extension()` usage.
+///
+/// Isolated usages carry Bazel's extra `%<module-key>+<exported-name>` suffix,
+/// so they aggregate and materialize independently from non-isolated usages of
+/// the same extension symbol.
+pub fn canonical_extension_id_for_usage(
+    usage: &ExtensionUsage,
+    declaring_module_name: &str,
+) -> String {
+    let mut id = canonical_extension_id(
+        &usage.extension_bzl_file,
+        &usage.extension_name,
+        declaring_module_name,
+    );
+    if let Some(isolation_key) = &usage.isolation_key {
+        id.push('%');
+        id.push_str(isolation_key);
+    }
+    id
 }
 
 /// Result of executing a module extension.
@@ -448,6 +475,34 @@ mod tests {
         assert_eq!(pip_ext.tags_by_module.len(), 2);
         assert_eq!(pip_ext.all_tags().len(), 2);
         assert_eq!(pip_ext.imported_repos, vec!["pip"]);
+    }
+
+    #[test]
+    fn aggregate_extensions_keeps_isolated_usages_distinct() {
+        let mut first = ExtensionUsage::new("//:ext.bzl".to_owned(), "ext".to_owned());
+        first.isolate = true;
+        first.isolation_key = Some("<root>+first".to_owned());
+        first.tags.push(ExtensionTag::new("config".to_owned()));
+
+        let mut second = ExtensionUsage::new("//:ext.bzl".to_owned(), "ext".to_owned());
+        second.isolate = true;
+        second.isolation_key = Some("<root>+second".to_owned());
+        second.tags.push(ExtensionTag::new("config".to_owned()));
+
+        let mut module_extensions = HashMap::new();
+        module_extensions.insert("root".to_owned(), vec![first, second]);
+
+        let aggregated = aggregate_extensions_with_policy(&module_extensions, Some("root"), false);
+
+        assert_eq!(aggregated.len(), 2);
+        assert!(aggregated.contains_key("@root//:ext.bzl%ext%<root>+first"));
+        assert!(aggregated.contains_key("@root//:ext.bzl%ext%<root>+second"));
+        assert!(
+            aggregated
+                .get("@root//:ext.bzl%ext%<root>+first")
+                .unwrap()
+                .isolated
+        );
     }
 
     #[test]

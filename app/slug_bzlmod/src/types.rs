@@ -356,6 +356,10 @@ pub struct ExtensionUsage {
     /// Isolate this extension usage from other modules (Bazel 6.3+).
     pub isolate: bool,
 
+    /// Bazel's isolation key for isolated usages, rendered as
+    /// `<module-key>+<exported-proxy-name>`.
+    pub isolation_key: Option<String>,
+
     /// Tags applied to this extension (e.g., `pip.parse(...)`).
     pub tags: Vec<ExtensionTag>,
 
@@ -379,6 +383,7 @@ impl ExtensionUsage {
             extension_name,
             dev_dependency: false,
             isolate: false,
+            isolation_key: None,
             tags: Vec::new(),
             imports: Vec::new(),
             repo_overrides: Vec::new(),
@@ -397,7 +402,12 @@ impl ExtensionUsage {
         } else {
             bzl.clone()
         };
-        format!("{}%{}", normalized, self.extension_name)
+        let mut id = format!("{}%{}", normalized, self.extension_name);
+        if let Some(isolation_key) = &self.isolation_key {
+            id.push('%');
+            id.push_str(isolation_key);
+        }
+        id
     }
 }
 

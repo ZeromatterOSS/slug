@@ -244,6 +244,11 @@ pub struct ModuleFileContext {
     /// the included file in a fresh Starlark module so variable bindings do not
     /// cross include boundaries.
     pub include_labels: Vec<String>,
+
+    /// Whether this context is evaluating the root MODULE.bazel. Bazel uses the
+    /// special `<root>` module key for isolated root extension usages even when
+    /// the root module declares a non-empty `module(name = ...)`.
+    pub is_root_module: bool,
 }
 
 fn mark_non_module_called(ctx: &mut ModuleFileContext) {
@@ -307,6 +312,22 @@ starlark_simple_value!(ExtensionProxy);
 
 #[starlark_value(type = "extension_proxy")]
 impl<'v> StarlarkValue<'v> for ExtensionProxy {
+    fn export_as(
+        &self,
+        variable_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<()> {
+        let ctx = get_module_context(eval)?;
+        let mut ctx = ctx.borrow_mut();
+        let isolation_key = module_extension_isolation_key(&ctx, variable_name);
+        if let Some(ext) = ctx.extensions.get_mut(self.extension_index) {
+            if ext.isolate {
+                ext.isolation_key = Some(isolation_key);
+            }
+        }
+        Ok(())
+    }
+
     fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
         // Extension proxies accept any attribute (tag class name)
         true
@@ -332,6 +353,26 @@ impl ExtensionProxy {
     pub fn index(&self) -> usize {
         self.extension_index
     }
+}
+
+fn module_extension_isolation_key(ctx: &ModuleFileContext, variable_name: &str) -> String {
+    if ctx.is_root_module {
+        return format!("<root>+{variable_name}");
+    }
+
+    let Some(module) = ctx.module.as_ref() else {
+        return format!("<root>+{variable_name}");
+    };
+    if module.name.is_empty() {
+        return format!("<root>+{variable_name}");
+    }
+
+    let version = if module.version.is_empty() {
+        String::new()
+    } else {
+        module.version.to_string()
+    };
+    format!("{}@{}+{}", module.name, version, variable_name)
 }
 
 /// A callable that records a tag invocation when called.
@@ -1010,14 +1051,6 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let mut ctx = ctx.borrow_mut();
         mark_non_module_called(&mut ctx);
 
-        if isolate {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "use_extension(isolate = True) requires Bazel's \
-                 --experimental_isolated_extension_usages semantics, which Slug does not yet \
-                 implement"
-            )));
-        }
-
         // Create the extension usage record
         let mut ext = ExtensionUsage::new(extension_bzl_file.to_owned(), extension_name.to_owned());
         ext.dev_dependency = dev_dependency;
@@ -1376,7 +1409,10 @@ fn get_module_context<'v, 'a>(
 
 /// Creates a new ModuleFileContext.
 pub fn new_module_file_context() -> RefCell<ModuleFileContext> {
-    RefCell::new(ModuleFileContext::default())
+    RefCell::new(ModuleFileContext {
+        is_root_module: true,
+        ..ModuleFileContext::default()
+    })
 }
 
 #[cfg(test)]

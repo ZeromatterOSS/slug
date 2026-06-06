@@ -1646,11 +1646,7 @@ fn repo_mapping_overrides_for_root(
             if usage.repo_overrides.is_empty() && usage.injected_repos.is_empty() {
                 continue;
             }
-            let ext_id = crate::canonical_extension_id(
-                &usage.extension_bzl_file,
-                &usage.extension_name,
-                module_name,
-            );
+            let ext_id = crate::canonical_extension_id_for_usage(usage, module_name);
             let entry = overrides.entry(ext_id).or_default();
             for (generated_name, replacement_repo) in &usage.repo_overrides {
                 entry.insert(generated_name.clone(), replacement_repo.clone());

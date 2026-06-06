@@ -127,6 +127,7 @@ impl ModuleFileParseSession {
 
     pub fn allow_ignored_extension_repo_directives(mut self) -> Self {
         self.validate_extension_repo_directives = false;
+        self.context.borrow_mut().is_root_module = false;
         self
     }
 }
@@ -219,6 +220,7 @@ fn parse_module_bazel_content_with_options(
     validate_extension_repo_directives: bool,
 ) -> slug_error::Result<ParsedModuleFile> {
     let context = new_module_file_context();
+    context.borrow_mut().is_root_module = validate_extension_repo_directives;
     eval_module_bazel_content_into_context(content, filename, &context, true)?;
 
     if !context.borrow().include_labels.is_empty() {
@@ -266,6 +268,7 @@ fn parsed_module_file_from_context(
 ) -> slug_error::Result<ParsedModuleFile> {
     // Extract results from context
     let ctx = context.borrow();
+    validate_isolated_extension_usages(&ctx.extensions)?;
     validate_extension_repo_imports(&ctx.extensions)?;
     if validate_extension_repo_directives_flag {
         validate_extension_repo_directives(&ctx.extensions, &ctx.repo_name_usages)?;
@@ -297,6 +300,21 @@ fn parsed_module_file_from_context(
         registered_toolchains: ctx.registered_toolchains.clone(),
         registered_execution_platforms: ctx.registered_execution_platforms.clone(),
     })
+}
+
+fn validate_isolated_extension_usages(
+    extension_usages: &[crate::types::ExtensionUsage],
+) -> slug_error::Result<()> {
+    for ext in extension_usages {
+        if ext.isolate && ext.isolation_key.is_none() {
+            return Err(ModuleParseError::EvalError(format!(
+                "Isolated extension usage for module extension '{}' must be assigned to a top-level variable",
+                ext.extension_name
+            ))
+            .into());
+        }
+    }
+    Ok(())
 }
 
 fn validate_extension_repo_directives(
@@ -1399,16 +1417,32 @@ pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_depen
     }
 
     #[test]
-    fn test_parse_use_extension_with_isolate_errors() {
+    fn test_parse_use_extension_with_isolate_records_root_key() {
         let content = r#"
 module(name = "test", version = "1.0.0")
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", isolate = True)
 "#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        let ext = &parsed.extension_usages[0];
+        assert!(ext.isolate);
+        assert_eq!(ext.isolation_key.as_deref(), Some("<root>+pip"));
+        assert_eq!(
+            ext.extension_id(),
+            "@rules_python//python/extensions:pip.bzl%pip%<root>+pip"
+        );
+    }
+
+    #[test]
+    fn test_parse_use_extension_with_isolate_requires_assignment() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+use_extension("@rules_python//python/extensions:pip.bzl", "pip", isolate = True)
+"#;
         let err = parse_module_bazel_content(content, "MODULE.bazel")
             .unwrap_err()
             .to_string();
-        assert!(err.contains("use_extension(isolate = True)"));
-        assert!(err.contains("experimental_isolated_extension_usages"));
+        assert!(err.contains("Isolated extension usage"));
+        assert!(err.contains("must be assigned to a top-level variable"));
     }
 
     #[test]

@@ -5173,32 +5173,67 @@ module(name = "plan61_late_module_after_include")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
-async def test_isolated_extension_usage_fails_until_supported(
+async def test_isolated_extension_usages_have_distinct_generated_repos(
     buck: Buck,
 ) -> None:
-    """Bazel anchor: isolate=True requires experimental isolated-extension semantics."""
+    """Bazel anchors: ModuleExtensionId isolation key and unique extension name."""
     _write(
         buck.cwd / "MODULE.bazel",
-        """module(name = "plan61_isolate_unsupported")
-ext = use_extension("//:ext.bzl", "ext", isolate = True)
-use_repo(ext, "generated")
+        """module(name = "plan61_isolate_supported")
+first = use_extension("//:ext.bzl", "ext", isolate = True)
+first.config(name = "first")
+use_repo(first, first_repo = "generated")
+
+second = use_extension("//:ext.bzl", "ext", isolate = True)
+second.config(name = "second")
+use_repo(second, second_repo = "generated")
 """,
     )
     _write(
         buck.cwd / "ext.bzl",
-        """def _ext_impl(module_ctx):
-    pass
+        """def _generated_repo_impl(rctx):
+    rctx.file("BUILD.bazel", "exports_files([\\"tag.txt\\"])\\n")
+    rctx.file("tag.txt", rctx.attr.payload + "\\n")
 
-ext = module_extension(implementation = _ext_impl)
+generated_repo = repository_rule(
+    implementation = _generated_repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _ext_impl(module_ctx):
+    if not module_ctx.is_isolated:
+        fail("expected isolated module extension context")
+    tags = []
+    for mod in module_ctx.modules:
+        for config in mod.tags.config:
+            tags.append(config.name)
+    if len(tags) != 1:
+        fail("expected one isolated tag, got %s" % tags)
+    generated_repo(name = "generated", payload = tags[0])
+
+ext = module_extension(
+    implementation = _ext_impl,
+    tag_classes = {
+        "config": tag_class(attrs = {"name": attr.string()}),
+    },
+)
 """,
     )
-    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "x")\n')
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """genrule(
+    name = "joined",
+    srcs = [
+        "@first_repo//:tag.txt",
+        "@second_repo//:tag.txt",
+    ],
+    out = "joined.txt",
+    cmd = "cat $(SRCS) > $OUT",
+)
+""",
+    )
 
-    with pytest.raises(BuckException) as exc:
-        await buck.build("//:x")
-
-    assert "use_extension(isolate = True)" in str(exc.value)
-    assert "experimental_isolated_extension_usages" in str(exc.value)
+    await buck.build("//:joined")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")

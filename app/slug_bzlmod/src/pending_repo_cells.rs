@@ -36,7 +36,8 @@
 //! in slug_common during cell resolver construction.
 
 use crate::extension_execution_dice::ModuleExtensionResult;
-use crate::extension_execution_dice::extract_extension_name;
+use crate::extension_execution_dice::extension_repo_prefix;
+use crate::extensions::canonical_extension_id_for_usage;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::AttrValue;
 use crate::types::ExtensionUsage;
@@ -105,11 +106,7 @@ fn collect_root_extension_repo_overrides(
         }
 
         for usage in &parsed.extension_usages {
-            let ext_id = crate::extensions::canonical_extension_id(
-                &usage.extension_bzl_file,
-                &usage.extension_name,
-                module_name,
-            );
+            let ext_id = canonical_extension_id_for_usage(usage, module_name);
             for (repo_name, dep_name) in &usage.repo_overrides {
                 overrides.insert((ext_id.clone(), repo_name.clone()), dep_name.clone());
             }
@@ -124,8 +121,7 @@ fn collect_root_extension_repo_overrides(
 
 fn canonical_repo_for_extension_import_with_root_overrides(
     usage: &ExtensionUsage,
-    owner_module: &str,
-    ext_name: &str,
+    extension_repo_prefix: &str,
     internal_name: &str,
     root_override: Option<&String>,
     use_usage_overrides: bool,
@@ -139,8 +135,7 @@ fn canonical_repo_for_extension_import_with_root_overrides(
 
     crate::repo_mapping::canonical_repo_for_extension_import_with_usage_overrides(
         usage,
-        owner_module,
-        ext_name,
+        extension_repo_prefix,
         internal_name,
         use_usage_overrides,
     )
@@ -246,12 +241,8 @@ pub fn pre_compute_extension_repo_cells(
             // Match the canonical form used by `aggregate_extensions_with_root`
             // so DICE extension-spoke lookup finds the aggregation for this
             // setup. See `extensions::canonical_extension_id`.
-            let ext_id = crate::extensions::canonical_extension_id(
-                &usage.extension_bzl_file,
-                &usage.extension_name,
-                module_name,
-            );
-            let ext_name = extract_extension_name(&ext_id);
+            let ext_id = canonical_extension_id_for_usage(usage, module_name);
+            let repo_prefix = extension_repo_prefix(&ext_id, root_module_name);
 
             // The canonical name prefix is the module that OWNS the .bzl file, not
             // the module that uses the extension. For `@bazel_features//private:ext.bzl`,
@@ -261,7 +252,8 @@ pub fn pre_compute_extension_repo_cells(
             // Bazel convention: the root module uses `_main` as its canonical prefix
             // (regardless of its declared name, which is only used by OTHER modules
             // to reference it). Extensions defined in the root module's own .bzl files
-            // therefore produce repos like `_main+ext_name+repo_name`.
+            // therefore produce repos like `_main+ext_name+repo_name`, or
+            // Bazel's isolated `_main+_ext+++usage+repo_name` shape.
             // Use the canonical `ext_id` (e.g. `@rules_java//java:extensions.bzl%toolchains`)
             // here, NOT `usage.extension_bzl_file` (e.g. `//java:extensions.bzl`).
             // `extract_owning_module` reads the `@<module>//` prefix; a bare
@@ -288,7 +280,7 @@ pub fn pre_compute_extension_repo_cells(
                         declaring_module: Some(owner_module.clone()),
                     });
                     aliases.push(RepoAlias {
-                        apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
+                        apparent_name: format!("{}+{}", repo_prefix, repo_name),
                         canonical_name: dep_name.clone(),
                         declaring_module: None,
                     });
@@ -300,7 +292,7 @@ pub fn pre_compute_extension_repo_cells(
                         declaring_module: Some(owner_module.clone()),
                     });
                     aliases.push(RepoAlias {
-                        apparent_name: format!("{}+{}+{}", owner_module, ext_name, repo_name),
+                        apparent_name: format!("{}+{}", repo_prefix, repo_name),
                         canonical_name: dep_name.clone(),
                         declaring_module: None,
                     });
@@ -312,8 +304,7 @@ pub fn pre_compute_extension_repo_cells(
                 for repo_name in &import.repos {
                     let canonical = canonical_repo_for_extension_import_with_root_overrides(
                         usage,
-                        &owner_module,
-                        &ext_name,
+                        &repo_prefix,
                         repo_name,
                         root_repo_overrides.get(&(ext_id.clone(), repo_name.clone())),
                         is_root,
@@ -347,8 +338,7 @@ pub fn pre_compute_extension_repo_cells(
                 for (apparent_name, actual_name) in &import.repo_mapping {
                     let canonical = canonical_repo_for_extension_import_with_root_overrides(
                         usage,
-                        &owner_module,
-                        &ext_name,
+                        &repo_prefix,
                         actual_name,
                         root_repo_overrides.get(&(ext_id.clone(), actual_name.clone())),
                         is_root,

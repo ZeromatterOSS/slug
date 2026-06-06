@@ -683,7 +683,8 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         // extension eval non-reusable when only materialization marker state needs
         // checking.
         if !specs.is_empty() {
-            let ext_name = slug_bzlmod::extract_extension_name(&aggregated.extension_id);
+            let repo_prefix =
+                slug_bzlmod::extension_repo_prefix(&aggregated.extension_id, root_module_name);
             // Pass `root_module_name` so the root module's declared name (e.g.
             // `llvm-project-overlay`) is canonicalized to `_main`, matching
             // what `pending_repo_cells.rs` registers for the same repo.
@@ -691,7 +692,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                 serde_json::to_string(repo_env.as_ref()).unwrap_or_else(|_| "{}".to_owned());
 
             for (internal_name, spec) in &specs {
-                let canonical = format!("{}+{}+{}", owning_module, ext_name, internal_name);
+                let canonical = format!("{}+{}", repo_prefix, internal_name);
                 let repo_spec_json = serde_json::to_string(spec).buck_error_context(format!(
                     "Serializing repo spec for generated repo '{}'",
                     canonical

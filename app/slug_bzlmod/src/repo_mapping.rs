@@ -17,9 +17,9 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-use crate::extension_execution_dice::extract_extension_name;
+use crate::extension_execution_dice::extension_repo_prefix;
 use crate::extension_execution_dice::extract_owning_module;
-use crate::extensions::canonical_extension_id;
+use crate::extensions::canonical_extension_id_for_usage;
 use crate::types::ExtensionUsage;
 use crate::types::ParsedModuleFile;
 
@@ -178,13 +178,8 @@ impl BzlmodRepoMapping {
         }
 
         for usage in &parsed.extension_usages {
-            let ext_id = canonical_extension_id(
-                &usage.extension_bzl_file,
-                &usage.extension_name,
-                module_name,
-            );
-            let ext_name = extract_extension_name(&ext_id);
-            let owner_module = extract_owning_module(&ext_id, root_module_name);
+            let ext_id = canonical_extension_id_for_usage(usage, module_name);
+            let repo_prefix = extension_repo_prefix(&ext_id, root_module_name);
 
             for import in &usage.imports {
                 for repo_name in &import.repos {
@@ -192,8 +187,7 @@ impl BzlmodRepoMapping {
                         repo_name.clone(),
                         canonical_repo_for_extension_import_with_usage_overrides(
                             usage,
-                            &owner_module,
-                            &ext_name,
+                            &repo_prefix,
                             repo_name,
                             use_usage_overrides,
                         )
@@ -205,8 +199,7 @@ impl BzlmodRepoMapping {
                         apparent_name.clone(),
                         canonical_repo_for_extension_import_with_usage_overrides(
                             usage,
-                            &owner_module,
-                            &ext_name,
+                            &repo_prefix,
                             actual_name,
                             use_usage_overrides,
                         )
@@ -217,8 +210,7 @@ impl BzlmodRepoMapping {
 
             if use_usage_overrides {
                 for (repo_name, actual_name) in &usage.repo_overrides {
-                    let generated_canonical =
-                        format!("{}+{}+{}", owner_module, ext_name, repo_name);
+                    let generated_canonical = format!("{}+{}", repo_prefix, repo_name);
                     entries.insert(
                         generated_canonical,
                         CanonicalRepoName::new(actual_name.clone()),
@@ -329,10 +321,10 @@ pub fn canonical_repo_for_extension_import(
     ext_name: &str,
     internal_name: &str,
 ) -> ExtensionImportCanonicalization {
+    let repo_prefix = format!("{}+{}", owner_module, ext_name);
     canonical_repo_for_extension_import_with_usage_overrides(
         usage,
-        owner_module,
-        ext_name,
+        &repo_prefix,
         internal_name,
         true,
     )
@@ -341,8 +333,7 @@ pub fn canonical_repo_for_extension_import(
 /// Canonical repository name for one repo imported from a module extension.
 pub fn canonical_repo_for_extension_import_with_usage_overrides(
     usage: &ExtensionUsage,
-    owner_module: &str,
-    ext_name: &str,
+    extension_repo_prefix: &str,
     internal_name: &str,
     use_usage_overrides: bool,
 ) -> ExtensionImportCanonicalization {
@@ -364,8 +355,8 @@ pub fn canonical_repo_for_extension_import_with_usage_overrides(
 
     ExtensionImportCanonicalization {
         canonical_name: CanonicalRepoName::new(format!(
-            "{}+{}+{}",
-            owner_module, ext_name, internal_name
+            "{}+{}",
+            extension_repo_prefix, internal_name
         )),
         is_override: false,
     }
@@ -637,6 +628,28 @@ mod tests {
                 .unwrap()
                 .to_storage_string(),
             "@actual_dep//pkg:target"
+        );
+    }
+
+    #[test]
+    fn canonicalizes_isolated_use_repo_with_unique_extension_name() {
+        let mut module = parsed_module("root");
+        let mut usage = ExtensionUsage::new("//:ext.bzl".to_owned(), "ext".to_owned());
+        usage.isolate = true;
+        usage.isolation_key = Some("<root>+first".to_owned());
+        usage
+            .imports
+            .push(UseRepo::new().add_mapping("first_repo".to_owned(), "generated".to_owned()));
+        module.extension_usages.push(usage);
+
+        let mapping = BzlmodRepoMapping::for_module(&module, "root");
+
+        assert_eq!(
+            mapping
+                .canonicalize_label("@first_repo//:tag.txt")
+                .unwrap()
+                .to_storage_string(),
+            "@_main+_ext+++first+generated//:tag.txt"
         );
     }
 

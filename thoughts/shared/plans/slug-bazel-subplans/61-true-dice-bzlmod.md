@@ -328,6 +328,17 @@ Landed this session:
   and touched-crate `cargo check -p slug_core -p slug_execute -p slug_build_api
   -p slug_analysis -p slug_anon_target -p slug_action_impl -p slug_bxl -p
   slug_server`.
+- **Item 6 (`use_extension(isolate=True)`):** `ExtensionUsage` now records
+  Bazel's exported-proxy isolation key (`<root>+name` for root usages),
+  `ExtensionProxy::export_as` fills it during MODULE.bazel evaluation,
+  extension aggregation/repo mapping/pending cells use isolation-aware
+  extension ids, generated repo names use Bazel's isolated unique-name prefix
+  (for example `_main+_ext+++first+generated`), and `module_ctx.is_isolated`
+  reflects isolated execution. Validation: focused parser, aggregation,
+  repo-mapping, and extension-id Rust regressions plus
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -k
+  isolated_extension_usages_have_distinct_generated_repos -rx --tb=short`.
 
 Remaining (next-up, none a quick slice — see `61-01`/`61-02` Status sections for
 detail):
@@ -341,10 +352,6 @@ detail):
   `dynamic_project_root()` reads (`host_llvm_toolchain_bin`,
   Windows cargo-manifest, kernel-headers scan) are out of item-5 scope
   (host-toolchain helpers); `repository_ctx.rs` ctor read is already `#[cfg(test)]`.
-- **Item 6:** `use_extension(isolate=True)` — needs Bazel's
-  `(owning_module, export_name)` isolation key so isolated usages get a distinct
-  `extension_id` (`types.rs:393` is currently just `"{bzl}%{name}"`); removing the
-  `globals.rs:1013` error without that is a correctness bug. M-L feature.
 - **Item 7:** `RepoMaterializationManifestKey` to own the full repository
   output-tree identity (replace remaining marker trust). L.
 

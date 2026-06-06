@@ -212,6 +212,7 @@ pub fn build_module_context(
     let root_has_non_dev = infos.iter().any(|i| i.is_root);
 
     ModuleContext::from_serialized(serialized_modules, root_has_non_dev)
+        .with_isolated(aggregated.isolated)
 }
 
 /// Build a ModuleContext with version information from a resolved graph.
@@ -239,6 +240,7 @@ pub fn build_module_context_with_versions(
     let root_has_non_dev = infos.iter().any(|i| i.is_root);
 
     ModuleContext::from_serialized(serialized_modules, root_has_non_dev)
+        .with_isolated(aggregated.isolated)
 }
 
 /// Extension execution context.
