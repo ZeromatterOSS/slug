@@ -15,8 +15,8 @@ graph from DICE-owned bzlmod producers, and installs the command resolver from
 `BzlmodCellGraphValue`.
 
 The plan is still not a replay-complete DICE/Skyframe implementation. Remaining
-work is now in repository replay inputs, repository materialization manifests,
-and lockfile policy edges, not in keeping the old resolution bridge alive.
+work is now in root/external cell-name process-global adapters and lockfile
+policy edges, not in keeping the old resolution bridge alive.
 
 Do not mark this plan complete because `//sdk:sdk_contents` passes, because the
 current guardrail file passes, or because a warm daemon smoke reuses the
@@ -32,15 +32,16 @@ Current classification:
   producers; `BzlmodProjectionBridgeDiceKey`, the standalone direct cell-graph
   parser, lockfile-seeded extension-cell preseed, and the fallback-scanned
   extension digest bridge are removed from production code.
-- Replay correctness still has remaining repository/materialization-policy work
-  in places where Bazel owns explicit Skyframe keys, but the old resolver bridge
-  is no longer the active blocker.
+- Replay correctness still has remaining policy work in places where Bazel owns
+  explicit Skyframe keys, but the old resolver bridge is no longer the active
+  blocker.
 - Repository materialization recorded-input manifest content and validation,
   marker/local rule state, BUILD-file layout probes, foreign top-level symlink
   detection, and invocation-specific layout probes for the known
   git/local/llvm repository classes now have production DICE read paths.
   Output-tree digest checks now use DICE-owned metadata, directory-entry, and
-  byte reads.
+  byte reads, and `RepoMaterializationManifestValue` carries that output-tree
+  state independently from complete-marker validation.
 - Module extension recorded-input replay validation uses DICE-backed project
   metadata, directory-entry, and byte-content reads in production; extension
   result/spoke validity no longer reopens recorded inputs synchronously.
@@ -339,6 +340,15 @@ Landed this session:
   `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
   tests/core/bzlmod/test_plan61_guardrails.py -k
   isolated_extension_usages_have_distinct_generated_repos -rx --tb=short`.
+- **Item 7 (manifest output-tree identity):** `RepoMaterializationManifestValue`
+  now carries a first-class `output_tree_state` computed from
+  `RepoMaterializationOutputDigestKey` and includes it in the manifest digest.
+  Complete-marker validation still gates warm reuse, but markerless or
+  incomplete repository trees now change the manifest identity when their
+  output contents change. Validation: focused
+  `cargo test -p slug_bzlmod materialization_manifest_key_observes_output_tree_without_marker
+  --lib -- --nocapture` plus `cargo test -p slug_bzlmod materialization_manifest
+  --lib -- --nocapture` (13 passed).
 
 Remaining (next-up, none a quick slice — see `61-01`/`61-02` Status sections for
 detail):
@@ -352,8 +362,6 @@ detail):
   `dynamic_project_root()` reads (`host_llvm_toolchain_bin`,
   Windows cargo-manifest, kernel-headers scan) are out of item-5 scope
   (host-toolchain helpers); `repository_ctx.rs` ctor read is already `#[cfg(test)]`.
-- **Item 7:** `RepoMaterializationManifestKey` to own the full repository
-  output-tree identity (replace remaining marker trust). L.
 
 Workflow tooling for this plan lives in `.claude/workflows/`
 (`plan61-burn-down.js` survey/rank orchestrator — `MAX_AUTO=0` = survey-only;
@@ -2181,8 +2189,10 @@ hardening behavior around it.
      overlays, and generated files.
    - Replace marker-file trust with a manifest value that proves the current
      repo spec and observed output tree are compatible. The current manifest
-     value has DICE child state for marker/layout/recorded-input checks, but
-     does not yet own the full repository output-tree identity. Known repo-spec
+     value has DICE child state for marker/layout/recorded-input checks plus an
+     independent output-tree state keyed by `RepoMaterializationOutputDigestKey`;
+     complete-marker validation gates reuse, but markerless trees still change
+     the manifest digest when their contents change. Known repo-spec
      extension file-ops now delegates marker/content/output-state staleness,
      recorded-input staleness, missing declared BUILD-file checks, and
      layout-validity probes, including foreign top-level symlink checks, to

@@ -5723,6 +5723,7 @@ pub struct RepoMaterializationManifestValue {
     pub marker_state: Arc<str>,
     pub layout_state: Arc<str>,
     pub recorded_inputs_state: Arc<str>,
+    pub output_tree_state: Arc<str>,
     pub digest: Arc<str>,
 }
 
@@ -5733,12 +5734,14 @@ impl RepoMaterializationManifestValue {
         marker_state: String,
         layout_state: String,
         recorded_inputs_state: String,
+        output_tree_state: String,
     ) -> Self {
         let digest = repo_materialization_manifest_digest(
             &key,
             &marker_state,
             &layout_state,
             &recorded_inputs_state,
+            &output_tree_state,
         );
         Self {
             key,
@@ -5746,14 +5749,18 @@ impl RepoMaterializationManifestValue {
             marker_state: Arc::from(marker_state.as_str()),
             layout_state: Arc::from(layout_state.as_str()),
             recorded_inputs_state: Arc::from(recorded_inputs_state.as_str()),
+            output_tree_state: Arc::from(output_tree_state.as_str()),
             digest: Arc::from(digest.as_str()),
         }
     }
 
     pub fn state_summary(&self) -> String {
         format!(
-            "{};{};{}",
-            self.marker_state, self.layout_state, self.recorded_inputs_state
+            "{};{};{};{}",
+            self.marker_state,
+            self.layout_state,
+            self.recorded_inputs_state,
+            self.output_tree_state
         )
     }
 }
@@ -5763,9 +5770,10 @@ fn repo_materialization_manifest_digest(
     marker_state: &str,
     layout_state: &str,
     recorded_inputs_state: &str,
+    output_tree_state: &str,
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"repo-materialization-manifest-v1");
+    hasher.update(b"repo-materialization-manifest-v2");
     hasher.update([0]);
     update_digest_str(&mut hasher, key.workspace_id.stable_hash());
     update_digest_str(&mut hasher, &key.canonical_repo);
@@ -5773,6 +5781,7 @@ fn repo_materialization_manifest_digest(
     update_digest_str(&mut hasher, marker_state);
     update_digest_str(&mut hasher, layout_state);
     update_digest_str(&mut hasher, recorded_inputs_state);
+    update_digest_str(&mut hasher, output_tree_state);
     hex::encode(hasher.finalize())
 }
 

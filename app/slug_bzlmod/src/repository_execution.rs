@@ -828,11 +828,13 @@ fn repo_materialization_manifest_for_key(
     let marker_state = repo_materialization_marker_state_for_key(key);
     let layout_state = repo_materialization_layout_state_for_key(key);
     let recorded_inputs_state = repo_materialization_recorded_inputs_state_for_key(key);
+    let output_tree_state = repo_materialization_output_tree_state_for_key(key);
     repo_materialization_manifest_from_states(
         key,
         Arc::from(marker_state.as_str()),
         Arc::from(layout_state.as_str()),
         Arc::from(recorded_inputs_state.as_str()),
+        Arc::from(output_tree_state.as_str()),
     )
 }
 
@@ -858,6 +860,19 @@ fn repo_dir_for_materialization_manifest_key(key: &RepoMaterializationManifestKe
         .canonical_project_root
         .join("bazel-external")
         .join(canonical_name)
+}
+
+#[cfg(test)]
+fn repo_materialization_output_tree_state_for_key(key: &RepoMaterializationManifestKey) -> String {
+    let repo_dir = repo_dir_for_materialization_manifest_key(key);
+    repo_materialization_output_tree_state_from_digest(
+        crate::repository_executor::repository_output_digest(&repo_dir)
+            .map(|digest| Arc::from(digest.as_str()))
+            .map_err(|e| {
+                let reason = e.to_string();
+                Arc::from(reason.as_str())
+            }),
+    )
 }
 
 #[cfg(test)]
@@ -1057,6 +1072,7 @@ fn repo_materialization_manifest_from_states(
     marker_state: Arc<str>,
     layout_state: Arc<str>,
     recorded_inputs_state: Arc<str>,
+    output_tree_state: Arc<str>,
 ) -> RepoMaterializationManifestValue {
     RepoMaterializationManifestValue::new(
         key.clone(),
@@ -1064,6 +1080,7 @@ fn repo_materialization_manifest_from_states(
         marker_state.as_ref().to_owned(),
         layout_state.as_ref().to_owned(),
         recorded_inputs_state.as_ref().to_owned(),
+        output_tree_state.as_ref().to_owned(),
     )
 }
 
@@ -1388,6 +1405,73 @@ impl Key for RepoMaterializationOutputDigestKey {
             RepoMaterializationStateValue::untracked(Err(Arc::from(
                 "repository materialization state reader unavailable",
             )))
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        RepoMaterializationStateValue::validity(x)
+    }
+}
+
+#[derive(Clone, Debug, Display, Eq, Allocative)]
+#[display("RepoMaterializationOutputTreeStateKey({})", _0)]
+struct RepoMaterializationOutputTreeStateKey(RepoMaterializationManifestKey);
+
+impl PartialEq for RepoMaterializationOutputTreeStateKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl std::hash::Hash for RepoMaterializationOutputTreeStateKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+fn repo_materialization_output_tree_state_from_digest(
+    digest: Result<Arc<str>, Arc<str>>,
+) -> String {
+    match digest {
+        Ok(digest) => format!("output:{digest}"),
+        Err(reason) => format!("output-unreadable:{reason}"),
+    }
+}
+
+#[async_trait]
+impl Key for RepoMaterializationOutputTreeStateKey {
+    type Value = RepoMaterializationStateValue<Arc<str>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let repo_dir = repo_dir_for_materialization_manifest_key(&self.0);
+        let output_digest_key = RepoMaterializationOutputDigestKey {
+            workspace_id: self.0.workspace_id.clone(),
+            repo_dir: Arc::new(repo_dir),
+        };
+        match ctx.compute(&output_digest_key).await {
+            Ok(output_digest) => {
+                let tracked_by_dice = output_digest.tracked_by_dice;
+                RepoMaterializationStateValue::with_tracking(
+                    Arc::from(
+                        repo_materialization_output_tree_state_from_digest(
+                            output_digest.into_value(),
+                        )
+                        .as_str(),
+                    ),
+                    tracked_by_dice,
+                )
+            }
+            Err(e) => RepoMaterializationStateValue::untracked(Arc::from(
+                format!("output-unreadable:{e}").as_str(),
+            )),
         }
     }
 
@@ -2571,11 +2655,15 @@ impl Key for RepoMaterializationManifestKey {
         let recorded_inputs_state = ctx
             .compute(&RepoMaterializationRecordedInputsStateKey(self.clone()))
             .await?;
+        let output_tree_state = ctx
+            .compute(&RepoMaterializationOutputTreeStateKey(self.clone()))
+            .await?;
         Ok(Arc::new(repo_materialization_manifest_from_states(
             self,
             marker_state.into_value(),
             layout_state.into_value(),
             recorded_inputs_state.into_value(),
+            output_tree_state.into_value(),
         )))
     }
 
@@ -4084,6 +4172,52 @@ mod tests {
         assert_eq!(second.marker_state.as_ref(), format!("marker:{marker}"));
     }
 
+    #[tokio::test]
+    async fn materialization_manifest_key_observes_output_tree_without_marker() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path().to_path_buf();
+        let canonical_name = "_main+ext+output_repo";
+        let repo_dir = project_root.join("bazel-external").join(canonical_name);
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::write(
+            repo_dir.join("BUILD.bazel"),
+            "exports_files([\"data.txt\"])\n",
+        )
+        .unwrap();
+        std::fs::write(repo_dir.join("data.txt"), "fresh").unwrap();
+
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.invalid/archive.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let key = RepoMaterializationManifestKey::for_project_root(
+            project_root.clone(),
+            canonical_name,
+            Arc::new(repo_spec),
+        );
+        let mut dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = dice.compute(&key).await.unwrap().unwrap();
+        assert_eq!(first.marker_state.as_ref(), "marker-absent");
+        assert!(first.output_tree_state.starts_with("output:"));
+
+        std::fs::write(repo_dir.join("data.txt"), "changed").unwrap();
+
+        let mut dice = dice.into_updater().commit().await;
+        let second = dice.compute(&key).await.unwrap().unwrap();
+        assert_eq!(second.marker_state.as_ref(), "marker-absent");
+        assert!(second.output_tree_state.starts_with("output:"));
+        assert_ne!(first.output_tree_state, second.output_tree_state);
+        assert_ne!(first.digest, second.digest);
+    }
+
     #[test]
     fn materialization_state_key_validity_tracks_reader_provenance() {
         let tracked_bool = RepoMaterializationStateValue::tracked(true);
@@ -4115,6 +4249,17 @@ mod tests {
         ));
         assert!(!<RepoMaterializationOutputDigestKey as Key>::validity(
             &untracked_digest
+        ));
+
+        let tracked_output: RepoMaterializationStateValue<Arc<str>> =
+            RepoMaterializationStateValue::tracked(Arc::from("output:sha256-test"));
+        let untracked_output: RepoMaterializationStateValue<Arc<str>> =
+            RepoMaterializationStateValue::untracked(Arc::from("output:sha256-test"));
+        assert!(<RepoMaterializationOutputTreeStateKey as Key>::validity(
+            &tracked_output
+        ));
+        assert!(!<RepoMaterializationOutputTreeStateKey as Key>::validity(
+            &untracked_output
         ));
 
         let validation: RepoMaterializationStateValue<Result<(), Arc<str>>> =
