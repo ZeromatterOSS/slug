@@ -349,19 +349,23 @@ Landed this session:
   `cargo test -p slug_bzlmod materialization_manifest_key_observes_output_tree_without_marker
   --lib -- --nocapture` plus `cargo test -p slug_bzlmod materialization_manifest
   --lib -- --nocapture` (13 passed).
+- **Item 5 tail (root/external cell-name globals):** `ROOT_CELL_NAME` and
+  `EXTERNAL_CELL_NAMES` are deleted from `slug_core::cells`; `CellResolver`
+  construction no longer writes process-global root/external names, and
+  `get_external_cell_names` / `is_known_external_cell_name` are gone.
+  Visibility checks now receive the active resolver root from DICE in
+  configured-node analysis and `audit visibility`; `is_root_cell_name` remains
+  only as a literal legacy `""`/`"root"` helper for no-owner test fallback
+  branches. Validation: `cargo test -p slug_node
+  visibility_uses_explicit_root_cell_name --lib -- --nocapture`, focused
+  `slug_core` dynamic scope / bzlmod-module collision / explicit-root symlink
+  tests, and touched-crate `cargo check -p slug_core -p slug_node -p
+  slug_configured -p slug_cmd_audit_server -p slug_execute -p slug_analysis -p
+  slug_build_api -p slug_interpreter -p slug_interpreter_for_build`.
 
-Remaining (next-up, none a quick slice — see `61-01`/`61-02` Status sections for
-detail):
-- **Item 5 tail:** delete the `ROOT_CELL_NAME` / `EXTERNAL_CELL_NAMES`
-  process-globals (slug_core `cells.rs:129/133`, written by the resolver
-  ctor ~2621/2624). Artifact path formatting now consumes explicit root stamps
-  for owner-aware production paths, but the pub adapter readers
-  (`is_root_cell_name` / `get_external_cell_names` / `is_known_external_cell_name`)
-  still need conversion across the remaining label/context/node helpers before
-  the process-global bridge can be deleted. Other remaining
-  `dynamic_project_root()` reads (`host_llvm_toolchain_bin`,
-  Windows cargo-manifest, kernel-headers scan) are out of item-5 scope
-  (host-toolchain helpers); `repository_ctx.rs` ctor read is already `#[cfg(test)]`.
+Remaining: no open Plan 61 structural implementation item is known in the live
+checkout. Closure still requires the full validation matrix, `/var/mnt/dev/zeromatter-kuro
+//sdk:sdk_contents` Slug/Bazel parity smoke, and independent reviewer sign-off.
 
 Workflow tooling for this plan lives in `.claude/workflows/`
 (`plan61-burn-down.js` survey/rank orchestrator — `MAX_AUTO=0` = survey-only;
@@ -2035,10 +2039,10 @@ hardening behavior around it.
      and metadata label parsing, repo-mapping canonicalization, and normal
      `CellResolver::get` / path projection before any test-only process-global
      fallback can run.
-   - Remaining item-5 work is narrower: audit the remaining root/external
-     cell-name adapter calls and keep only explicit no-owner/test fallbacks.
-     Production paths with a resolver or cell graph should pass that owner
-     through; materialized repository output state remains tracked under item 7.
+   - Item-5 root/external cell-name process globals are removed. Production
+     paths with a resolver or cell graph pass that owner through explicitly;
+     no-owner/test fallbacks now rely only on literal legacy root names rather
+     than mutable process-global root/external state.
    - 2026-05-29 root-adapter reduction: bzlmod runtime symlink replay now calls
      `ensure_external_symlinks_for_cells_with_root_cell(...)` with the root
      module name from `BzlmodCellGraphValue` instead of asking the process-global
@@ -2059,12 +2063,12 @@ hardening behavior around it.
      fallback inside the shared formatting helper. Guardrails: `cargo test -p
      slug_build_api analysis_context_repo_name --lib -- --nocapture`; `cargo
      check -p slug_analysis -p slug_build_api`.
-   - 2026-06-01 analysis-context no-owner fallback narrowed: production
-     analysis-context root classification now requires the explicit DICE root
-     cell; the process-global `ROOT_CELL_NAME` fallback remains available only
-     under tests for no-owner guardrails. Guardrails: `cargo test -p
-     slug_build_api analysis_context_repo_name --lib -- --nocapture`; `cargo
-     check -p slug_build_api`.
+   - 2026-06-01 analysis-context no-owner fallback narrowed, updated
+     2026-06-05: production analysis-context root classification now requires
+     the explicit DICE root cell; after item-5 tail closure the no-owner
+     fallback is a literal legacy root-name helper only. Guardrails: `cargo
+     test -p slug_build_api analysis_context_repo_name --lib -- --nocapture`;
+     `cargo check -p slug_build_api`.
    - 2026-06-01 explicit-root helper fallback audit: platform labels,
      configured source packages, configured-label/BazelLabel workspace names,
      aspect workspace names, BUILD/native label context repo names, and
@@ -2120,14 +2124,15 @@ hardening behavior around it.
      helper in test/no-owner contexts. Guardrails: `cargo test -p
      slug_interpreter_for_build module_context --lib -- --nocapture`; `cargo
      check -p slug_interpreter_for_build`.
-   - 2026-06-01 module_ctx no-root label-resolution helper made test-only:
-     production `ModuleContext` root classification now only uses the explicit
-     root cell installed by `with_label_resolution_and_root_cell(...)`; the
-     no-root `with_label_resolution(...)` helper and process-global root
-     fallback remain available only to tests. This keeps module-extension
-     recorded-input path spelling tied to the active resolver instead of
-     `ROOT_CELL_NAME`. Guardrails: `cargo test -p slug_interpreter_for_build
-     module_ctx --lib`; `cargo check -p slug_interpreter_for_build`.
+   - 2026-06-01 module_ctx no-root label-resolution helper made test-only,
+     updated 2026-06-05: production `ModuleContext` root classification now
+     only uses the explicit root cell installed by
+     `with_label_resolution_and_root_cell(...)`; after item-5 tail closure the
+     no-root helper's fallback is a literal legacy root-name helper only. This
+     keeps module-extension recorded-input path spelling tied to the active
+     resolver instead of mutable process-global root state. Guardrails: `cargo
+     test -p slug_interpreter_for_build module_ctx --lib`; `cargo check -p
+     slug_interpreter_for_build`.
    - 2026-05-29 BUILD/native Starlark repo-name root-adapter reduction:
      BUILD-file `repo_name()` / `repository_name()` and native `Label(...)`
      repo-context canonicalization now use the active `BuildContext`

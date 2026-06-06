@@ -121,18 +121,6 @@ use crate::fs::project::ProjectRoot;
 use crate::fs::project_rel_path::ProjectRelativePath;
 use crate::fs::project_rel_path::ProjectRelativePathBuf;
 
-/// Current root cell name for the temporary Bazel-compatible cell-name adapter.
-///
-/// This remains process state while Plan 61 migrates callers to resolver/DICE
-/// owned identity, but it must not be write-once: a long-lived process can
-/// construct a later resolver with a different root cell.
-static ROOT_CELL_NAME: std::sync::LazyLock<std::sync::RwLock<Option<DynamicBzlmodEntry<String>>>> =
-    std::sync::LazyLock::new(|| std::sync::RwLock::new(None));
-
-/// Global storage for non-root cell names (external repos).
-static EXTERNAL_CELL_NAMES: std::sync::Mutex<Option<DynamicBzlmodEntry<Vec<String>>>> =
-    std::sync::Mutex::new(None);
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct DynamicBzlmodScope {
     project_root: Option<std::path::PathBuf>,
@@ -688,7 +676,7 @@ pub fn canonical_test_dynamic_extension_cell_name(name: &str) -> Option<String> 
     // cell. Kuro has both a direct `zstd` module and an extension repo named
     // `ape+ape_cosmos+zstd`; once a target label is in the `zstd` cell, action
     // source paths must stay under `external/zstd`, not the extension repo.
-    if is_known_external_cell_name(name) {
+    if canonical_bzlmod_module_cell_name(name).is_some() {
         return None;
     }
 
@@ -1624,35 +1612,7 @@ pub fn get_test_dynamic_extension_cell(name: &str) -> Option<String> {
 
 /// Check if a cell name is the root cell (main workspace).
 pub fn is_root_cell_name(cell_name: &str) -> bool {
-    cell_name.is_empty()
-        || cell_name == "root"
-        || ROOT_CELL_NAME
-            .read()
-            .ok()
-            .and_then(|root| {
-                root.as_ref()
-                    .and_then(dynamic_bzlmod_value_for_current_scope)
-            })
-            .is_some_and(|root| root == cell_name)
-}
-
-/// Get all non-root cell names (external repos).
-pub fn get_external_cell_names() -> Vec<String> {
-    EXTERNAL_CELL_NAMES
-        .lock()
-        .ok()
-        .and_then(|names| {
-            names
-                .as_ref()
-                .and_then(dynamic_bzlmod_value_for_current_scope)
-        })
-        .unwrap_or_default()
-}
-
-fn is_known_external_cell_name(name: &str) -> bool {
-    get_external_cell_names()
-        .iter()
-        .any(|cell_name| cell_name == name)
+    cell_name.is_empty() || cell_name == "root"
 }
 
 /// Errors from cell creation
@@ -2625,20 +2585,6 @@ impl CellResolver {
         }
 
         let root_cell = root_cell.ok_or(CellError::NoRootCell)?;
-        // Update the temporary process-level Bazel compatibility adapters.
-        // These are not final Plan 61 ownership, but they must follow the
-        // current resolver rather than the first resolver built in-process.
-        if let Ok(mut current_root_cell) = ROOT_CELL_NAME.write() {
-            *current_root_cell = Some(dynamic_bzlmod_entry(root_cell.as_str().to_owned()));
-        }
-        if let Ok(mut ext_names) = EXTERNAL_CELL_NAMES.lock() {
-            let names = cells_map
-                .keys()
-                .filter(|cell_name| **cell_name != root_cell)
-                .map(|cell_name| cell_name.as_str().to_owned())
-                .collect();
-            *ext_names = Some(dynamic_bzlmod_entry(names));
-        }
         slug_util::memory_checkpoint::checkpoint(
             "cell_resolver_new",
             [
@@ -4767,8 +4713,7 @@ mod tests {
             (external_cell, CellRootPathBuf::testing_new("external_dep")),
         ]);
         let dynamic_cell = CellName::testing_new(canonical);
-        assert!(is_root_cell_name(root_cell.as_str()));
-        assert!(get_external_cell_names().contains(&external_cell.as_str().to_owned()));
+        assert!(!is_root_cell_name(root_cell.as_str()));
         assert_eq!(cells.get(dynamic_cell)?.name(), dynamic_cell);
         assert_eq!(
             cells.get_cell_path(ProjectRelativePath::new(&format!(
@@ -4793,7 +4738,6 @@ mod tests {
         assert_eq!(canonical_test_dynamic_extension_cell_name("repo"), None);
         assert_eq!(canonical_bzlmod_module_cell_name("dep"), None);
         assert!(!is_root_cell_name(root_cell.as_str()));
-        assert!(!get_external_cell_names().contains(&external_cell.as_str().to_owned()));
         assert!(cells.get(dynamic_cell).is_err());
         assert_eq!(
             cells.get_cell_path(ProjectRelativePath::new(&format!(
@@ -4976,28 +4920,20 @@ mod tests {
     }
 
     #[test]
-    fn canonical_dynamic_extension_cell_name_preserves_exact_external_cell() {
+    fn canonical_dynamic_extension_cell_name_preserves_bzlmod_module_cell() {
         let _guard = BZLMOD_APPARENT_ALIAS_CACHE_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
 
-        let apparent = "exact_external_cell_test_unique";
-        let canonical = "owner+extension+exact_external_cell_test_unique";
+        let apparent = "exact_module_cell_test_unique";
+        let canonical = "owner+extension+exact_module_cell_test_unique";
+        std::fs::create_dir_all(tmp.path().join(format!("bazel-external/{apparent}+"))).unwrap();
         register_test_dynamic_extension_cell(
             canonical.to_owned(),
             format!("bazel-external/{canonical}"),
         );
 
-        let original = {
-            let mut names = EXTERNAL_CELL_NAMES.lock().unwrap();
-            let original = names.clone();
-            *names = Some(dynamic_bzlmod_entry(vec![apparent.to_owned()]));
-            original
-        };
-
         let resolved = canonical_test_dynamic_extension_cell_name(apparent);
-
-        *EXTERNAL_CELL_NAMES.lock().unwrap() = original;
 
         assert_eq!(None, resolved);
     }
@@ -5500,10 +5436,6 @@ mod tests {
         std::fs::create_dir_all(&current_root_dir).unwrap();
         std::fs::create_dir_all(&dep_dir).unwrap();
         reset_dynamic_bzlmod_state_for_project_root(project_root.to_path_buf());
-        if let Ok(mut root) = ROOT_CELL_NAME.write() {
-            *root = Some(dynamic_bzlmod_entry("stale_root".to_owned()));
-        }
-
         ensure_external_symlinks_for_cells_with_root_cell(
             Some("current_root"),
             &[("current_root", "current_root"), ("dep", "dep")],

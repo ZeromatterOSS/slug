@@ -13,6 +13,7 @@ use dice::DiceTransaction;
 use dupe::Dupe;
 use slug_cli_proto::ClientContext;
 use slug_cmd_audit_client::visibility::AuditVisibilityCommand;
+use slug_common::dice::cells::HasCellResolver;
 use slug_common::pattern::parse_from_cli::parse_patterns_from_cli_args;
 use slug_core::pattern::pattern_type::TargetPatternExtra;
 use slug_node::load_patterns::MissingTargetBehavior;
@@ -62,13 +63,14 @@ async fn verify_visibility(
     })
     .await?;
 
+    let root_cell_name = ctx.get_cell_resolver().await?.root_cell();
     let mut visibility_errors = Vec::new();
 
     for target in new_targets.iter() {
         for dep in target.deps() {
             match new_targets.get(dep) {
                 Some(val) => {
-                    if !val.is_visible_to(target.label())? {
+                    if !val.is_visible_to(target.label(), root_cell_name.dupe())? {
                         visibility_errors.push(VisibilityError::NotVisibleTo(
                             dep.dupe(),
                             target.label().dupe(),

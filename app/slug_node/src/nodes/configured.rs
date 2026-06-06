@@ -22,6 +22,7 @@ use once_cell::sync::Lazy;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::bzl::ImportPath;
 use slug_core::cells::cell_path::CellPath;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::data::ConfigurationData;
 use slug_core::configuration::pair::ConfigurationNoExec;
 use slug_core::configuration::transition::applied::TransitionApplied;
@@ -138,10 +139,16 @@ impl TargetNodeOrForward {
         }
     }
 
-    fn is_visible_to(&self, target: &TargetLabel) -> slug_error::Result<bool> {
+    fn is_visible_to(
+        &self,
+        target: &TargetLabel,
+        root_cell_name: CellName,
+    ) -> slug_error::Result<bool> {
         match self {
-            TargetNodeOrForward::TargetNode(node) => node.is_visible_to(target),
-            TargetNodeOrForward::Forward(_, forward) => forward.is_visible_to(target),
+            TargetNodeOrForward::TargetNode(node) => node.is_visible_to(target, root_cell_name),
+            TargetNodeOrForward::Forward(_, forward) => {
+                forward.is_visible_to(target, root_cell_name)
+            }
         }
     }
 
@@ -440,8 +447,12 @@ impl ConfiguredTargetNode {
         self.0.target_node.buildfile_path()
     }
 
-    pub fn is_visible_to(&self, target: &TargetLabel) -> slug_error::Result<bool> {
-        self.0.target_node.is_visible_to(target)
+    pub fn is_visible_to(
+        &self,
+        target: &TargetLabel,
+        root_cell_name: CellName,
+    ) -> slug_error::Result<bool> {
+        self.0.target_node.is_visible_to(target, root_cell_name)
     }
 
     #[inline]

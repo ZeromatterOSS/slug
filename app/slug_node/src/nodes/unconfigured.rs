@@ -19,7 +19,7 @@ use dupe::Dupe;
 use pagable::Pagable;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::cells::cell_path::CellPath;
-use slug_core::cells::is_root_cell_name;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::transition::id::TransitionId;
 use slug_core::package::source_path::SourcePathRef;
 use slug_core::plugins::PluginKind;
@@ -328,7 +328,11 @@ impl TargetNode {
     ///
     /// Only intra-cell refs inside the root cell consult the declared
     /// visibility spec.
-    pub fn is_visible_to(&self, target: &TargetLabel) -> slug_error::Result<bool> {
+    pub fn is_visible_to(
+        &self,
+        target: &TargetLabel,
+        root_cell_name: CellName,
+    ) -> slug_error::Result<bool> {
         if self.label().pkg() == target.pkg() {
             return Ok(true);
         }
@@ -336,7 +340,7 @@ impl TargetNode {
             return Ok(true);
         }
         let cell_name = self.label().pkg().cell_name();
-        if !is_root_cell_name(cell_name.as_str()) {
+        if cell_name != root_cell_name {
             return Ok(true);
         }
         let vis = self.visibility()?;
@@ -820,5 +824,78 @@ pub mod testing {
             })
             .collect::<slug_error::Result<Map<String, Value>>>()?;
         Ok(Value::from(map))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use slug_core::cells::name::CellName;
+    use slug_fs::paths::file_name::FileNameBuf;
+    use starlark_map::ordered_map::OrderedMap;
+
+    use super::*;
+    use crate::attrs::spec::internal::VISIBILITY_ATTRIBUTE;
+    use crate::rule::RuleIncomingTransition;
+    use crate::rule_type::NativeRuleKind;
+    use crate::visibility::VisibilitySpecification;
+
+    fn target_with_visibility(label: &str, patterns: &[&str]) -> TargetNode {
+        let label = TargetLabel::testing_parse(label);
+        let mut attributes = AttrValues::with_capacity(1);
+        attributes.push_sorted(
+            VISIBILITY_ATTRIBUTE.id,
+            CoercedAttr::Visibility(VisibilitySpecification::testing_parse(patterns)),
+        );
+        let buildfile_path = Arc::new(BuildFilePath::new(
+            label.pkg().dupe(),
+            FileNameBuf::unchecked_new("BUILD.bazel"),
+        ));
+        TargetNode::new(
+            Arc::new(Rule {
+                attributes: AttributeSpec::testing_new(OrderedMap::new()),
+                rule_type: RuleType::Native(NativeRuleKind::Filegroup),
+                rule_kind: RuleKind::Normal,
+                cfg: RuleIncomingTransition::None,
+                uses_plugins: Vec::new(),
+                is_test: false,
+                is_executable: false,
+                provides: Vec::new(),
+                toolchain_types: Vec::new(),
+                exec_group_defs: Vec::new(),
+                fragments: Vec::new(),
+                build_setting_type: None,
+                build_setting_is_flag: false,
+            }),
+            Arc::new(Package {
+                buildfile_path,
+                oncall: None,
+            }),
+            label,
+            attributes,
+            CoercedDeps::default(),
+            None,
+            None,
+            false,
+        )
+    }
+
+    #[test]
+    fn visibility_uses_explicit_root_cell_name() {
+        let private_dep =
+            target_with_visibility("@workspace//pkg:private_dep", &["workspace//pkg:__pkg__"]);
+        let depending_target = TargetLabel::testing_parse("@workspace//other:target");
+
+        assert!(
+            private_dep
+                .is_visible_to(&depending_target, CellName::testing_new("external"))
+                .unwrap()
+        );
+        assert!(
+            !private_dep
+                .is_visible_to(&depending_target, CellName::testing_new("workspace"))
+                .unwrap()
+        );
     }
 }

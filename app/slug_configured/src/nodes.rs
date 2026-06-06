@@ -33,6 +33,7 @@ use slug_build_signals::node_key::BuildSignalsNodeKey;
 use slug_build_signals::node_key::BuildSignalsNodeKeyImpl;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::cycles::CycleGuard;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::build_setting::BuildSettingLabel;
 use slug_core::configuration::build_setting::BuildSettingValue;
 use slug_core::configuration::compatibility::IncompatiblePlatformReason;
@@ -511,6 +512,7 @@ async fn check_plugin_deps(
     target_label: &ConfiguredTargetLabel,
     plugin_deps: &PluginLists,
 ) -> slug_error::Result<()> {
+    let root_cell_name = ctx.get_cell_resolver().await?.root_cell();
     for (_, dep_label, elem_kind) in plugin_deps.iter() {
         if *elem_kind == PluginListElemKind::Direct {
             let dep_node = ctx
@@ -522,7 +524,7 @@ async fn check_plugin_deps(
             if dep_node.is_toolchain_rule() {
                 return Err(PluginDepError::PluginDepIsToolchainRule(dep_label.dupe()).into());
             }
-            if !dep_node.is_visible_to(target_label.unconfigured())? {
+            if !dep_node.is_visible_to(target_label.unconfigured(), root_cell_name.dupe())? {
                 return Err(VisibilityError::NotVisibleTo(
                     dep_label.dupe(),
                     target_label.unconfigured().dupe(),
@@ -540,13 +542,21 @@ pub(crate) enum CheckVisibility {
     No,
 }
 
-#[derive(Default)]
 pub(crate) struct ErrorsAndIncompatibilities {
+    root_cell_name: CellName,
     errs: Vec<slug_error::Error>,
     incompats: Vec<Arc<IncompatiblePlatformReason>>,
 }
 
 impl ErrorsAndIncompatibilities {
+    fn new(root_cell_name: CellName) -> Self {
+        Self {
+            root_cell_name,
+            errs: Vec::new(),
+            incompats: Vec::new(),
+        }
+    }
+
     fn unpack_dep_into(
         &mut self,
         target_label: &TargetConfiguredTargetLabel,
@@ -577,7 +587,7 @@ impl ErrorsAndIncompatibilities {
                 if CheckVisibility::No == check_visibility {
                     return Some(dep);
                 }
-                match dep.is_visible_to(target_label.unconfigured()) {
+                match dep.is_visible_to(target_label.unconfigured(), self.root_cell_name.dupe()) {
                     Ok(true) => {
                         return Some(dep);
                     }
@@ -857,8 +867,9 @@ pub(crate) async fn gather_deps(
 
     let mut plugin_lists = traversal.plugin_lists;
     let implicit_deps = traversal.implicit_deps;
+    let root_cell_name = ctx.get_cell_resolver().await?.root_cell();
     let mut deps = Vec::new();
-    let mut errors_and_incompats = ErrorsAndIncompatibilities::default();
+    let mut errors_and_incompats = ErrorsAndIncompatibilities::new(root_cell_name);
     for (res, (label, plugin_kind_sets)) in dep_results.into_iter().zip(traversal.deps) {
         // Implicit attrs (starting with `_`) bypass visibility checks, matching Bazel semantics.
         let visibility = if implicit_deps.contains(&label) {
