@@ -241,7 +241,7 @@ tables below preserve historical coverage and per-plan status.
 
 | Priority | Plan | Why now | Exit criteria |
 |----------|------|---------|---------------|
-| 1 | [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md) | Current bzlmod is functional, but the semantic graph is still partly computed outside DICE and supported by globals, lockfile caches, markers, stubs, and repair paths. | Parsed modules, resolved graph, repo mappings, extension aggregation/results, repo specs, and materialization manifests are DICE-owned; process globals and bzlmod stub/repair paths are retired. |
+| 1 | [62-bzlmod-replay-parity-followups.md](./slug-bazel-subplans/62-bzlmod-replay-parity-followups.md) | Post-Plan-61 audit found real replay/parity gaps: external-cell direct reads under cacheable DICE keys, refresh-mode registry metadata, multiple-version canonical repo identity, extension unique-name disambiguation, and lockfile shape. | High stale-replay surfaces fixed; multiple-version and extension unique names match Bazel 9; Bazel-visible lockfile shape is exact; focused guardrails and bzlmod validation matrix pass. |
 | 2 | [46-directory-paths-in-filegroup-srcs.md](./slug-bazel-subplans/46-directory-paths-in-filegroup-srcs.md) | Unblocks LLVM toolchain analysis reached during zeromatter/rules_rust verification. | Directory paths in `filegroup.srcs` coerce as source directories; zeromatter advances past `llvm-toolchain-minimal...//:lib/clang/22`. |
 | 3 | [45-per-args-paramfile-and-cargo-runfiles.md](./slug-bazel-subplans/45-per-args-paramfile-and-cargo-runfiles.md) | Unblocks rules_rust `cargo_build_script_runner` by honoring nested `args.use_param_file(use_always=True)`. | `cargo_build_script` runfiles args arrive via `--cargo_manifest_args=@...`; the local cargo-runfiles heuristic is deleted. |
 | 4 | [44-workspace-layout-parity.md](./slug-bazel-subplans/44-workspace-layout-parity.md) Phase 2.6 | Replaces the frozen shared-execroot collision allowlist with per-action prefix narrowing. | Action cwd exposes only declared top-level prefixes; no new collision-name entries are added. |
@@ -263,6 +263,7 @@ tables below preserve historical coverage and per-plan status.
 | 48 | Existing stub inventory | Small parity-gap closure | Groups genquery, stamping, proto, and platform-fragment gaps until any item needs a standalone plan. |
 | 49 | Plan 44 layout policy | Repo hygiene | Adds checks so generated layout artifacts do not re-enter commits. |
 | 61 | Plan 57 lockfile read-only policy, Plan 36/38 spoke materialization, Plan 09/10 historical extension execution work | Replay-correct bzlmod, daemon/watch correctness, and future explicit `slug mod` commands | Owns structural bzlmod DICE ownership; does not re-open the already-useful functional extension path except where globals/stubs/markers undermine correctness. |
+| 62 | Plan 61 closure audit, Bazel 9 bzlmod source citations | Post-Plan-61 bzlmod replay/parity closure | Owns replay/parity gaps discovered after Plan 61: external-cell DICE tracking, refresh metadata, multiple-version identity, extension unique names, lockfile shape, and guardrail gaps. |
 
 ### Plan Hygiene Rules
 
@@ -499,7 +500,7 @@ Quick reference to all phases and their locations:
 | 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment/CoverageFragment; 60+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-12) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; slug test //... runs 4 tests; slug version/shutdown/fetch Bazel-compat commands; ctx.workspace_name/build_file_path attrs; 2026-03-12) |
 
-### Real-World Compatibility and Bazel 9 Follow-ups (Plans 19-61) — CURRENT
+### Real-World Compatibility and Bazel 9 Follow-ups (Plans 19-62) — CURRENT
 
 | Phase | Title                                  | Sub-Plan | Status          |
 | ----- | -------------------------------------- | -------- | --------------- |
@@ -524,6 +525,7 @@ Quick reference to all phases and their locations:
 | 37    | Canonical-cell-prefix routing          | [37-canonical-cell-prefix-routing.md](./slug-bazel-subplans/37-canonical-cell-prefix-routing.md) | [x] Complete |
 | 38    | Spoke registration without lockfile    | [38-spoke-registration-without-lockfile.md](./slug-bazel-subplans/38-spoke-registration-without-lockfile.md) | [x] Complete |
 | 61    | True DICE-owned bzlmod                 | [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md) | [x] Complete: implementation, validation evidence, Kuro parity smoke, and independent reviewer sign-off recorded 2026-06-07 |
+| 62    | Bzlmod Replay and Bazel 9 Parity Follow-ups | [62-bzlmod-replay-parity-followups.md](./slug-bazel-subplans/62-bzlmod-replay-parity-followups.md) | [ ] Proposed: post-Plan-61 audit follow-ups for stale replay, canonical identity, extension unique names, and lockfile shape |
 | 39    | Preserve `.git` from `git_repository`  | [39-git-repository-keep-dot-git.md](./slug-bazel-subplans/39-git-repository-keep-dot-git.md) | [~] Partial: git worktree path works; Starlark override of native built-in remains open |
 | 40    | bazel_lib `relative_file`              | [40-bazel-lib-relative-file.md](./slug-bazel-subplans/40-bazel-lib-relative-file.md) | [x] Complete |
 | 41    | Transition allowlist cfg resolution    | [41-config-transition-allowlist-resolution.md](./slug-bazel-subplans/41-config-transition-allowlist-resolution.md) | [x] Complete |
