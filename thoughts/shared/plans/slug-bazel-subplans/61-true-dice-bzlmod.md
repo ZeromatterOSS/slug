@@ -8,20 +8,21 @@
 
 ## Status
 
-Open. The legacy bzlmod resolution bridge is replaced on the production
-persisted config-load path. That path now gets its resolved module graph,
-projection facts, repo mappings, extension aggregations, registrations, and cell
-graph from DICE-owned bzlmod producers, and installs the command resolver from
-`BzlmodCellGraphValue`.
+Complete as of 2026-06-07. The legacy bzlmod resolution bridge is replaced on
+the production persisted config-load path. That path now gets its resolved
+module graph, projection facts, repo mappings, extension aggregations,
+registrations, and cell graph from DICE-owned bzlmod producers, and installs the
+command resolver from `BzlmodCellGraphValue`.
 
-The plan is still not a replay-complete DICE/Skyframe implementation. Remaining
-work is now in root/external cell-name process-global adapters and lockfile
-policy edges, not in keeping the old resolution bridge alive.
+No open Plan 61 structural implementation item is known in the live checkout as
+of the 2026-06-07 validation pass, and the independent reviewer agent signed
+off with no blockers after reviewing `HEAD~6..HEAD` including final commit
+`9fd6337e`.
 
-Do not mark this plan complete because `//sdk:sdk_contents` passes, because the
-current guardrail file passes, or because a warm daemon smoke reuses the
-transitional bridge. Those are necessary evidence, not sufficient acceptance
-criteria.
+This plan was not closed only because `//sdk:sdk_contents` passed, because the
+guardrail file passed, or because a warm daemon smoke reused existing state.
+Closure required the structural bridge burn-down, the full validation matrix,
+Kuro Slug/Bazel parity evidence, and independent reviewer sign-off.
 
 Current classification:
 
@@ -362,10 +363,57 @@ Landed this session:
   tests, and touched-crate `cargo check -p slug_core -p slug_node -p
   slug_configured -p slug_cmd_audit_server -p slug_execute -p slug_analysis -p
   slug_build_api -p slug_interpreter -p slug_interpreter_for_build`.
+- **Final item 5/36 tail (direct repo-rule materialization and owner label
+  context):** direct `use_repo_rule()` cells visible to `module_ctx` label
+  dereferences now use resolver-owned runtime extension repo setups instead of a
+  missing-spoke fallback. `CellResolver` exposes canonical/internal runtime
+  extension setups from its runtime snapshot and graph-owned dynamic cells;
+  extension execution threads serialized `RepoSpec` setup data into
+  `with_extension_dice_and_repo_rules(...)`; and the materialization bridge
+  constructs an `ExtensionRepoExecutionKey` with the current workspace id,
+  repo-env, and repo mappings when a dereferenced label names a direct
+  repo-rule repo rather than a sibling extension spoke. Root artifact
+  owner/label rendering now carries analysis-time `CellAliasResolver` and root
+  cell context through declared, output, source, filegroup, native genrule, and
+  genquery artifacts without changing artifact identity. This fixed the Kuro SDK
+  manifest gap where root source files were rendered with workspace
+  `"reactor"` instead of Bazel's empty main-workspace owner.
+- **2026-06-07 final validation evidence:** `cargo fmt --check`; `git diff
+  --check`; `cargo check -p slug_analysis -p slug_build_api -p
+  slug_action_impl -p slug_bxl -p slug_bzlmod -p slug_core -p
+  slug_interpreter_for_build`; `cargo build -p slug`; focused owner/repo-rule
+  Python selectors (4 passed); full
+  `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short` (182 passed);
+  `cargo test -p slug_bzlmod` (428 passed, doctests 1 passed/3 ignored);
+  `cargo test -p slug_common bzlmod` (15 passed); `cargo test -p
+  slug_external_cells` (13 passed); and focused `slug_core`, `slug_interpreter`,
+  and `slug_node` explicit-root regressions passed.
+- **2026-06-07 Kuro parity checkpoint:** from `/var/mnt/dev/zeromatter-kuro`,
+  `target/debug/slug --isolation-dir sdk-parity-20260606-plan61-final5 build
+  //sdk:sdk_contents` succeeded with 8,360 local commands and exit status 0.
+  The final SDK tree
+  `buck-out/sdk-parity-20260606-plan61-final5/gen/reactor/2215414805206cf2/sdk/sdk_contents`
+  compared against Bazel 9.0.1 `bazel-bin/sdk/sdk_contents` with 578 Slug
+  entries, 578 Bazel entries, 0 missing, 0 extra, 0 type/mode/symlink diffs, 0
+  non-ELF hash diffs, and only the expected ELF hash diffs for `bin/zerobuf`,
+  `bin/zerosystem`, `bin/zm`, and `lib/libzeromatter_ffi.so`. Stale `slugd` and
+  forkserver processes were cleaned after the smoke.
 
-Remaining: no open Plan 61 structural implementation item is known in the live
-checkout. Closure still requires the full validation matrix, `/var/mnt/dev/zeromatter-kuro
-//sdk:sdk_contents` Slug/Bazel parity smoke, and independent reviewer sign-off.
+- **2026-06-07 independent reviewer sign-off:** the first reviewer-agent
+  attempt failed before producing findings due to the account usage limit. A
+  second independent reviewer agent reviewed `HEAD~6..HEAD`, including
+  `9fd6337e`, against this plan and `AGENTS.md`, reported no blocking findings,
+  and signed off that Plan 61 is eligible to close based on current HEAD and the
+  recorded validation evidence. The reviewer noted a non-blocking future parity
+  edge: literal cell name `root` is still treated as root by
+  `artifact_cell_is_root`/symlink helpers even when an explicit root is present;
+  this is not process-global mutable state and does not keep the old bridge
+  alive.
+
+Remaining: none for Plan 61. Future parity edges discovered after closure must
+be tracked in a new plan or the relevant existing parity plan, not by reopening
+Plan 61 unless the DICE-owned bzlmod bridge contract above regresses.
 
 Workflow tooling for this plan lives in `.claude/workflows/`
 (`plan61-burn-down.js` survey/rank orchestrator — `MAX_AUTO=0` = survey-only;
@@ -379,25 +427,26 @@ workers should read this main plan first and open the history file only when
 they need exact older evidence, command transcripts, or provenance for a prior
 bridge-burn-down slice.
 
-Current state to preserve:
+Closed state to preserve:
 
-- Plan 61 is open. The persisted config-load path now uses DICE bzlmod
+- Plan 61 is complete. The persisted config-load path uses DICE bzlmod
   producers for resolved graph data and `BzlmodCellGraphValue`. Direct
   no-updater bootstrap/completion callers build the same clean graph through a
   temporary DICE instance before parsing cells. The old fallback scanner and
-  lockfile preseed bridge are gone; lockfile policy, repository-rule replay
-  inputs, and materialization polling still need follow-up.
-- SDK frontier evidence is positive but not a closure condition. The latest
-  post-bridge-burn-down Slug smoke built
-  `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` successfully on 2026-05-29,
-  and the fresh Bazel 9.0.1 comparison for that output matched the historical
-  parity shape: directory/file manifests and modes match, all non-ELF hashes
-  match, and the accepted remaining differences are ELF output-root strings in
-  `bin/zm`, `bin/zerobuf`, `bin/zerosystem`, and
-  `lib/libzeromatter_ffi.so`.
-- The last recorded full Plan 61 Python guardrail in the archive passed after
-  rebuilding `target/debug/slug`, but future workers must rerun the focused
-  owner tests for their slice rather than relying on that snapshot.
+  lockfile preseed bridge are gone from production correctness paths, and the
+  final direct repo-rule materialization plus artifact owner/root context gaps
+  are closed.
+- SDK frontier evidence is positive but was not the only closure condition. The
+  final post-bridge-burn-down Slug smoke built
+  `/var/mnt/dev/zeromatter-kuro //sdk:sdk_contents` successfully on 2026-06-07,
+  and the Bazel 9.0.1 comparison for that output matched the accepted parity
+  shape: directory/file manifests and modes match, all non-ELF hashes match,
+  and the accepted remaining differences are ELF output-root strings in
+  `bin/zm`, `bin/zerobuf`, `bin/zerosystem`, and `lib/libzeromatter_ffi.so`.
+- The final full Plan 61 Python guardrail passed after rebuilding
+  `target/debug/slug` (`182 passed`), and the final close also included Rust
+  bzlmod/common/external-cells tests, Kuro parity smoke, and independent
+  reviewer sign-off.
 - Normal build/materialization extension replay uses a strict
   `ExtensionBzlTransitiveDigestKey` over the parsed loaded Starlark graph.
   `buck audit cell` uses the same graph traversal in tolerant validation mode
@@ -2494,8 +2543,10 @@ The plan is blocked, not complete, unless all of these are true.
 
 The `## Status` section must not say `Complete`, `Done`, or equivalent until
 the completion guardrails above pass and the remaining-work list has no
-semantic items left. SDK parity evidence may be summarized as a checkpoint, but
-it must not be used as the close condition for Plan 61.
+semantic items left. This guardrail was satisfied on 2026-06-07 by the full
+validation matrix, Kuro parity evidence, no remaining semantic Plan 61 items,
+and independent reviewer sign-off. SDK parity evidence may be summarized as a
+checkpoint, but it must not be used as the sole close condition for Plan 61.
 
 ### Test Guardrails
 

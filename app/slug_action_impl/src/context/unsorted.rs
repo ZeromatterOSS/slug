@@ -166,7 +166,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             eval.heap(),
         )?;
 
-        Ok(StarlarkDeclaredArtifact::new(
+        Ok(this.declared_artifact(
             eval.call_stack_top_location(),
             artifact,
             AssociatedArtifacts::new(),
@@ -196,7 +196,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             eval.heap(),
         )?;
 
-        Ok(StarlarkDeclaredArtifact::new(
+        Ok(this.declared_artifact(
             eval.call_stack_top_location(),
             artifact,
             AssociatedArtifacts::new(),
@@ -225,7 +225,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             eval.heap(),
         )?;
 
-        Ok(StarlarkDeclaredArtifact::new(
+        Ok(this.declared_artifact(
             eval.call_stack_top_location(),
             artifact,
             AssociatedArtifacts::new(),
@@ -254,7 +254,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             BuckOutPathKind::Shareable,
             eval.heap(),
         )?;
-        Ok(StarlarkDeclaredArtifact::new(
+        Ok(this.declared_artifact(
             eval.call_stack_top_location(),
             artifact,
             AssociatedArtifacts::new(),
@@ -282,7 +282,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             eval.heap(),
         )?;
 
-        Ok(StarlarkDeclaredArtifact::new(
+        Ok(this.declared_artifact(
             eval.call_stack_top_location(),
             artifact,
             AssociatedArtifacts::new(),
@@ -314,7 +314,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             eval.heap(),
         )?;
 
-        Ok(StarlarkDeclaredArtifact::new(
+        Ok(this.declared_artifact(
             eval.call_stack_top_location(),
             artifact,
             AssociatedArtifacts::new(),

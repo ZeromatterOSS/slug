@@ -111,6 +111,8 @@ impl<'v> AspectContext<'v> {
                 attributes: attrs,
                 plugins: None,
                 digest_config,
+                cell_alias_resolver: None,
+                root_cell_name,
             }),
             label,
             rule,

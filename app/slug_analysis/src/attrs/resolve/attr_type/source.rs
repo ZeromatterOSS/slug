@@ -10,6 +10,7 @@
 
 use dupe::Dupe;
 use slug_artifact::artifact::source_artifact::SourceArtifact;
+use slug_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use slug_build_api::interpreter::rule_defs::provider::dependency::SourceFileTarget;
 use slug_core::configuration::pair::Configuration;
@@ -36,8 +37,12 @@ pub(crate) trait SourceAttrTypeExt {
         ctx: &mut dyn AttrResolutionContext<'v>,
         path: SourcePath,
     ) -> Value<'v> {
-        ctx.heap()
-            .alloc(StarlarkArtifact::new(SourceArtifact::new(path).into()))
+        ctx.heap().alloc(StarlarkArtifact::new_with_label_context(
+            SourceArtifact::new(path).into(),
+            AssociatedArtifacts::new(),
+            ctx.cell_alias_resolver().cloned(),
+            ctx.root_cell_name().cloned(),
+        ))
     }
 
     fn resolve_single_file_target<'v>(

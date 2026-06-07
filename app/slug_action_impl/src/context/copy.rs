@@ -40,13 +40,13 @@ fn create_dir_tree<'v>(
     let action = UnregisteredSymlinkedDirAction::new(copy, srcs)?;
     let unioned_associated_artifacts = action.unioned_associated_artifacts();
 
-    let mut this = this.state()?;
     let (declaration, output_artifact) = this.get_or_declare_output(
         eval,
         output,
         OutputType::Directory,
         uses_experimental_content_based_path_hashing,
     )?;
+    let mut this = this.state()?;
     this.register_action(
         indexset![output_artifact],
         action,
@@ -72,13 +72,13 @@ fn copy_file_impl<'v>(
 
     let artifact = src.get_artifact_group()?;
     let associated_artifacts = src.get_associated_artifacts();
-    let mut this = this.state()?;
     let (declaration, output_artifact) = this.get_or_declare_output(
         eval,
         dest,
         output_type,
         uses_experimental_content_based_path_hashing,
     )?;
+    let mut this = this.state()?;
 
     this.register_action(
         indexset![output_artifact],
@@ -203,9 +203,9 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
             (None, Some(path)) => {
                 // String path symlink (unresolved, for declare_symlink outputs)
                 let action = UnregisteredSymlinkPathAction::new(path.to_owned());
-                let mut this = this.state()?;
                 let (declaration, output_artifact) =
                     this.get_or_declare_output(eval, output, OutputType::FileOrDirectory, None)?;
+                let mut this = this.state()?;
                 this.register_action(
                     indexset![output_artifact],
                     action,

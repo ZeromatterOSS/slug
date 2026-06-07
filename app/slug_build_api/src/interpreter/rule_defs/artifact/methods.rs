@@ -75,6 +75,17 @@ pub enum EitherStarlarkInputArtifact<'v> {
     PromiseArtifact(StarlarkPromiseArtifact),
 }
 
+fn label_with_artifact_context<'v>(
+    artifact: &'v dyn StarlarkArtifactLike<'v>,
+    label: ConfiguredProvidersLabel,
+) -> StarlarkConfiguredProvidersLabel {
+    StarlarkConfiguredProvidersLabel::new_with_cell_alias_resolver_and_root(
+        label,
+        artifact.cell_alias_resolver(),
+        artifact.root_cell_name(),
+    )
+}
+
 #[starlark_module]
 pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     /// The base name of this artifact. e.g. for an artifact at `foo/bar`, this is `bar`
@@ -123,14 +134,16 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<NoneOr<StarlarkConfiguredProvidersLabel>> {
         match this.owner()? {
             Some(BaseDeferredKey::TargetLabel(target)) => {
-                Ok(NoneOr::Other(StarlarkConfiguredProvidersLabel::new(
+                Ok(NoneOr::Other(label_with_artifact_context(
+                    this,
                     ConfiguredProvidersLabel::new(target.dupe(), ProvidersName::Default),
                 )))
             }
             Some(BaseDeferredKey::Aspect(key)) => {
                 // Aspect deferred key wraps a target - return the target's label
                 if let Some(label) = key.configured_label() {
-                    Ok(NoneOr::Other(StarlarkConfiguredProvidersLabel::new(
+                    Ok(NoneOr::Other(label_with_artifact_context(
+                        this,
                         ConfiguredProvidersLabel::new(label, ProvidersName::Default),
                     )))
                 } else {
@@ -148,7 +161,8 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                         let configured = target_label.configure(ConfigurationData::unbound());
                         let providers_label =
                             ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
-                        return Ok(NoneOr::Other(StarlarkConfiguredProvidersLabel::new(
+                        return Ok(NoneOr::Other(label_with_artifact_context(
+                            this,
                             providers_label,
                         )));
                     }
@@ -172,14 +186,16 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
         // or a path-based string for source files
         match this.owner()? {
             Some(BaseDeferredKey::TargetLabel(target)) => {
-                Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(
+                Ok(heap.alloc(label_with_artifact_context(
+                    this,
                     ConfiguredProvidersLabel::new(target.dupe(), ProvidersName::Default),
                 )))
             }
             Some(BaseDeferredKey::Aspect(key)) => {
                 // Aspect deferred key wraps a target - return the target's label
                 if let Some(label) = key.configured_label() {
-                    Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(
+                    Ok(heap.alloc(label_with_artifact_context(
+                        this,
                         ConfiguredProvidersLabel::new(label, ProvidersName::Default),
                     )))
                 } else {
@@ -195,9 +211,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                         let configured = target_label.configure(ConfigurationData::unbound());
                         let providers_label =
                             ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
-                        return Ok(
-                            heap.alloc(StarlarkConfiguredProvidersLabel::new(providers_label))
-                        );
+                        return Ok(heap.alloc(label_with_artifact_context(this, providers_label)));
                     }
                 }
                 // Fallback: return path string

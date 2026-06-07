@@ -7806,6 +7806,231 @@ use_repo(exec_label, "exec_label_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_execute_materializes_non_root_use_repo_rule_label(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: StarlarkBaseExternalContext.getPathFromLabel fetches repos."""
+    tool_repo = buck.cwd / "plan61_exec_tool"
+    tool_repo.mkdir()
+    _write(tool_repo / ".buckroot", "")
+    _write(tool_repo / "BUILD.bazel", 'exports_files(["tool.sh"])\n')
+    tool = tool_repo / "tool.sh"
+    _write(tool, "#!/bin/sh\nprintf materialized-direct-tool\n")
+    tool.chmod(0o755)
+
+    owner = buck.cwd / "plan61_exec_tool_owner"
+    owner.mkdir()
+    _write(
+        owner / "MODULE.bazel",
+        f"""module(name = "plan61_exec_tool_owner", version = "1.0")
+repo = use_repo_rule("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+repo(name = "plan61_exec_tool", path = "{tool_repo.as_posix()}")
+""",
+    )
+    _write(
+        owner / "ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload + "\\n")
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+exec_tool_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _exec_tool_ext_impl(module_ctx):
+    result = module_ctx.execute([Label("@plan61_exec_tool//:tool.sh")])
+    if result.return_code != 0:
+        fail("PLAN61_EXEC_TOOL_FAILED: %s" % result.stderr)
+    exec_tool_repo_rule(name = "exec_tool_repo", payload = result.stdout)
+
+exec_tool_ext = module_extension(
+    implementation = _exec_tool_ext_impl,
+)
+""",
+    )
+    _write(owner / "BUILD.bazel", "")
+
+    repo_dir = (
+        buck.cwd
+        / "bazel-external"
+        / "plan61_exec_tool_owner++exec_tool_ext+exec_tool_repo"
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_module_ctx_execute_use_repo_rule")
+
+bazel_dep(name = "plan61_exec_tool_owner", version = "1.0")
+local_path_override(
+    module_name = "plan61_exec_tool_owner",
+    path = "plan61_exec_tool_owner",
+)
+exec_tool = use_extension("@plan61_exec_tool_owner//:ext.bzl", "exec_tool_ext")
+use_repo(exec_tool, "exec_tool_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_exec_tool_repo",
+    srcs = ["@exec_tool_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_exec_tool_repo")
+    assert (repo_dir / "data.txt").read_text() == "materialized-direct-tool\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_generated_artifact_owner_workspace_name_is_empty(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root-generated File.owner.workspace_name is empty."""
+    _write(
+        buck.cwd / "defs.bzl",
+        """def _producer_impl(ctx):
+    out = ctx.actions.declare_file("generated.txt")
+    ctx.actions.write(out, "payload\\n")
+    return [DefaultInfo(files = depset([out]))]
+
+producer = rule(
+    implementation = _producer_impl,
+)
+
+def _consumer_impl(ctx):
+    src = ctx.files.srcs[0]
+    out = ctx.actions.declare_file("owner_workspace.txt")
+    ctx.actions.write(
+        out,
+        "ctx=%s\\nowner=%s\\n" % (
+            ctx.label.workspace_name,
+            src.owner.workspace_name,
+        ),
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+consumer = rule(
+    implementation = _consumer_impl,
+    attrs = {"srcs": attr.label_list()},
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_root_owner_workspace")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """load(":defs.bzl", "consumer", "producer")
+
+producer(name = "generated")
+consumer(name = "consumes", srcs = [":generated"])
+""",
+    )
+
+    result = await buck.build("//:consumes")
+    output = result.get_build_report().output_for_target("//:consumes")
+    assert output.read_text() == "ctx=\nowner=\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_native_genrule_owner_workspace_name_is_empty(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root native-rule output File.owner.workspace_name is empty."""
+    _write(
+        buck.cwd / "defs.bzl",
+        """def _consumer_impl(ctx):
+    src = ctx.files.srcs[0]
+    out = ctx.actions.declare_file("owner_workspace.txt")
+    ctx.actions.write(
+        out,
+        "ctx=%s\\nowner=%s\\nshort=%s\\n" % (
+            ctx.label.workspace_name,
+            src.owner.workspace_name,
+            src.short_path,
+        ),
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+consumer = rule(
+    implementation = _consumer_impl,
+    attrs = {"srcs": attr.label_list()},
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_root_native_genrule_owner")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """load(":defs.bzl", "consumer")
+
+genrule(name = "generated", outs = ["generated.txt"], cmd = "printf payload > $@")
+consumer(name = "consumes", srcs = [":generated"])
+""",
+    )
+
+    result = await buck.build("//:consumes")
+    output = result.get_build_report().output_for_target("//:consumes")
+    assert output.read_text() == "ctx=\nowner=\nshort=generated.txt\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_root_filegroup_source_owner_workspace_name_is_empty(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: root source File.owner.workspace_name stays empty via filegroup."""
+    _write(buck.cwd / "example.cpp", "int main() { return 0; }\n")
+    _write(
+        buck.cwd / "defs.bzl",
+        """def _consumer_impl(ctx):
+    src = ctx.files.srcs[0]
+    out = ctx.actions.declare_file("owner_workspace.txt")
+    ctx.actions.write(
+        out,
+        "ctx=%s\\nowner=%s\\nshort=%s\\n" % (
+            ctx.label.workspace_name,
+            src.owner.workspace_name,
+            src.short_path,
+        ),
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+consumer = rule(
+    implementation = _consumer_impl,
+    attrs = {"srcs": attr.label_list()},
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan61_root_filegroup_source")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """load(":defs.bzl", "consumer")
+
+filegroup(name = "examples", srcs = ["example.cpp"])
+consumer(name = "consumes", srcs = [":examples"])
+""",
+    )
+
+    result = await buck.build("//:consumes")
+    output = result.get_build_report().output_for_target("//:consumes")
+    assert output.read_text() == "ctx=\nowner=\nshort=example.cpp\n"
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_fresh_module_ctx_read_watch_file_edit_invalidates_extension_result(
     buck: Buck,
 ) -> None:

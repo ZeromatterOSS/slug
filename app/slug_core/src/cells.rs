@@ -3079,6 +3079,40 @@ impl CellResolver {
         self.bzlmod_label_cell_paths_for_owner(None)
     }
 
+    /// Runtime extension repo setups visible to bzlmod label dereferences from
+    /// this resolver. Callers use these to lazily materialize Label paths
+    /// without falling back to process-global dynamic cell registries.
+    pub fn bzlmod_runtime_extension_cell_setups(
+        &self,
+    ) -> Vec<(String, crate::cells::external::ExtensionRepoCellSetup)> {
+        let mut setups = BTreeMap::new();
+        if let Some(snapshot) = self.0.bzlmod_runtime_cell_snapshot.as_ref() {
+            for runtime_cell in snapshot.extension_cells.iter() {
+                setups
+                    .entry(runtime_cell.canonical_name.clone())
+                    .or_insert_with(|| runtime_cell.setup.clone());
+                if runtime_cell.internal_name != runtime_cell.canonical_name {
+                    setups
+                        .entry(runtime_cell.internal_name.clone())
+                        .or_insert_with(|| runtime_cell.setup.clone());
+                }
+            }
+        }
+        if let Ok(dynamic_cells) = self.0.dynamic_cells.read() {
+            for (cell, entry) in dynamic_cells.iter() {
+                if let Some(instance) = entry.graph_owned_instance()
+                    && let Some(crate::cells::external::ExternalCellOrigin::ExtensionRepo(setup)) =
+                        instance.external()
+                {
+                    setups
+                        .entry(cell.as_str().to_owned())
+                        .or_insert_with(|| setup.clone());
+                }
+            }
+        }
+        setups.into_iter().collect()
+    }
+
     /// Project-relative repo paths visible from a bzlmod owner module. This
     /// includes module-scoped aliases such as non-root `use_repo_rule()`
     /// repositories that module extensions can reference through Label().
@@ -4425,8 +4459,24 @@ mod tests {
         )?;
 
         let paths: BTreeMap<_, _> = resolver.bzlmod_label_cell_paths().into_iter().collect();
+        let setups: BTreeMap<_, _> = resolver
+            .bzlmod_runtime_extension_cell_setups()
+            .into_iter()
+            .collect();
 
         assert_eq!(paths.get(canonical), Some(&runtime_path));
+        assert_eq!(
+            setups
+                .get(canonical)
+                .map(|setup| setup.canonical_name.as_ref()),
+            Some(canonical)
+        );
+        assert_eq!(
+            setups
+                .get("generated")
+                .map(|setup| setup.canonical_name.as_ref()),
+            Some(canonical)
+        );
         assert_eq!(paths.get("runtime_alias"), Some(&runtime_path));
         assert_eq!(paths.get("root_generated"), Some(&runtime_path));
         assert!(!paths.contains_key("owner_tool"));

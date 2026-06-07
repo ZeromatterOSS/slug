@@ -330,7 +330,6 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         use_dep_files_placeholder_for_content_based_paths: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<impl AllocValue<'v> + use<'v>> {
-        let mut this = this.state()?;
         let (declaration, output_artifact) = this.get_or_declare_output(
             eval,
             output,
@@ -339,6 +338,7 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                 .into_option()
                 .or(has_content_based_path.into_option()),
         )?;
+        let mut this = this.state()?;
 
         let value = declaration.into_declared_artifact(AssociatedArtifacts::new());
         let cli = UnregisteredWriteJsonAction::cli(value.to_value(), content.value)?;
@@ -472,8 +472,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             Ok(visitor.associated_artifacts)
         }
 
-        let mut this = this.state()?;
-        let (declaration, output_artifact) = this.get_or_declare_output(
+        let actions = this;
+        let (declaration, output_artifact) = actions.get_or_declare_output(
             eval,
             output,
             OutputType::File,
@@ -481,6 +481,7 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                 .into_option()
                 .or(has_content_based_path.into_option()),
         )?;
+        let mut this = this.state()?;
 
         let (content_cli, written_macro_count, mut associated_artifacts) = match content {
             WriteContentArg::CommandLineArg(content) => {
@@ -587,7 +588,7 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         if allow_args {
             let macro_files: Vec<StarlarkDeclaredArtifact> = written_macro_files
                 .into_iter()
-                .map(|a| StarlarkDeclaredArtifact::new(None, a, AssociatedArtifacts::new()))
+                .map(|a| actions.declared_artifact(None, a, AssociatedArtifacts::new()))
                 .collect();
             Ok(Either::Right((value, macro_files)))
         } else {
@@ -616,11 +617,11 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             ),
         >,
     > {
-        let mut state = this.state()?;
         let (declaration, output_artifact) =
-            state.get_or_declare_output(eval, output, OutputType::File, None)?;
+            this.get_or_declare_output(eval, output, OutputType::File, None)?;
+        let mut state = this.state()?;
 
-        let (content_cli, mut associated_artifacts) = match content {
+        let (content_cli, associated_artifacts) = match content {
             WriteContentArg::CommandLineArg(content) => {
                 let content_arg = content.as_command_line_arg();
                 if !allow_args && content_arg.contains_arg_attr() {
@@ -696,9 +697,9 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         // through the same path; for source files, the action input
         // dependency is essentially free.
 
-        let mut this = this.state()?;
         let (declaration, output_artifact) =
             this.get_or_declare_output(eval, output, OutputType::File, None)?;
+        let mut this = this.state()?;
 
         let artifact_like = <&dyn slug_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike>::unpack_value(template)?
             .ok_or_else(|| slug_error::slug_error!(
@@ -788,13 +789,13 @@ fn stub_transform_file<'v>(
     output_file_name: &'v str,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<ValueTyped<'v, StarlarkDeclaredArtifact<'v>>> {
-    let mut state = this.state()?;
-    let (declaration, output_artifact) = state.get_or_declare_output(
+    let (declaration, output_artifact) = this.get_or_declare_output(
         eval,
         OutputArtifactArg::Str(output_file_name),
         OutputType::File,
         None,
     )?;
+    let mut state = this.state()?;
     let content_str = eval.heap().alloc_str("// Build stamping not implemented\n");
     let cmd_args = StarlarkCmdArgs::try_from_value(content_str.to_value())?;
     let content_cli = CommandLineArg::from_cmd_args(eval.heap().alloc_typed(cmd_args));

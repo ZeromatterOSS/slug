@@ -32,7 +32,6 @@ use slug_artifact::artifact::artifact_type::BaseArtifactKind;
 use slug_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
-use slug_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use slug_build_api::interpreter::rule_defs::context::AnalysisActions;
 use slug_build_api::interpreter::rule_defs::depset::depset_to_artifact_inputs;
 use slug_build_api::interpreter::rule_defs::provider::builtin::default_info::Runfiles;
@@ -183,7 +182,7 @@ fn synthesize_runfiles_tree<'v>(
     )?;
     drop(registry);
 
-    let tree_declared = StarlarkDeclaredArtifact::new(loc.dupe(), tree_artifact_obj, unioned);
+    let tree_declared = actions.declared_artifact(loc.dupe(), tree_artifact_obj, unioned);
     let tree_value: Value<'v> = tree_declared.alloc_value(heap);
 
     // Wrap the executable so consumers see the tree as an associated artifact.

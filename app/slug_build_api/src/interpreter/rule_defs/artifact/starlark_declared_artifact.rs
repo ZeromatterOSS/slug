@@ -17,6 +17,8 @@ use dupe::Dupe;
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_artifact::artifact::artifact_type::DeclaredArtifact;
 use slug_artifact::artifact::artifact_type::OutputArtifact;
+use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_error::BuckErrorContext;
 use slug_error::slug_error;
@@ -78,6 +80,12 @@ pub struct StarlarkDeclaredArtifact<'v> {
     pub(super) artifact: DeclaredArtifact<'v>,
     // A set of ArtifactGroups that should be materialized along with the main artifact
     pub(super) associated_artifacts: AssociatedArtifacts,
+    /// Analysis-time context used only for Bazel-visible owner/label strings.
+    #[trace(unsafe_ignore)]
+    #[allocative(skip)]
+    pub(super) cell_alias_resolver: Option<CellAliasResolver>,
+    #[trace(unsafe_ignore)]
+    pub(super) root_cell_name: Option<CellName>,
 }
 
 impl Display for StarlarkDeclaredArtifact<'_> {
@@ -103,6 +111,38 @@ impl<'v> StarlarkDeclaredArtifact<'v> {
             declaration_location,
             artifact,
             associated_artifacts,
+            cell_alias_resolver: None,
+            root_cell_name: None,
+        }
+    }
+
+    pub fn new_with_label_context(
+        declaration_location: Option<FileSpan>,
+        artifact: DeclaredArtifact<'v>,
+        associated_artifacts: AssociatedArtifacts,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        StarlarkDeclaredArtifact {
+            declaration_location,
+            artifact,
+            associated_artifacts,
+            cell_alias_resolver,
+            root_cell_name,
+        }
+    }
+
+    pub fn with_label_context(
+        &self,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        Self {
+            declaration_location: self.declaration_location.clone(),
+            artifact: self.artifact.dupe(),
+            associated_artifacts: self.associated_artifacts.dupe(),
+            cell_alias_resolver,
+            root_cell_name,
         }
     }
 
@@ -123,6 +163,8 @@ impl<'v> StarlarkDeclaredArtifact<'v> {
             declaration_location: self.declaration_location.clone(),
             artifact: self.artifact.dupe(),
             associated_artifacts: merged,
+            cell_alias_resolver: self.cell_alias_resolver.clone(),
+            root_cell_name: self.root_cell_name,
         }
     }
 
@@ -149,6 +191,14 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkDeclaredArtifact<'v> {
 
     fn owner(&'v self) -> slug_error::Result<Option<BaseDeferredKey>> {
         Ok(self.artifact.owner())
+    }
+
+    fn cell_alias_resolver(&self) -> Option<CellAliasResolver> {
+        self.cell_alias_resolver.clone()
+    }
+
+    fn root_cell_name(&self) -> Option<CellName> {
+        self.root_cell_name
     }
 
     fn with_short_path(
@@ -240,6 +290,8 @@ impl<'v> StarlarkInputArtifactLike<'v> for StarlarkDeclaredArtifact<'v> {
                 declaration_location: self.declaration_location.dupe(),
                 artifact: self.artifact.project(path, hide_prefix),
                 associated_artifacts: self.associated_artifacts.dupe(),
+                cell_alias_resolver: self.cell_alias_resolver.clone(),
+                root_cell_name: self.root_cell_name,
             },
         ))
     }
@@ -252,6 +304,8 @@ impl<'v> StarlarkInputArtifactLike<'v> for StarlarkDeclaredArtifact<'v> {
                 declaration_location: self.declaration_location.dupe(),
                 artifact: self.artifact.dupe(),
                 associated_artifacts: AssociatedArtifacts::new(),
+                cell_alias_resolver: self.cell_alias_resolver.clone(),
+                root_cell_name: self.root_cell_name,
             },
         ))
     }
@@ -273,6 +327,8 @@ impl<'v> StarlarkInputArtifactLike<'v> for StarlarkDeclaredArtifact<'v> {
                 declaration_location: self.declaration_location.dupe(),
                 artifact: self.artifact.dupe(),
                 associated_artifacts: self.associated_artifacts.union(artifacts),
+                cell_alias_resolver: self.cell_alias_resolver.clone(),
+                root_cell_name: self.root_cell_name,
             },
         ))
     }
@@ -343,6 +399,8 @@ impl Freeze for StarlarkDeclaredArtifact<'_> {
         Ok(StarlarkArtifact {
             artifact,
             associated_artifacts: self.associated_artifacts,
+            cell_alias_resolver: self.cell_alias_resolver,
+            root_cell_name: self.root_cell_name,
         })
     }
 }

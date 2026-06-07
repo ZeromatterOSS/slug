@@ -21,6 +21,8 @@ use derive_more::Display;
 use dice::DiceComputations;
 use dupe::Dupe;
 use futures::FutureExt;
+use slug_artifact::artifact::artifact_type::DeclaredArtifact;
+use slug_artifact::artifact::artifact_type::OutputArtifact;
 use slug_core::cells::CellAliasResolver;
 use slug_core::cells::name::CellName;
 use slug_core::configuration::build_setting::BuildSettingLabel;
@@ -33,10 +35,12 @@ use slug_core::target::configured_target_label::ConfiguredTargetLabel;
 use slug_error::BuckErrorContext;
 use slug_error::conversion::from_any_with_tag;
 use slug_execute::digest_config::DigestConfig;
+use slug_execute::execute::request::OutputType;
 use slug_interpreter::late_binding_ty::AnalysisContextReprLate;
 use slug_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
 use slug_util::late_binding::LateBinding;
 use starlark::any::ProvidesStaticType;
+use starlark::codemap::FileSpan;
 use starlark::collections::SmallMap;
 use starlark::collections::StarlarkHasher;
 use starlark::environment::GlobalsBuilder;
@@ -73,11 +77,15 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
+use crate::analysis::registry::ArtifactDeclaration;
 use crate::artifact_groups::ArtifactGroup;
 use crate::artifact_groups::InputSymlink;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 use crate::interpreter::rule_ctx_storage::get_current_rule_ctx;
+use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
+use crate::interpreter::rule_defs::artifact::output_artifact_like::OutputArtifactArg;
+use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::bazel_label::bazel_label_from_configured_with_alias_resolver_and_root;
 use crate::interpreter::rule_defs::cc_common::CcToolchainFeatures;
@@ -116,6 +124,12 @@ pub struct AnalysisActions<'v> {
     pub plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
     /// Digest configuration to use when interpreting digests passed in analysis.
     pub digest_config: DigestConfig,
+    /// Analysis-time context used only for Bazel-visible artifact owner/label strings.
+    #[trace(unsafe_ignore)]
+    #[allocative(skip)]
+    pub cell_alias_resolver: Option<CellAliasResolver>,
+    #[trace(unsafe_ignore)]
+    pub root_cell_name: Option<CellName>,
 }
 
 impl<'v> AnalysisActions<'v> {
@@ -177,6 +191,40 @@ impl<'v> AnalysisActions<'v> {
             )?;
         }
         Ok(())
+    }
+
+    pub fn declared_artifact(
+        &self,
+        declaration_location: Option<FileSpan>,
+        artifact: DeclaredArtifact<'v>,
+        associated_artifacts: AssociatedArtifacts,
+    ) -> StarlarkDeclaredArtifact<'v> {
+        StarlarkDeclaredArtifact::new_with_label_context(
+            declaration_location,
+            artifact,
+            associated_artifacts,
+            self.cell_alias_resolver.clone(),
+            self.root_cell_name,
+        )
+    }
+
+    pub fn get_or_declare_output(
+        &self,
+        eval: &Evaluator<'v, '_, '_>,
+        value: OutputArtifactArg<'v>,
+        output_type: OutputType,
+        has_content_based_path: Option<bool>,
+    ) -> slug_error::Result<(ArtifactDeclaration<'v>, OutputArtifact<'v>)> {
+        let (declaration, output) = self.state()?.get_or_declare_output(
+            eval,
+            value,
+            output_type,
+            has_content_based_path,
+        )?;
+        Ok((
+            declaration.with_label_context(self.cell_alias_resolver.clone(), self.root_cell_name),
+            output,
+        ))
     }
 }
 
@@ -284,6 +332,8 @@ impl<'v> AnalysisContext<'v> {
                 attributes: attrs,
                 plugins,
                 digest_config,
+                cell_alias_resolver: cell_alias_resolver.clone(),
+                root_cell_name,
             }),
             configured_label,
             label,
@@ -2077,39 +2127,35 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
         }
 
         use slug_core::fs::buck_out_path::BuckOutPathKind;
-        use slug_execute::execute::request::OutputType;
-
-        use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
-        use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
-
         // Outputs declared via `ctx.outputs.<name>` from `attr.output` /
         // `attr.output_list` attributes use the Bazel-shaped path layout so
         // that `cc_library(hdrs=[...])` consumers find generated headers at
         // the include-path locations that follow Bazel's `bazel-bin/<pkg>/...`
         // convention (with `external/<cell>/` prefix for external cells).
-        let declare_file = |filename: &str| -> Option<Value<'v>> {
-            if filename.is_empty() {
-                return None;
-            }
-            let artifact = self
-                .actions
-                .state()
-                .ok()?
-                .declare_output(
+        let declare_file =
+            |filename: &str| -> Option<Value<'v>> {
+                if filename.is_empty() {
+                    return None;
+                }
+                let artifact = self
+                    .actions
+                    .state()
+                    .ok()?
+                    .declare_output(
+                        None,
+                        filename,
+                        OutputType::File,
+                        None,
+                        BuckOutPathKind::BazelOutput,
+                        heap,
+                    )
+                    .ok()?;
+                Some(heap.alloc(self.actions.declared_artifact(
                     None,
-                    filename,
-                    OutputType::File,
-                    None,
-                    BuckOutPathKind::BazelOutput,
-                    heap,
-                )
-                .ok()?;
-            Some(heap.alloc(StarlarkDeclaredArtifact::new(
-                None,
-                artifact,
-                AssociatedArtifacts::new(),
-            )))
-        };
+                    artifact,
+                    AssociatedArtifacts::new(),
+                )))
+            };
 
         // Check if the attr is a list (attr.output_list()) - returns a list of declared artifacts
         let raw_attr_val = self.attrs.get_attr(attribute, heap).ok().flatten();

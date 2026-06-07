@@ -15,6 +15,8 @@ use std::hash::Hasher;
 
 use either::Either;
 use slug_artifact::artifact::artifact_type::Artifact;
+use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_core::package::PackageLabel;
 use slug_execute::path::artifact_path::ArtifactPath;
@@ -53,6 +55,14 @@ pub trait StarlarkArtifactLike<'v>: Display {
     }
 
     fn owner(&'v self) -> slug_error::Result<Option<BaseDeferredKey>>;
+
+    fn cell_alias_resolver(&self) -> Option<CellAliasResolver> {
+        None
+    }
+
+    fn root_cell_name(&self) -> Option<CellName> {
+        None
+    }
 
     fn with_short_path(
         &self,
@@ -142,6 +152,8 @@ pub trait StarlarkInputArtifactLike<'v>: StarlarkArtifactLike<'v> {
             artifact,
             associated_artifacts: associated_artifacts
                 .map_or(AssociatedArtifacts::new(), |a| a.clone()),
+            cell_alias_resolver: self.cell_alias_resolver(),
+            root_cell_name: self.root_cell_name(),
         })
     }
 

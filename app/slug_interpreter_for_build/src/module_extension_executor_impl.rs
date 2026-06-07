@@ -399,6 +399,7 @@ impl ConcreteModuleExtensionExecutor {
         aggregated: &AggregatedExtension,
         workspace_id: WorkspaceId,
         bzl_transitive_digest: Arc<str>,
+        lazy_repo_rule_setups: BTreeMap<String, slug_bzlmod::LazyRepoRuleMaterialization>,
         mut module_ctx: crate::module_ctx::ModuleContext,
     ) -> slug_error::Result<ExtensionExecutionOutput> {
         // 1. Load the module through a stable extension-specific DICE key.
@@ -482,65 +483,71 @@ impl ConcreteModuleExtensionExecutor {
         //
         // Plan 36: also stash a thread-local pointer to `ctx` so that
         // `mctx.path(Label)` / `mctx.read(Label)` calls inside the eval
-        // can drive lazy materialization of sibling-extension spoke
-        // repos via `slug_bzlmod::materialize_spoke_sync`.
+        // can drive lazy materialization of sibling-extension spoke repos and
+        // direct `use_repo_rule()` repos via
+        // `slug_bzlmod::materialize_spoke_sync`.
         record_declared_extension_environ(&module_ctx, frozen_extension.environ())?;
         let recorded_inputs_ctx = module_ctx.clone();
 
-        let (result, specs) = slug_bzlmod::with_extension_dice(ctx, workspace_id, || {
-            with_repo_spec_registry(|| {
-                // Create a Starlark module for evaluation
-                let starlark_module = Module::new();
+        let (result, specs) = slug_bzlmod::with_extension_dice_and_repo_rules(
+            ctx,
+            workspace_id,
+            lazy_repo_rule_setups,
+            || {
+                with_repo_spec_registry(|| {
+                    // Create a Starlark module for evaluation
+                    let starlark_module = Module::new();
 
-                // Allocate the module_ctx on the heap
-                let ctx_value = starlark_module.heap().alloc(module_ctx);
+                    // Allocate the module_ctx on the heap
+                    let ctx_value = starlark_module.heap().alloc(module_ctx);
 
-                // Create an evaluator
-                let mut eval = Evaluator::new(&starlark_module);
+                    // Create an evaluator
+                    let mut eval = Evaluator::new(&starlark_module);
 
-                // Get the implementation function
-                let implementation = frozen_extension.implementation();
+                    // Get the implementation function
+                    let implementation = frozen_extension.implementation();
 
-                tracing::debug!(
-                    "Invoking extension implementation for '{}'",
-                    aggregated.extension_name
-                );
+                    tracing::debug!(
+                        "Invoking extension implementation for '{}'",
+                        aggregated.extension_name
+                    );
 
-                // Invoke: implementation(module_ctx)
-                let invoke_result =
-                    eval.eval_function(implementation.to_value(), &[ctx_value], &[]);
+                    // Invoke: implementation(module_ctx)
+                    let invoke_result =
+                        eval.eval_function(implementation.to_value(), &[ctx_value], &[]);
 
-                match invoke_result {
-                    Ok(return_value) => {
-                        if return_value.is_none() {
-                            return Ok::<slug_bzlmod::ModuleExtensionMetadata, slug_error::Error>(
-                                Default::default(),
-                            );
-                        }
+                    match invoke_result {
+                        Ok(return_value) => {
+                            if return_value.is_none() {
+                                return Ok::<slug_bzlmod::ModuleExtensionMetadata, slug_error::Error>(
+                                    Default::default(),
+                                );
+                            }
 
-                        let Some(metadata) =
-                            return_value.downcast_ref::<StarlarkModuleExtensionMetadata>()
-                        else {
-                            return Err(ExtensionExecutionError::ImplementationError(format!(
+                            let Some(metadata) =
+                                return_value.downcast_ref::<StarlarkModuleExtensionMetadata>()
+                            else {
+                                return Err(ExtensionExecutionError::ImplementationError(format!(
                                 "module extension implementation must return None or module_ctx.extension_metadata(...), got {}",
                                 return_value.get_type()
                             ))
                             .into());
-                        };
+                            };
 
-                        Ok(metadata.metadata().clone())
+                            Ok(metadata.metadata().clone())
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Extension '{}' implementation failed: {}",
+                                aggregated.extension_name,
+                                e
+                            );
+                            Err(ExtensionExecutionError::ImplementationError(e.to_string()).into())
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!(
-                            "Extension '{}' implementation failed: {}",
-                            aggregated.extension_name,
-                            e
-                        );
-                        Err(ExtensionExecutionError::ImplementationError(e.to_string()).into())
-                    }
-                }
-            })
-        });
+                })
+            },
+        );
 
         // Check for execution errors
         let metadata = result?;
@@ -612,6 +619,23 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                 .entry(cell_name)
                 .or_insert_with(|| project_root.join(rel_path));
         }
+        let lazy_repo_rule_setups: BTreeMap<String, slug_bzlmod::LazyRepoRuleMaterialization> =
+            cell_resolver
+                .bzlmod_runtime_extension_cell_setups()
+                .into_iter()
+                .filter_map(|(name, setup)| {
+                    if setup.repo_spec_json.is_empty() {
+                        return None;
+                    }
+                    Some((
+                        name,
+                        slug_bzlmod::LazyRepoRuleMaterialization {
+                            extension_id: setup.extension_id.clone(),
+                            repo_spec_json: setup.repo_spec_json.clone(),
+                        },
+                    ))
+                })
+                .collect();
 
         // Build the module_ctx from aggregated extension data
         let module_ctx = build_module_context(aggregated, root_module_name)
@@ -656,6 +680,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                 aggregated,
                 workspace_id,
                 bzl_transitive_digest.clone(),
+                lazy_repo_rule_setups,
                 module_ctx,
             )
             .await

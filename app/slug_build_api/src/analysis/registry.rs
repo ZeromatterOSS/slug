@@ -25,6 +25,7 @@ use slug_artifact::actions::key::ActionKey;
 use slug_artifact::artifact::artifact_type::DeclaredArtifact;
 use slug_artifact::artifact::artifact_type::OutputArtifact;
 use slug_artifact::artifact::build_artifact::BuildArtifact;
+use slug_core::cells::CellAliasResolver;
 use slug_core::cells::name::CellName;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_core::deferred::key::DeferredHolderKey;
@@ -438,6 +439,21 @@ pub struct ArtifactDeclaration<'v> {
 }
 
 impl<'v> ArtifactDeclaration<'v> {
+    pub fn with_label_context(
+        self,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        let artifact = self.heap.alloc_typed(
+            self.artifact
+                .with_label_context(cell_alias_resolver, root_cell_name),
+        );
+        Self {
+            artifact,
+            heap: self.heap,
+        }
+    }
+
     pub fn into_declared_artifact(
         self,
         extra_associated_artifacts: AssociatedArtifacts,

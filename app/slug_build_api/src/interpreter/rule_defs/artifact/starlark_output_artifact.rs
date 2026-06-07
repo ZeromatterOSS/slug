@@ -18,6 +18,8 @@ use either::Either;
 use slug_artifact::artifact::artifact_type::BaseArtifactKind;
 use slug_artifact::artifact::artifact_type::OutputArtifact;
 use slug_artifact::artifact::build_artifact::BuildArtifact;
+use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_execute::path::artifact_path::ArtifactPath;
 use slug_fs::paths::file_name::FileName;
@@ -197,6 +199,20 @@ impl<'v, V: ValueLike<'v>> StarlarkArtifactLike<'v> for StarlarkOutputArtifactGe
             Either::Left(v) => v.artifact.owner(),
             Either::Right(v) => v.artifact.owner().cloned(),
         })
+    }
+
+    fn cell_alias_resolver(&self) -> Option<CellAliasResolver> {
+        match self.unpack() {
+            Either::Left(v) => v.cell_alias_resolver(),
+            Either::Right(v) => v.cell_alias_resolver(),
+        }
+    }
+
+    fn root_cell_name(&self) -> Option<CellName> {
+        match self.unpack() {
+            Either::Left(v) => v.root_cell_name(),
+            Either::Right(v) => v.root_cell_name(),
+        }
     }
 
     fn with_short_path(

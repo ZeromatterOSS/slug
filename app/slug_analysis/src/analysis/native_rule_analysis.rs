@@ -31,6 +31,7 @@ use slug_build_api::analysis::registry::FrozenAnalysisValueStorage;
 use slug_build_api::analysis::registry::RecordedAnalysisValues;
 use slug_build_api::artifact_groups::ArtifactGroup;
 use slug_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
+use slug_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use slug_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use slug_build_api::interpreter::rule_defs::cc_common::OutputGroupInfoInstanceGen;
 use slug_build_api::interpreter::rule_defs::cc_common::OutputGroupInfoProvider;
@@ -323,8 +324,12 @@ pub fn analyze_native_rule(
         NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
         NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
         NativeRuleKind::AnalysisTest => analyze_analysis_test(target),
-        NativeRuleKind::Genquery => analyze_genquery(target, root_cell_name.as_ref()),
-        NativeRuleKind::StarlarkDocExtract => analyze_genquery(target, root_cell_name.as_ref()), // stub: empty output file
+        NativeRuleKind::Genquery => {
+            analyze_genquery(target, cell_alias_resolver, root_cell_name.as_ref())
+        }
+        NativeRuleKind::StarlarkDocExtract => {
+            analyze_genquery(target, cell_alias_resolver, root_cell_name.as_ref())
+        } // stub: empty output file
         NativeRuleKind::XcodeConfig => analyze_xcode_config(target),
         NativeRuleKind::Removed(removed) => analyze_removed_rule(target, *removed),
     }
@@ -441,7 +446,12 @@ fn analyze_genrule(
             root_cell_name.cloned(),
         );
         let ba = BuildArtifact::new(path, action_key.dupe(), OutputType::File)?;
-        let starlark_ba = heap.alloc_simple(StarlarkArtifact::new(Artifact::from(ba.dupe())));
+        let starlark_ba = heap.alloc_simple(StarlarkArtifact::new_with_label_context(
+            Artifact::from(ba.dupe()),
+            AssociatedArtifacts::new(),
+            cell_alias_resolver.cloned(),
+            root_cell_name.cloned(),
+        ));
         output_starlark.push(starlark_ba);
         output_artifacts.push(ba);
     }
@@ -1060,7 +1070,13 @@ fn collect_source_files_from_configured_attr(
                     root_cell_name.cloned(),
                 ));
                 let artifact = Artifact::from(source_artifact);
-                let starlark_artifact = heap.alloc_simple(StarlarkArtifact::new(artifact));
+                let starlark_artifact =
+                    heap.alloc_simple(StarlarkArtifact::new_with_label_context(
+                        artifact,
+                        AssociatedArtifacts::new(),
+                        cell_alias_resolver.cloned(),
+                        root_cell_name.cloned(),
+                    ));
                 out.push(starlark_artifact);
             }
         }
@@ -1383,6 +1399,7 @@ fn analyze_analysis_test(target: &ConfiguredTargetLabel) -> slug_error::Result<A
 /// produces a file `deps` containing one label per line.
 fn analyze_genquery(
     target: &ConfiguredTargetLabel,
+    cell_alias_resolver: Option<&CellAliasResolver>,
     root_cell_name: Option<&CellName>,
 ) -> slug_error::Result<AnalysisResult> {
     let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
@@ -1400,9 +1417,12 @@ fn analyze_genquery(
     let output_artifact = BuildArtifact::new(path, action_key.dupe(), OutputType::File)?;
 
     let heap = FrozenHeap::new();
-    let starlark_output = heap.alloc_simple(StarlarkArtifact::new(Artifact::from(
-        output_artifact.dupe(),
-    )));
+    let starlark_output = heap.alloc_simple(StarlarkArtifact::new_with_label_context(
+        Artifact::from(output_artifact.dupe()),
+        AssociatedArtifacts::new(),
+        cell_alias_resolver.cloned(),
+        root_cell_name.cloned(),
+    ));
 
     // Register an action that creates an empty output file (stub implementation).
     // A real implementation would run the query and write results.

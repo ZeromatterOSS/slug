@@ -127,7 +127,10 @@ impl SourceFileTarget {
     }
 
     pub fn artifact_value<'v>(&self, heap: Heap<'v>) -> Value<'v> {
-        heap.alloc(self.artifact.dupe())
+        heap.alloc(
+            self.artifact
+                .with_label_context(self.cell_alias_resolver.clone(), self.root_cell_name),
+        )
     }
 
     fn default_info_value<'v>(&self, heap: Heap<'v>) -> Value<'v> {

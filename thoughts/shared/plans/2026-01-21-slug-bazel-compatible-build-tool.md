@@ -355,7 +355,7 @@ The detailed implementation is split into focused sub-plans:
 | [48-small-parity-gaps.md](./slug-bazel-subplans/48-small-parity-gaps.md)                               | Own small remaining parity gaps: genquery, stamping, proto action/toolchain behavior, and `target_platform_has_constraint()`. | **Proposed** |
 | [49-generated-output-hygiene.md](./slug-bazel-subplans/49-generated-output-hygiene.md)                 | Add repo hygiene checks preventing generated layout artifacts from being committed. | **Proposed** |
 | [59-analysis-parity-guardrails.md](./slug-bazel-subplans/59-analysis-parity-guardrails.md)             | Cross-plan guardrails for recurring SDK analysis failures: Bzlmod canonical identity, toolchain/provider ownership, rule-based C++ contract tests, and smoke classification. | **In Progress** |
-| [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md)                                 | Rebuild bzlmod as a DICE-owned graph: parsed modules, resolved graph, repo mappings, extension aggregation/results, replay inputs, repo specs, and materialization manifests. | **Proposed** |
+| [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md)                                 | Rebuild bzlmod as a DICE-owned graph: parsed modules, resolved graph, repo mappings, extension aggregation/results, replay inputs, repo specs, and materialization manifests. | **Complete** (implementation, validation evidence, Kuro parity smoke, and independent reviewer sign-off recorded 2026-06-07) |
 
 ### Remaining Stub Behavior
 
@@ -523,7 +523,7 @@ Quick reference to all phases and their locations:
 | 36    | Extension Spoke Lazy Materialization   | [36-extension-spoke-lazy-materialization.md](./slug-bazel-subplans/36-extension-spoke-lazy-materialization.md) | [~] Phases 1–3 done (2026-05-05). `zeromatter//sdk:sdk_contents` reaches deep analysis with ~550 crate spokes lazily materialized; new blocker is a package-file-tree-loading hang on a zeromatter-specific local-vendored crate (`crates__rstar-0.12.2-zm`), out of plan scope. Phases 3b (`repository_ctx` audit), 4 (`repository_rule_attr` backfill), 5 (stubbed sub-extension loud-fail) still open. |
 | 37    | Canonical-cell-prefix routing          | [37-canonical-cell-prefix-routing.md](./slug-bazel-subplans/37-canonical-cell-prefix-routing.md) | [x] Complete |
 | 38    | Spoke registration without lockfile    | [38-spoke-registration-without-lockfile.md](./slug-bazel-subplans/38-spoke-registration-without-lockfile.md) | [x] Complete |
-| 61    | True DICE-owned bzlmod                 | [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md) | [ ] Proposed |
+| 61    | True DICE-owned bzlmod                 | [61-true-dice-bzlmod.md](./slug-bazel-subplans/61-true-dice-bzlmod.md) | [x] Complete: implementation, validation evidence, Kuro parity smoke, and independent reviewer sign-off recorded 2026-06-07 |
 | 39    | Preserve `.git` from `git_repository`  | [39-git-repository-keep-dot-git.md](./slug-bazel-subplans/39-git-repository-keep-dot-git.md) | [~] Partial: git worktree path works; Starlark override of native built-in remains open |
 | 40    | bazel_lib `relative_file`              | [40-bazel-lib-relative-file.md](./slug-bazel-subplans/40-bazel-lib-relative-file.md) | [x] Complete |
 | 41    | Transition allowlist cfg resolution    | [41-config-transition-allowlist-resolution.md](./slug-bazel-subplans/41-config-transition-allowlist-resolution.md) | [x] Complete |

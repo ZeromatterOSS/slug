@@ -17,6 +17,8 @@ use serde::Serialize;
 use serde::Serializer;
 use slug_artifact::artifact::artifact_type::Artifact;
 use slug_artifact::artifact::artifact_type::BaseArtifactKind;
+use slug_core::cells::CellAliasResolver;
+use slug_core::cells::name::CellName;
 use slug_core::deferred::base_deferred_key::BaseDeferredKey;
 use slug_execute::execute::request::OutputType;
 use slug_execute::path::artifact_path::ArtifactPath;
@@ -75,20 +77,32 @@ enum ArtifactProviderError {
 
 /// A wrapper for an `Artifact` that is guaranteed to be bound, such as outputs
 /// from dependencies, or source files.
-#[derive(Debug, Dupe, Clone, PartialEq, ProvidesStaticType, Allocative)]
+#[derive(Debug, Dupe, Clone, ProvidesStaticType, Allocative)]
 pub struct StarlarkArtifact {
     pub(crate) artifact: Artifact,
     // A set of ArtifactGroups that should be materialized along with the main artifact
     pub(crate) associated_artifacts: AssociatedArtifacts,
+    /// Analysis-time context used only for Bazel-visible owner/label strings.
+    #[allocative(skip)]
+    pub(crate) cell_alias_resolver: Option<CellAliasResolver>,
+    pub(crate) root_cell_name: Option<CellName>,
 }
 
 starlark_simple_value!(StarlarkArtifact);
+
+impl PartialEq for StarlarkArtifact {
+    fn eq(&self, other: &Self) -> bool {
+        self.artifact == other.artifact && self.associated_artifacts == other.associated_artifacts
+    }
+}
 
 impl StarlarkArtifact {
     pub fn new(artifact: Artifact) -> Self {
         StarlarkArtifact {
             artifact,
             associated_artifacts: AssociatedArtifacts::new(),
+            cell_alias_resolver: None,
+            root_cell_name: None,
         }
     }
 
@@ -103,6 +117,35 @@ impl StarlarkArtifact {
         StarlarkArtifact {
             artifact,
             associated_artifacts,
+            cell_alias_resolver: None,
+            root_cell_name: None,
+        }
+    }
+
+    pub fn new_with_label_context(
+        artifact: Artifact,
+        associated_artifacts: AssociatedArtifacts,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        StarlarkArtifact {
+            artifact,
+            associated_artifacts,
+            cell_alias_resolver,
+            root_cell_name,
+        }
+    }
+
+    pub fn with_label_context(
+        &self,
+        cell_alias_resolver: Option<CellAliasResolver>,
+        root_cell_name: Option<CellName>,
+    ) -> Self {
+        Self {
+            artifact: self.artifact.dupe(),
+            associated_artifacts: self.associated_artifacts.dupe(),
+            cell_alias_resolver,
+            root_cell_name,
         }
     }
 
@@ -174,6 +217,14 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkArtifact {
 
     fn owner(&'v self) -> slug_error::Result<Option<BaseDeferredKey>> {
         Ok(self.artifact.owner().duped())
+    }
+
+    fn cell_alias_resolver(&self) -> Option<CellAliasResolver> {
+        self.cell_alias_resolver.clone()
+    }
+
+    fn root_cell_name(&self) -> Option<CellName> {
+        self.root_cell_name
     }
 
     fn with_short_path(
@@ -287,6 +338,8 @@ impl<'v> StarlarkInputArtifactLike<'v> for StarlarkArtifact {
         Ok(EitherStarlarkInputArtifact::Artifact(StarlarkArtifact {
             artifact: self.artifact.dupe().project(path, hide_prefix),
             associated_artifacts: self.associated_artifacts.dupe(),
+            cell_alias_resolver: self.cell_alias_resolver.clone(),
+            root_cell_name: self.root_cell_name,
         }))
     }
 
@@ -296,6 +349,8 @@ impl<'v> StarlarkInputArtifactLike<'v> for StarlarkArtifact {
         Ok(EitherStarlarkInputArtifact::Artifact(StarlarkArtifact {
             artifact: self.artifact.dupe(),
             associated_artifacts: AssociatedArtifacts::new(),
+            cell_alias_resolver: self.cell_alias_resolver.clone(),
+            root_cell_name: self.root_cell_name,
         }))
     }
 
@@ -314,6 +369,8 @@ impl<'v> StarlarkInputArtifactLike<'v> for StarlarkArtifact {
         Ok(EitherStarlarkInputArtifact::Artifact(StarlarkArtifact {
             artifact: self.artifact.dupe(),
             associated_artifacts: self.associated_artifacts.union(artifacts),
+            cell_alias_resolver: self.cell_alias_resolver.clone(),
+            root_cell_name: self.root_cell_name,
         }))
     }
 }
