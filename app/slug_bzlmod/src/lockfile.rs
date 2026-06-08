@@ -94,26 +94,28 @@ pub enum LockfileError {
     UnsupportedVersion { found: u32, expected: u32 },
 
     #[error(
-        "Lockfile is stale: MODULE.bazel has changed. \
+        "Lockfile is stale: {reason} \
         Run 'slug mod update' to update the lockfile."
     )]
-    StaleLockfile,
+    StaleLockfile { reason: String },
 
     #[error(
-        "Lockfile would change but --lockfile_mode=error was specified. \
+        "Lockfile would change but --lockfile_mode=error was specified: {reason} \
         Run 'slug mod update' to update the lockfile."
     )]
-    LockfileModeError,
+    LockfileModeError { reason: String },
 }
 
 /// Explicit capability for writing Bazel-visible lockfiles.
 ///
 /// Ordinary build/query/audit paths should read lockfiles but not write them.
 /// Future `slug mod update` plumbing can use `ExplicitModUpdate`; tests use the
-/// cfg-gated helper below.
+/// cfg-gated helper below.  `ResolutionUpdate` is used by the production
+/// resolution path when `--lockfile_mode=update` (the default).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LockfileWritePurpose {
     ExplicitModUpdate,
+    ResolutionUpdate,
     #[cfg(test)]
     Test,
 }
@@ -1081,13 +1083,11 @@ impl Lockfile {
     }
 
     /// Read a lockfile from disk (default Update mode for version checks).
-    #[cfg(test)]
     pub fn read(path: &Path) -> slug_error::Result<Self> {
         Self::read_with_mode(path, LockfileMode::Update)
     }
 
     /// Read a lockfile from disk with explicit mode for version-mismatch policy.
-    #[cfg(test)]
     pub fn read_with_mode(path: &Path, mode: LockfileMode) -> slug_error::Result<Self> {
         record_bzlmod_event(BzlmodEventKind::LockfileRead, path.display().to_string());
 
@@ -1129,6 +1129,99 @@ impl Lockfile {
         _purpose: LockfileWritePurpose,
     ) -> slug_error::Result<()> {
         self.write_impl(path)
+    }
+
+    /// Build a new lockfile from a resolved graph, incorporating registry
+    /// file hashes and selected yanked versions from the resolution result.
+    pub fn from_resolved_graph(graph: &crate::resolution::ResolvedGraph) -> Self {
+        let mut lockfile = Self::new();
+        // Carry forward registry file hashes from resolution.
+        for (url, hash) in &graph.registry_file_hashes {
+            lockfile
+                .registry_file_hashes
+                .insert(url.clone(), hash.clone());
+        }
+        // Carry forward selected yanked versions.
+        for (module_version, reason) in &graph.selected_yanked_versions {
+            lockfile
+                .selected_yanked_versions
+                .insert(module_version.clone(), reason.clone());
+        }
+        lockfile
+    }
+
+    /// Enforce `--lockfile_mode=error` by comparing the resolved graph against
+    /// the on-disk lockfile.
+    ///
+    /// Returns `Ok(())` if the lockfile is consistent with the resolved graph.
+    /// Returns `Err` with `StaleLockfile` or `LockfileModeError` if drift is
+    /// detected.
+    pub fn enforce_error_mode(
+        resolved_graph: &crate::resolution::ResolvedGraph,
+        existing_lockfile: &Lockfile,
+    ) -> slug_error::Result<()> {
+        // 1. Registry file hash drift.
+        for (url, current_hash) in &resolved_graph.registry_file_hashes {
+            match existing_lockfile.registry_file_hashes.get(url) {
+                Some(locked_hash) if locked_hash == current_hash => {}
+                Some(locked_hash) => {
+                    return Err(LockfileError::StaleLockfile {
+                        reason: format!(
+                            "registry file hash drift for '{}': lockfile has '{}', \
+                             resolution produced '{}'.",
+                            url, locked_hash, current_hash
+                        ),
+                    }
+                    .into());
+                }
+                None => {
+                    // New registry file not in lockfile.
+                    return Err(LockfileError::LockfileModeError {
+                        reason: format!(
+                            "new registry file '{}' not in lockfile.",
+                            url
+                        ),
+                    }
+                    .into());
+                }
+            }
+        }
+
+        // 2. Yanked version drift: a yanked version that wasn't previously
+        //    allowed is now selected.
+        for (module_version, reason) in &resolved_graph.selected_yanked_versions {
+            match existing_lockfile.selected_yanked_versions.get(module_version) {
+                Some(locked_reason) if locked_reason == reason => {}
+                _ => {
+                    return Err(LockfileError::LockfileModeError {
+                        reason: format!(
+                            "yanked version '{}' selected but not in lockfile.",
+                            module_version
+                        ),
+                    }
+                    .into());
+                }
+            }
+        }
+
+        // 3. Resolved-graph drift: compare the lockfile's recorded
+        //    registry hashes with the resolved graph to detect removed
+        //    entries (a module that was in the lockfile but is no longer
+        //    resolved).
+        for url in existing_lockfile.registry_file_hashes.keys() {
+            if !resolved_graph.registry_file_hashes.contains_key(url) {
+                return Err(LockfileError::StaleLockfile {
+                    reason: format!(
+                        "registry file '{}' is in the lockfile but no longer \
+                         in the resolved graph.",
+                        url
+                    ),
+                }
+                .into());
+            }
+        }
+
+        Ok(())
     }
 
     #[cfg(test)]
@@ -1668,8 +1761,7 @@ pub fn lockfile_canonical_extension_id(internal_id: &str) -> String {
 /// Bazel 9's default lockfile behavior. There is deliberately no process-wide
 /// parse cache here: callers that need replayable lockfile identity must go
 /// through their DICE-owned lockfile content key.
-#[cfg(test)]
-fn read_lockfile_at_path(
+pub fn read_lockfile_at_path(
     path: PathBuf,
     mode: LockfileMode,
 ) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
@@ -1694,7 +1786,6 @@ fn read_lockfile_at_path(
 /// Bazel parses the hidden output-base lockfile as `update` regardless of the
 /// command's visible lockfile mode, and treats read/parse failures as an empty
 /// hidden lockfile. Visible workspace lockfile failures remain hard errors.
-#[cfg(test)]
 pub fn read_hidden_lockfile_path(
     path: &Path,
 ) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
@@ -1713,7 +1804,6 @@ pub fn read_hidden_lockfile_path(
 
 /// Read `MODULE.bazel.lock` from `workspace_root` with explicit Bazel
 /// lockfile policy.
-#[cfg(test)]
 pub fn read_lockfile_with_mode(
     workspace_root: &Path,
     mode: LockfileMode,

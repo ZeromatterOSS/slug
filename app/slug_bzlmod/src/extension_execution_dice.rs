@@ -2437,6 +2437,21 @@ fn isolation_key_unique_name_parts(isolation_key: &str) -> (String, String, Stri
 ///
 /// TODO: Improve this by integrating with the Starlark module loading system
 /// to get the actual transitive digest of all loaded .bzl files.
+/// Compute the `bzlTransitiveDigest` for an extension.
+///
+/// **SLUG-PRIVATE DIGEST**: This algorithm does NOT match Bazel 9's
+/// `SingleExtensionEvalFunction` digest computation. Bazel hashes the
+/// transitive `.bzl` dependency graph in a specific order with specific
+/// framing, while Slug uses a simpler hash of the extension ID plus file
+/// state. The resulting `bzlTransitiveDigest` and `usagesDigest` values
+/// in the lockfile are NOT interoperable with Bazel's
+/// `MODULE.bazel.lock`. A Bazel-written lockfile's extension entries
+/// will always miss on Slug, and vice versa. This is documented
+/// intentionally — fail honest rather than fail silent.
+///
+/// Future work: reimplement both digests to match Bazel 9's algorithm
+/// exactly (see `SingleExtensionEvalFunction` and
+/// `ModuleExtensionEvalStarlarkThreadContext` in the Bazel source).
 pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
     use base64::Engine;
     use sha2::Digest;
