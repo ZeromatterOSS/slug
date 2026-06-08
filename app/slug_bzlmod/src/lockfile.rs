@@ -575,6 +575,11 @@ fn validate_recorded_inputs_for_replay(
                     return Err("recorded_input_unsupported".to_owned());
                 };
                 let Some(source_mapping) = repo_mappings.get(&source_repo) else {
+                    // Source repo has no mappings at all. This is valid only
+                    // if the recorded value was also absent (None).
+                    if old_value.is_none() {
+                        continue;
+                    }
                     return Err(recorded_input_changed_reason(raw));
                 };
                 let current = source_mapping
@@ -3319,5 +3324,249 @@ mod tests {
         let mut ids: Vec<_> = lockfile.extension_ids().collect();
         ids.sort();
         assert_eq!(ids, vec!["@@a//a.bzl%a", "@@b//b.bzl%b"]);
+    }
+
+    // --- Recorded-input replay tests ---
+
+    #[test]
+    fn test_recorded_input_file_create_and_delete() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("data.txt");
+
+        // File does not exist initially
+        let marker_when_absent = recorded_file_input(&file_path).unwrap();
+        assert!(marker_when_absent.contains("ENOENT"));
+
+        // Create file
+        fs::write(&file_path, b"hello").unwrap();
+        let marker_when_present = recorded_file_input(&file_path).unwrap();
+        assert!(!marker_when_present.contains("ENOENT"));
+
+        // Validate: absent marker should fail against present file
+        let inputs_absent = vec![marker_when_absent.clone()];
+        let result = validate_recorded_inputs_current(
+            &inputs_absent,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err(), "absent FILE marker should fail when file exists");
+
+        // Validate: present marker should pass
+        let inputs_present = vec![marker_when_present.clone()];
+        let result = validate_recorded_inputs_current(
+            &inputs_present,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_ok(), "present FILE marker should pass when file exists");
+
+        // Delete file
+        fs::remove_file(&file_path).unwrap();
+        let result = validate_recorded_inputs_current(
+            &inputs_present,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err(), "present FILE marker should fail when file is deleted");
+    }
+
+    #[test]
+    fn test_recorded_input_dirents_create_and_delete() {
+        let dir = TempDir::new().unwrap();
+        let sub_dir = dir.path().join("subdir");
+        fs::create_dir(&sub_dir).unwrap();
+
+        let marker_initial = recorded_dirents_input(&sub_dir).unwrap();
+
+        // Add an entry
+        fs::write(sub_dir.join("child.txt"), b"data").unwrap();
+        let marker_with_child = recorded_dirents_input(&sub_dir).unwrap();
+        assert_ne!(marker_initial, marker_with_child, "DIRENTS marker should change when entry added");
+
+        // Validate: initial marker should fail after adding entry
+        let inputs_initial = vec![marker_initial.clone()];
+        let result = validate_recorded_inputs_current(
+            &inputs_initial,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err(), "initial DIRENTS marker should fail after entry added");
+
+        // Validate: marker_with_child should pass
+        let inputs_with_child = vec![marker_with_child.clone()];
+        let result = validate_recorded_inputs_current(
+            &inputs_with_child,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_ok(), "DIRENTS marker should pass when entries match");
+
+        // Delete the child
+        fs::remove_file(sub_dir.join("child.txt")).unwrap();
+        let result = validate_recorded_inputs_current(
+            &inputs_with_child,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err(), "DIRENTS marker should fail after entry deleted");
+    }
+
+    #[test]
+    fn test_recorded_input_dirtree_create_and_delete() {
+        let dir = TempDir::new().unwrap();
+        let sub_dir = dir.path().join("tree_dir");
+        fs::create_dir(&sub_dir).unwrap();
+
+        let marker_initial = recorded_dirtree_input(&sub_dir).unwrap();
+
+        // Add a file in the tree
+        fs::write(sub_dir.join("leaf.txt"), b"leaf-data").unwrap();
+        let marker_with_leaf = recorded_dirtree_input(&sub_dir).unwrap();
+        assert_ne!(marker_initial, marker_with_leaf, "DIRTREE marker should change when file added");
+
+        // Validate: initial marker should fail after adding leaf
+        let inputs_initial = vec![marker_initial.clone()];
+        let result = validate_recorded_inputs_current(
+            &inputs_initial,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err(), "initial DIRTREE marker should fail after leaf added");
+
+        // Validate: marker_with_leaf should pass
+        let inputs_with_leaf = vec![marker_with_leaf.clone()];
+        let result = validate_recorded_inputs_current(
+            &inputs_with_leaf,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_ok(), "DIRTREE marker should pass when tree matches");
+
+        // Delete the leaf file
+        fs::remove_file(sub_dir.join("leaf.txt")).unwrap();
+        let result = validate_recorded_inputs_current(
+            &inputs_with_leaf,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err(), "DIRTREE marker should fail after leaf deleted");
+    }
+
+    #[test]
+    fn test_recorded_input_env_create_and_delete() {
+        let env: BTreeMap<String, String> = BTreeMap::new();
+
+        // Record an env var that is absent
+        let marker_absent = recorded_env_input("MY_VAR", None);
+        let inputs_absent = vec![marker_absent.clone()];
+
+        // Validate with empty env: should pass
+        let result = validate_recorded_inputs_current(
+            &inputs_absent,
+            None,
+            Some(&env),
+            None,
+        );
+        assert!(result.is_ok(), "absent ENV marker should pass when var is absent");
+
+        // Env now has the variable
+        let env_present: BTreeMap<String, String> = {
+            let mut m = BTreeMap::new();
+            m.insert("MY_VAR".to_owned(), "value".to_owned());
+            m
+        };
+        let result = validate_recorded_inputs_current(
+            &inputs_absent,
+            None,
+            Some(&env_present),
+            None,
+        );
+        assert!(result.is_err(), "absent ENV marker should fail when var is present");
+
+        // Record a present env var
+        let marker_present = recorded_env_input("MY_VAR", Some("value"));
+        let inputs_present = vec![marker_present.clone()];
+
+        let result = validate_recorded_inputs_current(
+            &inputs_present,
+            None,
+            Some(&env_present),
+            None,
+        );
+        assert!(result.is_ok(), "present ENV marker should pass when var matches");
+
+        // Env var removed again
+        let result = validate_recorded_inputs_current(
+            &inputs_present,
+            None,
+            Some(&env),
+            None,
+        );
+        assert!(result.is_err(), "present ENV marker should fail when var is removed");
+    }
+
+    #[test]
+    fn test_recorded_input_repo_mapping_create_and_delete() {
+        let mut snapshot = crate::RepoMappingSnapshot::new();
+
+        // No mapping for source repo initially
+        let marker_absent = recorded_repo_mapping_input("source_repo", "apparent_name", None);
+        let inputs_absent = vec![marker_absent.clone()];
+
+        let result = validate_recorded_inputs_current(
+            &inputs_absent,
+            None,
+            None,
+            Some(&snapshot),
+        );
+        assert!(result.is_ok(), "absent REPO_MAPPING marker should pass when mapping absent");
+
+        // Add a mapping
+        let mut mapping = BTreeMap::new();
+        mapping.insert("apparent_name".to_owned(), "canonical_name".to_owned());
+        snapshot.insert("source_repo".to_owned(), mapping);
+
+        let result = validate_recorded_inputs_current(
+            &inputs_absent,
+            None,
+            None,
+            Some(&snapshot),
+        );
+        assert!(result.is_err(), "absent REPO_MAPPING marker should fail when mapping present");
+
+        // Record present mapping
+        let marker_present = recorded_repo_mapping_input(
+            "source_repo",
+            "apparent_name",
+            Some("canonical_name"),
+        );
+        let inputs_present = vec![marker_present.clone()];
+
+        let result = validate_recorded_inputs_current(
+            &inputs_present,
+            None,
+            None,
+            Some(&snapshot),
+        );
+        assert!(result.is_ok(), "present REPO_MAPPING marker should pass when mapping matches");
+
+        // Remove the mapping
+        let empty_snapshot = crate::RepoMappingSnapshot::new();
+        let result = validate_recorded_inputs_current(
+            &inputs_present,
+            None,
+            None,
+            Some(&empty_snapshot),
+        );
+        assert!(result.is_err(), "present REPO_MAPPING marker should fail when mapping removed");
     }
 }

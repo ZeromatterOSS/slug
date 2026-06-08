@@ -1383,13 +1383,14 @@ fn record_clean_bzlmod_resolution_compute_if_changed(
     key: &BzlmodResolvedModuleGraphKey,
     resolution_key: &BzlmodResolutionKey,
     inputs: &BzlmodResolvedGraphSourceInputsValue,
+    non_root_digest: &str,
 ) {
     let cache_key = format!(
         "{}:{}",
         resolution_key.workspace_id.stable_hash(),
         resolution_key.command_policy_digest
     );
-    let input_digest = inputs.identity_digest_with_key(key);
+    let input_digest = inputs.identity_digest_with_key_and_non_root_files(key, non_root_digest);
     let mut last = LAST_RECORDED_BZLMOD_RESOLUTION_DIGEST
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
@@ -1522,7 +1523,7 @@ async fn compute_bzlmod_resolved_module_graph(
         key.options.ignore_dev_dependency,
         cell_graph,
     );
-    record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs);
+    record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs, &non_root_digest);
     Ok(Arc::new(BzlmodResolvedModuleGraphValue {
         lockfile_inputs: inputs.lockfile_inputs,
         outputs: Arc::new(Some(outputs)),
@@ -6471,6 +6472,36 @@ mod tests {
         assert_ne!(
             inputs.identity_digest_with_key(&TestSourceInputsKey { name: "first" }),
             inputs.identity_digest_with_key(&TestSourceInputsKey { name: "second" })
+        );
+    }
+
+    #[test]
+    fn identity_digest_with_non_root_files_tracks_non_root_digest() {
+        let key = TestSourceInputsKey { name: "same-key" };
+        let inputs = resolved_graph_source_inputs_for_test(
+            Some("root-a"),
+            None,
+            "local-a",
+            "reg-a",
+            "patch-a",
+        );
+
+        // Same inputs + same non-root digest = same identity digest
+        assert_eq!(
+            inputs.identity_digest_with_key_and_non_root_files(&key, "non-root-a"),
+            inputs.identity_digest_with_key_and_non_root_files(&key, "non-root-a"),
+        );
+
+        // Same inputs + different non-root digest = different identity digest
+        assert_ne!(
+            inputs.identity_digest_with_key_and_non_root_files(&key, "non-root-a"),
+            inputs.identity_digest_with_key_and_non_root_files(&key, "non-root-b"),
+        );
+
+        // Empty non-root digest vs non-empty = different
+        assert_ne!(
+            inputs.identity_digest_with_key_and_non_root_files(&key, ""),
+            inputs.identity_digest_with_key_and_non_root_files(&key, "non-root-a"),
         );
     }
 
