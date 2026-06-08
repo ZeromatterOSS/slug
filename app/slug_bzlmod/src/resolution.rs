@@ -358,12 +358,20 @@ pub struct ResolvedGraph {
     pub selected_versions: HashMap<String, String>,
     /// Full module information for each selected module.
     ///
+    /// For modules with multiple selected versions (from multiple_version_override),
+    /// keys are `name+version`. For single-version modules, keys are just `name`.
+    ///
     /// `FxHashMap` (fixed-seed, deterministic across invocations) so that
     /// iterating this map produces a stable order for the same content,
     /// without anyone having to sort on read. See Plan 21.2.
     pub modules: FxHashMap<String, ResolvedModuleInfo>,
     /// Resolution order (topological).
     pub resolution_order: Vec<String>,
+    /// Set of module names that have multiple selected versions in the dep
+    /// graph (from `multiple_version_override`). Canonical repo names for
+    /// these modules include the version suffix.
+    #[serde(default)]
+    pub multiple_versions_modules: HashSet<String>,
 
     /// Registry file hashes collected during module file and source metadata
     /// resolution. Keys are registry file URLs, values are SRI SHA-256 hashes
@@ -1085,17 +1093,36 @@ impl MvsResolver {
     ) -> slug_error::Result<ResolvedGraph> {
         let mut modules: FxHashMap<String, ResolvedModuleInfo> = FxHashMap::default();
         let mut resolution_order = Vec::new();
+        let mut name_counts: HashMap<String, usize> = HashMap::new();
 
-        // Build module info for each selected version
+        for (key, _) in selected {
+            let actual_name = if key.contains('+') {
+                key.split('+').next().unwrap().to_string()
+            } else {
+                key.clone()
+            };
+            *name_counts.entry(actual_name).or_insert(0) += 1;
+        }
+        let multiple_versions_modules: HashSet<String> = name_counts
+            .into_iter()
+            .filter(|(_, count)| *count > 1)
+            .map(|(name, _)| name)
+            .collect();
+
         for (name, version) in selected {
-            // Handle multiple version override keys (name+version format)
             let actual_name = if name.contains('+') {
                 name.split('+').next().unwrap().to_string()
             } else {
                 name.clone()
             };
 
-            // Find the discovered module
+            let is_multi = multiple_versions_modules.contains(&actual_name);
+            let module_key = if is_multi {
+                format!("{}+{}", actual_name, version)
+            } else {
+                actual_name.clone()
+            };
+
             let key = ModuleKey::new(&actual_name, version.as_str());
 
             let (module, source) = if let Some(discovered) = self.discovered.get(&key) {
@@ -1103,12 +1130,10 @@ impl MvsResolver {
             } else if let Some(overridden) = self.overridden_modules.get(&actual_name) {
                 (overridden.module.clone(), overridden.source.clone())
             } else {
-                // Module not found - this shouldn't happen
                 tracing::warn!("Module {} not found in discovered or overridden", key);
                 continue;
             };
 
-            // Rewrite dependencies to point to selected versions
             let mut dependencies = HashMap::new();
             for dep in &module.bazel_deps {
                 if dep.dev_dependency {
@@ -1125,11 +1150,11 @@ impl MvsResolver {
                 compatibility_level: module.compatibility_level,
                 dependencies,
                 source,
-                source_path: None, // Will be filled when sources are fetched
+                source_path: None,
             };
 
-            resolution_order.push(actual_name.clone());
-            modules.insert(actual_name, info);
+            resolution_order.push(module_key.clone());
+            modules.insert(module_key, info);
         }
 
         Ok(ResolvedGraph {
@@ -1139,6 +1164,7 @@ impl MvsResolver {
                 .collect(),
             modules,
             resolution_order,
+            multiple_versions_modules,
             registry_file_hashes: self.registry_file_hashes.clone(),
             selected_yanked_versions: IndexMap::new(),
         })
@@ -1504,6 +1530,10 @@ fn validate_registry_file_hash_facts(
     actual_hash: Option<&str>,
 ) -> slug_error::Result<()> {
     if registry_base_url.starts_with("file:") {
+        return Ok(());
+    }
+
+    if lockfile_mode == LockfileMode::Refresh {
         return Ok(());
     }
 

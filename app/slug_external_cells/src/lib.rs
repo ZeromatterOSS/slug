@@ -131,7 +131,10 @@ impl slug_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 repository_rule::copy_to_destination(&setup, abs_dest.as_path()).await?;
             }
             ExternalCellOrigin::ExtensionRepo(setup) => {
-                // Extension repo cells are at bazel-external/{canonical_name}, copy from there
+                // Extension repo cells need lazy materialization via DICE.
+                // get_file_ops_delegate triggers materialization if needed.
+                let _delegate =
+                    extension_repo::get_file_ops_delegate(ctx, cell, setup.clone()).await?;
                 let abs_dest = io.project_root().resolve(&dest_path);
                 let project_root = io.project_root().root();
                 extension_repo::copy_to_destination(&setup, project_root, abs_dest.as_path())

@@ -226,10 +226,6 @@ pub struct LockfileRepoSpec {
     /// All attributes (serialized as JSON values).
     #[serde(default)]
     pub attributes: IndexMap<String, serde_json::Value>,
-
-    /// Whether the repository rule was declared `local = True`.
-    #[serde(default, skip_serializing_if = "crate::repo_spec::is_false")]
-    pub local: bool,
 }
 
 impl LockfileExtensionData {
@@ -430,7 +426,6 @@ impl LockfileRepoSpec {
         Self {
             repo_rule_id,
             attributes: IndexMap::new(),
-            local: false,
         }
     }
 
@@ -444,7 +439,6 @@ impl LockfileRepoSpec {
     pub fn from_repo_spec(spec: &RepoSpec) -> Self {
         Self {
             repo_rule_id: spec.repo_rule_id.clone(),
-            local: spec.local,
             attributes: spec
                 .attributes
                 .iter()
@@ -457,7 +451,7 @@ impl LockfileRepoSpec {
     pub fn to_repo_spec(&self) -> RepoSpec {
         RepoSpec {
             repo_rule_id: self.repo_rule_id.clone(),
-            local: self.local,
+            local: false,
             attributes: self
                 .attributes
                 .iter()
@@ -878,62 +872,145 @@ fn encode_varint(mut value: u64, out: &mut Vec<u8>) {
 }
 
 /// Convert an AttrValue to a serde_json::Value for lockfile storage.
+///
+/// Parity: Bazel 9 `AttributeValuesAdapter.serializeObject`. Labels are
+/// serialized as their unambiguous canonical form (`@@repo+//pkg:target`),
+/// which always starts with `@@`. Plain strings starting with `@@` are
+/// escaped by wrapping in single quotes to avoid label ambiguity.
 pub fn attr_value_to_json(value: &AttrValue) -> serde_json::Value {
     match value {
-        AttrValue::String(s) => serde_json::Value::String(s.clone()),
+        AttrValue::String(s) => {
+            if s.starts_with("@@")
+                || (s.starts_with('\'') && s.ends_with('\''))
+            {
+                serde_json::Value::String(format!("'{}'", s))
+            } else {
+                serde_json::Value::String(s.clone())
+            }
+        }
         AttrValue::Int(i) => serde_json::Value::Number((*i).into()),
         AttrValue::Bool(b) => serde_json::Value::Bool(*b),
         AttrValue::None => serde_json::Value::Null,
         AttrValue::StringList(list) => serde_json::Value::Array(
             list.iter()
-                .map(|s| serde_json::Value::String(s.clone()))
+                .map(|s| {
+                    if s.starts_with("@@")
+                        || (s.starts_with('\'') && s.ends_with('\''))
+                    {
+                        serde_json::Value::String(format!("'{}'", s))
+                    } else {
+                        serde_json::Value::String(s.clone())
+                    }
+                })
                 .collect(),
         ),
         AttrValue::Label(s) => {
-            // Labels are stored as objects with a special marker
-            serde_json::json!({ "__label__": s })
+            let canonical = if s.starts_with("@@") {
+                s.clone()
+            } else if let Some(rest) = s.strip_prefix('@') {
+                if let Some(slash_pos) = rest.find("//") {
+                    let name = &rest[..slash_pos];
+                    let after = &rest[slash_pos..];
+                    format!("@@{name}+{after}")
+                } else {
+                    format!("@@{s}")
+                }
+            } else if s.starts_with("//") {
+                format!("@@_main+{s}")
+            } else {
+                format!("@@_main+//{s}")
+            };
+            serde_json::Value::String(canonical)
         }
         AttrValue::Dict(dict) => {
             let obj: serde_json::Map<String, serde_json::Value> = dict
                 .iter()
-                .map(|(k, v)| (k.clone(), attr_value_to_json(v)))
+                .map(|(k, v)| (attr_key_to_json_string(k), attr_value_to_json(v)))
                 .collect();
             serde_json::Value::Object(obj)
         }
     }
 }
 
+fn attr_key_to_json_string(key: &str) -> String {
+    if key.starts_with("@@")
+        || (key.starts_with('\'') && key.ends_with('\''))
+    {
+        format!("'{}'", key)
+    } else {
+        key.to_owned()
+    }
+}
+
 /// Convert a serde_json::Value back to an AttrValue.
+///
+/// Parity: Bazel 9 `AttributeValuesAdapter.deserializeObject`. Strings
+/// starting with `@@` are labels. Strings wrapped in single quotes have
+/// one layer of quotes stripped.
 pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
     match value {
-        serde_json::Value::String(s) => AttrValue::String(s.clone()),
+        serde_json::Value::String(s) => {
+            if s.starts_with("@@") {
+                let label = if let Some(rest) = s.strip_prefix("@@") {
+                    if let Some(slash_pos) = rest.find("//") {
+                        let name = &rest[..slash_pos];
+                        let after = &rest[slash_pos..];
+                        if name.ends_with('+') {
+                            format!("@{}{}", &name[..name.len()-1], after)
+                        } else {
+                            format!("@{}{}", name, after)
+                        }
+                    } else {
+                        s.clone()
+                    }
+                } else {
+                    s.clone()
+                };
+                AttrValue::Label(label)
+            } else if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
+                AttrValue::String(s[1..s.len()-1].to_owned())
+            } else if let Some(label) = s.strip_prefix("__label__:") {
+                AttrValue::Label(label.to_owned())
+            } else {
+                AttrValue::String(s.clone())
+            }
+        }
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 AttrValue::Int(i)
             } else {
-                // Fallback for floats: convert to string
                 AttrValue::String(n.to_string())
             }
         }
         serde_json::Value::Bool(b) => AttrValue::Bool(*b),
         serde_json::Value::Null => AttrValue::None,
         serde_json::Value::Array(arr) => {
-            // Assume it's a string list (most common case)
             let strings: Vec<String> = arr
                 .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_owned()))
+                .filter_map(|v| v.as_str().map(|s| {
+                    if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
+                        s[1..s.len()-1].to_owned()
+                    } else {
+                        s.to_owned()
+                    }
+                }))
                 .collect();
             AttrValue::StringList(strings)
         }
         serde_json::Value::Object(obj) => {
-            // Check for label marker
             if let Some(serde_json::Value::String(label)) = obj.get("__label__") {
                 return AttrValue::Label(label.clone());
             }
-            // Otherwise, treat as dict
             let dict: IndexMap<String, AttrValue> = obj
                 .iter()
-                .map(|(k, v)| (k.clone(), json_to_attr_value(v)))
+                .map(|(k, v)| {
+                    let key = if k.starts_with('\'') && k.ends_with('\'') && k.len() >= 2 {
+                        k[1..k.len()-1].to_owned()
+                    } else {
+                        k.clone()
+                    };
+                    (key, json_to_attr_value(v))
+                })
                 .collect();
             AttrValue::Dict(dict)
         }
@@ -1452,8 +1529,15 @@ pub fn parse_lockfile_content(path: &Path, content: &str) -> slug_error::Result<
         ],
     );
 
-    // Check version compatibility
     if lockfile.lock_file_version > LOCKFILE_VERSION {
+        return Err(LockfileError::VersionMismatch {
+            expected: LOCKFILE_VERSION,
+            found: lockfile.lock_file_version,
+        }
+        .into());
+    }
+
+    if lockfile.lock_file_version < LOCKFILE_VERSION {
         return Err(LockfileError::VersionMismatch {
             expected: LOCKFILE_VERSION,
             found: lockfile.lock_file_version,
@@ -1682,7 +1766,7 @@ mod tests {
 
     #[test]
     fn test_lockfile_backwards_compat_old_format() {
-        // Verify we can read old-format lockfiles (v24 with deprecated fields)
+        // Bazel 9 / slug reject lockfile versions < 26.
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("MODULE.bazel.lock");
 
@@ -1704,12 +1788,8 @@ mod tests {
         }"#;
 
         fs::write(&path, old_format_json).unwrap();
-        let loaded = Lockfile::read(&path).unwrap();
-
-        // Should successfully read old fields
-        assert_eq!(loaded.lock_file_version, 24);
-        assert_eq!(loaded.module_file_hash, "sha256-oldhash");
-        assert!(loaded.module_dep_graph.contains_key("rules_cc@0.0.9"));
+        let result = Lockfile::read(&path);
+        assert!(result.is_err(), "v24 lockfile should be rejected");
     }
 
     #[test]
@@ -2079,13 +2159,13 @@ mod tests {
             AttrValue::StringList(vec!["a".to_string(), "b".to_string()])
         );
 
-        // Test label (special format)
+        // Test label — Bazel 9 serializes as @@canonical string
         let val = AttrValue::Label("//foo:bar".to_string());
         let json = attr_value_to_json(&val);
-        assert_eq!(json, serde_json::json!({"__label__": "//foo:bar"}));
+        assert_eq!(json, serde_json::json!("@@_main+//foo:bar"));
         assert_eq!(
             json_to_attr_value(&json),
-            AttrValue::Label("//foo:bar".to_string())
+            AttrValue::Label("@_main//foo:bar".to_string())
         );
     }
 

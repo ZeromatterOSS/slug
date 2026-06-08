@@ -229,113 +229,63 @@ impl ExtensionRepoFileOpsDelegate {
 impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
     async fn read_file_if_exists(
         &self,
-        _ctx: &mut DiceComputations<'_>,
+        ctx: &mut DiceComputations<'_>,
         path: &'async_trait CellRelativePath,
     ) -> slug_error::Result<ReadFileProxy> {
         let abs_path = self.resolve_path(path);
-        Ok(ReadFileProxy::new_with_captures(
-            abs_path,
-            |abs_path| async move {
-                match tokio::fs::read_to_string(&abs_path).await {
-                    Ok(contents) => Ok(Some(contents)),
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                    Err(e) => Err(slug_error::slug_error!(
-                        slug_error::ErrorTag::Environment,
-                        "Failed to read extension repo file {:?}: {}",
-                        abs_path,
-                        e
-                    )),
+        let value =
+            slug_common::file_ops::dice::compute_watched_abs_file(ctx, abs_path).await?;
+        let content = value.content.clone();
+        Ok(ReadFileProxy::new_with_captures(content, |content| {
+            let content = content.clone();
+            async move {
+                match content {
+                    Some(bytes) => match String::from_utf8(bytes.to_vec()) {
+                        Ok(s) => Ok(Some(s)),
+                        Err(_) => Ok(None),
+                    },
+                    None => Ok(None),
                 }
-            },
-        ))
+            }
+        }))
     }
 
     async fn read_dir(
         &self,
-        _ctx: &mut DiceComputations<'_>,
+        ctx: &mut DiceComputations<'_>,
         path: &'async_trait CellRelativePath,
     ) -> slug_error::Result<Arc<[RawDirEntry]>> {
         let abs_path = self.resolve_path(path);
-
-        let mut entries = Vec::new();
-        let mut read_dir = tokio::fs::read_dir(&abs_path).await.map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to read extension repo directory {:?}: {}",
-                abs_path,
-                e
-            )
-        })?;
-
-        while let Some(entry) = read_dir.next_entry().await.map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to read directory entry: {}",
-                e
-            )
-        })? {
-            // Follow symlinks when classifying the entry type. Repository rules like
-            // rules_cc's llvm_configure use `repository_ctx.symlink` to materialize
-            // entire source subtrees as directory symlinks (e.g., llvm/lib -> ...);
-            // `DirEntry::file_type` does not follow symlinks, so those entries would
-            // come back as `FileType::Symlink`. gather_package_listing only recurses
-            // into `FileType::Directory`, so classifying symlinks-to-dirs as
-            // directories is required for `glob()` to see files inside.
-            let file_name_os = entry.file_name();
-            let file_name = file_name_os.into_string().map_err(|_| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Non-UTF8 filename in {:?}",
-                    abs_path
-                )
-            })?;
-
-            let entry_path = entry.path();
-            let resolved = tokio::fs::metadata(&entry_path).await;
-            let file_type = match resolved {
-                Ok(md) if md.is_dir() => FileType::Directory,
-                Ok(_) => FileType::File,
-                Err(_) => {
-                    // Broken or inaccessible symlink — fall back to the symlink's
-                    // own metadata so we at least report the entry instead of
-                    // failing the entire directory read.
-                    let st = entry.file_type().await.map_err(|e| {
-                        slug_error::slug_error!(
-                            slug_error::ErrorTag::Environment,
-                            "Failed to get file type: {}",
-                            e
-                        )
-                    })?;
-                    if st.is_dir() {
-                        FileType::Directory
-                    } else if st.is_symlink() {
-                        FileType::Symlink
-                    } else {
-                        FileType::File
-                    }
-                }
-            };
-
-            entries.push(RawDirEntry {
-                file_name: CompactString::from(file_name),
-                file_type,
-            });
-        }
-
-        // Sort entries for deterministic output
-        entries.sort_by(|a, b| a.file_name.cmp(&b.file_name));
-
-        Ok(entries.into())
+        let value =
+            slug_common::file_ops::dice::compute_watched_abs_dir_entries(ctx, abs_path).await?;
+        let entries: Arc<[RawDirEntry]> = value
+            .entries
+            .iter()
+            .map(|e| RawDirEntry {
+                file_name: CompactString::from(e.file_name.as_str()),
+                file_type: e.file_type,
+            })
+            .collect();
+        Ok(entries)
     }
 
     async fn read_path_metadata_if_exists(
         &self,
-        _ctx: &mut DiceComputations<'_>,
+        ctx: &mut DiceComputations<'_>,
         path: &'async_trait CellRelativePath,
     ) -> slug_error::Result<Option<RawPathMetadata>> {
         let abs_path = self.resolve_path(path);
 
-        let metadata = match tokio::fs::symlink_metadata(&abs_path).await {
+        let meta_value = slug_common::file_ops::dice::compute_watched_abs_path_metadata(
+            ctx,
+            abs_path.clone(),
+        )
+        .await?;
+        if !meta_value.exists {
+            return Ok(None);
+        }
+
+        let metadata = match std::fs::symlink_metadata(&abs_path) {
             Ok(m) => m,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => {
@@ -351,8 +301,7 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
         if metadata.is_dir() {
             Ok(Some(RawPathMetadata::Directory))
         } else if metadata.is_symlink() {
-            // Read symlink target
-            let target = tokio::fs::read_link(&abs_path).await.map_err(|e| {
+            let target = std::fs::read_link(&abs_path).map_err(|e| {
                 slug_error::slug_error!(
                     slug_error::ErrorTag::Environment,
                     "Failed to read symlink {:?}: {}",
@@ -362,23 +311,21 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
             })?;
 
             let cell_path = self.make_cell_path(path);
-
-            // Treat symlinks as external
             let external = ExternalSymlink::new(target, ForwardRelativePathBuf::empty())?;
             Ok(Some(RawPathMetadata::Symlink {
                 at: cell_path,
                 to: RawSymlink::External(Arc::new(external)),
             }))
         } else {
-            // Regular file
-            let contents = tokio::fs::read(&abs_path).await.map_err(|e| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Failed to read extension repo file {:?}: {}",
-                    abs_path,
-                    e
-                )
-            })?;
+            let file_value = slug_common::file_ops::dice::compute_watched_abs_file(
+                ctx,
+                abs_path.clone(),
+            )
+            .await?;
+            let contents = match &file_value.content {
+                Some(bytes) => bytes,
+                None => return Ok(None),
+            };
 
             let source_config = self.digest_config.cas_digest_config().source_files_config();
             let digest = TrackedFileDigest::from_content(&contents, source_config);
@@ -1104,20 +1051,18 @@ fn ensure_output_base_extension_repo_symlink(
 /// into the project's external directory.
 ///
 /// Note: This function cannot trigger lazy materialization because it doesn't
-/// have access to DICE. The caller should ensure the repo is materialized
+/// have access to DICE. The caller must ensure the repo is materialized
 /// (via `get_file_ops_delegate`) before calling this function.
 pub(crate) async fn copy_to_destination(
     setup: &ExtensionRepoCellSetup,
     project_root: &slug_fs::paths::abs_norm_path::AbsNormPath,
     dest_path: &std::path::Path,
 ) -> slug_error::Result<()> {
-    // Compute source path from canonical name
     let source_path = project_root
         .as_path()
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
 
-    // Check if materialized
     if !source_path.exists() {
         return Err(ExtensionRepoError::NotMaterialized {
             canonical_name: setup.canonical_name.to_string(),
@@ -1126,7 +1071,6 @@ pub(crate) async fn copy_to_destination(
         .into());
     }
 
-    // Copy recursively using the same helper as repository_rule
     crate::repository_rule::copy_to_destination_impl(&source_path, dest_path).await
 }
 

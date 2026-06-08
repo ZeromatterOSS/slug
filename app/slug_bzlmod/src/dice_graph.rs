@@ -479,6 +479,24 @@ impl BzlmodResolvedGraphSourceInputsValue {
         self.override_patch_inputs.digest.hash(&mut hasher);
         format!("{:016x}", hasher.finish())
     }
+
+    pub fn identity_digest_with_key_and_non_root_files<K: Hash>(
+        &self,
+        key: &K,
+        non_root_digest: &str,
+    ) -> String {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut hasher);
+        self.root_module_file.path.hash(&mut hasher);
+        self.root_module_file.input_digest.hash(&mut hasher);
+        self.lockfile_inputs.hash_identity(&mut hasher);
+        self.local_override_inputs.digest.hash(&mut hasher);
+        self.non_registry_override_inputs.digest.hash(&mut hasher);
+        self.registry_file_inputs.digest.hash(&mut hasher);
+        self.override_patch_inputs.digest.hash(&mut hasher);
+        non_root_digest.hash(&mut hasher);
+        format!("{:016x}", hasher.finish())
+    }
 }
 
 #[derive(Clone, Debug, Display, Allocative)]
@@ -586,7 +604,12 @@ impl Key for BzlmodResolvedModuleGraphKey {
 
     fn validity(x: &Self::Value) -> bool {
         match x {
-            Ok(value) => !value.lockfile_inputs.has_untracked_inputs(),
+            Ok(value) => {
+                if value.lockfile_inputs.lockfile_mode == crate::LockfileMode::Refresh {
+                    return false;
+                }
+                !value.lockfile_inputs.has_untracked_inputs()
+            }
             Err(_) => false,
         }
     }
@@ -1050,6 +1073,7 @@ pub async fn resolve_graph_with_module_file_inputs(
                 selected_versions,
                 modules,
                 resolution_order,
+                multiple_versions_modules: HashSet::new(),
                 registry_file_hashes: indexmap::IndexMap::new(),
                 selected_yanked_versions: indexmap::IndexMap::new(),
             },
@@ -1418,6 +1442,7 @@ async fn compute_bzlmod_resolved_module_graph(
     .await?;
     let graph = graph_inputs.graph;
     let mut parsed_modules = graph_inputs.parsed_modules;
+    let mut non_root_digest = String::new();
     if !graph_inputs.non_root_module_file_inputs.is_empty() {
         let non_root_value = io
             .compute_non_root_module_files(
@@ -1433,6 +1458,7 @@ async fn compute_bzlmod_resolved_module_graph(
                     parsed.module.name
                 )
             })?;
+        non_root_digest = non_root_value.digest.clone();
         append_resolved_non_root_modules(
             &mut parsed_modules,
             &graph,
@@ -1460,7 +1486,11 @@ async fn compute_bzlmod_resolved_module_graph(
         .await?;
     builder.install_precomputed_extension_mapping_rows();
     let cell_graph = builder.finish()?;
-    let cell_graph_resolution_digest = Arc::from(inputs.identity_digest_with_key(key).as_str());
+    let cell_graph_resolution_digest = Arc::from(
+        inputs
+            .identity_digest_with_key_and_non_root_files(key, &non_root_digest)
+            .as_str(),
+    );
     let outputs = clean_resolved_graph_outputs_value(
         key.workspace_id.clone(),
         cell_graph_resolution_digest,
@@ -1678,20 +1708,15 @@ pub fn selected_bzlmod_cell_name_for_dep<'a>(
                 .get(dep_name)
                 .map(String::as_str)
         })?;
-    let canonical_name = bazel_canonical_module_repo_name(dep_name, selected_version);
+    let canonical_name = bazel_canonical_module_repo_name(
+        dep_name,
+        selected_version,
+        resolved_graph.multiple_versions_modules.contains(dep_name),
+    );
     if let Some(name) = cell_names
         .iter()
         .copied()
         .find(|name| *name == canonical_name)
-    {
-        return Some(name);
-    }
-
-    let versioned_name = format!("{}+{}", dep_name, selected_version);
-    if let Some(name) = cell_names
-        .iter()
-        .copied()
-        .find(|name| *name == versioned_name)
     {
         return Some(name);
     }
@@ -2075,6 +2100,7 @@ pub struct BzlmodCleanCellGraphBuilder {
     scoped_aliases: Vec<BzlmodCellGraphScopedAlias>,
     dynamic_aliases: Vec<BzlmodCellGraphDynamicAlias>,
     selected_module_versions: HashMap<String, String>,
+    multiple_versions_modules: HashSet<String>,
     aggregated_extensions: HashMap<String, AggregatedExtension>,
     repo_mappings: crate::RepoMappingSnapshot,
     repo_mapping_overrides: crate::RepoMappingOverrides,
@@ -2112,7 +2138,11 @@ impl BzlmodCleanCellGraphBuilder {
                 }
 
                 let canonical_repo =
-                    bazel_canonical_module_repo_name(module_name, &module_info.version);
+                    bazel_canonical_module_repo_name(
+                        module_name,
+                        &module_info.version,
+                        graph.multiple_versions_modules.contains(module_name),
+                    );
                 match &module_info.source {
                     ModuleSource::Registry { url } => {
                         if let Some(source_path) = &module_info.source_path {
@@ -2144,6 +2174,7 @@ impl BzlmodCleanCellGraphBuilder {
                             module_name,
                             &module_info.version,
                             path,
+                            graph.multiple_versions_modules.contains(module_name),
                         );
                         if let Some(symlink) = symlink {
                             module_symlinks.push(symlink);
@@ -2227,6 +2258,7 @@ impl BzlmodCleanCellGraphBuilder {
                     &cells,
                     &dep.name,
                     &selected_module_versions,
+                    &graph.multiple_versions_modules,
                 ) {
                     root_aliases.push(BzlmodCellGraphAlias {
                         apparent_name: apparent_name.to_owned(),
@@ -2249,6 +2281,7 @@ impl BzlmodCleanCellGraphBuilder {
                     &cells,
                     module_name,
                     &selected_module_versions,
+                    &graph.multiple_versions_modules,
                 ) {
                     if module_name == target_name {
                         continue;
@@ -2269,6 +2302,7 @@ impl BzlmodCleanCellGraphBuilder {
                     &cells,
                     &dep.name,
                     &selected_module_versions,
+                    &graph.multiple_versions_modules,
                 ) else {
                     continue;
                 };
@@ -2338,6 +2372,7 @@ impl BzlmodCleanCellGraphBuilder {
             scoped_aliases,
             dynamic_aliases: Vec::new(),
             selected_module_versions,
+            multiple_versions_modules: graph.multiple_versions_modules.clone(),
             aggregated_extensions,
             repo_mappings,
             repo_mapping_overrides,
@@ -2418,6 +2453,7 @@ impl BzlmodCleanCellGraphBuilder {
                 &self.cells,
                 &alias.canonical_name,
                 &self.selected_module_versions,
+                &self.multiple_versions_modules,
             )
             .unwrap_or(alias.canonical_name.as_str())
             .to_owned();
@@ -2501,6 +2537,7 @@ impl BzlmodCleanCellGraphBuilder {
             &self.root_module_name,
             &self.cells,
             &self.selected_module_versions,
+            &self.multiple_versions_modules,
         );
         self.root_aliases.extend(extension_root_aliases);
 
@@ -2669,6 +2706,7 @@ fn local_override_cell_path_and_symlink(
     module_name: &str,
     module_version: &str,
     override_path: &str,
+    is_multiple_version: bool,
 ) -> (String, Option<BzlmodCellGraphModuleSymlink>) {
     let module_dir = local_override_module_dir(project_root, override_path);
     if let Ok(project_relative) = module_dir.strip_prefix(project_root) {
@@ -2677,7 +2715,8 @@ fn local_override_cell_path_and_symlink(
         }
     }
 
-    let canonical_repo = bazel_canonical_module_repo_name(module_name, module_version);
+    let canonical_repo =
+        bazel_canonical_module_repo_name(module_name, module_version, is_multiple_version);
     let source_path = module_dir
         .canonicalize()
         .unwrap_or_else(|_| module_dir.clone());
@@ -2706,13 +2745,18 @@ fn selected_bzlmod_cell_name_for_dep_in_graph_cells<'a>(
     cells: &'a [BzlmodCellGraphCell],
     dep_name: &str,
     selected_module_versions: &HashMap<String, String>,
+    multiple_versions_modules: &HashSet<String>,
 ) -> Option<&'a str> {
     if let Some(cell) = cells.iter().find(|cell| cell.name == dep_name) {
         return Some(cell.name.as_str());
     }
 
     let selected_version = selected_module_versions.get(dep_name)?;
-    let canonical_name = bazel_canonical_module_repo_name(dep_name, selected_version);
+    let canonical_name = bazel_canonical_module_repo_name(
+        dep_name,
+        selected_version,
+        multiple_versions_modules.contains(dep_name),
+    );
     cells
         .iter()
         .find(|cell| cell.name == canonical_name)
@@ -2743,6 +2787,7 @@ fn add_scoped_repo_aliases_from_root_overrides(
     root_module_name: &str,
     cells: &[BzlmodCellGraphCell],
     selected_module_versions: &HashMap<String, String>,
+    multiple_versions_modules: &HashSet<String>,
 ) {
     for (extension_id, overrides) in repo_mapping_overrides {
         let owner_module =
@@ -2752,6 +2797,7 @@ fn add_scoped_repo_aliases_from_root_overrides(
                 cells,
                 replacement_repo,
                 selected_module_versions,
+                multiple_versions_modules,
             )
             .unwrap_or(replacement_repo.as_str())
             .to_owned();
@@ -2883,7 +2929,11 @@ pub fn resolved_graph_cell_names(graph: &ResolvedGraph) -> Vec<String> {
     modules
         .into_iter()
         .map(|(module_name, module_info)| {
-            bazel_canonical_module_repo_name(module_name, &module_info.version)
+            bazel_canonical_module_repo_name(
+                module_name,
+                &module_info.version,
+                graph.multiple_versions_modules.contains(module_name),
+            )
         })
         .collect()
 }
@@ -3152,6 +3202,7 @@ impl Key for BzlmodCellDefinitionsKey {
                 &module_versions.invalidation.root_module_name,
                 module_sources.modules.as_ref(),
                 &repo_mappings,
+                &multiple_versions_modules_from_sources(&module_sources.modules),
             )));
         }
         let data = ctx
@@ -3409,6 +3460,7 @@ impl Key for BzlmodResidualModuleSymlinksKey {
             return Ok(Arc::new(residual_module_symlinks_from_module_sources(
                 &self.workspace_id,
                 module_sources.modules.as_ref(),
+                &multiple_versions_modules_from_sources(&module_sources.modules),
             )));
         }
         let data = ctx
@@ -3650,9 +3702,24 @@ fn residual_module_symlinks_from_payload(
         .collect()
 }
 
+fn multiple_versions_modules_from_sources(
+    module_sources: &[BzlmodResolvedModuleSource],
+) -> HashSet<String> {
+    let mut name_counts: HashMap<String, usize> = HashMap::new();
+    for source in module_sources {
+        *name_counts.entry(source.module_name.to_string()).or_insert(0) += 1;
+    }
+    name_counts
+        .into_iter()
+        .filter(|(_, count)| *count > 1)
+        .map(|(name, _)| name)
+        .collect()
+}
+
 fn residual_module_symlinks_from_module_sources(
     workspace_id: &WorkspaceId,
     module_sources: &[BzlmodResolvedModuleSource],
+    multiple_versions_modules: &HashSet<String>,
 ) -> Vec<BzlmodCellGraphModuleSymlink> {
     let mut symlinks = Vec::new();
     for module_info in module_sources {
@@ -3668,8 +3735,11 @@ fn residual_module_symlinks_from_module_sources(
         {
             continue;
         }
-        let canonical_repo =
-            bazel_canonical_module_repo_name(&module_info.module_name, &module_info.version);
+        let canonical_repo = bazel_canonical_module_repo_name(
+            &module_info.module_name,
+            &module_info.version,
+            multiple_versions_modules.contains(module_info.module_name.as_str()),
+        );
         let source_path = module_dir
             .canonicalize()
             .unwrap_or_else(|_| module_dir.clone());
@@ -3716,11 +3786,28 @@ const BZLMOD_ALWAYS_BUNDLED_CELLS: &[&str] = &[
     "local_config_python",
 ];
 
-pub fn bazel_canonical_module_repo_name(module_name: &str, version: &str) -> String {
+const BAZEL9_WELL_KNOWN_MODULES: &[&str] = &["bazel_tools", "platforms"];
+
+/// Compute the Bazel 9 canonical repository name for a bzlmod module.
+///
+/// Parity: `ModuleKey.getCanonicalRepoName` in Bazel 9.
+/// - Well-known modules (`bazel_tools`, `platforms`) return their bare name.
+/// - Single-version modules: `<name>+` (version elided).
+/// - Multi-version modules: `<name>+<version>` (version included).
+/// - Extension-generated repos (name contains `+`): returned as-is.
+pub fn bazel_canonical_module_repo_name(
+    module_name: &str,
+    version: &str,
+    is_multiple_version: bool,
+) -> String {
+    if BAZEL9_WELL_KNOWN_MODULES.contains(&module_name) {
+        return module_name.to_owned();
+    }
     if module_name.contains('+') {
-        module_name.to_owned()
-    } else if version.is_empty() {
-        format!("{module_name}+")
+        return module_name.to_owned();
+    }
+    if is_multiple_version && !version.is_empty() {
+        format!("{module_name}+{version}")
     } else {
         format!("{module_name}+")
     }
@@ -3731,6 +3818,7 @@ fn module_cells_from_module_sources(
     root_module_name: &str,
     module_sources: &[BzlmodResolvedModuleSource],
     repo_mappings: &BzlmodRepoMappingsDataValue,
+    multiple_versions_modules: &HashSet<String>,
 ) -> Vec<BzlmodCellGraphCell> {
     let mut cells = Vec::new();
     for module_info in module_sources {
@@ -3739,7 +3827,11 @@ fn module_cells_from_module_sources(
             continue;
         }
 
-        let canonical_repo = bazel_canonical_module_repo_name(module_name, &module_info.version);
+        let canonical_repo = bazel_canonical_module_repo_name(
+            module_name,
+            &module_info.version,
+            multiple_versions_modules.contains(module_name),
+        );
         match &module_info.source {
             ModuleSource::Registry { url } => {
                 let source_path = module_info

@@ -803,15 +803,12 @@ async fn read_bzlmod_file_for_module_inputs(
 
     // Out-of-project: tracked via a cacheable watched-abs DICE input, invalidated by
     // the per-command re-stat-diff (Plan 61 sub-plan 02). No longer an untracked poll.
-    let input = DiceFileComputations::read_watched_abs_file_if_exists(ctx, path).await?;
-    Ok((
-        input
-            .content
-            .clone()
-            .zip(input.digest.clone())
-            .map(|(content, digest)| (content, digest)),
-        BzlmodFileInputTracking::Project,
-    ))
+    let content = DiceFileComputations::read_watched_abs_file_if_exists(ctx, path).await?;
+    let result = content.map(|c| {
+        let digest = slug_bzlmod::compute_sha256_hex(c.as_bytes());
+        (c, digest)
+    });
+    Ok((result, BzlmodFileInputTracking::Project))
 }
 
 async fn local_override_module_dir_exists(
@@ -855,8 +852,8 @@ async fn read_text_file_for_project_input(
     }
 
     // Out-of-project: tracked via a cacheable watched-abs DICE input.
-    let input = DiceFileComputations::read_watched_abs_file_if_exists(ctx, path).await?;
-    Ok((input.content.clone(), BzlmodFileInputTracking::Project))
+    let content = DiceFileComputations::read_watched_abs_file_if_exists(ctx, path).await?;
+    Ok((content, BzlmodFileInputTracking::Project))
 }
 
 #[cfg(test)]

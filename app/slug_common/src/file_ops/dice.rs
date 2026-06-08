@@ -141,11 +141,26 @@ impl DiceFileComputations {
     pub async fn read_watched_abs_file_if_exists(
         ctx: &mut DiceComputations<'_>,
         path: &Path,
-    ) -> slug_error::Result<Arc<WatchedAbsFileValue>> {
-        ctx.compute(&WatchedAbsFileKey {
-            path: Arc::new(path.to_path_buf()),
-        })
-        .await?
+    ) -> slug_error::Result<Option<String>> {
+        let value = ctx
+            .compute(&WatchedAbsFileKey {
+                path: Arc::new(path.to_path_buf()),
+            })
+            .await??;
+        match &value.content {
+            Some(bytes) => {
+                let s = String::from_utf8(bytes.to_vec()).map_err(|e| {
+                    slug_error::slug_error!(
+                        slug_error::ErrorTag::Input,
+                        "Failed to read out-of-project bzlmod input file at {:?} as UTF-8: {}",
+                        path,
+                        e
+                    )
+                })?;
+                Ok(Some(s))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Read the existence/metadata of an out-of-project (absolute-path) bzlmod input
@@ -324,6 +339,7 @@ pub struct FileChangeTracker {
     // re-stat-diff over the daemon-owned registered-input registry.
     abs_files_to_dirty: HashSet<WatchedAbsFileKey>,
     abs_paths_to_dirty: HashSet<WatchedAbsPathMetadataKey>,
+    abs_dir_entries_to_dirty: HashSet<WatchedAbsDirEntriesKey>,
 
     maybe_modified_dirs: HashSet<CellPath>,
 }
@@ -342,6 +358,7 @@ impl FileChangeTracker {
             exists_matching_exact_case_to_dirty: Default::default(),
             abs_files_to_dirty: Default::default(),
             abs_paths_to_dirty: Default::default(),
+            abs_dir_entries_to_dirty: Default::default(),
         }
     }
 
@@ -364,6 +381,7 @@ impl FileChangeTracker {
         ctx.changed(self.exists_matching_exact_case_to_dirty)?;
         ctx.changed(self.abs_files_to_dirty)?;
         ctx.changed(self.abs_paths_to_dirty)?;
+        ctx.changed(self.abs_dir_entries_to_dirty)?;
 
         Ok(())
     }
@@ -454,8 +472,13 @@ impl FileChangeTracker {
     /// registered out-of-project input changed.
     pub fn abs_file_contents_changed(&mut self, path: PathBuf) {
         self.abs_files_to_dirty.insert(WatchedAbsFileKey {
-            path: Arc::new(path),
+            path: Arc::new(path.clone()),
         });
+        if let Some(parent) = path.parent() {
+            self.abs_dir_entries_to_dirty.insert(WatchedAbsDirEntriesKey {
+                path: Arc::new(parent.to_path_buf()),
+            });
+        }
     }
 
     /// Invalidate the cached existence/metadata of an out-of-project (absolute-path)
@@ -465,8 +488,13 @@ impl FileChangeTracker {
             path: Arc::new(path.clone()),
         });
         self.abs_files_to_dirty.insert(WatchedAbsFileKey {
-            path: Arc::new(path),
+            path: Arc::new(path.clone()),
         });
+        if let Some(parent) = path.parent() {
+            self.abs_dir_entries_to_dirty.insert(WatchedAbsDirEntriesKey {
+                path: Arc::new(parent.to_path_buf()),
+            });
+        }
     }
 }
 
@@ -652,7 +680,7 @@ impl Key for ProjectPathMetadataKey {
 /// sub-plan 02 Phase A), mirroring Bazel's `ExternalDirtinessChecker`.
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct WatchedAbsFileValue {
-    pub content: Option<String>,
+    pub content: Option<Arc<Vec<u8>>>,
     pub digest: Option<String>,
 }
 
@@ -674,16 +702,8 @@ fn read_watched_abs_file_value(path: &Path) -> slug_error::Result<WatchedAbsFile
         Err(e) => return Err(e.into()),
     };
     let digest = hex::encode(Sha256::digest(&bytes));
-    let content = String::from_utf8(bytes).map_err(|e| {
-        slug_error::slug_error!(
-            slug_error::ErrorTag::Input,
-            "Failed to read out-of-project bzlmod input file at {:?} as UTF-8: {}",
-            path,
-            e
-        )
-    })?;
     Ok(WatchedAbsFileValue {
-        content: Some(content),
+        content: Some(Arc::new(bytes)),
         digest: Some(digest),
     })
 }
@@ -771,6 +791,158 @@ impl Key for WatchedAbsPathMetadataKey {
     fn invalidation_source_priority() -> InvalidationSourcePriority {
         InvalidationSourcePriority::High
     }
+}
+
+/// Sorted directory entries of an out-of-project (absolute-path) directory.
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct WatchedAbsDirEntriesValue {
+    pub entries: Arc<Vec<WatchedAbsDirEntry>>,
+}
+
+/// A single directory entry from a watched-absolute-path directory listing.
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub struct WatchedAbsDirEntry {
+    pub file_name: String,
+    pub file_type: FileType,
+}
+
+fn read_watched_abs_dir_entries(path: &Path) -> slug_error::Result<WatchedAbsDirEntriesValue> {
+    let mut entries = Vec::new();
+    let rd = match std::fs::read_dir(path) {
+        Ok(rd) => rd,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(WatchedAbsDirEntriesValue {
+                entries: Arc::new(Vec::new()),
+            });
+        }
+        Err(e) => {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Environment,
+                "Failed to read directory {:?}: {}",
+                path,
+                e
+            ));
+        }
+    };
+    for entry in rd {
+        let entry = entry.map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Environment,
+                "Failed to read directory entry: {}",
+                e
+            )
+        })?;
+        let file_name = entry.file_name().into_string().map_err(|_| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Environment,
+                "Non-UTF8 filename in {:?}",
+                path
+            )
+        })?;
+        let entry_path = entry.path();
+        let resolved = std::fs::metadata(&entry_path);
+        let file_type = match resolved {
+            Ok(md) if md.is_dir() => FileType::Directory,
+            Ok(_) => FileType::File,
+            Err(_) => {
+                let st = entry.file_type().map_err(|e| {
+                    slug_error::slug_error!(
+                        slug_error::ErrorTag::Environment,
+                        "Failed to get file type: {}",
+                        e
+                    )
+                })?;
+                if st.is_dir() {
+                    FileType::Directory
+                } else if st.is_symlink() {
+                    FileType::Symlink
+                } else {
+                    FileType::File
+                }
+            }
+        };
+        entries.push(WatchedAbsDirEntry {
+            file_name,
+            file_type,
+        });
+    }
+    entries.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+    Ok(WatchedAbsDirEntriesValue {
+        entries: Arc::new(entries),
+    })
+}
+
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("WatchedAbsDirEntriesKey({})", path.display())]
+struct WatchedAbsDirEntriesKey {
+    path: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for WatchedAbsDirEntriesKey {
+    type Value = slug_error::Result<Arc<WatchedAbsDirEntriesValue>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = read_watched_abs_dir_entries(&self.path)?;
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            registry.register_path((*self.path).clone(), true);
+            for entry in value.entries.iter() {
+                let entry_path = self.path.join(&entry.file_name);
+                registry.register_path(entry_path, true);
+            }
+        }
+        Ok(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
+
+/// Public helper: compute a `WatchedAbsFileKey` for an absolute path and return
+/// the raw bytes + SHA-256 digest. Used by external-cell delegates that need
+/// DICE-tracked file reads outside the project root.
+pub async fn compute_watched_abs_file(
+    ctx: &mut DiceComputations<'_>,
+    path: PathBuf,
+) -> slug_error::Result<Arc<WatchedAbsFileValue>> {
+    ctx.compute(&WatchedAbsFileKey {
+        path: Arc::new(path),
+    })
+    .await?
+}
+
+/// Public helper: compute a `WatchedAbsPathMetadataKey` for an absolute path.
+pub async fn compute_watched_abs_path_metadata(
+    ctx: &mut DiceComputations<'_>,
+    path: PathBuf,
+) -> slug_error::Result<Arc<WatchedAbsPathMetadataValue>> {
+    ctx.compute(&WatchedAbsPathMetadataKey {
+        path: Arc::new(path),
+    })
+    .await?
+}
+
+/// Public helper: compute a `WatchedAbsDirEntriesKey` for an absolute path.
+pub async fn compute_watched_abs_dir_entries(
+    ctx: &mut DiceComputations<'_>,
+    path: PathBuf,
+) -> slug_error::Result<Arc<WatchedAbsDirEntriesValue>> {
+    ctx.compute(&WatchedAbsDirEntriesKey {
+        path: Arc::new(path),
+    })
+    .await?
 }
 
 #[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
@@ -1004,7 +1176,7 @@ mod watched_abs_tests {
             .await;
 
         let first = DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &path).await?;
-        assert_eq!(first.content.as_deref(), Some("a"));
+        assert_eq!(first.as_deref(), Some("a"));
 
         // Cacheable: editing the file WITHOUT dirtying the key must not be re-read.
         std::fs::write(&path, "b").unwrap();
@@ -1012,7 +1184,7 @@ mod watched_abs_tests {
         let cached =
             DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &path).await?;
         assert_eq!(
-            cached.content.as_deref(),
+            cached.as_deref(),
             Some("a"),
             "value must stay cached until explicitly invalidated"
         );
@@ -1024,7 +1196,7 @@ mod watched_abs_tests {
         tracker.write_to_dice(&mut updater)?;
         let mut dice = updater.commit().await;
         let after = DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &path).await?;
-        assert_eq!(after.content.as_deref(), Some("b"));
+        assert_eq!(after.as_deref(), Some("b"));
         Ok(())
     }
 

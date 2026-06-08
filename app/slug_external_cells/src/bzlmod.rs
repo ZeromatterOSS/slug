@@ -82,102 +82,63 @@ impl BzlmodFileOpsDelegate {
 impl FileOpsDelegate for BzlmodFileOpsDelegate {
     async fn read_file_if_exists(
         &self,
-        _ctx: &mut DiceComputations<'_>,
+        ctx: &mut DiceComputations<'_>,
         path: &'async_trait CellRelativePath,
     ) -> slug_error::Result<ReadFileProxy> {
         let abs_path = self.resolve_path(path);
-        Ok(ReadFileProxy::new_with_captures(
-            abs_path,
-            |abs_path| async move {
-                match tokio::fs::read_to_string(&abs_path).await {
-                    Ok(contents) => Ok(Some(contents)),
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                    Err(e) => Err(slug_error::slug_error!(
-                        slug_error::ErrorTag::Environment,
-                        "Failed to read bzlmod file {:?}: {}",
-                        abs_path,
-                        e
-                    )),
+        let value =
+            slug_common::file_ops::dice::compute_watched_abs_file(ctx, abs_path).await?;
+        let content = value.content.clone();
+        Ok(ReadFileProxy::new_with_captures(content, |content| {
+            let content = content.clone();
+            async move {
+                match content {
+                    Some(bytes) => match String::from_utf8(bytes.to_vec()) {
+                        Ok(s) => Ok(Some(s)),
+                        Err(_) => Ok(None),
+                    },
+                    None => Ok(None),
                 }
-            },
-        ))
+            }
+        }))
     }
 
     async fn read_dir(
         &self,
-        _ctx: &mut DiceComputations<'_>,
+        ctx: &mut DiceComputations<'_>,
         path: &'async_trait CellRelativePath,
     ) -> slug_error::Result<Arc<[RawDirEntry]>> {
         let abs_path = self.resolve_path(path);
-
-        let mut entries = Vec::new();
-        let mut read_dir = tokio::fs::read_dir(&abs_path).await.map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to read bzlmod directory {:?}: {}",
-                abs_path,
-                e
-            )
-        })?;
-
-        while let Some(entry) = read_dir.next_entry().await.map_err(|e| {
-            slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to read directory entry: {}",
-                e
-            )
-        })? {
-            let file_name = entry.file_name().into_string().map_err(|_| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Non-UTF8 filename in {:?}",
-                    abs_path
-                )
-            })?;
-
-            let entry_path = entry.path();
-            let resolved = tokio::fs::metadata(&entry_path).await;
-            let file_type = match resolved {
-                Ok(md) if md.is_dir() => FileType::Directory,
-                Ok(_) => FileType::File,
-                Err(_) => {
-                    let st = entry.file_type().await.map_err(|e| {
-                        slug_error::slug_error!(
-                            slug_error::ErrorTag::Environment,
-                            "Failed to get file type: {}",
-                            e
-                        )
-                    })?;
-                    if st.is_dir() {
-                        FileType::Directory
-                    } else if st.is_symlink() {
-                        FileType::Symlink
-                    } else {
-                        FileType::File
-                    }
-                }
-            };
-
-            entries.push(RawDirEntry {
-                file_name: CompactString::from(file_name),
-                file_type,
-            });
-        }
-
-        // Sort entries for deterministic output
-        entries.sort_by(|a, b| a.file_name.cmp(&b.file_name));
-
-        Ok(entries.into())
+        let value =
+            slug_common::file_ops::dice::compute_watched_abs_dir_entries(ctx, abs_path).await?;
+        let entries: Arc<[RawDirEntry]> = value
+            .entries
+            .iter()
+            .map(|e| RawDirEntry {
+                file_name: CompactString::from(e.file_name.as_str()),
+                file_type: e.file_type,
+            })
+            .collect();
+        Ok(entries)
     }
 
     async fn read_path_metadata_if_exists(
         &self,
-        _ctx: &mut DiceComputations<'_>,
+        ctx: &mut DiceComputations<'_>,
         path: &'async_trait CellRelativePath,
     ) -> slug_error::Result<Option<RawPathMetadata>> {
         let abs_path = self.resolve_path(path);
 
-        let metadata = match tokio::fs::symlink_metadata(&abs_path).await {
+        let meta_value = slug_common::file_ops::dice::compute_watched_abs_path_metadata(
+            ctx,
+            abs_path.clone(),
+        )
+        .await?;
+        if !meta_value.exists {
+            return Ok(None);
+        }
+
+        let metadata = match std::fs::symlink_metadata(&abs_path) {
             Ok(m) => m,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => {
@@ -193,8 +154,7 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
         if metadata.is_dir() {
             Ok(Some(RawPathMetadata::Directory))
         } else if metadata.is_symlink() {
-            // Read symlink target
-            let target = tokio::fs::read_link(&abs_path).await.map_err(|e| {
+            let target = std::fs::read_link(&abs_path).map_err(|e| {
                 slug_error::slug_error!(
                     slug_error::ErrorTag::Environment,
                     "Failed to read symlink {:?}: {}",
@@ -204,23 +164,21 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
             })?;
 
             let cell_path = self.make_cell_path(path);
-
-            // For bzlmod cells, treat symlinks as external
             let external = ExternalSymlink::new(target, ForwardRelativePathBuf::empty())?;
             Ok(Some(RawPathMetadata::Symlink {
                 at: cell_path,
                 to: RawSymlink::External(Arc::new(external)),
             }))
         } else {
-            // Regular file
-            let contents = tokio::fs::read(&abs_path).await.map_err(|e| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Failed to read bzlmod file {:?}: {}",
-                    abs_path,
-                    e
-                )
-            })?;
+            let file_value = slug_common::file_ops::dice::compute_watched_abs_file(
+                ctx,
+                abs_path.clone(),
+            )
+            .await?;
+            let contents = match &file_value.content {
+                Some(bytes) => bytes,
+                None => return Ok(None),
+            };
 
             let source_config = self.digest_config.cas_digest_config().source_files_config();
             let digest = TrackedFileDigest::from_content(&contents, source_config);
