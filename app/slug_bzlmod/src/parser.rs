@@ -703,6 +703,25 @@ pub fn include_label_to_path(module_root: &Path, label: &str) -> slug_error::Res
             label
         ))
     })?;
+    // Validate against path traversal: reject '..' segments in package or name
+    for segment in package.split('/') {
+        if segment == ".." || segment == "." {
+            return Err(ModuleParseError::IncludeError(format!(
+                "bad include label '{}': path traversal ('..' or '.') segments are not allowed",
+                label
+            ))
+            .into());
+        }
+    }
+    for segment in name.split('/') {
+        if segment == ".." || segment == "." {
+            return Err(ModuleParseError::IncludeError(format!(
+                "bad include label '{}': path traversal ('..' or '.') segments are not allowed",
+                label
+            ))
+            .into());
+        }
+    }
     let basename = name.rsplit('/').next().unwrap_or(name);
     if !basename.ends_with(".MODULE.bazel") || basename.starts_with('.') {
         return Err(ModuleParseError::IncludeError(format!(
@@ -711,7 +730,18 @@ pub fn include_label_to_path(module_root: &Path, label: &str) -> slug_error::Res
         ))
         .into());
     }
-    Ok(module_root.join(package).join(name))
+    // Verify the resolved path stays within module_root
+    let resolved = module_root.join(package).join(name);
+    let canonical_root = module_root.canonicalize().unwrap_or_else(|_| module_root.to_path_buf());
+    let canonical_resolved = resolved.canonicalize().unwrap_or_else(|_| resolved.clone());
+    if !canonical_resolved.starts_with(&canonical_root) {
+        return Err(ModuleParseError::IncludeError(format!(
+            "bad include label '{}': resolved path escapes module root",
+            label
+        ))
+        .into());
+    }
+    Ok(resolved)
 }
 
 fn sha256_hex(content: &[u8]) -> String {

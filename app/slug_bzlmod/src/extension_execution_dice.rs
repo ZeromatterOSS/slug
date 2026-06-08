@@ -334,15 +334,18 @@ fn selected_extension_cache_identity(
 }
 
 fn selected_extension_cache_repo_specs_digest(cache: &SelectedExtensionCache) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
     let mut repo_specs: Vec<_> = cache.repo_specs.iter().collect();
     repo_specs.sort_by(|(left, _), (right, _)| left.cmp(right));
     for (name, spec) in repo_specs {
-        name.hash(&mut hasher);
+        hasher.update(name.as_bytes());
+        hasher.update([0u8]);
         let spec_json = serde_json::to_string(spec).unwrap_or_else(|_| format!("{spec:?}"));
-        spec_json.hash(&mut hasher);
+        hasher.update(spec_json.as_bytes());
+        hasher.update([0u8]);
     }
-    format!("{:016x}", hasher.finish())
+    hex::encode(hasher.finalize())
 }
 
 fn facts_identity(value: &serde_json::Value) -> String {
@@ -356,13 +359,20 @@ fn module_extension_replay_inputs_identity_digest(
     workspace_lockfile_facts_present: bool,
     selected_cache_identity: &Option<SelectedExtensionCacheIdentity>,
 ) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    lockfile_mode.hash(&mut hasher);
-    facts_identity(prior_facts).hash(&mut hasher);
-    facts_identity(workspace_lockfile_facts).hash(&mut hasher);
-    workspace_lockfile_facts_present.hash(&mut hasher);
-    selected_cache_identity.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{:?}", lockfile_mode).as_bytes());
+    hasher.update([0u8]);
+    hasher.update(facts_identity(prior_facts).as_bytes());
+    hasher.update([0u8]);
+    hasher.update(facts_identity(workspace_lockfile_facts).as_bytes());
+    hasher.update([0u8]);
+    hasher.update(workspace_lockfile_facts_present.to_string().as_bytes());
+    hasher.update([0u8]);
+    if let Some(identity) = selected_cache_identity {
+        hasher.update(format!("{:?}", identity).as_bytes());
+    }
+    hex::encode(hasher.finalize())
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
