@@ -44,6 +44,7 @@ use crate::types::ExtensionUsage;
 use crate::types::ParsedModuleFile;
 use crate::types::TagValue;
 use crate::types::UseRepo;
+use std::collections::HashMap;
 
 /// A pending repository cell definition.
 ///
@@ -201,6 +202,7 @@ pub fn pre_compute_extension_repo_cells(
     parsed_modules: &[(String, ParsedModuleFile)],
     root_module_name: &str,
     ignore_dev_dependency: bool,
+    extension_unique_names: Option<&HashMap<String, String>>,
 ) -> slug_error::Result<(Vec<PendingRepoCell>, Vec<RepoAlias>)> {
     let mut cells = Vec::new();
     let mut aliases = Vec::new();
@@ -242,7 +244,9 @@ pub fn pre_compute_extension_repo_cells(
             // so DICE extension-spoke lookup finds the aggregation for this
             // setup. See `extensions::canonical_extension_id`.
             let ext_id = canonical_extension_id_for_usage(usage, module_name);
-            let repo_prefix = extension_repo_prefix(&ext_id, root_module_name);
+            let repo_prefix = extension_unique_names
+                .and_then(|m| m.get(&ext_id).cloned())
+                .unwrap_or_else(|| extension_repo_prefix(&ext_id, root_module_name));
 
             // The canonical name prefix is the module that OWNS the .bzl file, not
             // the module that uses the extension. For `@bazel_features//private:ext.bzl`,
@@ -972,6 +976,7 @@ mod tests {
             &[("ape+1.0.1".to_owned(), module)],
             "zeromatter",
             false,
+            None,
         )
         .unwrap();
 
@@ -1034,7 +1039,7 @@ mod tests {
         });
 
         let (cells, _) =
-            pre_compute_extension_repo_cells(&[("ape+1.0.1".to_owned(), module)], "ape", false)
+            pre_compute_extension_repo_cells(&[("ape+1.0.1".to_owned(), module)], "ape", false, None)
                 .unwrap();
 
         let local_specs: Vec<_> = cells
@@ -1069,6 +1074,7 @@ mod tests {
             &[("bazel_lib+3.2.2".to_owned(), module)],
             "zeromatter",
             false,
+            None,
         )
         .unwrap();
 
@@ -1104,7 +1110,7 @@ mod tests {
         module.extension_usages.push(usage);
 
         let (cells, aliases) =
-            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false)
+            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false, None)
                 .unwrap();
 
         assert!(cells.is_empty());
@@ -1133,7 +1139,7 @@ mod tests {
         module.extension_usages.push(usage);
 
         let (cells, aliases) =
-            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false)
+            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false, None)
                 .unwrap();
 
         assert_eq!(cells.len(), 1);
@@ -1165,6 +1171,7 @@ mod tests {
             &[("root".to_owned(), root), ("rules_owner".to_owned(), owner)],
             "root",
             false,
+            None,
         )
         .unwrap();
 
@@ -1197,6 +1204,7 @@ mod tests {
             &[("root".to_owned(), root), ("rules_owner".to_owned(), owner)],
             "root",
             true,
+            None,
         )
         .unwrap();
 

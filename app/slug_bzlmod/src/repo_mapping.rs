@@ -155,13 +155,14 @@ impl BzlmodRepoMapping {
     /// - repositories imported with `use_repo()`;
     /// - `override_repo()` entries overriding generated extension repos.
     pub fn for_module(parsed: &ParsedModuleFile, root_module_name: &str) -> Self {
-        Self::for_module_with_policy(parsed, root_module_name, false)
+        Self::for_module_with_policy(parsed, root_module_name, false, None)
     }
 
     pub fn for_module_with_policy(
         parsed: &ParsedModuleFile,
         root_module_name: &str,
         ignore_dev_dependency: bool,
+        extension_unique_names: Option<&HashMap<String, String>>,
     ) -> Self {
         let mut entries = HashMap::new();
         let module_name = parsed_module_name(parsed, root_module_name);
@@ -179,7 +180,13 @@ impl BzlmodRepoMapping {
 
         for usage in &parsed.extension_usages {
             let ext_id = canonical_extension_id_for_usage(usage, module_name);
-            let repo_prefix = extension_repo_prefix(&ext_id, root_module_name);
+            let mut repo_prefix_owned = String::new();
+            let repo_prefix: &str = extension_unique_names
+                .and_then(|m| m.get(&ext_id).map(|s| s.as_str()))
+                .unwrap_or_else(|| {
+                    repo_prefix_owned = extension_repo_prefix(&ext_id, root_module_name);
+                    repo_prefix_owned.as_str()
+                });
 
             for import in &usage.imports {
                 for repo_name in &import.repos {
@@ -666,7 +673,7 @@ mod tests {
             .push(("generated_name".to_owned(), "actual_dep".to_owned()));
         module.extension_usages.push(usage);
 
-        let mapping = BzlmodRepoMapping::for_module_with_policy(&module, "root", true);
+        let mapping = BzlmodRepoMapping::for_module_with_policy(&module, "root", true, None);
 
         assert_eq!(
             mapping

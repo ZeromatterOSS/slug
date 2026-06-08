@@ -96,6 +96,14 @@ pub struct AggregatedExtension {
 
     /// All repositories imported via use_repo() for this extension.
     pub imported_repos: Vec<String>,
+
+    /// Globally-disambiguated repo prefix for this extension.
+    ///
+    /// Computed by `populate_extension_unique_names` after all extensions
+    /// are aggregated, so that no two extensions share a prefix that is a
+    /// prefix of each other (Bazel 9 `calculateUniqueNameForUsedExtensionId`).
+    /// Falls back to the attempt-1 candidate when not yet populated.
+    pub unique_repo_prefix: String,
 }
 
 impl AggregatedExtension {
@@ -109,6 +117,7 @@ impl AggregatedExtension {
             isolation_key: None,
             tags_by_module: HashMap::new(),
             imported_repos: Vec::new(),
+            unique_repo_prefix: String::new(),
         }
     }
 
@@ -211,6 +220,30 @@ pub fn aggregate_extensions_with_policy(
     }
 
     aggregated
+}
+
+/// Populate `unique_repo_prefix` on every `AggregatedExtension` using
+/// globally-disambiguated names computed by `compute_extension_unique_names`.
+///
+/// This must be called once after `aggregate_extensions_with_policy` returns,
+/// before the aggregated extensions are stored or consumed.  Extension IDs are
+/// sorted before computing unique names so the result is deterministic
+/// regardless of HashMap iteration order.
+pub fn populate_extension_unique_names(
+    aggregated: &mut HashMap<String, AggregatedExtension>,
+    root_module_name: &str,
+) {
+    let mut sorted_ids: Vec<String> = aggregated.keys().cloned().collect();
+    sorted_ids.sort();
+    let unique_names = crate::extension_execution_dice::compute_extension_unique_names(
+        &sorted_ids,
+        root_module_name,
+    );
+    for (ext_id, agg) in aggregated.iter_mut() {
+        agg.unique_repo_prefix = unique_names.get(ext_id).cloned().unwrap_or_else(|| {
+            crate::extension_execution_dice::extension_repo_prefix(ext_id, root_module_name)
+        });
+    }
 }
 
 /// Build the canonical extension id from a `use_extension()` call.

@@ -1216,7 +1216,7 @@ impl ModuleExtensionResult {
         recorded_input_context: ModuleExtensionRecordedInputContext,
     ) -> Self {
         let canonical_names =
-            build_canonical_names(&extension_id, &generated_repo_specs, root_module_name);
+            build_canonical_names(&extension_id, &generated_repo_specs, root_module_name, None);
         Self {
             extension_id,
             input_hash,
@@ -2217,12 +2217,22 @@ fn sanitize_extension_id_for_path(extension_id: &str) -> String {
 /// — required so the root module's declared name (e.g., `llvm-project-overlay`)
 /// is canonicalized to `_main`, matching what `pending_repo_cells.rs` registers
 /// when it pre-computes the same cells from `use_repo()` declarations.
+/// Build canonical names for extension-generated repositories.
+///
+/// Format: `{repo_prefix}+{internal_name}` where `repo_prefix` is the
+/// globally-disambiguated extension prefix (see `compute_extension_unique_names`).
+///
+/// When `unique_name_map` is `Some`, the prefix is looked up from the map;
+/// otherwise it falls back to `extension_repo_prefix(extension_id, root_module_name)`.
 pub fn build_canonical_names(
     extension_id: &str,
     specs: &FxHashMap<String, RepoSpec>,
     root_module_name: &str,
+    unique_name_map: Option<&HashMap<String, String>>,
 ) -> FxHashMap<String, String> {
-    let repo_prefix = extension_repo_prefix(extension_id, root_module_name);
+    let repo_prefix = unique_name_map
+        .and_then(|m| m.get(extension_id).cloned())
+        .unwrap_or_else(|| extension_repo_prefix(extension_id, root_module_name));
     specs
         .keys()
         .map(|internal| {
@@ -3012,7 +3022,7 @@ mod tests {
         specs.insert("numpy".to_owned(), RepoSpec::new("rule".to_owned()));
         specs.insert("pandas".to_owned(), RepoSpec::new("rule".to_owned()));
 
-        let names = build_canonical_names("@@rules_python//pip:pip.bzl%pip", &specs, "");
+        let names = build_canonical_names("@@rules_python//pip:pip.bzl%pip", &specs, "", None);
 
         assert_eq!(
             names.get("numpy"),
@@ -3023,7 +3033,7 @@ mod tests {
             Some(&"rules_python++pip+pandas".to_owned())
         );
 
-        let isolated = build_canonical_names("//:ext.bzl%ext%<root>+first", &specs, "root");
+        let isolated = build_canonical_names("//:ext.bzl%ext%<root>+first", &specs, "root", None);
         assert_eq!(
             isolated.get("numpy"),
             Some(&"_main+_ext+++first+numpy".to_owned())

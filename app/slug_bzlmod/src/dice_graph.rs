@@ -1547,6 +1547,7 @@ pub fn repo_mapping_snapshot_for_modules_with_policy(
             parsed_mod,
             root_module_name,
             ignore_dev_dependency,
+            None,
         )
         .entries_as_strings();
         if module_name == root_module_name {
@@ -2376,6 +2377,7 @@ impl BzlmodCleanCellGraphBuilder {
                 parsed_modules,
                 &root_module_name,
                 options.ignore_dev_dependency,
+                None,
             )?;
         let repo_env_json = serde_json::to_string(&options.repo_env).map_err(|e| {
             slug_error::slug_error!(
