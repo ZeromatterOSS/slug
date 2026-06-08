@@ -490,6 +490,161 @@ pub struct ResolvedRegistryModule {
     pub source_info: SourceInfo,
 }
 
+/// An ordered chain of registry clients implementing Bazel 9's `--registry`
+/// fallback behavior: try each registry in order for metadata/source/module-file
+/// fetches, stopping at the first hit.
+///
+/// When a module is not found in a registry (404 or similar), the chain
+/// proceeds to the next. When all registries fail, the last error is returned.
+pub struct RegistryChain {
+    clients: Vec<RegistryClient>,
+}
+
+impl RegistryChain {
+    /// Create a new chain from an ordered list of registry clients.
+    /// The first client is tried first, matching `--registry` flag order.
+    pub fn new(clients: Vec<RegistryClient>) -> Self {
+        Self { clients }
+    }
+
+    /// Create a single-client chain (backward-compatible convenience).
+    pub fn single(client: RegistryClient) -> Self {
+        Self::new(vec![client])
+    }
+
+    /// Get the base URLs of all registries in this chain, in order.
+    pub fn base_urls(&self) -> Vec<&str> {
+        self.clients.iter().map(|c| c.base_url()).collect()
+    }
+
+    /// Fetch module metadata, trying each registry in order.
+    /// Returns the metadata from the first registry that has it.
+    pub async fn fetch_metadata(&self, name: &str) -> slug_error::Result<ModuleMetadata> {
+        let mut last_err = None;
+        for client in &self.clients {
+            match client.fetch_metadata(name).await {
+                Ok(meta) => {
+                    tracing::debug!(
+                        "Found module {} metadata at registry {}",
+                        name,
+                        client.base_url()
+                    );
+                    return Ok(meta);
+                }
+                Err(e) => {
+                    tracing::debug!(
+                        "Module {} not found at registry {}: {}",
+                        name,
+                        client.base_url(),
+                        e
+                    );
+                    last_err = Some(e);
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
+            url: "no registries configured".to_owned(),
+            reason: "No registry clients in chain".to_owned(),
+        }.into()))
+    }
+
+    /// Fetch MODULE.bazel content, trying each registry in order.
+    pub async fn fetch_module_bazel(&self, name: &str, version: &str) -> slug_error::Result<String> {
+        let mut last_err = None;
+        for client in &self.clients {
+            match client.fetch_module_bazel_file(name, version).await {
+                Ok(file) => {
+                    tracing::debug!(
+                        "Found MODULE.bazel for {}@{} at registry {}",
+                        name, version, client.base_url()
+                    );
+                    return Ok(file.content);
+                }
+                Err(e) => {
+                    last_err = Some(e);
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
+            url: "no registries configured".to_owned(),
+            reason: "No registry clients in chain".to_owned(),
+        }.into()))
+    }
+
+    /// Fetch MODULE.bazel content and file identity, trying each registry in order.
+    pub async fn fetch_module_bazel_file(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> slug_error::Result<RegistryFileContent> {
+        let mut last_err = None;
+        for client in &self.clients {
+            match client.fetch_module_bazel_file(name, version).await {
+                Ok(file) => return Ok(file),
+                Err(e) => {
+                    last_err = Some(e);
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
+            url: "no registries configured".to_owned(),
+            reason: "No registry clients in chain".to_owned(),
+        }.into()))
+    }
+
+    /// Fetch source info, trying each registry in order.
+    pub async fn fetch_source_info(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> slug_error::Result<SourceInfo> {
+        Ok(self.fetch_source_info_file(name, version).await?.source_info)
+    }
+
+    /// Fetch source info and file identity, trying each registry in order.
+    pub async fn fetch_source_info_file(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> slug_error::Result<RegistrySourceInfo> {
+        let mut last_err = None;
+        for client in &self.clients {
+            match client.fetch_source_info_file(name, version).await {
+                Ok(info) => return Ok(info),
+                Err(e) => {
+                    last_err = Some(e);
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
+            url: "no registries configured".to_owned(),
+            reason: "No registry clients in chain".to_owned(),
+        }.into()))
+    }
+
+    /// Fetch bazel_registry.json from the primary (first) registry.
+    /// Mirrors are only consulted for module content, not registry-level config.
+    pub async fn fetch_bazel_registry_json_file(&self) -> slug_error::Result<RegistryFileContent> {
+        match self.clients.first() {
+            Some(client) => client.fetch_bazel_registry_json_file().await,
+            None => Err(RegistryError::InvalidResponse {
+                url: "no registries configured".to_owned(),
+                reason: "No registry clients in chain".to_owned(),
+            }.into()),
+        }
+    }
+
+    /// Return the number of registries in this chain.
+    pub fn len(&self) -> usize {
+        self.clients.len()
+    }
+
+    /// Return true if this chain has no registries.
+    pub fn is_empty(&self) -> bool {
+        self.clients.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

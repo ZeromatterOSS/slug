@@ -684,10 +684,31 @@ pub struct WatchedAbsFileValue {
     pub digest: Option<String>,
 }
 
-/// Existence of an out-of-project (absolute-path) bzlmod input path.
+/// Detailed file type for an out-of-project (absolute-path) bzlmod input.
+#[derive(Clone, Debug, PartialEq, Eq, Allocative)]
+pub enum WatchedAbsFileType {
+    File,
+    Directory,
+    Symlink,
+}
+
+/// Existence + detailed metadata of an out-of-project (absolute-path) bzlmod input path.
+///
+/// When `exists` is true, `file_type`, `symlink_target`, and `is_executable`
+/// carry the information that delegates previously read via bare
+/// `std::fs::symlink_metadata` / `std::fs::read_link`.  Because these fields
+/// are populated inside the DICE key, they are tracked and invalidated by the
+/// same `WatchedAbsPathMetadataKey` machinery that the file-watcher uses,
+/// eliminating stale-cache bugs on mutable external trees.
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct WatchedAbsPathMetadataValue {
     pub exists: bool,
+    /// `Some(_)` when `exists` is true.
+    pub file_type: Option<WatchedAbsFileType>,
+    /// `Some(target)` only when the path is a symlink.
+    pub symlink_target: Option<PathBuf>,
+    /// `Some(is_executable)` only when the path is a regular file (unix).
+    pub is_executable: Option<bool>,
 }
 
 fn read_watched_abs_file_value(path: &Path) -> slug_error::Result<WatchedAbsFileValue> {
@@ -712,9 +733,50 @@ fn read_watched_abs_path_metadata_value(
     path: &Path,
 ) -> slug_error::Result<WatchedAbsPathMetadataValue> {
     match std::fs::symlink_metadata(path) {
-        Ok(_) => Ok(WatchedAbsPathMetadataValue { exists: true }),
+        Ok(metadata) => {
+            let file_type = if metadata.is_dir() {
+                WatchedAbsFileType::Directory
+            } else if metadata.is_symlink() {
+                WatchedAbsFileType::Symlink
+            } else {
+                WatchedAbsFileType::File
+            };
+
+            let symlink_target = if metadata.is_symlink() {
+                Some(std::fs::read_link(path)?)
+            } else {
+                None
+            };
+
+            #[cfg(unix)]
+            let is_executable = {
+                use std::os::unix::fs::PermissionsExt;
+                Some(metadata.permissions().mode() & 0o111 != 0)
+            };
+            #[cfg(not(unix))]
+            let is_executable: Option<bool> = None;
+
+            // Only attach is_executable for regular files.
+            let is_executable = if matches!(file_type, WatchedAbsFileType::File) {
+                is_executable
+            } else {
+                None
+            };
+
+            Ok(WatchedAbsPathMetadataValue {
+                exists: true,
+                file_type: Some(file_type),
+                symlink_target,
+                is_executable,
+            })
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Ok(WatchedAbsPathMetadataValue { exists: false })
+            Ok(WatchedAbsPathMetadataValue {
+                exists: false,
+                file_type: None,
+                symlink_target: None,
+                is_executable: None,
+            })
         }
         Err(e) => Err(e.into()),
     }
@@ -754,6 +816,15 @@ impl Key for WatchedAbsFileKey {
     // No `validity` override: this is a cacheable DICE input. The per-sync
     // re-stat-diff (Phase A.2) calls `FileChangeTracker::abs_file_contents_changed`
     // to invalidate it only when the on-disk content actually changes.
+    //
+    // However, external-cell delegates read mutable semantic file trees
+    // (bazel-external/…, cache/…) through these keys.  To prevent stale data
+    // from being served when the underlying external tree changes within a
+    // daemon session, we mark the value as never valid across transactions.
+    fn validity(_x: &Self::Value) -> bool {
+        false
+    }
+
     fn invalidation_source_priority() -> InvalidationSourcePriority {
         InvalidationSourcePriority::High
     }
@@ -786,6 +857,18 @@ impl Key for WatchedAbsPathMetadataKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    /// Never consider this value valid across DICE transactions.
+    ///
+    /// External-cell delegates use this key for mutable trees
+    /// (bazel-external/…, cache/…) that the project file-watcher does not
+    /// proactively watch.  Returning `false` forces a fresh read every
+    /// transaction, and the per-sync re-stat-diff invalidation
+    /// (`FileChangeTracker::abs_path_added_or_removed`) still applies within
+    /// a running transaction.
+    fn validity(_x: &Self::Value) -> bool {
+        false
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -903,6 +986,13 @@ impl Key for WatchedAbsDirEntriesKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    /// Never valid across transactions: external-cell delegates read mutable
+    /// trees through this key and the project watcher does not track these
+    /// paths.
+    fn validity(_x: &Self::Value) -> bool {
+        false
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {

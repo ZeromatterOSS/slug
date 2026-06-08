@@ -510,6 +510,42 @@ impl Default for ModuleCache {
     }
 }
 
+/// Compute a portable (machine-independent) relative cache key for a registry
+/// file URL.  The key is the path relative to the cache base directory — e.g.
+/// `"registry/bcr.bazel.build/bazel_registry.json"` — so it does not vary with
+/// `$XDG_CACHE_HOME` or `dirs::home_dir()`.
+///
+/// Returns `None` for URLs that do not map to a known cache location.
+pub fn registry_file_relative_cache_key(url: &str) -> Option<String> {
+    if let Some(registry_url) = url.strip_suffix("/bazel_registry.json") {
+        let registry_name = registry_url
+            .trim_start_matches("https://")
+            .trim_start_matches("http://")
+            .trim_end_matches('/');
+        return Some(format!("registry/{}/bazel_registry.json", registry_name));
+    }
+
+    let (registry_url, module_path) = url.split_once("/modules/")?;
+    let registry_name = registry_url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/');
+    let mut parts = module_path.split('/');
+    let name = parts.next()?;
+    let version = parts.next()?;
+    let file_name = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    match file_name {
+        "MODULE.bazel" | "source.json" => Some(format!(
+            "registry/{}/modules/{}/{}/{}",
+            registry_name, name, version, file_name
+        )),
+        _ => None,
+    }
+}
+
 fn download_safe_name(integrity: &str) -> String {
     // Integrity format often includes base64 punctuation. Keep the current
     // filename-compatible cache layout while preserving the logical cache key.

@@ -155,6 +155,7 @@ pub fn module_info_to_serialized(info: &ModuleInfo) -> SerializedModule {
         name: info.name.clone(),
         version: info.version.clone(),
         is_root: info.is_root,
+        is_dev_dependency: info.is_dev_dependency,
         tags_by_class,
     }
 }

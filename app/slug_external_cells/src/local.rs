@@ -148,63 +148,51 @@ impl FileOpsDelegate for LocalPathFileOpsDelegate {
             return Ok(None);
         }
 
-        let metadata = match std::fs::symlink_metadata(&abs_path) {
-            Ok(m) => m,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => {
-                return Err(slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Failed to get metadata for {:?}: {}",
-                    abs_path,
-                    e
-                ));
+        match meta_value.file_type.as_ref() {
+            Some(slug_common::file_ops::dice::WatchedAbsFileType::Directory) => {
+                Ok(Some(RawPathMetadata::Directory))
             }
-        };
+            Some(slug_common::file_ops::dice::WatchedAbsFileType::Symlink) => {
+                let target = match &meta_value.symlink_target {
+                    Some(t) => t.clone(),
+                    None => {
+                        return Err(slug_error::slug_error!(
+                            slug_error::ErrorTag::Environment,
+                            "Symlink metadata for local path file {:?} missing symlink target",
+                            abs_path
+                        ));
+                    }
+                };
 
-        if metadata.is_dir() {
-            Ok(Some(RawPathMetadata::Directory))
-        } else if metadata.is_symlink() {
-            let target = std::fs::read_link(&abs_path).map_err(|e| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Failed to read symlink {:?}: {}",
-                    abs_path,
-                    e
+                let cell_path = self.make_cell_path(path);
+                let external = ExternalSymlink::new(target, ForwardRelativePathBuf::empty())?;
+                Ok(Some(RawPathMetadata::Symlink {
+                    at: cell_path,
+                    to: RawSymlink::External(Arc::new(external)),
+                }))
+            }
+            Some(slug_common::file_ops::dice::WatchedAbsFileType::File) => {
+                let file_value = slug_common::file_ops::dice::compute_watched_abs_file(
+                    ctx,
+                    abs_path.clone(),
                 )
-            })?;
+                .await?;
+                let contents = match &file_value.content {
+                    Some(bytes) => bytes,
+                    None => return Ok(None),
+                };
 
-            let cell_path = self.make_cell_path(path);
-            let external = ExternalSymlink::new(target, ForwardRelativePathBuf::empty())?;
-            Ok(Some(RawPathMetadata::Symlink {
-                at: cell_path,
-                to: RawSymlink::External(Arc::new(external)),
-            }))
-        } else {
-            let file_value = slug_common::file_ops::dice::compute_watched_abs_file(
-                ctx,
-                abs_path.clone(),
-            )
-            .await?;
-            let contents = match &file_value.content {
-                Some(bytes) => bytes,
-                None => return Ok(None),
-            };
+                let source_config = self.digest_config.cas_digest_config().source_files_config();
+                let digest = TrackedFileDigest::from_content(&contents, source_config);
 
-            let source_config = self.digest_config.cas_digest_config().source_files_config();
-            let digest = TrackedFileDigest::from_content(&contents, source_config);
+                let is_executable = meta_value.is_executable.unwrap_or(false);
 
-            #[cfg(unix)]
-            let is_executable = {
-                use std::os::unix::fs::PermissionsExt;
-                metadata.permissions().mode() & 0o111 != 0
-            };
-            #[cfg(not(unix))]
-            let is_executable = false;
-
-            Ok(Some(RawPathMetadata::File(FileMetadata {
-                digest,
-                is_executable,
-            })))
+                Ok(Some(RawPathMetadata::File(FileMetadata {
+                    digest,
+                    is_executable,
+                })))
+            }
+            None => Ok(None),
         }
     }
 

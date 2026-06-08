@@ -763,6 +763,109 @@ impl MvsResolver {
         Ok(())
     }
 
+    /// Find modules where the selected version differs from the version
+    /// at which the module was originally discovered. MVS may select a
+    /// higher version (because another module requested it), and that
+    /// higher version may have different transitive deps that need to be
+    /// discovered.
+    fn find_modules_needing_rediscovery(
+        &self,
+        selected: &HashMap<String, Version>,
+    ) -> Vec<(String, Version)> {
+        let mut needs_rediscovery = Vec::new();
+
+        for (name, selected_version) in selected {
+            // Skip overridden modules — they're already at their final version
+            if self.overridden_modules.contains_key(name) {
+                continue;
+            }
+
+            // Check if we discovered this module at a different version
+            // than what was selected. We need to look through all discovered
+            // entries for this module name.
+            let discovered_versions: Vec<Version> = self
+                .discovered
+                .keys()
+                .filter(|k| k.name == *name)
+                .filter_map(|k| Version::parse(&k.version).ok())
+                .collect();
+
+            // If the selected version wasn't among the discovered versions,
+            // we need to discover it at the selected version.
+            if !discovered_versions.iter().any(|v| v == selected_version) {
+                needs_rediscovery.push((name.clone(), selected_version.clone()));
+            }
+        }
+
+        // Sort for deterministic rediscovery order across runs
+        needs_rediscovery.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        needs_rediscovery
+    }
+
+    /// Re-discover modules at their selected (higher) versions and add
+    /// their transitive deps to the discovery queue.
+    async fn rediscover_modules(
+        &mut self,
+        modules: &[(String, Version)],
+    ) -> slug_error::Result<()> {
+        for (name, version) in modules {
+            let dep = BazelDep {
+                name: name.clone(),
+                version: version.clone(),
+                repo_name: None,
+                dev_dependency: false,
+            };
+
+            let key = ModuleKey::from_dep(&dep);
+
+            // Remove the old entry at the originally-discovered version
+            // for this module name (if it exists at a different version).
+            // We keep entries at other versions since multiple modules may
+            // have requested different versions.
+            let old_keys_to_remove: Vec<ModuleKey> = self
+                .discovered
+                .keys()
+                .filter(|k| k.name == *name && k.version != version.as_str())
+                .cloned()
+                .collect();
+            for old_key in old_keys_to_remove {
+                self.discovered.remove(&old_key);
+            }
+
+            // Fetch module at the selected version
+            let discovered = self.fetch_and_discover_module(&dep).await?;
+
+            // Queue transitive deps of the newly-discovered version
+            for transitive_dep in &discovered.module.bazel_deps {
+                if transitive_dep.dev_dependency && self.ignore_dev_dependency {
+                    continue;
+                }
+                if self.overridden_modules.contains_key(&transitive_dep.name) {
+                    continue;
+                }
+
+                let effective_dep = BazelDep {
+                    name: transitive_dep.name.clone(),
+                    version: self.get_effective_version(transitive_dep),
+                    repo_name: transitive_dep.repo_name.clone(),
+                    dev_dependency: transitive_dep.dev_dependency,
+                };
+
+                let trans_key = ModuleKey::from_dep(&effective_dep);
+                // Only fetch if we haven't already discovered this exact key
+                if !self.discovered.contains_key(&trans_key) {
+                    let newly_discovered =
+                        self.fetch_and_discover_module(&effective_dep).await?;
+                    self.discovered.insert(trans_key, newly_discovered);
+                }
+            }
+
+            self.discovered.insert(key, discovered);
+        }
+
+        Ok(())
+    }
+
     /// Fetch a module from registry and create DiscoveredModule.
     async fn fetch_and_discover_module(
         &mut self,
@@ -1139,8 +1242,43 @@ impl MvsResolver {
                 if dep.dev_dependency {
                     continue;
                 }
+                // For multi-version modules, the dependency may resolve to a
+                // versioned key like "foo+1.3" rather than just "foo". We need
+                // to find the correct selected key by checking:
+                // 1. Exact name match in selected (single-version case)
+                // 2. If the dep name is a multi-version module, find the
+                //    selected key whose actual_name matches and whose selected
+                //    version satisfies this dep's version requirement.
                 if let Some(selected_version) = selected.get(&dep.name) {
+                    // Single-version module: key is just the name
                     dependencies.insert(dep.name.clone(), selected_version.to_string());
+                } else {
+                    // Multi-version module: look for a key like "name+version"
+                    // whose actual name matches and whose version >= dep.version.
+                    // Collect all matching candidates and pick deterministically
+                    // (lowest compatible version for Bazel 9 parity — Bazel
+                    // assigns each dep to the closest compatible selected version).
+                    let mut candidates: Vec<(&String, &Version)> = selected
+                        .iter()
+                        .filter(|(sel_key, sel_ver)| {
+                            sel_key
+                                .split_once('+')
+                                .map(|(sel_name, _)| {
+                                    sel_name == dep.name && *sel_ver >= &dep.version
+                                })
+                                .unwrap_or(false)
+                        })
+                        .collect();
+                    // Sort by version ascending for deterministic selection
+                    candidates.sort_by(|a, b| a.1.cmp(b.1));
+                    if let Some((sel_key, sel_ver)) = candidates.first() {
+                        dependencies.insert((*sel_key).clone(), sel_ver.to_string());
+                    } else {
+                        tracing::warn!(
+                            "Could not resolve dependency {}@{} for module {}",
+                            dep.name, dep.version, name
+                        );
+                    }
                 }
             }
 
@@ -1308,8 +1446,55 @@ impl MvsResolver {
             self.overridden_modules.len()
         );
 
-        // Phase 2-4: Select versions using MVS
-        let selected = self.select_versions()?;
+        // Phase 2-4: Select versions using MVS, then iterate to a fixpoint.
+        // MVS may bump a module to a higher version than the one originally
+        // discovered, and that higher version may introduce new transitive deps.
+        // We must re-discover those bumped modules and loop until the selected
+        // set stabilizes. Note: this is NOT the same as Bazel 9's Discovery
+        // fixpoint loop (which iterates for nodep-edge resolution). Slug's
+        // loop handles the case where MVS bumps a module to a version whose
+        // deps were not yet discovered. Bazel avoids this because its
+        // pre-selection graph contains all requested versions upfront.
+        let mut selected = self.select_versions()?;
+        let mut iteration = 0u32;
+        const MAX_FIXPOINT_ITERATIONS: usize = 100; // Safety bound against infinite loops
+
+        loop {
+            iteration += 1;
+            if iteration as usize > MAX_FIXPOINT_ITERATIONS {
+                return Err(MvsResolutionError::DependencyResolutionFailed {
+                    name: root.name.clone(),
+                    version: root.version.to_string(),
+                    reason: "MVS fixpoint iteration limit exceeded".to_owned(),
+                }
+                .into());
+            }
+
+            // Find modules where the selected version differs from what was
+            // discovered at the originally-requested version.
+            let needs_rediscovery = self.find_modules_needing_rediscovery(&selected);
+            if needs_rediscovery.is_empty() {
+                break;
+            }
+
+            tracing::debug!(
+                "MVS fixpoint iteration {}: re-discovering {} bumped modules",
+                iteration,
+                needs_rediscovery.len(),
+            );
+
+            // Re-discover bumped modules at their selected (higher) versions
+            self.rediscover_modules(&needs_rediscovery).await?;
+
+            // Re-run selection with the updated discovery data
+            selected = self.select_versions()?;
+
+            tracing::debug!(
+                "MVS fixpoint iteration {}: {} modules selected",
+                iteration,
+                selected.len(),
+            );
+        }
 
         tracing::debug!("Selected {} unique module versions", selected.len());
 

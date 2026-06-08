@@ -305,6 +305,9 @@ pub struct ModuleInfo {
     /// Whether this is the root module.
     pub is_root: bool,
 
+    /// Whether this module's use_extension() was declared with dev_dependency = True.
+    pub is_dev_dependency: bool,
+
     /// Tags applied by this module, grouped by tag class.
     pub tags: HashMap<String, Vec<ExtensionTag>>,
 }
@@ -316,6 +319,7 @@ impl ModuleInfo {
             name,
             version,
             is_root,
+            is_dev_dependency: false,
             tags: HashMap::new(),
         }
     }

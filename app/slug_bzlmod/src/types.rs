@@ -45,9 +45,11 @@ pub struct Module {
     pub version: Version,
 
     /// The compatibility level used during MVS selection.
-    /// Bazel 9's `module(compatibility_level = N)` attribute is a deprecated
-    /// no-op and stores 0; nonzero values are retained only for sources that
-    /// Bazel's resolver actually models with a compatibility level.
+    /// For the root module, Bazel 9 ignores the declared value and stores 0.
+    /// For non-root modules, the declared compatibility_level is preserved and
+    /// used in MVS conflict detection: two selected versions of the same module
+    /// with different compatibility levels is a resolution error unless a
+    /// multiple_version_override allows both.
     pub compatibility_level: u32,
 
     /// The repository name this module uses to refer to itself

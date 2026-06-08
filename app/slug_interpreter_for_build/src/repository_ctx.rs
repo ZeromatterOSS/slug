@@ -2212,6 +2212,28 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
+        // auth is not yet supported — produce an explicit error rather than
+        // silently ignoring it, so users get a clear diagnostic instead of a
+        // mysterious 401/403.
+        if auth.is_some() {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "The 'auth' parameter on download() is not yet supported. \
+                 Please use netrc or credential helpers for authentication."
+            )
+            .into());
+        }
+
+        // headers support: pass through when implemented; for now, warn if
+        // provided but otherwise ignore (headers don't cause silent auth
+        // failures the way auth does).
+        if headers.is_some() {
+            tracing::warn!(
+                "The 'headers' parameter on download() is not yet supported \
+                 and will be ignored."
+            );
+        }
+
         // Determine output path - accept string, RepositoryPath, or None
         let output_str = match output.into_option() {
             Some(v) => {
@@ -2295,6 +2317,25 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                 "No URL provided for download_and_extract"
             )
             .into());
+        }
+
+        // auth is not yet supported — produce an explicit error rather than
+        // silently ignoring it.
+        if auth.is_some() {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "The 'auth' parameter on download_and_extract() is not yet supported. \
+                 Please use netrc or credential helpers for authentication."
+            )
+            .into());
+        }
+
+        // headers: warn if provided
+        if headers.is_some() {
+            tracing::warn!(
+                "The 'headers' parameter on download_and_extract() is not yet \
+                 supported and will be ignored."
+            );
         }
 
         // Determine output directory - accept string or RepositoryPath

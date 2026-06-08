@@ -55,6 +55,8 @@ pub struct SerializedModule {
     pub version: String,
     /// Whether this is the root module.
     pub is_root: bool,
+    /// Whether this module's use_extension() was declared with dev_dependency = True.
+    pub is_dev_dependency: bool,
     /// Tags grouped by tag class name.
     pub tags_by_class: HashMap<String, Vec<SerializedTag>>,
 }
@@ -144,6 +146,7 @@ impl ModuleContext {
                 name: m.name,
                 version: m.version,
                 is_root: m.is_root,
+                is_dev_dependency: m.is_dev_dependency,
                 tags_by_class: m.tags_by_class,
             })
             .collect();
@@ -231,6 +234,12 @@ impl ModuleContext {
     /// This enables `module_ctx.path(Label)` and `module_ctx.execute([Label, ...])`
     /// to resolve Label arguments to filesystem paths. The cell_paths map is built
     /// from the CellResolver before entering Starlark evaluation.
+
+    /// Get the modules that use this extension.
+    pub fn modules(&self) -> &[SerializedModule] {
+        &self.modules
+    }
+
     #[cfg(test)]
     pub fn with_label_resolution(
         mut self,

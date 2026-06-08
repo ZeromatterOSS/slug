@@ -135,9 +135,30 @@ impl slug_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 // get_file_ops_delegate triggers materialization if needed.
                 let _delegate =
                     extension_repo::get_file_ops_delegate(ctx, cell, setup.clone()).await?;
-                let abs_dest = io.project_root().resolve(&dest_path);
+
+                // Verify the materialized source exists via DICE-backed
+                // metadata instead of a bare source_path.exists() check.
+                let io = ctx.global_data().get_io_provider();
                 let project_root = io.project_root().root();
-                extension_repo::copy_to_destination(&setup, project_root, abs_dest.as_path())
+                let source_path = project_root
+                    .join("bazel-external")
+                    .join(setup.canonical_name.as_ref());
+                let meta_value =
+                    slug_common::file_ops::dice::compute_watched_abs_path_metadata(
+                        ctx,
+                        source_path.clone(),
+                    )
+                    .await?;
+                if !meta_value.exists {
+                    return Err(extension_repo::ExtensionRepoError::NotMaterialized {
+                        canonical_name: setup.canonical_name.to_string(),
+                        extension_id: setup.extension_id.to_string(),
+                    }
+                    .into());
+                }
+
+                let abs_dest = io.project_root().resolve(&dest_path);
+                extension_repo::copy_to_destination(&setup, io.project_root(), abs_dest.as_path())
                     .await?;
             }
         }

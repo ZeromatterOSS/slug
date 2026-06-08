@@ -226,6 +226,9 @@ pub enum RepositoryExecutionError {
         "Invalid repo_rule_id format: '{repo_rule_id}' (expected format: @@module//path:file.bzl%rule_name)"
     )]
     InvalidRepoRuleId { repo_rule_id: String },
+
+    #[error("Path traversal in archive entry: '{entry}' escapes destination directory")]
+    PathTraversal { entry: String },
 }
 
 /// Result of executing a repository rule.
@@ -2748,21 +2751,14 @@ impl Key for ExtensionRepoExecutionKey {
             format!("{}:{miss_reason}", self.canonical_name),
         );
 
-        if working_dir.exists() {
-            tracing::debug!(
-                "Removing incomplete repository rule working dir for '{}': {:?}",
-                self.canonical_name,
-                working_dir
-            );
-            std::fs::remove_dir_all(&working_dir).map_err(|e| {
-                RepositoryExecutionError::WorkingDirFailed {
-                    reason: format!(
-                        "Failed to remove incomplete repository directory {:?}: {}",
-                        working_dir, e
-                    ),
-                }
-            })?;
-        }
+        // Acquire per-canonical-name lock to serialize concurrent materializations
+        // of the same output path. Two DICE keys with different spec_hash but
+        // the same canonical_name would race on the same bazel-external/{name}
+        // directory without this lock. Uses tokio::sync::Mutex so the guard
+        // is Send and can be held across the .await in Starlark execution.
+        let _mat_lock_arc =
+            crate::repository_executor::acquire_materialization_lock(self.canonical_name.as_ref());
+        let _mat_lock = _mat_lock_arc.lock().await;
 
         // For non-builtin rules with a known Starlark source, try Starlark execution
         let is_builtin =
@@ -2785,14 +2781,10 @@ impl Key for ExtensionRepoExecutionKey {
                             self.canonical_name
                         );
 
-                        // Prepare working directory
-                        if !working_dir.exists() {
-                            std::fs::create_dir_all(&working_dir).map_err(|e| {
-                                RepositoryExecutionError::WorkingDirFailed {
-                                    reason: format!("Failed to create directory: {}", e),
-                                }
-                            })?;
-                        }
+                        // Prepare staging directory for atomic materialization
+                        let staging_dir = crate::repository_executor::prepare_staging_dir(
+                            &working_dir,
+                        )?;
 
                         match executor
                             .execute_rule(
@@ -2800,7 +2792,7 @@ impl Key for ExtensionRepoExecutionKey {
                                 &invocation,
                                 rule_bzl_path,
                                 rule_fn_name,
-                                &working_dir,
+                                &staging_dir,
                                 self.repo_env.clone(),
                                 self.repo_mappings.clone(),
                                 self.materialization_manifest_key.workspace_id.clone(),
@@ -2808,38 +2800,46 @@ impl Key for ExtensionRepoExecutionKey {
                             .await
                         {
                             Ok(execution) => {
-                                // Mark as complete and write WORKSPACE if missing
-                                if !working_dir.join("WORKSPACE").exists()
-                                    && !working_dir.join("WORKSPACE.bazel").exists()
+                                // Write WORKSPACE if missing
+                                if !staging_dir.join("WORKSPACE").exists()
+                                    && !staging_dir.join("WORKSPACE.bazel").exists()
                                 {
                                     let _ = std::fs::write(
-                                        working_dir.join("WORKSPACE.bazel"),
+                                        staging_dir.join("WORKSPACE.bazel"),
                                         format!("workspace(name = \"{}\")\n", self.canonical_name),
                                     );
                                 }
                                 write_repository_recorded_inputs(
-                                    &working_dir,
+                                    &staging_dir,
                                     &execution.recorded_inputs,
                                 )?;
                                 let effective_local = self.repo_spec.local || execution.local;
-                                write_repository_rule_local_state(&working_dir, effective_local)?;
-                                // Mirror the reuse predicate (which gates on
-                                // `!self.repo_spec.local`): the `.slug_repo_complete`
-                                // marker is never consulted for a repo_spec.local repo,
-                                // so skip the vestigial write (Plan 61 item 7). Note this
-                                // intentionally uses `self.repo_spec.local`, NOT
-                                // `effective_local`: an execution.local-only repo
-                                // (repo_spec.local == false) is still reachable by the
-                                // reuse predicate and must keep its marker.
+                                write_repository_rule_local_state(&staging_dir, effective_local)?;
+                                // Write completion marker into staging dir (before atomic rename)
+                                // so the marker moves with the directory atomically.
                                 if !self.repo_spec.local {
                                     let output_digest =
                                         crate::repository_executor::repository_output_digest(
-                                            &working_dir,
+                                            &staging_dir,
                                         )?;
-                                    let _ = std::fs::write(
-                                        working_dir.join(".slug_repo_complete"),
+                                    std::fs::write(
+                                        staging_dir.join(".slug_repo_complete"),
                                         complete_marker(&self.spec_hash, &output_digest),
-                                    );
+                                    )
+                                    .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
+                                        reason: format!(
+                                            "Failed to write completion marker for '{}': {}",
+                                            self.canonical_name, e
+                                        ),
+                                    })?;
+                                }
+                                // Atomically swap staging dir into canonical path
+                                if let Err(e) = crate::repository_executor::finalize_staging_dir(
+                                    &staging_dir,
+                                    &working_dir,
+                                ) {
+                                    crate::repository_executor::cleanup_staging_dir(&staging_dir);
+                                    return Err(e);
                                 }
                                 let mut result = RepositoryRuleResult::success(
                                     self.canonical_name.to_string(),
@@ -2851,6 +2851,8 @@ impl Key for ExtensionRepoExecutionKey {
                                 return Ok(Arc::new(result));
                             }
                             Err(e) => {
+                                // Clean up staging dir, leave canonical path untouched
+                                crate::repository_executor::cleanup_staging_dir(&staging_dir);
                                 return Err(RepositoryExecutionError::ExecutionFailed {
                                     name: self.canonical_name.to_string(),
                                     reason: format!(

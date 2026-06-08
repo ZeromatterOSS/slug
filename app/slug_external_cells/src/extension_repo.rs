@@ -285,63 +285,51 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
             return Ok(None);
         }
 
-        let metadata = match std::fs::symlink_metadata(&abs_path) {
-            Ok(m) => m,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => {
-                return Err(slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Failed to get metadata for extension repo file {:?}: {}",
-                    abs_path,
-                    e
-                ));
+        match meta_value.file_type.as_ref() {
+            Some(slug_common::file_ops::dice::WatchedAbsFileType::Directory) => {
+                Ok(Some(RawPathMetadata::Directory))
             }
-        };
+            Some(slug_common::file_ops::dice::WatchedAbsFileType::Symlink) => {
+                let target = match &meta_value.symlink_target {
+                    Some(t) => t.clone(),
+                    None => {
+                        return Err(slug_error::slug_error!(
+                            slug_error::ErrorTag::Environment,
+                            "Symlink metadata for extension repo file {:?} missing symlink target",
+                            abs_path
+                        ));
+                    }
+                };
 
-        if metadata.is_dir() {
-            Ok(Some(RawPathMetadata::Directory))
-        } else if metadata.is_symlink() {
-            let target = std::fs::read_link(&abs_path).map_err(|e| {
-                slug_error::slug_error!(
-                    slug_error::ErrorTag::Environment,
-                    "Failed to read symlink {:?}: {}",
-                    abs_path,
-                    e
+                let cell_path = self.make_cell_path(path);
+                let external = ExternalSymlink::new(target, ForwardRelativePathBuf::empty())?;
+                Ok(Some(RawPathMetadata::Symlink {
+                    at: cell_path,
+                    to: RawSymlink::External(Arc::new(external)),
+                }))
+            }
+            Some(slug_common::file_ops::dice::WatchedAbsFileType::File) => {
+                let file_value = slug_common::file_ops::dice::compute_watched_abs_file(
+                    ctx,
+                    abs_path.clone(),
                 )
-            })?;
+                .await?;
+                let contents = match &file_value.content {
+                    Some(bytes) => bytes,
+                    None => return Ok(None),
+                };
 
-            let cell_path = self.make_cell_path(path);
-            let external = ExternalSymlink::new(target, ForwardRelativePathBuf::empty())?;
-            Ok(Some(RawPathMetadata::Symlink {
-                at: cell_path,
-                to: RawSymlink::External(Arc::new(external)),
-            }))
-        } else {
-            let file_value = slug_common::file_ops::dice::compute_watched_abs_file(
-                ctx,
-                abs_path.clone(),
-            )
-            .await?;
-            let contents = match &file_value.content {
-                Some(bytes) => bytes,
-                None => return Ok(None),
-            };
+                let source_config = self.digest_config.cas_digest_config().source_files_config();
+                let digest = TrackedFileDigest::from_content(&contents, source_config);
 
-            let source_config = self.digest_config.cas_digest_config().source_files_config();
-            let digest = TrackedFileDigest::from_content(&contents, source_config);
+                let is_executable = meta_value.is_executable.unwrap_or(false);
 
-            #[cfg(unix)]
-            let is_executable = {
-                use std::os::unix::fs::PermissionsExt;
-                metadata.permissions().mode() & 0o111 != 0
-            };
-            #[cfg(not(unix))]
-            let is_executable = false;
-
-            Ok(Some(RawPathMetadata::File(FileMetadata {
-                digest,
-                is_executable,
-            })))
+                Ok(Some(RawPathMetadata::File(FileMetadata {
+                    digest,
+                    is_executable,
+                })))
+            }
+            None => Ok(None),
         }
     }
 
@@ -1053,6 +1041,10 @@ fn ensure_output_base_extension_repo_symlink(
 /// Note: This function cannot trigger lazy materialization because it doesn't
 /// have access to DICE. The caller must ensure the repo is materialized
 /// (via `get_file_ops_delegate`) before calling this function.
+///
+/// The caller (expand) must use DICE-backed checks (e.g.,
+/// `compute_watched_abs_path_metadata`) to verify the source path exists
+/// rather than relying on this function's internal existence check.
 pub(crate) async fn copy_to_destination(
     setup: &ExtensionRepoCellSetup,
     project_root: &slug_fs::paths::abs_norm_path::AbsNormPath,
@@ -1063,6 +1055,11 @@ pub(crate) async fn copy_to_destination(
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
 
+    // The caller (expand) must have already triggered lazy materialization
+    // via `get_file_ops_delegate` before calling this function. If the
+    // directory still doesn't exist after that, the materialization failed.
+    // Use a direct check here since we don't have access to DICE; the
+    // DICE-tracked existence is verified by the caller before invoking us.
     if !source_path.exists() {
         return Err(ExtensionRepoError::NotMaterialized {
             canonical_name: setup.canonical_name.to_string(),

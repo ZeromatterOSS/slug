@@ -622,8 +622,10 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     /// * `name` - The name of the module. Required for modules that will be
     ///   published to a registry.
     /// * `version` - The version of the module (relaxed SemVer format).
-    /// * `compatibility_level` - Deprecated Bazel 9 no-op accepted for parsing
-    ///   parity. The stored compatibility level is always 0.
+    /// * `compatibility_level` - For the root module, Bazel 9 ignores this and
+    ///   stores 0 (with a deprecation warning). For non-root modules, the
+    ///   declared compatibility_level is stored and used in MVS conflict
+    ///   detection.
     /// * `repo_name` - The repository name for the module (defaults to `name`).
     /// * `bazel_compatibility` - List of Bazel version constraints.
     ///
@@ -686,19 +688,34 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         validate_bazel_compatibility(name, &bazel_compatibility.items)?;
 
+        // Bazel 9 parity: the root module's compatibility_level is ignored
+        // (Bazel warns it's deprecated and stores 0). Non-root modules
+        // retain their declared compatibility_level for MVS conflict detection.
+        let stored_compat_level = if ctx.is_root_module {
+            if compatibility_level != 0 {
+                // Bazel 9 emits a deprecation warning for root module's
+                // compatibility_level. Match that behavior.
+                tracing::warn!(
+                    "The attribute 'compatibility_level' in module() is a no-op \
+                     for the root module and will be ignored. \
+                     Please remove it from your MODULE.bazel file."
+                );
+            }
+            0u32
+        } else {
+            compatibility_level.max(0) as u32
+        };
+
         ctx.module = Some(ModuleDecl {
             name: name.to_owned(),
             version: parsed_version,
-            compatibility_level: 0,
+            compatibility_level: stored_compat_level,
             repo_name: if repo_name.is_empty() {
                 None
             } else {
                 Some(repo_name.to_owned())
             },
         });
-
-        // Bazel 9 accepts compatibility_level but ModuleFileGlobals stores 0.
-        let _ = compatibility_level;
 
         Ok(NoneType)
     }

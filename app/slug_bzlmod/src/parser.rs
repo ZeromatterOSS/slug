@@ -837,7 +837,7 @@ ext = use_extension("//:defs.bzl", "ext")
     }
 
     #[test]
-    fn test_parse_module_compatibility_level_is_bazel9_noop() {
+    fn test_parse_root_module_compatibility_level_is_zeroed() {
         let content = r#"
 module(
     name = "my_project",
@@ -846,8 +846,24 @@ module(
 )
 "#;
 
+        // Root module's compatibility_level is ignored (Bazel 9 parity)
         let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
         assert_eq!(parsed.module.compatibility_level, 0);
+    }
+
+    #[test]
+    fn test_parse_non_root_module_preserves_compatibility_level() {
+        let content = r#"
+module(
+    name = "rules_foo",
+    version = "1.0.0",
+    compatibility_level = 3,
+)
+"#;
+
+        // Non-root module's compatibility_level is preserved for MVS conflict detection
+        let parsed = parse_non_root_module_bazel_content(content, "rules_foo@1.0.0/MODULE.bazel").unwrap();
+        assert_eq!(parsed.module.compatibility_level, 3);
     }
 
     #[test]

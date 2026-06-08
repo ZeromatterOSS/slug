@@ -60,11 +60,22 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
     /// visible in the root module.
     fn is_dev_dependency<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] _module: Value<'v>,
+        #[starlark(require = pos)] module: Value<'v>,
     ) -> starlark::Result<bool> {
-        // For now, return false (not a dev dependency).
-        // A full implementation would check the module's use_extension() declaration.
-        let _ = this;
+        // Bazel 9 parity: check if the given module's use_extension() was
+        // declared with dev_dependency = True. The module argument is a
+        // BazelModule struct from module_ctx.modules().
+        if let Some(bzl_mod) = module.downcast_ref::<crate::module_ctx::BazelModule>() {
+            return Ok(bzl_mod.is_dev_dependency);
+        }
+        // Fallback: iterate modules by name match
+        let module_name = module.to_str();
+        for m in this.modules() {
+            if m.name == module_name {
+                return Ok(m.is_dev_dependency);
+            }
+        }
+        // Unknown module, default to false
         Ok(false)
     }
 
@@ -192,6 +203,22 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
+        // auth is not yet supported — produce an explicit error
+        if auth.is_some() {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "The 'auth' parameter on module_ctx.download() is not yet supported. \
+                 Please use netrc or credential helpers for authentication."
+            )
+            .into());
+        }
+        if headers.is_some() {
+            tracing::warn!(
+                "The 'headers' parameter on module_ctx.download() is not yet \
+                 supported and will be ignored."
+            );
+        }
+
         // Determine output path
         let output_path = if output.is_empty() {
             let filename = urls[0].split('/').last().unwrap_or("downloaded");
@@ -255,6 +282,22 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                 "No URL provided for download_and_extract"
             )
             .into());
+        }
+
+        // auth is not yet supported — produce an explicit error
+        if _auth.is_some() {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "The 'auth' parameter on module_ctx.download_and_extract() is not yet supported. \
+                 Please use netrc or credential helpers for authentication."
+            )
+            .into());
+        }
+        if _headers.is_some() {
+            tracing::warn!(
+                "The 'headers' parameter on module_ctx.download_and_extract() is not yet \
+                 supported and will be ignored."
+            );
         }
 
         // Determine output directory

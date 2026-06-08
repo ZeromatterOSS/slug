@@ -2034,8 +2034,10 @@ fn registry_file_inputs_poll_digest_for_cache(
         hasher.update([0]);
         hasher.update(expected_hash.as_bytes());
         hasher.update([0]);
-        hasher.update(path.to_string_lossy().as_bytes());
-        hasher.update([0]);
+        // Use project-relative-ness rather than the absolute cache path,
+        // so the digest is content-based and portable across machines.
+        // The URL + expected_hash already uniquely identify the content;
+        // the path only determined *where* to read it, not *what* it is.
         if project_relative_path_for_abs_path(project_fs, &path).is_some() {
             hasher.update(b"project-tracked");
             hasher.update([0]);
@@ -2130,8 +2132,12 @@ impl Key for RegistryFileInputsKey {
                 hasher.update([0]);
                 continue;
             };
-            hasher.update(path.to_string_lossy().as_bytes());
-            hasher.update([0]);
+            // Use project-relative-ness rather than the absolute cache path,
+            // so the digest is content-based and portable across machines.
+            // For out-of-project files the URL + expected_hash uniquely
+            // identifies the content. For in-project files, the on-disk
+            // content is DICE-tracked via AbsoluteTextFileInputKey.
+            //
             // http(s) registry files are checksum-pinned by the lockfile's
             // registry_file_hashes (a tracked DICE input). For OUT-OF-PROJECT cache
             // files the on-disk blob is therefore content-addressed: read that

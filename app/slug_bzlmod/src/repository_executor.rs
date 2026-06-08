@@ -29,6 +29,10 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
+use std::sync::LazyLock;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use base64::Engine;
@@ -39,9 +43,7 @@ use tar::Archive;
 use zip::ZipArchive;
 
 use crate::dice_graph::BzlmodCellGraphValue;
-#[cfg(test)]
 use crate::dice_graph::BzlmodEventKind;
-#[cfg(test)]
 use crate::dice_graph::record_bzlmod_event;
 use crate::repository_execution::InvocationAttrs;
 use crate::repository_execution::REPO_RECORDED_INPUTS_FILE;
@@ -49,6 +51,7 @@ use crate::repository_execution::RepositoryExecutionError;
 use crate::repository_execution::RepositoryRuleResult;
 use crate::repository_execution::write_repository_recorded_inputs;
 use crate::repository_invocations::RepositoryInvocation;
+use crate::lockfile::compute_sha256_hex;
 
 #[derive(Default)]
 struct NativeRepositoryRecordedInputs {
@@ -90,6 +93,38 @@ impl NativeRepositoryRecordedInputs {
         Ok(())
     }
 }
+
+/// Global counter for generating unique staging directory names.
+static STAGING_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Per-canonical-name lock for repository materialization.
+///
+/// When two DICE computations with the same `canonical_name` but different
+/// keys (e.g. different spec_hash) run concurrently, they would both write
+/// to the same `bazel-external/{name}` path and race on disk. This lock
+/// serializes materializations of the same canonical name within one daemon.
+///
+/// Uses `tokio::sync::Mutex` so the guard is `Send` and can be held across
+/// `.await` points in the Starlark execution path.
+///
+/// Cross-daemon concurrency on the same output base is out of scope here.
+struct MaterializationLocks {
+    locks: std::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+}
+
+impl MaterializationLocks {
+    fn acquire(&self, canonical_name: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut map = self.locks.lock().unwrap();
+        map.entry(canonical_name.to_owned())
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone()
+    }
+}
+
+static MATERIALIZATION_LOCKS: LazyLock<MaterializationLocks> =
+    LazyLock::new(|| MaterializationLocks {
+        locks: std::sync::Mutex::new(std::collections::HashMap::new()),
+    });
 
 /// Execute a repository rule invocation using legacy marker reuse.
 ///
@@ -174,25 +209,29 @@ fn execute_repository_rule_impl(
         );
     }
 
-    // Clean and create working directory
-    prepare_working_dir(&working_dir)?;
+    // Acquire per-canonical-name lock to serialize concurrent materializations
+    // of the same output path.
+    let _mat_lock_arc = acquire_materialization_lock(&invocation.name);
+    // Use blocking_lock since this is a synchronous code path
+    let _mat_lock = _mat_lock_arc.blocking_lock();
+    let staging_dir = prepare_staging_dir(&working_dir)?;
 
     let mut recorded_inputs = NativeRepositoryRecordedInputs::default();
 
-    // Dispatch based on rule name
+    // Dispatch based on rule name - write into staging dir
     let result = match invocation.rule_name.as_str() {
         "http_archive" => execute_http_archive(
             invocation,
             &attrs,
-            &working_dir,
+            &staging_dir,
             label_resolution,
             &mut recorded_inputs,
         ),
-        "http_file" => execute_http_file(invocation, &attrs, &working_dir, &mut recorded_inputs),
-        "http_jar" => execute_http_jar(invocation, &attrs, &working_dir, &mut recorded_inputs),
-        "git_repository" => execute_git_repository(invocation, &attrs, &working_dir),
+        "http_file" => execute_http_file(invocation, &attrs, &staging_dir, &mut recorded_inputs),
+        "http_jar" => execute_http_jar(invocation, &attrs, &staging_dir, &mut recorded_inputs),
+        "git_repository" => execute_git_repository(invocation, &attrs, &staging_dir),
         "local_repository" | "new_local_repository" => {
-            execute_local_repository(invocation, &attrs, &working_dir)
+            execute_local_repository(invocation, &attrs, &staging_dir)
         }
         rule_name => Err(RepositoryExecutionError::NoImplementation {
             name: rule_name.to_owned(),
@@ -202,16 +241,26 @@ fn execute_repository_rule_impl(
 
     match result {
         Ok(()) => {
-            write_repository_recorded_inputs(&working_dir, &recorded_inputs.inputs)?;
-            mark_repo_complete(&working_dir)?;
+            write_repository_recorded_inputs(&staging_dir, &recorded_inputs.inputs)?;
+            // Write completion marker BEFORE atomic rename so it's part of
+            // the atomic swap (the marker moves with the directory).
+            mark_repo_complete(&staging_dir)?;
+            // Atomically swap staging dir into the canonical path.
+            // On success, the canonical path has a complete tree with a valid marker.
+            // On failure, we clean up the staging dir and leave the old canonical path
+            // untouched (or absent if this was a first materialization).
+            if let Err(e) = finalize_staging_dir(&staging_dir, &working_dir) {
+                cleanup_staging_dir(&staging_dir);
+                return Err(e);
+            }
             Ok(RepositoryRuleResult::success(
                 invocation.name.clone(),
                 working_dir,
             ))
         }
         Err(e) => {
-            // Clean up on failure
-            let _ = std::fs::remove_dir_all(&working_dir);
+            // Clean up staging dir on failure, leave canonical path untouched
+            cleanup_staging_dir(&staging_dir);
             Err(e)
         }
     }
@@ -563,7 +612,112 @@ fn hash_path_bytes(path: &Path, hasher: &mut Sha256) {
     hasher.update([0]);
 }
 
-/// Prepare the working directory.
+/// Prepare a staging directory for atomic materialization.
+///
+/// Creates a unique temporary directory as a sibling of `canonical_dir` (same
+/// filesystem so `rename` is atomic). The caller populates the staging dir,
+/// then calls [`finalize_staging_dir`] to atomically swap it into place.
+///
+/// On any error during materialization, call [`cleanup_staging_dir`] to remove
+/// the staging dir without disturbing the existing canonical directory.
+pub(crate) fn prepare_staging_dir(canonical_dir: &Path) -> slug_error::Result<PathBuf> {
+    let parent = canonical_dir.parent().ok_or_else(|| {
+        RepositoryExecutionError::WorkingDirFailed {
+            reason: format!(
+                "Canonical dir {:?} has no parent for staging",
+                canonical_dir
+            ),
+        }
+    })?;
+
+    // Ensure parent exists
+    std::fs::create_dir_all(parent).map_err(|e| {
+        RepositoryExecutionError::WorkingDirFailed {
+            reason: format!("Failed to create parent directory {:?}: {}", parent, e),
+        }
+    })?;
+
+    let counter = STAGING_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let staging_dir = canonical_dir.with_file_name(format!(
+        "{}.staging.{}.{}",
+        canonical_dir.file_name().unwrap_or_default().to_string_lossy(),
+        std::process::id(),
+        counter,
+    ));
+
+    // Clean up any leftover staging dir from a previous failed attempt
+    if staging_dir.exists() {
+        let _ = std::fs::remove_dir_all(&staging_dir);
+    }
+
+    std::fs::create_dir_all(&staging_dir).map_err(|e| {
+        RepositoryExecutionError::WorkingDirFailed {
+            reason: format!("Failed to create staging directory {:?}: {}", staging_dir, e),
+        }
+    })?;
+
+    Ok(staging_dir)
+}
+
+/// Atomically move a staging directory to the canonical path.
+///
+/// Removes the old canonical directory (if present), then renames the staging
+/// directory to the canonical path. On Linux, `rename` of a directory on the
+/// same filesystem is atomic, so readers of the canonical path will see either
+/// the old complete tree or the new complete tree, never a partial tree.
+///
+/// Atomically swap the staging directory into the canonical path.
+///
+/// On Linux, `rename()` atomically replaces an existing directory with the
+/// new one, so there is no window where the canonical path doesn't exist.
+/// The old directory's inode is freed once no process has it open. This
+/// avoids the "delete-then-rename" gap where concurrent readers would see
+/// a missing directory.
+///
+/// If the rename fails, this function attempts to clean up the staging dir
+/// and returns an error.
+pub(crate) fn finalize_staging_dir(staging_dir: &Path, canonical_dir: &Path) -> slug_error::Result<()> {
+    // Atomically rename staging -> canonical.
+    // On Linux, rename() atomically replaces the target if it exists,
+    // so we do NOT need to remove_dir_all first. The old canonical dir
+    // (if any) is atomically replaced; its inode is freed once no
+    // process holds it open.
+    std::fs::rename(staging_dir, canonical_dir).map_err(|e| {
+        // Try to clean up staging dir on rename failure
+        let _ = std::fs::remove_dir_all(staging_dir);
+        RepositoryExecutionError::WorkingDirFailed {
+            reason: format!(
+                "Failed to rename staging directory {:?} to canonical {:?}: {}",
+                staging_dir, canonical_dir, e
+            ),
+        }
+    })?;
+
+    Ok(())
+}
+
+/// Clean up a staging directory after a failed materialization.
+pub(crate) fn cleanup_staging_dir(staging_dir: &Path) {
+    if staging_dir.exists() {
+        let _ = std::fs::remove_dir_all(staging_dir);
+    }
+}
+
+/// Acquire the per-canonical-name materialization lock.
+///
+/// This serializes concurrent materializations of the same output path
+/// within one daemon, preventing races when two DICE keys target the same
+/// `bazel-external/{name}` directory.
+pub(crate) fn acquire_materialization_lock(canonical_name: &str) -> Arc<tokio::sync::Mutex<()>> {
+    MATERIALIZATION_LOCKS.acquire(canonical_name)
+}
+
+/// Prepare the working directory (legacy non-atomic path).
+///
+/// Prefer [`prepare_staging_dir`] + [`finalize_staging_dir`] for production
+/// materialization. This function remains for test-only code paths that
+/// don't need crash safety.
+#[cfg(test)]
 fn prepare_working_dir(working_dir: &Path) -> slug_error::Result<()> {
     // Remove existing directory if present
     if working_dir.exists() {
@@ -987,6 +1141,17 @@ fn execute_http_file(
         verify_integrity(&file_data, expected)?;
     }
 
+    // Warn on unpinned downloads
+    if sha256.is_none() && integrity.is_none() {
+        let computed = compute_sha256_hex(&file_data);
+        tracing::warn!(
+            "Downloaded {} without integrity verification for http_file '{}'. \
+             Add `sha256 = \"{computed}\"` to verify this download.",
+            urls.first().map(|s| s.as_str()).unwrap_or("unknown"),
+            invocation.name,
+        );
+    }
+
     // Write the file. Bazel's http_file places the downloaded file in a
     // "file/" subdirectory so Label("@repo//file:downloaded") resolves correctly.
     let file_dir = working_dir.join("file");
@@ -1105,6 +1270,17 @@ fn execute_http_jar(
     }
     if let Some(expected) = integrity.as_deref() {
         verify_integrity(&jar_data, expected)?;
+    }
+
+    // Warn on unpinned downloads
+    if sha256.is_none() && integrity.is_none() {
+        let computed = compute_sha256_hex(&jar_data);
+        tracing::warn!(
+            "Downloaded {} without integrity verification for http_jar '{}'. \
+             Add `sha256 = \"{computed}\"` to verify this download.",
+            urls.first().map(|s| s.as_str()).unwrap_or("unknown"),
+            invocation.name,
+        );
     }
 
     // Write the jar file
@@ -1322,6 +1498,24 @@ fn download_and_extract(
     if let Some(expected) = integrity {
         verify_integrity(&data, expected)?;
     }
+
+    // Warn on unpinned downloads: when neither sha256 nor integrity is
+    // provided, the download is unverified and not reproducible. Bazel 9
+    // also warns in this case. Surface the computed sha256 so the user can
+    // pin it.
+    if sha256.is_none() && integrity.is_none() {
+        let computed = compute_sha256_hex(&data);
+        tracing::warn!(
+            "Downloaded {} without integrity verification. \
+             Add `sha256 = \"{computed}\"` to verify this download.",
+            url,
+        );
+        record_bzlmod_event(
+            BzlmodEventKind::RepoMaterializationMissReason,
+            &format!("unpinned_download:{url}:sha256={computed}"),
+        );
+    }
+
     write_cached_repository_download(sha256, integrity, canonical_id, &data);
 
     // Extract
@@ -1554,6 +1748,76 @@ fn extract_archive(
     .into())
 }
 
+/// Ensure a candidate path stays within dest_dir after lexical normalization.
+///
+/// This rejects absolute paths and any path that, after resolving `.` and `..`
+/// components, would escape `dest_dir`. It does NOT call `canonicalize()` because
+/// the target may not exist yet and canonicalize follows symlinks.
+fn contain_path(dest_dir: &Path, candidate: &Path) -> slug_error::Result<PathBuf> {
+    // Reject absolute paths outright
+    if candidate.is_absolute() {
+        return Err(RepositoryExecutionError::PathTraversal {
+            entry: candidate.to_string_lossy().to_string(),
+        }
+        .into());
+    }
+    // Lexically normalize by folding components
+    let normalized = dest_dir
+        .join(candidate)
+        .components()
+        .fold(PathBuf::new(), |mut acc, c| {
+            match c {
+                std::path::Component::ParentDir => {
+                    acc.pop();
+                }
+                std::path::Component::Normal(n) => acc.push(n),
+                std::path::Component::CurDir => {}
+                std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                    acc.push(c.as_os_str());
+                }
+            }
+            acc
+        });
+    // Check that normalized path starts with dest_dir
+    if !normalized.starts_with(dest_dir) {
+        return Err(RepositoryExecutionError::PathTraversal {
+            entry: candidate.to_string_lossy().to_string(),
+        }
+        .into());
+    }
+    Ok(normalized)
+}
+
+/// Lexically normalize a path and check that it stays within `parent`.
+///
+/// Unlike `contain_path`, this accepts already-absolute paths (e.g. from joining
+/// a relative symlink target with its parent directory). It normalizes the path
+/// lexically and verifies the result starts with `parent`.
+fn path_is_within(parent: &Path, candidate: &Path) -> slug_error::Result<PathBuf> {
+    let normalized = candidate
+        .components()
+        .fold(PathBuf::new(), |mut acc, c| {
+            match c {
+                std::path::Component::ParentDir => {
+                    acc.pop();
+                }
+                std::path::Component::Normal(n) => acc.push(n),
+                std::path::Component::CurDir => {}
+                std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                    acc.push(c.as_os_str());
+                }
+            }
+            acc
+        });
+    if !normalized.starts_with(parent) {
+        return Err(RepositoryExecutionError::PathTraversal {
+            entry: candidate.to_string_lossy().to_string(),
+        }
+        .into());
+    }
+    Ok(normalized)
+}
+
 /// Extract a tar archive from any reader.
 fn extract_tar_from_reader<R: std::io::Read>(
     reader: R,
@@ -1582,7 +1846,7 @@ fn extract_tar_from_reader<R: std::io::Read>(
                 reason: e.to_string(),
             })?;
 
-        // Apply strip_prefix
+        // Apply strip_prefix and route through containment check
         let dest_path = if let Some(prefix) = strip_prefix {
             let path_str = path.to_string_lossy();
             if let Some(stripped) = path_str.strip_prefix(prefix) {
@@ -1590,14 +1854,14 @@ fn extract_tar_from_reader<R: std::io::Read>(
                 if stripped.is_empty() {
                     continue;
                 }
-                dest_dir.join(stripped)
+                contain_path(dest_dir, Path::new(stripped))?
             } else if path_str.starts_with(prefix.trim_end_matches('/')) {
                 let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
                 if let Some(stripped) = path_str.strip_prefix(&prefix_with_slash) {
                     if stripped.is_empty() {
                         continue;
                     }
-                    dest_dir.join(stripped)
+                    contain_path(dest_dir, Path::new(stripped))?
                 } else {
                     continue;
                 }
@@ -1605,18 +1869,28 @@ fn extract_tar_from_reader<R: std::io::Read>(
                 continue;
             }
         } else {
-            dest_dir.join(&*path)
+            contain_path(dest_dir, &*path)?
         };
 
         // Create parent directories
         if let Some(parent) = dest_path.parent() {
-            std::fs::create_dir_all(parent).ok();
+            std::fs::create_dir_all(parent).map_err(|e| {
+                RepositoryExecutionError::ExecutionFailed {
+                    name: "extract".to_owned(),
+                    reason: format!("Failed to create parent directory: {}", e),
+                }
+            })?;
         }
 
         // Extract based on entry type
         let entry_type = entry.header().entry_type();
         if entry_type.is_dir() {
-            std::fs::create_dir_all(&dest_path).ok();
+            std::fs::create_dir_all(&dest_path).map_err(|e| {
+                RepositoryExecutionError::ExecutionFailed {
+                    name: "extract".to_owned(),
+                    reason: format!("Failed to create directory: {}", e),
+                }
+            })?;
         } else if entry_type.is_file() {
             let mut file = std::fs::File::create(&dest_path).map_err(|e| {
                 RepositoryExecutionError::ExecutionFailed {
@@ -1624,7 +1898,12 @@ fn extract_tar_from_reader<R: std::io::Read>(
                     reason: format!("Failed to create file: {}", e),
                 }
             })?;
-            std::io::copy(&mut entry, &mut file).ok();
+            std::io::copy(&mut entry, &mut file).map_err(|e| {
+                RepositoryExecutionError::ExecutionFailed {
+                    name: "extract".to_owned(),
+                    reason: format!("Failed to write file contents: {}", e),
+                }
+            })?;
 
             // Set permissions
             #[cfg(unix)]
@@ -1639,7 +1918,22 @@ fn extract_tar_from_reader<R: std::io::Read>(
             #[cfg(unix)]
             if let Ok(link_name) = entry.link_name() {
                 if let Some(link_target) = link_name {
-                    let _ = std::os::unix::fs::symlink(&*link_target, &dest_path);
+                    // Contain symlink target: resolve relative to the symlink's own
+                    // location (parent of dest_path) and check it stays within dest_dir.
+                    let symlink_parent = dest_path.parent().unwrap_or(dest_dir);
+                    let resolved_target = symlink_parent.join(&*link_target);
+                    let contained_target = path_is_within(dest_dir, &resolved_target)?;
+                    // Re-derive the relative link target that points to the contained path
+                    // from the symlink's parent, so the symlink itself is relative.
+                    let relative_target = contained_target
+                        .strip_prefix(symlink_parent)
+                        .unwrap_or(&*link_target);
+                    std::os::unix::fs::symlink(relative_target, &dest_path).map_err(|e| {
+                        RepositoryExecutionError::ExecutionFailed {
+                            name: "extract".to_owned(),
+                            reason: format!("Failed to create symlink: {}", e),
+                        }
+                    })?;
                 }
             }
         } else if entry_type.is_hard_link() {
@@ -1651,7 +1945,7 @@ fn extract_tar_from_reader<R: std::io::Read>(
                         reason: e.to_string(),
                     })?;
             if let Some(link_target) = link_name {
-                let source_path = resolve_tar_link_target(&link_target, dest_dir, strip_prefix);
+                let source_path = resolve_tar_link_target(&link_target, dest_dir, strip_prefix)?;
                 std::fs::hard_link(&source_path, &dest_path)
                     .or_else(|_| std::fs::copy(&source_path, &dest_path).map(|_| ()))
                     .map_err(|e| RepositoryExecutionError::ExecutionFailed {
@@ -1668,22 +1962,29 @@ fn extract_tar_from_reader<R: std::io::Read>(
     Ok(())
 }
 
+/// Resolve a tar hard-link target, applying strip_prefix if present and
+/// running the result through path containment.
 fn resolve_tar_link_target(
     link_target: &Path,
     dest_dir: &Path,
     strip_prefix: Option<&str>,
-) -> PathBuf {
+) -> slug_error::Result<PathBuf> {
     let target_str = link_target.to_string_lossy();
-    if let Some(prefix) = strip_prefix {
+    let candidate = if let Some(prefix) = strip_prefix {
         if let Some(stripped) = target_str.strip_prefix(prefix) {
-            return dest_dir.join(stripped.trim_start_matches('/'));
+            PathBuf::from(stripped.trim_start_matches('/'))
+        } else {
+            let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
+            if let Some(stripped) = target_str.strip_prefix(&prefix_with_slash) {
+                PathBuf::from(stripped)
+            } else {
+                link_target.to_owned()
+            }
         }
-        let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
-        if let Some(stripped) = target_str.strip_prefix(&prefix_with_slash) {
-            return dest_dir.join(stripped);
-        }
-    }
-    dest_dir.join(link_target)
+    } else {
+        link_target.to_owned()
+    };
+    contain_path(dest_dir, &candidate)
 }
 
 /// Extract tar.gz archive.
@@ -1742,12 +2043,13 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> slug
             None => continue,
         };
 
-        // Apply strip_prefix
+        // Apply strip_prefix (enclosed_name() already strips .., but we also
+        // run through contain_path as a belt-and-suspenders check)
         let dest_path = if let Some(prefix) = strip_prefix {
             let stripped = file_path.strip_prefix(prefix).unwrap_or(&file_path);
-            dest_dir.join(stripped)
+            contain_path(dest_dir, stripped)?
         } else {
-            dest_dir.join(&file_path)
+            contain_path(dest_dir, &file_path)?
         };
 
         if dest_path == dest_dir {
@@ -1755,10 +2057,20 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> slug
         }
 
         if file.is_dir() {
-            std::fs::create_dir_all(&dest_path).ok();
+            std::fs::create_dir_all(&dest_path).map_err(|e| {
+                RepositoryExecutionError::ExecutionFailed {
+                    name: "extract".to_owned(),
+                    reason: format!("Failed to create directory: {}", e),
+                }
+            })?;
         } else {
             if let Some(parent) = dest_path.parent() {
-                std::fs::create_dir_all(parent).ok();
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    RepositoryExecutionError::ExecutionFailed {
+                        name: "extract".to_owned(),
+                        reason: format!("Failed to create parent directory: {}", e),
+                    }
+                })?;
             }
 
             let mut outfile = std::fs::File::create(&dest_path).map_err(|e| {
@@ -1767,7 +2079,12 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> slug
                     reason: format!("Failed to create file: {}", e),
                 }
             })?;
-            std::io::copy(&mut file, &mut outfile).ok();
+            std::io::copy(&mut file, &mut outfile).map_err(|e| {
+                RepositoryExecutionError::ExecutionFailed {
+                    name: "extract".to_owned(),
+                    reason: format!("Failed to write file contents: {}", e),
+                }
+            })?;
 
             #[cfg(unix)]
             {
@@ -2080,7 +2397,10 @@ mod tests {
             err.to_string()
                 .contains("Repository rule 'unimplemented_rule' has no implementation")
         );
-        assert!(!working_dir.exists());
+        // With staging-dir materialization, a failed fresh execution cleans up
+        // the staging dir but leaves the existing canonical directory intact.
+        // This preserves the prior materialization so the repo isn't left empty.
+        assert!(working_dir.exists());
     }
 
     #[test]
@@ -2755,5 +3075,260 @@ mod tests {
             std::fs::read_to_string(result.repo_path.join("BUILD.bazel")).unwrap(),
             "# resolver owned\n"
         );
+    }
+
+    // --- Phase 7: Path-traversal + symlink containment tests ---
+
+    /// Helper: build an in-memory tar.gz archive from a closure that populates entries.
+    fn build_tar_gz<F>(f: F) -> Vec<u8>
+    where
+        F: FnOnce(&mut tar::Builder<std::vec::Vec<u8>>),
+    {
+        use flate2::Compression;
+        use flate2::write::GzEncoder;
+
+        let mut builder = tar::Builder::new(Vec::new());
+        f(&mut builder);
+        let data = builder.into_inner().unwrap();
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&data).unwrap();
+        encoder.finish().unwrap()
+    }
+
+    /// Helper: append a tar entry with an arbitrary raw path, bypassing the tar
+    /// crate's path validation. This simulates a malicious archive that a real
+    /// attacker could craft.
+    fn append_raw_path_entry(
+        builder: &mut tar::Builder<Vec<u8>>,
+        entry_type: tar::EntryType,
+        path: &[u8],
+        link_target: Option<&[u8]>,
+        data: &[u8],
+    ) {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(data.len() as u64);
+        header.set_entry_type(entry_type);
+        // Write path and link target directly into raw GNU header fields
+        // to bypass the tar crate's path validation.
+        if let Some(gnu) = header.as_gnu_mut() {
+            let path_len = path.len().min(99);
+            gnu.name[..path_len].copy_from_slice(&path[..path_len]);
+            gnu.name[path_len] = 0;
+            if let Some(target) = link_target {
+                let target_len = target.len().min(99);
+                gnu.linkname[..target_len].copy_from_slice(&target[..target_len]);
+                gnu.linkname[target_len] = 0;
+            }
+        }
+        header.set_cksum();
+        builder.append(&mut header, data).unwrap();
+    }
+
+    #[test]
+    fn test_path_traversal_dotdot() {
+        let dest = tempfile::tempdir().unwrap();
+        let data = build_tar_gz(|builder| {
+            append_raw_path_entry(
+                builder,
+                tar::EntryType::file(),
+                b"../escape.txt",
+                None,
+                b"evil\n",
+            );
+        });
+        let result = extract_tar_gz(&data, dest.path(), None);
+        assert!(result.is_err(), "Expected error for path traversal via ../");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("escapes destination directory"),
+            "Error message should mention path traversal: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_path_traversal_absolute() {
+        let dest = tempfile::tempdir().unwrap();
+        let data = build_tar_gz(|builder| {
+            append_raw_path_entry(
+                builder,
+                tar::EntryType::file(),
+                b"/tmp/escape.txt",
+                None,
+                b"evil\n",
+            );
+        });
+        let result = extract_tar_gz(&data, dest.path(), None);
+        assert!(result.is_err(), "Expected error for absolute path entry");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("escapes destination directory"),
+            "Error message should mention path traversal: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_symlink_escape() {
+        let dest = tempfile::tempdir().unwrap();
+        let data = build_tar_gz(|builder| {
+            // Create a directory so the symlink has a parent inside dest_dir
+            let mut dir_header = tar::Header::new_gnu();
+            dir_header.set_size(0);
+            dir_header.set_entry_type(tar::EntryType::dir());
+            dir_header.set_cksum();
+            builder
+                .append_data(&mut dir_header, "inner", std::io::empty())
+                .unwrap();
+
+            // Symlink that escapes via ../../
+            append_raw_path_entry(
+                builder,
+                tar::EntryType::symlink(),
+                b"inner/link",
+                Some(b"../../escape"),
+                &[],
+            );
+        });
+        let result = extract_tar_gz(&data, dest.path(), None);
+        assert!(result.is_err(), "Expected error for escaping symlink");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("escapes destination directory"),
+            "Error message should mention path traversal: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_hard_link_escape() {
+        let dest = tempfile::tempdir().unwrap();
+        let data = build_tar_gz(|builder| {
+            // First a normal file entry
+            let mut header = tar::Header::new_gnu();
+            header.set_size(4);
+            header.set_entry_type(tar::EntryType::file());
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "original.txt", &b"data"[..])
+                .unwrap();
+
+            // Hard-link whose target escapes via ../..
+            append_raw_path_entry(
+                builder,
+                tar::EntryType::hard_link(),
+                b"hl.txt",
+                Some(b"../../etc/passwd"),
+                &[],
+            );
+        });
+        let result = extract_tar_gz(&data, dest.path(), None);
+        assert!(result.is_err(), "Expected error for escaping hard link");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("escapes destination directory"),
+            "Error message should mention path traversal: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_in_repo_symlink_ok() {
+        let dest = tempfile::tempdir().unwrap();
+        let data = build_tar_gz(|builder| {
+            // Create sibling directory and inner directory
+            let mut dir_header = tar::Header::new_gnu();
+            dir_header.set_size(0);
+            dir_header.set_entry_type(tar::EntryType::dir());
+            dir_header.set_cksum();
+            builder
+                .append_data(&mut dir_header, "sibling", std::io::empty())
+                .unwrap();
+
+            let mut dir_header2 = tar::Header::new_gnu();
+            dir_header2.set_size(0);
+            dir_header2.set_entry_type(tar::EntryType::dir());
+            dir_header2.set_cksum();
+            builder
+                .append_data(&mut dir_header2, "inner", std::io::empty())
+                .unwrap();
+
+            // Symlink: inner/link -> ../sibling  (both inside dest_dir)
+            let mut link_header = tar::Header::new_gnu();
+            link_header.set_size(0);
+            link_header.set_entry_type(tar::EntryType::symlink());
+            link_header.set_cksum();
+            builder
+                .append_link(&mut link_header, "inner/link", "../sibling")
+                .unwrap();
+        });
+        let result = extract_tar_gz(&data, dest.path(), None);
+        assert!(result.is_ok(), "In-repo relative symlinks should be allowed");
+        // Verify the symlink exists and points correctly
+        let link_path = dest.path().join("inner/link");
+        assert!(link_path.exists(), "Symlink should exist");
+        assert!(
+            std::fs::symlink_metadata(&link_path)
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "Should be a symlink"
+        );
+    }
+
+    #[test]
+    fn test_normal_extraction_ok() {
+        let dest = tempfile::tempdir().unwrap();
+        let data = build_tar_gz(|builder| {
+            // Directory
+            let mut dir_header = tar::Header::new_gnu();
+            dir_header.set_size(0);
+            dir_header.set_entry_type(tar::EntryType::dir());
+            dir_header.set_cksum();
+            builder
+                .append_data(&mut dir_header, "subdir", std::io::empty())
+                .unwrap();
+
+            // Regular file
+            let mut file_header = tar::Header::new_gnu();
+            file_header.set_size(11);
+            file_header.set_entry_type(tar::EntryType::file());
+            file_header.set_cksum();
+            builder
+                .append_data(&mut file_header, "subdir/hello.txt", &b"hello world"[..])
+                .unwrap();
+        });
+        let result = extract_tar_gz(&data, dest.path(), None);
+        assert!(result.is_ok(), "Normal extraction should succeed");
+        let content =
+            std::fs::read_to_string(dest.path().join("subdir/hello.txt")).unwrap();
+        assert_eq!(content, "hello world");
+    }
+
+    #[test]
+    fn test_contain_path_rejects_dotdot() {
+        let dest = Path::new("/tmp/dest");
+        let result = contain_path(dest, Path::new("../etc/passwd"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_contain_path_rejects_absolute() {
+        let dest = Path::new("/tmp/dest");
+        let result = contain_path(dest, Path::new("/etc/passwd"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_contain_path_allows_normal() {
+        let dest = Path::new("/tmp/dest");
+        let result = contain_path(dest, Path::new("foo/bar.txt"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PathBuf::from("/tmp/dest/foo/bar.txt"));
+    }
+
+    #[test]
+    fn test_contain_path_normalizes_dotdot_in_middle() {
+        let dest = Path::new("/tmp/dest");
+        // foo/../bar should normalize to /tmp/dest/bar (still inside)
+        let result = contain_path(dest, Path::new("foo/../bar"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PathBuf::from("/tmp/dest/bar"));
     }
 }

@@ -62,6 +62,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 pub use cache::ModuleCache;
+pub use cache::registry_file_relative_cache_key;
 pub use dice_graph::BZLMOD_CLEAN_GRAPH_IO_IMPL;
 pub use dice_graph::BzlmodCellGraphAlias;
 pub use dice_graph::BzlmodCellGraphCell;
@@ -258,6 +259,7 @@ pub use registry::DEFAULT_REGISTRY_URL;
 // `RegisteredToolchain` is defined below; re-export under the crate root for
 // consumers that already do `use slug_bzlmod::RegisteredToolchain`.
 pub use registry::RegistryClient;
+pub use registry::RegistryChain;
 pub use repo_mapping::BzlmodRepoMapping;
 pub use repo_mapping::CanonicalLabel;
 pub use repo_mapping::CanonicalRepoName;

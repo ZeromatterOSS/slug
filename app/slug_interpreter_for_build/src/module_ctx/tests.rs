@@ -779,6 +779,7 @@ fn test_module_context_from_serialized_has_no_working_dir() {
         name: "test_module".to_owned(),
         version: "1.0.0".to_owned(),
         is_root: true,
+        is_dev_dependency: false,
         tags_by_class: HashMap::new(),
     }];
     let ctx = ModuleContext::from_serialized(modules, false);

@@ -41,6 +41,8 @@ pub struct BazelModule {
     pub(super) version: String,
     /// Whether this is the root module.
     pub(super) is_root: bool,
+    /// Whether this module's use_extension() was declared with dev_dependency = True.
+    pub(super) is_dev_dependency: bool,
     /// Tags grouped by tag class name.
     pub(super) tags_by_class: HashMap<String, Vec<SerializedTag>>,
 }
@@ -58,6 +60,7 @@ impl BazelModule {
             name,
             version,
             is_root,
+            is_dev_dependency: false,
             tags_by_class,
         }
     }
@@ -73,6 +76,7 @@ impl BazelModule {
             name,
             version,
             is_root,
+            is_dev_dependency: false,
             tags_by_class,
         }
     }
