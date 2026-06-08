@@ -223,6 +223,7 @@ pub use lockfile::compute_sri_hash;
 pub use lockfile::lockfile_canonical_extension_id;
 pub use lockfile::lockfile_path;
 pub use lockfile::parse_lockfile_content;
+pub use lockfile::parse_lockfile_content_with_mode;
 pub use lockfile::recorded_dirents_input;
 pub use lockfile::recorded_dirents_input_with_recorded_path;
 pub use lockfile::recorded_dirents_marker_value_from_entries;

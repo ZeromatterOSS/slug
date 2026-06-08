@@ -88,6 +88,12 @@ pub enum LockfileError {
     VersionMismatch { expected: u32, found: u32 },
 
     #[error(
+        "The version of MODULE.bazel.lock is not supported by this version of Slug. \
+        Please run `slug mod update` to update your lockfile."
+    )]
+    UnsupportedVersion { found: u32, expected: u32 },
+
+    #[error(
         "Lockfile is stale: MODULE.bazel has changed. \
         Run 'slug mod update' to update the lockfile."
     )]
@@ -956,7 +962,7 @@ pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
                         let name = &rest[..slash_pos];
                         let after = &rest[slash_pos..];
                         if name.ends_with('+') {
-                            format!("@{}{}", &name[..name.len()-1], after)
+                            format!("@{}{}", &name[..name.len() - 1], after)
                         } else {
                             format!("@{}{}", name, after)
                         }
@@ -968,9 +974,7 @@ pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
                 };
                 AttrValue::Label(label)
             } else if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
-                AttrValue::String(s[1..s.len()-1].to_owned())
-            } else if let Some(label) = s.strip_prefix("__label__:") {
-                AttrValue::Label(label.to_owned())
+                AttrValue::String(s[1..s.len() - 1].to_owned())
             } else {
                 AttrValue::String(s.clone())
             }
@@ -987,25 +991,24 @@ pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
         serde_json::Value::Array(arr) => {
             let strings: Vec<String> = arr
                 .iter()
-                .filter_map(|v| v.as_str().map(|s| {
-                    if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
-                        s[1..s.len()-1].to_owned()
-                    } else {
-                        s.to_owned()
-                    }
-                }))
+                .filter_map(|v| {
+                    v.as_str().map(|s| {
+                        if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
+                            s[1..s.len() - 1].to_owned()
+                        } else {
+                            s.to_owned()
+                        }
+                    })
+                })
                 .collect();
             AttrValue::StringList(strings)
         }
         serde_json::Value::Object(obj) => {
-            if let Some(serde_json::Value::String(label)) = obj.get("__label__") {
-                return AttrValue::Label(label.clone());
-            }
             let dict: IndexMap<String, AttrValue> = obj
                 .iter()
                 .map(|(k, v)| {
                     let key = if k.starts_with('\'') && k.ends_with('\'') && k.len() >= 2 {
-                        k[1..k.len()-1].to_owned()
+                        k[1..k.len() - 1].to_owned()
                     } else {
                         k.clone()
                     };
@@ -1072,9 +1075,15 @@ impl Lockfile {
         }
     }
 
-    /// Read a lockfile from disk.
+    /// Read a lockfile from disk (default Update mode for version checks).
     #[cfg(test)]
     pub fn read(path: &Path) -> slug_error::Result<Self> {
+        Self::read_with_mode(path, LockfileMode::Update)
+    }
+
+    /// Read a lockfile from disk with explicit mode for version-mismatch policy.
+    #[cfg(test)]
+    pub fn read_with_mode(path: &Path, mode: LockfileMode) -> slug_error::Result<Self> {
         record_bzlmod_event(BzlmodEventKind::LockfileRead, path.display().to_string());
 
         if !path.exists() {
@@ -1084,7 +1093,7 @@ impl Lockfile {
         let content = fs::read_to_string(path)
             .map_err(|e| LockfileError::ReadError(format!("{}: {}", path.display(), e)))?;
 
-        parse_lockfile_content(path, &content)
+        parse_lockfile_content_with_mode(path, &content, mode)
     }
 
     fn validate_extension_digests(&self, path: &Path) -> slug_error::Result<()> {
@@ -1517,8 +1526,44 @@ impl Lockfile {
 }
 
 pub fn parse_lockfile_content(path: &Path, content: &str) -> slug_error::Result<Lockfile> {
+    parse_lockfile_content_with_mode(path, content, LockfileMode::Update)
+}
+
+/// Parse lockfile content with explicit mode for version-mismatch policy.
+///
+/// Matches Bazel 9's `BazelLockFileFunction.getLockfileValue`:
+/// - **Error mode**: unsupported version → hard error ("not supported by this
+///   version of Slug, please run `slug mod update`").
+/// - **Update/Refresh mode**: unsupported version → data is unusable, return an
+///   empty lockfile so resolution proceeds from scratch.
+/// - **Off mode**: the caller should not call this function; returns empty.
+pub fn parse_lockfile_content_with_mode(
+    path: &Path,
+    content: &str,
+    mode: LockfileMode,
+) -> slug_error::Result<Lockfile> {
+    if mode == LockfileMode::Off {
+        return Ok(Lockfile::new());
+    }
+
     let lockfile: Lockfile = serde_json::from_str(content)
         .map_err(|e| LockfileError::ParseError(format!("{}: {}", path.display(), e)))?;
+
+    if lockfile.lock_file_version != LOCKFILE_VERSION {
+        // Bazel 9: "The version of MODULE.bazel.lock is not supported by this
+        // version of Bazel.  Please run `bazel mod deps --lockfile_mode=update`"
+        if mode == LockfileMode::Error {
+            return Err(LockfileError::UnsupportedVersion {
+                found: lockfile.lock_file_version,
+                expected: LOCKFILE_VERSION,
+            }
+            .into());
+        }
+        // Update / Refresh: treat old data as unusable (like Bazel's
+        // EMPTY_LOCKFILE) so resolution proceeds from scratch.
+        return Ok(Lockfile::new());
+    }
+
     lockfile.validate_extension_digests(path)?;
     slug_util::memory_checkpoint::checkpoint(
         "bzlmod_lockfile_read",
@@ -1528,22 +1573,6 @@ pub fn parse_lockfile_content(path: &Path, content: &str) -> slug_error::Result<
             ("registry_hashes", lockfile.registry_file_hashes.len()),
         ],
     );
-
-    if lockfile.lock_file_version > LOCKFILE_VERSION {
-        return Err(LockfileError::VersionMismatch {
-            expected: LOCKFILE_VERSION,
-            found: lockfile.lock_file_version,
-        }
-        .into());
-    }
-
-    if lockfile.lock_file_version < LOCKFILE_VERSION {
-        return Err(LockfileError::VersionMismatch {
-            expected: LOCKFILE_VERSION,
-            found: lockfile.lock_file_version,
-        }
-        .into());
-    }
 
     Ok(lockfile)
 }
@@ -1647,7 +1676,7 @@ fn read_lockfile_at_path(
         return Ok(None);
     }
 
-    let parsed = std::sync::Arc::new(Lockfile::read(&path)?);
+    let parsed = std::sync::Arc::new(Lockfile::read_with_mode(&path, mode)?);
     slug_util::memory_checkpoint::checkpoint(
         "bzlmod_lockfile_read",
         [("extensions", parsed.module_extensions.len())],
@@ -1766,7 +1795,9 @@ mod tests {
 
     #[test]
     fn test_lockfile_backwards_compat_old_format() {
-        // Bazel 9 / slug reject lockfile versions < 26.
+        // Bazel 9 behavior: old lockfile versions are unsupported.
+        // - Error mode: hard error with descriptive message
+        // - Update mode: treat data as unusable (return empty lockfile)
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("MODULE.bazel.lock");
 
@@ -1788,8 +1819,55 @@ mod tests {
         }"#;
 
         fs::write(&path, old_format_json).unwrap();
-        let result = Lockfile::read(&path);
-        assert!(result.is_err(), "v24 lockfile should be rejected");
+
+        // Error mode: should fail with UnsupportedVersion
+        let result = Lockfile::read_with_mode(&path, LockfileMode::Error);
+        let err = result.unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("not supported"),
+            "Error mode should report unsupported version, got: {msg}"
+        );
+
+        // Update mode: should succeed with empty lockfile (data unusable)
+        let result = Lockfile::read_with_mode(&path, LockfileMode::Update);
+        assert!(result.is_ok(), "Update mode should succeed for old version");
+        let lockfile = result.unwrap();
+        assert_eq!(
+            lockfile.lock_file_version, LOCKFILE_VERSION,
+            "Update mode should return a fresh lockfile with current version"
+        );
+        assert!(
+            lockfile.module_extensions.is_empty(),
+            "Old data should be discarded"
+        );
+    }
+
+    #[test]
+    fn test_lockfile_future_version_error_mode() {
+        // Future versions are also unsupported.
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+
+        let future_json = r#"{
+            "lockFileVersion": 99,
+            "registryFileHashes": {},
+            "selectedYankedVersions": {},
+            "moduleExtensions": {},
+            "facts": {}
+        }"#;
+
+        fs::write(&path, future_json).unwrap();
+
+        // Error mode
+        let result = Lockfile::read_with_mode(&path, LockfileMode::Error);
+        assert!(result.is_err(), "Future version should be rejected in error mode");
+
+        // Update mode: treat as unusable
+        let result = Lockfile::read_with_mode(&path, LockfileMode::Update);
+        assert!(result.is_ok(), "Update mode should succeed for future version");
+        let lockfile = result.unwrap();
+        assert_eq!(lockfile.lock_file_version, LOCKFILE_VERSION);
     }
 
     #[test]
