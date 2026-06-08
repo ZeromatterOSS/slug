@@ -468,16 +468,27 @@ pub struct BzlmodResolvedGraphSourceInputsValue {
 
 impl BzlmodResolvedGraphSourceInputsValue {
     pub fn identity_digest_with_key<K: Hash>(&self, key: &K) -> String {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        key.hash(&mut hasher);
-        self.root_module_file.path.hash(&mut hasher);
-        self.root_module_file.input_digest.hash(&mut hasher);
-        self.lockfile_inputs.hash_identity(&mut hasher);
-        self.local_override_inputs.digest.hash(&mut hasher);
-        self.non_registry_override_inputs.digest.hash(&mut hasher);
-        self.registry_file_inputs.digest.hash(&mut hasher);
-        self.override_patch_inputs.digest.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        // Hash the key by using its std::hash::Hash impl to produce bytes
+        let mut key_hasher = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.root_module_file.path.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.root_module_file.input_digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.lockfile_inputs.hash_identity(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.local_override_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.non_registry_override_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.registry_file_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.override_patch_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        hex::encode(hasher.finalize())
     }
 
     pub fn identity_digest_with_key_and_non_root_files<K: Hash>(
@@ -485,17 +496,28 @@ impl BzlmodResolvedGraphSourceInputsValue {
         key: &K,
         non_root_digest: &str,
     ) -> String {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        key.hash(&mut hasher);
-        self.root_module_file.path.hash(&mut hasher);
-        self.root_module_file.input_digest.hash(&mut hasher);
-        self.lockfile_inputs.hash_identity(&mut hasher);
-        self.local_override_inputs.digest.hash(&mut hasher);
-        self.non_registry_override_inputs.digest.hash(&mut hasher);
-        self.registry_file_inputs.digest.hash(&mut hasher);
-        self.override_patch_inputs.digest.hash(&mut hasher);
-        non_root_digest.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        let mut key_hasher = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.root_module_file.path.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.root_module_file.input_digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.lockfile_inputs.hash_identity(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.local_override_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.non_registry_override_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.registry_file_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        self.override_patch_inputs.digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        non_root_digest.hash(&mut key_hasher);
+        hasher.update(key_hasher.finish().to_le_bytes());
+        hex::encode(hasher.finalize())
     }
 }
 
