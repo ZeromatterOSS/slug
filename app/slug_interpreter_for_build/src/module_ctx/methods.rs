@@ -203,14 +203,13 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth is not yet supported — produce an explicit error
+        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
         if auth.is_some() {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "The 'auth' parameter on module_ctx.download() is not yet supported. \
-                 Please use netrc or credential helpers for authentication."
-            )
-            .into());
+            tracing::warn!(
+                "The 'auth' parameter on module_ctx.download() is not yet \
+                 supported and will be ignored. Please use netrc or credential \
+                 helpers for authentication."
+            );
         }
         if headers.is_some() {
             tracing::warn!(
@@ -284,14 +283,13 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth is not yet supported — produce an explicit error
+        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
         if _auth.is_some() {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "The 'auth' parameter on module_ctx.download_and_extract() is not yet supported. \
-                 Please use netrc or credential helpers for authentication."
-            )
-            .into());
+            tracing::warn!(
+                "The 'auth' parameter on module_ctx.download_and_extract() is not yet \
+                 supported and will be ignored. Please use netrc or credential \
+                 helpers for authentication."
+            );
         }
         if _headers.is_some() {
             tracing::warn!(

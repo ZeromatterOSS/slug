@@ -2212,21 +2212,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth is not yet supported — produce an explicit error rather than
-        // silently ignoring it, so users get a clear diagnostic instead of a
-        // mysterious 401/403.
+        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
         if auth.is_some() {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "The 'auth' parameter on download() is not yet supported. \
-                 Please use netrc or credential helpers for authentication."
-            )
-            .into());
+            tracing::warn!(
+                "The 'auth' parameter on download() is not yet \
+                 supported and will be ignored. Please use netrc or credential \
+                 helpers for authentication."
+            );
         }
 
-        // headers support: pass through when implemented; for now, warn if
-        // provided but otherwise ignore (headers don't cause silent auth
-        // failures the way auth does).
+        // headers: warn if provided, otherwise ignore
         if headers.is_some() {
             tracing::warn!(
                 "The 'headers' parameter on download() is not yet supported \
@@ -2319,15 +2314,13 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth is not yet supported — produce an explicit error rather than
-        // silently ignoring it.
+        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
         if auth.is_some() {
-            return Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Input,
-                "The 'auth' parameter on download_and_extract() is not yet supported. \
-                 Please use netrc or credential helpers for authentication."
-            )
-            .into());
+            tracing::warn!(
+                "The 'auth' parameter on download_and_extract() is not yet \
+                 supported and will be ignored. Please use netrc or credential \
+                 helpers for authentication."
+            );
         }
 
         // headers: warn if provided
