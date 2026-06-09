@@ -212,8 +212,10 @@ fn execute_repository_rule_impl(
     // Acquire per-canonical-name lock to serialize concurrent materializations
     // of the same output path.
     let _mat_lock_arc = acquire_materialization_lock(&invocation.name);
-    // Use blocking_lock since this is a synchronous code path
-    let _mat_lock = _mat_lock_arc.blocking_lock();
+    // block_in_place allows blocking_lock inside a tokio multi-thread runtime
+    // without panicking. The lock serializes concurrent materializations of
+    // the same canonical output path.
+    let _mat_lock = tokio::task::block_in_place(|| _mat_lock_arc.blocking_lock());
     let staging_dir = prepare_staging_dir(&working_dir)?;
 
     let mut recorded_inputs = NativeRepositoryRecordedInputs::default();
