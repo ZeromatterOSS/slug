@@ -467,27 +467,54 @@ pub struct BzlmodResolvedGraphSourceInputsValue {
 }
 
 impl BzlmodResolvedGraphSourceInputsValue {
+    /// Compute a stable identity digest by feeding each field independently
+    /// into SHA-256. Uses a per-field fresh DefaultHasher only to convert
+    /// the std::hash::Hash output into bytes — each field gets its own
+    /// hasher so there's no cross-field state accumulation. The 8-byte
+    /// DefaultHasher output per field is fed into SHA-256 as a fixed-width
+    /// token.
+    ///
+    /// NOTE: DefaultHasher (SipHash 1-3) is NOT guaranteed stable across
+    /// Rust versions. However, since we feed its output into SHA-256 and
+    /// these digests are only compared within the same process invocation,
+    /// this is acceptable for DICE cache identity within a single build
+    /// session. Cross-session persistence would require a stable hasher.
     pub fn identity_digest_with_key<K: Hash>(&self, key: &K) -> String {
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();
-        // Hash the key by using its std::hash::Hash impl to produce bytes
-        let mut key_hasher = std::collections::hash_map::DefaultHasher::new();
-        key.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.root_module_file.path.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.root_module_file.input_digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.lockfile_inputs.hash_identity(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.local_override_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.non_registry_override_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.registry_file_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.override_patch_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
+        // Each field gets a fresh DefaultHasher so hashes are independent
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.root_module_file.path.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.root_module_file.input_digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.lockfile_inputs.hash_identity(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.local_override_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.non_registry_override_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.registry_file_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.override_patch_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
         hex::encode(hasher.finalize())
     }
 
@@ -498,25 +525,43 @@ impl BzlmodResolvedGraphSourceInputsValue {
     ) -> String {
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();
-        let mut key_hasher = std::collections::hash_map::DefaultHasher::new();
-        key.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.root_module_file.path.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.root_module_file.input_digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.lockfile_inputs.hash_identity(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.local_override_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.non_registry_override_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.registry_file_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        self.override_patch_inputs.digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
-        non_root_digest.hash(&mut key_hasher);
-        hasher.update(key_hasher.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.root_module_file.path.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.root_module_file.input_digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.lockfile_inputs.hash_identity(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.local_override_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.non_registry_override_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.registry_file_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.override_patch_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        non_root_digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
         hex::encode(hasher.finalize())
     }
 }
