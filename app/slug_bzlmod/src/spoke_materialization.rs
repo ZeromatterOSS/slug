@@ -153,29 +153,57 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> slug_error::Result<bool> 
         }
     };
 
-    // Bridge sync -> async. block_in_place releases the current tokio
-    // worker so other tasks can make progress while we wait. The nested
-    // block_on then drives the DICE compute on this thread.
+    // Check if the spoke is already on disk. If so, skip DICE entirely —
+    // no need to materialize what's already there. This avoids DICE
+    // dependency cycles that cause deadlocks when a spoke's DICE key
+    // transitively depends on the currently-running computation.
+    let spoke_dir = EXTENSION_WORKSPACE_ID.with(|c| {
+        c.borrow().as_ref().map(|ws| {
+            ws.canonical_project_root
+                .join("bazel-external")
+                .join(canonical_name)
+        })
+    });
+    if let Some(ref dir) = spoke_dir {
+        if dir.is_dir() {
+            return Ok(true);
+        }
+    }
+
+    // Spoke is not on disk — attempt DICE materialization with a timeout
+    // to avoid deadlocking the runtime.
     tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(async {
-            // SAFETY: `with_extension_dice` is active on this call stack;
-            // the pointer is valid for the duration of `f` (the eval
-            // closure) which encloses this call.
+        let result = tokio::runtime::Handle::current().block_on(async {
             let ctx: &mut DiceComputations<'_> = unsafe { &mut *raw };
             let Some(key) = spoke_execution_key(ctx, canonical_name).await? else {
                 return Ok(false);
             };
-            match ctx.compute(&key).await {
-                Ok(Ok(_)) => Ok(true),
-                Ok(Err(e)) => Err(e),
-                Err(e) => Err(slug_error::slug_error!(
+            // Timeout to prevent deadlock: if the spoke's DICE computation
+            // depends on a key held by the current computation, it will
+            // never complete. Return false after the timeout so the build
+            // can continue; the spoke will be materialized on retry.
+            let compute_future = ctx.compute(&key);
+            match tokio::time::timeout(std::time::Duration::from_secs(30), compute_future).await {
+                Ok(Ok(Ok(_))) => Ok(true),
+                Ok(Ok(Err(e))) => Err(e),
+                Ok(Err(e)) => Err(slug_error::slug_error!(
                     slug_error::ErrorTag::Tier0,
                     "DICE compute failed for spoke '{}': {}",
                     canonical_name,
                     e
                 )),
+                Err(_) => {
+                    tracing::warn!(
+                        "materialize_spoke_sync: timed out waiting for DICE \
+                         computation of '{}', skipping (potential deadlock avoided)",
+                        canonical_name
+                    );
+                    Ok(false)
+                }
             }
-        })
+        });
+        // Handle::block_on returns the future's Output directly.
+        result
     })
 }
 
