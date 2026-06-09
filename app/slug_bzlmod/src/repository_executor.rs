@@ -247,8 +247,10 @@ fn execute_repository_rule_impl(
             mark_repo_complete(&staging_dir)?;
             // Atomically swap staging dir into the canonical path.
             // On success, the canonical path has a complete tree with a valid marker.
-            // On failure, we clean up the staging dir and leave the old canonical path
-            // untouched (or absent if this was a first materialization).
+            // On failure (first rename fails with non-ENOTEMPTY error), we clean up
+            // the staging dir and leave the old canonical path untouched.
+            // Note: in the ENOTEMPTY recovery path, the old canonical dir is removed
+            // first; if the retry rename then fails, both directories are lost.
             if let Err(e) = finalize_staging_dir(&staging_dir, &working_dir) {
                 cleanup_staging_dir(&staging_dir);
                 return Err(e);
@@ -661,39 +663,82 @@ pub(crate) fn prepare_staging_dir(canonical_dir: &Path) -> slug_error::Result<Pa
 
 /// Atomically move a staging directory to the canonical path.
 ///
-/// Removes the old canonical directory (if present), then renames the staging
-/// directory to the canonical path. On Linux, `rename` of a directory on the
-/// same filesystem is atomic, so readers of the canonical path will see either
-/// the old complete tree or the new complete tree, never a partial tree.
+/// On POSIX, `rename()` atomically replaces an existing **empty** directory
+/// or file at the target path. When the target is a non-empty directory,
+/// `rename()` fails with ENOTEMPTY (or EEXIST on some systems). In that
+/// case we remove the old directory and retry the rename.
 ///
-/// Atomically swap the staging directory into the canonical path.
-///
-/// On Linux, `rename()` atomically replaces an existing directory with the
-/// new one, so there is no window where the canonical path doesn't exist.
-/// The old directory's inode is freed once no process has it open. This
-/// avoids the "delete-then-rename" gap where concurrent readers would see
-/// a missing directory.
+/// **TOCTOU window**: after `remove_dir_all` and before the retry `rename`,
+/// the canonical path does not exist. New path-based lookups will see
+/// ENOENT during this window. Processes that already hold open fds to the
+/// old directory can still access it (inode remains alive until the last fd
+/// closes). This window is acceptable because per-canonical-name
+/// materialization locks serialize access within one daemon, and
+/// cross-daemon concurrency is documented as out of scope.
 ///
 /// If the rename fails, this function attempts to clean up the staging dir
-/// and returns an error.
+/// and returns an error. Note: if the old canonical dir was already removed
+/// (ENOTEMPTY path) and the retry rename fails, both directories are lost;
+/// the caller will need to re-materialize.
 pub(crate) fn finalize_staging_dir(staging_dir: &Path, canonical_dir: &Path) -> slug_error::Result<()> {
-    // Atomically rename staging -> canonical.
-    // On Linux, rename() atomically replaces the target if it exists,
-    // so we do NOT need to remove_dir_all first. The old canonical dir
-    // (if any) is atomically replaced; its inode is freed once no
-    // process holds it open.
-    std::fs::rename(staging_dir, canonical_dir).map_err(|e| {
-        // Try to clean up staging dir on rename failure
-        let _ = std::fs::remove_dir_all(staging_dir);
-        RepositoryExecutionError::WorkingDirFailed {
-            reason: format!(
-                "Failed to rename staging directory {:?} to canonical {:?}: {}",
-                staging_dir, canonical_dir, e
-            ),
+    // Try atomic rename first. This succeeds when canonical_dir doesn't
+    // exist or is an empty directory (atomic swap).
+    match std::fs::rename(staging_dir, canonical_dir) {
+        Ok(()) => Ok(()),
+        Err(e) if is_enotempty_or_eexist(&e) => {
+            // ENOTEMPTY/EEXIST: canonical dir exists and is non-empty.
+            // Remove it and retry the rename.
+            std::fs::remove_dir_all(canonical_dir).map_err(|rm_err| {
+                let _ = std::fs::remove_dir_all(staging_dir);
+                RepositoryExecutionError::WorkingDirFailed {
+                    reason: format!(
+                        "Failed to remove old canonical directory {:?}: {} (original rename error: {})",
+                        canonical_dir, rm_err, e
+                    ),
+                }
+            })?;
+            std::fs::rename(staging_dir, canonical_dir).map_err(|retry_err| {
+                let _ = std::fs::remove_dir_all(staging_dir);
+                RepositoryExecutionError::WorkingDirFailed {
+                    reason: format!(
+                        "Failed to rename staging directory {:?} to canonical {:?} after removing old dir: {}",
+                        staging_dir, canonical_dir, retry_err
+                    ),
+                }
+            })?;
+            Ok(())
         }
-    })?;
+        Err(e) => {
+            // Try to clean up staging dir on rename failure
+            let _ = std::fs::remove_dir_all(staging_dir);
+            Err(RepositoryExecutionError::WorkingDirFailed {
+                reason: format!(
+                    "Failed to rename staging directory {:?} to canonical {:?}: {}",
+                    staging_dir, canonical_dir, e
+                ),
+            }.into())
+        }
+    }
+}
 
-    Ok(())
+/// Check whether an `io::Error` is ENOTEMPTY or EEXIST, both of which
+/// POSIX permits `rename()` to return when the target directory is non-empty.
+///
+/// Using symbolic constants from `libc` instead of hardcoded errno values
+/// ensures portability across platforms (e.g. ENOTEMPTY=39 on Linux but 66
+/// on macOS; EEXIST=17 on both).
+#[cfg(unix)]
+fn is_enotempty_or_eexist(e: &std::io::Error) -> bool {
+    e.raw_os_error() == Some(libc::ENOTEMPTY) || e.raw_os_error() == Some(libc::EEXIST)
+}
+
+#[cfg(not(unix))]
+fn is_enotempty_or_eexist(e: &std::io::Error) -> bool {
+    // On non-Unix platforms (Windows), rename() has different semantics.
+    // Fall back to checking the platform's "directory not empty" equivalent.
+    // Windows rename of a directory over an existing directory fails with
+    // ERROR_ACCESS_DENIED (5) or ERROR_DIR_NOT_EMPTY (145).
+    e.raw_os_error() == Some(145) || e.raw_os_error() == Some(5)
 }
 
 /// Clean up a staging directory after a failed materialization.
