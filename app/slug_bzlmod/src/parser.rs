@@ -277,7 +277,6 @@ fn parsed_module_file_from_context(
     let (module_info, has_module_directive) = match &ctx.module {
         Some(decl) => {
             let mut module = BzlModule::new(decl.name.clone(), decl.version.clone());
-            module.compatibility_level = decl.compatibility_level;
             module.repo_name = decl.repo_name.clone();
             module.bazel_deps = ctx.bazel_deps.clone();
             module.overrides = ctx.overrides.clone();
@@ -767,7 +766,6 @@ module(
         assert!(parsed.has_module_directive);
         assert_eq!(parsed.module.name, "my_project");
         assert_eq!(parsed.module.version.as_str(), "1.0.0");
-        assert_eq!(parsed.module.compatibility_level, 0);
     }
 
     #[test]
@@ -864,36 +862,6 @@ ext = use_extension("//:defs.bzl", "ext")
 
         let err = parse_module_bazel(&root_module).unwrap_err().to_string();
         assert!(err.contains("ext"), "{err}");
-    }
-
-    #[test]
-    fn test_parse_root_module_compatibility_level_is_zeroed() {
-        let content = r#"
-module(
-    name = "my_project",
-    version = "2.0.0",
-    compatibility_level = 2,
-)
-"#;
-
-        // Root module's compatibility_level is ignored (Bazel 9 parity)
-        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
-        assert_eq!(parsed.module.compatibility_level, 0);
-    }
-
-    #[test]
-    fn test_parse_non_root_module_preserves_compatibility_level() {
-        let content = r#"
-module(
-    name = "rules_foo",
-    version = "1.0.0",
-    compatibility_level = 3,
-)
-"#;
-
-        // Non-root module's compatibility_level is preserved for MVS conflict detection
-        let parsed = parse_non_root_module_bazel_content(content, "rules_foo@1.0.0/MODULE.bazel").unwrap();
-        assert_eq!(parsed.module.compatibility_level, 3);
     }
 
     #[test]
@@ -1908,7 +1876,6 @@ use_repo(bazel_lib_toolchains, "copy_directory_toolchains", "copy_to_directory_t
 module(
     name = "bazel_lib",
     bazel_compatibility = [">=6.0.0"],
-    compatibility_level = 1,
     version = "3.1.1",
 )
 
@@ -1948,7 +1915,6 @@ bazel_dep(
 "#;
         let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
         assert_eq!(parsed.module.name, "bazel_lib");
-        assert_eq!(parsed.module.compatibility_level, 0);
 
         // Should have multiple bazel_deps including dev dependencies
         assert!(parsed.module.bazel_deps.len() >= 6);

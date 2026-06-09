@@ -28,7 +28,6 @@ use crate::version::Version;
 /// module(
 ///     name = "my_project",
 ///     version = "1.0.0",
-///     compatibility_level = 1,
 /// )
 ///
 /// bazel_dep(name = "rules_cc", version = "0.0.9")
@@ -43,14 +42,6 @@ pub struct Module {
     /// The module's version string (from `module(version = "...")`).
     /// Parsed according to Bazel's relaxed SemVer format.
     pub version: Version,
-
-    /// The compatibility level used during MVS selection.
-    /// For the root module, Bazel 9 ignores the declared value and stores 0.
-    /// For non-root modules, the declared compatibility_level is preserved and
-    /// used in MVS conflict detection: two selected versions of the same module
-    /// with different compatibility levels is a resolution error unless a
-    /// multiple_version_override allows both.
-    pub compatibility_level: u32,
 
     /// The repository name this module uses to refer to itself
     /// (`module(repo_name = "...")`). Defaults to `name`.
@@ -69,7 +60,6 @@ impl Module {
         Self {
             name,
             version,
-            compatibility_level: 0,
             repo_name: None,
             bazel_deps: Vec::new(),
             overrides: Vec::new(),
@@ -81,7 +71,6 @@ impl Module {
         Self {
             name: String::new(),
             version: Version::empty(),
-            compatibility_level: 0,
             repo_name: None,
             bazel_deps: Vec::new(),
             overrides: Vec::new(),

@@ -276,7 +276,6 @@ pub struct RepoRuleInvocation {
 pub struct ModuleDecl {
     pub name: String,
     pub version: Version,
-    pub compatibility_level: u32,
     pub repo_name: Option<String>,
 }
 
@@ -622,10 +621,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     /// * `name` - The name of the module. Required for modules that will be
     ///   published to a registry.
     /// * `version` - The version of the module (relaxed SemVer format).
-    /// * `compatibility_level` - For the root module, Bazel 9 ignores this and
-    ///   stores 0 (with a deprecation warning). For non-root modules, the
-    ///   declared compatibility_level is stored and used in MVS conflict
-    ///   detection.
+    /// * `compatibility_level` - Accepted but ignored (Bazel 9 no-op).
     /// * `repo_name` - The repository name for the module (defaults to `name`).
     /// * `bazel_compatibility` - List of Bazel version constraints.
     ///
@@ -635,7 +631,6 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     /// module(
     ///     name = "my_project",
     ///     version = "1.0.0",
-    ///     compatibility_level = 1,
     /// )
     /// ```
     fn module<'v>(
@@ -688,28 +683,13 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         validate_bazel_compatibility(name, &bazel_compatibility.items)?;
 
-        // Bazel 9 parity: the root module's compatibility_level is ignored
-        // (Bazel warns it's deprecated and stores 0). Non-root modules
-        // retain their declared compatibility_level for MVS conflict detection.
-        let stored_compat_level = if ctx.is_root_module {
-            if compatibility_level != 0 {
-                // Bazel 9 emits a deprecation warning for root module's
-                // compatibility_level. Match that behavior.
-                tracing::warn!(
-                    "The attribute 'compatibility_level' in module() is a no-op \
-                     for the root module and will be ignored. \
-                     Please remove it from your MODULE.bazel file."
-                );
-            }
-            0u32
-        } else {
-            compatibility_level.max(0) as u32
-        };
+        // Bazel 9 parity: compatibility_level is accepted but ignored.
+        // ModuleFileGlobals.java line 192 unconditionally stores 0.
+        let _ = compatibility_level;
 
         ctx.module = Some(ModuleDecl {
             name: name.to_owned(),
             version: parsed_version,
-            compatibility_level: stored_compat_level,
             repo_name: if repo_name.is_empty() {
                 None
             } else {
@@ -726,8 +706,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     ///
     /// * `name` - The name of the module to depend on.
     /// * `version` - The minimum required version.
-    /// * `max_compatibility_level` - Deprecated Bazel 9 no-op accepted for
-    ///   parsing parity.
+    /// * `max_compatibility_level` - Accepted but ignored (Bazel 9 no-op).
     /// * `repo_name` - Override the repository name for this dependency.
     /// * `dev_dependency` - If true, this dependency is only needed for development.
     ///
@@ -784,8 +763,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
         ctx.bazel_deps.push(dep);
 
-        // Bazel 9 warns that max_compatibility_level is a no-op. Slug accepts
-        // and ignores it for parity.
+        // Bazel 9 parity: max_compatibility_level is accepted but ignored.
         let _ = max_compatibility_level;
 
         Ok(NoneType)

@@ -3083,7 +3083,6 @@ mod tests {
             ResolvedModuleInfo {
                 name: "root".to_owned(),
                 version: String::new(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: ModuleSource::LocalPath {
                     path: ".".to_owned(),
@@ -3096,7 +3095,6 @@ mod tests {
             ResolvedModuleInfo {
                 name: "dep".to_owned(),
                 version: "1.0".to_owned(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: ModuleSource::Registry {
                     url: "https://registry.example".to_owned(),
@@ -3109,7 +3107,6 @@ mod tests {
             ResolvedModuleInfo {
                 name: "local".to_owned(),
                 version: String::new(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: ModuleSource::LocalPath {
                     path: "/tmp/slug-plan61-local-outside".to_owned(),

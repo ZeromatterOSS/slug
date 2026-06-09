@@ -242,7 +242,6 @@ pub fn bzlmod_resolved_graph_digest(graph: &ResolvedGraph) -> String {
         update(&mut hasher, name);
         update(&mut hasher, &info.name);
         update(&mut hasher, &info.version);
-        update(&mut hasher, &info.compatibility_level.to_string());
         let mut deps: Vec<_> = info.dependencies.iter().collect();
         deps.sort_by(|(left, _), (right, _)| left.cmp(right));
         for (dep, version) in deps {
@@ -1126,7 +1125,6 @@ pub async fn resolve_graph_with_module_file_inputs(
                 ResolvedModuleInfo {
                     name: dep.name.clone(),
                     version,
-                    compatibility_level: parsed_override.module.compatibility_level,
                     dependencies: HashMap::new(),
                     source: ModuleSource::LocalPath {
                         path: override_path.clone(),
@@ -6770,7 +6768,6 @@ mod tests {
             ResolvedModuleInfo {
                 name: "dep".to_owned(),
                 version: "1.0".to_owned(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: ModuleSource::Registry {
                     url: "https://registry.example".to_owned(),
@@ -6819,7 +6816,6 @@ mod tests {
             ResolvedModuleInfo {
                 name: "dep".to_owned(),
                 version: "1.0".to_owned(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: ModuleSource::Registry {
                     url: "https://registry.example".to_owned(),
@@ -6867,7 +6863,6 @@ mod tests {
             ResolvedModuleInfo {
                 name: "dep".to_owned(),
                 version: "1.0".to_owned(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: ModuleSource::Registry {
                     url: "https://bcr.bazel.build".to_owned(),
@@ -6892,7 +6887,6 @@ mod tests {
                 ResolvedModuleInfo {
                     name: module_name.to_owned(),
                     version: "1.0".to_owned(),
-                    compatibility_level: 0,
                     dependencies: HashMap::new(),
                     source: ModuleSource::Registry {
                         url: "https://bcr.bazel.build".to_owned(),
@@ -6933,7 +6927,6 @@ mod tests {
             ResolvedModuleInfo {
                 name: "dep".to_owned(),
                 version: "1.0".to_owned(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: ModuleSource::Registry {
                     url: "https://bcr.bazel.build".to_owned(),

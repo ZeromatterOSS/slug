@@ -16,12 +16,6 @@ from buck2.tests.e2e_util.buck_workspace import buck_test
 
 @buck_test(data_dir="test_module_directive_data")
 async def test_module_directive_basic(buck: Buck) -> None:
-    """Verify module() directive extracts name, version, compatibility_level."""
+    """Verify module() directive extracts name and version."""
     # Test that basic module() directive is parsed correctly
-    await buck.audit("cell")
-
-
-@buck_test(data_dir="test_module_directive_data")
-async def test_module_with_compatibility_level(buck: Buck) -> None:
-    """Verify compatibility_level is parsed from module() directive."""
     await buck.audit("cell")

@@ -4356,7 +4356,6 @@ use_repo(ext, "generated")
             slug_bzlmod::ResolvedModuleInfo {
                 name: "dep".to_owned(),
                 version: "1.0".to_owned(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: slug_bzlmod::ModuleSource::Registry {
                     url: "https://bcr.bazel.build".to_owned(),
@@ -4394,7 +4393,6 @@ use_repo(ext, "generated")
                 slug_bzlmod::ResolvedModuleInfo {
                     name: module_name.to_owned(),
                     version: "1.0".to_owned(),
-                    compatibility_level: 0,
                     dependencies: HashMap::new(),
                     source: slug_bzlmod::ModuleSource::Registry {
                         url: "https://bcr.bazel.build".to_owned(),
@@ -4442,7 +4440,6 @@ use_repo(ext, "generated")
             slug_bzlmod::ResolvedModuleInfo {
                 name: "dep".to_owned(),
                 version: "1.0".to_owned(),
-                compatibility_level: 0,
                 dependencies: HashMap::new(),
                 source: slug_bzlmod::ModuleSource::Registry {
                     url: "https://bcr.bazel.build".to_owned(),

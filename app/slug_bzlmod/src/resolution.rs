@@ -88,20 +88,6 @@ pub enum RemoteResolutionError {
 #[slug(tag = Input)]
 pub enum MvsResolutionError {
     #[error(
-        "Compatibility level conflict for module '{name}': \
-        version {version1} has compatibility_level={compat1}, \
-        version {version2} has compatibility_level={compat2}. \
-        Use multiple_version_override to allow both versions."
-    )]
-    CompatibilityConflict {
-        name: String,
-        version1: String,
-        compat1: u32,
-        version2: String,
-        compat2: u32,
-    },
-
-    #[error(
         "Yanked version detected in your resolved dependency graph: {name}@{version}, \
         for the reason: {reason}.\n\
         Yanked versions may contain serious vulnerabilities and should not be used. \
@@ -267,14 +253,13 @@ fn parse_allowed_yanked_versions_entry(
 
 /// Selection group key for MVS algorithm.
 ///
-/// Modules are grouped by name and compatibility level. Within each group,
-/// MVS selects the maximum version.
+/// Modules are grouped by name (and target_allowed_version for
+/// multiple_version_override). Within each group, MVS selects the
+/// maximum version.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SelectionGroup {
     /// The module name.
     pub module_name: String,
-    /// The compatibility level.
-    pub compatibility_level: u32,
     /// Target allowed version for multiple_version_override.
     /// If set, only this specific version is allowed in this group.
     pub target_allowed_version: Option<Version>,
@@ -282,19 +267,17 @@ pub struct SelectionGroup {
 
 impl SelectionGroup {
     /// Create a selection group for a module.
-    pub fn new(name: &str, compat_level: u32) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
             module_name: name.to_string(),
-            compatibility_level: compat_level,
             target_allowed_version: None,
         }
     }
 
     /// Create a selection group with a target version (for multiple_version_override).
-    pub fn with_target_version(name: &str, compat_level: u32, target: Version) -> Self {
+    pub fn with_target_version(name: &str, target: Version) -> Self {
         Self {
             module_name: name.to_string(),
-            compatibility_level: compat_level,
             target_allowed_version: Some(target),
         }
     }
@@ -307,8 +290,6 @@ pub struct DiscoveredModule {
     pub key: ModuleKey,
     /// The parsed module.
     pub module: Module,
-    /// The compatibility level.
-    pub compatibility_level: u32,
     /// Source of this module (registry URL or local path).
     pub source: ModuleSource,
 }
@@ -392,8 +373,6 @@ pub struct ResolvedModuleInfo {
     pub name: String,
     /// The selected version.
     pub version: String,
-    /// Compatibility level.
-    pub compatibility_level: u32,
     /// Direct dependencies (module name -> required version).
     pub dependencies: HashMap<String, String>,
     /// Source of this module.
@@ -934,7 +913,6 @@ impl MvsResolver {
 
         Ok(DiscoveredModule {
             key,
-            compatibility_level: parsed.module.compatibility_level,
             module: parsed.module,
             source: ModuleSource::Registry {
                 url: registry_url.to_string(),
@@ -962,7 +940,6 @@ impl MvsResolver {
                 };
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&lp.module_name, resolved.version.as_str()),
-                    compatibility_level: resolved.module.compatibility_level,
                     module: resolved.module,
                     source: ModuleSource::LocalPath {
                         path: lp.path.clone(),
@@ -981,7 +958,6 @@ impl MvsResolver {
                 let version = Version::empty();
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&g.module_name, version.as_str()),
-                    compatibility_level: resolved.module.compatibility_level,
                     module: resolved.module,
                     source: ModuleSource::Git {
                         remote: g.remote.clone(),
@@ -1005,7 +981,6 @@ impl MvsResolver {
                 let version = Version::empty();
                 let discovered = DiscoveredModule {
                     key: ModuleKey::new(&a.module_name, version.as_str()),
-                    compatibility_level: resolved.module.compatibility_level,
                     module: resolved.module,
                     source: ModuleSource::Archive {
                         urls: a.urls.clone(),
@@ -1037,13 +1012,9 @@ impl MvsResolver {
             let group = if let Some(mv) = self.multiple_version_overrides.get(&key.name) {
                 // Find the target version this should map to
                 let target = self.find_target_allowed_version(&version, mv)?;
-                SelectionGroup::with_target_version(
-                    &key.name,
-                    discovered.compatibility_level,
-                    target,
-                )
+                SelectionGroup::with_target_version(&key.name, target)
             } else {
-                SelectionGroup::new(&key.name, discovered.compatibility_level)
+                SelectionGroup::new(&key.name)
             };
 
             selection_groups
@@ -1051,11 +1022,6 @@ impl MvsResolver {
                 .or_default()
                 .push((version, discovered));
         }
-
-        // Check for compatibility conflicts (same module name, different compat levels).
-        // Bazel rejects these unless a multiple_version_override explicitly allows
-        // the split.
-        Self::check_compatibility_conflicts(&self.multiple_version_overrides, &selection_groups)?;
 
         // Select maximum version per group
         let mut selected: HashMap<String, Version> = HashMap::new();
@@ -1075,8 +1041,8 @@ impl MvsResolver {
                 group.module_name.clone()
             };
 
-            // When multiple groups have the same key (e.g., compat level conflict),
-            // keep the highest version
+            // When multiple groups map to the same module name (e.g., via
+            // multiple_version_override), keep the highest version
             match selected.entry(key) {
                 std::collections::hash_map::Entry::Vacant(e) => {
                     e.insert(max_version);
@@ -1129,64 +1095,6 @@ impl MvsResolver {
             allowed: mv.versions.iter().map(|v| v.to_string()).collect(),
         }
         .into())
-    }
-
-    /// Check for compatibility level conflicts.
-    ///
-    /// Bazel rejects selected versions of the same module with different
-    /// compatibility levels unless a multiple_version_override explicitly
-    /// allows multiple selected versions.
-    fn check_compatibility_conflicts(
-        multiple_version_overrides: &HashMap<String, MultipleVersionOverride>,
-        groups: &HashMap<SelectionGroup, Vec<(Version, &DiscoveredModule)>>,
-    ) -> slug_error::Result<()> {
-        // Group by module name to check for compat conflicts
-        let mut by_name: HashMap<&str, Vec<&SelectionGroup>> = HashMap::new();
-        for group in groups.keys() {
-            by_name.entry(&group.module_name).or_default().push(group);
-        }
-
-        for (name, name_groups) in by_name {
-            // Skip if there's a multiple_version_override for this module
-            if multiple_version_overrides.contains_key(name) {
-                continue;
-            }
-
-            // Check if all groups have the same compatibility level
-            let compat_levels: HashSet<_> =
-                name_groups.iter().map(|g| g.compatibility_level).collect();
-
-            if compat_levels.len() > 1 {
-                // Find two conflicting versions for the error message
-                let g1 = name_groups[0];
-                let g2 = name_groups
-                    .iter()
-                    .find(|g| g.compatibility_level != g1.compatibility_level)
-                    .unwrap();
-
-                let v1 = groups
-                    .get(g1)
-                    .and_then(|vs| vs.first())
-                    .map(|(v, _)| v.to_string())
-                    .unwrap_or_default();
-                let v2 = groups
-                    .get(*g2)
-                    .and_then(|vs| vs.first())
-                    .map(|(v, _)| v.to_string())
-                    .unwrap_or_default();
-
-                return Err(MvsResolutionError::CompatibilityConflict {
-                    name: name.to_owned(),
-                    version1: v1,
-                    compat1: g1.compatibility_level,
-                    version2: v2,
-                    compat2: g2.compatibility_level,
-                }
-                .into());
-            }
-        }
-
-        Ok(())
     }
 
     /// Build the final resolved graph with rewritten dependencies.
@@ -1285,7 +1193,6 @@ impl MvsResolver {
             let info = ResolvedModuleInfo {
                 name: actual_name.clone(),
                 version: version.to_string(),
-                compatibility_level: module.compatibility_level,
                 dependencies,
                 source,
                 source_path: None,
@@ -1417,10 +1324,9 @@ impl MvsResolver {
     ///
     /// 1. Discover all modules by traversing the dependency graph
     /// 2. Process overrides (single_version, multiple_version, local_path, etc.)
-    /// 3. Group modules by selection key (name + compatibility_level)
-    /// 4. Check for compatibility level conflicts
-    /// 5. Select maximum version per group (MVS)
-    /// 6. Build final resolved graph with rewritten dependencies
+    /// 3. Group modules by selection key (name; or name + target_allowed_version for MVO)
+    /// 4. Select maximum version per group (MVS)
+    /// 5. Build final resolved graph with rewritten dependencies
     ///
     /// # Arguments
     ///
@@ -2487,7 +2393,6 @@ module(name = "local_lib", version = "2.0.0")
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
         };
-        parsed.module.compatibility_level = 3;
         let precomputed_modules = HashMap::from([("my_local".to_owned(), parsed)]);
 
         let resolved = resolve_local_override_from_precomputed_inputs(
@@ -2500,7 +2405,6 @@ module(name = "local_lib", version = "2.0.0")
 
         assert_eq!(resolved.name, "my_local");
         assert_eq!(resolved.version.as_str(), "2.0.0");
-        assert_eq!(resolved.module.compatibility_level, 3);
         assert!(resolved.has_module_file);
     }
 
@@ -2517,7 +2421,6 @@ module(name = "local_lib", version = "2.0.0")
             registered_toolchains: Vec::new(),
             registered_execution_platforms: Vec::new(),
         };
-        parsed.module.compatibility_level = 2;
         let precomputed_modules = HashMap::from([(
             "git_dep".to_owned(),
             PrecomputedNonRegistryOverrideModule {
@@ -2535,7 +2438,6 @@ module(name = "local_lib", version = "2.0.0")
 
         assert_eq!(resolved.module_dir, module_dir);
         assert_eq!(resolved.module.name, "git_dep");
-        assert_eq!(resolved.module.compatibility_level, 2);
     }
 
     #[test]
@@ -2803,111 +2705,27 @@ module(name = "local_lib", version = "2.0.0")
 
     #[test]
     fn test_selection_group_basic() {
-        let group = SelectionGroup::new("my_module", 0);
+        let group = SelectionGroup::new("my_module");
         assert_eq!(group.module_name, "my_module");
-        assert_eq!(group.compatibility_level, 0);
         assert!(group.target_allowed_version.is_none());
     }
 
     #[test]
     fn test_selection_group_with_target() {
         let target = Version::parse("2.0.0").unwrap();
-        let group = SelectionGroup::with_target_version("my_module", 1, target.clone());
+        let group = SelectionGroup::with_target_version("my_module", target.clone());
         assert_eq!(group.module_name, "my_module");
-        assert_eq!(group.compatibility_level, 1);
         assert_eq!(group.target_allowed_version, Some(target));
     }
 
     #[test]
     fn test_selection_group_equality() {
-        let group1 = SelectionGroup::new("foo", 0);
-        let group2 = SelectionGroup::new("foo", 0);
-        let group3 = SelectionGroup::new("foo", 1);
-        let group4 = SelectionGroup::new("bar", 0);
+        let group1 = SelectionGroup::new("foo");
+        let group2 = SelectionGroup::new("foo");
+        let group3 = SelectionGroup::new("bar");
 
         assert_eq!(group1, group2);
-        assert_ne!(group1, group3); // Different compat level
-        assert_ne!(group1, group4); // Different name
-    }
-
-    #[test]
-    fn compatibility_conflicts_fail_without_multiple_version_override() {
-        let module_v1 = Module::new("dep".to_owned(), Version::parse("1.0.0").unwrap());
-        let module_v2 = Module::new("dep".to_owned(), Version::parse("2.0.0").unwrap());
-        let discovered_v1 = DiscoveredModule {
-            key: ModuleKey::new("dep", "1.0.0"),
-            module: module_v1,
-            compatibility_level: 1,
-            source: ModuleSource::Registry {
-                url: "https://bcr.bazel.build".to_owned(),
-            },
-        };
-        let discovered_v2 = DiscoveredModule {
-            key: ModuleKey::new("dep", "2.0.0"),
-            module: module_v2,
-            compatibility_level: 2,
-            source: ModuleSource::Registry {
-                url: "https://bcr.bazel.build".to_owned(),
-            },
-        };
-        let mut groups = HashMap::new();
-        groups.insert(
-            SelectionGroup::new("dep", 1),
-            vec![(Version::parse("1.0.0").unwrap(), &discovered_v1)],
-        );
-        groups.insert(
-            SelectionGroup::new("dep", 2),
-            vec![(Version::parse("2.0.0").unwrap(), &discovered_v2)],
-        );
-
-        let err = MvsResolver::check_compatibility_conflicts(&HashMap::new(), &groups).unwrap_err();
-        let message = err.to_string();
-        assert!(message.contains("dep"));
-        assert!(message.contains("compatibility_level"));
-    }
-
-    #[test]
-    fn compatibility_conflicts_are_allowed_by_multiple_version_override() {
-        let module_v1 = Module::new("dep".to_owned(), Version::parse("1.0.0").unwrap());
-        let module_v2 = Module::new("dep".to_owned(), Version::parse("2.0.0").unwrap());
-        let discovered_v1 = DiscoveredModule {
-            key: ModuleKey::new("dep", "1.0.0"),
-            module: module_v1,
-            compatibility_level: 1,
-            source: ModuleSource::Registry {
-                url: "https://bcr.bazel.build".to_owned(),
-            },
-        };
-        let discovered_v2 = DiscoveredModule {
-            key: ModuleKey::new("dep", "2.0.0"),
-            module: module_v2,
-            compatibility_level: 2,
-            source: ModuleSource::Registry {
-                url: "https://bcr.bazel.build".to_owned(),
-            },
-        };
-        let mut groups = HashMap::new();
-        groups.insert(
-            SelectionGroup::new("dep", 1),
-            vec![(Version::parse("1.0.0").unwrap(), &discovered_v1)],
-        );
-        groups.insert(
-            SelectionGroup::new("dep", 2),
-            vec![(Version::parse("2.0.0").unwrap(), &discovered_v2)],
-        );
-        let overrides = HashMap::from([(
-            "dep".to_owned(),
-            MultipleVersionOverride {
-                module_name: "dep".to_owned(),
-                versions: vec![
-                    Version::parse("1.0.0").unwrap(),
-                    Version::parse("2.0.0").unwrap(),
-                ],
-                registry: None,
-            },
-        )]);
-
-        MvsResolver::check_compatibility_conflicts(&overrides, &groups).unwrap();
+        assert_ne!(group1, group3); // Different name
     }
 
     #[test]
@@ -2967,7 +2785,6 @@ module(name = "local_lib", version = "2.0.0")
         let info = ResolvedModuleInfo {
             name: "rules_cc".to_string(),
             version: "0.0.9".to_string(),
-            compatibility_level: 0,
             dependencies: HashMap::from([("bazel_skylib".to_string(), "1.5.0".to_string())]),
             source: ModuleSource::Registry {
                 url: "https://bcr.bazel.build".to_string(),
@@ -2990,30 +2807,12 @@ module(name = "local_lib", version = "2.0.0")
         let discovered = DiscoveredModule {
             key: ModuleKey::new("test", "1.0.0"),
             module: module.clone(),
-            compatibility_level: 0,
             source: ModuleSource::Registry {
                 url: "https://bcr.bazel.build".to_string(),
             },
         };
 
         assert_eq!(discovered.key.name, "test");
-        assert_eq!(discovered.compatibility_level, 0);
-    }
-
-    #[test]
-    fn test_mvs_resolution_error_display() {
-        let err = MvsResolutionError::CompatibilityConflict {
-            name: "protobuf".to_string(),
-            version1: "3.18.0".to_string(),
-            compat1: 1,
-            version2: "4.0.0".to_string(),
-            compat2: 2,
-        };
-        let msg = err.to_string();
-        assert!(msg.contains("protobuf"));
-        assert!(msg.contains("3.18.0"));
-        assert!(msg.contains("4.0.0"));
-        assert!(msg.contains("compatibility_level"));
     }
 
     #[test]
