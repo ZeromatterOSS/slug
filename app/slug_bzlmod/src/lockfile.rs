@@ -1598,7 +1598,7 @@ impl Lockfile {
 
     /// Remove a module extension from the cache.
     pub fn remove_extension_cache(&mut self, extension_id: &str) -> Option<LockfileExtensionData> {
-        self.module_extensions.remove(extension_id)
+        self.module_extensions.shift_remove(extension_id)
     }
 
     /// Check if any module extensions are cached.

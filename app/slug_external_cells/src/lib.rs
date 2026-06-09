@@ -139,14 +139,16 @@ impl slug_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 // Verify the materialized source exists via DICE-backed
                 // metadata instead of a bare source_path.exists() check.
                 let io = ctx.global_data().get_io_provider();
-                let project_root = io.project_root().root();
-                let source_path = project_root
+                let source_path: std::path::PathBuf = io
+                    .project_root()
+                    .root()
+                    .as_path()
                     .join("bazel-external")
                     .join(setup.canonical_name.as_ref());
                 let meta_value =
                     slug_common::file_ops::dice::compute_watched_abs_path_metadata(
                         ctx,
-                        source_path.clone(),
+                        source_path,
                     )
                     .await?;
                 if !meta_value.exists {
@@ -158,7 +160,7 @@ impl slug_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 }
 
                 let abs_dest = io.project_root().resolve(&dest_path);
-                extension_repo::copy_to_destination(&setup, io.project_root(), abs_dest.as_path())
+                extension_repo::copy_to_destination(&setup, io.project_root().root(), abs_dest.as_path())
                     .await?;
             }
         }

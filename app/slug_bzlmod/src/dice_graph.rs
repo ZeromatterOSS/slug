@@ -1514,6 +1514,24 @@ async fn compute_bzlmod_resolved_module_graph(
             .identity_digest_with_key_and_non_root_files(key, &non_root_digest)
             .as_str(),
     );
+    // In error mode, enforce that the lockfile matches the resolved graph.
+    // This catches registry hash drift, yanked version drift, and other
+    // discrepancies that Bazel's SingleExtensionEvalFunction also catches.
+    // Must run BEFORE graph is moved into outputs.
+    if key.options.lockfile_mode == LockfileMode::Error {
+        if let Some(ref lockfile) = visible_lockfile {
+            if let Err(e) = Lockfile::enforce_error_mode(
+                &graph,
+                lockfile,
+            ) {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "{e:#}"
+                ));
+            }
+        }
+    }
+
     let outputs = clean_resolved_graph_outputs_value(
         key.workspace_id.clone(),
         cell_graph_resolution_digest,
@@ -1524,6 +1542,7 @@ async fn compute_bzlmod_resolved_module_graph(
         cell_graph,
     );
     record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs, &non_root_digest);
+
     Ok(Arc::new(BzlmodResolvedModuleGraphValue {
         lockfile_inputs: inputs.lockfile_inputs,
         outputs: Arc::new(Some(outputs)),
