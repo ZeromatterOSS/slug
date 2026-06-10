@@ -104,19 +104,25 @@ static STAGING_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 /// to the same `bazel-external/{name}` path and race on disk. This lock
 /// serializes materializations of the same canonical name within one daemon.
 ///
-/// Uses `tokio::sync::Mutex` so the guard is `Send` and can be held across
-/// `.await` points in the Starlark execution path.
+/// Uses `parking_lot::Mutex` (with `send_guard` feature) so the guard is
+/// `Send` and can be held across `.await` points in the Starlark execution
+/// path, without interacting with the tokio runtime. The previous
+/// `tokio::sync::Mutex` caused thread-starvation deadlocks when combined
+/// with `block_in_place` + `blocking_lock` in the sync path and only 2
+/// tokio worker threads: the sync path would block a worker thread holding
+/// the mutex, the async path on the other worker would await the mutex,
+/// and no threads remained to resume the async path when the lock released.
 ///
 /// Cross-daemon concurrency on the same output base is out of scope here.
 struct MaterializationLocks {
-    locks: std::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+    locks: std::sync::Mutex<std::collections::HashMap<String, Arc<parking_lot::Mutex<()>>>>,
 }
 
 impl MaterializationLocks {
-    fn acquire(&self, canonical_name: &str) -> Arc<tokio::sync::Mutex<()>> {
+    fn acquire(&self, canonical_name: &str) -> Arc<parking_lot::Mutex<()>> {
         let mut map = self.locks.lock().unwrap();
         map.entry(canonical_name.to_owned())
-            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .or_insert_with(|| Arc::new(parking_lot::Mutex::new(())))
             .clone()
     }
 }
@@ -210,12 +216,10 @@ fn execute_repository_rule_impl(
     }
 
     // Acquire per-canonical-name lock to serialize concurrent materializations
-    // of the same output path.
+    // of the same output path. parking_lot::Mutex::lock() does not interact
+    // with the tokio runtime, so no block_in_place wrapper is needed.
     let _mat_lock_arc = acquire_materialization_lock(&invocation.name);
-    // block_in_place allows blocking_lock inside a tokio multi-thread runtime
-    // without panicking. The lock serializes concurrent materializations of
-    // the same canonical output path.
-    let _mat_lock = tokio::task::block_in_place(|| _mat_lock_arc.blocking_lock());
+    let _mat_lock = _mat_lock_arc.lock();
     let staging_dir = prepare_staging_dir(&working_dir)?;
 
     let mut recorded_inputs = NativeRepositoryRecordedInputs::default();
@@ -755,7 +759,7 @@ pub(crate) fn cleanup_staging_dir(staging_dir: &Path) {
 /// This serializes concurrent materializations of the same output path
 /// within one daemon, preventing races when two DICE keys target the same
 /// `bazel-external/{name}` directory.
-pub(crate) fn acquire_materialization_lock(canonical_name: &str) -> Arc<tokio::sync::Mutex<()>> {
+pub(crate) fn acquire_materialization_lock(canonical_name: &str) -> Arc<parking_lot::Mutex<()>> {
     MATERIALIZATION_LOCKS.acquire(canonical_name)
 }
 

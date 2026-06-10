@@ -2754,11 +2754,13 @@ impl Key for ExtensionRepoExecutionKey {
         // Acquire per-canonical-name lock to serialize concurrent materializations
         // of the same output path. Two DICE keys with different spec_hash but
         // the same canonical_name would race on the same bazel-external/{name}
-        // directory without this lock. Uses tokio::sync::Mutex so the guard
-        // is Send and can be held across the .await in Starlark execution.
+        // directory without this lock. Uses parking_lot::Mutex so the guard is
+        // Send and can be held across the .await in Starlark execution, without
+        // interacting with the tokio runtime (avoiding the thread-starvation
+        // deadlock that tokio::sync::Mutex caused with block_in_place).
         let _mat_lock_arc =
             crate::repository_executor::acquire_materialization_lock(self.canonical_name.as_ref());
-        let _mat_lock = _mat_lock_arc.lock().await;
+        let _mat_lock = _mat_lock_arc.lock();
 
         // For non-builtin rules with a known Starlark source, try Starlark execution
         let is_builtin =
