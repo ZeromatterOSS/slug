@@ -71,6 +71,44 @@ that must be cached, invalidated, replayed, or shared across requests.
   producers and dependencies rather than being bundled into an opaque session
   object.
 
+### Never hold a global/process-wide mutex across a DICE computation
+
+This is a hard rule, not a preference.
+
+- NEVER hold a global or otherwise shared mutex guard across a `.await` that
+  runs (directly or transitively) a DICE computation (`ctx.compute(...)`,
+  `try_compute_join`, `get_*` helpers, Starlark evaluation, repository-rule
+  execution, etc.). DICE schedules work across a multi-threaded tokio runtime
+  and freely re-enters other keys; a guard held across that await can be
+  re-requested by the same logical computation or by a dependency, and the
+  lock holder will never be polled to completion. Modern DICE has NO cycle
+  detection for analysis/native keys, so this manifests as a silent hang
+  (daemon at low CPU, threads parked in `futex_wait`), not an error.
+- The lock type does not save you: `parking_lot::Mutex` blocks the OS worker
+  thread (hard deadlock); `tokio::sync::Mutex` + `blocking_lock`/`block_in_place`
+  either panics or starves the runtime; `futures::lock::Mutex` held across a
+  re-entrant compute still deadlocks the holder. All three have been tried and
+  all three are wrong here.
+- The lock is also typically NON-REENTRANT. If an async path acquires a
+  per-key lock and then calls a helper that re-acquires the same key's lock,
+  that single computation self-deadlocks. Thread an
+  "already-held" flag (or restructure) so the inner call does not re-lock.
+  See the materialization lock: `ExtensionRepoExecutionKey::compute`
+  (`repository_execution.rs`) holds the per-canonical-name lock and passes
+  `caller_holds_materialization_lock = true` into
+  `execute_repository_rule_impl` (`repository_executor.rs`) so it skips the
+  inner acquisition.
+- Correct patterns instead: (a) let DICE own the serialization — two requests
+  for the same key already dedupe to one computation, so you usually do not
+  need a manual lock at all; (b) if you must serialize, scope the guard to a
+  synchronous critical section that does NO `.await` and NO compute, drop it
+  before awaiting; (c) make the serialized state its own DICE key.
+- Diagnosing a suspected hang: `gdb` works without sudo on this host
+  (`ptrace_scope=0`, daemon owned by the user) —
+  `gdb -p <slugd_pid> -batch -ex "set pagination off" -ex "thread apply all bt"`.
+  A thread parked in `parking_lot ... lock_slow` / `futex_wait` under a
+  `*_compute` frame is the signature of this bug.
+
 ## Validation expectations
 
 - Every parity fix needs either observed Bazel 9.0.1 behavior or a local Bazel
