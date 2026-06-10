@@ -2883,6 +2883,10 @@ impl Key for ExtensionRepoExecutionKey {
                 &invocation,
                 &self.project_root,
                 label_resolution.as_ref(),
+                // This async compute already holds the per-canonical-name
+                // materialization lock (acquired above). The lock is
+                // non-reentrant, so the inner executor must NOT re-acquire it.
+                true,
             )?;
         if self.repo_spec.local {
             result = result.non_cacheable();

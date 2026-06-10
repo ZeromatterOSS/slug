@@ -144,7 +144,7 @@ pub fn execute_repository_rule(
     project_root: &Path,
 ) -> slug_error::Result<RepositoryRuleResult> {
     let label_resolution = RepositoryLabelResolution::default();
-    execute_repository_rule_impl(invocation, project_root, true, &label_resolution)
+    execute_repository_rule_impl(invocation, project_root, true, &label_resolution, false)
 }
 
 /// Execute a repository rule after the caller has already classified
@@ -155,17 +155,33 @@ fn execute_repository_rule_fresh(
     project_root: &Path,
 ) -> slug_error::Result<RepositoryRuleResult> {
     let label_resolution = RepositoryLabelResolution::default();
-    execute_repository_rule_impl(invocation, project_root, false, &label_resolution)
+    execute_repository_rule_impl(invocation, project_root, false, &label_resolution, false)
 }
 
 /// Execute a repository rule after the caller has classified materialization
 /// reuse and supplied resolver-owned bzlmod label paths.
+///
+/// `caller_holds_materialization_lock` must be `true` when the caller already
+/// holds the per-canonical-name materialization lock for `invocation.name`
+/// (e.g. the async `ExtensionRepoExecutionKey::compute` path, which acquires
+/// it before dispatching here). The per-canonical-name lock is a
+/// non-reentrant `parking_lot::Mutex`; re-acquiring it here while the caller
+/// holds it self-deadlocks the DICE worker thread. When `true`, we skip the
+/// inner acquisition because the caller's guard already provides the required
+/// serialization for that output path.
 pub(crate) fn execute_repository_rule_fresh_with_label_resolution(
     invocation: &RepositoryInvocation,
     project_root: &Path,
     label_resolution: &RepositoryLabelResolution,
+    caller_holds_materialization_lock: bool,
 ) -> slug_error::Result<RepositoryRuleResult> {
-    execute_repository_rule_impl(invocation, project_root, false, label_resolution)
+    execute_repository_rule_impl(
+        invocation,
+        project_root,
+        false,
+        label_resolution,
+        caller_holds_materialization_lock,
+    )
 }
 
 fn execute_repository_rule_impl(
@@ -173,6 +189,7 @@ fn execute_repository_rule_impl(
     project_root: &Path,
     allow_marker_reuse: bool,
     label_resolution: &RepositoryLabelResolution,
+    caller_holds_materialization_lock: bool,
 ) -> slug_error::Result<RepositoryRuleResult> {
     let attrs = InvocationAttrs::new(invocation);
     let working_dir = project_root.join("bazel-external").join(&invocation.name);
@@ -218,8 +235,20 @@ fn execute_repository_rule_impl(
     // Acquire per-canonical-name lock to serialize concurrent materializations
     // of the same output path. parking_lot::Mutex::lock() does not interact
     // with the tokio runtime, so no block_in_place wrapper is needed.
-    let _mat_lock_arc = acquire_materialization_lock(&invocation.name);
-    let _mat_lock = _mat_lock_arc.lock();
+    //
+    // The lock is NON-REENTRANT. When the caller (the async
+    // `ExtensionRepoExecutionKey::compute` path) already holds it for this
+    // canonical name, re-acquiring here self-deadlocks the DICE worker thread.
+    // In that case the caller's guard already serializes this output path, so
+    // we skip the inner acquisition.
+    let _mat_lock_arc;
+    let _mat_lock;
+    if !caller_holds_materialization_lock {
+        _mat_lock_arc = acquire_materialization_lock(&invocation.name);
+        _mat_lock = Some(_mat_lock_arc.lock());
+    } else {
+        _mat_lock = None;
+    }
     let staging_dir = prepare_staging_dir(&working_dir)?;
 
     let mut recorded_inputs = NativeRepositoryRecordedInputs::default();
@@ -3119,6 +3148,7 @@ mod tests {
             &invocation,
             project_root,
             &label_resolution,
+            false,
         )
         .unwrap();
 
