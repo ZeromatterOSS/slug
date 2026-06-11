@@ -125,6 +125,10 @@ impl ConfiguredGraphQueryEnvironmentDelegate for AnalysisConfiguredGraphQueryDel
                 // result is not comparable
                 false
             }
+
+            fn validity(x: &Self::Value) -> bool {
+                x.is_ok()
+            }
         }
 
         let targets: Vec<_> = targets

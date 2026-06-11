@@ -402,6 +402,10 @@ pub(crate) async fn get_file_ops_delegate(
         fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
             false
         }
+
+        fn validity(x: &Self::Value) -> bool {
+            x.is_ok()
+        }
     }
 
     ctx.compute(&GitFileOpsDelegateKey(cell, setup)).await?

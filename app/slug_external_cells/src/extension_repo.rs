@@ -33,6 +33,7 @@ use slug_bzlmod::ExtensionRepoExecutionKey;
 use slug_bzlmod::RepoSpec;
 use slug_common::dice::cells::HasCellResolver;
 use slug_common::dice::data::HasIoProvider;
+use slug_common::dice::data::HasWatchedAbsInputRegistry;
 use slug_common::external_symlink::ExternalSymlink;
 use slug_common::file_ops::delegate::FileOpsDelegate;
 use slug_common::file_ops::dice::ReadFileProxy;
@@ -47,6 +48,7 @@ use slug_core::cells::external::ExtensionRepoCellSetup;
 use slug_core::cells::name::CellName;
 use slug_core::cells::paths::CellRelativePath;
 use slug_core::cells::paths::CellRelativePathBuf;
+
 use slug_execute::digest_config::DigestConfig;
 use slug_execute::digest_config::HasDigestConfig;
 use slug_fs::paths::forward_rel_path::ForwardRelativePathBuf;
@@ -743,6 +745,11 @@ pub(crate) async fn get_file_ops_delegate(
                 .into());
             }
         };
+        // Register the repo's materialized tree root so that WatchedAbs key
+        // computes under this path depend on ExternalTreeGenerationKey.
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            registry.register_tree_root(repo_result.repo_path.clone());
+        }
         return Ok(file_ops_delegate_for_materialized_extension_repo(
             cell_name,
             &project_root_path,
@@ -836,6 +843,11 @@ pub(crate) async fn get_file_ops_delegate(
                 };
                 // Skip the extension execution path below
                 // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
+                // Register the repo's materialized tree root so that WatchedAbs key
+                // computes under this path depend on ExternalTreeGenerationKey.
+                if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+                    registry.register_tree_root(repo_result.repo_path.clone());
+                }
                 return Ok(file_ops_delegate_for_materialized_extension_repo(
                     cell_name,
                     &project_root_path,
@@ -932,6 +944,12 @@ pub(crate) async fn get_file_ops_delegate(
             .into());
         }
     };
+
+    // Register the repo's materialized tree root so that WatchedAbs key
+    // computes under this path depend on ExternalTreeGenerationKey.
+    if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+        registry.register_tree_root(repo_result.repo_path.clone());
+    }
 
     Ok(file_ops_delegate_for_materialized_extension_repo(
         cell_name,

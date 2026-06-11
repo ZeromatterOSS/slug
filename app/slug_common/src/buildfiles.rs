@@ -92,6 +92,10 @@ impl Key for BuildfilesKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 impl HasBuildfiles for DiceComputations<'_> {

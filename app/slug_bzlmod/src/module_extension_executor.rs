@@ -33,6 +33,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
+use indexmap::IndexSet;
 use slug_util::late_binding::LateBinding;
 
 use crate::WorkspaceId;
@@ -47,12 +48,39 @@ use crate::repo_spec::RepoSpec;
 pub struct ModuleExtensionMetadata {
     /// JSON-like facts made available to future executions as `module_ctx.facts`.
     pub facts: serde_json::Value,
+
+    /// Names of repos the extension considers direct deps of the root module.
+    /// `None` signals "not set" (different from empty list = no deps).
+    /// `"all"` means all generated repos are direct deps.
+    pub root_module_direct_deps: RootModuleDirectDeps,
+
+    /// Names of repos the extension considers direct dev-deps of the root module.
+    pub root_module_direct_dev_deps: RootModuleDirectDeps,
+}
+
+/// Represents the value of `root_module_direct_deps` or `root_module_direct_dev_deps`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RootModuleDirectDeps {
+    /// Not specified (None in Starlark).
+    Unset,
+    /// Set to the special string "all" — all generated repos.
+    All,
+    /// Explicit list of repo names.
+    Explicit(IndexSet<String>),
+}
+
+impl Default for RootModuleDirectDeps {
+    fn default() -> Self {
+        Self::Unset
+    }
 }
 
 impl Default for ModuleExtensionMetadata {
     fn default() -> Self {
         Self {
             facts: serde_json::Value::Object(serde_json::Map::new()),
+            root_module_direct_deps: RootModuleDirectDeps::Unset,
+            root_module_direct_dev_deps: RootModuleDirectDeps::Unset,
         }
     }
 }

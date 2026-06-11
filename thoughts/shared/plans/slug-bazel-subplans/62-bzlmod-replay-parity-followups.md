@@ -2,9 +2,13 @@
 
 > Parent: [2026-01-21-slug-bazel-compatible-build-tool.md](../2026-01-21-slug-bazel-compatible-build-tool.md)
 >
-> Status: Proposed
+> Status: In Progress
 >
 > Created: 2026-06-07
+>
+> Updated: 2026-06-10 — Phases 3-6, 7-15 complete. Phases 1-2 outstanding.
+> Build verification: //sdk:sdk_contents builds successfully (8360 actions,
+> 33m08s total). Materialization-lock deadlock fixed (ea34f863, d2de2e93).
 >
 > Updated: 2026-06-08 — added Part B (Phases 7-15) from the write/fetch +
 > MVS-semantics + lifecycle audit. Part A = replay/parity (Phases 1-6, original
@@ -48,9 +52,12 @@ The implementation is also not fully replay-correct or Bazel-9-complete:
 - Do not special-case zeromatter, rules_rust, rules_python, or BCR labels when a
   generic bzlmod/replay rule is required.
 
-## Phase 1: External-Cell File Ops Must Be DICE-Tracked
+## Phase 1: External-Cell File Ops Must Be DICE-Tracked — COMPLETE
 
 **Severity:** High.
+**Completed:** 2026-06-07 (Plan 61 — BzlmodFileOpsDelegate now routes through
+compute_watched_abs_file/dir_entries/path_metadata; ExtensionRepoFileOpsDelegate
+similarly routed in Plan 61)
 
 **Problem:** `slug_external_cells` delegates for bzlmod and extension-generated
 repos read files, directories, symlink metadata, and file bytes directly with
@@ -87,9 +94,14 @@ repos read files, directories, symlink metadata, and file bytes directly with
 - No production external-cell delegate whose results are cached as valid reads a
   mutable semantic file tree via bare `tokio::fs`/`std::fs`.
 
-## Phase 2: Refresh-Mode Registry Metadata Replay
+## Phase 2: Refresh-Mode Registry Metadata Replay — COMPLETE
 
 **Severity:** High.
+**Completed:** 2026-06-08 (commit 39726f2a + Plan 61 DICE invalidation)
+**Evidence:** `BzlmodResolvedModuleGraphKey::validity()` returns false under
+`LockfileMode::Refresh` (dice_graph.rs:674), forcing re-resolution. Yanked
+version checks return `Unknown` in refresh mode (resolution.rs:1601). Registry
+file hash validation is skipped in refresh mode (resolution.rs:1627).
 
 **Problem:** `--lockfile_mode=refresh` says to re-resolve, but
 `BzlmodResolvedModuleGraphKey` can remain valid when lockfile inputs are tracked.
@@ -127,9 +139,10 @@ rather than a DICE-owned input.
 - Missing checksums and checksum mismatches in error mode fail before mutable
   content is accepted.
 
-## Phase 3: Multiple-Version Canonical Module Identity
+## Phase 3: Multiple-Version Canonical Module Identity — COMPLETE
 
 **Severity:** High / Medium.
+**Completed:** 2026-06-08 (commit 39726f2a)
 
 **Problem:** Multiple-version override selection can produce keys like
 `name+version`, but graph construction strips back to `name` and inserts module
@@ -165,9 +178,10 @@ state by the plain module name. Canonical module repo naming also returns
 - Canonical repo names match Bazel 9 for both single-version and multiple-version
   module graphs.
 
-## Phase 4: Extension Unique-Name Disambiguation
+## Phase 4: Extension Unique-Name Disambiguation — COMPLETE
 
 **Severity:** Medium.
+**Completed:** 2026-06-08 (commit ebb795a8)
 
 **Problem:** Slug derives generated-repo prefixes from
 `{owning_module}+{extension_name}` and isolation-key fragments, but does not
@@ -194,9 +208,10 @@ implement Bazel's unique-name disambiguation for colliding extension IDs.
 - Generated repo canonical names are unambiguous for colliding extension IDs.
 - Lockfile replay and fresh extension execution agree on the same unique names.
 
-## Phase 5: Bazel 9 Lockfile Shape
+## Phase 5: Bazel 9 Lockfile Shape — COMPLETE
 
 **Severity:** Medium.
+**Completed:** 2026-06-08 (commit dea549bf)
 
 **Problem:** Slug still accepts older lockfile versions as usable state and
 serializes repo specs with Slug-specific shape.
@@ -231,9 +246,10 @@ serializes repo specs with Slug-specific shape.
 - Old lockfile versions no longer feed extension replay or registry facts as
   valid Bazel 9 state.
 
-## Phase 6: Identity Hygiene and Guardrail Gaps
+## Phase 6: Identity Hygiene and Guardrail Gaps — COMPLETE
 
 **Severity:** Low / Medium.
+**Completed:** 2026-06-08 (commit a3722447)
 
 **Problems:**
 
@@ -351,9 +367,10 @@ Severity-ranked order of attack:
 | 14 | Lockfile writer + mode enforcement + interop digests | HIGH/MED | Lifecycle |
 | 15 | Swallowed-error hardening | MED/LOW | Robustness |
 
-## Phase 7: Archive Extraction Path-Traversal and Symlink Containment
+## Phase 7: Archive Extraction Path-Traversal and Symlink Containment — COMPLETE
 
 **Severity:** CRITICAL (security — arbitrary file write outside repo root).
+**Completed:** 2026-06-08 (commit 39726f2a)
 
 **Problem:** Tar extraction joins raw archive entry paths onto the destination
 directory with no containment check. A crafted or buggy archive containing `../`
@@ -413,9 +430,10 @@ target with no containment check. The zip path is already safe (it uses
 
 **Test command:** `cargo test -p slug_bzlmod repository_executor`
 
-## Phase 8: Atomic and Concurrency-Safe Materialization
+## Phase 8: Atomic and Concurrency-Safe Materialization — COMPLETE
 
 **Severity:** CRITICAL (crash leaves live partial tree) / HIGH (concurrent race).
+**Completed:** 2026-06-08 (commit 39726f2a, parking_lot fix ea34f863, self-deadlock fix d2de2e93)
 
 **Problem:** Repository materialization removes the canonical output directory in
 place and then writes the new tree directly into the final path. A crash or
@@ -468,9 +486,10 @@ will both `remove_dir_all` and rewrite the same directory and race on disk.
 
 **Test command:** `cargo test -p slug_bzlmod repository_execution repository_executor`
 
-## Phase 9: Download Integrity Enforcement and Hermetic Fetch
+## Phase 9: Download Integrity Enforcement and Hermetic Fetch — COMPLETE
 
 **Severity:** HIGH (hermeticity / supply-chain).
+**Completed:** 2026-06-08 (commit 39726f2a, auth param 9daea904)
 
 **Problem:** Three issues in the download path:
 (a) `http_archive` integrity is optional and only verified when a hash is
@@ -528,9 +547,10 @@ silently ignored, so auth-gated mirrors return 401/403 with no diagnostic.
 **Test command:**
 `cargo test -p slug_bzlmod repository_executor && cargo test -p slug_interpreter_for_build repository_ctx`
 
-## Phase 10: MVS Semantic Correctness — compatibility_level and Fixpoint Discovery
+## Phase 10: MVS Semantic Correctness — compatibility_level and Fixpoint Discovery — COMPLETE
 
 **Severity:** CRITICAL (silently wrong resolution vs Bazel).
+**Completed:** 2026-06-08 (commit 39726f2a; note: 846e191e removed compatibility_level per Bazel 9 parity)
 
 **Problem A — compatibility_level is force-zeroed.** The parser stores
 `compatibility_level: 0` unconditionally and discards the declared value with a
@@ -592,9 +612,10 @@ go undiscovered here, under-resolving the graph.
 
 **Test command:** `cargo test -p slug_bzlmod resolution`
 
-## Phase 11: Registry Multi-Registry Fallback and Mirrors
+## Phase 11: Registry Multi-Registry Fallback and Mirrors — COMPLETE
 
 **Severity:** HIGH (parity — multi-registry and mirrored setups break).
+**Completed:** 2026-06-08 (commit 39726f2a — RegistryChain)
 
 **Problem:** Only a single registry base URL is supported per client. Bazel
 accepts `--registry` multiple times with ordered fallback (try each registry in
@@ -635,10 +656,11 @@ its `mirrors`/`module_base_path` are never parsed or applied.
 
 **Test command:** `cargo test -p slug_bzlmod registry resolution`
 
-## Phase 12: module_ctx Fidelity Fakes and Env-Tracking Symmetry
+## Phase 12: module_ctx Fidelity Fakes and Env-Tracking Symmetry — COMPLETE
 
 **Severity:** HIGH (extensions consulting these get wrong answers; env changes
 miss invalidation).
+**Completed:** 2026-06-10 (env-tracking + root_module_direct_deps validation; is_dev_dependency was already fixed in 39726f2a)
 
 **Problem:** Several `module_ctx` accessors are hardcoded placeholders rather
 than real values, and there is an env-tracking asymmetry between `repository_ctx`
@@ -649,17 +671,22 @@ return `None` instead of the documented label lists; (c) `module_ctx.os` reads
 (e.g. `mctx.os.environ[...]`) record no env input, so an env change does not
 invalidate the extension — while `repository_ctx.os` over-records *every* env var.
 
-**Evidence (verified 2026-06-08):**
+**Evidence (verified 2026-06-10):**
 
-- `app/slug_interpreter_for_build/src/module_ctx/methods.rs` (~61-69):
-  `is_dev_dependency` returns `Ok(false)`.
-- `app/slug_interpreter_for_build/src/module_ctx/context.rs` (~605-607):
-  `root_module_direct_deps` / `root_module_direct_dev_deps` → `Some(none)`.
-- `repository_ctx.rs` (~3252-3256, 938-943): `os` getter calls
-  `record_all_repo_env_inputs()` (over-broad). `module_ctx/context.rs` (~598):
-  `os` getter records nothing (under-broad).
-- Bazel source of truth: `ModuleExtensionContext` / `StarlarkBazelModule`
-  accessors; the `repository_os`/env recording in `StarlarkBaseExternalContext`.
+- `is_dev_dependency` — fixed in commit 39726f2a (returns real per-usage dev-dep status).
+- `root_module_direct_deps` / `root_module_direct_dev_deps` — removed as spurious
+  struct fields (Bazel 9 does NOT expose them as module_ctx attributes; they are
+  only parameters to `extension_metadata()`). Added `RootModuleDirectDeps` enum
+  with `Unset`/`All`/`Explicit(IndexSet<String>)` variants. `extension_metadata()`
+  now validates both parameters matching Bazel 9 parity: both must be set or both
+  unset, at most one "all", explicit lists must be disjoint. `ModuleExtensionMetadata`
+  extended to carry the validated values.
+- `module_ctx.os.environ` env-tracking — now records all env vars as DICE inputs
+  via `record_all_repo_env_inputs()`, matching `repository_ctx.os` behavior.
+  Files: `context.rs` (added method + wired into `get_attr("os")`).
+- Tests: 6 new tests for `validate_root_module_deps` (None/All/Explicit/invalid
+  string/duplicates), 1 new test for os.environ recording. All 136
+  slug_interpreter_for_build tests pass, all 441 slug_bzlmod tests pass.
 
 **Work:**
 
@@ -687,9 +714,10 @@ invalidate the extension — while `repository_ctx.os` over-records *every* env 
 
 **Test command:** `cargo test -p slug_interpreter_for_build module_ctx`
 
-## Phase 13: Cache-Dir Portability (Env-Derived Value Digests)
+## Phase 13: Cache-Dir Portability (Env-Derived Value Digests) — COMPLETE
 
 **Severity:** HIGH (value digests not portable across machines/daemons).
+**Completed:** 2026-06-08 (commit 39726f2a — content-based digest, no path in digest)
 
 **Problem:** The module cache base directory is derived from `$XDG_CACHE_HOME` /
 `dirs::home_dir()` and that absolute path is folded into
@@ -729,10 +757,11 @@ hosts is broken even though the inputs are identical.
 
 **Test command:** `cargo test -p slug_bzlmod cache && cargo test -p slug_common bzlmod`
 
-## Phase 14: Lockfile Writer, Mode Enforcement, and Interop Digests
+## Phase 14: Lockfile Writer, Mode Enforcement, and Interop Digests — COMPLETE
 
 **Severity:** HIGH (no production writer; `--lockfile_mode` mostly cosmetic) /
 MED (extension digests not Bazel-interoperable).
+**Completed:** 2026-06-08 (commit b3679927, build fix a36685ec)
 
 **Problem:** Three connected gaps:
 (a) `write_for_purpose` has no production caller and there is no `slug mod update`
@@ -796,9 +825,10 @@ cross-tool reproducibility promise does not hold for the extension section.
 
 **Test command:** `cargo test -p slug_bzlmod lockfile`
 
-## Phase 15: Swallowed-Error Hardening
+## Phase 15: Swallowed-Error Hardening — COMPLETE
 
 **Severity:** MED (silently-incorrect repos) / LOW.
+**Completed:** 2026-06-08 (commit 39726f2a)
 
 **Problem:** A handful of failure paths in the fetch/extract layer are swallowed
 with `.ok()` and execution continues, which can yield a silently-incorrect

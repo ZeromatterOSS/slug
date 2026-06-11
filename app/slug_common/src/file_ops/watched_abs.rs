@@ -47,6 +47,16 @@ struct WatchedAbsInputState {
     files: HashMap<PathBuf, Option<String>>,
     /// path -> last-seen existence.
     paths: HashMap<PathBuf, bool>,
+    /// Registered mutable-tree roots (e.g. bazel-external/… dirs). When a
+    /// WatchedAbs key's path falls under one of these roots, the compute
+    /// function depends on `ExternalTreeGenerationKey` so that
+    /// re-materialization invalidates the cached leaf.
+    tree_roots: Vec<PathBuf>,
+    /// tree_root -> last-seen content digest of `.slug_repo_complete`.
+    /// Used to detect re-materialization between per-sync re-stat-diffs so
+    /// the generation node can be invalidated (which transitively invalidates
+    /// all dependent WatchedAbs/Project* leaves).
+    tree_generation_markers: HashMap<PathBuf, Option<String>>,
 }
 
 /// Daemon-owned set of registered out-of-project bzlmod input paths plus their
@@ -63,11 +73,13 @@ pub struct WatchedAbsInputRegistry {
 pub struct WatchedAbsChanges {
     pub files: Vec<PathBuf>,
     pub paths: Vec<PathBuf>,
+    /// Mutable-tree roots whose `.slug_repo_complete` marker changed.
+    pub tree_roots_changed: Vec<PathBuf>,
 }
 
 impl WatchedAbsChanges {
     pub fn is_empty(&self) -> bool {
-        self.files.is_empty() && self.paths.is_empty()
+        self.files.is_empty() && self.paths.is_empty() && self.tree_roots_changed.is_empty()
     }
 }
 
@@ -92,12 +104,48 @@ impl WatchedAbsInputRegistry {
         }
     }
 
+    /// Register `root` as a mutable-tree root (e.g. a bazel-external/… directory).
+    /// When a WatchedAbs key's path falls under this root, its compute function
+    /// will depend on `ExternalTreeGenerationKey` so that re-materialization
+    /// invalidates the cached leaf.
+    pub fn register_tree_root(&self, root: PathBuf) {
+        if let Ok(mut state) = self.inner.lock() {
+            if !state.tree_roots.iter().any(|r| r == &root) {
+                let marker_digest =
+                    current_file_digest(&root.join(".slug_repo_complete"));
+                state.tree_roots.push(root.clone());
+                // Seed the marker baseline so the first diff_and_update
+                // doesn't see a spurious change.
+                state
+                    .tree_generation_markers
+                    .entry(root)
+                    .or_insert(marker_digest);
+            }
+        }
+    }
+
+    /// If `path` starts with a registered mutable-tree root, return that root.
+    /// Used by WatchedAbs compute functions to create a DICE dependency edge on
+    /// `ExternalTreeGenerationKey` when the path is inside a mutable tree.
+    pub fn is_under_tree_root(&self, path: &Path) -> Option<PathBuf> {
+        let Ok(state) = self.inner.lock() else {
+            return None;
+        };
+        for root in &state.tree_roots {
+            if path.starts_with(root) {
+                return Some(root.clone());
+            }
+        }
+        None
+    }
+
     /// Re-stat every registered path, return the ones that changed, and update the
     /// stored last-seen state. This is the `ExternalDirtinessChecker` analog.
     pub fn diff_and_update(&self) -> WatchedAbsChanges {
         let mut changes = WatchedAbsChanges {
             files: Vec::new(),
             paths: Vec::new(),
+            tree_roots_changed: Vec::new(),
         };
         let Ok(mut state) = self.inner.lock() else {
             return changes;
@@ -114,6 +162,17 @@ impl WatchedAbsInputRegistry {
             if current != *last {
                 changes.paths.push(path.clone());
                 *last = current;
+            }
+        }
+        // Re-stat .slug_repo_complete for each registered tree root.
+        let tree_roots = state.tree_roots.clone();
+        for root in &tree_roots {
+            let marker_path = root.join(".slug_repo_complete");
+            let current = current_file_digest(&marker_path);
+            let last = state.tree_generation_markers.get(root);
+            if last != Some(&current) {
+                changes.tree_roots_changed.push(root.clone());
+                state.tree_generation_markers.insert(root.clone(), current);
             }
         }
         changes
@@ -138,6 +197,9 @@ pub fn inject_watched_abs_changes(
     }
     for path in changes.paths {
         tracker.abs_path_added_or_removed(path);
+    }
+    for tree_root in changes.tree_roots_changed {
+        tracker.ext_tree_generation_changed(tree_root);
     }
     tracker.write_to_dice(updater)?;
     Ok(true)
@@ -179,5 +241,35 @@ mod tests {
         std::fs::remove_file(&file).unwrap();
         let changes = registry.diff_and_update();
         assert_eq!(changes.files, vec![file]);
+    }
+
+    #[test]
+    fn diff_detects_generation_marker_change() {
+        let dir = tempfile::Builder::new()
+            .prefix("slug-plan63-gen-marker-")
+            .tempdir_in("/var/mnt/dev")
+            .unwrap();
+
+        // Create a tree root with an initial marker.
+        let marker = dir.path().join(".slug_repo_complete");
+        std::fs::write(&marker, "gen1").unwrap();
+
+        let registry = WatchedAbsInputRegistry::new();
+        registry.register_tree_root(dir.path().to_path_buf());
+
+        // No change — marker seeded at registration.
+        assert!(registry.diff_and_update().is_empty());
+
+        // Change the marker -> generation change detected.
+        std::fs::write(&marker, "gen2").unwrap();
+        let changes = registry.diff_and_update();
+        assert_eq!(changes.tree_roots_changed, vec![dir.path().to_path_buf()]);
+        assert!(registry.diff_and_update().is_empty());
+
+        // Delete the marker -> generation change detected (digest -> None).
+        std::fs::remove_file(&marker).unwrap();
+        let changes = registry.diff_and_update();
+        assert_eq!(changes.tree_roots_changed, vec![dir.path().to_path_buf()]);
+        assert!(registry.diff_and_update().is_empty());
     }
 }

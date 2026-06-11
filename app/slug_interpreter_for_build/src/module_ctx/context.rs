@@ -528,6 +528,15 @@ impl ModuleContext {
         self.record_input(recorded)
     }
 
+    /// Record all environment variables as DICE inputs.
+    /// Called when `module_ctx.os` is accessed (matching `repository_ctx.os` behavior).
+    fn record_all_repo_env_inputs(&self) -> starlark::Result<()> {
+        for name in self.repo_env.keys() {
+            self.record_env_input(name)?;
+        }
+        Ok(())
+    }
+
     fn record_input(&self, recorded: String) -> starlark::Result<()> {
         let mut inputs = self.recorded_inputs.lock().map_err(|_| {
             starlark::Error::from(slug_error::slug_error!(
@@ -581,8 +590,6 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
                 | "os"
                 | "root_module_has_non_dev_dependency"
                 | "is_isolated"
-                | "root_module_direct_deps"
-                | "root_module_direct_dev_deps"
                 | "facts"
         )
     }
@@ -604,16 +611,17 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
                     .collect();
                 Some(heap.alloc(modules))
             }
-            "os" => Some(heap.alloc(RepositoryOs::new_with_environ(self.repo_env.clone()))),
+            "os" => {
+                if let Err(e) = self.record_all_repo_env_inputs() {
+                    tracing::warn!("Failed to record module_ctx.os.environ inputs: {e}");
+                }
+                Some(heap.alloc(RepositoryOs::new_with_environ(self.repo_env.clone())))
+            }
             "root_module_has_non_dev_dependency" => {
                 Some(Value::new_bool(self.root_module_has_non_dev_dependency))
             }
             // Whether this extension is isolated (Bazel 7.1+)
             "is_isolated" => Some(Value::new_bool(self.is_isolated)),
-            // Root module's direct (non-dev) bazel_dep labels
-            "root_module_direct_deps" => Some(Value::new_none()),
-            // Root module's direct dev bazel_dep labels
-            "root_module_direct_dev_deps" => Some(Value::new_none()),
             "facts" => Some(heap.alloc(FactsValue::new(self.facts.clone()))),
             _ => None,
         }
@@ -625,8 +633,6 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
             "os".to_owned(),
             "root_module_has_non_dev_dependency".to_owned(),
             "is_isolated".to_owned(),
-            "root_module_direct_deps".to_owned(),
-            "root_module_direct_dev_deps".to_owned(),
             "facts".to_owned(),
         ]
     }

@@ -173,6 +173,10 @@ impl Key for AspectKey {
         // Aspect values are not comparable (similar to AnalysisKey)
         false
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 /// Load the module containing the aspect definition (Phase 8c).

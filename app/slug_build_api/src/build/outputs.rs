@@ -114,6 +114,10 @@ pub async fn get_outputs_for_top_level_target(
         fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
             false
         }
+
+        fn validity(x: &Self::Value) -> bool {
+            x.is_ok()
+        }
     }
     ctx.compute(&TopLevelTargetOutputsKey(
         providers_label.clone(),

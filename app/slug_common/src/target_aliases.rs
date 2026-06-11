@@ -153,6 +153,10 @@ impl Key for TargetAliasResolverKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[async_trait]

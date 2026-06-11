@@ -444,6 +444,10 @@ pub(crate) async fn get_file_ops_delegate(
             // No need for non-trivial equality, because this has no deps and is never recomputed
             false
         }
+
+        fn validity(x: &Self::Value) -> bool {
+            x.is_ok()
+        }
     }
 
     ctx.compute(&BundledFileOpsDelegateKey(cell_name)).await?

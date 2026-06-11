@@ -279,6 +279,10 @@ impl Key for CellAliasResolverKey {
             (_, _) => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 impl SetCellResolver for DiceTransactionUpdater {

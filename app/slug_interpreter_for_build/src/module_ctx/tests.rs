@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use starlark::values::Value;
 use tempfile::TempDir;
 
 use crate::module_ctx::context::ModuleContext;
@@ -857,4 +858,120 @@ fn test_repository_os() {
     // Just verify it creates something - actual values depend on platform
     assert!(!os.name.is_empty());
     assert!(!os.arch.is_empty());
+}
+
+#[test]
+fn test_module_context_os_environ_records_all_env_inputs() {
+    use starlark::environment::Globals;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    let mut repo_env = BTreeMap::new();
+    repo_env.insert("PLAN61_FOO".to_owned(), "val_foo".to_owned());
+    repo_env.insert("PLAN61_BAR".to_owned(), "val_bar".to_owned());
+    let ctx = ModuleContext::empty().with_repo_env(Arc::new(repo_env));
+    let ctx_handle = ctx.clone();
+
+    let module = Module::new();
+    let heap = module.heap();
+    module.set("mctx", heap.alloc(ctx));
+
+    let ast = AstModule::parse(
+        "os_environ.star",
+        "mctx.os.environ['PLAN61_FOO']".to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    let result = eval.eval_module(ast, &Globals::standard()).unwrap();
+
+    assert_eq!(result.unpack_str(), Some("val_foo"));
+
+    // Accessing module_ctx.os should record ALL env vars as inputs,
+    // matching repository_ctx.os behavior.
+    let recorded = ctx_handle.recorded_inputs().unwrap();
+    assert!(
+        recorded.contains(&"ENV:PLAN61_FOO val_foo".to_owned()),
+        "Expected PLAN61_FOO recorded input, got: {:?}",
+        recorded
+    );
+    assert!(
+        recorded.contains(&"ENV:PLAN61_BAR val_bar".to_owned()),
+        "Expected PLAN61_BAR recorded input, got: {:?}",
+        recorded
+    );
+}
+
+#[test]
+fn test_validate_root_module_deps_none() {
+    use starlark::environment::Module;
+
+    let module = Module::new();
+    let heap = module.heap();
+    let result =
+        crate::module_ctx::metadata::validate_root_module_deps(Value::new_none(), "test", heap)
+            .unwrap();
+    assert_eq!(result, slug_bzlmod::RootModuleDirectDeps::Unset);
+}
+
+#[test]
+fn test_validate_root_module_deps_all() {
+    use starlark::environment::Module;
+
+    let module = Module::new();
+    let heap = module.heap();
+    let result =
+        crate::module_ctx::metadata::validate_root_module_deps(heap.alloc("all"), "test", heap)
+            .unwrap();
+    assert_eq!(result, slug_bzlmod::RootModuleDirectDeps::All);
+}
+
+#[test]
+fn test_validate_root_module_deps_explicit() {
+    use starlark::environment::Module;
+
+    let module = Module::new();
+    let heap = module.heap();
+    let list = heap.alloc(vec![
+        heap.alloc_str("repo_foo").to_value(),
+        heap.alloc_str("repo_bar").to_value(),
+    ]);
+    let result =
+        crate::module_ctx::metadata::validate_root_module_deps(list, "test", heap).unwrap();
+    match result {
+        slug_bzlmod::RootModuleDirectDeps::Explicit(set) => {
+            assert_eq!(set.len(), 2);
+            assert!(set.contains("repo_foo"));
+            assert!(set.contains("repo_bar"));
+        }
+        _ => panic!("Expected Explicit, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_validate_root_module_deps_rejects_invalid_string() {
+    use starlark::environment::Module;
+
+    let module = Module::new();
+    let heap = module.heap();
+    let result =
+        crate::module_ctx::metadata::validate_root_module_deps(heap.alloc("not_all"), "test", heap);
+    assert!(result.is_err(), "Expected error for non-'all' string");
+}
+
+#[test]
+fn test_validate_root_module_deps_rejects_duplicates() {
+    use starlark::environment::Module;
+
+    let module = Module::new();
+    let heap = module.heap();
+    let list = heap.alloc(vec![
+        heap.alloc_str("repo_dup").to_value(),
+        heap.alloc_str("repo_dup").to_value(),
+    ]);
+    let result =
+        crate::module_ctx::metadata::validate_root_module_deps(list, "test", heap);
+    assert!(result.is_err(), "Expected error for duplicate entries");
 }

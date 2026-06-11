@@ -12,6 +12,7 @@ use std::fmt;
 
 use allocative::Allocative;
 use derive_more::Display;
+use indexmap::IndexSet;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -185,6 +186,80 @@ pub fn validate_facts_value(value: Value<'_>) -> starlark::Result<serde_json::Va
     }
 
     Ok(serde_json::Value::Object(object))
+}
+
+/// Validate `root_module_direct_deps` or `root_module_direct_dev_deps` parameter
+/// to `extension_metadata()`. Matches Bazel 9's `ModuleExtensionMetadata` constructor.
+pub fn validate_root_module_deps<'v>(
+    value: Value<'v>,
+    param_name: &str,
+    heap: Heap<'v>,
+) -> starlark::Result<slug_bzlmod::RootModuleDirectDeps> {
+    // None → Unset
+    if value.is_none() {
+        return Ok(slug_bzlmod::RootModuleDirectDeps::Unset);
+    }
+
+    // "all" → All
+    if let Some(s) = value.unpack_str() {
+        if s == "all" {
+            return Ok(slug_bzlmod::RootModuleDirectDeps::All);
+        }
+        // Any other string is invalid
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "{} and root_module_direct_dev_deps must be set to None, \"all\", or a list of \
+             strings, got string {:?}",
+            param_name,
+            s
+        )
+        .into());
+    }
+
+    // List of strings → Explicit
+    let mut seen = IndexSet::new();
+    if let Ok(iter) = value.iterate(heap) {
+        for item in iter {
+            let Some(s) = item.unpack_str() else {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "in {}: expected string, got {}",
+                    param_name,
+                    item.get_type()
+                )
+                .into());
+            };
+            // Validate repo name characters
+            if s.is_empty() || s.contains(|c: char| c.is_whitespace() || c == '\0') {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "in {}: invalid repository name {:?}",
+                    param_name,
+                    s
+                )
+                .into());
+            }
+            if !seen.insert(s.to_owned()) {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "in {}: duplicate entry '{}'",
+                    param_name,
+                    s
+                )
+                .into());
+            }
+        }
+        return Ok(slug_bzlmod::RootModuleDirectDeps::Explicit(seen));
+    }
+
+    // Anything else is invalid
+    Err(slug_error::slug_error!(
+        slug_error::ErrorTag::Input,
+        "{} must be None, \"all\", or a list of strings, got {}",
+        param_name,
+        value.get_type()
+    )
+    .into())
 }
 
 fn validate_json_depth(value: &serde_json::Value, remaining_depth: usize) -> starlark::Result<()> {

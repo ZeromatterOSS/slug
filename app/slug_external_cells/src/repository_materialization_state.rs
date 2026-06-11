@@ -681,7 +681,18 @@ mod tests {
         );
 
         std::fs::write(&watched, "second\n").unwrap();
-        let mut dice = dice.into_updater().commit().await;
+
+        // The Project* DICE keys are now cacheable (validity = x.is_ok()),
+        // so an out-of-band file change requires explicit invalidation —
+        // exactly as the file watcher does in the real daemon.
+        let mut updater = dice.into_updater();
+        let mut tracker = slug_common::file_ops::dice::FileChangeTracker::new();
+        let watched_rel: slug_core::fs::project_rel_path::ProjectRelativePathBuf =
+            watched.strip_prefix(&root).unwrap().to_path_buf().try_into().unwrap();
+        tracker.project_file_contents_changed(watched_rel);
+        tracker.write_to_dice(&mut updater).unwrap();
+        let mut dice = updater.commit().await;
+
         let changed_file_marker = DICE_REPOSITORY_MATERIALIZATION_STATE_READER
             .repo_recorded_file_marker_value(&mut dice, workspace_id, Arc::new(watched))
             .await

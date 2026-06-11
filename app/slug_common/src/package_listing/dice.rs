@@ -126,6 +126,10 @@ impl Key for PackageListingKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 pub struct DicePackageListingResolver<'compute, 'dice>(pub &'compute mut DiceComputations<'dice>);

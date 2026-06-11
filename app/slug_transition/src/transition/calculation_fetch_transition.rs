@@ -243,6 +243,10 @@ impl Key for TransitionAttrsKey {
             false
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 struct TransitionGetAttrs;

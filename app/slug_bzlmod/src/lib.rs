@@ -237,6 +237,7 @@ pub use module_extension_executor::ExtensionExecutionOutput;
 pub use module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 pub use module_extension_executor::ModuleExtensionExecutorImpl;
 pub use module_extension_executor::ModuleExtensionMetadata;
+pub use module_extension_executor::RootModuleDirectDeps;
 pub use parser::ModuleFileParseSession;
 pub use parser::ModuleParseError;
 pub use parser::ParsedModuleFileWithInputs;

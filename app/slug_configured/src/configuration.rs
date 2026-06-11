@@ -239,6 +239,10 @@ impl Key for MatchedConfigurationSettingKeysKey {
     fn equality(_: &Self::Value, _: &Self::Value) -> bool {
         false
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 async fn get_configuration_node(
@@ -326,6 +330,10 @@ impl Key for ConfigurationNodeKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 pub(crate) async fn get_platform_configuration(
@@ -354,6 +362,10 @@ pub(crate) async fn get_platform_configuration(
                 (Ok(x), Ok(y)) => x == y,
                 _ => false,
             }
+        }
+
+        fn validity(x: &Self::Value) -> bool {
+            x.is_ok()
         }
     }
 

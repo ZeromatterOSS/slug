@@ -330,6 +330,7 @@ pub struct FileChangeTracker {
     project_files_to_dirty: HashSet<ProjectReadFileKey>,
     project_file_bytes_to_dirty: HashSet<ProjectReadFileBytesKey>,
     project_paths_to_dirty: HashSet<ProjectPathMetadataKey>,
+    project_dir_entries_to_dirty: HashSet<ProjectReadDirEntriesKey>,
     project_files_requiring_pre_config_commit: bool,
     dirs_to_dirty: HashSet<ReadDirKey>,
     paths_to_dirty: HashSet<PathMetadataKey>,
@@ -341,6 +342,11 @@ pub struct FileChangeTracker {
     abs_paths_to_dirty: HashSet<WatchedAbsPathMetadataKey>,
     abs_dir_entries_to_dirty: HashSet<WatchedAbsDirEntriesKey>,
 
+    // External tree generation keys, dirtied when a .slug_repo_complete marker
+    // changes between per-sync re-stat-diffs. Invalidating the generation node
+    // transitively invalidates all WatchedAbs/Project* leaves that depend on it.
+    ext_tree_generation_to_dirty: HashSet<ExternalTreeGenerationKey>,
+
     maybe_modified_dirs: HashSet<CellPath>,
 }
 
@@ -351,6 +357,7 @@ impl FileChangeTracker {
             project_files_to_dirty: Default::default(),
             project_file_bytes_to_dirty: Default::default(),
             project_paths_to_dirty: Default::default(),
+            project_dir_entries_to_dirty: Default::default(),
             project_files_requiring_pre_config_commit: false,
             dirs_to_dirty: Default::default(),
             paths_to_dirty: Default::default(),
@@ -359,6 +366,7 @@ impl FileChangeTracker {
             abs_files_to_dirty: Default::default(),
             abs_paths_to_dirty: Default::default(),
             abs_dir_entries_to_dirty: Default::default(),
+            ext_tree_generation_to_dirty: Default::default(),
         }
     }
 
@@ -376,12 +384,14 @@ impl FileChangeTracker {
         ctx.changed(self.project_files_to_dirty)?;
         ctx.changed(self.project_file_bytes_to_dirty)?;
         ctx.changed(self.project_paths_to_dirty)?;
+        ctx.changed(self.project_dir_entries_to_dirty)?;
         ctx.changed(self.dirs_to_dirty)?;
         ctx.changed(self.paths_to_dirty)?;
         ctx.changed(self.exists_matching_exact_case_to_dirty)?;
         ctx.changed(self.abs_files_to_dirty)?;
         ctx.changed(self.abs_paths_to_dirty)?;
         ctx.changed(self.abs_dir_entries_to_dirty)?;
+        ctx.changed(self.ext_tree_generation_to_dirty)?;
 
         Ok(())
     }
@@ -435,16 +445,19 @@ impl FileChangeTracker {
     }
 
     pub fn project_file_contents_changed(&mut self, path: ProjectRelativePathBuf) {
-        if !is_bzlmod_config_project_file(&path) {
-            return;
+        if is_bzlmod_config_project_file(&path) {
+            self.project_files_requiring_pre_config_commit = true;
         }
-        self.project_files_requiring_pre_config_commit = true;
         self.project_files_to_dirty
             .insert(ProjectReadFileKey(Arc::new(path.clone())));
         self.project_file_bytes_to_dirty
             .insert(ProjectReadFileBytesKey(Arc::new(path.clone())));
         self.project_paths_to_dirty
-            .insert(ProjectPathMetadataKey(Arc::new(path)));
+            .insert(ProjectPathMetadataKey(Arc::new(path.clone())));
+        if let Some(parent) = path.parent() {
+            self.project_dir_entries_to_dirty
+                .insert(ProjectReadDirEntriesKey(Arc::new(parent.to_owned())));
+        }
     }
 
     /// Normally, buck does not need the file watcher to tell it that a directory's entries have
@@ -491,10 +504,20 @@ impl FileChangeTracker {
             path: Arc::new(path.clone()),
         });
         if let Some(parent) = path.parent() {
-            self.abs_dir_entries_to_dirty.insert(WatchedAbsDirEntriesKey {
-                path: Arc::new(parent.to_path_buf()),
-            });
+            self.abs_dir_entries_to_dirty
+                .insert(WatchedAbsDirEntriesKey {
+                    path: Arc::new(parent.to_path_buf()),
+                });
         }
+    }
+
+    /// Invalidate the generation node for a mutable tree root whose
+    /// `.slug_repo_complete` marker changed between re-stat-diffs.
+    pub fn ext_tree_generation_changed(&mut self, tree_root: PathBuf) {
+        self.ext_tree_generation_to_dirty
+            .insert(ExternalTreeGenerationKey {
+                tree_root: Arc::new(tree_root),
+            });
     }
 }
 
@@ -613,9 +636,21 @@ impl Key for ProjectReadFileBytesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        ctx.global_data()
-            .get_io_provider()
-            .read_file_bytes_if_exists(self.0.as_ref().to_owned())
+        // If this project-relative path is under a registered mutable-tree root,
+        // depend on the tree's generation so re-materialization invalidates this
+        // cached value. Convert to absolute to reuse the existing abs registry.
+        let io = ctx.global_data().get_io_provider();
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            let abs = io.project_root().root().join(self.0.as_ref());
+            if let Some(tree_root) = registry.is_under_tree_root(&abs) {
+                let _ = ctx
+                    .compute(&ExternalTreeGenerationKey {
+                        tree_root: Arc::new(tree_root),
+                    })
+                    .await?;
+            }
+        }
+        io.read_file_bytes_if_exists(self.0.as_ref().to_owned())
             .await
             .map(|content| content.map(Arc::new))
     }
@@ -627,8 +662,8 @@ impl Key for ProjectReadFileBytesKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -648,9 +683,21 @@ impl Key for ProjectPathMetadataKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        ctx.global_data()
-            .get_io_provider()
-            .read_path_metadata_if_exists(self.0.as_ref().to_owned())
+        // If this project-relative path is under a registered mutable-tree root,
+        // depend on the tree's generation so re-materialization invalidates this
+        // cached value. Convert to absolute to reuse the existing abs registry.
+        let io = ctx.global_data().get_io_provider();
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            let abs = io.project_root().root().join(self.0.as_ref());
+            if let Some(tree_root) = registry.is_under_tree_root(&abs) {
+                let _ = ctx
+                    .compute(&ExternalTreeGenerationKey {
+                        tree_root: Arc::new(tree_root),
+                    })
+                    .await?;
+            }
+        }
+        io.read_path_metadata_if_exists(self.0.as_ref().to_owned())
             .await
             .map(|metadata| metadata.map(|metadata| metadata.map(Arc::new)))
     }
@@ -662,8 +709,8 @@ impl Key for ProjectPathMetadataKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -797,6 +844,13 @@ impl Key for WatchedAbsFileKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        // If this path is under a registered mutable-tree root, depend on the
+        // tree's generation so re-materialization invalidates this cached value.
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            if let Some(tree_root) = registry.is_under_tree_root(&self.path) {
+                let _ = ctx.compute(&ExternalTreeGenerationKey { tree_root: Arc::new(tree_root) }).await?;
+            }
+        }
         let value = read_watched_abs_file_value(&self.path)?;
         // Register so the per-command re-stat-diff observes edits to this
         // out-of-project input. No-op when no registry is installed (bootstrap/tests).
@@ -813,16 +867,8 @@ impl Key for WatchedAbsFileKey {
         }
     }
 
-    // No `validity` override: this is a cacheable DICE input. The per-sync
-    // re-stat-diff (Phase A.2) calls `FileChangeTracker::abs_file_contents_changed`
-    // to invalidate it only when the on-disk content actually changes.
-    //
-    // However, external-cell delegates read mutable semantic file trees
-    // (bazel-external/…, cache/…) through these keys.  To prevent stale data
-    // from being served when the underlying external tree changes within a
-    // daemon session, we mark the value as never valid across transactions.
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -845,6 +891,17 @@ impl Key for WatchedAbsPathMetadataKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        // If this path is under a registered mutable-tree root, depend on the
+        // tree's generation so re-materialization invalidates this cached value.
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            if let Some(tree_root) = registry.is_under_tree_root(&self.path) {
+                let _ = ctx
+                    .compute(&ExternalTreeGenerationKey {
+                        tree_root: Arc::new(tree_root),
+                    })
+                    .await?;
+            }
+        }
         let value = read_watched_abs_path_metadata_value(&self.path)?;
         if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
             registry.register_path((*self.path).clone(), value.exists);
@@ -859,16 +916,8 @@ impl Key for WatchedAbsPathMetadataKey {
         }
     }
 
-    /// Never consider this value valid across DICE transactions.
-    ///
-    /// External-cell delegates use this key for mutable trees
-    /// (bazel-external/…, cache/…) that the project file-watcher does not
-    /// proactively watch.  Returning `false` forces a fresh read every
-    /// transaction, and the per-sync re-stat-diff invalidation
-    /// (`FileChangeTracker::abs_path_added_or_removed`) still applies within
-    /// a running transaction.
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -970,6 +1019,17 @@ impl Key for WatchedAbsDirEntriesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        // If this path is under a registered mutable-tree root, depend on the
+        // tree's generation so re-materialization invalidates this cached value.
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            if let Some(tree_root) = registry.is_under_tree_root(&self.path) {
+                let _ = ctx
+                    .compute(&ExternalTreeGenerationKey {
+                        tree_root: Arc::new(tree_root),
+                    })
+                    .await?;
+            }
+        }
         let value = read_watched_abs_dir_entries(&self.path)?;
         if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
             registry.register_path((*self.path).clone(), true);
@@ -988,11 +1048,8 @@ impl Key for WatchedAbsDirEntriesKey {
         }
     }
 
-    /// Never valid across transactions: external-cell delegates read mutable
-    /// trees through this key and the project watcher does not track these
-    /// paths.
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -1000,6 +1057,56 @@ impl Key for WatchedAbsDirEntriesKey {
     }
 }
 
+/// DICE key for the materialization generation of an external tree (repo).
+/// Reads the repo's `.slug_repo_complete` marker file via raw filesystem.
+/// Cacheable (validity=true for Ok results) — the per-sync re-stat-diff
+/// invalidates this key when the marker content changes, which transitively
+/// invalidates all WatchedAbs/Project* leaves that depend on it.
+#[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("ExternalTreeGenerationKey({})", tree_root.display())]
+pub struct ExternalTreeGenerationKey {
+    pub tree_root: Arc<PathBuf>,
+}
+
+#[async_trait]
+impl Key for ExternalTreeGenerationKey {
+    type Value = slug_error::Result<Arc<str>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let marker_path = self.tree_root.join(".slug_repo_complete");
+        match std::fs::read_to_string(&marker_path) {
+            Ok(content) => Ok(Arc::from(content.trim().to_string().into_boxed_str())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                Ok(Arc::from("marker-absent"))
+            }
+            Err(e) => Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Environment,
+                "Failed to read generation marker {:?}: {}",
+                marker_path,
+                e
+            )),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::High
+    }
+}
 /// Public helper: compute a `WatchedAbsFileKey` for an absolute path and return
 /// the raw bytes + SHA-256 digest. Used by external-cell delegates that need
 /// DICE-tracked file reads outside the project root.
@@ -1053,9 +1160,21 @@ impl Key for ProjectReadDirEntriesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let mut entries: Vec<(String, FileType)> = ctx
-            .global_data()
-            .get_io_provider()
+        // If this project-relative path is under a registered mutable-tree root,
+        // depend on the tree's generation so re-materialization invalidates this
+        // cached value. Convert to absolute to reuse the existing abs registry.
+        let io = ctx.global_data().get_io_provider();
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            let abs = io.project_root().root().join(self.0.as_ref());
+            if let Some(tree_root) = registry.is_under_tree_root(&abs) {
+                let _ = ctx
+                    .compute(&ExternalTreeGenerationKey {
+                        tree_root: Arc::new(tree_root),
+                    })
+                    .await?;
+            }
+        }
+        let mut entries: Vec<(String, FileType)> = io
             .read_dir(self.0.as_ref().to_owned())
             .await?
             .into_iter()
@@ -1072,8 +1191,8 @@ impl Key for ProjectReadDirEntriesKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {

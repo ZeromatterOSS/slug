@@ -76,6 +76,10 @@ async fn get_cfg_constructor(
         fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
             false
         }
+
+        fn validity(x: &Self::Value) -> bool {
+            x.is_ok()
+        }
     }
 
     ctx.compute(&GetCfgConstructorKey)
@@ -135,6 +139,10 @@ impl CfgConstructorCalculationImpl for CfgConstructorCalculationInstance {
                     (Ok(x), Ok(y)) => x == y,
                     _ => false,
                 }
+            }
+
+            fn validity(x: &Self::Value) -> bool {
+                x.is_ok()
             }
         }
 

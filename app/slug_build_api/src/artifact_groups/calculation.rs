@@ -510,6 +510,10 @@ async fn dir_artifact_value(
                 _ => false,
             }
         }
+
+        fn validity(x: &Self::Value) -> bool {
+            x.is_ok()
+        }
     }
 
     ctx.compute(&DirArtifactValueKey(cell_path)).await?
@@ -748,6 +752,10 @@ impl Key for EnsureProjectedArtifactKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[derive(Clone, Dupe, Eq, PartialEq, Hash, Display, Debug, Allocative, RefCast)]
@@ -836,5 +844,9 @@ impl Key for EnsureTransitiveSetProjectionKey {
             (Ok(x), Ok(y)) => x.shallow_equals(y),
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }

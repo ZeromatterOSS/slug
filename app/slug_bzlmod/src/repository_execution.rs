@@ -400,26 +400,26 @@ pub struct ExtensionRepoExecutionKey {
 impl std::hash::Hash for ExtensionRepoExecutionKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Hash the identifying fields; spec_hash represents the repo_spec
+        // repo_env and repo_mappings identity is covered by the nested
+        // materialization_manifest_key, which uses digest-based hashing.
         self.canonical_name.hash(state);
         self.extension_id.hash(state);
         self.spec_hash.hash(state);
         self.project_root.hash(state);
         self.materialization_manifest_key.hash(state);
-        self.repo_env.hash(state);
-        self.repo_mappings.hash(state);
     }
 }
 
 impl PartialEq for ExtensionRepoExecutionKey {
     fn eq(&self, other: &Self) -> bool {
         // Compare by identifying fields; spec_hash represents the repo_spec
+        // repo_env and repo_mappings identity is covered by the nested
+        // materialization_manifest_key, which uses digest-based equality.
         self.canonical_name == other.canonical_name
             && self.extension_id == other.extension_id
             && self.spec_hash == other.spec_hash
             && self.project_root == other.project_root
             && self.materialization_manifest_key == other.materialization_manifest_key
-            && self.repo_env == other.repo_env
-            && self.repo_mappings == other.repo_mappings
     }
 }
 

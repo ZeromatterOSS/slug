@@ -524,6 +524,10 @@ impl Key for ToolchainExecutionPlatformCompatibilityKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 async fn check_toolchain_execution_platform_compatibility(
@@ -964,6 +968,10 @@ impl Key for ExecutionPlatformResolutionKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
@@ -984,6 +992,10 @@ impl Key for ExecutionPlatformsKey {
     fn equality(_: &Self::Value, _: &Self::Value) -> bool {
         // TODO(cjhopman) should these be comparable for caching
         false
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 

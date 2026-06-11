@@ -112,6 +112,10 @@ impl HasImportPaths for DiceComputations<'_> {
                     _ => false,
                 }
             }
+
+            fn validity(x: &Self::Value) -> bool {
+                x.is_ok()
+            }
         }
 
         self.compute(&ImportPathsKey { cell_name }).await?

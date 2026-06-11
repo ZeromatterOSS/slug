@@ -130,6 +130,10 @@ impl HasGlobalInterpreterState for DiceComputations<'_> {
             fn equality(_: &Self::Value, _: &Self::Value) -> bool {
                 false
             }
+
+            fn validity(x: &Self::Value) -> bool {
+                x.is_ok()
+            }
         }
 
         Ok(self.compute(&GisKey()).await??.0)

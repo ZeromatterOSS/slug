@@ -215,6 +215,10 @@ impl Key for LegacyBuckConfigForCellKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 /// The computation `LegacyBuckConfigForCellKey` computation might encounter an error.

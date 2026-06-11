@@ -36,7 +36,6 @@ use std::collections::HashSet;
 #[cfg(test)]
 use std::collections::BTreeSet;
 use std::hash::Hash;
-use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -439,42 +438,10 @@ impl Key for ModuleExtensionReplayInputsKey {
             _ => false,
         }
     }
-}
 
-fn extension_id_for_canonical_repo<'a>(
-    aggregations: &'a BzlmodExtensionAggregationsDataValue,
-    root_module_name: &str,
-    canonical_name: &str,
-) -> Option<&'a str> {
-    let (owner_module, extension_name, _) = crate::parse_canonical_name(canonical_name)?;
-    let mut matches = aggregations
-        .extension_aggregations
-        .iter()
-        .filter_map(|(extension_id, aggregation)| {
-            if aggregation.extension_name != extension_name {
-                return None;
-            }
-            let owner = extract_owning_module(extension_id, root_module_name);
-            owning_module_matches(owner_module, &owner).then_some(extension_id.as_str())
-        })
-        .collect::<Vec<_>>();
-    matches.sort_unstable();
-    if matches.len() > 1 {
-        tracing::warn!(
-            "Multiple extensions match canonical repo '{}'; choosing '{}' from {:?}",
-            canonical_name,
-            matches[0],
-            matches
-        );
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
-    matches.first().copied()
-}
-
-fn owning_module_matches(canonical_owner: &str, extension_owner: &str) -> bool {
-    canonical_owner == extension_owner
-        || (!canonical_owner.ends_with('+') && extension_owner == format!("{canonical_owner}+"))
-        || (canonical_owner.ends_with('+')
-            && extension_owner.strip_suffix('+') == Some(canonical_owner.trim_end_matches('+')))
 }
 
 fn ensure_extension_aggregations_data_workspace(
@@ -669,8 +636,8 @@ impl Key for BzlmodExtensionAggregationKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -731,8 +698,8 @@ impl Key for ExtensionBzlTransitiveDigestKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -809,8 +776,8 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -834,12 +801,9 @@ impl Key for ExtensionIdByCanonicalRepoKey {
         if aggregations.extension_aggregations.is_empty() {
             return Ok(None);
         }
-        Ok(extension_id_for_canonical_repo(
-            aggregations.as_ref(),
-            &aggregations.root_module_name,
-            &self.canonical_name,
-        )
-        .map(Arc::from))
+        Ok(aggregations
+            .extension_id_for_canonical_repo(&self.canonical_name)
+            .map(Arc::from))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -863,16 +827,22 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let extension_id = ctx
-            .compute(
-                &ExtensionIdByCanonicalRepoKey::for_workspace_id_with_resolution_digest(
-                    self.workspace_id.clone(),
-                    self.resolution_digest.clone(),
-                    self.canonical_name.as_ref(),
-                ),
-            )
-            .await??;
-        let Some(extension_id) = extension_id else {
+        // Use the pre-built reverse map in aggregations data to get the
+        // extension_id in O(1) instead of cascading through
+        // ExtensionIdByCanonicalRepoKey (which itself reads aggregations data
+        // and does a linear scan).
+        let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+        ensure_extension_aggregations_data_workspace(
+            &self.workspace_id,
+            &self.resolution_digest,
+            aggregations.as_ref(),
+            "ExtensionSpokesByCanonicalRepoKey",
+            self.canonical_name.as_ref(),
+        )?;
+        let Some(extension_id): Option<Arc<str>> = aggregations
+            .extension_id_for_canonical_repo(&self.canonical_name)
+            .map(Arc::from)
+        else {
             return Ok(None);
         };
         let bzl_transitive_digest = ctx
@@ -922,8 +892,8 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         }
     }
 
-    fn validity(_x: &Self::Value) -> bool {
-        false
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -1385,6 +1355,12 @@ impl Key for ModuleExtensionRecordedInputsKey {
     }
 
     fn validity(_x: &Self::Value) -> bool {
+        // Recorded-inputs validation reads files from disk without DICE file
+        // tracking (in test mode). Keeping validity=false ensures the
+        // validation re-runs on each DICE transaction so file changes are
+        // detected. In production, the dice_reader path registers DICE deps,
+        // but the test path does not -- so caching would mask file mutations
+        // in tests.
         false
     }
 }
@@ -1457,11 +1433,22 @@ pub struct ModuleExtensionExecutionKey {
     /// Effective Bazel repository environment used for ENV recorded-input replay.
     pub repo_env: Arc<BTreeMap<String, String>>,
 
+    /// Pre-computed digest of `repo_env` for O(1) key identity.
+    /// Avoids O(N) BTreeMap traversal on every DICE cache probe.
+    pub repo_env_digest: Arc<str>,
+
     /// Current scoped repository mappings used for REPO_MAPPING recorded-input replay.
     pub repo_mappings: Arc<RepoMappingSnapshot>,
 
+    /// Pre-computed digest of `repo_mappings` for O(1) key identity.
+    /// Avoids O(N*M) nested BTreeMap traversal on every DICE cache probe.
+    pub repo_mappings_digest: Arc<str>,
+
     /// Root-module override_repo rows used for extension-generated repo mappings.
     pub repo_mapping_overrides: Arc<RepoMappingOverrides>,
+
+    /// Pre-computed digest of `repo_mapping_overrides` for O(1) key identity.
+    pub repo_mapping_overrides_digest: Arc<str>,
 }
 
 impl std::hash::Hash for ModuleExtensionExecutionKey {
@@ -1474,9 +1461,9 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
         self.project_root.hash(state);
         self.workspace_id.hash(state);
         self.replay_inputs.identity_digest().hash(state);
-        self.repo_env.hash(state);
-        self.repo_mappings.hash(state);
-        self.repo_mapping_overrides.hash(state);
+        self.repo_env_digest.hash(state);
+        self.repo_mappings_digest.hash(state);
+        self.repo_mapping_overrides_digest.hash(state);
     }
 }
 
@@ -1490,9 +1477,9 @@ impl PartialEq for ModuleExtensionExecutionKey {
             && self.project_root == other.project_root
             && self.workspace_id == other.workspace_id
             && self.replay_inputs.identity_digest() == other.replay_inputs.identity_digest()
-            && self.repo_env == other.repo_env
-            && self.repo_mappings == other.repo_mappings
-            && self.repo_mapping_overrides == other.repo_mapping_overrides
+            && self.repo_env_digest == other.repo_env_digest
+            && self.repo_mappings_digest == other.repo_mappings_digest
+            && self.repo_mapping_overrides_digest == other.repo_mapping_overrides_digest
     }
 }
 
@@ -1511,8 +1498,11 @@ impl Dupe for ModuleExtensionExecutionKey {
             workspace_id: self.workspace_id.clone(),
             replay_inputs: self.replay_inputs.clone(),
             repo_env: self.repo_env.clone(),
+            repo_env_digest: self.repo_env_digest.dupe(),
             repo_mappings: self.repo_mappings.clone(),
+            repo_mappings_digest: self.repo_mappings_digest.dupe(),
             repo_mapping_overrides: self.repo_mapping_overrides.clone(),
+            repo_mapping_overrides_digest: self.repo_mapping_overrides_digest.dupe(),
         }
     }
 }
@@ -1535,8 +1525,11 @@ impl ModuleExtensionExecutionKey {
             workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
             replay_inputs: ModuleExtensionReplayInputsValue::empty(LockfileMode::Update),
             repo_env: Arc::new(BTreeMap::new()),
+            repo_env_digest: Arc::from(""),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
+            repo_mappings_digest: Arc::from(""),
             repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
+            repo_mapping_overrides_digest: Arc::from(""),
         }
     }
 
@@ -1684,6 +1677,15 @@ impl ModuleExtensionExecutionKey {
     ) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
+        let repo_env_digest = Arc::from(
+            crate::dice_graph::repo_env_policy_digest(&repo_env).as_str(),
+        );
+        let repo_mappings_digest = Arc::from(
+            repo_mappings_identity_digest(&repo_mappings).as_str(),
+        );
+        let repo_mapping_overrides_digest = Arc::from(
+            repo_mapping_overrides_identity_digest(&repo_mapping_overrides).as_str(),
+        );
         Self {
             extension_id,
             input_hash,
@@ -1694,8 +1696,11 @@ impl ModuleExtensionExecutionKey {
             workspace_id,
             replay_inputs,
             repo_env: Arc::new(repo_env),
+            repo_env_digest,
             repo_mappings: Arc::new(repo_mappings),
+            repo_mappings_digest,
             repo_mapping_overrides: Arc::new(repo_mapping_overrides),
+            repo_mapping_overrides_digest,
         }
     }
 
@@ -1729,12 +1734,21 @@ impl ModuleExtensionExecutionKey {
             bzl_transitive_digest,
             aggregated,
             root_module_name,
-            project_root: Some(project_root),
+            project_root: Some(project_root.clone()),
             workspace_id,
             replay_inputs: ModuleExtensionReplayInputsValue::empty(lockfile_mode),
-            repo_env,
-            repo_mappings,
-            repo_mapping_overrides,
+            repo_env: repo_env.clone(),
+            repo_env_digest: Arc::from(
+                crate::dice_graph::repo_env_policy_digest(&repo_env).as_str(),
+            ),
+            repo_mappings: repo_mappings.clone(),
+            repo_mappings_digest: Arc::from(
+                repo_mappings_identity_digest(&repo_mappings).as_str(),
+            ),
+            repo_mapping_overrides: repo_mapping_overrides.clone(),
+            repo_mapping_overrides_digest: Arc::from(
+                repo_mapping_overrides_identity_digest(&repo_mapping_overrides).as_str(),
+            ),
         }
     }
 
@@ -1753,8 +1767,11 @@ impl ModuleExtensionExecutionKey {
             workspace_id: crate::WorkspaceId::for_project_root(PathBuf::from("__test__")),
             replay_inputs: ModuleExtensionReplayInputsValue::empty(LockfileMode::Update),
             repo_env: Arc::new(BTreeMap::new()),
+            repo_env_digest: Arc::from(""),
             repo_mappings: Arc::new(RepoMappingSnapshot::new()),
+            repo_mappings_digest: Arc::from(""),
             repo_mapping_overrides: Arc::new(RepoMappingOverrides::new()),
+            repo_mapping_overrides_digest: Arc::from(""),
         }
     }
 
@@ -2133,6 +2150,8 @@ impl Key for ModuleExtensionExecutionKey {
                 &self.root_module_name,
                 ModuleExtensionMetadata {
                     facts: prior_facts.clone(),
+                    root_module_direct_deps: Default::default(),
+                    root_module_direct_dev_deps: Default::default(),
                 },
                 selected_cache.recorded_inputs.clone(),
                 recorded_input_context,
@@ -3082,14 +3101,10 @@ mod tests {
             Arc::new(extensions),
         );
 
-        let dep_id =
-            extension_id_for_canonical_repo(&data, &data.root_module_name, "dep++ext+tool")
-                .unwrap();
+        let dep_id = data.extension_id_for_canonical_repo("dep++ext+tool").unwrap();
         assert_eq!(dep_id, "@dep//:ext.bzl%ext");
 
-        let root_id =
-            extension_id_for_canonical_repo(&data, &data.root_module_name, "_main+ext+tool")
-                .unwrap();
+        let root_id = data.extension_id_for_canonical_repo("_main+ext+tool").unwrap();
         assert_eq!(root_id, "@root//:ext.bzl%ext");
     }
 
@@ -3123,7 +3138,9 @@ mod tests {
             slug_error::slug_error!(slug_error::ErrorTag::Tier0, "digest failed"),
         );
 
-        assert!(!<BzlmodExtensionAggregationKey as Key>::validity(
+        // With validity() -> x.is_ok(), Ok values are cached across transactions
+        // and Err values are not (retry on next request).
+        assert!(<BzlmodExtensionAggregationKey as Key>::validity(
             &missing_aggregation
         ));
         assert!(!<BzlmodExtensionAggregationKey as Key>::validity(
@@ -3135,10 +3152,10 @@ mod tests {
         assert!(!<ExtensionIdByCanonicalRepoKey as Key>::validity(
             &failed_canonical_owner
         ));
-        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &missing_extension
         ));
-        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &missing_extension
         ));
         assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
@@ -3156,7 +3173,7 @@ mod tests {
             &first_digest,
             &changed_digest
         ));
-        assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
+        assert!(<ExtensionBzlTransitiveDigestKey as Key>::validity(
             &first_digest
         ));
         assert!(!<ExtensionBzlTransitiveDigestKey as Key>::validity(
@@ -3626,6 +3643,8 @@ mod tests {
             .await;
 
         assert!(dice.compute(&key).await?.is_ok());
+        // ModuleExtensionRecordedInputsKey validity stays false because
+        // it reads files from disk without DICE tracking in test mode.
         assert!(!<ModuleExtensionRecordedInputsKey as Key>::validity(
             &Ok(())
         ));
@@ -3789,19 +3808,20 @@ mod tests {
         let optional_value = Ok(Some(value.as_ref().unwrap().clone()));
 
         assert!(<ExtensionSpokesKey as Key>::validity(&value));
-        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        // With validity() -> x.is_ok(), Ok values are cached across transactions.
+        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &optional_value
         ));
-        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &optional_value
         ));
 
         std::fs::write(&watched, "second\n").unwrap();
         assert!(<ExtensionSpokesKey as Key>::validity(&value));
-        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &optional_value
         ));
-        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &optional_value
         ));
     }
@@ -4097,6 +4117,8 @@ mod tests {
             "",
             ModuleExtensionMetadata {
                 facts: serde_json::json!({"resource": {"checksum": "abc"}}),
+                root_module_direct_deps: Default::default(),
+                root_module_direct_dev_deps: Default::default(),
             },
             vec!["ENV:PLAN61_ENV value".to_owned()],
         );

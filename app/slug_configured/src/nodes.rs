@@ -1859,6 +1859,10 @@ impl Key for ConfiguredTargetNodeKey {
         }
     }
 
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
+
     fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
         demand.provide_value_with(|| BuildSignalsNodeKey::new(self.dupe()))
     }
@@ -1943,6 +1947,10 @@ async fn get_dep_only_incompatible_custom_soft_error(
                 (Ok(x), Ok(y)) => x == y,
                 _ => false,
             }
+        }
+
+        fn validity(x: &Self::Value) -> bool {
+            x.is_ok()
         }
     }
 

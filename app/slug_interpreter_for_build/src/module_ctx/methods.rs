@@ -27,6 +27,7 @@ use crate::module_ctx::context::ModuleContext;
 use crate::module_ctx::context::ShouldWatch;
 use crate::module_ctx::metadata::StarlarkModuleExtensionMetadata;
 use crate::module_ctx::metadata::validate_facts_value;
+use crate::module_ctx::metadata::validate_root_module_deps;
 use crate::repository_ctx::DownloadInfo;
 use crate::repository_ctx::DownloadToken;
 use crate::repository_ctx::ExecutionResult;
@@ -637,17 +638,76 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
     fn extension_metadata<'v>(
         this: &ModuleContext,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
-        _root_module_direct_deps: Value<'v>,
+        root_module_direct_deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
-        _root_module_direct_dev_deps: Value<'v>,
+        root_module_direct_dev_deps: Value<'v>,
         #[starlark(require = named, default = false)] _reproducible: bool,
         #[starlark(require = named, default = starlark::values::none::NoneType)] facts: Value<'v>,
         #[starlark(kwargs)] _kwargs: Value<'v>,
         eval: &mut starlark::eval::Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
+        let validated_deps =
+            validate_root_module_deps(root_module_direct_deps, "root_module_direct_deps", eval.heap())?;
+        let validated_dev_deps =
+            validate_root_module_deps(root_module_direct_dev_deps, "root_module_direct_dev_deps", eval.heap())?;
+
+        // Bazel 9 parity: if one is set (not Unset), the other must be too.
+        match (&validated_deps, &validated_dev_deps) {
+            (slug_bzlmod::RootModuleDirectDeps::Unset, slug_bzlmod::RootModuleDirectDeps::Unset) => {}
+            (slug_bzlmod::RootModuleDirectDeps::Unset, _) => {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "if one of root_module_direct_deps and root_module_direct_dev_deps is \
+                     specified, the other has to be as well"
+                )
+                .into());
+            }
+            (_, slug_bzlmod::RootModuleDirectDeps::Unset) => {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "if one of root_module_direct_deps and root_module_direct_dev_deps is \
+                     specified, the other has to be as well"
+                )
+                .into());
+            }
+            _ => {}
+        }
+
+        // Bazel 9 parity: exactly one can be "all", not both.
+        if matches!(validated_deps, slug_bzlmod::RootModuleDirectDeps::All)
+            && matches!(validated_dev_deps, slug_bzlmod::RootModuleDirectDeps::All)
+        {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "at most one of root_module_direct_deps and root_module_direct_dev_deps \
+                 can be set to \"all\""
+            )
+            .into());
+        }
+
+        // Bazel 9 parity: explicit lists must be disjoint.
+        if let (
+            slug_bzlmod::RootModuleDirectDeps::Explicit(deps),
+            slug_bzlmod::RootModuleDirectDeps::Explicit(dev_deps),
+        ) = (&validated_deps, &validated_dev_deps)
+        {
+            for dep in deps.iter() {
+                if dev_deps.contains(dep) {
+                    return Err(slug_error::slug_error!(
+                        slug_error::ErrorTag::Input,
+                        "in root_module_direct_dev_deps: entry '{}' is also in root_module_direct_deps",
+                        dep
+                    )
+                    .into());
+                }
+            }
+        }
+
         let metadata = slug_bzlmod::ModuleExtensionMetadata {
             facts: validate_facts_value(facts)?,
+            root_module_direct_deps: validated_deps,
+            root_module_direct_dev_deps: validated_dev_deps,
         };
         Ok(eval
             .heap()

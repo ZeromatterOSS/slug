@@ -319,6 +319,10 @@ impl Key for BzlmodCommandPolicyKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 fn bzlmod_command_policy_digest(key: &BzlmodCommandPolicyKey) -> String {
@@ -3126,6 +3130,10 @@ impl Key for BzlmodCurrentCellGraphKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Allocative)]
@@ -3186,6 +3194,10 @@ impl Key for BzlmodModuleSourcesKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Allocative)]
@@ -3241,6 +3253,10 @@ impl Key for BzlmodFallbackCellGraphKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -3309,6 +3325,10 @@ impl Key for BzlmodCellDefinitionsKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -3396,6 +3416,10 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -3570,6 +3594,10 @@ impl Key for BzlmodResidualModuleSymlinksKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -3764,6 +3792,10 @@ impl Key for BzlmodCellGraphKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -4491,6 +4523,30 @@ impl BzlmodRepoMappingsDataValue {
     }
 }
 
+/// Build the reverse map from canonical repo prefix to extension ID.
+///
+/// Key format: `"<owner_module>+<extension_name>"` where `owner_module` is
+/// the canonical form returned by `extract_owning_module` (e.g. `_main` for
+/// root, `dep+` for non-root). This mirrors the prefix structure of Bazel
+/// canonical repo names (`_main+ext+repo`, `dep++ext+repo`), making the
+/// lookup in `BzlmodExtensionAggregationsDataValue::extension_id_for_canonical_repo`
+/// O(1) instead of a linear scan over all extensions.
+fn build_canonical_repo_to_extension_id(
+    extension_aggregations: &HashMap<String, AggregatedExtension>,
+    root_module_name: &str,
+) -> HashMap<String, String> {
+    let mut map = HashMap::with_capacity(extension_aggregations.len());
+    for (extension_id, aggregation) in extension_aggregations {
+        let owner = crate::extension_execution_dice::extract_owning_module(
+            extension_id,
+            root_module_name,
+        );
+        let key = format!("{owner}+{}", aggregation.extension_name);
+        map.insert(key, extension_id.clone());
+    }
+    map
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Allocative)]
 pub struct BzlmodExtensionAggregationsDataValue {
     pub workspace_id: WorkspaceId,
@@ -4498,6 +4554,11 @@ pub struct BzlmodExtensionAggregationsDataValue {
     pub root_module_name: String,
     pub extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
     pub declared_extension_cells: Arc<Vec<BzlmodCellGraphExtensionCell>>,
+    /// Pre-built reverse map from canonical repo prefix
+    /// (`"<owner_module>+<extension_name>"`) to the owning extension ID.
+    /// Eliminates the linear scan in `extension_id_for_canonical_repo`.
+    #[allocative(skip)]
+    pub canonical_repo_to_extension_id: Arc<HashMap<String, String>>,
 }
 
 impl BzlmodExtensionAggregationsDataValue {
@@ -4506,13 +4567,47 @@ impl BzlmodExtensionAggregationsDataValue {
         root_module_name: String,
         extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
     ) -> Self {
+        let canonical_repo_to_extension_id = Arc::new(
+            build_canonical_repo_to_extension_id(&extension_aggregations, &root_module_name),
+        );
         Self {
             workspace_id,
             resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
             root_module_name,
             extension_aggregations,
             declared_extension_cells: Arc::new(Vec::new()),
+            canonical_repo_to_extension_id,
         }
+    }
+
+    /// O(1) lookup: given a canonical repo name, find the owning extension ID.
+    /// Returns None if the canonical name cannot be parsed or has no match.
+    pub fn extension_id_for_canonical_repo(&self, canonical_name: &str) -> Option<&str> {
+        let (owner_module, extension_name, _) = crate::parse_canonical_name(canonical_name)?;
+        let key = format!("{owner_module}+{extension_name}");
+        let mut matches = self
+            .canonical_repo_to_extension_id
+            .get(&key)
+            .map(|s| s.as_str())
+            .into_iter()
+            .collect::<Vec<_>>();
+        // Also check the trailing-plus variant (e.g. "_main" vs "_main+").
+        if !owner_module.ends_with('+') {
+            let alt_key = format!("{owner_module}+{extension_name}+");
+            if let Some(v) = self.canonical_repo_to_extension_id.get(&alt_key) {
+                matches.push(v.as_str());
+            }
+        }
+        matches.sort_unstable();
+        if matches.len() > 1 {
+            tracing::warn!(
+                "Multiple extensions match canonical repo '{}'; choosing '{}' from {:?}",
+                canonical_name,
+                matches[0],
+                matches
+            );
+        }
+        matches.first().copied()
     }
 
     pub fn with_resolution_digest(mut self, resolution_digest: Arc<str>) -> Self {
@@ -4761,6 +4856,10 @@ impl Key for BzlmodRepoEnvKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[async_trait]
@@ -4800,6 +4899,10 @@ impl Key for BzlmodRepoMappingsKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[async_trait]
@@ -4838,6 +4941,10 @@ impl Key for BzlmodResolutionFactsKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -4913,6 +5020,10 @@ impl Key for ModuleVersionsKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -5168,6 +5279,10 @@ impl Key for RegisteredToolchainsKey {
             _ => false,
         }
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative)]
@@ -5299,6 +5414,10 @@ impl Key for RegisteredExecutionPlatformsKey {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         }
+    }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
     }
 }
 
@@ -5436,8 +5555,14 @@ pub struct ExtensionSpokesKey {
     pub aggregated: Arc<AggregatedExtension>,
     pub replay_inputs_identity_digest: Arc<str>,
     pub repo_env: Arc<BTreeMap<String, String>>,
+    /// Pre-computed digest of `repo_env` for O(1) key identity.
+    pub repo_env_digest: Arc<str>,
     pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
+    /// Pre-computed digest of `repo_mappings` for O(1) key identity.
+    pub repo_mappings_digest: Arc<str>,
     pub repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
+    /// Pre-computed digest of `repo_mapping_overrides` for O(1) key identity.
+    pub repo_mapping_overrides_digest: Arc<str>,
 }
 
 impl PartialEq for ExtensionSpokesKey {
@@ -5449,9 +5574,9 @@ impl PartialEq for ExtensionSpokesKey {
             && self.usages_digest == other.usages_digest
             && self.root_module_name == other.root_module_name
             && self.replay_inputs_identity_digest == other.replay_inputs_identity_digest
-            && self.repo_env == other.repo_env
-            && self.repo_mappings == other.repo_mappings
-            && self.repo_mapping_overrides == other.repo_mapping_overrides
+            && self.repo_env_digest == other.repo_env_digest
+            && self.repo_mappings_digest == other.repo_mappings_digest
+            && self.repo_mapping_overrides_digest == other.repo_mapping_overrides_digest
     }
 }
 
@@ -5466,9 +5591,9 @@ impl Hash for ExtensionSpokesKey {
         self.usages_digest.hash(state);
         self.root_module_name.hash(state);
         self.replay_inputs_identity_digest.hash(state);
-        self.repo_env.hash(state);
-        self.repo_mappings.hash(state);
-        self.repo_mapping_overrides.hash(state);
+        self.repo_env_digest.hash(state);
+        self.repo_mappings_digest.hash(state);
+        self.repo_mapping_overrides_digest.hash(state);
     }
 }
 
@@ -5541,6 +5666,18 @@ impl ExtensionSpokesKey {
         repo_mappings: Arc<crate::RepoMappingSnapshot>,
         repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
     ) -> Self {
+        let repo_env_digest =
+            Arc::from(repo_env_policy_digest(&repo_env).as_str());
+        let repo_mappings_digest = Arc::from(
+            crate::extension_execution_dice::repo_mappings_identity_digest(&repo_mappings)
+                .as_str(),
+        );
+        let repo_mapping_overrides_digest = Arc::from(
+            crate::extension_execution_dice::repo_mapping_overrides_identity_digest(
+                &repo_mapping_overrides,
+            )
+            .as_str(),
+        );
         Self {
             workspace_id,
             resolution_digest,
@@ -5551,8 +5688,11 @@ impl ExtensionSpokesKey {
             replay_inputs_identity_digest: Arc::from(replay_inputs_identity_digest),
             aggregated,
             repo_env,
+            repo_env_digest,
             repo_mappings,
+            repo_mappings_digest,
             repo_mapping_overrides,
+            repo_mapping_overrides_digest,
         }
     }
 
@@ -5755,7 +5895,11 @@ pub struct RepoMaterializationManifestKey {
     pub repo_spec_digest: Arc<str>,
     pub repo_spec: Arc<RepoSpec>,
     pub repo_env: Arc<BTreeMap<String, String>>,
+    /// Pre-computed digest of `repo_env` for O(1) key identity.
+    pub repo_env_digest: Arc<str>,
     pub repo_mappings: Arc<crate::RepoMappingSnapshot>,
+    /// Pre-computed digest of `repo_mappings` for O(1) key identity.
+    pub repo_mappings_digest: Arc<str>,
 }
 
 impl RepoMaterializationManifestKey {
@@ -5844,6 +5988,12 @@ impl RepoMaterializationManifestKey {
         repo_env: Arc<BTreeMap<String, String>>,
         repo_mappings: Arc<crate::RepoMappingSnapshot>,
     ) -> Self {
+        let repo_env_digest =
+            Arc::from(repo_env_policy_digest(&repo_env).as_str());
+        let repo_mappings_digest = Arc::from(
+            crate::extension_execution_dice::repo_mappings_identity_digest(&repo_mappings)
+                .as_str(),
+        );
         Self {
             output_base: workspace_id.output_base.clone(),
             workspace_id,
@@ -5851,7 +6001,9 @@ impl RepoMaterializationManifestKey {
             repo_spec_digest: Arc::from(repo_spec_digest.as_str()),
             repo_spec,
             repo_env,
+            repo_env_digest,
             repo_mappings,
+            repo_mappings_digest,
         }
     }
 
@@ -5879,8 +6031,8 @@ impl PartialEq for RepoMaterializationManifestKey {
             && self.output_base == other.output_base
             && self.canonical_repo == other.canonical_repo
             && self.repo_spec_digest == other.repo_spec_digest
-            && self.repo_env == other.repo_env
-            && self.repo_mappings == other.repo_mappings
+            && self.repo_env_digest == other.repo_env_digest
+            && self.repo_mappings_digest == other.repo_mappings_digest
     }
 }
 
@@ -5890,8 +6042,8 @@ impl std::hash::Hash for RepoMaterializationManifestKey {
         self.output_base.hash(state);
         self.canonical_repo.hash(state);
         self.repo_spec_digest.hash(state);
-        self.repo_env.hash(state);
-        self.repo_mappings.hash(state);
+        self.repo_env_digest.hash(state);
+        self.repo_mappings_digest.hash(state);
     }
 }
 

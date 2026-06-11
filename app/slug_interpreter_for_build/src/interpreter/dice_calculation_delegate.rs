@@ -194,6 +194,10 @@ impl<'c, 'd> HasCalculationDelegate<'c, 'd> for DiceComputations<'d> {
             fn equality(_: &Self::Value, _: &Self::Value) -> bool {
                 false
             }
+
+            fn validity(x: &Self::Value) -> bool {
+                x.is_ok()
+            }
         }
 
         let is_bzlmod = self.is_bzlmod().await?;

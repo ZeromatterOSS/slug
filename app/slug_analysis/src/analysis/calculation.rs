@@ -538,6 +538,10 @@ impl Key for AnalysisKey {
         // TODO consider if we want analysis result to be eq
         false
     }
+
+    fn validity(x: &Self::Value) -> bool {
+        x.is_ok()
+    }
 }
 
 #[async_trait]

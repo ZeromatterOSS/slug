@@ -59,6 +59,10 @@ impl HasAllowRelativePaths for DiceComputations<'_> {
                     _ => false,
                 }
             }
+
+            fn validity(x: &Self::Value) -> bool {
+                x.is_ok()
+            }
         }
 
         self.compute(&AllowRelativePathsKey { cell_path }).await?
