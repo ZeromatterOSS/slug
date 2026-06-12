@@ -2751,16 +2751,14 @@ impl Key for ExtensionRepoExecutionKey {
             format!("{}:{miss_reason}", self.canonical_name),
         );
 
-        // Acquire per-canonical-name lock to serialize concurrent materializations
-        // of the same output path. Two DICE keys with different spec_hash but
-        // the same canonical_name would race on the same bazel-external/{name}
-        // directory without this lock. Uses parking_lot::Mutex so the guard is
-        // Send and can be held across the .await in Starlark execution, without
-        // interacting with the tokio runtime (avoiding the thread-starvation
-        // deadlock that tokio::sync::Mutex caused with block_in_place).
-        let _mat_lock_arc =
-            crate::repository_executor::acquire_materialization_lock(self.canonical_name.as_ref());
-        let _mat_lock = _mat_lock_arc.lock();
+        // No lock held across the Starlark execution .await below. The staging
+        // directory has a unique name so concurrent materializations of the same
+        // canonical path write to separate staging dirs. Per-canonical-name
+        // serialization is applied only at the publish step
+        // (finalize_staging_dir_serialized), which is a synchronous critical
+        // section with NO .await and NO DICE compute. This satisfies the
+        // AGENTS.md hard rule: never hold a thread-blocking lock across a
+        // .await that runs or can transitively re-enter DICE.
 
         // For non-builtin rules with a known Starlark source, try Starlark execution
         let is_builtin =
@@ -2835,11 +2833,15 @@ impl Key for ExtensionRepoExecutionKey {
                                         ),
                                     })?;
                                 }
-                                // Atomically swap staging dir into canonical path
-                                if let Err(e) = crate::repository_executor::finalize_staging_dir(
-                                    &staging_dir,
-                                    &working_dir,
-                                ) {
+                                // Atomically swap staging dir into canonical path,
+                                // serialized by canonical name (synchronous critical
+                                // section — no .await, no DICE compute).
+                                if let Err(e) =
+                                    crate::repository_executor::finalize_staging_dir_serialized(
+                                        &staging_dir,
+                                        &working_dir,
+                                        &self.canonical_name,
+                                    ) {
                                     crate::repository_executor::cleanup_staging_dir(&staging_dir);
                                     return Err(e);
                                 }
@@ -2883,10 +2885,6 @@ impl Key for ExtensionRepoExecutionKey {
                 &invocation,
                 &self.project_root,
                 label_resolution.as_ref(),
-                // This async compute already holds the per-canonical-name
-                // materialization lock (acquired above). The lock is
-                // non-reentrant, so the inner executor must NOT re-acquire it.
-                true,
             )?;
         if self.repo_spec.local {
             result = result.non_cacheable();
