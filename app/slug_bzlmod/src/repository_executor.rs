@@ -45,13 +45,13 @@ use zip::ZipArchive;
 use crate::dice_graph::BzlmodCellGraphValue;
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::record_bzlmod_event;
+use crate::lockfile::compute_sha256_hex;
 use crate::repository_execution::InvocationAttrs;
 use crate::repository_execution::REPO_RECORDED_INPUTS_FILE;
 use crate::repository_execution::RepositoryExecutionError;
 use crate::repository_execution::RepositoryRuleResult;
 use crate::repository_execution::write_repository_recorded_inputs;
 use crate::repository_invocations::RepositoryInvocation;
-use crate::lockfile::compute_sha256_hex;
 
 #[derive(Default)]
 struct NativeRepositoryRecordedInputs {
@@ -636,14 +636,15 @@ fn hash_path_bytes(path: &Path, hasher: &mut Sha256) {
 /// remove the generation dir without disturbing the existing visible
 /// generation.
 pub(crate) fn prepare_staging_dir(canonical_dir: &Path) -> slug_error::Result<PathBuf> {
-    let parent = canonical_dir.parent().ok_or_else(|| {
-        RepositoryExecutionError::WorkingDirFailed {
-            reason: format!(
-                "Canonical dir {:?} has no parent for staging",
-                canonical_dir
-            ),
-        }
-    })?;
+    let parent =
+        canonical_dir
+            .parent()
+            .ok_or_else(|| RepositoryExecutionError::WorkingDirFailed {
+                reason: format!(
+                    "Canonical dir {:?} has no parent for staging",
+                    canonical_dir
+                ),
+            })?;
 
     // Generation directories live under bazel-external/.generations/
     let generations_dir = parent.join(".generations");
@@ -661,12 +662,7 @@ pub(crate) fn prepare_staging_dir(canonical_dir: &Path) -> slug_error::Result<Pa
         .file_name()
         .unwrap_or_default()
         .to_string_lossy();
-    let staging_dir = generations_dir.join(format!(
-        "{}.{}.{}",
-        name,
-        std::process::id(),
-        counter,
-    ));
+    let staging_dir = generations_dir.join(format!("{}.{}.{}", name, std::process::id(), counter,));
 
     // Clean up any leftover generation dir from a previous failed attempt
     if staging_dir.exists() {
@@ -748,7 +744,10 @@ pub(crate) fn finalize_staging_dir(
     // so concurrent finalize calls for the same canonical name never clobber
     // each other's temp link. The unlocked path relies on this; the serialized
     // wrapper additionally holds the per-name lock.
-    let staging_name = staging_dir.file_name().unwrap_or_default().to_string_lossy();
+    let staging_name = staging_dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy();
     let temp_link_name = canonical_dir.with_file_name(format!(".{}.symlink.tmp", staging_name));
 
     // Clean up any stale temp link from a previous failed attempt.
@@ -800,8 +799,7 @@ pub(crate) fn finalize_staging_dir(
                         .map(|p| p.join(&prev))
                         .unwrap_or(prev)
                 };
-                let generations_dir =
-                    canonical_dir.parent().map(|p| p.join(".generations"));
+                let generations_dir = canonical_dir.parent().map(|p| p.join(".generations"));
                 let under_generations = generations_dir
                     .as_deref()
                     .is_some_and(|gd| prev_abs.starts_with(gd));
@@ -1945,21 +1943,19 @@ fn contain_path(dest_dir: &Path, candidate: &Path) -> slug_error::Result<PathBuf
 /// a relative symlink target with its parent directory). It normalizes the path
 /// lexically and verifies the result starts with `parent`.
 fn path_is_within(parent: &Path, candidate: &Path) -> slug_error::Result<PathBuf> {
-    let normalized = candidate
-        .components()
-        .fold(PathBuf::new(), |mut acc, c| {
-            match c {
-                std::path::Component::ParentDir => {
-                    acc.pop();
-                }
-                std::path::Component::Normal(n) => acc.push(n),
-                std::path::Component::CurDir => {}
-                std::path::Component::RootDir | std::path::Component::Prefix(_) => {
-                    acc.push(c.as_os_str());
-                }
+    let normalized = candidate.components().fold(PathBuf::new(), |mut acc, c| {
+        match c {
+            std::path::Component::ParentDir => {
+                acc.pop();
             }
-            acc
-        });
+            std::path::Component::Normal(n) => acc.push(n),
+            std::path::Component::CurDir => {}
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                acc.push(c.as_os_str());
+            }
+        }
+        acc
+    });
     if !normalized.starts_with(parent) {
         return Err(RepositoryExecutionError::PathTraversal {
             entry: candidate.to_string_lossy().to_string(),
@@ -3410,7 +3406,10 @@ mod tests {
                 .unwrap();
         });
         let result = extract_tar_gz(&data, dest.path(), None);
-        assert!(result.is_ok(), "In-repo relative symlinks should be allowed");
+        assert!(
+            result.is_ok(),
+            "In-repo relative symlinks should be allowed"
+        );
         // Verify the symlink exists and points correctly
         let link_path = dest.path().join("inner/link");
         assert!(link_path.exists(), "Symlink should exist");
@@ -3447,8 +3446,7 @@ mod tests {
         });
         let result = extract_tar_gz(&data, dest.path(), None);
         assert!(result.is_ok(), "Normal extraction should succeed");
-        let content =
-            std::fs::read_to_string(dest.path().join("subdir/hello.txt")).unwrap();
+        let content = std::fs::read_to_string(dest.path().join("subdir/hello.txt")).unwrap();
         assert_eq!(content, "hello world");
     }
 
@@ -3577,8 +3575,7 @@ mod tests {
         std::fs::create_dir_all(&staging).unwrap();
         std::fs::write(staging.join("file.txt"), "hello").unwrap();
 
-        let result =
-            finalize_staging_dir_serialized(&staging, &canonical_dir, "no_deadlock_repo");
+        let result = finalize_staging_dir_serialized(&staging, &canonical_dir, "no_deadlock_repo");
         assert!(result.is_ok());
         assert!(canonical_dir.exists());
         assert_eq!(

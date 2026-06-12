@@ -2782,9 +2782,8 @@ impl Key for ExtensionRepoExecutionKey {
                         );
 
                         // Prepare staging directory for atomic materialization
-                        let staging_dir = crate::repository_executor::prepare_staging_dir(
-                            &working_dir,
-                        )?;
+                        let staging_dir =
+                            crate::repository_executor::prepare_staging_dir(&working_dir)?;
 
                         match executor
                             .execute_rule(
@@ -2826,11 +2825,13 @@ impl Key for ExtensionRepoExecutionKey {
                                         staging_dir.join(".slug_repo_complete"),
                                         complete_marker(&self.spec_hash, &output_digest),
                                     )
-                                    .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
-                                        reason: format!(
-                                            "Failed to write completion marker for '{}': {}",
-                                            self.canonical_name, e
-                                        ),
+                                    .map_err(|e| {
+                                        RepositoryExecutionError::WorkingDirFailed {
+                                            reason: format!(
+                                                "Failed to write completion marker for '{}': {}",
+                                                self.canonical_name, e
+                                            ),
+                                        }
                                     })?;
                                 }
                                 // Atomically swap staging dir into canonical path,
@@ -2841,7 +2842,8 @@ impl Key for ExtensionRepoExecutionKey {
                                         &staging_dir,
                                         &working_dir,
                                         &self.canonical_name,
-                                    ) {
+                                    )
+                                {
                                     crate::repository_executor::cleanup_staging_dir(&staging_dir);
                                     return Err(e);
                                 }

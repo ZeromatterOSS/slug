@@ -542,21 +542,30 @@ impl RegistryChain {
                 }
             }
         }
-        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
-            url: "no registries configured".to_owned(),
-            reason: "No registry clients in chain".to_owned(),
-        }.into()))
+        Err(last_err.unwrap_or_else(|| {
+            RegistryError::InvalidResponse {
+                url: "no registries configured".to_owned(),
+                reason: "No registry clients in chain".to_owned(),
+            }
+            .into()
+        }))
     }
 
     /// Fetch MODULE.bazel content, trying each registry in order.
-    pub async fn fetch_module_bazel(&self, name: &str, version: &str) -> slug_error::Result<String> {
+    pub async fn fetch_module_bazel(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> slug_error::Result<String> {
         let mut last_err = None;
         for client in &self.clients {
             match client.fetch_module_bazel_file(name, version).await {
                 Ok(file) => {
                     tracing::debug!(
                         "Found MODULE.bazel for {}@{} at registry {}",
-                        name, version, client.base_url()
+                        name,
+                        version,
+                        client.base_url()
                     );
                     return Ok(file.content);
                 }
@@ -565,10 +574,13 @@ impl RegistryChain {
                 }
             }
         }
-        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
-            url: "no registries configured".to_owned(),
-            reason: "No registry clients in chain".to_owned(),
-        }.into()))
+        Err(last_err.unwrap_or_else(|| {
+            RegistryError::InvalidResponse {
+                url: "no registries configured".to_owned(),
+                reason: "No registry clients in chain".to_owned(),
+            }
+            .into()
+        }))
     }
 
     /// Fetch MODULE.bazel content and file identity, trying each registry in order.
@@ -586,10 +598,13 @@ impl RegistryChain {
                 }
             }
         }
-        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
-            url: "no registries configured".to_owned(),
-            reason: "No registry clients in chain".to_owned(),
-        }.into()))
+        Err(last_err.unwrap_or_else(|| {
+            RegistryError::InvalidResponse {
+                url: "no registries configured".to_owned(),
+                reason: "No registry clients in chain".to_owned(),
+            }
+            .into()
+        }))
     }
 
     /// Fetch source info, trying each registry in order.
@@ -598,7 +613,10 @@ impl RegistryChain {
         name: &str,
         version: &str,
     ) -> slug_error::Result<SourceInfo> {
-        Ok(self.fetch_source_info_file(name, version).await?.source_info)
+        Ok(self
+            .fetch_source_info_file(name, version)
+            .await?
+            .source_info)
     }
 
     /// Fetch source info and file identity, trying each registry in order.
@@ -616,10 +634,13 @@ impl RegistryChain {
                 }
             }
         }
-        Err(last_err.unwrap_or_else(|| RegistryError::InvalidResponse {
-            url: "no registries configured".to_owned(),
-            reason: "No registry clients in chain".to_owned(),
-        }.into()))
+        Err(last_err.unwrap_or_else(|| {
+            RegistryError::InvalidResponse {
+                url: "no registries configured".to_owned(),
+                reason: "No registry clients in chain".to_owned(),
+            }
+            .into()
+        }))
     }
 
     /// Fetch bazel_registry.json from the primary (first) registry.
@@ -630,7 +651,8 @@ impl RegistryChain {
             None => Err(RegistryError::InvalidResponse {
                 url: "no registries configured".to_owned(),
                 reason: "No registry clients in chain".to_owned(),
-            }.into()),
+            }
+            .into()),
         }
     }
 

@@ -333,7 +333,16 @@ pub enum ModuleSource {
 }
 
 /// Result of MVS resolution - the final resolved dependency graph.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Allocative)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Allocative
+)]
 pub struct ResolvedGraph {
     /// Map from module name to selected version.
     pub selected_versions: HashMap<String, String>,
@@ -834,8 +843,7 @@ impl MvsResolver {
                 let trans_key = ModuleKey::from_dep(&effective_dep);
                 // Only fetch if we haven't already discovered this exact key
                 if !self.discovered.contains_key(&trans_key) {
-                    let newly_discovered =
-                        self.fetch_and_discover_module(&effective_dep).await?;
+                    let newly_discovered = self.fetch_and_discover_module(&effective_dep).await?;
                     self.discovered.insert(trans_key, newly_discovered);
                 }
             }
@@ -1185,7 +1193,9 @@ impl MvsResolver {
                     } else {
                         tracing::warn!(
                             "Could not resolve dependency {}@{} for module {}",
-                            dep.name, dep.version, name
+                            dep.name,
+                            dep.version,
+                            name
                         );
                     }
                 }

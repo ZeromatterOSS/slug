@@ -483,7 +483,8 @@ impl BzlmodResolvedGraphSourceInputsValue {
     /// this is acceptable for DICE cache identity within a single build
     /// session. Cross-session persistence would require a stable hasher.
     pub fn identity_digest_with_key<K: Hash>(&self, key: &K) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::Digest;
+        use sha2::Sha256;
         let mut hasher = Sha256::new();
         // Each field gets a fresh DefaultHasher so hashes are independent
         let mut kh = std::collections::hash_map::DefaultHasher::new();
@@ -526,7 +527,8 @@ impl BzlmodResolvedGraphSourceInputsValue {
         key: &K,
         non_root_digest: &str,
     ) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::Digest;
+        use sha2::Sha256;
         let mut hasher = Sha256::new();
 
         let mut kh = std::collections::hash_map::DefaultHasher::new();
@@ -1567,10 +1569,7 @@ async fn compute_bzlmod_resolved_module_graph(
     // Must run BEFORE graph is moved into outputs.
     if key.options.lockfile_mode == LockfileMode::Error {
         if let Some(ref lockfile) = visible_lockfile {
-            if let Err(e) = Lockfile::enforce_error_mode(
-                &graph,
-                lockfile,
-            ) {
+            if let Err(e) = Lockfile::enforce_error_mode(&graph, lockfile) {
                 return Err(slug_error::slug_error!(
                     slug_error::ErrorTag::Input,
                     "{e:#}"
@@ -1588,7 +1587,12 @@ async fn compute_bzlmod_resolved_module_graph(
         key.options.ignore_dev_dependency,
         cell_graph,
     );
-    record_clean_bzlmod_resolution_compute_if_changed(key, &resolution_key, &inputs, &non_root_digest);
+    record_clean_bzlmod_resolution_compute_if_changed(
+        key,
+        &resolution_key,
+        &inputs,
+        &non_root_digest,
+    );
 
     Ok(Arc::new(BzlmodResolvedModuleGraphValue {
         lockfile_inputs: inputs.lockfile_inputs,
@@ -2227,12 +2231,11 @@ impl BzlmodCleanCellGraphBuilder {
                     continue;
                 }
 
-                let canonical_repo =
-                    bazel_canonical_module_repo_name(
-                        module_name,
-                        &module_info.version,
-                        graph.multiple_versions_modules.contains(module_name),
-                    );
+                let canonical_repo = bazel_canonical_module_repo_name(
+                    module_name,
+                    &module_info.version,
+                    graph.multiple_versions_modules.contains(module_name),
+                );
                 match &module_info.source {
                     ModuleSource::Registry { url } => {
                         if let Some(source_path) = &module_info.source_path {
@@ -3520,9 +3523,7 @@ async fn extension_cells_from_spokes(
                     spokes.recorded_inputs.as_ref(),
                 )
                 .unwrap_or_else(|e| {
-                    panic!(
-                        "extension_recorded_inputs_json: JSON serialization failed: {e}"
-                    )
+                    panic!("extension_recorded_inputs_json: JSON serialization failed: {e}")
                 }),
                 materialized: false,
                 lazy: false,
@@ -3830,7 +3831,9 @@ fn multiple_versions_modules_from_sources(
 ) -> HashSet<String> {
     let mut name_counts: HashMap<String, usize> = HashMap::new();
     for source in module_sources {
-        *name_counts.entry(source.module_name.to_string()).or_insert(0) += 1;
+        *name_counts
+            .entry(source.module_name.to_string())
+            .or_insert(0) += 1;
     }
     name_counts
         .into_iter()
@@ -4541,10 +4544,8 @@ fn build_canonical_repo_to_extension_id(
 ) -> HashMap<String, String> {
     let mut map = HashMap::with_capacity(extension_aggregations.len());
     for (extension_id, aggregation) in extension_aggregations {
-        let owner = crate::extension_execution_dice::extract_owning_module(
-            extension_id,
-            root_module_name,
-        );
+        let owner =
+            crate::extension_execution_dice::extract_owning_module(extension_id, root_module_name);
         let key = format!("{owner}+{}", aggregation.extension_name);
         map.insert(key, extension_id.clone());
     }
@@ -4571,9 +4572,10 @@ impl BzlmodExtensionAggregationsDataValue {
         root_module_name: String,
         extension_aggregations: Arc<HashMap<String, AggregatedExtension>>,
     ) -> Self {
-        let canonical_repo_to_extension_id = Arc::new(
-            build_canonical_repo_to_extension_id(&extension_aggregations, &root_module_name),
-        );
+        let canonical_repo_to_extension_id = Arc::new(build_canonical_repo_to_extension_id(
+            &extension_aggregations,
+            &root_module_name,
+        ));
         Self {
             workspace_id,
             resolution_digest: Arc::from(INJECTED_BZLMOD_PROJECTION_DIGEST),
@@ -5696,8 +5698,7 @@ impl ExtensionSpokesKey {
         repo_mappings: Arc<crate::RepoMappingSnapshot>,
         repo_mapping_overrides: Arc<crate::RepoMappingOverrides>,
     ) -> Self {
-        let repo_env_digest =
-            Arc::from(repo_env_policy_digest(&repo_env).as_str());
+        let repo_env_digest = Arc::from(repo_env_policy_digest(&repo_env).as_str());
         let repo_mappings_digest = Arc::from(
             crate::extension_execution_dice::repo_mappings_identity_digest(&repo_mappings)
                 .expect("RepoMappingSnapshot serialization is infallible")
@@ -6020,8 +6021,7 @@ impl RepoMaterializationManifestKey {
         repo_env: Arc<BTreeMap<String, String>>,
         repo_mappings: Arc<crate::RepoMappingSnapshot>,
     ) -> Self {
-        let repo_env_digest =
-            Arc::from(repo_env_policy_digest(&repo_env).as_str());
+        let repo_env_digest = Arc::from(repo_env_policy_digest(&repo_env).as_str());
         let repo_mappings_digest = Arc::from(
             crate::extension_execution_dice::repo_mappings_identity_digest(&repo_mappings)
                 .expect("RepoMappingSnapshot serialization is infallible")

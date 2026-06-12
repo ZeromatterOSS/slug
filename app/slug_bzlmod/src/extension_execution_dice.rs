@@ -31,10 +31,10 @@
 //! This follows the `RepositoryRuleExecutionKey` pattern from `repository_execution.rs`.
 
 use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::collections::HashSet;
 #[cfg(test)]
 use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::Path;
 use std::path::PathBuf;
@@ -361,7 +361,8 @@ fn selected_extension_cache_identity(
 }
 
 fn selected_extension_cache_repo_specs_digest(cache: &SelectedExtensionCache) -> String {
-    use sha2::{Sha256, Digest};
+    use sha2::Digest;
+    use sha2::Sha256;
     let mut hasher = Sha256::new();
     let mut repo_specs: Vec<_> = cache.repo_specs.iter().collect();
     repo_specs.sort_by(|(left, _), (right, _)| left.cmp(right));
@@ -388,7 +389,8 @@ fn lockfile_mode_tag(mode: LockfileMode) -> &'static str {
 }
 
 fn selected_extension_cache_identity_digest(identity: &SelectedExtensionCacheIdentity) -> String {
-    use sha2::{Sha256, Digest};
+    use sha2::Digest;
+    use sha2::Sha256;
     let mut hasher = Sha256::new();
     hasher.update(format!("{:?}", identity.source).as_bytes());
     hasher.update([0u8]);
@@ -432,7 +434,8 @@ fn module_extension_replay_inputs_identity_digest(
     workspace_lockfile_facts_present: bool,
     selected_cache_identity: &Option<SelectedExtensionCacheIdentity>,
 ) -> String {
-    use sha2::{Sha256, Digest};
+    use sha2::Digest;
+    use sha2::Sha256;
     let mut hasher = Sha256::new();
     hasher.update(lockfile_mode_tag(lockfile_mode).as_bytes());
     hasher.update([0u8]);
@@ -1077,23 +1080,24 @@ impl Key for ExtensionSpokesKey {
             );
         }
 
-        let repo_mappings_dig =
-            repo_mappings_identity_digest(self.repo_mappings.as_ref()).map_err(|e| {
+        let repo_mappings_dig = repo_mappings_identity_digest(self.repo_mappings.as_ref())
+            .map_err(|e| {
                 slug_error::slug_error!(
                     slug_error::ErrorTag::Input,
                     "repo_mappings digest failed for extension '{}': {e}",
                     self.extension_id
                 )
             })?;
-        let repo_mapping_overrides_dig =
-            repo_mapping_overrides_identity_digest(self.repo_mapping_overrides.as_ref())
-                .map_err(|e| {
-                    slug_error::slug_error!(
-                        slug_error::ErrorTag::Input,
-                        "repo_mapping_overrides digest failed for extension '{}': {e}",
-                        self.extension_id
-                    )
-                })?;
+        let repo_mapping_overrides_dig = repo_mapping_overrides_identity_digest(
+            self.repo_mapping_overrides.as_ref(),
+        )
+        .map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "repo_mapping_overrides digest failed for extension '{}': {e}",
+                self.extension_id
+            )
+        })?;
 
         Ok(Arc::new(ExtensionSpokesValue {
             workspace_id: self.workspace_id.clone(),
@@ -1775,15 +1779,13 @@ impl ModuleExtensionExecutionKey {
     ) -> Self {
         let extension_id = Arc::from(aggregated.extension_id.as_str());
         let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
-        let repo_env_digest = Arc::from(
-            crate::dice_graph::repo_env_policy_digest(&repo_env).as_str(),
-        );
+        let repo_env_digest =
+            Arc::from(crate::dice_graph::repo_env_policy_digest(&repo_env).as_str());
         let repo_mappings_digest = repo_mappings_identity_digest(&repo_mappings)
             .expect("RepoMappingSnapshot serialization is infallible");
-        let repo_mapping_overrides_digest = repo_mapping_overrides_identity_digest(
-            &repo_mapping_overrides,
-        )
-        .expect("RepoMappingOverrides serialization is infallible");
+        let repo_mapping_overrides_digest =
+            repo_mapping_overrides_identity_digest(&repo_mapping_overrides)
+                .expect("RepoMappingOverrides serialization is infallible");
         Self {
             extension_id,
             input_hash,
@@ -2504,7 +2506,11 @@ pub fn compute_extension_unique_names(
     assigned
 }
 
-fn make_unique_name_candidate(extension_id: &str, root_module_name: &str, attempt: usize) -> String {
+fn make_unique_name_candidate(
+    extension_id: &str,
+    root_module_name: &str,
+    attempt: usize,
+) -> String {
     let owning_module = extract_owning_module(extension_id, root_module_name);
     let ext_name = extract_extension_name_for_unique_candidate(extension_id);
     let disambiguator = if attempt == 1 {
@@ -2526,7 +2532,9 @@ fn make_unique_name_candidate(extension_id: &str, root_module_name: &str, attemp
 fn extract_extension_name_for_unique_candidate(extension_id: &str) -> String {
     let name = extract_extension_name(extension_id);
     if name.contains(' ') {
-        name.split_once(' ').map(|(_, after)| after.to_owned()).unwrap_or(name)
+        name.split_once(' ')
+            .map(|(_, after)| after.to_owned())
+            .unwrap_or(name)
     } else {
         name
     }
@@ -3203,10 +3211,14 @@ mod tests {
             Arc::new(extensions),
         );
 
-        let dep_id = data.extension_id_for_canonical_repo("dep++ext+tool").unwrap();
+        let dep_id = data
+            .extension_id_for_canonical_repo("dep++ext+tool")
+            .unwrap();
         assert_eq!(dep_id, "@dep//:ext.bzl%ext");
 
-        let root_id = data.extension_id_for_canonical_repo("_main+ext+tool").unwrap();
+        let root_id = data
+            .extension_id_for_canonical_repo("_main+ext+tool")
+            .unwrap();
         assert_eq!(root_id, "@root//:ext.bzl%ext");
     }
 

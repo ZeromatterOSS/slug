@@ -93,7 +93,6 @@ pub use dice_graph::BzlmodLockfileInputsDataKey;
 pub use dice_graph::BzlmodLockfileInputsDataValue;
 pub use dice_graph::BzlmodLockfileInputsKey;
 pub use dice_graph::BzlmodLockfileInputsValue;
-pub use dice_graph::BzlmodResolvedGraphDataKey;
 use dice_graph::BzlmodModuleSourcesDataKey;
 use dice_graph::BzlmodModuleSourcesDataValue;
 pub use dice_graph::BzlmodModuleVersionsDataKey;
@@ -112,6 +111,7 @@ pub use dice_graph::BzlmodResolutionFactsKey;
 pub use dice_graph::BzlmodResolutionFactsValue;
 pub use dice_graph::BzlmodResolutionKey;
 pub use dice_graph::BzlmodResolutionOptions;
+pub use dice_graph::BzlmodResolvedGraphDataKey;
 pub use dice_graph::BzlmodResolvedGraphOutputsValue;
 pub use dice_graph::BzlmodResolvedGraphProjectionValues;
 pub use dice_graph::BzlmodResolvedGraphSourceInputsValue;
@@ -194,8 +194,8 @@ pub use extension_execution_dice::ModuleExtensionRecordedInputsKey;
 pub use extension_execution_dice::ModuleExtensionResult;
 pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::compute_bzl_transitive_digest_from_file_states;
-pub use extension_execution_dice::extension_repo_prefix;
 pub use extension_execution_dice::compute_extension_unique_names;
+pub use extension_execution_dice::extension_repo_prefix;
 pub use extension_execution_dice::extension_spokes_identity_for_workspace;
 pub use extension_execution_dice::extract_extension_name;
 pub use extension_execution_dice::extract_owning_module;
@@ -262,10 +262,10 @@ pub use pending_repo_cells::is_extension_repo_canonical_name;
 pub use pending_repo_cells::parse_canonical_name;
 pub use pending_repo_cells::pre_compute_extension_repo_cells;
 pub use registry::DEFAULT_REGISTRY_URL;
+pub use registry::RegistryChain;
 // `RegisteredToolchain` is defined below; re-export under the crate root for
 // consumers that already do `use slug_bzlmod::RegisteredToolchain`.
 pub use registry::RegistryClient;
-pub use registry::RegistryChain;
 pub use repo_mapping::BzlmodRepoMapping;
 pub use repo_mapping::CanonicalLabel;
 pub use repo_mapping::CanonicalRepoName;
@@ -1027,8 +1027,7 @@ pub fn persist_lockfile_after_resolution(
     match existing_lockfile {
         Some(existing) if existing == new_lockfile => Ok(false),
         _ => {
-            new_lockfile
-                .write_for_purpose(&path, LockfileWritePurpose::ResolutionUpdate)?;
+            new_lockfile.write_for_purpose(&path, LockfileWritePurpose::ResolutionUpdate)?;
             Ok(true)
         }
     }

@@ -35,6 +35,8 @@
 //! The cell definitions and aliases generated here are passed to `CellsAggregator`
 //! in slug_common during cell resolver construction.
 
+use std::collections::HashMap;
+
 use crate::extension_execution_dice::ModuleExtensionResult;
 use crate::extension_execution_dice::extension_repo_prefix;
 use crate::extensions::canonical_extension_id_for_usage;
@@ -44,7 +46,6 @@ use crate::types::ExtensionUsage;
 use crate::types::ParsedModuleFile;
 use crate::types::TagValue;
 use crate::types::UseRepo;
-use std::collections::HashMap;
 
 /// A pending repository cell definition.
 ///
@@ -1038,9 +1039,13 @@ mod tests {
             attrs: indexmap::IndexMap::new(),
         });
 
-        let (cells, _) =
-            pre_compute_extension_repo_cells(&[("ape+1.0.1".to_owned(), module)], "ape", false, None)
-                .unwrap();
+        let (cells, _) = pre_compute_extension_repo_cells(
+            &[("ape+1.0.1".to_owned(), module)],
+            "ape",
+            false,
+            None,
+        )
+        .unwrap();
 
         let local_specs: Vec<_> = cells
             .iter()
@@ -1109,9 +1114,13 @@ mod tests {
             .push(("generated".to_owned(), "actual_dep".to_owned()));
         module.extension_usages.push(usage);
 
-        let (cells, aliases) =
-            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false, None)
-                .unwrap();
+        let (cells, aliases) = pre_compute_extension_repo_cells(
+            &[("rules_owner".to_owned(), module)],
+            "root",
+            false,
+            None,
+        )
+        .unwrap();
 
         assert!(cells.is_empty());
         assert_eq!(aliases.len(), 3);
@@ -1138,9 +1147,13 @@ mod tests {
             .push(("generated".to_owned(), "actual_dep".to_owned()));
         module.extension_usages.push(usage);
 
-        let (cells, aliases) =
-            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root", false, None)
-                .unwrap();
+        let (cells, aliases) = pre_compute_extension_repo_cells(
+            &[("rules_owner".to_owned(), module)],
+            "root",
+            false,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(cells.len(), 1);
         assert_eq!(cells[0].canonical_name, "rules_owner++ext+generated");

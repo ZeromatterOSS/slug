@@ -899,9 +899,7 @@ fn encode_varint(mut value: u64, out: &mut Vec<u8>) {
 pub fn attr_value_to_json(value: &AttrValue) -> serde_json::Value {
     match value {
         AttrValue::String(s) => {
-            if s.starts_with("@@")
-                || (s.starts_with('\'') && s.ends_with('\''))
-            {
+            if s.starts_with("@@") || (s.starts_with('\'') && s.ends_with('\'')) {
                 serde_json::Value::String(format!("'{}'", s))
             } else {
                 serde_json::Value::String(s.clone())
@@ -913,9 +911,7 @@ pub fn attr_value_to_json(value: &AttrValue) -> serde_json::Value {
         AttrValue::StringList(list) => serde_json::Value::Array(
             list.iter()
                 .map(|s| {
-                    if s.starts_with("@@")
-                        || (s.starts_with('\'') && s.ends_with('\''))
-                    {
+                    if s.starts_with("@@") || (s.starts_with('\'') && s.ends_with('\'')) {
                         serde_json::Value::String(format!("'{}'", s))
                     } else {
                         serde_json::Value::String(s.clone())
@@ -952,9 +948,7 @@ pub fn attr_value_to_json(value: &AttrValue) -> serde_json::Value {
 }
 
 fn attr_key_to_json_string(key: &str) -> String {
-    if key.starts_with("@@")
-        || (key.starts_with('\'') && key.ends_with('\''))
-    {
+    if key.starts_with("@@") || (key.starts_with('\'') && key.ends_with('\'')) {
         format!("'{}'", key)
     } else {
         key.to_owned()
@@ -1219,10 +1213,7 @@ impl Lockfile {
 
             for (ext_id, facts) in &old.facts {
                 if active_set.contains(ext_id.as_str())
-                    && (!facts.is_object()
-                        || facts
-                            .as_object()
-                            .is_some_and(|obj| !obj.is_empty()))
+                    && (!facts.is_object() || facts.as_object().is_some_and(|obj| !obj.is_empty()))
                 {
                     lockfile.facts.insert(ext_id.clone(), facts.clone());
                 }
@@ -1253,6 +1244,30 @@ impl Lockfile {
         lockfile
     }
 
+    /// Compute the set of extension IDs to preserve and refresh when persisting
+    /// the lockfile after a build.
+    ///
+    /// `aggregated` are the extensions (re-)aggregated during this resolution.
+    /// `locked` are the extension IDs already recorded in the injected lockfile
+    /// inputs. The result is the deduplicated, sorted union of the two.
+    ///
+    /// The union matters because on a cache-replayed build (nothing in the
+    /// module graph changed) `aggregated` is empty. Feeding only the aggregated
+    /// IDs into [`Self::from_resolved_graph_with_extensions`] as the active set
+    /// would prune every extension out of the lockfile (`moduleExtensions: {}`),
+    /// which makes all extension-generated repos (e.g. crate repos pulled in by
+    /// rules_rust's internal extension) unresolvable and breaks every build.
+    /// Keeping already-locked IDs active preserves them across replays.
+    pub fn active_extension_ids_for_persist(
+        aggregated: impl IntoIterator<Item = String>,
+        locked: impl IntoIterator<Item = String>,
+    ) -> Vec<String> {
+        let mut ids: Vec<String> = aggregated.into_iter().chain(locked).collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
     /// Enforce `--lockfile_mode=error` by comparing the resolved graph against
     /// the on-disk lockfile.
     ///
@@ -1280,10 +1295,7 @@ impl Lockfile {
                 None => {
                     // New registry file not in lockfile.
                     return Err(LockfileError::LockfileModeError {
-                        reason: format!(
-                            "new registry file '{}' not in lockfile.",
-                            url
-                        ),
+                        reason: format!("new registry file '{}' not in lockfile.", url),
                     }
                     .into());
                 }
@@ -1293,7 +1305,10 @@ impl Lockfile {
         // 2. Yanked version drift: a yanked version that wasn't previously
         //    allowed is now selected.
         for (module_version, reason) in &resolved_graph.selected_yanked_versions {
-            match existing_lockfile.selected_yanked_versions.get(module_version) {
+            match existing_lockfile
+                .selected_yanked_versions
+                .get(module_version)
+            {
                 Some(locked_reason) if locked_reason == reason => {}
                 _ => {
                     return Err(LockfileError::LockfileModeError {
@@ -2059,11 +2074,17 @@ mod tests {
 
         // Error mode
         let result = Lockfile::read_with_mode(&path, LockfileMode::Error);
-        assert!(result.is_err(), "Future version should be rejected in error mode");
+        assert!(
+            result.is_err(),
+            "Future version should be rejected in error mode"
+        );
 
         // Update mode: treat as unusable
         let result = Lockfile::read_with_mode(&path, LockfileMode::Update);
-        assert!(result.is_ok(), "Update mode should succeed for future version");
+        assert!(
+            result.is_ok(),
+            "Update mode should succeed for future version"
+        );
         let lockfile = result.unwrap();
         assert_eq!(lockfile.lock_file_version, LOCKFILE_VERSION);
     }
@@ -3537,33 +3558,27 @@ mod tests {
 
         // Validate: absent marker should fail against present file
         let inputs_absent = vec![marker_when_absent.clone()];
-        let result = validate_recorded_inputs_current(
-            &inputs_absent,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_absent, None, None, None);
+        assert!(
+            result.is_err(),
+            "absent FILE marker should fail when file exists"
         );
-        assert!(result.is_err(), "absent FILE marker should fail when file exists");
 
         // Validate: present marker should pass
         let inputs_present = vec![marker_when_present.clone()];
-        let result = validate_recorded_inputs_current(
-            &inputs_present,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_present, None, None, None);
+        assert!(
+            result.is_ok(),
+            "present FILE marker should pass when file exists"
         );
-        assert!(result.is_ok(), "present FILE marker should pass when file exists");
 
         // Delete file
         fs::remove_file(&file_path).unwrap();
-        let result = validate_recorded_inputs_current(
-            &inputs_present,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_present, None, None, None);
+        assert!(
+            result.is_err(),
+            "present FILE marker should fail when file is deleted"
         );
-        assert!(result.is_err(), "present FILE marker should fail when file is deleted");
     }
 
     #[test]
@@ -3577,37 +3592,34 @@ mod tests {
         // Add an entry
         fs::write(sub_dir.join("child.txt"), b"data").unwrap();
         let marker_with_child = recorded_dirents_input(&sub_dir).unwrap();
-        assert_ne!(marker_initial, marker_with_child, "DIRENTS marker should change when entry added");
+        assert_ne!(
+            marker_initial, marker_with_child,
+            "DIRENTS marker should change when entry added"
+        );
 
         // Validate: initial marker should fail after adding entry
         let inputs_initial = vec![marker_initial.clone()];
-        let result = validate_recorded_inputs_current(
-            &inputs_initial,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_initial, None, None, None);
+        assert!(
+            result.is_err(),
+            "initial DIRENTS marker should fail after entry added"
         );
-        assert!(result.is_err(), "initial DIRENTS marker should fail after entry added");
 
         // Validate: marker_with_child should pass
         let inputs_with_child = vec![marker_with_child.clone()];
-        let result = validate_recorded_inputs_current(
-            &inputs_with_child,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_with_child, None, None, None);
+        assert!(
+            result.is_ok(),
+            "DIRENTS marker should pass when entries match"
         );
-        assert!(result.is_ok(), "DIRENTS marker should pass when entries match");
 
         // Delete the child
         fs::remove_file(sub_dir.join("child.txt")).unwrap();
-        let result = validate_recorded_inputs_current(
-            &inputs_with_child,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_with_child, None, None, None);
+        assert!(
+            result.is_err(),
+            "DIRENTS marker should fail after entry deleted"
         );
-        assert!(result.is_err(), "DIRENTS marker should fail after entry deleted");
     }
 
     #[test]
@@ -3621,37 +3633,34 @@ mod tests {
         // Add a file in the tree
         fs::write(sub_dir.join("leaf.txt"), b"leaf-data").unwrap();
         let marker_with_leaf = recorded_dirtree_input(&sub_dir).unwrap();
-        assert_ne!(marker_initial, marker_with_leaf, "DIRTREE marker should change when file added");
+        assert_ne!(
+            marker_initial, marker_with_leaf,
+            "DIRTREE marker should change when file added"
+        );
 
         // Validate: initial marker should fail after adding leaf
         let inputs_initial = vec![marker_initial.clone()];
-        let result = validate_recorded_inputs_current(
-            &inputs_initial,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_initial, None, None, None);
+        assert!(
+            result.is_err(),
+            "initial DIRTREE marker should fail after leaf added"
         );
-        assert!(result.is_err(), "initial DIRTREE marker should fail after leaf added");
 
         // Validate: marker_with_leaf should pass
         let inputs_with_leaf = vec![marker_with_leaf.clone()];
-        let result = validate_recorded_inputs_current(
-            &inputs_with_leaf,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_with_leaf, None, None, None);
+        assert!(
+            result.is_ok(),
+            "DIRTREE marker should pass when tree matches"
         );
-        assert!(result.is_ok(), "DIRTREE marker should pass when tree matches");
 
         // Delete the leaf file
         fs::remove_file(sub_dir.join("leaf.txt")).unwrap();
-        let result = validate_recorded_inputs_current(
-            &inputs_with_leaf,
-            None,
-            None,
-            None,
+        let result = validate_recorded_inputs_current(&inputs_with_leaf, None, None, None);
+        assert!(
+            result.is_err(),
+            "DIRTREE marker should fail after leaf deleted"
         );
-        assert!(result.is_err(), "DIRTREE marker should fail after leaf deleted");
     }
 
     #[test]
@@ -3663,13 +3672,11 @@ mod tests {
         let inputs_absent = vec![marker_absent.clone()];
 
         // Validate with empty env: should pass
-        let result = validate_recorded_inputs_current(
-            &inputs_absent,
-            None,
-            Some(&env),
-            None,
+        let result = validate_recorded_inputs_current(&inputs_absent, None, Some(&env), None);
+        assert!(
+            result.is_ok(),
+            "absent ENV marker should pass when var is absent"
         );
-        assert!(result.is_ok(), "absent ENV marker should pass when var is absent");
 
         // Env now has the variable
         let env_present: BTreeMap<String, String> = {
@@ -3677,34 +3684,30 @@ mod tests {
             m.insert("MY_VAR".to_owned(), "value".to_owned());
             m
         };
-        let result = validate_recorded_inputs_current(
-            &inputs_absent,
-            None,
-            Some(&env_present),
-            None,
+        let result =
+            validate_recorded_inputs_current(&inputs_absent, None, Some(&env_present), None);
+        assert!(
+            result.is_err(),
+            "absent ENV marker should fail when var is present"
         );
-        assert!(result.is_err(), "absent ENV marker should fail when var is present");
 
         // Record a present env var
         let marker_present = recorded_env_input("MY_VAR", Some("value"));
         let inputs_present = vec![marker_present.clone()];
 
-        let result = validate_recorded_inputs_current(
-            &inputs_present,
-            None,
-            Some(&env_present),
-            None,
+        let result =
+            validate_recorded_inputs_current(&inputs_present, None, Some(&env_present), None);
+        assert!(
+            result.is_ok(),
+            "present ENV marker should pass when var matches"
         );
-        assert!(result.is_ok(), "present ENV marker should pass when var matches");
 
         // Env var removed again
-        let result = validate_recorded_inputs_current(
-            &inputs_present,
-            None,
-            Some(&env),
-            None,
+        let result = validate_recorded_inputs_current(&inputs_present, None, Some(&env), None);
+        assert!(
+            result.is_err(),
+            "present ENV marker should fail when var is removed"
         );
-        assert!(result.is_err(), "present ENV marker should fail when var is removed");
     }
 
     #[test]
@@ -3715,52 +3718,42 @@ mod tests {
         let marker_absent = recorded_repo_mapping_input("source_repo", "apparent_name", None);
         let inputs_absent = vec![marker_absent.clone()];
 
-        let result = validate_recorded_inputs_current(
-            &inputs_absent,
-            None,
-            None,
-            Some(&snapshot),
+        let result = validate_recorded_inputs_current(&inputs_absent, None, None, Some(&snapshot));
+        assert!(
+            result.is_ok(),
+            "absent REPO_MAPPING marker should pass when mapping absent"
         );
-        assert!(result.is_ok(), "absent REPO_MAPPING marker should pass when mapping absent");
 
         // Add a mapping
         let mut mapping = BTreeMap::new();
         mapping.insert("apparent_name".to_owned(), "canonical_name".to_owned());
         snapshot.insert("source_repo".to_owned(), mapping);
 
-        let result = validate_recorded_inputs_current(
-            &inputs_absent,
-            None,
-            None,
-            Some(&snapshot),
+        let result = validate_recorded_inputs_current(&inputs_absent, None, None, Some(&snapshot));
+        assert!(
+            result.is_err(),
+            "absent REPO_MAPPING marker should fail when mapping present"
         );
-        assert!(result.is_err(), "absent REPO_MAPPING marker should fail when mapping present");
 
         // Record present mapping
-        let marker_present = recorded_repo_mapping_input(
-            "source_repo",
-            "apparent_name",
-            Some("canonical_name"),
-        );
+        let marker_present =
+            recorded_repo_mapping_input("source_repo", "apparent_name", Some("canonical_name"));
         let inputs_present = vec![marker_present.clone()];
 
-        let result = validate_recorded_inputs_current(
-            &inputs_present,
-            None,
-            None,
-            Some(&snapshot),
+        let result = validate_recorded_inputs_current(&inputs_present, None, None, Some(&snapshot));
+        assert!(
+            result.is_ok(),
+            "present REPO_MAPPING marker should pass when mapping matches"
         );
-        assert!(result.is_ok(), "present REPO_MAPPING marker should pass when mapping matches");
 
         // Remove the mapping
         let empty_snapshot = crate::RepoMappingSnapshot::new();
-        let result = validate_recorded_inputs_current(
-            &inputs_present,
-            None,
-            None,
-            Some(&empty_snapshot),
+        let result =
+            validate_recorded_inputs_current(&inputs_present, None, None, Some(&empty_snapshot));
+        assert!(
+            result.is_err(),
+            "present REPO_MAPPING marker should fail when mapping removed"
         );
-        assert!(result.is_err(), "present REPO_MAPPING marker should fail when mapping removed");
     }
 
     #[test]
@@ -3792,9 +3785,11 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(&lockfile_path).unwrap()).unwrap();
         assert_eq!(parsed.lock_file_version, LOCKFILE_VERSION);
         assert_eq!(parsed.registry_file_hashes.len(), 1);
-        assert!(parsed.registry_file_hashes.contains_key(
-            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"
-        ));
+        assert!(
+            parsed
+                .registry_file_hashes
+                .contains_key("https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel")
+        );
     }
 
     #[test]
@@ -3828,10 +3823,7 @@ mod tests {
             &[],
         )
         .unwrap();
-        assert!(
-            !written2,
-            "second build with same data should not rewrite"
-        );
+        assert!(!written2, "second build with same data should not rewrite");
     }
 
     #[test]
@@ -3982,9 +3974,10 @@ mod tests {
             "old_usages_digest".to_owned(),
             IndexMap::new(),
         );
-        old_lockfile
-            .module_extensions
-            .insert("@@rules_python+//python/extensions:pip.bzl%pip".to_owned(), old_ext_data);
+        old_lockfile.module_extensions.insert(
+            "@@rules_python+//python/extensions:pip.bzl%pip".to_owned(),
+            old_ext_data,
+        );
         old_lockfile.facts.insert(
             "@@rules_python+//python/extensions:pip.bzl%pip".to_owned(),
             serde_json::json!({"version": "1.0"}),
@@ -4009,24 +4002,26 @@ mod tests {
         let result = Lockfile::from_resolved_graph_with_extensions(
             &graph,
             Some(&old_lockfile),
-            &[
-                (
-                    "@@rules_java+//java/extensions:java.bzl%java".to_owned(),
-                    new_ext_data,
-                ),
-            ],
+            &[(
+                "@@rules_java+//java/extensions:java.bzl%java".to_owned(),
+                new_ext_data,
+            )],
             &active_ids,
             &new_facts,
         );
 
         assert_eq!(result.registry_file_hashes.len(), 1);
         assert_eq!(result.module_extensions.len(), 2);
-        assert!(result
-            .module_extensions
-            .contains_key("@@rules_python+//python/extensions:pip.bzl%pip"));
-        assert!(result
-            .module_extensions
-            .contains_key("@@rules_java+//java/extensions:java.bzl%java"));
+        assert!(
+            result
+                .module_extensions
+                .contains_key("@@rules_python+//python/extensions:pip.bzl%pip")
+        );
+        assert!(
+            result
+                .module_extensions
+                .contains_key("@@rules_java+//java/extensions:java.bzl%java")
+        );
 
         let pip_facts = result
             .facts
@@ -4047,21 +4042,19 @@ mod tests {
             "local_hash".to_owned(),
         );
 
-        let result = Lockfile::from_resolved_graph_with_extensions(
-            &graph,
-            None,
-            &[],
-            &[],
-            &[],
-        );
+        let result = Lockfile::from_resolved_graph_with_extensions(&graph, None, &[], &[], &[]);
 
         assert_eq!(result.registry_file_hashes.len(), 1);
-        assert!(!result
-            .registry_file_hashes
-            .contains_key("file:///home/user/local-registry/modules/foo/MODULE.bazel"));
-        assert!(result
-            .registry_file_hashes
-            .contains_key("https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"));
+        assert!(
+            !result
+                .registry_file_hashes
+                .contains_key("file:///home/user/local-registry/modules/foo/MODULE.bazel")
+        );
+        assert!(
+            result
+                .registry_file_hashes
+                .contains_key("https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel")
+        );
     }
 
     #[test]
@@ -4110,15 +4103,55 @@ mod tests {
                 ("@@z_ext//ext.bzl%z".to_owned(), ext_z),
                 ("@@a_ext//ext.bzl%a".to_owned(), ext_a),
             ],
-            &["@@z_ext//ext.bzl%z".to_owned(), "@@a_ext//ext.bzl%a".to_owned()],
+            &[
+                "@@z_ext//ext.bzl%z".to_owned(),
+                "@@a_ext//ext.bzl%a".to_owned(),
+            ],
             &[],
         );
 
-        let keys: Vec<&str> = result.module_extensions.keys().map(|s| s.as_str()).collect();
+        let keys: Vec<&str> = result
+            .module_extensions
+            .keys()
+            .map(|s| s.as_str())
+            .collect();
         assert_eq!(
             keys,
             &["@@a_ext//ext.bzl%a", "@@z_ext//ext.bzl%z"],
             "extensions should be sorted lexicographically"
+        );
+    }
+
+    #[test]
+    fn active_extension_ids_for_persist_preserves_locked_on_replay() {
+        // Cache-replayed build: nothing re-aggregated this resolution, but the
+        // injected lockfile already records an extension in use. It must stay
+        // active so the post-build persist does not prune it to {}.
+        let result = Lockfile::active_extension_ids_for_persist(
+            std::iter::empty(),
+            ["@@rules_rust+//rust/private/internal_extensions.bzl%i".to_owned()],
+        );
+        assert_eq!(
+            result,
+            vec!["@@rules_rust+//rust/private/internal_extensions.bzl%i".to_owned()],
+            "locked extensions must be preserved when nothing was re-aggregated"
+        );
+    }
+
+    #[test]
+    fn active_extension_ids_for_persist_unions_and_dedups_sorted() {
+        let result = Lockfile::active_extension_ids_for_persist(
+            ["@@b//e.bzl%x".to_owned(), "@@a//e.bzl%y".to_owned()],
+            ["@@a//e.bzl%y".to_owned(), "@@c//e.bzl%z".to_owned()],
+        );
+        assert_eq!(
+            result,
+            vec![
+                "@@a//e.bzl%y".to_owned(),
+                "@@b//e.bzl%x".to_owned(),
+                "@@c//e.bzl%z".to_owned(),
+            ],
+            "result must be the deduplicated, sorted union of aggregated and locked"
         );
     }
 }

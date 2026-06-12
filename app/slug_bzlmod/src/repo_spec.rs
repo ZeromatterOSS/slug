@@ -268,8 +268,8 @@ mod tests {
         // hash is deterministic and not dependent on Rust compiler version.
         let spec_str = RepoSpec::new("test_rule".to_owned())
             .with_attr("val".to_owned(), AttrValue::String("42".to_owned()));
-        let spec_int = RepoSpec::new("test_rule".to_owned())
-            .with_attr("val".to_owned(), AttrValue::Int(42));
+        let spec_int =
+            RepoSpec::new("test_rule".to_owned()).with_attr("val".to_owned(), AttrValue::Int(42));
 
         // Different AttrValue variants must produce different hashes
         assert_ne!(
@@ -355,11 +355,26 @@ mod tests {
         assert_ne!(bytes_int, bytes_bool, "Int vs Bool must differ");
         assert_ne!(bytes_int, bytes_none, "Int vs None must differ");
         assert!(!bytes_str.is_empty(), "String hash bytes must not be empty");
-        assert!(bytes_str.starts_with(b"str:"), "String must have str: discriminator");
-        assert!(bytes_label.starts_with(b"label:"), "Label must have label: discriminator");
-        assert!(bytes_int.starts_with(b"int:"), "Int must have int: discriminator");
-        assert!(bytes_bool.starts_with(b"bool:"), "Bool must have bool: discriminator");
-        assert!(bytes_none.starts_with(b"none"), "None must have none discriminator");
+        assert!(
+            bytes_str.starts_with(b"str:"),
+            "String must have str: discriminator"
+        );
+        assert!(
+            bytes_label.starts_with(b"label:"),
+            "Label must have label: discriminator"
+        );
+        assert!(
+            bytes_int.starts_with(b"int:"),
+            "Int must have int: discriminator"
+        );
+        assert!(
+            bytes_bool.starts_with(b"bool:"),
+            "Bool must have bool: discriminator"
+        );
+        assert!(
+            bytes_none.starts_with(b"none"),
+            "None must have none discriminator"
+        );
     }
 
     #[test]

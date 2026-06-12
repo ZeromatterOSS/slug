@@ -243,8 +243,7 @@ async fn build(
 
     // Phase 64.5: persist lockfile after a successful build (Bazel's afterCommand parity).
     // Non-fatal: a lockfile write failure should not fail the build.
-    if build_result.other_errors.is_empty()
-        && build_result.configured.values().all(|v| v.is_some())
+    if build_result.other_errors.is_empty() && build_result.configured.values().all(|v| v.is_some())
     {
         if let Err(e) = persist_lockfile_post_build(&ctx).await {
             tracing::warn!("Lockfile persistence failed after build: {e:#}");
@@ -792,6 +791,7 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
     use slug_bzlmod::BzlmodLockfileInputsDataKey;
     use slug_bzlmod::BzlmodLockfileInputsKey;
     use slug_bzlmod::BzlmodResolvedGraphDataKey;
+    use slug_bzlmod::Lockfile;
     use slug_bzlmod::LockfileExtensionData;
     use slug_bzlmod::persist_lockfile_after_resolution;
 
@@ -807,11 +807,6 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
     let lockfile_mode = lockfile_data.lockfile_mode;
 
     let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
-    let active_extension_ids: Vec<String> = aggregations
-        .extension_aggregations
-        .keys()
-        .cloned()
-        .collect();
 
     let lockfile_inputs_key = BzlmodLockfileInputsKey::for_workspace_id_with_resolution_digest(
         lockfile_data.workspace_id.clone(),
@@ -819,10 +814,7 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
     );
     let lockfile_inputs = ctx.compute(&lockfile_inputs_key).await??;
 
-    let mut new_extension_results: Vec<(String, LockfileExtensionData)> = Vec::new();
-    let mut new_facts: Vec<(String, _)> = Vec::new();
-
-    for lockfile_value in [
+    let lockfile_values: Vec<_> = [
         lockfile_inputs
             .visible_lockfile
             .as_ref()
@@ -834,15 +826,28 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
     ]
     .into_iter()
     .flatten()
-    {
+    .collect();
+
+    // Extensions already recorded in the injected lockfile must stay active even
+    // when nothing was re-aggregated this resolution (a cache-replayed build, in
+    // which `extension_aggregations` is empty). Without this union the persist
+    // below would prune every extension to `moduleExtensions: {}`, making all
+    // extension-generated repos unresolvable and breaking subsequent builds.
+    let active_extension_ids = Lockfile::active_extension_ids_for_persist(
+        aggregations.extension_aggregations.keys().cloned(),
+        lockfile_values
+            .iter()
+            .flat_map(|lf| lf.module_extensions.keys().cloned()),
+    );
+
+    let mut new_extension_results: Vec<(String, LockfileExtensionData)> = Vec::new();
+    let mut new_facts: Vec<(String, _)> = Vec::new();
+
+    for lockfile_value in lockfile_values {
         for ext_id in &active_extension_ids {
             if let Some(ext_data) = lockfile_value.get_extension_data(ext_id) {
-                if !new_extension_results
-                    .iter()
-                    .any(|(id, _)| id == ext_id)
-                {
-                    new_extension_results
-                        .push((ext_id.clone(), ext_data.clone()));
+                if !new_extension_results.iter().any(|(id, _)| id == ext_id) {
+                    new_extension_results.push((ext_id.clone(), ext_data.clone()));
                 }
             }
         }

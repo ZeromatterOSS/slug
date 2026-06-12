@@ -731,7 +731,9 @@ pub fn include_label_to_path(module_root: &Path, label: &str) -> slug_error::Res
     }
     // Verify the resolved path stays within module_root
     let resolved = module_root.join(package).join(name);
-    let canonical_root = module_root.canonicalize().unwrap_or_else(|_| module_root.to_path_buf());
+    let canonical_root = module_root
+        .canonicalize()
+        .unwrap_or_else(|_| module_root.to_path_buf());
     let canonical_resolved = resolved.canonicalize().unwrap_or_else(|_| resolved.clone());
     if !canonical_resolved.starts_with(&canonical_root) {
         return Err(ModuleParseError::IncludeError(format!(

@@ -663,9 +663,11 @@ mod tests {
         let mut agg = AggregatedExtension::new("@rules_rs//:crates.bzl", "crates");
         agg.add_module_tags(
             "root",
-            vec![ExtensionTag::new("crate".to_owned())
-                .with_kwarg("name".to_owned(), TagValue::String("serde".to_owned()))
-                .with_kwarg("version".to_owned(), TagValue::String("1.0".to_owned()))],
+            vec![
+                ExtensionTag::new("crate".to_owned())
+                    .with_kwarg("name".to_owned(), TagValue::String("serde".to_owned()))
+                    .with_kwarg("version".to_owned(), TagValue::String("1.0".to_owned())),
+            ],
         );
         let h1 = compute_extension_input_hash(&agg);
         let h2 = compute_extension_input_hash(&agg);
