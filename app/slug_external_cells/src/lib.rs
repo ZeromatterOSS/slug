@@ -145,12 +145,11 @@ impl slug_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                     .as_path()
                     .join("bazel-external")
                     .join(setup.canonical_name.as_ref());
-                let meta_value =
-                    slug_common::file_ops::dice::compute_watched_abs_path_metadata(
-                        ctx,
-                        source_path,
-                    )
-                    .await?;
+                let meta_value = slug_common::file_ops::dice::compute_watched_abs_path_metadata(
+                    ctx,
+                    source_path,
+                )
+                .await?;
                 if !meta_value.exists {
                     return Err(extension_repo::ExtensionRepoError::NotMaterialized {
                         canonical_name: setup.canonical_name.to_string(),
@@ -160,8 +159,12 @@ impl slug_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 }
 
                 let abs_dest = io.project_root().resolve(&dest_path);
-                extension_repo::copy_to_destination(&setup, io.project_root().root(), abs_dest.as_path())
-                    .await?;
+                extension_repo::copy_to_destination(
+                    &setup,
+                    io.project_root().root(),
+                    abs_dest.as_path(),
+                )
+                .await?;
             }
         }
 

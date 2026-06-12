@@ -488,9 +488,10 @@ impl FileChangeTracker {
             path: Arc::new(path.clone()),
         });
         if let Some(parent) = path.parent() {
-            self.abs_dir_entries_to_dirty.insert(WatchedAbsDirEntriesKey {
-                path: Arc::new(parent.to_path_buf()),
-            });
+            self.abs_dir_entries_to_dirty
+                .insert(WatchedAbsDirEntriesKey {
+                    path: Arc::new(parent.to_path_buf()),
+                });
         }
     }
 
@@ -817,14 +818,12 @@ fn read_watched_abs_path_metadata_value(
                 is_executable,
             })
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Ok(WatchedAbsPathMetadataValue {
-                exists: false,
-                file_type: None,
-                symlink_target: None,
-                is_executable: None,
-            })
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(WatchedAbsPathMetadataValue {
+            exists: false,
+            file_type: None,
+            symlink_target: None,
+            is_executable: None,
+        }),
         Err(e) => Err(e.into()),
     }
 }
@@ -848,7 +847,11 @@ impl Key for WatchedAbsFileKey {
         // tree's generation so re-materialization invalidates this cached value.
         if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
             if let Some(tree_root) = registry.is_under_tree_root(&self.path) {
-                let _ = ctx.compute(&ExternalTreeGenerationKey { tree_root: Arc::new(tree_root) }).await?;
+                let _ = ctx
+                    .compute(&ExternalTreeGenerationKey {
+                        tree_root: Arc::new(tree_root),
+                    })
+                    .await?;
             }
         }
         let value = read_watched_abs_file_value(&self.path)?;
@@ -1080,9 +1083,7 @@ impl Key for ExternalTreeGenerationKey {
         let marker_path = self.tree_root.join(".slug_repo_complete");
         match std::fs::read_to_string(&marker_path) {
             Ok(content) => Ok(Arc::from(content.trim().to_string().into_boxed_str())),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                Ok(Arc::from("marker-absent"))
-            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Arc::from("marker-absent")),
             Err(e) => Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Environment,
                 "Failed to read generation marker {:?}: {}",
@@ -1448,13 +1449,15 @@ mod watched_abs_tests {
     /// path correctly busts cached WatchedAbs values so re-reads observe the
     /// new on-disk state. Covers create, edit, and delete transitions.
     #[tokio::test]
-    async fn external_tree_generation_replay_observes_create_edit_delete()
-    -> slug_error::Result<()> {
+    async fn external_tree_generation_replay_observes_create_edit_delete() -> slug_error::Result<()>
+    {
+        use std::sync::Arc;
+
+        use dupe::Dupe;
+
         use crate::dice::data::SetWatchedAbsInputRegistry;
         use crate::file_ops::watched_abs::WatchedAbsInputRegistry;
         use crate::file_ops::watched_abs::inject_watched_abs_changes;
-        use std::sync::Arc;
-        use dupe::Dupe;
 
         // ── Setup: temp dir that acts as a materialized extension repo ──
         let dir = tempfile::Builder::new()

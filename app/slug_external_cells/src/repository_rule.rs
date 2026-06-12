@@ -82,8 +82,7 @@ impl FileOpsDelegate for RepositoryRuleFileOpsDelegate {
         path: &'async_trait CellRelativePath,
     ) -> slug_error::Result<ReadFileProxy> {
         let abs_path = self.resolve_path(path);
-        let value =
-            slug_common::file_ops::dice::compute_watched_abs_file(ctx, abs_path).await?;
+        let value = slug_common::file_ops::dice::compute_watched_abs_file(ctx, abs_path).await?;
         let content = value.content.clone();
         Ok(ReadFileProxy::new_with_captures(content, |content| {
             let content = content.clone();
@@ -125,11 +124,9 @@ impl FileOpsDelegate for RepositoryRuleFileOpsDelegate {
     ) -> slug_error::Result<Option<RawPathMetadata>> {
         let abs_path = self.resolve_path(path);
 
-        let meta_value = slug_common::file_ops::dice::compute_watched_abs_path_metadata(
-            ctx,
-            abs_path.clone(),
-        )
-        .await?;
+        let meta_value =
+            slug_common::file_ops::dice::compute_watched_abs_path_metadata(ctx, abs_path.clone())
+                .await?;
         if !meta_value.exists {
             return Ok(None);
         }
@@ -158,11 +155,9 @@ impl FileOpsDelegate for RepositoryRuleFileOpsDelegate {
                 }))
             }
             Some(slug_common::file_ops::dice::WatchedAbsFileType::File) => {
-                let file_value = slug_common::file_ops::dice::compute_watched_abs_file(
-                    ctx,
-                    abs_path.clone(),
-                )
-                .await?;
+                let file_value =
+                    slug_common::file_ops::dice::compute_watched_abs_file(ctx, abs_path.clone())
+                        .await?;
                 let contents = match &file_value.content {
                     Some(bytes) => bytes,
                     None => return Ok(None),

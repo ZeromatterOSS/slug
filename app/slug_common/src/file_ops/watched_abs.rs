@@ -111,8 +111,7 @@ impl WatchedAbsInputRegistry {
     pub fn register_tree_root(&self, root: PathBuf) {
         if let Ok(mut state) = self.inner.lock() {
             if !state.tree_roots.iter().any(|r| r == &root) {
-                let marker_digest =
-                    current_file_digest(&root.join(".slug_repo_complete"));
+                let marker_digest = current_file_digest(&root.join(".slug_repo_complete"));
                 state.tree_roots.push(root.clone());
                 // Seed the marker baseline so the first diff_and_update
                 // doesn't see a spurious change.
