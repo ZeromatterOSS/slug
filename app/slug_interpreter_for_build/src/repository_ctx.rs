@@ -1458,29 +1458,206 @@ fn canonical_name_from_bazel_external_path(path: &Path) -> Option<String> {
     None
 }
 
-/// Download a file from a URL synchronously.
-/// Uses blocking HTTP client since Starlark interpreter is synchronous.
-pub(crate) fn download_url(url: &str) -> Result<Vec<u8>, String> {
-    // Use a simple blocking HTTP GET
-    // Since we're in sync context, we use std::process to call curl/wget
-    // or implement a minimal HTTP client
+/// Authentication policy for download operations.
+///
+/// Bazel 9 supports `auth` dicts on `download()` / `download_and_extract()`
+/// with keys like `type`, `login`, `password`. Slug does not yet implement
+/// credential injection, so any non-empty auth dict is rejected with a typed
+/// error *before* any network request is made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum AuthPolicy {
+    None,
+    Unsupported { type_hint: String },
+}
+
+/// Download options for repository/module context download operations.
+///
+/// Encapsulates all parameters that affect the HTTP request beyond the URL
+/// and output path. This struct is the single source of truth for what
+/// download parameters are supported and how they behave.
+pub(crate) struct DownloadOptions {
+    /// Custom HTTP headers to include in the request.
+    /// Bazel 9 forwards these verbatim to the HTTP client.
+    pub headers: Vec<(String, String)>,
+
+    /// Maximum time to wait for the TCP connection to be established.
+    /// Defaults to 30 seconds.
+    pub connect_timeout: std::time::Duration,
+
+    /// Maximum total time for the download, including connection, redirects,
+    /// and body transfer. Defaults to 300 seconds.
+    pub total_timeout: std::time::Duration,
+}
+
+impl Default for DownloadOptions {
+    fn default() -> Self {
+        Self {
+            headers: Vec::new(),
+            connect_timeout: std::time::Duration::from_secs(30),
+            total_timeout: std::time::Duration::from_secs(300),
+        }
+    }
+}
+
+/// Parse the `auth` Starlark dict value into an `AuthPolicy`.
+///
+/// Returns `AuthPolicy::None` when the value is absent or `None`.
+/// If a non-empty dict is provided, returns `AuthPolicy::Unsupported` with
+/// the `type` field (if present) as a hint — but the caller must reject the
+/// download *before* any network request.
+pub(crate) fn parse_auth<'v>(auth: Option<Value<'v>>) -> starlark::Result<AuthPolicy> {
+    let Some(value) = auth else {
+        return Ok(AuthPolicy::None);
+    };
+    if value.is_none() {
+        return Ok(AuthPolicy::None);
+    }
+    let Some(dict) = DictRef::from_value(value) else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "auth must be a dict, got {}",
+            value.get_type(),
+        )
+        .into());
+    };
+    if dict.is_empty() {
+        return Ok(AuthPolicy::None);
+    }
+    let type_hint = dict
+        .iter()
+        .find_map(|(k, v)| {
+            let key = k.unpack_str()?;
+            if key == "type" {
+                v.unpack_str().map(|s| s.to_owned())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "unknown".to_owned());
+    Ok(AuthPolicy::Unsupported { type_hint })
+}
+
+/// Return a Starlark error for unsupported auth, ensuring it is produced
+/// *before* any network request.
+pub(crate) fn auth_unsupported_error(method_name: &str, policy: &AuthPolicy) -> Option<starlark::Error> {
+    match policy {
+        AuthPolicy::None => None,
+        AuthPolicy::Unsupported { type_hint } => Some(starlark::Error::from(
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "The 'auth' parameter on {}() is not yet supported (auth type: {}). \
+                 Please use netrc or credential helpers for authentication.",
+                method_name,
+                type_hint
+            ),
+        )),
+    }
+}
+
+/// Download a file from a URL using the in-process HTTP client.
+///
+/// Uses `slug_http::HttpClient` with proper timeout and redirect handling.
+/// Falls back to curl/wget only if the tokio runtime is unavailable (e.g.
+/// during unit tests without a runtime).
+///
+/// Returns the downloaded bytes on success.
+pub(crate) fn download_url(url: &str, options: &DownloadOptions) -> Result<Vec<u8>, String> {
     tracing::info!("Downloading from: {}", url);
 
-    // Try using curl first (more commonly available)
-    // On Windows, prefer curl.exe to avoid PowerShell Invoke-WebRequest alias
+    // Try in-process HTTP client first.
+    match download_with_http_client(url, options) {
+        Ok(data) => return Ok(data),
+        Err(e) => {
+            tracing::debug!(
+                "In-process HTTP client failed for {}: {}, falling back to curl/wget",
+                url,
+                e
+            );
+        }
+    }
+
+    // Fallback: use curl/wget subprocess.
+    download_url_subprocess(url, options)
+}
+
+/// Download using the in-process `slug_http::HttpClient`.
+///
+/// Uses `HttpClient::get_with_headers` which preserves the default User-Agent
+/// header and forwards any custom headers from the caller.
+fn download_with_http_client(url: &str, options: &DownloadOptions) -> Result<Vec<u8>, String> {
+    let handle = tokio::runtime::Handle::try_current().map_err(|e| e.to_string())?;
+
+    handle.block_on(async {
+        let mut builder = slug_http::HttpClientBuilder::https_with_system_roots()
+            .await
+            .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+        builder
+            .with_connect_timeout(Some(options.connect_timeout))
+            .with_read_timeout(Some(options.total_timeout));
+        let client = builder
+            .with_max_redirects(10)
+            .build();
+
+        let resp = if options.headers.is_empty() {
+            client.get(url).await
+        } else {
+            client
+                .get_with_headers(url, options.headers.clone())
+                .await
+        }
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+        let body = slug_http::to_bytes(resp.into_body())
+            .await
+            .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+        Ok(body.to_vec())
+    })
+}
+
+/// Download using curl/wget subprocess as a fallback.
+fn download_url_subprocess(url: &str, options: &DownloadOptions) -> Result<Vec<u8>, String> {
+    let total_secs = options.total_timeout.as_secs();
     let curl_cmd = if cfg!(windows) { "curl.exe" } else { "curl" };
-    let output = Command::new(curl_cmd)
-        .args(["-fsSL", "--max-time", "300", url])
-        .output();
+
+    let mut curl_args: Vec<String> = vec![
+        "-fsSL".to_owned(),
+        "--max-time".to_owned(),
+        total_secs.to_string(),
+        "--connect-timeout".to_owned(),
+        options.connect_timeout.as_secs().to_string(),
+    ];
+
+    // Forward custom headers to curl via -H flags.
+    for (name, value) in &options.headers {
+        curl_args.push("-H".to_owned());
+        curl_args.push(format!("{}: {}", name, value));
+    }
+
+    curl_args.push(url.to_owned());
+
+    let output = Command::new(curl_cmd).args(&curl_args).output();
 
     match output {
         Ok(output) if output.status.success() => Ok(output.stdout),
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            // Try wget as fallback
-            let wget_output = Command::new("wget")
-                .args(["-q", "-O", "-", "--timeout=300", url])
-                .output();
+            let mut wget_args: Vec<String> = vec![
+                "-q".to_owned(),
+                "-O".to_owned(),
+                "-".to_owned(),
+                format!("--timeout={total_secs}"),
+            ];
+
+            // Forward custom headers to wget via --header flags.
+            for (name, value) in &options.headers {
+                wget_args.push("--header".to_owned());
+                wget_args.push(format!("{}: {}", name, value));
+            }
+
+            wget_args.push(url.to_owned());
+
+            let wget_output = Command::new("wget").args(&wget_args).output();
 
             match wget_output {
                 Ok(output) if output.status.success() => Ok(output.stdout),
@@ -1488,10 +1665,21 @@ pub(crate) fn download_url(url: &str) -> Result<Vec<u8>, String> {
             }
         }
         Err(e) => {
-            // curl not found, try wget
-            let wget_output = Command::new("wget")
-                .args(["-q", "-O", "-", "--timeout=300", url])
-                .output();
+            let mut wget_args: Vec<String> = vec![
+                "-q".to_owned(),
+                "-O".to_owned(),
+                "-".to_owned(),
+                format!("--timeout={total_secs}"),
+            ];
+
+            for (name, value) in &options.headers {
+                wget_args.push("--header".to_owned());
+                wget_args.push(format!("{}: {}", name, value));
+            }
+
+            wget_args.push(url.to_owned());
+
+            let wget_output = Command::new("wget").args(&wget_args).output();
 
             match wget_output {
                 Ok(output) if output.status.success() => Ok(output.stdout),
@@ -1640,6 +1828,7 @@ pub(crate) fn perform_download_to_path(
     integrity: &str,
     canonical_id: &str,
     executable: bool,
+    options: &DownloadOptions,
 ) -> slug_error::Result<DownloadInfo> {
     if let Some(data) = read_cached_repository_download(sha256, integrity, canonical_id) {
         if let Some(parent) = output_path.parent() {
@@ -1671,7 +1860,7 @@ pub(crate) fn perform_download_to_path(
 
     let mut last_error: Option<String> = None;
     for url in urls {
-        match download_url(url) {
+        match download_url(url, options) {
             Ok(data) => {
                 if !sha256.is_empty() {
                     verify_sha256(&data, sha256).map_err(|e| {
@@ -1743,6 +1932,7 @@ pub(crate) fn perform_download_and_extract_to_dir(
     canonical_id: &str,
     strip_prefix: Option<&str>,
     rename_files: &BTreeMap<String, String>,
+    options: &DownloadOptions,
 ) -> slug_error::Result<DownloadInfo> {
     if let Some(data) = read_cached_repository_download(sha256, integrity, canonical_id) {
         std::fs::create_dir_all(output_dir).map_err(|e| {
@@ -1759,7 +1949,7 @@ pub(crate) fn perform_download_and_extract_to_dir(
 
     let mut last_error: Option<String> = None;
     for url in urls {
-        match download_url(url) {
+        match download_url(url, options) {
             Ok(data) => {
                 if !sha256.is_empty() {
                     verify_sha256(&data, sha256).map_err(|e| {
@@ -1840,6 +2030,53 @@ pub(crate) fn parse_rename_files<'v>(
             .into());
         };
         parsed.insert(key.to_owned(), value.to_owned());
+    }
+
+    Ok(parsed)
+}
+
+/// Parse headers from a Starlark dict value into `Vec<(String, String)>`.
+///
+/// Accepts `None` (no headers provided) or a Starlark dict mapping string
+/// header names to string header values. Returns an error for non-dict or
+/// non-string key/value types.
+pub(crate) fn parse_headers<'v>(
+    headers: Option<Value<'v>>,
+) -> starlark::Result<Vec<(String, String)>> {
+    let Some(value) = headers else {
+        return Ok(Vec::new());
+    };
+    if value.is_none() {
+        return Ok(Vec::new());
+    }
+    let Some(dict) = DictRef::from_value(value) else {
+        return Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "headers must be a dict of string to string, got {}",
+            value.get_type(),
+        )
+        .into());
+    };
+
+    let mut parsed = Vec::with_capacity(dict.len());
+    for (key, value) in dict.iter() {
+        let Some(key) = key.unpack_str() else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "headers keys must be strings, got {}",
+                key.get_type(),
+            )
+            .into());
+        };
+        let Some(value) = value.unpack_str() else {
+            return Err(slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "headers values must be strings, got {}",
+                value.get_type(),
+            )
+            .into());
+        };
+        parsed.push((key.to_owned(), value.to_owned()));
     }
 
     Ok(parsed)
@@ -2212,22 +2449,21 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
-        if auth.is_some() {
-            tracing::warn!(
-                "The 'auth' parameter on download() is not yet \
-                 supported and will be ignored. Please use netrc or credential \
-                 helpers for authentication."
-            );
+        // auth: not yet supported — fail with a typed error rather than silently
+        // ignoring, per Plan 64 Phase 4.  The error is produced before any
+        // network request and before `allow_fail` is consulted so that
+        // unsupported auth is never silently swallowed.
+        let auth_policy = parse_auth(auth)?;
+        if let Some(err) = auth_unsupported_error("repository_ctx.download", &auth_policy) {
+            return Err(err);
         }
 
-        // headers: warn if provided, otherwise ignore
-        if headers.is_some() {
-            tracing::warn!(
-                "The 'headers' parameter on download() is not yet supported \
-                 and will be ignored."
-            );
-        }
+        let headers = parse_headers(headers)?;
+
+        let options = DownloadOptions {
+            headers,
+            ..DownloadOptions::default()
+        };
 
         // Determine output path - accept string, RepositoryPath, or None
         let output_str = match output.into_option() {
@@ -2258,6 +2494,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             integrity,
             canonical_id,
             executable,
+            &options,
         ) {
             Ok(info) => Ok(heap.alloc(info)),
             Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
@@ -2314,22 +2551,20 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
-        if auth.is_some() {
-            tracing::warn!(
-                "The 'auth' parameter on download_and_extract() is not yet \
-                 supported and will be ignored. Please use netrc or credential \
-                 helpers for authentication."
-            );
+        // auth: not yet supported — fail with a typed error rather than silently
+        // ignoring, per Plan 64 Phase 4.  The error is produced before any
+        // network request and before `allow_fail` is consulted.
+        let auth_policy = parse_auth(auth)?;
+        if let Some(err) = auth_unsupported_error("repository_ctx.download_and_extract", &auth_policy) {
+            return Err(err);
         }
 
-        // headers: warn if provided
-        if headers.is_some() {
-            tracing::warn!(
-                "The 'headers' parameter on download_and_extract() is not yet \
-                 supported and will be ignored."
-            );
-        }
+        let parsed_headers = parse_headers(headers)?;
+
+        let options = DownloadOptions {
+            headers: parsed_headers,
+            ..DownloadOptions::default()
+        };
 
         // Determine output directory - accept string or RepositoryPath
         let output_str = match output.into_option() {
@@ -2370,6 +2605,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             canonical_id,
             strip,
             &rename_files,
+            &options,
         ) {
             Ok(info) => Ok(heap.alloc(info)),
             Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
@@ -3808,5 +4044,286 @@ mod tests {
                 .replace("\r\n", "\n"),
             "extra\nbefore\nnew\nafter\n"
         );
+    }
+
+    // --- Plan 64 Phase 4: Download headers/auth semantics tests ---
+
+    #[test]
+    fn test_parse_headers_none() {
+        let none: Option<Value> = None;
+        let result = parse_headers(none).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_headers_starlark_none() {
+        let module = Module::new();
+        let none_val = module.heap().alloc(starlark::values::none::NoneOr::<Value>::None);
+        let result = parse_headers(Some(none_val)).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_headers_rejects_non_dict() {
+        let module = Module::new();
+        let string_val = module.heap().alloc("not a dict");
+        let result = parse_headers(Some(string_val));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("headers must be a dict"));
+    }
+
+    #[test]
+    fn test_download_options_default_has_no_headers() {
+        let opts = DownloadOptions::default();
+        assert!(opts.headers.is_empty());
+    }
+
+    #[test]
+    fn test_download_options_default_timeouts() {
+        let opts = DownloadOptions::default();
+        assert_eq!(opts.connect_timeout, std::time::Duration::from_secs(30));
+        assert_eq!(opts.total_timeout, std::time::Duration::from_secs(300));
+    }
+
+    // --- auth policy parsing tests ---
+
+    #[test]
+    fn test_parse_auth_none() {
+        let none: Option<Value> = None;
+        let result = parse_auth(none).unwrap();
+        assert_eq!(result, AuthPolicy::None);
+    }
+
+    #[test]
+    fn test_parse_auth_starlark_none() {
+        let module = Module::new();
+        let none_val = module.heap().alloc(starlark::values::none::NoneOr::<Value>::None);
+        let result = parse_auth(Some(none_val)).unwrap();
+        assert_eq!(result, AuthPolicy::None);
+    }
+
+    #[test]
+    fn test_parse_auth_empty_dict_is_none() {
+        let module = Module::new();
+        let empty_dict = module.heap().alloc(AllocDict(Vec::<(&str, Value)>::new()));
+        let result = parse_auth(Some(empty_dict)).unwrap();
+        assert_eq!(result, AuthPolicy::None);
+    }
+
+    #[test]
+    fn test_parse_auth_non_empty_dict_is_unsupported() {
+        let module = Module::new();
+        let dict_val = module.heap().alloc(AllocDict(vec![
+            ("type", module.heap().alloc("basic")),
+            ("login", module.heap().alloc("user")),
+        ]));
+        let result = parse_auth(Some(dict_val)).unwrap();
+        match result {
+            AuthPolicy::Unsupported { type_hint } => {
+                assert_eq!(type_hint, "basic");
+            }
+            AuthPolicy::None => panic!("expected Unsupported, got None"),
+        }
+    }
+
+    #[test]
+    fn test_parse_auth_non_empty_dict_without_type_uses_unknown() {
+        let module = Module::new();
+        let dict_val = module
+            .heap()
+            .alloc(AllocDict(vec![("login", module.heap().alloc("user"))]));
+        let result = parse_auth(Some(dict_val)).unwrap();
+        match result {
+            AuthPolicy::Unsupported { type_hint } => {
+                assert_eq!(type_hint, "unknown");
+            }
+            AuthPolicy::None => panic!("expected Unsupported, got None"),
+        }
+    }
+
+    #[test]
+    fn test_parse_auth_rejects_non_dict() {
+        let module = Module::new();
+        let string_val = module.heap().alloc("not a dict");
+        let result = parse_auth(Some(string_val));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("auth must be a dict"));
+    }
+
+    // --- auth_unsupported_error tests ---
+
+    #[test]
+    fn test_auth_unsupported_error_returns_none_for_none_policy() {
+        assert!(auth_unsupported_error("download", &AuthPolicy::None).is_none());
+    }
+
+    #[test]
+    fn test_auth_unsupported_error_returns_error_for_unsupported_policy() {
+        let policy = AuthPolicy::Unsupported {
+            type_hint: "basic".to_owned(),
+        };
+        let err = auth_unsupported_error("repository_ctx.download", &policy).unwrap();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("not yet supported"),
+            "error should mention 'not yet supported': {msg}"
+        );
+        assert!(
+            msg.contains("repository_ctx.download"),
+            "error should mention method name: {msg}"
+        );
+        assert!(
+            msg.contains("basic"),
+            "error should mention auth type hint: {msg}"
+        );
+    }
+
+    // --- Starlark-level download auth/headers integration tests ---
+
+    fn make_eval_and_ctx() -> (Module, RepositoryContext, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let ctx = RepositoryContext::new(
+            "test_repo".to_owned(),
+            RepositoryAttr::empty(),
+            temp_dir.path().to_path_buf(),
+        );
+        let module = Module::new();
+        module.set("repository_ctx", module.heap().alloc(ctx.clone()));
+        (module, ctx, temp_dir)
+    }
+
+    #[test]
+    fn test_download_rejects_auth_dict_before_network() {
+        let (module, _ctx, _temp_dir) = make_eval_and_ctx();
+        let globals = Globals::standard();
+        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("auth_test")));
+
+        let ast = AstModule::parse(
+            "test_auth.star",
+            r#"repository_ctx.download("http://127.0.0.1:1/never-reached", auth = {"type": "basic", "login": "u"})"#.to_owned(),
+            &Dialect::Standard,
+        ).unwrap();
+        let mut eval = Evaluator::new(&module);
+        let err = eval.eval_module(ast, &globals).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("not yet supported"),
+            "should reject auth with typed error: {msg}"
+        );
+        assert!(
+            msg.contains("basic"),
+            "should mention auth type hint: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_download_and_extract_rejects_auth_dict_before_network() {
+        let (module, _ctx, _temp_dir) = make_eval_and_ctx();
+        let globals = Globals::standard();
+        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("auth_test_dae")));
+
+        let ast = AstModule::parse(
+            "test_auth_dae.star",
+            r#"repository_ctx.download_and_extract("http://127.0.0.1:1/never-reached", auth = {"type": "ntlm"})"#.to_owned(),
+            &Dialect::Standard,
+        ).unwrap();
+        let mut eval = Evaluator::new(&module);
+        let err = eval.eval_module(ast, &globals).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("not yet supported"),
+            "should reject auth with typed error: {msg}"
+        );
+        assert!(
+            msg.contains("ntlm"),
+            "should mention auth type hint: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_download_rejects_auth_even_with_allow_fail() {
+        let (module, _ctx, _temp_dir) = make_eval_and_ctx();
+        let globals = Globals::standard();
+        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("auth_allow_fail")));
+
+        let ast = AstModule::parse(
+            "test_auth_allow_fail.star",
+            r#"repository_ctx.download("http://127.0.0.1:1/never-reached", allow_fail = True, auth = {"type": "basic"})"#.to_owned(),
+            &Dialect::Standard,
+        ).unwrap();
+        let mut eval = Evaluator::new(&module);
+        let err = eval.eval_module(ast, &globals).unwrap_err();
+        assert!(
+            err.to_string().contains("not yet supported"),
+            "auth rejection must fire even when allow_fail=True"
+        );
+    }
+
+    #[test]
+    fn test_download_headers_dict_parsed_before_network() {
+        let (module, _ctx, _temp_dir) = make_eval_and_ctx();
+        let globals = Globals::standard();
+        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("headers_test")));
+
+        // With headers that would cause a network error (invalid URL), the
+        // headers should at least parse without error — they are forwarded
+        // to the HTTP client / subprocess. We test parse correctness here.
+        let module2 = Module::new();
+        let headers_val = module2
+            .heap()
+            .alloc(AllocDict(vec![("X-Custom", module2.heap().alloc("value"))]));
+        let parsed = parse_headers(Some(headers_val)).unwrap();
+        assert_eq!(parsed, vec![("X-Custom".to_owned(), "value".to_owned())]);
+    }
+
+    #[test]
+    fn test_download_rejects_invalid_headers_type() {
+        let (module, _ctx, _temp_dir) = make_eval_and_ctx();
+        let globals = Globals::standard();
+        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("bad_headers")));
+
+        let ast = AstModule::parse(
+            "test_bad_headers.star",
+            r#"repository_ctx.download("http://127.0.0.1:1/never-reached", headers = "not a dict")"#.to_owned(),
+            &Dialect::Standard,
+        ).unwrap();
+        let mut eval = Evaluator::new(&module);
+        let err = eval.eval_module(ast, &globals).unwrap_err();
+        assert!(
+            err.to_string().contains("headers must be a dict"),
+            "should reject non-dict headers with typed error"
+        );
+    }
+
+    #[test]
+    fn test_download_rejects_invalid_auth_type() {
+        let (module, _ctx, _temp_dir) = make_eval_and_ctx();
+        let globals = Globals::standard();
+        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("bad_auth")));
+
+        let ast = AstModule::parse(
+            "test_bad_auth.star",
+            r#"repository_ctx.download("http://127.0.0.1:1/never-reached", auth = "not a dict")"#.to_owned(),
+            &Dialect::Standard,
+        ).unwrap();
+        let mut eval = Evaluator::new(&module);
+        let err = eval.eval_module(ast, &globals).unwrap_err();
+        assert!(
+            err.to_string().contains("auth must be a dict"),
+            "should reject non-dict auth with typed error"
+        );
+    }
+
+    #[test]
+    fn test_download_options_custom_timeouts() {
+        let opts = DownloadOptions {
+            headers: Vec::new(),
+            connect_timeout: std::time::Duration::from_secs(10),
+            total_timeout: std::time::Duration::from_secs(60),
+        };
+        assert_eq!(opts.connect_timeout, std::time::Duration::from_secs(10));
+        assert_eq!(opts.total_timeout, std::time::Duration::from_secs(60));
     }
 }

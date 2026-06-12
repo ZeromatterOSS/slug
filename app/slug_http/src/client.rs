@@ -87,6 +87,22 @@ impl HttpClient {
         self.request(req).await
     }
 
+    /// Send a GET request with custom headers.
+    pub async fn get_with_headers(
+        &self,
+        uri: &str,
+        headers: Vec<(String, String)>,
+    ) -> Result<Response<BoxStream<'_, hyper::Result<Bytes>>>, HttpError> {
+        let mut builder = self.request_builder(uri).method(Method::GET);
+        for (name, value) in headers {
+            builder = builder.header(name, value);
+        }
+        let req = builder
+            .body(Bytes::new())
+            .map_err(HttpError::BuildRequest)?;
+        self.request(req).await
+    }
+
     pub async fn post(
         &self,
         uri: &str,
@@ -867,6 +883,35 @@ mod tests {
                 .available_permits(),
             2
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_with_headers_forwards_custom_headers() -> slug_error::Result<()> {
+        slug_certs::certs::maybe_setup_cryptography();
+        let test_server = httptest::Server::run();
+        // Server expects a custom header and returns 200 only if it's present.
+        test_server.expect(
+            Expectation::matching(all_of![
+                request::method_path("GET", "/foo"),
+                request::headers(contains(("x-custom-header", "custom-value"))),
+            ])
+            .times(1)
+            .respond_with(responders::status_code(200)),
+        );
+
+        let client = HttpClientBuilder::https_with_system_roots()
+            .await?
+            .with_max_redirects(10)
+            .build();
+        let resp = client
+            .get_with_headers(
+                &test_server.url_str("/foo"),
+                vec![("x-custom-header".to_owned(), "custom-value".to_owned())],
+            )
+            .await?;
+        assert_eq!(200, resp.status().as_u16());
 
         Ok(())
     }

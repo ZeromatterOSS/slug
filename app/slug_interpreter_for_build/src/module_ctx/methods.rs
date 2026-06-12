@@ -183,7 +183,6 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[allow(unused_variables)]
         #[starlark(require = named)]
         headers: Option<Value<'v>>,
-        #[allow(unused_variables)]
         #[starlark(require = named, default = true)]
         block: bool,
         heap: Heap<'v>,
@@ -204,20 +203,21 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
-        if auth.is_some() {
-            tracing::warn!(
-                "The 'auth' parameter on module_ctx.download() is not yet \
-                 supported and will be ignored. Please use netrc or credential \
-                 helpers for authentication."
-            );
+        // auth: not yet supported — fail with a typed error rather than silently
+        // ignoring, per Plan 64 Phase 4.  The error is produced before any
+        // network request and before `allow_fail` is consulted so that
+        // unsupported auth is never silently swallowed.
+        let auth_policy = crate::repository_ctx::parse_auth(auth)?;
+        if let Some(err) = crate::repository_ctx::auth_unsupported_error("module_ctx.download", &auth_policy) {
+            return Err(err);
         }
-        if headers.is_some() {
-            tracing::warn!(
-                "The 'headers' parameter on module_ctx.download() is not yet \
-                 supported and will be ignored."
-            );
-        }
+
+        let parsed_headers = crate::repository_ctx::parse_headers(headers)?;
+
+        let options = crate::repository_ctx::DownloadOptions {
+            headers: parsed_headers,
+            ..crate::repository_ctx::DownloadOptions::default()
+        };
 
         // Determine output path
         let output_path = if output.is_empty() {
@@ -243,6 +243,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             integrity,
             canonical_id,
             executable,
+            &options,
         ) {
             Ok(info) => {
                 if block {
@@ -270,8 +271,8 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = "")] strip_prefix: &str,
         #[starlark(require = named, default = "")] _type: &str,
         #[starlark(require = named)] rename_files: Option<Value<'v>>,
-        #[starlark(require = named)] _auth: Option<Value<'v>>,
-        #[starlark(require = named)] _headers: Option<Value<'v>>,
+        #[starlark(require = named)] auth: Option<Value<'v>>,
+        #[starlark(require = named)] headers: Option<Value<'v>>,
         #[starlark(require = named, default = "")] canonical_id: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
@@ -284,20 +285,20 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             .into());
         }
 
-        // auth: accepted but ignored (Bazel 9 parity — falls through to netrc)
-        if _auth.is_some() {
-            tracing::warn!(
-                "The 'auth' parameter on module_ctx.download_and_extract() is not yet \
-                 supported and will be ignored. Please use netrc or credential \
-                 helpers for authentication."
-            );
+        // auth: not yet supported — fail with a typed error rather than silently
+        // ignoring, per Plan 64 Phase 4.  The error is produced before any
+        // network request.
+        let auth_policy = crate::repository_ctx::parse_auth(auth)?;
+        if let Some(err) = crate::repository_ctx::auth_unsupported_error("module_ctx.download_and_extract", &auth_policy) {
+            return Err(err);
         }
-        if _headers.is_some() {
-            tracing::warn!(
-                "The 'headers' parameter on module_ctx.download_and_extract() is not yet \
-                 supported and will be ignored."
-            );
-        }
+
+        let parsed_headers = crate::repository_ctx::parse_headers(headers)?;
+
+        let options = crate::repository_ctx::DownloadOptions {
+            headers: parsed_headers,
+            ..crate::repository_ctx::DownloadOptions::default()
+        };
 
         // Determine output directory
         let output_dir = if output.is_empty() {
@@ -329,6 +330,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             canonical_id,
             strip,
             &rename_files,
+            &options,
         ) {
             Ok(info) => Ok(heap.alloc(info)),
             Err(e) => Err(e.into()),
