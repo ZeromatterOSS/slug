@@ -108,10 +108,16 @@ pub enum LockfileError {
 
 /// Explicit capability for writing Bazel-visible lockfiles.
 ///
-/// Ordinary build/query/audit paths should read lockfiles but not write them.
-/// Future `slug mod update` plumbing can use `ExplicitModUpdate`; tests use the
-/// cfg-gated helper below.  `ResolutionUpdate` is used by the production
-/// resolution path when `--lockfile_mode=update` (the default).
+/// Both `ExplicitModUpdate` and `ResolutionUpdate` produce identical on-disk
+/// content — the distinction is a capability gate for future `slug mod update`
+/// plumbing.  `ResolutionUpdate` is used by the production post-build path;
+/// `ExplicitModUpdate` is reserved for the (not-yet-existent) `slug mod`
+/// command; tests use the cfg-gated `Test` variant.
+///
+/// Bazel 9 reference: `BazelLockFileModule.afterCommand()` writes the
+/// lockfile unconditionally (no purpose distinction). The purpose enum
+/// exists so that a future `slug mod update` can enforce a stricter
+/// write policy without refactoring the call sites.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LockfileWritePurpose {
     ExplicitModUpdate,
@@ -1122,7 +1128,16 @@ impl Lockfile {
         Ok(())
     }
 
-    /// Write the lockfile to disk for an explicit lockfile-update operation.
+    /// Write the lockfile to disk.
+    ///
+    /// The `purpose` parameter is currently advisory — both
+    /// `ResolutionUpdate` and `ExplicitModUpdate` produce the same output.
+    /// It exists to allow a future `slug mod update` command to inject a
+    /// different write policy (e.g., always write even if unchanged) without
+    /// refactoring call sites.
+    ///
+    /// Bazel 9 reference: `BazelLockFileModule.updateLockfile()` writes
+    /// unconditionally — there is no purpose distinction.
     pub fn write_for_purpose(
         &self,
         path: &Path,
@@ -1133,20 +1148,108 @@ impl Lockfile {
 
     /// Build a new lockfile from a resolved graph, incorporating registry
     /// file hashes and selected yanked versions from the resolution result.
+    ///
+    /// This produces a lockfile with *only* registry-level data — no extension
+    /// entries. Use [`Self::from_resolved_graph_with_extensions`] for the
+    /// production path that merges extension data from the old lockfile and
+    /// newly evaluated extension results.
     pub fn from_resolved_graph(graph: &crate::resolution::ResolvedGraph) -> Self {
         let mut lockfile = Self::new();
-        // Carry forward registry file hashes from resolution.
         for (url, hash) in &graph.registry_file_hashes {
             lockfile
                 .registry_file_hashes
                 .insert(url.clone(), hash.clone());
         }
-        // Carry forward selected yanked versions.
         for (module_version, reason) in &graph.selected_yanked_versions {
             lockfile
                 .selected_yanked_versions
                 .insert(module_version.clone(), reason.clone());
         }
+        lockfile
+    }
+
+    /// Build a lockfile from a resolved graph, merging extension data and
+    /// facts from the old lockfile and newly evaluated extensions.
+    ///
+    /// This follows Bazel 9's `BazelLockFileModule.afterCommand()` algorithm:
+    ///
+    /// 1. Registry file hashes come from the resolved graph. Local `file:`
+    ///    registry URLs are excluded (Bazel: "they are not needed for
+    ///    reproducibility" and "would contribute absolute paths").
+    /// 2. Selected yanked versions come from the resolved graph.
+    /// 3. Extension data is a union of old lockfile entries (for extensions
+    ///    that still have usages) and new extension results.
+    /// 4. Facts are merged: old facts for extensions still present in the
+    ///    dep graph, plus new facts from freshly evaluated extensions.
+    pub fn from_resolved_graph_with_extensions(
+        graph: &crate::resolution::ResolvedGraph,
+        old_lockfile: Option<&Lockfile>,
+        new_extension_results: &[(String, LockfileExtensionData)],
+        active_extension_ids: &[String],
+        new_facts: &[(String, serde_json::Value)],
+    ) -> Self {
+        let mut lockfile = Self::new();
+
+        for (url, hash) in &graph.registry_file_hashes {
+            if url.starts_with("file:") {
+                continue;
+            }
+            lockfile
+                .registry_file_hashes
+                .insert(url.clone(), hash.clone());
+        }
+        for (module_version, reason) in &graph.selected_yanked_versions {
+            lockfile
+                .selected_yanked_versions
+                .insert(module_version.clone(), reason.clone());
+        }
+
+        let active_set: std::collections::HashSet<&str> =
+            active_extension_ids.iter().map(|s| s.as_str()).collect();
+
+        if let Some(old) = old_lockfile {
+            for (ext_id, ext_data) in &old.module_extensions {
+                if !active_set.contains(ext_id.as_str()) {
+                    continue;
+                }
+                lockfile
+                    .module_extensions
+                    .insert(ext_id.clone(), ext_data.clone());
+            }
+
+            for (ext_id, facts) in &old.facts {
+                if active_set.contains(ext_id.as_str())
+                    && (!facts.is_object()
+                        || facts
+                            .as_object()
+                            .is_some_and(|obj| !obj.is_empty()))
+                {
+                    lockfile.facts.insert(ext_id.clone(), facts.clone());
+                }
+            }
+        }
+
+        for (ext_id, ext_data) in new_extension_results {
+            lockfile
+                .module_extensions
+                .insert(ext_id.clone(), ext_data.clone());
+        }
+
+        for (ext_id, facts) in new_facts {
+            if facts.is_object() && facts.as_object().is_some_and(|obj| obj.is_empty()) {
+                continue;
+            }
+            lockfile.facts.insert(ext_id.clone(), facts.clone());
+        }
+
+        let mut sorted_extensions: Vec<_> = lockfile.module_extensions.into_iter().collect();
+        sorted_extensions.sort_by(|a, b| a.0.cmp(&b.0));
+        lockfile.module_extensions = sorted_extensions.into_iter().collect();
+
+        let mut sorted_facts: Vec<_> = lockfile.facts.into_iter().collect();
+        sorted_facts.sort_by(|a, b| a.0.cmp(&b.0));
+        lockfile.facts = sorted_facts.into_iter().collect();
+
         lockfile
     }
 
@@ -3658,5 +3761,364 @@ mod tests {
             Some(&empty_snapshot),
         );
         assert!(result.is_err(), "present REPO_MAPPING marker should fail when mapping removed");
+    }
+
+    #[test]
+    fn lockfile_lifecycle_creates_lockfile_on_first_build() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "abcdef1234567890".to_owned(),
+        );
+
+        let written = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Update,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(written, "first build should write the lockfile");
+
+        let lockfile_path = workspace_root.join("MODULE.bazel.lock");
+        assert!(lockfile_path.exists(), "lockfile should exist on disk");
+
+        let parsed: Lockfile =
+            serde_json::from_str(&std::fs::read_to_string(&lockfile_path).unwrap()).unwrap();
+        assert_eq!(parsed.lock_file_version, LOCKFILE_VERSION);
+        assert_eq!(parsed.registry_file_hashes.len(), 1);
+        assert!(parsed.registry_file_hashes.contains_key(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"
+        ));
+    }
+
+    #[test]
+    fn lockfile_lifecycle_skips_rewrite_when_unchanged() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "abcdef1234567890".to_owned(),
+        );
+
+        let written1 = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Update,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(written1, "first build should write");
+
+        let written2 = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Update,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(
+            !written2,
+            "second build with same data should not rewrite"
+        );
+    }
+
+    #[test]
+    fn lockfile_lifecycle_error_mode_rejects_registry_hash_drift() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "old_hash".to_owned(),
+        );
+
+        crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Update,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+
+        let mut drifted_graph = crate::resolution::ResolvedGraph::default();
+        drifted_graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "new_hash".to_owned(),
+        );
+
+        let existing: Lockfile = serde_json::from_str(
+            &std::fs::read_to_string(workspace_root.join("MODULE.bazel.lock")).unwrap(),
+        )
+        .unwrap();
+
+        let err = Lockfile::enforce_error_mode(&drifted_graph, &existing).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("registry file hash drift"),
+            "error mode should detect hash drift: {msg}"
+        );
+    }
+
+    #[test]
+    fn lockfile_lifecycle_error_mode_rejects_new_registry_file() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+
+        crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Update,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+
+        let mut new_graph = crate::resolution::ResolvedGraph::default();
+        new_graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+        new_graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_java/7.1/MODULE.bazel".to_owned(),
+            "hash2".to_owned(),
+        );
+
+        let existing: Lockfile = serde_json::from_str(
+            &std::fs::read_to_string(workspace_root.join("MODULE.bazel.lock")).unwrap(),
+        )
+        .unwrap();
+
+        let err = Lockfile::enforce_error_mode(&new_graph, &existing).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("new registry file") && msg.contains("not in lockfile"),
+            "error mode should detect new registry file: {msg}"
+        );
+    }
+
+    #[test]
+    fn lockfile_lifecycle_off_mode_neither_reads_nor_writes() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+
+        let written = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Off,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(!written, "off mode should not write");
+        assert!(
+            !workspace_root.join("MODULE.bazel.lock").exists(),
+            "off mode should not create lockfile"
+        );
+    }
+
+    #[test]
+    fn lockfile_lifecycle_error_mode_skips_write() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        let graph = crate::resolution::ResolvedGraph::default();
+
+        let written = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Error,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(!written, "error mode should not write");
+        assert!(
+            !workspace_root.join("MODULE.bazel.lock").exists(),
+            "error mode should not create lockfile"
+        );
+    }
+
+    #[test]
+    fn from_resolved_graph_with_extensions_merges_extension_data() {
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+
+        let mut old_lockfile = Lockfile::new();
+        let old_ext_data = LockfileExtensionData::new(
+            "old_bzl_digest".to_owned(),
+            "old_usages_digest".to_owned(),
+            IndexMap::new(),
+        );
+        old_lockfile
+            .module_extensions
+            .insert("@@rules_python+//python/extensions:pip.bzl%pip".to_owned(), old_ext_data);
+        old_lockfile.facts.insert(
+            "@@rules_python+//python/extensions:pip.bzl%pip".to_owned(),
+            serde_json::json!({"version": "1.0"}),
+        );
+
+        let new_ext_data = LockfileExtensionData::new(
+            "new_bzl_digest".to_owned(),
+            "new_usages_digest".to_owned(),
+            IndexMap::new(),
+        );
+
+        let active_ids = vec![
+            "@@rules_python+//python/extensions:pip.bzl%pip".to_owned(),
+            "@@rules_java+//java/extensions:java.bzl%java".to_owned(),
+        ];
+
+        let new_facts = vec![(
+            "@@rules_python+//python/extensions:pip.bzl%pip".to_owned(),
+            serde_json::json!({"version": "2.0"}),
+        )];
+
+        let result = Lockfile::from_resolved_graph_with_extensions(
+            &graph,
+            Some(&old_lockfile),
+            &[
+                (
+                    "@@rules_java+//java/extensions:java.bzl%java".to_owned(),
+                    new_ext_data,
+                ),
+            ],
+            &active_ids,
+            &new_facts,
+        );
+
+        assert_eq!(result.registry_file_hashes.len(), 1);
+        assert_eq!(result.module_extensions.len(), 2);
+        assert!(result
+            .module_extensions
+            .contains_key("@@rules_python+//python/extensions:pip.bzl%pip"));
+        assert!(result
+            .module_extensions
+            .contains_key("@@rules_java+//java/extensions:java.bzl%java"));
+
+        let pip_facts = result
+            .facts
+            .get("@@rules_python+//python/extensions:pip.bzl%pip")
+            .unwrap();
+        assert_eq!(pip_facts["version"], "2.0");
+    }
+
+    #[test]
+    fn from_resolved_graph_with_extensions_excludes_file_registry_urls() {
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+        graph.registry_file_hashes.insert(
+            "file:///home/user/local-registry/modules/foo/MODULE.bazel".to_owned(),
+            "local_hash".to_owned(),
+        );
+
+        let result = Lockfile::from_resolved_graph_with_extensions(
+            &graph,
+            None,
+            &[],
+            &[],
+            &[],
+        );
+
+        assert_eq!(result.registry_file_hashes.len(), 1);
+        assert!(!result
+            .registry_file_hashes
+            .contains_key("file:///home/user/local-registry/modules/foo/MODULE.bazel"));
+        assert!(result
+            .registry_file_hashes
+            .contains_key("https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"));
+    }
+
+    #[test]
+    fn from_resolved_graph_with_extensions_prunes_inactive_extensions() {
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        let mut old_lockfile = Lockfile::new();
+        old_lockfile.module_extensions.insert(
+            "@@old_extension//ext.bzl%old".to_owned(),
+            LockfileExtensionData::new("d1".to_owned(), "d2".to_owned(), IndexMap::new()),
+        );
+        old_lockfile.facts.insert(
+            "@@old_extension//ext.bzl%old".to_owned(),
+            serde_json::json!({"orphaned_key": "should_be_pruned"}),
+        );
+
+        let result = Lockfile::from_resolved_graph_with_extensions(
+            &graph,
+            Some(&old_lockfile),
+            &[],
+            &["@@new_extension//ext.bzl%new".to_owned()],
+            &[],
+        );
+
+        assert!(
+            !result
+                .module_extensions
+                .contains_key("@@old_extension//ext.bzl%old"),
+            "inactive extensions should be pruned"
+        );
+        assert!(
+            !result.facts.contains_key("@@old_extension//ext.bzl%old"),
+            "facts for inactive extensions should be pruned"
+        );
+    }
+
+    #[test]
+    fn from_resolved_graph_with_extensions_sorts_output_deterministically() {
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        let ext_z = LockfileExtensionData::new("z".to_owned(), "z".to_owned(), IndexMap::new());
+        let ext_a = LockfileExtensionData::new("a".to_owned(), "a".to_owned(), IndexMap::new());
+
+        let result = Lockfile::from_resolved_graph_with_extensions(
+            &graph,
+            None,
+            &[
+                ("@@z_ext//ext.bzl%z".to_owned(), ext_z),
+                ("@@a_ext//ext.bzl%a".to_owned(), ext_a),
+            ],
+            &["@@z_ext//ext.bzl%z".to_owned(), "@@a_ext//ext.bzl%a".to_owned()],
+            &[],
+        );
+
+        let keys: Vec<&str> = result.module_extensions.keys().map(|s| s.as_str()).collect();
+        assert_eq!(
+            keys,
+            &["@@a_ext//ext.bzl%a", "@@z_ext//ext.bzl%z"],
+            "extensions should be sorted lexicographically"
+        );
     }
 }

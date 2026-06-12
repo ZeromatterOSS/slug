@@ -93,6 +93,7 @@ pub use dice_graph::BzlmodLockfileInputsDataKey;
 pub use dice_graph::BzlmodLockfileInputsDataValue;
 pub use dice_graph::BzlmodLockfileInputsKey;
 pub use dice_graph::BzlmodLockfileInputsValue;
+pub use dice_graph::BzlmodResolvedGraphDataKey;
 use dice_graph::BzlmodModuleSourcesDataKey;
 use dice_graph::BzlmodModuleSourcesDataValue;
 pub use dice_graph::BzlmodModuleVersionsDataKey;
@@ -215,6 +216,7 @@ pub use fetch::OverridePatchInputs;
 pub use fetch::SourceFetcher;
 pub use integrity::verify_integrity;
 pub use lockfile::Lockfile;
+pub use lockfile::LockfileExtensionData;
 pub use lockfile::LockfileMode;
 pub use lockfile::RecordedDirtreeEntryState;
 pub use lockfile::SelectedExtensionCache;
@@ -643,6 +645,8 @@ fn set_bzlmod_projection_data_with_inputs(
         BzlmodExtensionAggregationsDataKey,
         extension_aggregations,
     )])?;
+    // Phase 64.5: inject resolved graph for post-build lockfile persistence
+    updater.changed_to(vec![(BzlmodResolvedGraphDataKey, resolved_graph)])?;
     #[cfg(test)]
     if let Some(cell_graph_data) = cell_graph_data {
         updater.changed_to(vec![(BzlmodCellGraphDataKey, cell_graph_data)])?;
@@ -957,6 +961,77 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
     }
 
     Ok(())
+}
+
+/// Persist the lockfile after a successful bzlmod resolution.
+///
+/// This is a **post-DICE side effect**, modeled on Bazel 9's
+/// `BazelLockFileModule.afterCommand()`. It must be called from the server
+/// command context after the resolution completes, NOT from inside a DICE
+/// computation.
+///
+/// # Arguments
+///
+/// * `workspace_root` — The project root directory (contains MODULE.bazel).
+/// * `lockfile_mode` — The current lockfile mode. Writing only occurs for
+///   `Update` or `Refresh`; `Error` and `Off` skip writing.
+/// * `resolved_graph` — The resolved module graph containing registry file
+///   hashes and selected yanked versions.
+/// * `new_extension_results` — Extension data from freshly evaluated
+///   extensions, as `(extension_id, LockfileExtensionData)` pairs.
+///   Bazel 9 reference: `BazelLockFileModule.afterCommand()` iterates
+///   `evaluator.getDoneValues()` for `SingleExtensionValue` results.
+/// * `active_extension_ids` — Extension IDs that still have usages in the
+///   current dep graph. Extensions not in this list are pruned from the
+///   lockfile. Bazel 9 reference: `depGraphValue.getExtensionUsagesTable()
+///   ::containsRow`.
+/// * `new_facts` — Facts from freshly evaluated extensions.
+///
+/// # Behavior
+///
+/// - Reads the on-disk visible lockfile (if any).
+/// - Builds a new lockfile from the resolved graph + merged extension data.
+/// - Writes only if the new lockfile differs from the on-disk one (Bazel's
+///   `!newLockfile.equals(oldLockfile)` guard).
+/// - Returns `Ok(true)` if a write occurred, `Ok(false)` if skipped.
+pub fn persist_lockfile_after_resolution(
+    workspace_root: &std::path::Path,
+    lockfile_mode: LockfileMode,
+    resolved_graph: &crate::resolution::ResolvedGraph,
+    new_extension_results: &[(String, lockfile::LockfileExtensionData)],
+    active_extension_ids: &[String],
+    new_facts: &[(String, serde_json::Value)],
+) -> slug_error::Result<bool> {
+    use crate::lockfile::Lockfile;
+    use crate::lockfile::LockfileWritePurpose;
+    use crate::lockfile::lockfile_path;
+    match lockfile_mode {
+        LockfileMode::Update | LockfileMode::Refresh => {}
+        LockfileMode::Error | LockfileMode::Off => return Ok(false),
+    }
+
+    let path = lockfile_path(workspace_root);
+
+    let existing_lockfile: Option<Lockfile> = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<Lockfile>(&content).ok());
+
+    let new_lockfile = Lockfile::from_resolved_graph_with_extensions(
+        resolved_graph,
+        existing_lockfile.as_ref(),
+        new_extension_results,
+        active_extension_ids,
+        new_facts,
+    );
+
+    match existing_lockfile {
+        Some(existing) if existing == new_lockfile => Ok(false),
+        _ => {
+            new_lockfile
+                .write_for_purpose(&path, LockfileWritePurpose::ResolutionUpdate)?;
+            Ok(true)
+        }
+    }
 }
 
 async fn validate_lockfile_extension_replay_for_extension(

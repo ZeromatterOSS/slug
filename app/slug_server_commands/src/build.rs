@@ -241,6 +241,16 @@ async fn build(
     )
     .await?;
 
+    // Phase 64.5: persist lockfile after a successful build (Bazel's afterCommand parity).
+    // Non-fatal: a lockfile write failure should not fail the build.
+    if build_result.other_errors.is_empty()
+        && build_result.configured.values().all(|v| v.is_some())
+    {
+        if let Err(e) = persist_lockfile_post_build(&ctx).await {
+            tracing::warn!("Lockfile persistence failed after build: {e:#}");
+        }
+    }
+
     let detailed_metrics: Option<_> = None;
 
     send_target_cfg_event(
@@ -755,4 +765,106 @@ async fn build_target(
         timeout_observer,
     )
     .await;
+}
+
+/// Phase 64.5: persist the lockfile after a successful build.
+///
+/// Reads the injected resolved graph, lockfile mode, extension aggregations,
+/// and lockfile inputs from DICE, then delegates to
+/// `slug_bzlmod::persist_lockfile_after_resolution`.
+///
+/// Extension data is gathered from the existing DICE-injected lockfile
+/// (visible + hidden), which already contains merged results from all
+/// evaluated extensions. This follows Bazel 9's
+/// `BazelLockFileModule.afterCommand()` pattern of combining old lockfile
+/// entries with newly resolved results.
+///
+/// Non-fatal: errors are logged but do not fail the build.
+///
+/// **Limitation:** Extension data and facts are read from the DICE-injected
+/// lockfile contents captured at session start, not from freshly computed
+/// results. This means the function currently acts as a maintenance step for
+/// registry-file-hash drift only. To capture fresh extension results, this
+/// function would need to read from `ExtensionSpokesKey`/`ExtensionSpokesValue`
+/// DICE computations instead.
+async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error::Result<()> {
+    use slug_bzlmod::BzlmodExtensionAggregationsDataKey;
+    use slug_bzlmod::BzlmodLockfileInputsDataKey;
+    use slug_bzlmod::BzlmodLockfileInputsKey;
+    use slug_bzlmod::BzlmodResolvedGraphDataKey;
+    use slug_bzlmod::LockfileExtensionData;
+    use slug_bzlmod::persist_lockfile_after_resolution;
+
+    let mut ctx = ctx.clone();
+    let lockfile_data = ctx.compute(&BzlmodLockfileInputsDataKey).await?;
+    let resolved_graph = ctx.compute(&BzlmodResolvedGraphDataKey).await?;
+
+    let Some(resolved_graph) = resolved_graph else {
+        return Ok(());
+    };
+
+    let workspace_root = lockfile_data.workspace_id.canonical_project_root.as_ref();
+    let lockfile_mode = lockfile_data.lockfile_mode;
+
+    let aggregations = ctx.compute(&BzlmodExtensionAggregationsDataKey).await?;
+    let active_extension_ids: Vec<String> = aggregations
+        .extension_aggregations
+        .keys()
+        .cloned()
+        .collect();
+
+    let lockfile_inputs_key = BzlmodLockfileInputsKey::for_workspace_id_with_resolution_digest(
+        lockfile_data.workspace_id.clone(),
+        lockfile_data.resolution_digest.clone(),
+    );
+    let lockfile_inputs = ctx.compute(&lockfile_inputs_key).await??;
+
+    let mut new_extension_results: Vec<(String, LockfileExtensionData)> = Vec::new();
+    let mut new_facts: Vec<(String, _)> = Vec::new();
+
+    for lockfile_value in [
+        lockfile_inputs
+            .visible_lockfile
+            .as_ref()
+            .and_then(|v| v.lockfile.as_ref()),
+        lockfile_inputs
+            .hidden_lockfile
+            .as_ref()
+            .and_then(|v| v.lockfile.as_ref()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        for ext_id in &active_extension_ids {
+            if let Some(ext_data) = lockfile_value.get_extension_data(ext_id) {
+                if !new_extension_results
+                    .iter()
+                    .any(|(id, _)| id == ext_id)
+                {
+                    new_extension_results
+                        .push((ext_id.clone(), ext_data.clone()));
+                }
+            }
+        }
+        for (fact_ext_id, fact_value) in &lockfile_value.facts {
+            if active_extension_ids.contains(fact_ext_id)
+                && !new_facts.iter().any(|(id, _)| id == fact_ext_id)
+            {
+                new_facts.push((fact_ext_id.clone(), fact_value.clone()));
+            }
+        }
+    }
+
+    match persist_lockfile_after_resolution(
+        workspace_root,
+        lockfile_mode,
+        &resolved_graph,
+        &new_extension_results,
+        &active_extension_ids,
+        &new_facts,
+    )? {
+        true => tracing::info!("Lockfile updated after build"),
+        false => tracing::debug!("Lockfile unchanged after build"),
+    }
+    Ok(())
 }

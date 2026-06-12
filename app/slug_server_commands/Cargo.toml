@@ -24,6 +24,7 @@ starlark_map = { workspace = true }
 
 slug_artifact = { workspace = true }
 slug_build_api = { workspace = true }
+slug_bzlmod = { workspace = true }
 slug_certs = { workspace = true }
 slug_cli_proto = { workspace = true }
 slug_common = { workspace = true }
