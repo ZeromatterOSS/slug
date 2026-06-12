@@ -3519,7 +3519,11 @@ async fn extension_cells_from_spokes(
                 extension_recorded_inputs_json: serde_json::to_string(
                     spokes.recorded_inputs.as_ref(),
                 )
-                .unwrap_or_else(|_| "[]".to_owned()),
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "extension_recorded_inputs_json: JSON serialization failed: {e}"
+                    )
+                }),
                 materialized: false,
                 lazy: false,
             });
@@ -4654,6 +4658,32 @@ impl dice::InjectedKey for BzlmodLockfileInputsDataKey {
     }
 }
 
+/// Injected key that stores the most recently computed resolved graph
+/// for the workspace. Used by the post-build lockfile persistence step
+/// (Phase 64.5: `persist_lockfile_after_resolution`).
+///
+/// Set to `None` for non-bzlmod workspaces or before the first resolution.
+#[derive(
+    derive_more::Display,
+    Debug,
+    Hash,
+    Eq,
+    Clone,
+    Dupe,
+    PartialEq,
+    Allocative
+)]
+#[display("BzlmodResolvedGraphDataKey")]
+pub struct BzlmodResolvedGraphDataKey;
+
+impl dice::InjectedKey for BzlmodResolvedGraphDataKey {
+    type Value = Option<Arc<crate::resolution::ResolvedGraph>>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[derive(
     derive_more::Display,
     Debug,
@@ -5670,12 +5700,14 @@ impl ExtensionSpokesKey {
             Arc::from(repo_env_policy_digest(&repo_env).as_str());
         let repo_mappings_digest = Arc::from(
             crate::extension_execution_dice::repo_mappings_identity_digest(&repo_mappings)
+                .expect("RepoMappingSnapshot serialization is infallible")
                 .as_str(),
         );
         let repo_mapping_overrides_digest = Arc::from(
             crate::extension_execution_dice::repo_mapping_overrides_identity_digest(
                 &repo_mapping_overrides,
             )
+            .expect("RepoMappingOverrides serialization is infallible")
             .as_str(),
         );
         Self {
@@ -5992,6 +6024,7 @@ impl RepoMaterializationManifestKey {
             Arc::from(repo_env_policy_digest(&repo_env).as_str());
         let repo_mappings_digest = Arc::from(
             crate::extension_execution_dice::repo_mappings_identity_digest(&repo_mappings)
+                .expect("RepoMappingSnapshot serialization is infallible")
                 .as_str(),
         );
         Self {

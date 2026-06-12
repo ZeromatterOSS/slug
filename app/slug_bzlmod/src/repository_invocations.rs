@@ -89,16 +89,17 @@ impl RepositoryInvocation {
         let mut hasher = Sha256::new();
         hasher.update(self.name.as_bytes());
         hasher.update(self.rule_name.as_bytes());
-        if let Some(source) = &self.rule_source {
-            hasher.update(source.as_bytes());
+        if let Some(src) = &self.rule_source {
+            hasher.update(src.as_bytes());
         }
-        // Sort keys for deterministic hashing
         let mut keys: Vec<_> = self.attrs.keys().collect();
         keys.sort();
         for key in keys {
             hasher.update(key.as_bytes());
-            if let Some(value) = self.attrs.get(key) {
-                hasher.update(value.hash_bytes().as_slice());
+            if let Some(val) = self.attrs.get(key) {
+                let mut buf = Vec::new();
+                val.stable_hash_bytes(&mut buf);
+                hasher.update(&buf);
             }
         }
         let hash = hasher.finalize();
@@ -154,33 +155,47 @@ impl AttrValue {
         }
     }
 
-    /// Compute bytes for hashing.
-    fn hash_bytes(&self) -> Vec<u8> {
+    pub fn stable_hash_bytes(&self, out: &mut Vec<u8>) {
         match self {
-            AttrValue::String(s) => s.as_bytes().to_vec(),
-            AttrValue::Int(i) => i.to_le_bytes().to_vec(),
-            AttrValue::Bool(b) => vec![if *b { 1 } else { 0 }],
-            AttrValue::None => vec![],
-            AttrValue::StringList(list) => {
-                let mut bytes = Vec::new();
-                for s in list {
-                    bytes.extend(s.as_bytes());
-                    bytes.push(0);
-                }
-                bytes
+            AttrValue::String(s) => {
+                out.extend_from_slice(b"str:");
+                out.extend_from_slice(s.as_bytes());
             }
-            AttrValue::Label(s) => s.as_bytes().to_vec(),
+            AttrValue::Int(i) => {
+                out.extend_from_slice(b"int:");
+                out.extend_from_slice(&i.to_le_bytes());
+            }
+            AttrValue::Bool(b) => {
+                out.extend_from_slice(b"bool:");
+                out.push(if *b { 1 } else { 0 });
+            }
+            AttrValue::None => {
+                out.extend_from_slice(b"none");
+            }
+            AttrValue::StringList(list) => {
+                out.extend_from_slice(b"list:");
+                out.extend_from_slice(&list.len().to_le_bytes());
+                for s in list {
+                    out.extend_from_slice(s.as_bytes());
+                    out.push(0);
+                }
+            }
+            AttrValue::Label(s) => {
+                out.extend_from_slice(b"label:");
+                out.extend_from_slice(s.as_bytes());
+            }
             AttrValue::Dict(map) => {
+                out.extend_from_slice(b"dict:");
+                out.extend_from_slice(&map.len().to_le_bytes());
                 let mut keys: Vec<_> = map.keys().collect();
                 keys.sort();
-                let mut bytes = Vec::new();
                 for key in keys {
-                    bytes.extend(key.as_bytes());
+                    out.extend_from_slice(key.as_bytes());
+                    out.push(0);
                     if let Some(value) = map.get(key) {
-                        bytes.extend(value.hash_bytes());
+                        value.stable_hash_bytes(out);
                     }
                 }
-                bytes
             }
         }
     }
@@ -402,6 +417,13 @@ mod tests {
         assert_eq!(outer_invocations.len(), 2);
         assert_eq!(outer_invocations[0].name, "outer");
         assert_eq!(outer_invocations[1].name, "outer_after_inner");
+    }
+
+    #[test]
+    fn test_attr_value_stable_hash_bytes_none() {
+        let mut bytes = Vec::new();
+        AttrValue::None.stable_hash_bytes(&mut bytes);
+        assert_eq!(bytes.as_slice(), b"none");
     }
 
     #[test]

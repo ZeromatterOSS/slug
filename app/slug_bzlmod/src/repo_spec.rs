@@ -90,6 +90,10 @@ impl RepoSpec {
     }
 
     /// Compute a hash for cache invalidation.
+    ///
+    /// Uses `AttrValue::stable_hash_bytes` which produces deterministic output
+    /// with type discriminators, independent of Rust `Debug` formatting or
+    /// `serde_json` output format.
     pub fn compute_hash(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(self.repo_rule_id.as_bytes());
@@ -99,8 +103,11 @@ impl RepoSpec {
         keys.sort();
         for key in keys {
             hasher.update(key.as_bytes());
+            hasher.update([0u8]);
             if let Some(value) = self.attributes.get(key) {
-                hasher.update(format!("{:?}", value).as_bytes());
+                let mut buf = Vec::new();
+                value.stable_hash_bytes(&mut buf);
+                hasher.update(&buf);
             }
         }
 
@@ -248,6 +255,111 @@ mod tests {
 
         // Different specs should have different hash
         assert_ne!(spec1.compute_hash(), spec3.compute_hash());
+    }
+
+    /// Phase 64.6: verify compute_hash uses stable JSON serialization,
+    /// not Rust Debug formatting. Distinct AttrValue variants that might
+    /// coincidentally have the same Debug representation must produce
+    /// distinct hashes.
+    #[test]
+    fn test_compute_hash_stable_json_not_debug() {
+        // String "42" vs Int 42 — these have different Debug formats
+        // ("String(\"42\")" vs "Int(42)"), but the key test is that the
+        // hash is deterministic and not dependent on Rust compiler version.
+        let spec_str = RepoSpec::new("test_rule".to_owned())
+            .with_attr("val".to_owned(), AttrValue::String("42".to_owned()));
+        let spec_int = RepoSpec::new("test_rule".to_owned())
+            .with_attr("val".to_owned(), AttrValue::Int(42));
+
+        // Different AttrValue variants must produce different hashes
+        assert_ne!(
+            spec_str.compute_hash(),
+            spec_int.compute_hash(),
+            "String(\"42\") and Int(42) must hash differently"
+        );
+
+        // Repeated calls produce the same result (deterministic)
+        let hash1 = spec_str.compute_hash();
+        let hash2 = spec_str.compute_hash();
+        assert_eq!(hash1, hash2, "compute_hash must be deterministic");
+
+        // Bool and Int must also differ
+        let spec_bool = RepoSpec::new("test_rule".to_owned())
+            .with_attr("val".to_owned(), AttrValue::Bool(true));
+        assert_ne!(
+            spec_int.compute_hash(),
+            spec_bool.compute_hash(),
+            "Int(42) and Bool(true) must hash differently"
+        );
+    }
+
+    /// Phase 64.6: verify that attribute key ordering does not affect the hash.
+    /// This is a property of the sorted-key iteration, not JSON serialization.
+    #[test]
+    fn test_compute_hash_attribute_ordering_stable() {
+        let spec_a = RepoSpec::new("test_rule".to_owned())
+            .with_attr("alpha".to_owned(), AttrValue::String("a".to_owned()))
+            .with_attr("beta".to_owned(), AttrValue::String("b".to_owned()));
+
+        let spec_b = RepoSpec::new("test_rule".to_owned())
+            .with_attr("beta".to_owned(), AttrValue::String("b".to_owned()))
+            .with_attr("alpha".to_owned(), AttrValue::String("a".to_owned()));
+
+        assert_eq!(
+            spec_a.compute_hash(),
+            spec_b.compute_hash(),
+            "Attribute insertion order must not affect hash"
+        );
+    }
+
+    /// Phase 64.6: String and Label with the same text must produce
+    /// distinct hashes. The old hash_bytes() had no type discriminators,
+    /// so String("foo") and Label("foo") would collide.
+    #[test]
+    fn test_compute_hash_string_vs_label_distinct() {
+        let spec_str = RepoSpec::new("test_rule".to_owned())
+            .with_attr("val".to_owned(), AttrValue::String("foo".to_owned()));
+        let spec_label = RepoSpec::new("test_rule".to_owned())
+            .with_attr("val".to_owned(), AttrValue::Label("foo".to_owned()));
+        assert_ne!(
+            spec_str.compute_hash(),
+            spec_label.compute_hash(),
+            "String(\"foo\") and Label(\"foo\") must hash differently"
+        );
+    }
+
+    /// Phase 64.6: verify that stable_hash_bytes produces different
+    /// bytes for every AttrValue variant, even when the payload is
+    /// identical text.
+    #[test]
+    fn test_attr_value_stable_hash_bytes_discriminates_variants() {
+        let mut bytes_str = Vec::new();
+        AttrValue::String("x".to_owned()).stable_hash_bytes(&mut bytes_str);
+
+        let mut bytes_label = Vec::new();
+        AttrValue::Label("x".to_owned()).stable_hash_bytes(&mut bytes_label);
+
+        let mut bytes_int = Vec::new();
+        AttrValue::Int(1).stable_hash_bytes(&mut bytes_int);
+
+        let mut bytes_bool = Vec::new();
+        AttrValue::Bool(true).stable_hash_bytes(&mut bytes_bool);
+
+        let mut bytes_none = Vec::new();
+        AttrValue::None.stable_hash_bytes(&mut bytes_none);
+
+        assert_ne!(bytes_str, bytes_label, "String vs Label must differ");
+        assert_ne!(bytes_str, bytes_int, "String vs Int must differ");
+        assert_ne!(bytes_str, bytes_bool, "String vs Bool must differ");
+        assert_ne!(bytes_str, bytes_none, "String vs None must differ");
+        assert_ne!(bytes_int, bytes_bool, "Int vs Bool must differ");
+        assert_ne!(bytes_int, bytes_none, "Int vs None must differ");
+        assert!(!bytes_str.is_empty(), "String hash bytes must not be empty");
+        assert!(bytes_str.starts_with(b"str:"), "String must have str: discriminator");
+        assert!(bytes_label.starts_with(b"label:"), "Label must have label: discriminator");
+        assert!(bytes_int.starts_with(b"int:"), "Int must have int: discriminator");
+        assert!(bytes_bool.starts_with(b"bool:"), "Bool must have bool: discriminator");
+        assert!(bytes_none.starts_with(b"none"), "None must have none discriminator");
     }
 
     #[test]

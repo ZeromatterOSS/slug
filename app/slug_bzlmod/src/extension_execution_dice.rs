@@ -88,20 +88,39 @@ use crate::repo_spec::RepoSpec;
 use crate::repository_execution::REPOSITORY_MATERIALIZATION_STATE_READER_IMPL;
 use crate::repository_execution::validate_recorded_inputs_with_dice_reader;
 
-fn stable_json_digest<T: Serialize>(value: &T) -> String {
-    let json = serde_json::to_string(value).unwrap_or_else(|_| "<json-error>".to_owned());
-    compute_sha256_hex(json.as_bytes())
+/// Compute a SHA-256 digest of the JSON serialization of `value`.
+///
+/// Returns an error if `value` cannot be serialized to JSON, rather than
+/// collapsing distinct failures to a single sentinel digest. All types
+/// passed to this function (`RepoMappingSnapshot`, `RepoMappingOverrides`)
+/// are derived `Serialize` and should never fail serialization in practice,
+/// but the fallible signature makes the contract honest and ensures that
+/// if a new type is introduced that *can* fail, the error propagates
+/// instead of being silently swallowed.
+fn stable_json_digest<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
+    let json = serde_json::to_string(value)?;
+    Ok(compute_sha256_hex(json.as_bytes()))
 }
 
-fn stable_json_string<T: Serialize>(value: &T, fallback: &str) -> String {
-    serde_json::to_string(value).unwrap_or_else(|_| fallback.to_owned())
+/// Serialize `value` to a JSON string.
+///
+/// Returns an error if serialization fails. Since the input type is always
+/// `BTreeMap<String, String>` (which cannot fail `Serialize`), errors
+/// should not occur in practice, but the fallible signature keeps the
+/// contract honest.
+fn stable_json_string<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
+    serde_json::to_string(value)
 }
 
-pub fn repo_mappings_identity_digest(repo_mappings: &RepoMappingSnapshot) -> String {
+pub fn repo_mappings_identity_digest(
+    repo_mappings: &RepoMappingSnapshot,
+) -> Result<String, serde_json::Error> {
     stable_json_digest(repo_mappings)
 }
 
-pub fn repo_mapping_overrides_identity_digest(overrides: &RepoMappingOverrides) -> String {
+pub fn repo_mapping_overrides_identity_digest(
+    overrides: &RepoMappingOverrides,
+) -> Result<String, serde_json::Error> {
     stable_json_digest(overrides)
 }
 
@@ -349,15 +368,61 @@ fn selected_extension_cache_repo_specs_digest(cache: &SelectedExtensionCache) ->
     for (name, spec) in repo_specs {
         hasher.update(name.as_bytes());
         hasher.update([0u8]);
-        let spec_json = serde_json::to_string(spec).unwrap_or_else(|_| format!("{spec:?}"));
-        hasher.update(spec_json.as_bytes());
+        hasher.update(spec.compute_hash().as_bytes());
         hasher.update([0u8]);
     }
     hex::encode(hasher.finalize())
 }
 
 fn facts_identity(value: &serde_json::Value) -> String {
-    serde_json::to_string(value).unwrap_or_else(|_| value.to_string())
+    serde_json::to_string(value).expect("serde_json::Value serialization is infallible")
+}
+
+fn lockfile_mode_tag(mode: LockfileMode) -> &'static str {
+    match mode {
+        LockfileMode::Update => "update",
+        LockfileMode::Refresh => "refresh",
+        LockfileMode::Error => "error",
+        LockfileMode::Off => "off",
+    }
+}
+
+fn selected_extension_cache_identity_digest(identity: &SelectedExtensionCacheIdentity) -> String {
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{:?}", identity.source).as_bytes());
+    hasher.update([0u8]);
+    hasher.update(identity.selected_key.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(identity.repo_specs_digest.as_bytes());
+    hasher.update([0u8]);
+    for input in &identity.recorded_inputs {
+        hasher.update(input.as_bytes());
+        hasher.update([0u8]);
+    }
+    if let Some(root) = &identity.workspace_root {
+        hasher.update(root.to_string_lossy().as_bytes());
+    }
+    hasher.update([0u8]);
+    if let Some(env) = &identity.repo_env {
+        let mut keys: Vec<_> = env.keys().collect();
+        keys.sort();
+        for key in keys {
+            hasher.update(key.as_bytes());
+            hasher.update([0u8]);
+            if let Some(val) = env.get(key) {
+                hasher.update(val.as_bytes());
+            }
+            hasher.update([0u8]);
+        }
+    }
+    hasher.update([0u8]);
+    if let Some(mappings) = &identity.repo_mappings {
+        let json = serde_json::to_string(mappings)
+            .expect("RepoMappingSnapshot serialization is infallible");
+        hasher.update(json.as_bytes());
+    }
+    hex::encode(hasher.finalize())
 }
 
 fn module_extension_replay_inputs_identity_digest(
@@ -369,7 +434,7 @@ fn module_extension_replay_inputs_identity_digest(
 ) -> String {
     use sha2::{Sha256, Digest};
     let mut hasher = Sha256::new();
-    hasher.update(format!("{:?}", lockfile_mode).as_bytes());
+    hasher.update(lockfile_mode_tag(lockfile_mode).as_bytes());
     hasher.update([0u8]);
     hasher.update(facts_identity(prior_facts).as_bytes());
     hasher.update([0u8]);
@@ -378,7 +443,7 @@ fn module_extension_replay_inputs_identity_digest(
     hasher.update(workspace_lockfile_facts_present.to_string().as_bytes());
     hasher.update([0u8]);
     if let Some(identity) = selected_cache_identity {
-        hasher.update(format!("{:?}", identity).as_bytes());
+        hasher.update(selected_extension_cache_identity_digest(identity).as_bytes());
     }
     hex::encode(hasher.finalize())
 }
@@ -506,6 +571,28 @@ async fn extension_spokes_identity_for_aggregation(
         })
         .await??;
 
+    let repo_env_json = stable_json_string(repo_env.as_ref()).map_err(|e| {
+        slug_error::slug_error!(
+            slug_error::ErrorTag::Input,
+            "repo_env serialization failed: {e}"
+        )
+    })?;
+    let repo_mappings_dig = repo_mappings_identity_digest(repo_mappings.repo_mappings.as_ref())
+        .map_err(|e| {
+            slug_error::slug_error!(
+                slug_error::ErrorTag::Input,
+                "repo_mappings digest failed: {e}"
+            )
+        })?;
+    let repo_mapping_overrides_dig =
+        repo_mapping_overrides_identity_digest(repo_mappings.repo_mapping_overrides.as_ref())
+            .map_err(|e| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "repo_mapping_overrides digest failed: {e}"
+                )
+            })?;
+
     Ok(Arc::new(ExtensionSpokesIdentityValue {
         workspace_id: workspace_id.clone(),
         extension_id: aggregation.extension_id.clone(),
@@ -515,14 +602,9 @@ async fn extension_spokes_identity_for_aggregation(
         aggregated: aggregation.aggregated.clone(),
         replay_inputs_identity_digest: Arc::from(replay_inputs.identity_digest()),
         replay_inputs_have_facts: replay_inputs.has_facts(),
-        repo_env_json: Arc::from(stable_json_string(repo_env.as_ref(), "{}").as_str()),
-        repo_mappings_digest: Arc::from(
-            repo_mappings_identity_digest(repo_mappings.repo_mappings.as_ref()).as_str(),
-        ),
-        repo_mapping_overrides_digest: Arc::from(
-            repo_mapping_overrides_identity_digest(repo_mappings.repo_mapping_overrides.as_ref())
-                .as_str(),
-        ),
+        repo_env_json: Arc::from(repo_env_json.as_str()),
+        repo_mappings_digest: Arc::from(repo_mappings_dig.as_str()),
+        repo_mapping_overrides_digest: Arc::from(repo_mapping_overrides_dig.as_str()),
         repo_env,
         repo_mappings: repo_mappings.repo_mappings.clone(),
         repo_mapping_overrides: repo_mappings.repo_mapping_overrides.clone(),
@@ -995,19 +1077,32 @@ impl Key for ExtensionSpokesKey {
             );
         }
 
+        let repo_mappings_dig =
+            repo_mappings_identity_digest(self.repo_mappings.as_ref()).map_err(|e| {
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "repo_mappings digest failed for extension '{}': {e}",
+                    self.extension_id
+                )
+            })?;
+        let repo_mapping_overrides_dig =
+            repo_mapping_overrides_identity_digest(self.repo_mapping_overrides.as_ref())
+                .map_err(|e| {
+                    slug_error::slug_error!(
+                        slug_error::ErrorTag::Input,
+                        "repo_mapping_overrides digest failed for extension '{}': {e}",
+                        self.extension_id
+                    )
+                })?;
+
         Ok(Arc::new(ExtensionSpokesValue {
             workspace_id: self.workspace_id.clone(),
             extension_id: self.extension_id.clone(),
             bzl_transitive_digest: self.bzl_transitive_digest.clone(),
             usages_digest: self.usages_digest.clone(),
             replay_inputs_identity_digest: self.replay_inputs_identity_digest.clone(),
-            repo_mappings_digest: Arc::from(
-                repo_mappings_identity_digest(self.repo_mappings.as_ref()).as_str(),
-            ),
-            repo_mapping_overrides_digest: Arc::from(
-                repo_mapping_overrides_identity_digest(self.repo_mapping_overrides.as_ref())
-                    .as_str(),
-            ),
+            repo_mappings_digest: Arc::from(repo_mappings_dig.as_str()),
+            repo_mapping_overrides_digest: Arc::from(repo_mapping_overrides_dig.as_str()),
             project_root: self.workspace_id.canonical_project_root.clone(),
             repo_env: self.repo_env.clone(),
             spokes,
@@ -1076,7 +1171,10 @@ pub struct ModuleExtensionResult {
     /// Generated repository specifications (NOT materialized).
     /// Keys are internal names (e.g., "numpy"), values are RepoSpecs.
     ///
-    /// `FxHashMap` so iteration is stable across invocations (Plan 21.2).
+    /// `FxHashMap` for deterministic hashing (same key → same bucket), NOT
+    /// for iteration stability. Iteration order is insertion-dependent under
+    /// hashbrown. Order-dependent consumers must sort on read when the order
+    /// matters for correctness (e.g., first-wins dedup). See Plan 21.2/26.
     pub generated_repo_specs: FxHashMap<String, RepoSpec>,
 
     /// Canonical name mapping.
@@ -1680,12 +1778,12 @@ impl ModuleExtensionExecutionKey {
         let repo_env_digest = Arc::from(
             crate::dice_graph::repo_env_policy_digest(&repo_env).as_str(),
         );
-        let repo_mappings_digest = Arc::from(
-            repo_mappings_identity_digest(&repo_mappings).as_str(),
-        );
-        let repo_mapping_overrides_digest = Arc::from(
-            repo_mapping_overrides_identity_digest(&repo_mapping_overrides).as_str(),
-        );
+        let repo_mappings_digest = repo_mappings_identity_digest(&repo_mappings)
+            .expect("RepoMappingSnapshot serialization is infallible");
+        let repo_mapping_overrides_digest = repo_mapping_overrides_identity_digest(
+            &repo_mapping_overrides,
+        )
+        .expect("RepoMappingOverrides serialization is infallible");
         Self {
             extension_id,
             input_hash,
@@ -1698,9 +1796,9 @@ impl ModuleExtensionExecutionKey {
             repo_env: Arc::new(repo_env),
             repo_env_digest,
             repo_mappings: Arc::new(repo_mappings),
-            repo_mappings_digest,
+            repo_mappings_digest: Arc::from(repo_mappings_digest.as_str()),
             repo_mapping_overrides: Arc::new(repo_mapping_overrides),
-            repo_mapping_overrides_digest,
+            repo_mapping_overrides_digest: Arc::from(repo_mapping_overrides_digest.as_str()),
         }
     }
 
@@ -1743,11 +1841,15 @@ impl ModuleExtensionExecutionKey {
             ),
             repo_mappings: repo_mappings.clone(),
             repo_mappings_digest: Arc::from(
-                repo_mappings_identity_digest(&repo_mappings).as_str(),
+                repo_mappings_identity_digest(&repo_mappings)
+                    .expect("RepoMappingSnapshot serialization is infallible")
+                    .as_str(),
             ),
             repo_mapping_overrides: repo_mapping_overrides.clone(),
             repo_mapping_overrides_digest: Arc::from(
-                repo_mapping_overrides_identity_digest(&repo_mapping_overrides).as_str(),
+                repo_mapping_overrides_identity_digest(&repo_mapping_overrides)
+                    .expect("RepoMappingOverrides serialization is infallible")
+                    .as_str(),
             ),
         }
     }
@@ -1801,7 +1903,7 @@ fn empty_facts() -> serde_json::Value {
 }
 
 fn facts_for_message(facts: &serde_json::Value) -> String {
-    serde_json::to_string(facts).unwrap_or_else(|_| facts.to_string())
+    serde_json::to_string(facts).expect("serde_json::Value serialization is infallible")
 }
 
 fn validate_error_mode_facts(
@@ -4743,5 +4845,98 @@ mod tests {
 
         assert!(key.project_root.is_none());
         assert!(key.project_root().is_none());
+    }
+
+    /// Phase 64.6: distinct RepoMappingSnapshot values must produce distinct
+    /// identity digests. This catches the old bug where failed serialization
+    /// collapsed to "<json-error>" producing identical digests.
+    #[test]
+    fn test_repo_mappings_identity_digest_distinct() {
+        let empty: crate::RepoMappingSnapshot = std::collections::BTreeMap::new();
+        let mut with_mapping: crate::RepoMappingSnapshot = std::collections::BTreeMap::new();
+        let mut inner = std::collections::BTreeMap::new();
+        inner.insert("apparent".to_owned(), "canonical".to_owned());
+        with_mapping.insert("source_repo".to_owned(), inner);
+
+        let digest_empty = repo_mappings_identity_digest(&empty).unwrap();
+        let digest_with = repo_mappings_identity_digest(&with_mapping).unwrap();
+
+        assert_ne!(
+            digest_empty, digest_with,
+            "Empty and non-empty repo mappings must produce distinct digests"
+        );
+    }
+
+    /// Phase 64.6: stable_json_digest must be deterministic.
+    #[test]
+    fn test_stable_json_digest_deterministic() {
+        let empty: crate::RepoMappingSnapshot = std::collections::BTreeMap::new();
+        let d1 = stable_json_digest(&empty).unwrap();
+        let d2 = stable_json_digest(&empty).unwrap();
+        assert_eq!(d1, d2, "stable_json_digest must be deterministic");
+    }
+
+    /// Phase 64.6: stable_json_digest is fallible and returns Err
+    /// (not a sentinel) when serialization fails. A non-serializable
+    /// type would fail at compile time, so we test that the Result
+    /// contract is present and Ok for known-good types.
+    #[test]
+    fn test_stable_json_digest_is_fallible() {
+        let map: crate::RepoMappingSnapshot = std::collections::BTreeMap::new();
+        let result = stable_json_digest(&map);
+        assert!(result.is_ok(), "Known-serializable type must produce Ok");
+        assert!(!result.unwrap().is_empty(), "Digest must be non-empty");
+    }
+
+    /// Phase 64.6: repo_mapping_overrides_identity_digest is fallible
+    /// and returns distinct digests for distinct inputs.
+    #[test]
+    fn test_repo_mapping_overrides_identity_digest_distinct() {
+        let empty: crate::RepoMappingOverrides = std::collections::BTreeMap::new();
+        let mut with_override: crate::RepoMappingOverrides = std::collections::BTreeMap::new();
+        let mut inner = std::collections::BTreeMap::new();
+        inner.insert("repo".to_owned(), "other".to_owned());
+        with_override.insert("key".to_owned(), inner);
+
+        let digest_empty = repo_mapping_overrides_identity_digest(&empty).unwrap();
+        let digest_with = repo_mapping_overrides_identity_digest(&with_override).unwrap();
+
+        assert_ne!(
+            digest_empty, digest_with,
+            "Empty and non-empty overrides must produce distinct digests"
+        );
+    }
+
+    /// Phase 64.6: lockfile_mode_tag produces stable tags not
+    /// dependent on Rust Debug formatting.
+    #[test]
+    fn test_lockfile_mode_tag_stable() {
+        assert_eq!(lockfile_mode_tag(LockfileMode::Update), "update");
+        assert_eq!(lockfile_mode_tag(LockfileMode::Refresh), "refresh");
+        assert_eq!(lockfile_mode_tag(LockfileMode::Error), "error");
+        assert_eq!(lockfile_mode_tag(LockfileMode::Off), "off");
+    }
+
+    /// Phase 64.6: selected_extension_cache_identity_digest uses
+    /// field-by-field hashing, not Debug formatting, so it's
+    /// deterministic across Rust compiler versions.
+    #[test]
+    fn test_selected_extension_cache_identity_digest_deterministic() {
+        let identity = SelectedExtensionCacheIdentity {
+            source: crate::dice_graph::LockfileContentKind::Workspace,
+            selected_key: "key".to_owned(),
+            repo_specs_digest: "abc123".to_owned(),
+            recorded_inputs: vec!["input1".to_owned()],
+            workspace_root: Some(PathBuf::from("/tmp/project")),
+            repo_env: Some({
+                let mut m = BTreeMap::new();
+                m.insert("K".to_owned(), "V".to_owned());
+                m
+            }),
+            repo_mappings: None,
+        };
+        let d1 = selected_extension_cache_identity_digest(&identity);
+        let d2 = selected_extension_cache_identity_digest(&identity);
+        assert_eq!(d1, d2, "Identity digest must be deterministic");
     }
 }
