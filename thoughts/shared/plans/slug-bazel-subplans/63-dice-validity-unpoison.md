@@ -2,7 +2,11 @@
 
 > Parent: [Plan 62: Bzlmod replay parity followups](./62-bzlmod-replay-parity-followups.md)
 >
-> Created: 2026-06-13
+> Created: 2026-06-11
+>
+> Follow-up owner: [Plan 64](./64-plan62-implementation-review-remediation.md)
+> Phase 64.7 adds the same-daemon semantic replay guardrail that proves the
+> generation marker edge invalidates external-tree package/file reads end to end.
 >
 > Root-cause investigation: `/var/mnt/dev/tmp/dice_commit_fix_plan.md`
 

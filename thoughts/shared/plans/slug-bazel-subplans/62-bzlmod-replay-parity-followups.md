@@ -6,9 +6,16 @@
 >
 > Created: 2026-06-07
 >
-> Updated: 2026-06-10 — Phases 3-6, 7-15 complete. Phases 1-2 outstanding.
-> Build verification: //sdk:sdk_contents builds successfully (8360 actions,
-> 33m08s total). Materialization-lock deadlock fixed (ea34f863, d2de2e93).
+> Updated: 2026-06-11 — live implementation review reopened residual follow-ups
+> in [Plan 64](./64-plan62-implementation-review-remediation.md). Historical
+> phase completion labels below record landed work, but Plan 62 is not considered
+> closed until Plan 64 resolves materialization locking/publish, download/auth,
+> lockfile lifecycle, digest honesty, and same-daemon replay guardrail gaps.
+>
+> Updated: 2026-06-10 — major implementation landed and //sdk:sdk_contents built
+> successfully (8360 actions, 33m08s total). Materialization-lock deadlock fixes
+> landed as ea34f863 and d2de2e93, but the 2026-06-11 review found that the
+> remaining blocking-lock shape still needs redesign under Plan 64.
 >
 > Updated: 2026-06-08 — added Part B (Phases 7-15) from the write/fetch +
 > MVS-semantics + lifecycle audit. Part A = replay/parity (Phases 1-6, original
@@ -29,6 +36,13 @@ state below those graph producers.
 The implementation is not slop: root/non-root module inputs, lockfile inputs,
 registry file hashes, override modules, repo mappings, extension replay inputs,
 and repository materialization manifests are substantially DICE-shaped.
+
+2026-06-11 review update: the implementation is directionally strong but not
+done. Plan 64 is now the owner for residual review findings: status drift,
+blocking materialization locks held across async/DICE work, remove-then-rename
+publish windows, warning-only download auth/header handling, unwired production
+lockfile writing, fallible digest honesty, semantic external-tree replay
+coverage, and bzlmod string/data-structure audit work.
 
 The implementation is also not fully replay-correct or Bazel-9-complete:
 
@@ -430,10 +444,15 @@ target with no containment check. The zip path is already safe (it uses
 
 **Test command:** `cargo test -p slug_bzlmod repository_executor`
 
-## Phase 8: Atomic and Concurrency-Safe Materialization — COMPLETE
+## Phase 8: Atomic and Concurrency-Safe Materialization — COMPLETE WITH PLAN 64 FOLLOW-UP
 
 **Severity:** CRITICAL (crash leaves live partial tree) / HIGH (concurrent race).
 **Completed:** 2026-06-08 (commit 39726f2a, parking_lot fix ea34f863, self-deadlock fix d2de2e93)
+**Review follow-up:** 2026-06-11 review found residual gaps owned by Plan 64:
+the per-canonical-name `parking_lot::Mutex` is still held across async
+repository-rule execution, and `finalize_staging_dir` still removes the old
+non-empty canonical directory before retrying rename. Treat this phase as
+historically implemented but not finally closed.
 
 **Problem:** Repository materialization removes the canonical output directory in
 place and then writes the new tree directly into the final path. A crash or
@@ -486,10 +505,14 @@ will both `remove_dir_all` and rewrite the same directory and race on disk.
 
 **Test command:** `cargo test -p slug_bzlmod repository_execution repository_executor`
 
-## Phase 9: Download Integrity Enforcement and Hermetic Fetch — COMPLETE
+## Phase 9: Download Integrity Enforcement and Hermetic Fetch — COMPLETE WITH PLAN 64 FOLLOW-UP
 
 **Severity:** HIGH (hermeticity / supply-chain).
 **Completed:** 2026-06-08 (commit 39726f2a, auth param 9daea904)
+**Review follow-up:** 2026-06-11 review found `repository_ctx` and `module_ctx`
+still warn-and-ignore non-empty `auth`/`headers`, and shared downloads still
+shell out through `curl`/`wget`. Plan 64 owns completing or explicitly rejecting
+those semantics.
 
 **Problem:** Three issues in the download path:
 (a) `http_archive` integrity is optional and only verified when a hash is
@@ -757,11 +780,15 @@ hosts is broken even though the inputs are identical.
 
 **Test command:** `cargo test -p slug_bzlmod cache && cargo test -p slug_common bzlmod`
 
-## Phase 14: Lockfile Writer, Mode Enforcement, and Interop Digests — COMPLETE
+## Phase 14: Lockfile Writer, Mode Enforcement, and Interop Digests — COMPLETE WITH PLAN 64 FOLLOW-UP
 
 **Severity:** HIGH (no production writer; `--lockfile_mode` mostly cosmetic) /
 MED (extension digests not Bazel-interoperable).
 **Completed:** 2026-06-08 (commit b3679927, build fix a36685ec)
+**Review follow-up:** 2026-06-11 review found no production caller of
+`Lockfile::write_for_purpose(...)`, and digest helpers still need a fallible
+stable-serialization audit. Plan 64 owns the production lockfile lifecycle and
+digest-honesty closure.
 
 **Problem:** Three connected gaps:
 (a) `write_for_purpose` has no production caller and there is no `slug mod update`

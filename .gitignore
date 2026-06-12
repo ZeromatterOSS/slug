@@ -36,6 +36,12 @@ examples/hello_world/library.lib
 /slug.exe
 tests/manual_test/**
 
+# Hermes DICE benchmark traces (raw CSV output; see thoughts/shared/research/ for summaries)
+.hermes/
+
+# Accidental npm metadata (this is a Cargo workspace, not an npm project)
+package-lock.json
+
 # Benchmark artifacts: keep FINDINGS.md + summary.json + wall.txt;
 # skip the large event logs and captured stderr.
 benchmarks/**/*.pb.zst
