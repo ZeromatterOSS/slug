@@ -971,7 +971,6 @@ fn test_validate_root_module_deps_rejects_duplicates() {
         heap.alloc_str("repo_dup").to_value(),
         heap.alloc_str("repo_dup").to_value(),
     ]);
-    let result =
-        crate::module_ctx::metadata::validate_root_module_deps(list, "test", heap);
+    let result = crate::module_ctx::metadata::validate_root_module_deps(list, "test", heap);
     assert!(result.is_err(), "Expected error for duplicate entries");
 }

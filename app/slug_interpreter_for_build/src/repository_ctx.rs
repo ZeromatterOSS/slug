@@ -1539,18 +1539,21 @@ pub(crate) fn parse_auth<'v>(auth: Option<Value<'v>>) -> starlark::Result<AuthPo
 
 /// Return a Starlark error for unsupported auth, ensuring it is produced
 /// *before* any network request.
-pub(crate) fn auth_unsupported_error(method_name: &str, policy: &AuthPolicy) -> Option<starlark::Error> {
+pub(crate) fn auth_unsupported_error(
+    method_name: &str,
+    policy: &AuthPolicy,
+) -> Option<starlark::Error> {
     match policy {
         AuthPolicy::None => None,
-        AuthPolicy::Unsupported { type_hint } => Some(starlark::Error::from(
-            slug_error::slug_error!(
+        AuthPolicy::Unsupported { type_hint } => {
+            Some(starlark::Error::from(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
                 "The 'auth' parameter on {}() is not yet supported (auth type: {}). \
                  Please use netrc or credential helpers for authentication.",
                 method_name,
                 type_hint
-            ),
-        )),
+            )))
+        }
     }
 }
 
@@ -1587,31 +1590,33 @@ pub(crate) fn download_url(url: &str, options: &DownloadOptions) -> Result<Vec<u
 fn download_with_http_client(url: &str, options: &DownloadOptions) -> Result<Vec<u8>, String> {
     let handle = tokio::runtime::Handle::try_current().map_err(|e| e.to_string())?;
 
-    handle.block_on(async {
-        let mut builder = slug_http::HttpClientBuilder::https_with_system_roots()
-            .await
-            .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
-        builder
-            .with_connect_timeout(Some(options.connect_timeout))
-            .with_read_timeout(Some(options.total_timeout));
-        let client = builder
-            .with_max_redirects(10)
-            .build();
-
-        let resp = if options.headers.is_empty() {
-            client.get(url).await
-        } else {
-            client
-                .get_with_headers(url, options.headers.clone())
+    // We are on a tokio runtime thread (e.g. the DICE executor).  Calling
+    // `block_on` directly panics ("Cannot start a runtime from within a
+    // runtime").  `block_in_place` moves the current task off the executor
+    // so that `block_on` can drive the inner future without deadlocking.
+    tokio::task::block_in_place(|| {
+        handle.block_on(async {
+            let mut builder = slug_http::HttpClientBuilder::https_with_system_roots()
                 .await
-        }
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
+                .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+            builder
+                .with_connect_timeout(Some(options.connect_timeout))
+                .with_read_timeout(Some(options.total_timeout));
+            let client = builder.with_max_redirects(10).build();
 
-        let body = slug_http::to_bytes(resp.into_body())
-            .await
-            .map_err(|e| format!("Failed to read response body: {}", e))?;
+            let resp = if options.headers.is_empty() {
+                client.get(url).await
+            } else {
+                client.get_with_headers(url, options.headers.clone()).await
+            }
+            .map_err(|e| format!("HTTP request failed: {}", e))?;
 
-        Ok(body.to_vec())
+            let body = slug_http::to_bytes(resp.into_body())
+                .await
+                .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+            Ok(body.to_vec())
+        })
     })
 }
 
@@ -2436,11 +2441,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let urls = get_urls_from_value(url);
         if urls.is_empty() {
             if allow_fail {
-                return Ok(heap.alloc(DownloadInfo {
+                let failed_info = DownloadInfo {
                     success: false,
                     integrity: String::new(),
                     sha256: String::new(),
-                }));
+                };
+                return if block {
+                    Ok(heap.alloc(failed_info))
+                } else {
+                    Ok(heap.alloc(DownloadToken { info: failed_info }))
+                };
             }
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -2496,12 +2506,25 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             executable,
             &options,
         ) {
-            Ok(info) => Ok(heap.alloc(info)),
-            Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
-                success: false,
-                integrity: String::new(),
-                sha256: String::new(),
-            })),
+            Ok(info) => {
+                if block {
+                    Ok(heap.alloc(info))
+                } else {
+                    Ok(heap.alloc(DownloadToken { info }))
+                }
+            }
+            Err(_) if allow_fail => {
+                let failed_info = DownloadInfo {
+                    success: false,
+                    integrity: String::new(),
+                    sha256: String::new(),
+                };
+                if block {
+                    Ok(heap.alloc(failed_info))
+                } else {
+                    Ok(heap.alloc(DownloadToken { info: failed_info }))
+                }
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -2555,7 +2578,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         // ignoring, per Plan 64 Phase 4.  The error is produced before any
         // network request and before `allow_fail` is consulted.
         let auth_policy = parse_auth(auth)?;
-        if let Some(err) = auth_unsupported_error("repository_ctx.download_and_extract", &auth_policy) {
+        if let Some(err) =
+            auth_unsupported_error("repository_ctx.download_and_extract", &auth_policy)
+        {
             return Err(err);
         }
 
@@ -4058,7 +4083,9 @@ mod tests {
     #[test]
     fn test_parse_headers_starlark_none() {
         let module = Module::new();
-        let none_val = module.heap().alloc(starlark::values::none::NoneOr::<Value>::None);
+        let none_val = module
+            .heap()
+            .alloc(starlark::values::none::NoneOr::<Value>::None);
         let result = parse_headers(Some(none_val)).unwrap();
         assert!(result.is_empty());
     }
@@ -4098,7 +4125,9 @@ mod tests {
     #[test]
     fn test_parse_auth_starlark_none() {
         let module = Module::new();
-        let none_val = module.heap().alloc(starlark::values::none::NoneOr::<Value>::None);
+        let none_val = module
+            .heap()
+            .alloc(starlark::values::none::NoneOr::<Value>::None);
         let result = parse_auth(Some(none_val)).unwrap();
         assert_eq!(result, AuthPolicy::None);
     }
@@ -4198,7 +4227,10 @@ mod tests {
     fn test_download_rejects_auth_dict_before_network() {
         let (module, _ctx, _temp_dir) = make_eval_and_ctx();
         let globals = Globals::standard();
-        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("auth_test")));
+        module.set(
+            "repository_ctx",
+            module.heap().alloc(RepositoryContext::stub("auth_test")),
+        );
 
         let ast = AstModule::parse(
             "test_auth.star",
@@ -4222,7 +4254,12 @@ mod tests {
     fn test_download_and_extract_rejects_auth_dict_before_network() {
         let (module, _ctx, _temp_dir) = make_eval_and_ctx();
         let globals = Globals::standard();
-        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("auth_test_dae")));
+        module.set(
+            "repository_ctx",
+            module
+                .heap()
+                .alloc(RepositoryContext::stub("auth_test_dae")),
+        );
 
         let ast = AstModule::parse(
             "test_auth_dae.star",
@@ -4236,17 +4273,19 @@ mod tests {
             msg.contains("not yet supported"),
             "should reject auth with typed error: {msg}"
         );
-        assert!(
-            msg.contains("ntlm"),
-            "should mention auth type hint: {msg}"
-        );
+        assert!(msg.contains("ntlm"), "should mention auth type hint: {msg}");
     }
 
     #[test]
     fn test_download_rejects_auth_even_with_allow_fail() {
         let (module, _ctx, _temp_dir) = make_eval_and_ctx();
         let globals = Globals::standard();
-        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("auth_allow_fail")));
+        module.set(
+            "repository_ctx",
+            module
+                .heap()
+                .alloc(RepositoryContext::stub("auth_allow_fail")),
+        );
 
         let ast = AstModule::parse(
             "test_auth_allow_fail.star",
@@ -4265,7 +4304,10 @@ mod tests {
     fn test_download_headers_dict_parsed_before_network() {
         let (module, _ctx, _temp_dir) = make_eval_and_ctx();
         let globals = Globals::standard();
-        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("headers_test")));
+        module.set(
+            "repository_ctx",
+            module.heap().alloc(RepositoryContext::stub("headers_test")),
+        );
 
         // With headers that would cause a network error (invalid URL), the
         // headers should at least parse without error — they are forwarded
@@ -4282,7 +4324,10 @@ mod tests {
     fn test_download_rejects_invalid_headers_type() {
         let (module, _ctx, _temp_dir) = make_eval_and_ctx();
         let globals = Globals::standard();
-        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("bad_headers")));
+        module.set(
+            "repository_ctx",
+            module.heap().alloc(RepositoryContext::stub("bad_headers")),
+        );
 
         let ast = AstModule::parse(
             "test_bad_headers.star",
@@ -4301,13 +4346,18 @@ mod tests {
     fn test_download_rejects_invalid_auth_type() {
         let (module, _ctx, _temp_dir) = make_eval_and_ctx();
         let globals = Globals::standard();
-        module.set("repository_ctx", module.heap().alloc(RepositoryContext::stub("bad_auth")));
+        module.set(
+            "repository_ctx",
+            module.heap().alloc(RepositoryContext::stub("bad_auth")),
+        );
 
         let ast = AstModule::parse(
             "test_bad_auth.star",
-            r#"repository_ctx.download("http://127.0.0.1:1/never-reached", auth = "not a dict")"#.to_owned(),
+            r#"repository_ctx.download("http://127.0.0.1:1/never-reached", auth = "not a dict")"#
+                .to_owned(),
             &Dialect::Standard,
-        ).unwrap();
+        )
+        .unwrap();
         let mut eval = Evaluator::new(&module);
         let err = eval.eval_module(ast, &globals).unwrap_err();
         assert!(

@@ -586,11 +586,7 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "modules"
-                | "os"
-                | "root_module_has_non_dev_dependency"
-                | "is_isolated"
-                | "facts"
+            "modules" | "os" | "root_module_has_non_dev_dependency" | "is_isolated" | "facts"
         )
     }
 

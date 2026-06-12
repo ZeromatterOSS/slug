@@ -183,18 +183,22 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[allow(unused_variables)]
         #[starlark(require = named)]
         headers: Option<Value<'v>>,
-        #[starlark(require = named, default = true)]
-        block: bool,
+        #[starlark(require = named, default = true)] block: bool,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let urls = get_urls_from_value(url);
         if urls.is_empty() {
             if allow_fail {
-                return Ok(heap.alloc(DownloadInfo {
+                let failed_info = DownloadInfo {
                     success: false,
                     integrity: String::new(),
                     sha256: String::new(),
-                }));
+                };
+                return if block {
+                    Ok(heap.alloc(failed_info))
+                } else {
+                    Ok(heap.alloc(DownloadToken { info: failed_info }))
+                };
             }
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
@@ -208,7 +212,9 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         // network request and before `allow_fail` is consulted so that
         // unsupported auth is never silently swallowed.
         let auth_policy = crate::repository_ctx::parse_auth(auth)?;
-        if let Some(err) = crate::repository_ctx::auth_unsupported_error("module_ctx.download", &auth_policy) {
+        if let Some(err) =
+            crate::repository_ctx::auth_unsupported_error("module_ctx.download", &auth_policy)
+        {
             return Err(err);
         }
 
@@ -252,11 +258,18 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                     Ok(heap.alloc(DownloadToken { info }))
                 }
             }
-            Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
-                success: false,
-                integrity: String::new(),
-                sha256: String::new(),
-            })),
+            Err(_) if allow_fail => {
+                let failed_info = DownloadInfo {
+                    success: false,
+                    integrity: String::new(),
+                    sha256: String::new(),
+                };
+                if block {
+                    Ok(heap.alloc(failed_info))
+                } else {
+                    Ok(heap.alloc(DownloadToken { info: failed_info }))
+                }
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -289,7 +302,10 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         // ignoring, per Plan 64 Phase 4.  The error is produced before any
         // network request.
         let auth_policy = crate::repository_ctx::parse_auth(auth)?;
-        if let Some(err) = crate::repository_ctx::auth_unsupported_error("module_ctx.download_and_extract", &auth_policy) {
+        if let Some(err) = crate::repository_ctx::auth_unsupported_error(
+            "module_ctx.download_and_extract",
+            &auth_policy,
+        ) {
             return Err(err);
         }
 
@@ -649,14 +665,23 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         eval: &mut starlark::eval::Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let validated_deps =
-            validate_root_module_deps(root_module_direct_deps, "root_module_direct_deps", eval.heap())?;
-        let validated_dev_deps =
-            validate_root_module_deps(root_module_direct_dev_deps, "root_module_direct_dev_deps", eval.heap())?;
+        let validated_deps = validate_root_module_deps(
+            root_module_direct_deps,
+            "root_module_direct_deps",
+            eval.heap(),
+        )?;
+        let validated_dev_deps = validate_root_module_deps(
+            root_module_direct_dev_deps,
+            "root_module_direct_dev_deps",
+            eval.heap(),
+        )?;
 
         // Bazel 9 parity: if one is set (not Unset), the other must be too.
         match (&validated_deps, &validated_dev_deps) {
-            (slug_bzlmod::RootModuleDirectDeps::Unset, slug_bzlmod::RootModuleDirectDeps::Unset) => {}
+            (
+                slug_bzlmod::RootModuleDirectDeps::Unset,
+                slug_bzlmod::RootModuleDirectDeps::Unset,
+            ) => {}
             (slug_bzlmod::RootModuleDirectDeps::Unset, _) => {
                 return Err(slug_error::slug_error!(
                     slug_error::ErrorTag::Input,
