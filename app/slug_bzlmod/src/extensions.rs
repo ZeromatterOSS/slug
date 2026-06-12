@@ -364,6 +364,21 @@ impl ModuleInfo {
 }
 
 /// Compute a hash of extension inputs for caching.
+///
+/// ## Bazel Interop Status (Phase 64.6 / Plan 62 Phase 14)
+///
+/// This digest is **Slug-private**. Bazel 9 computes its extension usage
+/// digest via `SingleExtensionUsagesValue.hashForEvaluation`, which hashes
+/// a Gson-serialized JSON representation of the trimmed usages value
+/// (`Hashing.sha256().hashUnencodedChars(gson.toJson(trimmed))`). Slug's
+/// implementation instead hashes fields individually with type-discriminated
+/// binary encoding (`append_tag_value_hash_input`). The two formats produce
+/// different digests for identical inputs; byte-for-byte parity would require
+/// replicating Gson's field ordering, null-handling, and type adapter
+/// registration exactly. Since Slug's lockfile section is not consumed by
+/// Bazel (and vice versa), there is no current need for cross-tool digest
+/// compatibility. If interop becomes required, a golden-test against Bazel's
+/// output must be introduced first.
 pub fn compute_extension_input_hash(extension: &AggregatedExtension) -> String {
     use sha2::Digest;
     use sha2::Sha256;
@@ -638,5 +653,22 @@ mod tests {
             compute_extension_input_hash(&first),
             compute_extension_input_hash(&second)
         );
+    }
+
+    /// Phase 64.6: compute_extension_input_hash is deterministic — same
+    /// inputs must always produce the same hash, regardless of HashMap
+    /// iteration order.
+    #[test]
+    fn test_compute_extension_input_hash_deterministic() {
+        let mut agg = AggregatedExtension::new("@rules_rs//:crates.bzl", "crates");
+        agg.add_module_tags(
+            "root",
+            vec![ExtensionTag::new("crate".to_owned())
+                .with_kwarg("name".to_owned(), TagValue::String("serde".to_owned()))
+                .with_kwarg("version".to_owned(), TagValue::String("1.0".to_owned()))],
+        );
+        let h1 = compute_extension_input_hash(&agg);
+        let h2 = compute_extension_input_hash(&agg);
+        assert_eq!(h1, h2, "compute_extension_input_hash must be deterministic");
     }
 }

@@ -333,7 +333,7 @@ pub enum ModuleSource {
 }
 
 /// Result of MVS resolution - the final resolved dependency graph.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Allocative)]
 pub struct ResolvedGraph {
     /// Map from module name to selected version.
     pub selected_versions: HashMap<String, String>,
@@ -342,9 +342,10 @@ pub struct ResolvedGraph {
     /// For modules with multiple selected versions (from multiple_version_override),
     /// keys are `name+version`. For single-version modules, keys are just `name`.
     ///
-    /// `FxHashMap` (fixed-seed, deterministic across invocations) so that
-    /// iterating this map produces a stable order for the same content,
-    /// without anyone having to sort on read. See Plan 21.2.
+    /// `FxHashMap` for deterministic hashing (same key → same bucket), NOT
+    /// for iteration stability. Iteration order is insertion-dependent under
+    /// hashbrown. Order-dependent consumers must sort on read when the order
+    /// matters for correctness (e.g., first-wins dedup). See Plan 21.2/26.
     pub modules: FxHashMap<String, ResolvedModuleInfo>,
     /// Resolution order (topological).
     pub resolution_order: Vec<String>,
@@ -367,7 +368,7 @@ pub struct ResolvedGraph {
 }
 
 /// Information about a resolved module in the final graph.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Allocative)]
 pub struct ResolvedModuleInfo {
     /// The module name.
     pub name: String,

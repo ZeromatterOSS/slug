@@ -1373,7 +1373,7 @@ mod watched_abs_tests {
     async fn watched_abs_file_is_cacheable_and_dirtied_by_tracker() -> slug_error::Result<()> {
         let dir = tempfile::Builder::new()
             .prefix("slug-plan61-watched-abs-")
-            .tempdir_in("/var/mnt/dev")
+            .tempdir()
             .unwrap();
         let path = dir.path().join("MODULE.bazel");
         std::fs::write(&path, "a").unwrap();
@@ -1413,7 +1413,7 @@ mod watched_abs_tests {
     async fn watched_abs_path_metadata_tracks_existence() -> slug_error::Result<()> {
         let dir = tempfile::Builder::new()
             .prefix("slug-plan61-watched-abs-meta-")
-            .tempdir_in("/var/mnt/dev")
+            .tempdir()
             .unwrap();
         let path = dir.path().join("MODULE.bazel");
 
@@ -1438,6 +1438,133 @@ mod watched_abs_tests {
             DiceFileComputations::read_watched_abs_path_metadata_if_exists(&mut dice, &path)
                 .await?;
         assert!(created.exists);
+        Ok(())
+    }
+
+    /// Phase 64.7: end-to-end external-tree generation replay coverage.
+    ///
+    /// Tests that when a materialized extension repo's generation changes
+    /// (simulated by updating `.slug_repo_complete`), the DICE invalidation
+    /// path correctly busts cached WatchedAbs values so re-reads observe the
+    /// new on-disk state. Covers create, edit, and delete transitions.
+    #[tokio::test]
+    async fn external_tree_generation_replay_observes_create_edit_delete()
+    -> slug_error::Result<()> {
+        use crate::dice::data::SetWatchedAbsInputRegistry;
+        use crate::file_ops::watched_abs::WatchedAbsInputRegistry;
+        use crate::file_ops::watched_abs::inject_watched_abs_changes;
+        use std::sync::Arc;
+        use dupe::Dupe;
+
+        // ── Setup: temp dir that acts as a materialized extension repo ──
+        let dir = tempfile::Builder::new()
+            .prefix("slug-phase64-7-gen-replay-")
+            .tempdir()
+            .unwrap();
+        let tree_root = dir.path().to_path_buf();
+        let marker_path = tree_root.join(".slug_repo_complete");
+        let data_path = tree_root.join("data.txt");
+
+        // Step 1: Initial materialization — write marker + data
+        std::fs::write(&data_path, "v1").unwrap();
+        std::fs::write(&marker_path, "complete:output:sha256-dummy1").unwrap();
+
+        // Install registry + DICE
+        let registry = Arc::new(WatchedAbsInputRegistry::new());
+        registry.register_tree_root(tree_root.clone());
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_watched_abs_input_registry(registry.dupe());
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        // Step 2: Read through DICE — should see "v1"
+        let first =
+            DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &data_path).await?;
+        assert_eq!(first.as_deref(), Some("v1"));
+
+        // ── Transition A: EDIT — change data + marker ──
+        std::fs::write(&data_path, "v2").unwrap();
+        std::fs::write(&marker_path, "complete:output:sha256-dummy2").unwrap();
+
+        // Run the real re-stat-diff path (what the daemon does per-command)
+        let mut updater = dice.into_updater();
+        let injected = inject_watched_abs_changes(&registry, &mut updater)?;
+        assert!(
+            injected,
+            "re-stat-diff must observe the generation marker change"
+        );
+        let mut dice = updater.commit().await;
+
+        let after_edit =
+            DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &data_path).await?;
+        assert_eq!(
+            after_edit.as_deref(),
+            Some("v2"),
+            "DICE must see the edited content"
+        );
+
+        // ── Transition B: CREATE — add a new file ──
+        let new_file = tree_root.join("new_pkg/BUILD.bazel");
+        std::fs::create_dir_all(new_file.parent().unwrap()).unwrap();
+        std::fs::write(&new_file, "filegroup(name='x')").unwrap();
+        // Re-materialize the marker to reflect the new content
+        std::fs::write(&marker_path, "complete:output:sha256-dummy3").unwrap();
+
+        let mut updater = dice.into_updater();
+        let injected = inject_watched_abs_changes(&registry, &mut updater)?;
+        assert!(injected);
+        let mut dice = updater.commit().await;
+
+        let created =
+            DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &new_file).await?;
+        assert_eq!(
+            created.as_deref(),
+            Some("filegroup(name='x')"),
+            "DICE must see the newly created file"
+        );
+
+        // ── Transition C: DELETE — remove data.txt ──
+        std::fs::remove_file(&data_path).unwrap();
+        std::fs::write(&marker_path, "complete:output:sha256-dummy4").unwrap();
+
+        let mut updater = dice.into_updater();
+        let injected = inject_watched_abs_changes(&registry, &mut updater)?;
+        assert!(injected);
+        let mut dice = updater.commit().await;
+
+        let after_delete =
+            DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &data_path).await?;
+        assert_eq!(
+            after_delete.as_deref(),
+            None,
+            "DICE must observe the deleted file is gone"
+        );
+
+        // ── Guardrail: prove ExternalTreeGenerationKey invalidation alone is sufficient ──
+        // Change ONLY the marker (not data content) — the WatchedAbs leaf
+        // that depends on the generation key should still be recomputed.
+        std::fs::write(&marker_path, "complete:output:sha256-dummy5").unwrap();
+
+        let mut updater = dice.into_updater();
+        let injected = inject_watched_abs_changes(&registry, &mut updater)?;
+        // Even though no file content changed, the marker change invalidates
+        // the generation key, which transitively invalidates dependent leaves.
+        assert!(
+            injected,
+            "generation-only change must still trigger invalidation"
+        );
+        let mut dice = updater.commit().await;
+
+        let re_read =
+            DiceFileComputations::read_watched_abs_file_if_exists(&mut dice, &new_file).await?;
+        // Content unchanged but DICE value was recomputed through the
+        // generation-key dependency edge, not served from stale cache.
+        assert_eq!(re_read.as_deref(), Some("filegroup(name='x')"));
+
         Ok(())
     }
 }

@@ -94,8 +94,10 @@ pub struct ExtensionExecutionOutput {
     /// Captured repository specifications (NOT materialized).
     /// Keys are internal names (e.g., "numpy"), values are RepoSpecs.
     ///
-    /// `FxHashMap` so that iteration order is stable across invocations
-    /// (Plan 21.2 — fixes CellResolver churn).
+    /// `FxHashMap` for deterministic hashing (same key → same bucket), NOT
+    /// for iteration stability. Iteration order is insertion-dependent under
+    /// hashbrown. Order-dependent consumers must sort on read when the order
+    /// matters for correctness (e.g., first-wins dedup). See Plan 21.2/26.
     pub generated_repo_specs: fxhash::FxHashMap<String, RepoSpec>,
 
     /// Metadata returned by the extension implementation.
