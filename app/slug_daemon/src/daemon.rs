@@ -209,8 +209,19 @@ impl DaemonCommand {
     ) -> slug_error::Result<()> {
         let prepped_cgroups = if self.has_cgroup {
             // Note: It's important that we do this before daemonizing, as otherwise there may be
-            // stray processes laying around in this cgroup
-            Some(PreppedBuckCgroups::prep_current_process()?)
+            // stray processes laying around in this cgroup.
+            // If cgroup prep fails (e.g. the cgroup namespace is flattened in a container),
+            // degrade gracefully rather than preventing the daemon from starting.
+            match PreppedBuckCgroups::prep_current_process() {
+                Ok(cgroups) => Some(cgroups),
+                Err(e) => {
+                    tracing::warn!(
+                        "cgroup prep failed, resource control disabled: {:#}",
+                        e
+                    );
+                    None
+                }
+            }
         } else {
             None
         };

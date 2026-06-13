@@ -52,8 +52,37 @@ fn parse_procfs_cgroup_output(out: &str) -> slug_error::Result<CgroupPathBuf> {
     let Some(cgroup) = find_v2(out) else {
         return Err(CgroupParsingError::NoCgroupV2Membership(out.trim().to_owned()).into());
     };
-    // Can't use .join() since the second part is absolute too
-    let path = AbsNormPathBuf::new(format!("/sys/fs/cgroup{cgroup}").into())?;
+
+    // The cgroup path from /proc/self/cgroup may contain `..` components (e.g.
+    // `/../../../slug.slice/slug-daemon...scope`) when the process runs in a
+    // systemd scope that escapes the current cgroup subtree.  The `..` are
+    // relative to the cgroup v2 mount root, so we normalize them *before*
+    // prepending `/sys/fs/cgroup`.  This way `/../../../slug.slice/X` collapses
+    // to `/slug.slice/X` (not all the way to the filesystem root).
+    let normalized_cgroup = {
+        let mut components: Vec<&str> = Vec::new();
+        for part in cgroup.split('/') {
+            match part {
+                "" | "." => {
+                    // Keep the leading empty string so the path stays absolute
+                    if components.is_empty() {
+                        components.push("");
+                    }
+                }
+                ".." => {
+                    // Pop but don't go past the root
+                    if components.len() > 1 {
+                        components.pop();
+                    }
+                }
+                _ => {
+                    components.push(part);
+                }
+            }
+        }
+        components.join("/")
+    };
+    let path = AbsNormPathBuf::new(format!("/sys/fs/cgroup{normalized_cgroup}").into())?;
     Ok(CgroupPathBuf::new(path))
 }
 
@@ -270,6 +299,21 @@ mod tests {
         assert_eq!(
             "/sys/fs/cgroup/user.slice/user-532497.slice/user@532497.service/slug.cg",
             parse_procfs_cgroup_output(cgroup).unwrap().to_string()
+        );
+    }
+
+    #[test]
+    fn test_cgroup_info_parse_with_dotdot() {
+        // systemd-run scopes may produce cgroup paths with `..` components that
+        // escape the current subtree (e.g. `/../../../slug.slice/...scope`).
+        // parse_procfs_cgroup_output must normalize these away.
+        let cgroup = "\
+0::/../../../slug.slice/slug-daemon.test.scope\n";
+        let parsed = parse_procfs_cgroup_output(cgroup)
+            .expect("should parse cgroup path with .. components");
+        assert_eq!(
+            "/sys/fs/cgroup/slug.slice/slug-daemon.test.scope",
+            parsed.to_string()
         );
     }
 

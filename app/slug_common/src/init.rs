@@ -226,14 +226,14 @@ impl ResourceControlConfig {
             Self::deserialize(env_conf)
         } else {
             Ok(Self {
-                status: ResourceControlStatus::Off,
+                status: ResourceControlStatus::IfAvailable,
                 memory_max: None,
                 memory_high: None,
                 memory_max_per_action: None,
                 memory_high_per_action: None,
                 memory_high_action_cgroup_pool: None,
                 memory_pressure_threshold_percent: 10,
-                enable_suspension: false,
+                enable_suspension: true,
                 preferred_action_suspend_strategy: ActionSuspendStrategy::KillAndRetry,
             })
         }
