@@ -93,7 +93,7 @@ pub struct CommonBuildOptions {
     #[clap(long = "streaming-build-report", value_name = "PATH")]
     streaming_build_report: Option<String>,
 
-    /// Number of threads to use during execution (default is # cores)
+    /// Number of threads to use during execution (default is min(cpu_cores, 67% RAM / 1 GB))
     // TODO(cjhopman): This only limits the threads used for action execution and it doesn't work correctly with concurrent commands.
     #[clap(
         short = 'j',

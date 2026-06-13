@@ -43,6 +43,57 @@ pub fn available_parallelism_fresh() -> usize {
     std::thread::available_parallelism().map_or(1, |v| v.get())
 }
 
+/// Get the default concurrency for action execution, accounting for available RAM.
+///
+/// Bazel's `--jobs` defaults to `HOST_CPUS` but its resource-aware scheduler further constrains
+/// based on `HOST_RAM * 0.67` with per-action RAM budgets. Slug does not yet have a resource-aware
+/// scheduler, so we bake RAM-awareness into the default concurrency to avoid OOM on machines with
+/// fewer GB per core.
+///
+/// The formula: `min(cpu_cores, available_ram_mb / PER_ACTION_RAM_MB)`.
+///
+/// - `PER_ACTION_RAM_MB = 1024`: a conservative estimate covering heavy C++ compiles (~1–1.5 GB
+///   each for LLVM/libc++) while not over-throttling lighter workloads. Bazel uses 250 MB per
+///   rule action but that only works because the resource scheduler can reject over-subscription;
+///   without one, we need a bigger per-slot budget.
+/// - We use 67% of total RAM (matching Bazel's default `HOST_RAM*.67`) as the portion available
+///   for build actions, leaving headroom for the daemon, OS, and other processes.
+pub fn default_concurrency_for_actions() -> usize {
+    let cpu_cores = available_parallelism_fresh();
+
+    // Try to read total RAM in MB from /proc/meminfo (Linux-only; on other platforms we fall
+    // back to cpu_cores).
+    let ram_mb = read_total_ram_mb();
+    let Some(ram_mb) = ram_mb else {
+        return cpu_cores;
+    };
+
+    const USABLE_RAM_FRACTION: f64 = 0.67;
+    const PER_ACTION_RAM_MB: usize = 1024;
+
+    let usable_ram_mb = (ram_mb as f64 * USABLE_RAM_FRACTION) as usize;
+    let ram_limited = std::cmp::max(usable_ram_mb / PER_ACTION_RAM_MB, 1);
+
+    std::cmp::min(cpu_cores, ram_limited)
+}
+
+/// Read total RAM in MB from `/proc/meminfo` on Linux. Returns `None` on non-Linux or on error.
+fn read_total_ram_mb() -> Option<usize> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+
+    let meminfo = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in meminfo.lines() {
+        if let Some(rest) = line.strip_prefix("MemTotal:") {
+            // Format: "MemTotal:       65736424 kB"
+            let kb: usize = rest.trim().split_whitespace().next()?.parse().ok()?;
+            return Some(kb / 1024);
+        }
+    }
+    None
+}
+
 /// Default stack size for slug.
 ///
 /// We want to be independent of possible future changes to the default stack size in Rust.
@@ -253,5 +304,34 @@ pub(crate) mod tests {
             .join()
             .unwrap()
             .unwrap();
+    }
+
+    #[test]
+    fn test_read_total_ram_mb() {
+        // On Linux, /proc/meminfo exists and we should get a positive value.
+        // On non-Linux, the function returns None.
+        let ram = crate::threads::read_total_ram_mb();
+        if cfg!(target_os = "linux") {
+            let ram = ram.expect("should read /proc/meminfo on Linux");
+            assert!(ram > 0, "RAM should be positive, got {ram}");
+            // A reasonable sanity check: most dev machines have >= 1GB.
+            assert!(ram >= 1024, "RAM should be >= 1 GB, got {ram} MB");
+        } else {
+            assert!(ram.is_none());
+        }
+    }
+
+    #[test]
+    fn test_default_concurrency_for_actions() {
+        let concurrency = crate::threads::default_concurrency_for_actions();
+        assert!(concurrency >= 1, "concurrency should be >= 1, got {concurrency}");
+        // On a 16-core / 62GB box: cpu_cores=16, ram_limited = (64254*0.67)/1024 ≈ 42.
+        // So min(16, 42) = 16.  On a 16-core / 8GB box: ram_limited = (8192*0.67)/1024 ≈ 5.
+        // So min(16, 5) = 5.  Either way, concurrency <= cpu_cores.
+        let cpu_cores = crate::threads::available_parallelism_fresh();
+        assert!(
+            concurrency <= cpu_cores,
+            "concurrency ({concurrency}) should not exceed cpu_cores ({cpu_cores})"
+        );
     }
 }

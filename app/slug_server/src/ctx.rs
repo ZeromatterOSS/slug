@@ -796,7 +796,7 @@ impl DiceCommandUpdater<'_, '_> {
     ) -> slug_error::Result<UserComputationData> {
         let concurrency = self
             .concurrency
-            .unwrap_or_else(slug_util::threads::available_parallelism_fresh);
+            .unwrap_or_else(slug_util::threads::default_concurrency_for_actions);
 
         let enable_miniperf = true;
         let log_action_keys = true;
