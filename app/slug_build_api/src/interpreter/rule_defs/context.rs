@@ -1747,7 +1747,10 @@ mod tests {
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
     use slug_core::cells::CellAliasResolver;
     use slug_core::cells::name::CellName;
+    use starlark::values::Heap;
+    use starlark::values::StarlarkValue;
 
+    use super::EmptyCompilationContext;
     use super::canonical_bazel_repo_name_for_cell;
 
     #[test]
@@ -1774,6 +1777,28 @@ mod tests {
             canonical
         );
         Ok(())
+    }
+
+    #[test]
+    fn empty_compilation_context_exporting_module_maps_is_iterable_list() -> starlark::Result<()> {
+        Heap::temp(|heap| {
+            let context = EmptyCompilationContext {
+                module_map_path: None,
+            };
+
+            let exporting_module_maps = context
+                .get_attr("_exporting_module_maps", heap)
+                .expect("_exporting_module_maps attribute");
+            assert_eq!("list", exporting_module_maps.get_type());
+            let mut iter = exporting_module_maps.iterate(heap)?;
+            assert!(iter.next().is_none());
+
+            let direct_module_maps = context
+                .get_attr("_direct_module_maps", heap)
+                .expect("_direct_module_maps attribute");
+            assert_eq!("depset", direct_module_maps.get_type());
+            Ok(())
+        })
     }
 
     #[test]
@@ -3816,7 +3841,7 @@ impl<'v> StarlarkValue<'v> for EmptyCompilationContext {
             "_module_files" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "_pic_module_files" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
             "_direct_module_maps" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
-            "_exporting_module_maps" => Some(crate::interpreter::rule_defs::depset::empty_depset()),
+            "_exporting_module_maps" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_public_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_private_headers" => Some(heap.alloc(Vec::<Value>::new())),

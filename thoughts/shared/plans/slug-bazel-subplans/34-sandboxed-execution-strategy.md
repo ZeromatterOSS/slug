@@ -44,10 +44,13 @@ shortcut.
   starts a local all-in-one NativeLink REAPI service with one worker and builds
   fast in-repo fixtures through `--remote_executor`, `--remote_cache`, and
   `--remote-only`.
-- The smoke proves both a one-action shell fixture and a three-action C-source
-  Starlark rule fixture cross REAPI with what-ran `executor="Re"` and zero
-  direct-local actions. It remains opt-in because NativeLink binary/bootstrap
-  availability is not yet repo-owned or a CI gate.
+- The smoke proves a one-action shell fixture, a three-action C-source Starlark
+  rule fixture, and a real `@rules_cc` `cc_binary` fixture cross REAPI with
+  what-ran `executor="Re"` and zero direct-local actions. The `rules_cc` fixture
+  uses `--remote-only` plus Bazel-shaped `--action_env=PATH=/usr/bin:/bin` so
+  the NativeLink-local host C++ toolchain can find its linker.
+- It remains opt-in because NativeLink binary/bootstrap availability is not yet
+  repo-owned or a CI gate.
 - Hybrid/local fallback is still present below the promoted default. Until it is
   quarantined or made to point at a local REAPI service, direct-local success is
   not Plan 34 evidence.
@@ -63,18 +66,18 @@ shortcut.
 - `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   proves local NativeLink-backed REAPI execution for repo-owned fixtures with
   `reapi_actions=1` for the shell fixture, `reapi_actions=3` for the C-source
-  Starlark rule fixture, `direct_local_actions=0`, and local command count 0.
+  Starlark rule fixture, `reapi_actions=2` for the `@rules_cc` fixture,
+  `direct_local_actions=0`, and local command count 0.
 
-The NativeLink smoke is execution-boundary evidence, but it is not yet a
-routine gate or full `@rules_cc` toolchain proof.
+The NativeLink smoke is execution-boundary evidence, including a real
+`@rules_cc` compile/link proof, but it is not yet a routine gate.
 
 ## Remaining Gaps
 
 - Promote the NativeLink-local REAPI smoke from opt-in to routine gate once
   NativeLink binary/config bootstrap is repo-owned or otherwise available in CI.
-- Promote the C-source fixture from compile/link-shaped rule actions to full
-  `@rules_cc` once the Bazel 9 C++ toolchain registration path executes without
-  falling back to direct local.
+- Decide whether the test-owned `--action_env=PATH=/usr/bin:/bin` belongs in
+  routine validation or should move behind a hermetic local C++ toolchain setup.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
   REAPI surface if it is needed as the executor backend.
 - Quarantine direct-local fallback for RE-configured builds or make it explicit
@@ -93,7 +96,6 @@ routine gate or full `@rules_cc` toolchain proof.
 
 ## Next Owner
 
-Promote the NativeLink-local REAPI smoke into a repeatable gate, then broaden it
-to a fast cc/rules fixture. Do not open new flag or target-language
-compatibility lanes until the local REAPI path is routine and direct-local
-fallback is quarantined for RE-configured builds.
+Promote the NativeLink-local `rules_cc` REAPI smoke into a repeatable gate, then
+quarantine direct-local fallback for RE-configured builds. Do not open new flag
+or target-language compatibility lanes until the local REAPI path is routine.

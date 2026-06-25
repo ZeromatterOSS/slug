@@ -1163,7 +1163,7 @@ pub async fn resolve_graph_with_module_file_inputs(
             parsed.module.name
         )
     })?;
-    let mut resolver = MvsResolver::new(cache, override_patch_inputs)
+    let mut resolver = MvsResolver::new(cache.clone(), override_patch_inputs)
         .await
         .with_buck_error_context(|| {
             format!(
@@ -1246,19 +1246,14 @@ pub async fn resolve_graph_with_module_file_inputs(
         let Some(module_info) = graph.modules.get(module_name) else {
             continue;
         };
-        let Some(source_path) = module_info.source_path.as_ref() else {
-            continue;
-        };
-        let module_dir = if source_path.is_absolute() {
-            source_path.clone()
-        } else {
-            workspace_root.join(source_path)
-        };
-        let module_bazel_path = module_dir.join("MODULE.bazel");
-        non_root_module_file_inputs.push(NonRootModuleFileInput {
-            module_key: module_name.clone(),
-            module_bazel_path,
-        });
+        if let Some(module_bazel_path) =
+            non_root_module_bazel_path(module_info, workspace_root, &cache)
+        {
+            non_root_module_file_inputs.push(NonRootModuleFileInput {
+                module_key: module_name.clone(),
+                module_bazel_path,
+            });
+        }
     }
 
     Ok(ResolvedGraphWithModuleFileInputs {
@@ -1266,6 +1261,26 @@ pub async fn resolve_graph_with_module_file_inputs(
         parsed_modules,
         non_root_module_file_inputs,
     })
+}
+
+fn non_root_module_bazel_path(
+    module_info: &ResolvedModuleInfo,
+    workspace_root: &Path,
+    cache: &ModuleCache,
+) -> Option<PathBuf> {
+    match &module_info.source {
+        ModuleSource::Registry { url } => {
+            Some(cache.module_bazel_path(url, &module_info.name, &module_info.version))
+        }
+        _ => module_info.source_path.as_ref().map(|source_path| {
+            let module_dir = if source_path.is_absolute() {
+                source_path.clone()
+            } else {
+                workspace_root.join(source_path)
+            };
+            module_dir.join("MODULE.bazel")
+        }),
+    }
 }
 
 pub fn append_resolved_non_root_modules(
@@ -6272,6 +6287,7 @@ mod tests {
     use crate::types::GitOverride;
     use crate::types::LocalPathOverride;
     use crate::types::RegisteredItem;
+    use crate::types::UseRepo;
     use crate::version::Version;
 
     #[test]
@@ -6883,6 +6899,49 @@ mod tests {
     }
 
     #[test]
+    fn non_root_module_bazel_path_uses_registry_module_metadata() -> slug_error::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let cache = ModuleCache::with_base_dir(tmp.path().join("cache"))?;
+        let registry_module = ResolvedModuleInfo {
+            name: "platforms".to_owned(),
+            version: "0.0.10".to_owned(),
+            dependencies: HashMap::new(),
+            source: ModuleSource::Registry {
+                url: "https://bcr.bazel.build".to_owned(),
+            },
+            source_path: Some(PathBuf::from("/unpacked/platforms/source")),
+        };
+
+        let module_bazel_path =
+            non_root_module_bazel_path(&registry_module, Path::new("/workspace"), &cache)
+                .expect("registry modules always have a registry MODULE.bazel path");
+
+        assert_eq!(
+            module_bazel_path,
+            tmp.path()
+                .join("cache/registry/bcr.bazel.build/modules/platforms/0.0.10/MODULE.bazel")
+        );
+        assert!(!module_bazel_path.starts_with("/unpacked/platforms/source"));
+
+        let local_module = ResolvedModuleInfo {
+            name: "dep".to_owned(),
+            version: "1.0".to_owned(),
+            dependencies: HashMap::new(),
+            source: ModuleSource::LocalPath {
+                path: "third_party/dep".to_owned(),
+            },
+            source_path: Some(PathBuf::from("third_party/dep")),
+        };
+
+        assert_eq!(
+            non_root_module_bazel_path(&local_module, Path::new("/workspace"), &cache),
+            Some(PathBuf::from("/workspace/third_party/dep/MODULE.bazel"))
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn non_registry_override_inputs_include_patch_digest() {
         let mut root = parsed_module("root");
         let git = GitOverride {
@@ -7176,6 +7235,86 @@ mod tests {
                 .map(String::as_str),
             Some("dep+")
         );
+    }
+
+    #[test]
+    fn clean_cell_graph_scopes_dependency_module_use_repo_aliases() -> slug_error::Result<()> {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-platforms-host-alias"),
+            PathBuf::from("/tmp/slug-platforms-host-alias-output"),
+        );
+        let mut root = parsed_module("root");
+        root.module
+            .bazel_deps
+            .push(BazelDep::new("platforms".to_owned(), Version::empty()));
+
+        let mut platforms = parsed_module("platforms");
+        let mut usage = ExtensionUsage::new(
+            "//host:extension.bzl".to_owned(),
+            "host_platform".to_owned(),
+        );
+        usage
+            .imports
+            .push(UseRepo::new().add_repo("host_platform".to_owned()));
+        platforms.extension_usages.push(usage);
+
+        let parsed_modules = vec![
+            ("root".to_owned(), root.clone()),
+            ("platforms".to_owned(), platforms),
+        ];
+        let mut graph = ResolvedGraph::default();
+        graph.modules.insert(
+            "platforms".to_owned(),
+            ResolvedModuleInfo {
+                name: "platforms".to_owned(),
+                version: "0.0.10".to_owned(),
+                dependencies: HashMap::new(),
+                source: ModuleSource::Registry {
+                    url: "https://bcr.bazel.build".to_owned(),
+                },
+                source_path: None,
+            },
+        );
+        let options = BzlmodResolutionOptions {
+            lockfile_mode: LockfileMode::Off,
+            ignore_dev_dependency: false,
+            allow_yanked_versions_env: None,
+            allow_yanked_versions_flags: Vec::new(),
+            hidden_lockfile_path: None,
+            repo_env: BTreeMap::new(),
+            repo_env_digest: "repo-env".to_owned(),
+        };
+
+        let mut builder = BzlmodCleanCellGraphBuilder::new(
+            workspace_id,
+            &options,
+            &root,
+            &graph,
+            &parsed_modules,
+        )?;
+        builder.install_precomputed_extension_mapping_rows();
+        let generated_repo = "platforms++host_platform+host_platform";
+        assert_eq!(
+            builder
+                .repo_mappings
+                .get(generated_repo)
+                .and_then(|mapping| mapping.get("host_platform"))
+                .map(String::as_str),
+            Some(generated_repo)
+        );
+
+        let cell_graph = builder.finish()?;
+
+        assert!(cell_graph.extension_cells.iter().any(|cell| {
+            cell.canonical_name == generated_repo && cell.internal_name == "host_platform"
+        }));
+        assert!(cell_graph.scoped_aliases.iter().any(|alias| {
+            alias.owner_module == "platforms"
+                && alias.apparent_name == "host_platform"
+                && alias.target_name == generated_repo
+        }));
+
+        Ok(())
     }
 
     #[test]

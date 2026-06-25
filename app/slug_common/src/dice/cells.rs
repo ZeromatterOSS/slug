@@ -311,6 +311,7 @@ mod tests {
     use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
     use slug_core::cells::BzlmodRuntimeDynamicAlias;
     use slug_core::cells::BzlmodRuntimeExtensionCell;
+    use slug_core::cells::BzlmodRuntimeScopedRepoAlias;
     use slug_core::cells::alias::NonEmptyCellAlias;
     use slug_core::cells::cell_root_path::CellRootPathBuf;
     use slug_core::cells::external::ExtensionRepoCellSetup;
@@ -454,6 +455,102 @@ mod tests {
         assert_eq!(
             apparent_aliases.resolve("sibling")?,
             CellName::testing_new(sibling_canonical)
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_non_root_alias_resolver_uses_module_scoped_aliases() -> slug_error::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        reset_dynamic_bzlmod_state_for_project_root(tmp.path().to_path_buf());
+
+        let root = CellName::testing_new("root");
+        let platforms = CellName::testing_new("platforms");
+        let generated = CellName::testing_new("platforms++host_platform+host_platform");
+        let root_path = CellRootPathBuf::testing_new("");
+        let platforms_path = CellRootPathBuf::testing_new("bazel-external/platforms");
+        let cell_roots = [
+            (root, root_path.as_path()),
+            (platforms, platforms_path.as_path()),
+        ];
+        let root_instance = CellInstance::new(
+            root,
+            root_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &root_path),
+        )?;
+        let platforms_instance = CellInstance::new(
+            platforms,
+            platforms_path.clone(),
+            None,
+            NestedCells::from_cell_roots(&cell_roots, &platforms_path),
+        )?;
+        let setup = ExtensionRepoCellSetup {
+            canonical_name: Arc::from(generated.as_str()),
+            extension_id: Arc::from("@platforms//host:extension.bzl%host_platform"),
+            internal_name: Arc::from("host_platform"),
+            spec_hash: Arc::from("sha256-host"),
+            repo_spec_json: Arc::from("{}"),
+            repo_env_json: Arc::from("{}"),
+            extension_usages_digest: Arc::from(""),
+            extension_replay_inputs_identity_digest: Arc::from(""),
+            extension_repo_mappings_digest: Arc::from(""),
+            extension_repo_mapping_overrides_digest: Arc::from(""),
+            extension_bzl_transitive_digest: Arc::from(""),
+            extension_recorded_inputs_json: Arc::from(""),
+            materialized: false,
+        };
+        let snapshot = BzlmodRuntimeCellInstallSnapshot {
+            root_module_name: Some("root".to_owned()),
+            extension_cells: vec![BzlmodRuntimeExtensionCell {
+                canonical_name: generated.as_str().to_owned(),
+                internal_name: "host_platform".to_owned(),
+                path: format!("bazel-external/{}", generated.as_str()),
+                setup,
+            }],
+            scoped_aliases: vec![BzlmodRuntimeScopedRepoAlias {
+                owner_module: "platforms".to_owned(),
+                apparent_name: "host_platform".to_owned(),
+                target_name: generated.as_str().to_owned(),
+            }],
+            dynamic_aliases: Vec::new(),
+        };
+        let mut root_aliases = HashMap::new();
+        root_aliases.insert(
+            NonEmptyCellAlias::new(platforms.as_str().to_owned())?,
+            platforms,
+        );
+        let root_alias_resolver = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+            root,
+            root_aliases,
+            &snapshot,
+        )?;
+        let resolver = CellResolver::new_bzlmod_with_runtime_cell_snapshot(
+            vec![root_instance, platforms_instance],
+            root_alias_resolver,
+            snapshot,
+        )?;
+
+        let dice = DiceBuilder::new()
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.set_cell_resolver(resolver)?;
+        updater.set_is_bzlmod(true)?;
+        updater.set_empty_bzlmod_dice_inputs_for_workspace(WorkspaceId::new(
+            tmp.path().to_path_buf(),
+            tmp.path().join("buck-out"),
+        ))?;
+        let mut dice = updater.commit().await;
+
+        let aliases = dice.get_cell_alias_resolver(platforms).await?;
+
+        assert_eq!(aliases.resolve("host_platform")?, generated);
+        assert_eq!(
+            aliases.resolve_declared_or_runtime_alias("host_platform"),
+            Some(generated)
         );
         Ok(())
     }
