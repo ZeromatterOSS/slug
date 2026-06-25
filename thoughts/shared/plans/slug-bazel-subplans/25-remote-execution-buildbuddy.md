@@ -62,9 +62,10 @@ proof.
 
 ## Remaining Gaps
 
-- Plan 34 now has an opt-in NativeLink/local-REAPI execution smoke for one
-  repo-owned action. Keep transport changes pointed at making that path routine
-  rather than adding direct executor shortcuts.
+- Plan 34 now has opt-in NativeLink/local-REAPI execution smokes for one shell
+  action and a three-action C-source Starlark rule fixture. Keep transport
+  changes pointed at making that path routine rather than adding direct
+  executor shortcuts.
 - Split `--remote_cache` without `--remote_executor` into a cache-only
   `RemoteEnabledExecutor::Local` path instead of treating cache-only config as
   proof of RE execution.
@@ -74,4 +75,5 @@ proof.
 ## Next Owner
 
 Plan 34 should take the next slice: promote the local NativeLink REAPI smoke
-into a repeatable gate and broaden it beyond the one-action shell fixture.
+into a repeatable gate, then replace the C-source rule fixture with full
+`@rules_cc` once the toolchain registration path is ready.

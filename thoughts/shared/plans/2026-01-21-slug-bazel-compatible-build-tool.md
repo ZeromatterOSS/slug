@@ -27,7 +27,7 @@ Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiel
 | Config format    | .buckconfig                 | .bazelrc                 | Overhaul config file parsing                 |
 | Dep management   | Cells, no modules           | bzlmod mandatory         | Full bzlmod implementation                   |
 | Registry         | None                        | BCR                      | Registry client                              |
-| Execution boundary | Direct local / Buck executors | REAPI for remote and local executor backends | Make NativeLink-local REAPI proof routine and broaden coverage |
+| Execution boundary | Direct local / Buck executors | REAPI for remote and local executor backends | Make NativeLink-local REAPI proof routine and reach full rules_cc |
 | Target patterns  | `//pkg:`                    | `//pkg:all`              | Pattern parsing                              |
 | Visibility       | `"PUBLIC"`                  | `"//visibility:public"`  | Syntax change                                |
 
