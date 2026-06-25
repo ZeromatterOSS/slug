@@ -265,6 +265,15 @@ treats orphaned cached results as misses before re-execution, and
 `/var/mnt/dev/bazel/src/test/java/com/google/devtools/build/lib/remote/RemoteSpawnRunnerWithGrpcRemoteExecutorTest.java:1216-1395`
 covers orphaned file and directory cached actions.
 
+Deferred file-output misses are now covered explicitly. The NativeLink test
+`test_stale_deferred_file_output_cache_hit_reexecutes_through_reapi` primes
+local SQLite AC with `--materializations=none`, restarts Slug against a clean
+NativeLink CAS/AC, and still observes `remote: 1`, `local: 0`, no `CacheQuery`,
+and no direct-local action before a subsequent `cached: 1` rebuild. Evidence:
+`TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest
+tests/plan31/test_persistent_re_action_cache.py::test_stale_deferred_file_output_cache_hit_reexecutes_through_reapi
+-q --tb=short --basetemp target/tmp/plan31-deferred-verify`.
+
 Local-vs-RE AC hit accounting is now explicit at the command-event boundary.
 `RemoteCommand.local_action_cache_hit` is set only for Slug's local SQLite AC
 hits; remote REAPI AC hits keep `ActionExecutionKind::ActionCache` but leave the
@@ -279,8 +288,9 @@ TMPDIR=$PWD/target/tmp python -m pytest tests/plan31/ -q --tb=short
 `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest
 tests/plan34/ -q --tb=short --basetemp target/tmp/plan34-accounting-verify`.
 
-Remaining 31.1 gap: deferred file-output CAS misses that surface only after the
-command claim.
+No known 31.1 stale-AC correctness gap remains. Open Plan 31 work is the
+existing broad-suite/manual perf validation and the independent 31.3
+daemon-resident BES uploader.
 
 #### Changes Required
 
@@ -415,6 +425,9 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
       proves a stale local SQLite AC hit against a clean NativeLink CAS/AC
       falls through to REAPI execution with `remote: 1`, `local: 0`, no
       `direct-local` action, and then refreshes the local durable row.
+- [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan31/test_persistent_re_action_cache.py::test_stale_deferred_file_output_cache_hit_reexecutes_through_reapi -q --tb=short --basetemp target/tmp/plan31-deferred-verify`
+      proves a stale deferred file-output AC hit falls through to REAPI
+      execution even when final artifact materialization is skipped.
 - [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan31/ -q --tb=short --basetemp target/tmp/plan31-skip-lookup-verify`
       proves orphaned remote AC results fall through to REAPI Execute with
       cache lookup skipped, then refresh Slug's local durable row.
