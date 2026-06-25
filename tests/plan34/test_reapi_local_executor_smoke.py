@@ -14,6 +14,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SHELL_FIXTURE_ROOT = REPO_ROOT / "tests/core/executor/test_outputs_ordering_data"
 CC_ACTIONS_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/cc_actions"
 RULES_CC_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/rules_cc"
+PLATFORM_EXEC_PROPERTIES_FIXTURE_ROOT = (
+    REPO_ROOT / "tests/plan34/fixtures/platform_exec_properties"
+)
 
 
 def _existing_executable_from_env(name: str) -> Path | None:
@@ -222,6 +225,99 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
+            ],
+            cwd=workspace,
+        )
+        build_output = build.stdout + build.stderr
+        assert "BUILD SUCCEEDED" in build_output
+        assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
+        assert "RE Session:" in build_output
+
+        what_ran = _run(
+            [
+                str(slug_bin),
+                "--isolation-dir",
+                isolation,
+                "log",
+                "what-ran",
+                "--format",
+                "json",
+            ],
+            cwd=workspace,
+        )
+        what_ran_lines = [
+            json.loads(line)
+            for line in (what_ran.stdout + what_ran.stderr).splitlines()
+            if line.startswith("{")
+        ]
+        reapi_actions = [
+            entry for entry in what_ran_lines if entry["reproducer"]["executor"] == "Re"
+        ]
+        direct_local_actions = [
+            entry
+            for entry in what_ran_lines
+            if entry["reproducer"]["executor"] in {"Local", "LocalWorker"}
+        ]
+
+        assert len(reapi_actions) == 1
+        assert direct_local_actions == []
+        action = reapi_actions[0]
+        assert action["reproducer"]["details"]["platform_properties"] == {"cpu_count": "1"}
+        assert action["reproducer"]["details"]["digest"]
+    finally:
+        _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+            pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
+
+
+@pytest.mark.skipif(
+    not os.environ.get("SLUG_PLAN34_NATIVELINK_BIN"),
+    reason="set SLUG_PLAN34_NATIVELINK_BIN to run the local REAPI executor smoke",
+)
+def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
+    tmp_path: Path,
+) -> None:
+    slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
+    if not slug_bin.is_file():
+        pytest.skip("build target/debug/slug or set SLUG_BIN")
+    nativelink_bin = _existing_executable_from_env("SLUG_PLAN34_NATIVELINK_BIN")
+    assert nativelink_bin is not None
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _copy_fixture(
+        PLATFORM_EXEC_PROPERTIES_FIXTURE_ROOT,
+        workspace,
+        [".buckroot", "MODULE.bazel", "BUILD.bazel", "defs.bzl"],
+    )
+
+    nativelink_root = tmp_path / "nativelink"
+    nativelink_root.mkdir()
+    frontend_port = _free_port()
+    worker_port = _free_port()
+    config = nativelink_root / "nativelink.json5"
+    _write_nativelink_config(config, nativelink_root, frontend_port, worker_port)
+
+    proc, nativelink_lines = _start_nativelink(nativelink_bin, config, frontend_port)
+    isolation = "plan34-reapi-platform-exec-properties-smoke"
+    remote_endpoint = f"grpc://127.0.0.1:{frontend_port}"
+
+    try:
+        build = _run(
+            [
+                str(slug_bin),
+                "--isolation-dir",
+                isolation,
+                "build",
+                "//:foo",
+                f"--remote_executor={remote_endpoint}",
+                f"--remote_cache={remote_endpoint}",
+                "--platforms=//:re_platform",
             ],
             cwd=workspace,
         )

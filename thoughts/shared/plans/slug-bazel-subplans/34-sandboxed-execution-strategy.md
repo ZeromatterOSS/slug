@@ -40,21 +40,28 @@ shortcut.
   default to `RemoteEnabled(Remote)`, so Bazel-shaped `--remote_executor`
   builds use REAPI by default instead of silently falling back to direct-local
   execution.
+- Bazel `platform(exec_properties = {...})` handling now also synthesizes
+  `RemoteEnabled(Remote)` for the platform-derived executor config. Label-shaped
+  build-setting keys stay out of the RE Platform message, and opaque keys such
+  as `cpu_count` flow to RE.
 - `tests/plan34/test_reapi_local_executor_smoke.py` is an opt-in repo-owned
   smoke. When `SLUG_PLAN34_NATIVELINK_BIN` points at a NativeLink binary, it
   starts a local all-in-one NativeLink REAPI service with one worker and builds
   fast in-repo fixtures through `--remote_executor` and `--remote_cache`. The
-  shell fixture intentionally omits `--remote-only` to prove the RE-configured
-  default path; the C-source and `@rules_cc` fixtures also pass `--remote-only`
-  as an explicit strategy check.
-- The smoke proves a one-action shell fixture, a three-action C-source Starlark
-  rule fixture, and a real `@rules_cc` `cc_binary` fixture cross REAPI with
-  what-ran `executor="Re"` and zero direct-local actions. The `rules_cc` fixture
-  uses Bazel-shaped `--action_env=PATH=/usr/bin:/bin` so the NativeLink-local
-  host C++ toolchain can find its linker.
+  shell and platform-exec-properties fixtures intentionally omit
+  `--remote-only` to prove the RE-configured default and platform-derived
+  executor paths; the C-source and `@rules_cc` fixtures also pass
+  `--remote-only` as an explicit strategy check.
+- The smoke proves a one-action shell fixture, a one-action platform
+  `exec_properties` fixture, a three-action C-source Starlark rule fixture, and
+  a real `@rules_cc` `cc_binary` fixture cross REAPI with what-ran
+  `executor="Re"` and zero direct-local actions. The `rules_cc` fixture uses
+  Bazel-shaped `--action_env=PATH=/usr/bin:/bin` so the NativeLink-local host
+  C++ toolchain can find its linker.
 - It remains opt-in because NativeLink binary/bootstrap availability is not yet
   repo-owned or a CI gate.
-- Hybrid/local fallback is still present for explicit hybrid executor configs.
+- Hybrid/local fallback is still present for legacy explicit
+  `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` configs.
   Until that lane is audited or made diagnostic, direct-local success is not
   Plan 34 evidence.
 
@@ -62,6 +69,10 @@ shortcut.
 
 - `cargo test -p slug_server oss_default_executor_ --lib` proves RE-configured
   OSS defaults are remote-only rather than local-only or hybrid.
+- `cargo test -p slug_configured platform_exec_properties_ --lib` proves
+  Bazel `platform(exec_properties = {...})` synthesis emits a remote-only
+  executor config and filters label-shaped build-setting keys out of
+  `re_properties`.
 - `cargo test -p slug_server re_config_overlay_projects_reapi_executor_snapshot --lib`
   proves the daemon binds an REAPI executor snapshot into static RE metadata.
 - `cargo test -p slug_client_ctx cli_re_config_snapshot_projects_bazel_remote_flags --lib`
@@ -69,9 +80,10 @@ shortcut.
 - `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   proves local NativeLink-backed REAPI execution for repo-owned fixtures with
   `reapi_actions=1` for the no-`--remote-only` shell fixture,
-  `reapi_actions=3` for the C-source Starlark rule fixture, `reapi_actions=2`
-  for the `@rules_cc` fixture, `direct_local_actions=0`, and local command
-  count 0.
+  `reapi_actions=1` for the no-`--remote-only` platform `exec_properties`
+  fixture, `reapi_actions=3` for the C-source Starlark rule fixture,
+  `reapi_actions=2` for the `@rules_cc` fixture, `direct_local_actions=0`, and
+  local command count 0.
 
 The NativeLink smoke is execution-boundary evidence, including a real
 `@rules_cc` compile/link proof, but it is not yet a routine gate.
@@ -84,9 +96,9 @@ The NativeLink smoke is execution-boundary evidence, including a real
   routine validation or should move behind a hermetic local C++ toolchain setup.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
   REAPI surface if it is needed as the executor backend.
-- Audit explicit hybrid executor configs and either quarantine their
-  direct-local fallback for RE-configured builds or make it explicit diagnostic
-  behavior rather than silent success.
+- Audit legacy explicit hybrid `CommandExecutorConfig` users and either
+  quarantine their direct-local fallback for Bazel-shaped RE builds or document
+  them as non-Bazel diagnostic behavior.
 - Keep cache identity and ActionResult replay in Plan 31. Plan 34 only consumes
   cache evidence when it proves the action crossed REAPI.
 
@@ -101,7 +113,7 @@ The NativeLink smoke is execution-boundary evidence, including a real
 
 ## Next Owner
 
-Promote the NativeLink-local `rules_cc` REAPI smoke into a repeatable gate, then
-audit explicit hybrid executor configs for remaining direct-local fallback. Do
-not open new flag or target-language compatibility lanes until the local REAPI
-path is routine.
+Promote the NativeLink-local REAPI smoke into a repeatable gate, then audit
+legacy explicit hybrid `CommandExecutorConfig` users for remaining direct-local
+fallback. Do not open new flag or target-language compatibility lanes until the
+local REAPI path is routine.

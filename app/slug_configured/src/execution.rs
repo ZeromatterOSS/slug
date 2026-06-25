@@ -166,7 +166,7 @@ async fn legacy_execution_platform(
 ///
 /// Look up the cfg's platform label (e.g.
 /// `buildbuddy_toolchain//:platform_linux_x86_64`), load its
-/// `PlatformInfo`, and synthesize a `Hybrid` `CommandExecutorConfig`
+/// `PlatformInfo`, and synthesize a `Remote` `CommandExecutorConfig`
 /// whose `re_properties` are the platform's `exec_properties`. Returns
 /// `None` for cfgs without an attached platform (`unbound`,
 /// `unspecified`) or platforms without `exec_properties`, in which
@@ -176,19 +176,6 @@ async fn exec_platform_executor_config_from_cfg(
     cfg: &ConfigurationNoExec,
 ) -> Option<Arc<slug_core::execution_types::executor_config::CommandExecutorConfig>> {
     use slug_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
-    use slug_core::execution_types::executor_config::CacheUploadBehavior;
-    use slug_core::execution_types::executor_config::CommandExecutorConfig;
-    use slug_core::execution_types::executor_config::CommandGenerationOptions;
-    use slug_core::execution_types::executor_config::Executor;
-    use slug_core::execution_types::executor_config::HybridExecutionLevel;
-    use slug_core::execution_types::executor_config::LocalExecutorOptions;
-    use slug_core::execution_types::executor_config::MetaInternalExtraParams;
-    use slug_core::execution_types::executor_config::PathSeparatorKind;
-    use slug_core::execution_types::executor_config::RePlatformFields;
-    use slug_core::execution_types::executor_config::RemoteEnabledExecutor;
-    use slug_core::execution_types::executor_config::RemoteEnabledExecutorOptions;
-    use slug_core::execution_types::executor_config::RemoteExecutorOptions;
-    use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
     use slug_core::pattern::pattern::ParsedPattern;
     use slug_core::pattern::pattern_type::TargetPatternExtra;
     use slug_core::provider::label::ProvidersLabel;
@@ -221,8 +208,25 @@ async fn exec_platform_executor_config_from_cfg(
     // entries (e.g. `@bazel_tools//tools/cpp:compilation_mode = "opt"`)
     // that flow into ConfigurationData.build_settings, NOT to RE
     // worker selection.
-    let entries: Vec<(String, String)> = platform_info
-        .exec_properties_entries()
+    platform_executor_config_from_exec_properties(platform_info.exec_properties_entries())
+}
+
+fn platform_executor_config_from_exec_properties(
+    entries: impl IntoIterator<Item = (String, String)>,
+) -> Option<Arc<slug_core::execution_types::executor_config::CommandExecutorConfig>> {
+    use slug_core::execution_types::executor_config::CacheUploadBehavior;
+    use slug_core::execution_types::executor_config::CommandExecutorConfig;
+    use slug_core::execution_types::executor_config::CommandGenerationOptions;
+    use slug_core::execution_types::executor_config::Executor;
+    use slug_core::execution_types::executor_config::MetaInternalExtraParams;
+    use slug_core::execution_types::executor_config::PathSeparatorKind;
+    use slug_core::execution_types::executor_config::RePlatformFields;
+    use slug_core::execution_types::executor_config::RemoteEnabledExecutor;
+    use slug_core::execution_types::executor_config::RemoteEnabledExecutorOptions;
+    use slug_core::execution_types::executor_config::RemoteExecutorOptions;
+    use slug_core::execution_types::executor_config::RemoteExecutorUseCase;
+
+    let entries: Vec<(String, String)> = entries
         .into_iter()
         .filter(|(k, _)| !k.starts_with('@') && !k.starts_with("//") && !k.contains("//"))
         .collect();
@@ -234,11 +238,7 @@ async fn exec_platform_executor_config_from_cfg(
     };
     Some(Arc::new(CommandExecutorConfig {
         executor: Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
-            executor: RemoteEnabledExecutor::Hybrid {
-                local: LocalExecutorOptions::default(),
-                remote: RemoteExecutorOptions::default(),
-                level: HybridExecutionLevel::Limited,
-            },
+            executor: RemoteEnabledExecutor::Remote(RemoteExecutorOptions::default()),
             re_properties,
             re_use_case: RemoteExecutorUseCase::slug_default(),
             re_action_key: None,
@@ -1030,4 +1030,70 @@ impl GetExecutionPlatformsImpl for GetExecutionPlatformsInstance {
 
 pub(crate) fn init_get_execution_platforms() {
     GET_EXECUTION_PLATFORMS.init(&GetExecutionPlatformsInstance);
+}
+
+#[cfg(test)]
+mod tests {
+    use slug_core::execution_types::executor_config::Executor;
+    use slug_core::execution_types::executor_config::RemoteEnabledExecutor;
+
+    use super::*;
+
+    #[test]
+    fn platform_exec_properties_synthesize_remote_executor_without_local_fallback() {
+        let config = platform_executor_config_from_exec_properties([
+            ("OSFamily".to_owned(), "Linux".to_owned()),
+            ("Arch".to_owned(), "x86_64".to_owned()),
+            (
+                "@bazel_tools//tools/cpp:compilation_mode".to_owned(),
+                "opt".to_owned(),
+            ),
+            ("//command_line_option:cpu".to_owned(), "k8".to_owned()),
+        ])
+        .expect("opaque exec_properties should synthesize a remote executor config");
+
+        let Executor::RemoteEnabled(options) = &config.executor else {
+            panic!("platform exec_properties should synthesize a remote-enabled executor");
+        };
+        assert!(matches!(options.executor, RemoteEnabledExecutor::Remote(_)));
+        assert_eq!(
+            options
+                .re_properties
+                .properties
+                .get("OSFamily")
+                .map(String::as_str),
+            Some("Linux")
+        );
+        assert_eq!(
+            options
+                .re_properties
+                .properties
+                .get("Arch")
+                .map(String::as_str),
+            Some("x86_64")
+        );
+        assert!(
+            !options
+                .re_properties
+                .properties
+                .contains_key("@bazel_tools//tools/cpp:compilation_mode")
+        );
+        assert!(
+            !options
+                .re_properties
+                .properties
+                .contains_key("//command_line_option:cpu")
+        );
+    }
+
+    #[test]
+    fn platform_exec_properties_with_only_build_settings_do_not_override_fallback() {
+        assert!(
+            platform_executor_config_from_exec_properties([(
+                "@bazel_tools//tools/cpp:compilation_mode".to_owned(),
+                "dbg".to_owned()
+            )])
+            .is_none()
+        );
+    }
 }
