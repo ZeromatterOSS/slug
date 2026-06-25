@@ -2080,6 +2080,62 @@ mod tests {
     }
 
     #[test]
+    fn cli_re_config_snapshot_projects_bazel_remote_flags() {
+        let opts = <CommonBuildConfigurationOptions as clap::Parser>::try_parse_from([
+            "slug",
+            "--remote_executor=grpc://executor.example:8980",
+            "--remote_cache=grpc://cache.example:8980",
+            "--remote_header=authorization=Bearer test",
+            "--remote_cache_header=x-cache=1",
+            "--remote_exec_header=x-exec=2",
+            "--remote_default_exec_properties=OSFamily=linux",
+            "--remote_default_exec_properties=container-image=docker://example/rbe:latest",
+            "--remote_instance_name=main",
+            "--tls_client_certificate=/tmp/client.pem",
+        ])
+        .unwrap();
+
+        let snapshot = opts.cli_re_config_snapshot().unwrap();
+        assert_eq!(
+            snapshot.address.as_deref(),
+            Some("grpc://executor.example:8980")
+        );
+        assert_eq!(
+            snapshot.engine_address.as_deref(),
+            Some("grpc://executor.example:8980")
+        );
+        assert_eq!(
+            snapshot.cas_address.as_deref(),
+            Some("grpc://cache.example:8980")
+        );
+        assert_eq!(
+            snapshot.action_cache_address.as_deref(),
+            Some("grpc://cache.example:8980")
+        );
+        assert_eq!(snapshot.tls, None);
+        assert_eq!(snapshot.tls_client_cert.as_deref(), Some("/tmp/client.pem"));
+        assert_eq!(
+            snapshot.http_headers,
+            vec![
+                "authorization: Bearer test".to_owned(),
+                "x-cache: 1".to_owned(),
+                "x-exec: 2".to_owned(),
+            ]
+        );
+        assert_eq!(snapshot.instance_name.as_deref(), Some("main"));
+        assert_eq!(
+            snapshot.default_exec_properties,
+            vec![
+                ("OSFamily".to_owned(), "linux".to_owned()),
+                (
+                    "container-image".to_owned(),
+                    "docker://example/rbe:latest".to_owned()
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn test_get_representative_config_flags() -> slug_error::Result<()> {
         let mut argv = ExpandedArgvBuilder::new();
 

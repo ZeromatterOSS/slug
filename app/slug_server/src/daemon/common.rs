@@ -619,3 +619,70 @@ fn get_default_path_separator(host_platform: HostPlatformOverride) -> PathSepara
         HostPlatformOverride::DefaultPlatform => PathSeparatorKind::system_default(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oss_default_executor_stays_local_without_re_config() {
+        if !slug_core::is_open_source() {
+            return;
+        }
+
+        let config = get_default_executor_config(HostPlatformOverride::Linux, false, &[]);
+        assert!(matches!(config.executor, Executor::Local(_)));
+    }
+
+    #[test]
+    fn oss_default_executor_promotes_to_hybrid_when_re_configured() {
+        if !slug_core::is_open_source() {
+            return;
+        }
+
+        let default_exec_properties = vec![
+            ("OSFamily".to_owned(), "linux".to_owned()),
+            (
+                "container-image".to_owned(),
+                "docker://example/rbe:latest".to_owned(),
+            ),
+        ];
+        let config = get_default_executor_config(
+            HostPlatformOverride::Linux,
+            true,
+            &default_exec_properties,
+        );
+        let Executor::RemoteEnabled(options) = config.executor else {
+            panic!("RE-configured OSS default executor should be remote-enabled");
+        };
+
+        assert!(matches!(
+            options.executor,
+            RemoteEnabledExecutor::Hybrid {
+                level: HybridExecutionLevel::Limited,
+                ..
+            }
+        ));
+        assert_eq!(options.cache_upload_behavior, CacheUploadBehavior::Disabled);
+        assert!(options.remote_cache_enabled);
+        assert!(!options.remote_dep_file_cache_enabled);
+        assert_eq!(options.re_use_case.as_str(), "slug-default");
+        assert_eq!(
+            options
+                .re_properties
+                .properties
+                .get("OSFamily")
+                .map(String::as_str),
+            Some("linux")
+        );
+        assert_eq!(
+            options
+                .re_properties
+                .properties
+                .get("container-image")
+                .map(String::as_str),
+            Some("docker://example/rbe:latest")
+        );
+        assert_eq!(options.re_properties.properties.len(), 2);
+    }
+}

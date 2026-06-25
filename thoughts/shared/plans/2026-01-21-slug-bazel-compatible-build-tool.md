@@ -27,7 +27,7 @@ Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiel
 | Config format    | .buckconfig                 | .bazelrc                 | Overhaul config file parsing                 |
 | Dep management   | Cells, no modules           | bzlmod mandatory         | Full bzlmod implementation                   |
 | Registry         | None                        | BCR                      | Registry client                              |
-| Local isolation  | None (RE-first)             | Sandboxing               | Implement sandboxing                         |
+| Execution boundary | Direct local / Buck executors | REAPI for remote and local executor backends | Prove REAPI execution with direct-local count 0 |
 | Target patterns  | `//pkg:`                    | `//pkg:all`              | Pattern parsing                              |
 | Visibility       | `"PUBLIC"`                  | `"//visibility:public"`  | Syntax change                                |
 
@@ -36,7 +36,8 @@ Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiel
 After completing this plan, slug will:
 
 1. **Parse and execute** standard Bazel 9.0 BUILD.bazel and MODULE.bazel files
-2. **Enforce build isolation** via local sandboxing
+2. **Execute actions through an REAPI boundary**, using remote or local REAPI
+   backends as configured
 3. **Fetch dependencies** from the Bazel Central Registry (BCR)
 4. **Run rules_cc** to compile C/C++ projects
 5. **Run rules_rust** to compile Rust projects
@@ -97,7 +98,9 @@ Slug `transitive_set`:
 2. **WORKSPACE support** - Removed in Bazel 9.0, not implementing
 3. **Android/iOS rules** - Focus on C/C++, Rust, Python first
 4. **Java rules** - Lower priority than core languages
-5. **Remote execution initially** - Local execution first, RE later
+5. **Direct executor shortcuts as compatibility proof** - direct-local success
+   does not prove Bazel 9 REAPI parity; local executors must sit behind the same
+   REAPI boundary as remote execution
 6. **GUI/IDE integration** - CLI only initially
 7. **Removing type annotations** - Keep starlark-rust's type support (Bazel is adding this)
 8. **Native language rule implementations** - In Bazel 9.0, language rules (cc*\*, py*_, proto\__) are pure Starlark in their respective rules\_\* repos. Slug does NOT implement `native.py_library`, `native.proto_library`, etc. See [Native → Starlark Migration Architecture](#native--starlark-migration-architecture).
