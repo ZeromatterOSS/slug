@@ -2041,6 +2041,26 @@ mod tests {
     }
 
     #[test]
+    fn bazel9_execution_policy_rejects_old_name_aliases() {
+        for arg in [
+            "--experimental_local_execution_delay=0",
+            "--experimental-debug-spawn-scheduler",
+            "--experimental_worker_max_multiplex_instances=2",
+            "--experimental_worker_multiplex=false",
+            "--experimental_sandbox_base=/tmp/slug-sandbox",
+            "--experimental_reuse_sandbox_directories",
+            "--experimental_sandbox_default_allow_network",
+        ] {
+            let error =
+                <CommonBuildConfigurationOptions as clap::Parser>::try_parse_from(["slug", arg])
+                    .unwrap_err();
+
+            assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
+            assert!(error.to_string().contains(arg.split('=').next().unwrap()));
+        }
+    }
+
+    #[test]
     fn test_get_representative_config_flags() -> slug_error::Result<()> {
         let mut argv = ExpandedArgvBuilder::new();
 

@@ -488,7 +488,9 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
     // Strip leading "no" prefix for boolean flags
     let base = flag_name.strip_prefix("no").unwrap_or(flag_name);
     let normalized_base = base.replace('-', "_");
-    if is_bazel9_remote_old_name(&normalized_base) {
+    if is_bazel9_remote_old_name(&normalized_base)
+        || is_bazel9_execution_policy_old_name(&normalized_base)
+    {
         return false;
     }
     if normalized_base == "experimental_cc_implementation_deps" {
@@ -529,6 +531,19 @@ fn is_bazel9_remote_old_name(normalized_base: &str) -> bool {
             | "experimental_remote_download_outputs"
             | "experimental_remote_download_minimal"
             | "experimental_remote_download_toplevel"
+    )
+}
+
+fn is_bazel9_execution_policy_old_name(normalized_base: &str) -> bool {
+    matches!(
+        normalized_base,
+        "experimental_local_execution_delay"
+            | "experimental_debug_spawn_scheduler"
+            | "experimental_worker_max_multiplex_instances"
+            | "experimental_worker_multiplex"
+            | "experimental_sandbox_base"
+            | "experimental_reuse_sandbox_directories"
+            | "experimental_sandbox_default_allow_network"
     )
 }
 
@@ -1134,6 +1149,62 @@ mod tests {
                 "--experimental-remote-downloader-propagate-credentials",
                 "--experimental-remote-retry-max-attempts=3",
                 "--experimental-remote-download-minimal",
+                "//..."
+            ]
+        );
+    }
+
+    #[test]
+    fn execution_old_name_flags_are_preserved_for_bazel9_rejection() {
+        for flag in [
+            "--experimental_local_execution_delay=0",
+            "--experimental_debug_spawn_scheduler",
+            "--noexperimental_debug_spawn_scheduler",
+            "--experimental_worker_max_multiplex_instances=Javac=4",
+            "--experimental_worker_multiplex=false",
+            "--noexperimental_worker_multiplex",
+            "--experimental_sandbox_base=/tmp/slug-sandbox",
+            "--experimental_reuse_sandbox_directories",
+            "--noexperimental_reuse_sandbox_directories",
+            "--experimental_sandbox_default_allow_network",
+            "--noexperimental_sandbox_default_allow_network",
+        ] {
+            assert!(!is_bazel_transitional_flag(flag), "{flag}");
+        }
+
+        let args = vec![
+            "slug".to_owned(),
+            "build".to_owned(),
+            "--experimental_local_execution_delay=0".to_owned(),
+            "--experimental_debug_spawn_scheduler".to_owned(),
+            "--noexperimental_debug_spawn_scheduler".to_owned(),
+            "--experimental_worker_max_multiplex_instances=Javac=4".to_owned(),
+            "--experimental_worker_multiplex=false".to_owned(),
+            "--noexperimental_worker_multiplex".to_owned(),
+            "--experimental_sandbox_base=/tmp/slug-sandbox".to_owned(),
+            "--experimental_reuse_sandbox_directories".to_owned(),
+            "--noexperimental_reuse_sandbox_directories".to_owned(),
+            "--experimental_sandbox_default_allow_network".to_owned(),
+            "--noexperimental_sandbox_default_allow_network".to_owned(),
+            "//...".to_owned(),
+        ];
+        let result = normalize_args(args);
+        assert_eq!(
+            result,
+            vec![
+                "slug",
+                "build",
+                "--experimental-local-execution-delay=0",
+                "--experimental-debug-spawn-scheduler",
+                "--noexperimental-debug-spawn-scheduler",
+                "--experimental-worker-max-multiplex-instances=Javac=4",
+                "--experimental-worker-multiplex=false",
+                "--noexperimental-worker-multiplex",
+                "--experimental-sandbox-base=/tmp/slug-sandbox",
+                "--experimental-reuse-sandbox-directories",
+                "--noexperimental-reuse-sandbox-directories",
+                "--experimental-sandbox-default-allow-network",
+                "--noexperimental-sandbox-default-allow-network",
                 "//..."
             ]
         );

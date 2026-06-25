@@ -58,6 +58,18 @@ sandboxed execution strategy:
   performance.
 - Windows has no enforcement backend.
 
+Current Bazel 9 flag-parity note (2026-06-25): pre-9 `oldName` aliases for
+dynamic scheduler, persistent-worker, and sandbox execution policy are not
+supported Slug aliases. They survive `.bazelrc` normalization only so the Bazel
+9-only CLI rejects stale spellings such as
+`--experimental_local_execution_delay=0` instead of stripping them or
+translating them to canonical policy. Bazel source:
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/dynamic/DynamicExecutionOptions.java:113-130`,
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/worker/WorkerOptions.java:100-170`,
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/sandbox/SandboxOptions.java:100-102`,
+and
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/sandbox/SandboxOptions.java:287-315`.
+
 ## Background Research
 
 ### Bazel Prior Art
