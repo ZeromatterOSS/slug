@@ -423,6 +423,7 @@ def run_python_tests(slug_binary: str) -> None:
             slug_binary = str(exe_path)
     env = os.environ.copy()
     env["TEST_EXECUTABLE"] = slug_binary
+    env["SLUG_BIN"] = slug_binary
     # 30 minutes should be enough for all integration tests
     timeout_sec = 30 * 60
     run(
@@ -431,6 +432,36 @@ def run_python_tests(slug_binary: str) -> None:
             "-m",
             "pytest",
             "tests/core/",
+            "-q",
+            "--tb=short",
+        ],
+        timeout=timeout_sec,
+        env=env,
+    )
+
+
+def run_plan34_tests(slug_binary: str) -> None:
+    """Run Plan 34 REAPI-boundary tests in the Python integration entrypoint."""
+    print_running("pytest tests/plan34/")
+    if is_windows():
+        slug_binary = _normalize_windows_path(slug_binary)
+    binary_path = Path(slug_binary)
+    if is_windows() and not binary_path.exists():
+        exe_path = binary_path.with_suffix(".exe")
+        if exe_path.exists():
+            slug_binary = str(exe_path)
+    env = os.environ.copy()
+    env["TEST_EXECUTABLE"] = slug_binary
+    env["SLUG_BIN"] = slug_binary
+    # The local NativeLink REAPI smoke is short when a binary is available and
+    # skips cleanly on CI hosts that have not provisioned NativeLink yet.
+    timeout_sec = 5 * 60
+    run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/plan34/",
             "-q",
             "--tb=short",
         ],
@@ -570,6 +601,8 @@ def main() -> None:
     ):
         with timing():
             run_python_tests(args.buck2)
+        with timing():
+            run_plan34_tests(args.buck2)
 
     # On CI, check to make sure our test doesn't overwrite existing files
     if args.ci:

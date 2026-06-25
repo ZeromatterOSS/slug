@@ -20,10 +20,21 @@ RULES_CC_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/rules_cc"
 PLATFORM_EXEC_PROPERTIES_FIXTURE_ROOT = (
     REPO_ROOT / "tests/plan34/fixtures/platform_exec_properties"
 )
+DIRECT_LOCAL_EXECUTORS = {"Local", "LocalWorker", "Worker", "WorkerInit"}
 
 
 def _is_executable(path: Path) -> bool:
     return path.is_file() and os.access(path, os.X_OK)
+
+
+def _executable_path(path: Path) -> Path | None:
+    if _is_executable(path):
+        return path
+    if os.name == "nt" and path.suffix != ".exe":
+        exe_path = path.with_suffix(".exe")
+        if _is_executable(exe_path):
+            return exe_path
+    return None
 
 
 def _existing_executable_from_env(name: str) -> Path | None:
@@ -31,16 +42,22 @@ def _existing_executable_from_env(name: str) -> Path | None:
     if not value:
         return None
     path = Path(value)
-    if _is_executable(path):
-        return path
+    executable = _executable_path(path)
+    if executable is not None:
+        return executable
     pytest.fail(f"{name}={value} is not an executable file")
 
 
 def _slug_binary() -> Path:
-    slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
-    if _is_executable(slug_bin):
-        return slug_bin
-    pytest.skip("build target/debug/slug or set SLUG_BIN")
+    slug_bin = (
+        _existing_executable_from_env("SLUG_BIN")
+        or _existing_executable_from_env("TEST_EXECUTABLE")
+        or REPO_ROOT / "target/debug/slug"
+    )
+    executable = _executable_path(slug_bin)
+    if executable is not None:
+        return executable
+    pytest.skip("build target/debug/slug or set SLUG_BIN/TEST_EXECUTABLE")
 
 
 def _nativelink_binary() -> Path:
@@ -85,6 +102,63 @@ def _run(args: list[str], cwd: Path, check: bool = True) -> subprocess.Completed
             )
         )
     return result
+
+
+def _read_what_ran(slug_bin: Path, workspace: Path, isolation: str) -> list[dict]:
+    what_ran = _run(
+        [
+            str(slug_bin),
+            "--isolation-dir",
+            isolation,
+            "log",
+            "what-ran",
+            "--format",
+            "json",
+        ],
+        cwd=workspace,
+    )
+    return [
+        json.loads(line)
+        for line in (what_ran.stdout + what_ran.stderr).splitlines()
+        if line.startswith("{")
+    ]
+
+
+def _assert_reapi_what_ran(
+    slug_bin: Path,
+    workspace: Path,
+    isolation: str,
+    expected_count: int,
+    action_key_fragments: list[str] | None = None,
+) -> list[dict]:
+    entries = _read_what_ran(slug_bin, workspace, isolation)
+    assert entries
+    direct_local_actions = [
+        entry
+        for entry in entries
+        if entry["reproducer"]["executor"] in DIRECT_LOCAL_EXECUTORS
+    ]
+    assert direct_local_actions == []
+
+    reapi_actions = [
+        entry for entry in entries if entry["reproducer"]["executor"] == "Re"
+    ]
+    assert len(reapi_actions) == expected_count
+    assert reapi_actions == entries
+    for action in reapi_actions:
+        details = action["reproducer"]["details"]
+        assert details["platform_properties"] == {"cpu_count": "1"}
+        assert details["digest"]
+
+    if action_key_fragments is not None:
+        action_keys = {
+            entry["reproducer"]["details"].get("action_key", "")
+            for entry in reapi_actions
+        }
+        for fragment in action_key_fragments:
+            assert any(fragment in action_key for action_key in action_keys)
+
+    return reapi_actions
 
 
 def _write_nativelink_config(path: Path, root: Path, frontend_port: int, worker_port: int) -> None:
@@ -252,37 +326,7 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
         assert "RE Session:" in build_output
 
-        what_ran = _run(
-            [
-                str(slug_bin),
-                "--isolation-dir",
-                isolation,
-                "log",
-                "what-ran",
-                "--format",
-                "json",
-            ],
-            cwd=workspace,
-        )
-        what_ran_lines = [
-            json.loads(line)
-            for line in (what_ran.stdout + what_ran.stderr).splitlines()
-            if line.startswith("{")
-        ]
-        reapi_actions = [
-            entry for entry in what_ran_lines if entry["reproducer"]["executor"] == "Re"
-        ]
-        direct_local_actions = [
-            entry
-            for entry in what_ran_lines
-            if entry["reproducer"]["executor"] in {"Local", "LocalWorker"}
-        ]
-
-        assert len(reapi_actions) == 1
-        assert direct_local_actions == []
-        action = reapi_actions[0]
-        assert action["reproducer"]["details"]["platform_properties"] == {"cpu_count": "1"}
-        assert action["reproducer"]["details"]["digest"]
+        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -338,37 +382,7 @@ def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
         assert "RE Session:" in build_output
 
-        what_ran = _run(
-            [
-                str(slug_bin),
-                "--isolation-dir",
-                isolation,
-                "log",
-                "what-ran",
-                "--format",
-                "json",
-            ],
-            cwd=workspace,
-        )
-        what_ran_lines = [
-            json.loads(line)
-            for line in (what_ran.stdout + what_ran.stderr).splitlines()
-            if line.startswith("{")
-        ]
-        reapi_actions = [
-            entry for entry in what_ran_lines if entry["reproducer"]["executor"] == "Re"
-        ]
-        direct_local_actions = [
-            entry
-            for entry in what_ran_lines
-            if entry["reproducer"]["executor"] in {"Local", "LocalWorker"}
-        ]
-
-        assert len(reapi_actions) == 1
-        assert direct_local_actions == []
-        action = reapi_actions[0]
-        assert action["reproducer"]["details"]["platform_properties"] == {"cpu_count": "1"}
-        assert action["reproducer"]["details"]["digest"]
+        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -424,39 +438,7 @@ def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
         assert "Commands: 3 (cached: 0, remote: 3, local: 0)" in build_output
         assert "local: 0" in build_output
 
-        what_ran = _run(
-            [
-                str(slug_bin),
-                "--isolation-dir",
-                isolation,
-                "log",
-                "what-ran",
-                "--format",
-                "json",
-            ],
-            cwd=workspace,
-        )
-        what_ran_lines = [
-            json.loads(line)
-            for line in (what_ran.stdout + what_ran.stderr).splitlines()
-            if line.startswith("{")
-        ]
-        reapi_actions = [
-            entry for entry in what_ran_lines if entry["reproducer"]["executor"] == "Re"
-        ]
-        direct_local_actions = [
-            entry
-            for entry in what_ran_lines
-            if entry["reproducer"]["executor"] in {"Local", "LocalWorker"}
-        ]
-
-        assert len(reapi_actions) == 3
-        assert direct_local_actions == []
-        for action in reapi_actions:
-            assert action["reproducer"]["details"]["platform_properties"] == {
-                "cpu_count": "1"
-            }
-            assert action["reproducer"]["details"]["digest"]
+        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=3)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -513,44 +495,13 @@ def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
         assert "Commands: 2 (cached: 0, remote: 2, local: 0)" in build_output
         assert "local: 0" in build_output
 
-        what_ran = _run(
-            [
-                str(slug_bin),
-                "--isolation-dir",
-                isolation,
-                "log",
-                "what-ran",
-                "--format",
-                "json",
-            ],
-            cwd=workspace,
+        _assert_reapi_what_ran(
+            slug_bin,
+            workspace,
+            isolation,
+            expected_count=2,
+            action_key_fragments=[" c_compile ", " cpp_link "],
         )
-        what_ran_lines = [
-            json.loads(line)
-            for line in (what_ran.stdout + what_ran.stderr).splitlines()
-            if line.startswith("{")
-        ]
-        reapi_actions = [
-            entry for entry in what_ran_lines if entry["reproducer"]["executor"] == "Re"
-        ]
-        direct_local_actions = [
-            entry
-            for entry in what_ran_lines
-            if entry["reproducer"]["executor"] in {"Local", "LocalWorker"}
-        ]
-
-        assert len(reapi_actions) == 2
-        assert direct_local_actions == []
-        action_keys = {
-            entry["reproducer"]["details"]["action_key"] for entry in reapi_actions
-        }
-        assert any(" c_compile " in action_key for action_key in action_keys)
-        assert any(" cpp_link " in action_key for action_key in action_keys)
-        for action in reapi_actions:
-            assert action["reproducer"]["details"]["platform_properties"] == {
-                "cpu_count": "1"
-            }
-            assert action["reproducer"]["details"]["digest"]
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
