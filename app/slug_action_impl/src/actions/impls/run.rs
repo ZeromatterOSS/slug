@@ -259,8 +259,8 @@ pub(crate) struct UnregisteredRunAction {
     pub(crate) remote_execution_custom_image: Option<Box<RemoteExecutorCustomImage>>,
     pub(crate) meta_internal_extra_params: MetaInternalExtraParams,
     pub(crate) expected_eligible_for_dedupe: Option<bool>,
-    /// Bazel compatibility: when true, the action inherits the host environment.
-    /// When false (default), only explicitly set env vars are available (hermetic).
+    /// Bazel compatibility: when true, apply Bazel's default shell environment.
+    /// When false (default), only explicitly set env vars are available.
     pub(crate) use_default_shell_env: bool,
 }
 
@@ -1332,7 +1332,7 @@ impl RunAction {
     ) -> slug_error::Result<CommandExecutionRequest> {
         let outputs_for_error_handler = self.outputs_for_error_handler()?;
         let mut req = prepared_run_action
-            .into_command_execution_request()
+            .into_command_execution_request(self.inner.use_default_shell_env)
             .with_prefetch_lossy_stderr(true)
             .with_executor_preference(self.inner.executor_preference)
             .with_host_sharing_requirements(host_sharing_requirements.into())
@@ -1397,7 +1397,10 @@ pub(crate) struct PreparedRunAction {
 }
 
 impl PreparedRunAction {
-    fn into_command_execution_request(self) -> CommandExecutionRequest {
+    fn into_command_execution_request(
+        self,
+        use_default_shell_env: bool,
+    ) -> CommandExecutionRequest {
         let Self {
             expanded: ExpandedCommandLine { exe, args, mut env },
             extra_env,
@@ -1411,11 +1414,14 @@ impl PreparedRunAction {
             env.insert(k, v);
         }
 
-        // Inject --action_env values from the build config.
-        // These are set as base env vars; per-action env takes precedence (already in `env`).
-        let action_env = slug_build_api::interpreter::rule_defs::build_config::get_action_env();
-        for (k, v) in action_env {
-            env.entry(k).or_insert(v);
+        // Bazel only applies --action_env through the default shell environment;
+        // per-action env entries keep precedence over the defaults.
+        if use_default_shell_env {
+            let shell_env =
+                slug_build_api::interpreter::rule_defs::build_config::get_default_shell_env();
+            for (k, v) in shell_env {
+                env.entry(k).or_insert(v);
+            }
         }
 
         CommandExecutionRequest::new(exe, args, paths, env)

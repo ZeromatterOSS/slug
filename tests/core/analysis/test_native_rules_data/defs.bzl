@@ -655,6 +655,7 @@ def _build_config_test_impl(ctx):
     lines = [
         "stamp_binaries=" + str(ctx.configuration.stamp_binaries),
         "coverage_enabled=" + str(ctx.configuration.coverage_enabled),
+        "default_shell_env=" + str(ctx.configuration.default_shell_env),
         "test_env=" + str(ctx.configuration.test_env),
     ]
     ctx.actions.write(out, "\n".join(lines) + "\n")

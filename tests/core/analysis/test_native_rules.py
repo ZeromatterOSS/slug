@@ -1395,6 +1395,11 @@ async def test_build_config_defaults(buck: Buck) -> None:
     # Defaults: stamp off, coverage off, empty test_env
     assert lines["stamp_binaries"] == "False"
     assert lines["coverage_enabled"] == "False"
+    assert "PATH" in lines["default_shell_env"]
+    if sys.platform != "win32":
+        assert "/bin:/usr/bin:/sbin:/usr/sbin" in lines["default_shell_env"]
+    assert "LC_CTYPE" in lines["default_shell_env"]
+    assert "C.UTF-8" in lines["default_shell_env"]
     assert lines["test_env"] == "{}"
 
 
@@ -1406,6 +1411,24 @@ async def test_build_config_stamp_flag(buck: Buck) -> None:
     content = output.read_text().strip()
     lines = dict(line.split("=", 1) for line in content.splitlines())
     assert lines["stamp_binaries"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_build_config_action_env_overrides_default_shell_env(buck: Buck) -> None:
+    """--action_env values override ctx.configuration.default_shell_env."""
+    result = await buck.build(
+        "--action_env",
+        "PATH=/slug/test/path",
+        "--action_env",
+        "EXTRA_ENV=present",
+        "//:build_config_defaults",
+    )
+    output = result.get_build_report().output_for_target("//:build_config_defaults")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert "/slug/test/path" in lines["default_shell_env"]
+    assert "EXTRA_ENV" in lines["default_shell_env"]
+    assert "present" in lines["default_shell_env"]
 
 
 @buck_test(data_dir="test_native_rules_data")

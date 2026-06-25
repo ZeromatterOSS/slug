@@ -4618,7 +4618,7 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
 /// Provides build configuration attributes:
 /// - `coverage_enabled`: Whether --collect_code_coverage is active
 /// - `host_path_separator`: ":" on Unix, ";" on Windows
-/// - `default_shell_env`: Dict from --action_env flags
+/// - `default_shell_env`: Bazel default shell env plus --action_env overrides
 /// - `stamp_binaries`: Whether build stamping is enabled
 /// - `short_id`: Opaque configuration fingerprint (cpu-hash)
 /// - `test_env`: Dict from --test_env flags
@@ -4671,8 +4671,7 @@ impl<'v> StarlarkValue<'v> for BuildConfiguration {
                 Some(heap.alloc_str(sep).to_value())
             }
             "default_shell_env" => {
-                // Return --action_env values from build config
-                let env_map = crate::interpreter::rule_defs::build_config::get_action_env();
+                let env_map = crate::interpreter::rule_defs::build_config::get_default_shell_env();
                 let dict = starlark::values::dict::Dict::new(
                     env_map
                         .into_iter()
@@ -4745,6 +4744,7 @@ fn build_configuration_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Returns whether build stamping is enabled.
+    #[starlark(attribute)]
     fn stamp_binaries(this: &BuildConfiguration) -> starlark::Result<bool> {
         let _ = this;
         Ok(crate::interpreter::rule_defs::build_config::get_stamp())

@@ -148,13 +148,47 @@ pub fn set_action_env(env_values: &[String]) {
     }
 }
 
-/// Get all --action_env values as a map.
+fn default_action_path() -> String {
+    #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
+    {
+        "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin".to_owned()
+    }
+
+    #[cfg(all(unix, not(any(target_os = "freebsd", target_os = "openbsd"))))]
+    {
+        "/bin:/usr/bin:/sbin:/usr/sbin".to_owned()
+    }
+
+    #[cfg(windows)]
+    {
+        let system_root = std::env::var("SYSTEMROOT").unwrap_or_else(|_| "C:\\Windows".to_owned());
+        format!(
+            "{system_root};{system_root}\\System32;{system_root}\\System32\\WindowsPowerShell\\v1.0"
+        )
+    }
+}
+
+fn bazel_default_shell_env() -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    map.insert("PATH".to_owned(), default_action_path());
+    map.insert("LC_CTYPE".to_owned(), "C.UTF-8".to_owned());
+    map
+}
+
+/// Get explicit --action_env values as a map.
 pub fn get_action_env() -> HashMap<String, String> {
     BUILD_CONFIG
         .read()
         .ok()
         .and_then(|c| c.action_env.clone())
         .unwrap_or_default()
+}
+
+/// Get Bazel's default shell action environment, with --action_env overrides.
+pub fn get_default_shell_env() -> HashMap<String, String> {
+    let mut map = bazel_default_shell_env();
+    map.extend(get_action_env());
+    map
 }
 
 /// Compute Slug's current effective repository environment.

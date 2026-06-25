@@ -30,6 +30,12 @@ shortcut.
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteSpawnStrategy.java:20-32`.
 - Bazel's gRPC executor issues REAPI `Execute` / `WaitExecution` calls:
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/GrpcRemoteExecutor.java:122-177`.
+- Bazel 9 strict action env defaults true and provides a fixed Unix
+  `PATH=/bin:/usr/bin:/sbin:/usr/sbin` plus `LC_CTYPE=C.UTF-8`, with
+  `--action_env` overrides:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/rules/BazelRuleClassProvider.java:73-87,141-208,351-364`.
+- Bazel only applies `--action_env` through the default shell environment:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/analysis/actions/SpawnAction.java:575-605,916-944`.
 
 ## Current State
 
@@ -61,9 +67,9 @@ shortcut.
 - The smoke proves a one-action shell fixture, a one-action platform
   `exec_properties` fixture, a three-action C-source Starlark rule fixture, and
   a real `@rules_cc` `cc_binary` fixture cross REAPI with what-ran
-  `executor="Re"` and zero direct-local actions. The `rules_cc` fixture uses
-  Bazel-shaped `--action_env=PATH=/usr/bin:/bin` so the NativeLink-local host
-  C++ toolchain can find its linker.
+  `executor="Re"` and zero direct-local actions. The `rules_cc` fixture no
+  longer needs a test-owned `--action_env=PATH=...`; Slug now applies Bazel 9's
+  default shell action env when rules request `use_default_shell_env`.
 - It is repeatable on checkouts with a sibling NativeLink build and is wired
   into the CI test entrypoint. Linux CI now has a repo-owned bootstrap action:
   `.github/actions/setup_plan34_nativelink` clones public NativeLink tag
@@ -102,6 +108,12 @@ shortcut.
 - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q` proves
   the Plan 34 guard and smoke are reachable through the same Slug-binary
   environment used by `test.py`/CI.
+- `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/core/analysis/test_native_rules.py -q -k 'build_config_defaults or action_env_overrides'`
+  proves `ctx.configuration.default_shell_env` contains Bazel-shaped defaults
+  and that explicit `--action_env` values override them.
+- `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/plan34/ -q`
+  proves the local NativeLink `rules_cc` REAPI smoke succeeds without a
+  test-owned `--action_env=PATH=...`.
 - `.github/actions/setup_plan34_nativelink/action.yml` plus the Linux
   `build-and-test.yml` job wire the Plan 34 smoke to a pinned public NativeLink
   `v1.5.2` source build in CI without secrets or hosted RE endpoints.
@@ -125,8 +137,6 @@ hosted run still needs to be recorded as accepted runtime evidence.
   `.github/actions/setup_plan34_nativelink`. If source-building NativeLink makes
   routine CI too slow, keep the same REAPI boundary but switch the bootstrap to a
   faster pinned public artifact/cache path.
-- Decide whether the test-owned `--action_env=PATH=/usr/bin:/bin` belongs in
-  routine validation or should move behind a hermetic local C++ toolchain setup.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
   REAPI surface if it is needed as the executor backend.
 - Keep cache identity and ActionResult replay in Plan 31. Plan 34 only consumes
@@ -143,6 +153,8 @@ hosted run still needs to be recorded as accepted runtime evidence.
   - `SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   - Set `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink` when no sibling
     `../nativelink/target/debug/nativelink` binary is available.
+- Bazel default shell env:
+  - `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/core/analysis/test_native_rules.py -q -k 'build_config_defaults or action_env_overrides'`
 - CI bootstrap sanity:
   - `git ls-remote --tags https://github.com/TraceMachina/nativelink.git refs/tags/v1.5.2`
   - `git clone --depth=1 --branch v1.5.2 https://github.com/TraceMachina/nativelink.git ...`

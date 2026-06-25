@@ -484,7 +484,6 @@ def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
-                "--action_env=PATH=/usr/bin:/bin",
                 "--remote-only",
             ],
             cwd=workspace,
