@@ -182,6 +182,21 @@ impl ActionCacheSqliteTable {
             None => Ok(None),
         }
     }
+
+    pub(crate) fn delete(&self, digest: &ActionDigest) -> slug_error::Result<()> {
+        let (digest_hash, digest_size) = digest_key(digest)?;
+        static SQL: Lazy<String> = Lazy::new(|| {
+            format!("DELETE FROM {STATE_TABLE_NAME} WHERE digest_hash = ?1 AND digest_size = ?2")
+        });
+        tracing::trace!(sql = %*SQL, digest = %digest, "deleting action cache result");
+        self.connection
+            .lock()
+            .execute(&SQL, rusqlite::params![digest_hash, digest_size])
+            .with_buck_error_context(|| {
+                format!("deleting action result from sqlite table {STATE_TABLE_NAME}")
+            })?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -293,6 +308,22 @@ mod tests {
             "new-worker"
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn delete_removes_entry() -> slug_error::Result<()> {
+        let connection = Connection::open_in_memory()?;
+        let table = ActionCacheSqliteTable::new(Arc::new(Mutex::new(connection)));
+        table.create_table()?;
+
+        let digest = sample_digest();
+        table.put(&digest, &sample_response("worker-1"), 123)?;
+        assert!(table.get(&digest)?.is_some());
+
+        table.delete(&digest)?;
+
+        assert!(table.get(&digest)?.is_none());
         Ok(())
     }
 }

@@ -107,9 +107,9 @@ async fn query_action_cache_and_download_result(
         CacheType::RemoteDepFileCache(_) => None,
     };
 
-    let action_cache_response = match local_action_cache_hit {
-        Some(response) => Ok(Some(response)),
-        None => {
+    let (action_cache_response, local_action_cache_hit) = match local_action_cache_hit {
+        Some(response) => (Ok(Some(response)), true),
+        None => (
             executor_stage_async(
                 slug_data::CacheQuery {
                     action_digest: digest.to_string(),
@@ -117,8 +117,9 @@ async fn query_action_cache_and_download_result(
                 },
                 re_client.action_cache(digest.dupe()),
             )
-            .await
-        }
+            .await,
+            false,
+        ),
     };
 
     // Diagnostic for BB cache miss investigation: log every action-cache
@@ -238,10 +239,23 @@ async fn query_action_cache_and_download_result(
         false,
         None,
         output_trees_download_config,
+        local_action_cache_hit,
     )
     .await;
 
-    let DownloadResult::Result(mut res) = res;
+    let mut res = match res {
+        DownloadResult::Result(res) => res,
+        DownloadResult::CacheMiss(manager) => {
+            if local_action_cache_hit && let Some(state) = action_cache_db_state {
+                state.delete(&digest);
+            }
+            tracing::info!(
+                "Local action cache entry for `{}` referenced missing CAS data; falling through to execution",
+                digest,
+            );
+            return ControlFlow::Continue(manager);
+        }
+    };
     match &cache_type {
         CacheType::RemoteDepFileCache(key) => {
             tracing::trace!(

@@ -93,6 +93,7 @@ pub async fn download_action_results<'a>(
     materialize_failed_re_action_outputs: bool,
     additional_message: Option<String>,
     output_trees_download_config: &OutputTreesDownloadConfig,
+    treat_cache_not_found_as_miss: bool,
 ) -> DownloadResult {
     let std_streams = response.std_streams(re_client, digest_config);
     let std_streams = async {
@@ -126,6 +127,7 @@ pub async fn download_action_results<'a>(
         digest_config,
         paranoid,
         output_trees_download_config,
+        treat_cache_not_found_as_miss,
     };
 
     let download = downloader.download(
@@ -268,6 +270,7 @@ pub struct CasDownloader<'a> {
     pub digest_config: DigestConfig,
     pub paranoid: Option<&'a ParanoidDownloader>,
     pub output_trees_download_config: &'a OutputTreesDownloadConfig,
+    pub treat_cache_not_found_as_miss: bool,
 }
 
 impl CasDownloader<'_> {
@@ -302,6 +305,11 @@ impl CasDownloader<'_> {
                         let error: slug_error::Error = e
                             .context(format!("action_digest={}", details.action_digest))
                             .into();
+                        if self.treat_cache_not_found_as_miss
+                            && is_retryable_action_cache_not_found(&error)
+                        {
+                            return ControlFlow::Break(DownloadResult::CacheMiss(manager));
+                        }
                         let is_storage_resource_exhausted = error
                             .find_typed_context::<RemoteExecutionError>()
                             .is_some_and(|re_client_error| {
@@ -352,10 +360,12 @@ impl CasDownloader<'_> {
                     let outputs = match outputs {
                         Ok(outputs) => outputs,
                         Err(e) => {
-                            return ControlFlow::Break(DownloadResult::Result(manager.error(
-                                "materialize_outputs",
-                                e.context(format!("action_digest={}", details.action_digest)),
-                            )));
+                            let error: slug_error::Error = e
+                                .context(format!("action_digest={}", details.action_digest))
+                                .into();
+                            return ControlFlow::Break(DownloadResult::Result(
+                                manager.error("materialize_outputs", error),
+                            ));
                         }
                     };
 
@@ -520,6 +530,12 @@ impl CasDownloader<'_> {
     }
 }
 
+fn is_retryable_action_cache_not_found(error: &slug_error::Error) -> bool {
+    error
+        .find_typed_context::<RemoteExecutionError>()
+        .is_some_and(|re_error| re_error.code == RE::TCode::NOT_FOUND)
+}
+
 /// Takes a path that came from RE and tries to convert it to
 /// a `ForwardRelativePath`. These paths are supposed to be forward relative,
 /// so if the conversion fails, RE is broken.
@@ -542,6 +558,10 @@ pub enum DownloadResult {
     /// Got a result: might be a success, might be a failure. Caller needs to deal with this
     /// result.
     Result(CommandExecutionResult),
+    /// A cached action result referenced missing CAS data before the command
+    /// execution claim was taken. The action-cache checker should treat this as
+    /// a miss and let the underlying executor run the action.
+    CacheMiss(CommandExecutionManager),
 }
 
 impl FromResidual<ControlFlow<Self, Infallible>> for DownloadResult {

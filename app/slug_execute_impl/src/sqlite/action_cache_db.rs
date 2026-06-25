@@ -104,6 +104,25 @@ impl ActionCacheDbState {
             .unwrap();
         }
     }
+
+    pub fn delete(&self, digest: &ActionDigest) {
+        let Some(db) = &self.db else {
+            return;
+        };
+
+        if let Err(e) = db.action_cache_table().delete(digest) {
+            soft_error!(
+                "delete_from_action_cache_db",
+                slug_error::slug_error!(
+                    slug_error::ErrorTag::Tier0,
+                    "Failed to delete action cache entry from sqlite db. {}",
+                    e
+                ),
+                quiet: true
+            )
+            .unwrap();
+        }
+    }
 }
 
 pub fn action_cache_ttl_from_days(days: u64) -> slug_error::Result<Duration> {
@@ -267,6 +286,26 @@ mod tests {
         let response = state.get(&digest).expect("entry should be present");
         assert_eq!(response.action_result.execution_metadata.worker, "worker-1");
 
+        Ok(())
+    }
+
+    #[test]
+    fn state_delete_removes_entry() -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        let state = testing_action_cache_sqlite_db(
+            fs.path(),
+            versions(ACTION_CACHE_DB_SCHEMA_VERSION),
+            metadata(),
+            default_action_cache_ttl(),
+        )?;
+
+        let digest = sample_digest();
+        state.put(&digest, &sample_response("worker-1"));
+        assert!(state.get(&digest).is_some());
+
+        state.delete(&digest);
+
+        assert!(state.get(&digest).is_none());
         Ok(())
     }
 
