@@ -470,7 +470,7 @@ impl<'a> ServerCommandContext<'a> {
             .and_then(|opts| opts.concurrency.as_ref())
             .and_then(|obj| parse_concurrency(obj.concurrency));
 
-        let re_configured = self
+        let remote_execution_configured = self
             .base_context
             .daemon
             .re_client_manager
@@ -482,7 +482,7 @@ impl<'a> ServerCommandContext<'a> {
             .default_exec_properties();
         let executor_config = get_default_executor_config(
             self.host_platform_override,
-            re_configured,
+            remote_execution_configured,
             &default_exec_properties,
         );
         let re_connection = Arc::new(self.get_re_connection());

@@ -2136,6 +2136,37 @@ mod tests {
     }
 
     #[test]
+    fn cli_re_config_snapshot_keeps_remote_cache_cache_only() {
+        let opts = <CommonBuildConfigurationOptions as clap::Parser>::try_parse_from([
+            "slug",
+            "--remote_cache=grpc://cache.example:8980",
+            "--remote_header=authorization=Bearer test",
+            "--remote_default_exec_properties=OSFamily=linux",
+        ])
+        .unwrap();
+
+        let snapshot = opts.cli_re_config_snapshot().unwrap();
+        assert_eq!(snapshot.address, None);
+        assert_eq!(snapshot.engine_address, None);
+        assert_eq!(
+            snapshot.cas_address.as_deref(),
+            Some("grpc://cache.example:8980")
+        );
+        assert_eq!(
+            snapshot.action_cache_address.as_deref(),
+            Some("grpc://cache.example:8980")
+        );
+        assert_eq!(
+            snapshot.http_headers,
+            vec!["authorization: Bearer test".to_owned()]
+        );
+        assert_eq!(
+            snapshot.default_exec_properties,
+            vec![("OSFamily".to_owned(), "linux".to_owned())]
+        );
+    }
+
+    #[test]
     fn test_get_representative_config_flags() -> slug_error::Result<()> {
         let mut argv = ExpandedArgvBuilder::new();
 

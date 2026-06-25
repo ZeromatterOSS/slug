@@ -1051,6 +1051,42 @@ mod tests {
         );
     }
 
+    #[cfg(not(fbcode_build))]
+    #[test]
+    fn re_config_overlay_keeps_remote_cache_cache_only() {
+        let mut metadata = RemoteExecutionStaticMetadata::default();
+        let snapshot = slug_common::init::ReConfigSnapshot {
+            address: None,
+            cas_address: Some("grpc://127.0.0.1:50052".to_owned()),
+            engine_address: None,
+            action_cache_address: Some("grpc://127.0.0.1:50052".to_owned()),
+            tls: None,
+            tls_client_cert: None,
+            http_headers: vec!["authorization: Bearer test".to_owned()],
+            instance_name: Some("main".to_owned()),
+            default_exec_properties: vec![("OSFamily".to_owned(), "linux".to_owned())],
+        };
+
+        apply_re_config_overlay(&mut metadata, &snapshot);
+
+        let oss = &metadata.0;
+        assert_eq!(oss.cas_address.as_deref(), Some("grpc://127.0.0.1:50052"));
+        assert_eq!(oss.engine_address, None);
+        assert_eq!(
+            oss.action_cache_address.as_deref(),
+            Some("grpc://127.0.0.1:50052")
+        );
+        assert!(!metadata.is_re_configured());
+        assert_eq!(oss.http_headers.len(), 1);
+        assert_eq!(oss.http_headers[0].key, "authorization");
+        assert_eq!(oss.http_headers[0].value, "Bearer test");
+        assert_eq!(oss.instance_name.as_deref(), Some("main"));
+        assert_eq!(
+            oss.default_exec_properties,
+            vec![("OSFamily".to_owned(), "linux".to_owned())]
+        );
+    }
+
     #[tokio::test]
     async fn test_from_startup_config_defaults_internal() -> slug_error::Result<()> {
         slug_certs::certs::maybe_setup_cryptography();

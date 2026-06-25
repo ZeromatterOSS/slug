@@ -32,6 +32,12 @@ boundary. Those are Plan 24 and Plan 34.
 - Bare `--remote_executor` also supplies the cache endpoint when
   `--remote_cache` is empty:
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteModule.java:423-427`.
+- Remote execution is enabled only by a non-empty `--remote_executor`:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteModule.java:219-222`.
+- Cache-only configuration creates a remote-caching action context with no
+  remote executor:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteModule.java:775-838`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteActionContextProvider.java:93-110`.
 - Bazel's remote strategy dispatches through REAPI `Execute`:
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteActionContextProvider.java:201-214`,
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/GrpcRemoteExecutor.java:122-177`.
@@ -47,8 +53,12 @@ boundary. Those are Plan 24 and Plan 34.
 - `apply_re_config_overlay` layers the startup snapshot onto
   `RemoteExecutionStaticMetadata`. A bare executor endpoint fills CAS, engine,
   and action-cache addresses unless a more-specific cache endpoint overrides it.
-- `get_default_executor_config(..., re_configured = true, ...)` promotes the OSS
-  default executor from direct local to `RemoteEnabled(Hybrid, Limited)`.
+- Cache-only `--remote_cache` overlays fill CAS and Action Cache addresses but
+  leave the engine address empty, so the daemon is not considered
+  remote-execution configured and the OSS default executor remains local.
+- `get_default_executor_config(..., remote_execution_configured = true, ...)`
+  promotes the OSS default executor from direct local to
+  `RemoteEnabled(Remote)`.
 
 This proves configuration reaches the RE client boundary; it does not prove that
 every build action executes through REAPI. Plan 34 owns that execution-boundary
@@ -57,23 +67,21 @@ proof.
 ## Accepted Evidence
 
 - `cargo test -p slug_client_ctx cli_re_config_snapshot_projects_bazel_remote_flags --lib`
+- `cargo test -p slug_client_ctx cli_re_config_snapshot_keeps_remote_cache_cache_only --lib`
 - `cargo test -p slug_server re_config_overlay_projects_reapi_executor_snapshot --lib`
+- `cargo test -p slug_server re_config_overlay_keeps_remote_cache_cache_only --lib`
 - `cargo test -p slug_server oss_default_executor_ --lib`
 
 ## Remaining Gaps
 
-- Plan 34 now has opt-in NativeLink/local-REAPI execution smokes for one shell
-  action and a three-action C-source Starlark rule fixture. Keep transport
-  changes pointed at making that path routine rather than adding direct
-  executor shortcuts.
-- Split `--remote_cache` without `--remote_executor` into a cache-only
-  `RemoteEnabledExecutor::Local` path instead of treating cache-only config as
-  proof of RE execution.
+- Plan 34 has a sibling-binary NativeLink/local-REAPI smoke for shell,
+  platform `exec_properties`, C-source, and `@rules_cc` fixtures. Keep
+  transport changes pointed at making that path routine rather than adding
+  direct executor shortcuts.
 - Keep BuildBuddy hosted execution as supplemental public/open-source evidence
   only. Do not commit credentials, private endpoints, or private workspace names.
 
 ## Next Owner
 
 Plan 34 should take the next slice: promote the local NativeLink REAPI smoke
-into a repeatable gate, then replace the C-source rule fixture with full
-`@rules_cc` once the toolchain registration path is ready.
+from sibling-binary local gate into a routine CI gate.

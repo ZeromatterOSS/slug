@@ -517,21 +517,22 @@ impl ExecutionStrategyExt for ExecutionStrategy {
 
 /// This is used when execution platforms are not configured.
 ///
-/// `re_configured` indicates whether the daemon has an RE backend
-/// address set (`[slug_re_client] address` or the equivalent
-/// `--remote_executor` overlay). When true, the open-source default
-/// (which would otherwise be local-only) is promoted to remote-only
-/// execution, so a user who passes `--remote_executor=grpcs://X`
-/// actually dispatches actions through REAPI without silent direct-local
-/// fallback (Plan 34).
+/// `remote_execution_configured` indicates whether the daemon has an REAPI
+/// execution endpoint (`[slug_re_client] address` or the equivalent
+/// `--remote_executor` overlay). Cache-only REAPI configuration does not count:
+/// Bazel enables remote execution only from `--remote_executor`, while
+/// `--remote_cache` alone is a cache path. When true, the open-source default
+/// (which would otherwise be local-only) is promoted to remote-only execution,
+/// so a user who passes `--remote_executor=grpcs://X` actually dispatches
+/// actions through REAPI without silent direct-local fallback (Plan 34).
 pub fn get_default_executor_config(
     host_platform: HostPlatformOverride,
-    re_configured: bool,
+    remote_execution_configured: bool,
     default_exec_properties: &[(String, String)],
 ) -> CommandExecutorConfig {
-    let executor = if slug_core::is_open_source() && !re_configured {
+    let executor = if slug_core::is_open_source() && !remote_execution_configured {
         Executor::Local(LocalExecutorOptions::default())
-    } else if re_configured {
+    } else if remote_execution_configured {
         Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
             executor: RemoteEnabledExecutor::Remote(RemoteExecutorOptions::default()),
             re_properties: get_default_re_properties(host_platform, default_exec_properties),
@@ -668,10 +669,7 @@ mod tests {
             panic!("RE-configured OSS default executor should be remote-enabled");
         };
 
-        assert!(matches!(
-            options.executor,
-            RemoteEnabledExecutor::Remote(_)
-        ));
+        assert!(matches!(options.executor, RemoteEnabledExecutor::Remote(_)));
         assert_eq!(options.cache_upload_behavior, CacheUploadBehavior::Disabled);
         assert!(options.remote_cache_enabled);
         assert!(!options.remote_dep_file_cache_enabled);
