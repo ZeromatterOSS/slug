@@ -11,6 +11,9 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+SIBLING_NATIVELINK_BIN = (
+    REPO_ROOT.parent / "nativelink" / "target" / "debug" / "nativelink"
+)
 SHELL_FIXTURE_ROOT = REPO_ROOT / "tests/core/executor/test_outputs_ordering_data"
 CC_ACTIONS_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/cc_actions"
 RULES_CC_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/rules_cc"
@@ -19,14 +22,37 @@ PLATFORM_EXEC_PROPERTIES_FIXTURE_ROOT = (
 )
 
 
+def _is_executable(path: Path) -> bool:
+    return path.is_file() and os.access(path, os.X_OK)
+
+
 def _existing_executable_from_env(name: str) -> Path | None:
     value = os.environ.get(name)
     if not value:
         return None
     path = Path(value)
-    if path.is_file() and os.access(path, os.X_OK):
+    if _is_executable(path):
         return path
     pytest.fail(f"{name}={value} is not an executable file")
+
+
+def _slug_binary() -> Path:
+    slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
+    if _is_executable(slug_bin):
+        return slug_bin
+    pytest.skip("build target/debug/slug or set SLUG_BIN")
+
+
+def _nativelink_binary() -> Path:
+    nativelink_bin = _existing_executable_from_env("SLUG_PLAN34_NATIVELINK_BIN")
+    if nativelink_bin is not None:
+        return nativelink_bin
+    if _is_executable(SIBLING_NATIVELINK_BIN):
+        return SIBLING_NATIVELINK_BIN
+    pytest.skip(
+        "set SLUG_PLAN34_NATIVELINK_BIN or build "
+        "../nativelink/target/debug/nativelink to run the local REAPI executor smoke"
+    )
 
 
 def _free_port() -> int:
@@ -182,18 +208,11 @@ def _start_nativelink(
     pytest.fail("NativeLink did not become ready:\n" + "".join(lines))
 
 
-@pytest.mark.skipif(
-    not os.environ.get("SLUG_PLAN34_NATIVELINK_BIN"),
-    reason="set SLUG_PLAN34_NATIVELINK_BIN to run the local REAPI executor smoke",
-)
 def test_native_link_re_config_default_uses_reapi_without_remote_only(
     tmp_path: Path,
 ) -> None:
-    slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
-    if not slug_bin.is_file():
-        pytest.skip("build target/debug/slug or set SLUG_BIN")
-    nativelink_bin = _existing_executable_from_env("SLUG_PLAN34_NATIVELINK_BIN")
-    assert nativelink_bin is not None
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -275,18 +294,11 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
             pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
 
 
-@pytest.mark.skipif(
-    not os.environ.get("SLUG_PLAN34_NATIVELINK_BIN"),
-    reason="set SLUG_PLAN34_NATIVELINK_BIN to run the local REAPI executor smoke",
-)
 def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
     tmp_path: Path,
 ) -> None:
-    slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
-    if not slug_bin.is_file():
-        pytest.skip("build target/debug/slug or set SLUG_BIN")
-    nativelink_bin = _existing_executable_from_env("SLUG_PLAN34_NATIVELINK_BIN")
-    assert nativelink_bin is not None
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -368,16 +380,9 @@ def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
             pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
 
 
-@pytest.mark.skipif(
-    not os.environ.get("SLUG_PLAN34_NATIVELINK_BIN"),
-    reason="set SLUG_PLAN34_NATIVELINK_BIN to run the local REAPI executor smoke",
-)
 def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
-    slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
-    if not slug_bin.is_file():
-        pytest.skip("build target/debug/slug or set SLUG_BIN")
-    nativelink_bin = _existing_executable_from_env("SLUG_PLAN34_NATIVELINK_BIN")
-    assert nativelink_bin is not None
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -463,16 +468,9 @@ def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
             pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
 
 
-@pytest.mark.skipif(
-    not os.environ.get("SLUG_PLAN34_NATIVELINK_BIN"),
-    reason="set SLUG_PLAN34_NATIVELINK_BIN to run the local REAPI executor smoke",
-)
 def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
-    slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
-    if not slug_bin.is_file():
-        pytest.skip("build target/debug/slug or set SLUG_BIN")
-    nativelink_bin = _existing_executable_from_env("SLUG_PLAN34_NATIVELINK_BIN")
-    assert nativelink_bin is not None
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()

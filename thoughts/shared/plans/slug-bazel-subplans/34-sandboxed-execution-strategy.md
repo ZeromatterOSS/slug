@@ -44,22 +44,25 @@ shortcut.
   `RemoteEnabled(Remote)` for the platform-derived executor config. Label-shaped
   build-setting keys stay out of the RE Platform message, and opaque keys such
   as `cpu_count` flow to RE.
-- `tests/plan34/test_reapi_local_executor_smoke.py` is an opt-in repo-owned
-  smoke. When `SLUG_PLAN34_NATIVELINK_BIN` points at a NativeLink binary, it
-  starts a local all-in-one NativeLink REAPI service with one worker and builds
-  fast in-repo fixtures through `--remote_executor` and `--remote_cache`. The
-  shell and platform-exec-properties fixtures intentionally omit
-  `--remote-only` to prove the RE-configured default and platform-derived
-  executor paths; the C-source and `@rules_cc` fixtures also pass
-  `--remote-only` as an explicit strategy check.
+- `tests/plan34/test_reapi_local_executor_smoke.py` is a repo-owned local REAPI
+  smoke. It uses `SLUG_PLAN34_NATIVELINK_BIN` when set, otherwise it discovers a
+  sibling checkout's `../nativelink/target/debug/nativelink` binary. When a
+  NativeLink binary is available, it starts a local all-in-one NativeLink REAPI
+  service with one worker and builds fast in-repo fixtures through
+  `--remote_executor` and `--remote_cache`. The shell and
+  platform-exec-properties fixtures intentionally omit `--remote-only` to prove
+  the RE-configured default and platform-derived executor paths; the C-source
+  and `@rules_cc` fixtures also pass `--remote-only` as an explicit strategy
+  check.
 - The smoke proves a one-action shell fixture, a one-action platform
   `exec_properties` fixture, a three-action C-source Starlark rule fixture, and
   a real `@rules_cc` `cc_binary` fixture cross REAPI with what-ran
   `executor="Re"` and zero direct-local actions. The `rules_cc` fixture uses
   Bazel-shaped `--action_env=PATH=/usr/bin:/bin` so the NativeLink-local host
   C++ toolchain can find its linker.
-- It remains opt-in because NativeLink binary/bootstrap availability is not yet
-  repo-owned or a CI gate.
+- It is repeatable on checkouts with a sibling NativeLink build, but still skips
+  cleanly where no NativeLink binary is available. NativeLink binary/bootstrap
+  ownership is not yet repo-owned or a CI gate.
 - Legacy explicit
   `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` hybrid
   configs are classified as test/example-only Buck/BXL diagnostic surfaces, not
@@ -81,7 +84,7 @@ shortcut.
   proves Bazel-shaped RE flags reach the daemon startup snapshot.
 - `pytest -q tests/plan34/test_legacy_execution_platform_surface.py` proves
   legacy explicit hybrid execution-platform APIs are confined to tests/examples.
-- `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
+- `SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   proves local NativeLink-backed REAPI execution for repo-owned fixtures with
   `reapi_actions=1` for the no-`--remote-only` shell fixture,
   `reapi_actions=1` for the no-`--remote-only` platform `exec_properties`
@@ -94,8 +97,9 @@ The NativeLink smoke is execution-boundary evidence, including a real
 
 ## Remaining Gaps
 
-- Promote the NativeLink-local REAPI smoke from opt-in to routine gate once
-  NativeLink binary/config bootstrap is repo-owned or otherwise available in CI.
+- Promote the NativeLink-local REAPI smoke from sibling-binary local gate to
+  routine CI gate once NativeLink binary/config bootstrap is repo-owned or
+  otherwise available in CI.
 - Decide whether the test-owned `--action_env=PATH=/usr/bin:/bin` belongs in
   routine validation or should move behind a hermetic local C++ toolchain setup.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
@@ -110,10 +114,12 @@ The NativeLink smoke is execution-boundary evidence, including a real
   - `cargo test -p slug_server re_config_overlay_projects_reapi_executor_snapshot --lib`
   - `cargo test -p slug_server oss_default_executor_ --lib`
 - NativeLink/local-REAPI execution proof:
-  - `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
+  - `SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
+  - Set `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink` when no sibling
+    `../nativelink/target/debug/nativelink` binary is available.
 
 ## Next Owner
 
-Promote the NativeLink-local REAPI smoke into a repeatable gate. Do not open new
-flag or target-language compatibility lanes until the local REAPI path is
-routine.
+Promote the NativeLink-local REAPI smoke from sibling-binary local gate to
+routine CI gate. Do not open new flag or target-language compatibility lanes
+until the local REAPI path is routine.
