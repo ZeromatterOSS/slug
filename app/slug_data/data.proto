@@ -2321,6 +2321,12 @@ message RemoteCommand {
   // Project relative paths to the materialized outputs for failed actions, if
   // `--unstable_materialize_failed_action_outputs` was passed to build options
   repeated string materialized_outputs_for_failed_actions = 8;
+
+  // True only when this ActionCache hit was served from Slug's local
+  // persistent action-cache state. Remote REAPI ActionCache hits remain false
+  // so Bazel-shaped BES metrics can exclude only local action-cache hits from
+  // executed action counts.
+  bool local_action_cache_hit = 9;
 }
 
 message RemoteCommandDetails {

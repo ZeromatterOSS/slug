@@ -606,6 +606,28 @@ struct TraceEvent {
     execution_kind: i32,
 }
 
+fn remote_command_from_action_end(
+    action_end: Option<&data::ActionExecutionEnd>,
+) -> Option<&data::RemoteCommand> {
+    action_end
+        .and_then(|ae| ae.commands.last())
+        .and_then(|command| command.details.as_ref())
+        .and_then(|details| details.command_kind.as_ref())
+        .and_then(|kind| kind.command.as_ref())
+        .and_then(|command| match command {
+            data::command_execution_kind::Command::RemoteCommand(remote) => Some(remote),
+            _ => None,
+        })
+}
+
+fn is_local_action_cache_hit(action_end: Option<&data::ActionExecutionEnd>) -> bool {
+    remote_command_from_action_end(action_end).is_some_and(|remote| {
+        remote.cache_hit
+            && remote.cache_hit_type == data::CacheHitType::ActionCache as i32
+            && remote.local_action_cache_hit
+    })
+}
+
 impl BepStreamState {
     pub fn new() -> Self {
         let (iso, ms) = current_time_pair();
@@ -770,6 +792,7 @@ impl BepStreamState {
                             data::span_end_event::Data::ActionExecution(ae) => Some(ae),
                             _ => None,
                         });
+                    let action_end = action_end.map(Box::as_ref);
                     let tid = action_end.map(|ae| ae.local_thread_id).unwrap_or(0);
                     let thread_name = action_end
                         .map(|ae| ae.local_thread_name.clone())
@@ -781,9 +804,12 @@ impl BepStreamState {
                     // local action-cache hits (their docs: "includes
                     // remote cache hits but excludes local action cache
                     // hits") — those go in `action_cache_statistics`.
+                    // Slug's `ActionExecutionKind::ActionCache` covers both
+                    // local SQLite AC and remote REAPI AC hits, so use the
+                    // structured command field to distinguish the local-only
+                    // subset.
                     let exec_kind = action_end.map(|ae| ae.execution_kind).unwrap_or(0);
-                    let is_local_action_cache_hit =
-                        exec_kind == data::ActionExecutionKind::ActionCache as i32;
+                    let is_local_action_cache_hit = is_local_action_cache_hit(action_end);
                     if is_local_action_cache_hit {
                         self.local_action_cache_hits =
                             self.local_action_cache_hits.saturating_add(1);
@@ -813,7 +839,13 @@ impl BepStreamState {
                     {
                         data::ActionExecutionKind::Local => "local",
                         data::ActionExecutionKind::Remote => "remote",
-                        data::ActionExecutionKind::ActionCache => "local-cache",
+                        data::ActionExecutionKind::ActionCache => {
+                            if is_local_action_cache_hit {
+                                "local-cache"
+                            } else {
+                                "remote-cache"
+                            }
+                        }
                         data::ActionExecutionKind::Simple => "internal",
                         data::ActionExecutionKind::Deferred => "deferred",
                         data::ActionExecutionKind::LocalDepFile => "local-dep-file-cache",
@@ -2116,5 +2148,107 @@ mod tests {
         let timing = payload.timing_metrics.expect("timing metrics");
         assert_eq!(timing.wall_time_in_ms, 2_000);
         assert_eq!(timing.execution_phase_time_in_ms, 2_000);
+    }
+
+    fn action_cache_action(local_action_cache_hit: bool) -> data::ActionExecutionEnd {
+        data::ActionExecutionEnd {
+            kind: data::ActionKind::Run as i32,
+            name: Some(data::ActionName {
+                category: "c_compile".to_owned(),
+                identifier: "lib.cc".to_owned(),
+                progress_message: String::new(),
+            }),
+            failed: false,
+            execution_kind: data::ActionExecutionKind::ActionCache as i32,
+            wall_time: Some(prost_types::Duration {
+                seconds: 1,
+                nanos: 0,
+            }),
+            commands: vec![data::CommandExecution {
+                details: Some(data::CommandExecutionDetails {
+                    signed_exit_code: Some(0),
+                    command_kind: Some(data::CommandExecutionKind {
+                        command: Some(data::command_execution_kind::Command::RemoteCommand(
+                            data::RemoteCommand {
+                                cache_hit: true,
+                                cache_hit_type: data::CacheHitType::ActionCache as i32,
+                                local_action_cache_hit,
+                                ..Default::default()
+                            },
+                        )),
+                    }),
+                    ..Default::default()
+                }),
+                status: Some(data::command_execution::Status::Success(
+                    data::command_execution::Success {},
+                )),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    fn action_source_event(action: data::ActionExecutionEnd) -> data::BuckEvent {
+        data::BuckEvent {
+            timestamp: Some(prost_types::Timestamp {
+                seconds: 10,
+                nanos: 0,
+            }),
+            data: Some(data::buck_event::Data::SpanEnd(data::SpanEndEvent {
+                data: Some(data::span_end_event::Data::ActionExecution(Box::new(
+                    action,
+                ))),
+                duration: Some(prost_types::Duration {
+                    seconds: 1,
+                    nanos: 0,
+                }),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn build_metrics_separates_local_and_remote_action_cache_hits() {
+        use crate::build_event_stream::build_event::Payload;
+
+        let mut state = BepStreamState::with_invocation_id("test-id".to_owned());
+        let timestamp = prost_types::Timestamp {
+            seconds: 10,
+            nanos: 0,
+        };
+
+        let local_hit = action_cache_action(true);
+        let local_source = action_source_event(local_hit.clone());
+        let local_bep = translate_action_execution_end(&local_hit, None, Some(&timestamp));
+        state.observe(Some(&local_source), &local_bep);
+
+        let remote_hit = action_cache_action(false);
+        let remote_source = action_source_event(remote_hit.clone());
+        let remote_bep = translate_action_execution_end(&remote_hit, None, Some(&timestamp));
+        state.observe(Some(&remote_source), &remote_bep);
+
+        let event = state.build_metrics_event();
+        let payload = match event.payload {
+            Some(Payload::BuildMetrics(m)) => m,
+            other => panic!("expected BuildMetrics payload, got {other:?}"),
+        };
+        let summary = payload.action_summary.expect("ActionSummary");
+
+        let stats = summary.action_cache_statistics.expect("cache stats");
+        assert_eq!(stats.hits, 1);
+        assert_eq!(stats.misses, 1);
+        assert_eq!(summary.actions_executed, 1);
+        assert_eq!(summary.action_data.len(), 1);
+        assert_eq!(summary.action_data[0].mnemonic, "c_compile");
+        assert_eq!(summary.action_data[0].actions_executed, 1);
+
+        let runner_counts: std::collections::HashMap<_, _> = summary
+            .runner_count
+            .into_iter()
+            .map(|runner| (runner.name, runner.count))
+            .collect();
+        assert_eq!(runner_counts.get("local-cache"), Some(&1));
+        assert_eq!(runner_counts.get("remote-cache"), Some(&1));
     }
 }

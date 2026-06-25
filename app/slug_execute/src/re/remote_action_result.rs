@@ -30,7 +30,11 @@ use crate::re::manager::ManagedRemoteExecutionClient;
 use crate::re::queue_stats::QueueStats;
 use crate::re::streams::RemoteCommandStdStreams;
 
-pub struct ActionCacheResult(pub ActionResultResponse, pub slug_data::CacheType);
+pub struct ActionCacheResult {
+    pub response: ActionResultResponse,
+    pub cache_type: slug_data::CacheType,
+    pub local_action_cache_hit: bool,
+}
 
 pub trait RemoteActionResult: Send + Sync {
     fn output_files(&self) -> &[TFile];
@@ -114,20 +118,23 @@ impl RemoteActionResult for ExecuteResponseWithQueueStats {
 
 impl RemoteActionResult for ActionCacheResult {
     fn output_files(&self) -> &[TFile] {
-        &self.0.action_result.output_files
+        &self.response.action_result.output_files
     }
 
     fn output_directories(&self) -> &[TDirectory2] {
-        &self.0.action_result.output_directories
+        &self.response.action_result.output_directories
     }
 
     fn output_symlinks(&self) -> &[TSymlink] {
-        &self.0.action_result.output_symlinks
+        &self.response.action_result.output_symlinks
     }
 
     fn execution_kind(&self, details: RemoteCommandExecutionDetails) -> CommandExecutionKind {
-        match self.1 {
-            slug_data::CacheType::ActionCache => CommandExecutionKind::ActionCache { details },
+        match self.cache_type {
+            slug_data::CacheType::ActionCache => CommandExecutionKind::ActionCache {
+                details,
+                local_action_cache_hit: self.local_action_cache_hit,
+            },
             slug_data::CacheType::RemoteDepFileCache => {
                 CommandExecutionKind::RemoteDepFileCache { details }
             }
@@ -144,7 +151,7 @@ impl RemoteActionResult for ActionCacheResult {
     }
 
     fn timing(&self) -> ReMetadataTiming {
-        let mut timing = timing_from_re_metadata(&self.0.action_result.execution_metadata);
+        let mut timing = timing_from_re_metadata(&self.response.action_result.execution_metadata);
         timing.input_materialization_duration = Duration::ZERO;
         timing.queue_duration = None;
         timing
@@ -155,11 +162,11 @@ impl RemoteActionResult for ActionCacheResult {
         client: &ManagedRemoteExecutionClient,
         digest_config: DigestConfig,
     ) -> RemoteCommandStdStreams {
-        RemoteCommandStdStreams::new(&self.0.action_result, client, digest_config)
+        RemoteCommandStdStreams::new(&self.response.action_result, client, digest_config)
     }
 
     fn ttl(&self) -> i64 {
-        self.0.ttl
+        self.response.ttl
     }
 }
 

@@ -208,7 +208,11 @@ async fn query_action_cache_and_download_result(
         command.request.paths(),
     );
 
-    let response = ActionCacheResult(response, cache_type.to_proto());
+    let response = ActionCacheResult {
+        response,
+        cache_type: cache_type.to_proto(),
+        local_action_cache_hit,
+    };
     let res = download_action_results(
         request,
         TimeSpan::start_now(),
@@ -272,14 +276,14 @@ async fn query_action_cache_and_download_result(
         }
         CacheType::ActionCache => {
             if let Some(state) = action_cache_db_state {
-                state.put(&digest, &response.0);
+                state.put(&digest, &response.response);
             }
             tracing::info!(
                 "Action result is cached, skipping execution of:\n```\n$ {}\n```\n for action `{}`",
                 command.request.all_args_str(),
                 action_digest,
             );
-            res.action_result = Some(response.0.action_result);
+            res.action_result = Some(response.response.action_result);
         }
     }
 
@@ -414,7 +418,10 @@ fn command_execution_kind_for_cache_type(
     details: RemoteCommandExecutionDetails,
 ) -> CommandExecutionKind {
     match cache_type {
-        CacheType::ActionCache => CommandExecutionKind::ActionCache { details },
+        CacheType::ActionCache => CommandExecutionKind::ActionCache {
+            details,
+            local_action_cache_hit: false,
+        },
         CacheType::RemoteDepFileCache(_) => CommandExecutionKind::RemoteDepFileCache { details },
     }
 }

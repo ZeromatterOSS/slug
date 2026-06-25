@@ -265,8 +265,22 @@ treats orphaned cached results as misses before re-execution, and
 `/var/mnt/dev/bazel/src/test/java/com/google/devtools/build/lib/remote/RemoteSpawnRunnerWithGrpcRemoteExecutorTest.java:1216-1395`
 covers orphaned file and directory cached actions.
 
-Remaining 31.1 gaps are deferred file-output CAS misses that surface only after
-the command claim and local-vs-RE AC hit accounting.
+Local-vs-RE AC hit accounting is now explicit at the command-event boundary.
+`RemoteCommand.local_action_cache_hit` is set only for Slug's local SQLite AC
+hits; remote REAPI AC hits keep `ActionExecutionKind::ActionCache` but leave the
+flag false. BES BuildMetrics uses that structured bit so local SQLite hits
+increment `ActionCacheStatistics.hits` and runner `local-cache`, while remote
+REAPI AC hits remain in `actions_executed`, per Bazel's
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/buildeventstream/proto/build_event_stream.proto:950-960`
+contract. Evidence: `TMPDIR=$PWD/target/tmp cargo test -p
+slug_build_event_stream --lib`, `TEST_EXECUTABLE=$PWD/target/debug/slug
+TMPDIR=$PWD/target/tmp python -m pytest tests/plan31/ -q --tb=short
+--basetemp target/tmp/plan31-accounting-verify`, and
+`TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest
+tests/plan34/ -q --tb=short --basetemp target/tmp/plan34-accounting-verify`.
+
+Remaining 31.1 gap: deferred file-output CAS misses that surface only after the
+command claim.
 
 #### Changes Required
 
@@ -407,12 +421,13 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
 - [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan34/ -q`
       proves the local NativeLink REAPI smoke still passes with the durable AC
       plumbing in the executor path.
+- [x] BES BuildMetrics separate local-SQLite AC hits from remote REAPI AC hits:
+      `RemoteCommand.local_action_cache_hit` drives
+      `ActionCacheStatistics.hits`, `actions_executed`, and runner buckets
+      (`local-cache` vs `remote-cache`) according to the Bazel BuildMetrics
+      proto contract.
 - [ ] Existing test suite passes:
       `slug test fbcode//slug/tests/core/build_command/...`.
-- [ ] BES events report local-SQLite AC hits separately from remote AC hits:
-      in a warm-RE run,
-      console shows `Cache hits: 100%` and the BES-side `CacheHit`
-      events break down hits into `local` vs `remote`.
 
 ##### Manual Verification:
 

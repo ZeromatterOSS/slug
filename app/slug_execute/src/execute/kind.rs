@@ -53,6 +53,7 @@ pub enum CommandExecutionKind {
     #[display("action_cache")]
     ActionCache {
         details: RemoteCommandExecutionDetails,
+        local_action_cache_hit: bool,
     },
     /// This action was served by the action cache (remote dep file) and not executed.
     #[display("remote_dep_file_cache")]
@@ -138,8 +139,12 @@ impl CommandExecutionKind {
                     .as_ref()
                     .map(|paths| paths.clone().map(|p| format!("{p}")))
                     .unwrap_or_default(),
+                local_action_cache_hit: false,
             }),
-            Self::ActionCache { details } => Command::RemoteCommand(slug_data::RemoteCommand {
+            Self::ActionCache {
+                details,
+                local_action_cache_hit,
+            } => Command::RemoteCommand(slug_data::RemoteCommand {
                 action_digest: details.action_digest.to_string(),
                 cache_hit: true,
                 cache_hit_type: slug_data::CacheHitType::ActionCache.into(),
@@ -148,6 +153,7 @@ impl CommandExecutionKind {
                 remote_dep_file_key: None,
                 materialized_inputs_for_failed: Vec::new(),
                 materialized_outputs_for_failed_actions: Vec::new(),
+                local_action_cache_hit: *local_action_cache_hit,
             }),
 
             Self::RemoteDepFileCache { details } => {
@@ -163,6 +169,7 @@ impl CommandExecutionKind {
                         .map(|k| k.to_string()),
                     materialized_inputs_for_failed: Vec::new(),
                     materialized_outputs_for_failed_actions: Vec::new(),
+                    local_action_cache_hit: false,
                 })
             }
 
