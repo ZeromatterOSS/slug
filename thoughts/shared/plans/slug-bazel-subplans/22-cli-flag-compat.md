@@ -14,6 +14,57 @@ Make Slug's command line accept Bazel-shape flags where the semantics have
 a clear mapping, without breaking the existing Buck2 flag surface. Each
 phase is a targeted, independently landable fix.
 
+## Current State (2026-06-25)
+
+Accepted evidence:
+
+- Slug no longer accepts any clap alias that intersects Bazel's
+  `@Option(oldName=...)` spellings. The remaining `alias = "experimental_*"`
+  entries in `app/slug_client_ctx/src/common.rs` are canonical Bazel 9 names
+  Slug either maps or rejects with an owned diagnostic.
+- `.bazelrc` normalization now keeps every source-grounded Bazel old-name
+  spelling long enough for clap to reject it, instead of dropping it as generic
+  `experimental_*`, `incompatible_*`, or Bazel-only noise. This covers old names
+  extracted from `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib`
+  `@Option(oldName=...)` annotations; representative source anchors include
+  `bazel/rules/BazelRulesModule.java:1244-1246`,
+  `analysis/PlatformOptions.java:54-89`,
+  `bazel/repository/RepositoryOptions.java:41-60`,
+  `exec/ExecutionOptions.java:496-499`,
+  `remote/options/RemoteOptions.java:51-621`,
+  `dynamic/DynamicExecutionOptions.java:113-130`,
+  `worker/WorkerOptions.java:100-170`, and
+  `sandbox/SandboxOptions.java:100-315`.
+
+Validation:
+
+- `cargo fmt --check --package slug_client_ctx`
+- `cargo test -p slug_client_ctx bazel9_old_name_flags_are_preserved_for_rejection --lib -- --nocapture`
+- `cargo test -p slug_client_ctx bazel9_rejects_non_execution_old_name_aliases --lib -- --nocapture`
+- `cargo test -p slug_client_ctx bazelrc::tests --lib -- --nocapture`
+- `cargo test -p slug_client_ctx common::tests --lib -- --nocapture`
+- `comm -3 <(rg -no 'oldName\s*=\s*"[^"]+"' /var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib -g '*.java' | sed -E 's/.*oldName\s*=\s*"([^"]+)".*/\1/' | sort -u) <(sed -n '/const BAZEL9_OLD_OPTION_NAMES/,/];/p' app/slug_client_ctx/src/bazelrc.rs | sed -n 's/.*"\([^"]*\)".*/\1/p' | sort -u)` produced no output.
+- `cargo build -p slug`
+- From the repo root:
+  `target/debug/slug build --experimental_enable_bzlmod //:__old_name_probe__`
+  exits 3 with `unexpected argument '--experimental-enable-bzlmod'`.
+- `git diff --check`
+
+Remaining gaps:
+
+- Plan 34 still owns real REAPI executor proof. CLI rejection of pre-9 flag
+  spellings only prevents stale `.bazelrc` policy from silently bypassing that
+  boundary; it is not execution-boundary evidence.
+- Future CLI compatibility work should be Bazel 9-only. Do not add deprecated
+  `oldName` aliases as convenience shims; either map the canonical Bazel 9 flag
+  or preserve stale spellings so the parser rejects them.
+
+Next owner:
+
+- Continue closing canonical Bazel 9 flags that block fast repo-owned fixtures.
+  Treat `.bazelrc` support as a parser/normalization contract, not as authority
+  to accept pre-9 spellings.
+
 ## Phases
 
 ### 22.1 `--config` shape-based disambiguation (DONE 2026-04-24)

@@ -488,9 +488,7 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
     // Strip leading "no" prefix for boolean flags
     let base = flag_name.strip_prefix("no").unwrap_or(flag_name);
     let normalized_base = base.replace('-', "_");
-    if is_bazel9_remote_old_name(&normalized_base)
-        || is_bazel9_execution_policy_old_name(&normalized_base)
-    {
+    if is_bazel9_old_name(&normalized_base) {
         return false;
     }
     if normalized_base == "experimental_cc_implementation_deps" {
@@ -514,37 +512,82 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
     is_bazel_specific_flag(&normalized)
 }
 
-fn is_bazel9_remote_old_name(normalized_base: &str) -> bool {
-    matches!(
-        normalized_base,
-        "remote_cache_proxy"
-            | "remote_http_cache"
-            | "experimental_remote_cache_async"
-            | "experimental_remote_downloader"
-            | "experimental_remote_downloader_local_fallback"
-            | "experimental_remote_downloader_propagate_credentials"
-            | "experimental_remote_build_event_upload"
-            | "experimental_remote_retry_max_attempts"
-            | "experimental_guard_against_concurrent_changes"
-            | "experimental_remote_grpc_log"
-            | "experimental_remote_cache_compression"
-            | "experimental_remote_download_outputs"
-            | "experimental_remote_download_minimal"
-            | "experimental_remote_download_toplevel"
-    )
-}
+// Source: Bazel `@Option(oldName = ...)` annotations under
+// /var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib.
+const BAZEL9_OLD_OPTION_NAMES: &[&str] = &[
+    "auth_credentials",
+    "auth_enabled",
+    "auth_scope",
+    "experimental_action_cache_store_output_metadata",
+    "experimental_allow_tags_propagation",
+    "experimental_allow_unresolved_symlinks",
+    "experimental_build_event_binary_file_path_conversion",
+    "experimental_build_event_json_file_path_conversion",
+    "experimental_build_event_text_file_path_conversion",
+    "experimental_build_event_upload_max_retries",
+    "experimental_bytecode_optimizers",
+    "experimental_credential_helper",
+    "experimental_credential_helper_cache_duration",
+    "experimental_credential_helper_timeout",
+    "experimental_debug_spawn_scheduler",
+    "experimental_desugar_for_android",
+    "experimental_desugar_java8_libs",
+    "experimental_discard_package_values_post_analysis",
+    "experimental_distdir",
+    "experimental_downloader_config",
+    "experimental_enable_bzlmod",
+    "experimental_enforce_constraints",
+    "experimental_exclude_starlark_flags_from_exec_config",
+    "experimental_execution_log_compact_file",
+    "experimental_generate_json_trace_profile",
+    "experimental_guard_against_concurrent_changes",
+    "experimental_heuristically_drop_nodes",
+    "experimental_host_platform",
+    "experimental_include_primary_output",
+    "experimental_java_header_compilation",
+    "experimental_local_execution_delay",
+    "experimental_oom_more_eagerly_threshold",
+    "experimental_output_tree_tracking",
+    "experimental_override_name_platform_in_output_dir",
+    "experimental_platforms",
+    "experimental_remote_build_event_upload",
+    "experimental_remote_cache_async",
+    "experimental_remote_cache_compression",
+    "experimental_remote_download_minimal",
+    "experimental_remote_download_outputs",
+    "experimental_remote_download_regex",
+    "experimental_remote_download_toplevel",
+    "experimental_remote_downloader",
+    "experimental_remote_downloader_local_fallback",
+    "experimental_remote_downloader_propagate_credentials",
+    "experimental_remote_grpc_log",
+    "experimental_remote_retry_max_attempts",
+    "experimental_repository_cache",
+    "experimental_repository_disable_download",
+    "experimental_reuse_sandbox_directories",
+    "experimental_run_validations",
+    "experimental_sandbox_base",
+    "experimental_sandbox_default_allow_network",
+    "experimental_slim_json_profile",
+    "experimental_strict_action_env",
+    "experimental_ui_actions_shown",
+    "experimental_ui_attempt_to_print_relative_paths",
+    "experimental_worker_max_multiplex_instances",
+    "experimental_worker_multiplex",
+    "host_deps",
+    "incompatible_build_transitive_python_runfiles",
+    "java_classpath",
+    "keep_incrementality_data",
+    "local_sigkill_grace_seconds",
+    "project_id",
+    "remote_cache_proxy",
+    "remote_http_cache",
+    "repository_contents_cache",
+    "strict_java_deps",
+];
 
-fn is_bazel9_execution_policy_old_name(normalized_base: &str) -> bool {
-    matches!(
-        normalized_base,
-        "experimental_local_execution_delay"
-            | "experimental_debug_spawn_scheduler"
-            | "experimental_worker_max_multiplex_instances"
-            | "experimental_worker_multiplex"
-            | "experimental_sandbox_base"
-            | "experimental_reuse_sandbox_directories"
-            | "experimental_sandbox_default_allow_network"
-    )
+fn is_bazel9_old_name(normalized_base: &str) -> bool {
+    BAZEL9_OLD_OPTION_NAMES.contains(&normalized_base)
 }
 
 /// Bazel-specific flags that slug should silently ignore from .bazelrc files.
@@ -1053,6 +1096,44 @@ mod tests {
         assert!(!is_bazel_transitional_flag("--jobs=8"));
         assert!(!is_bazel_transitional_flag("//my:target"));
         assert!(!is_bazel_transitional_flag("-c"));
+    }
+
+    #[test]
+    fn bazel9_old_name_flags_are_preserved_for_rejection() {
+        for old_name in BAZEL9_OLD_OPTION_NAMES {
+            let flag = format!("--{old_name}=value");
+            assert!(!is_bazel_transitional_flag(&flag), "{flag}");
+
+            let hyphenated = format!("--{}=value", old_name.replace('_', "-"));
+            assert!(!is_bazel_transitional_flag(&hyphenated), "{hyphenated}");
+        }
+
+        let args = vec![
+            "slug".to_owned(),
+            "build".to_owned(),
+            "--experimental_enable_bzlmod".to_owned(),
+            "--experimental_repository_cache=/tmp/repo-cache".to_owned(),
+            "--incompatible_build_transitive_python_runfiles=false".to_owned(),
+            "--experimental_host_platform=@platforms//host".to_owned(),
+            "--experimental_platforms=//:platform".to_owned(),
+            "--experimental_execution_log_compact_file=/tmp/exec.log".to_owned(),
+            "//...".to_owned(),
+        ];
+        let result = normalize_args(args);
+        assert_eq!(
+            result,
+            vec![
+                "slug",
+                "build",
+                "--experimental-enable-bzlmod",
+                "--experimental-repository-cache=/tmp/repo-cache",
+                "--incompatible-build-transitive-python-runfiles=false",
+                "--experimental-host-platform=@platforms//host",
+                "--experimental-platforms=//:platform",
+                "--experimental-execution-log-compact-file=/tmp/exec.log",
+                "//..."
+            ]
+        );
     }
 
     #[test]

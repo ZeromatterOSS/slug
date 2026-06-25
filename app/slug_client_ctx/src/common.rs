@@ -2061,6 +2061,25 @@ mod tests {
     }
 
     #[test]
+    fn bazel9_rejects_non_execution_old_name_aliases() {
+        for arg in [
+            "--experimental_enable_bzlmod",
+            "--incompatible_build_transitive_python_runfiles=false",
+            "--experimental_host_platform=@platforms//host",
+            "--experimental_platforms=//:platform",
+            "--experimental_repository_cache=/tmp/repo-cache",
+            "--experimental_execution_log_compact_file=/tmp/exec.log",
+        ] {
+            let error =
+                <CommonBuildConfigurationOptions as clap::Parser>::try_parse_from(["slug", arg])
+                    .unwrap_err();
+
+            assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
+            assert!(error.to_string().contains(arg.split('=').next().unwrap()));
+        }
+    }
+
+    #[test]
     fn test_get_representative_config_flags() -> slug_error::Result<()> {
         let mut argv = ExpandedArgvBuilder::new();
 
