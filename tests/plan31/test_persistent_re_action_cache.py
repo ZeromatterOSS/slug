@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -95,6 +96,18 @@ def _stop_nativelink(proc: subprocess.Popen[str], lines: list[str]) -> None:
         proc.kill()
         proc.wait(timeout=5)
         pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(lines))
+
+
+def _remove_local_action_cache_state(workspace: Path, isolation: str) -> None:
+    shutil.rmtree(
+        workspace / "buck-out" / isolation / "cache" / "action_cache_state",
+        ignore_errors=True,
+    )
+
+
+def _clear_nativelink_cas(nativelink_root: Path) -> None:
+    shutil.rmtree(nativelink_root / "cas", ignore_errors=True)
+    (nativelink_root / "cas").mkdir()
 
 
 def test_persistent_re_action_cache_short_circuits_remote_cache_query(
@@ -236,6 +249,79 @@ def test_stale_persistent_re_action_cache_reexecutes_through_reapi(
             for entry in entries
             if entry["reproducer"]["executor"] == "CacheQuery"
         ] == []
+        assert any(entry["reproducer"]["executor"] == "Re" for entry in entries)
+
+        _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace)
+        third = _build_with_reapi(slug_bin, workspace, isolation, endpoint)
+        third_output = third.stdout + third.stderr
+        assert "BUILD SUCCEEDED" in third_output
+        assert "Commands: 1 (cached: 1, remote: 0, local: 0)" in third_output
+    finally:
+        _run(
+            [str(slug_bin), "--isolation-dir", isolation, "kill"],
+            cwd=workspace,
+            check=False,
+        )
+        if proc is not None:
+            _stop_nativelink(proc, nativelink_lines)
+
+
+def test_orphaned_remote_action_cache_reexecutes_with_skip_lookup(
+    tmp_path: Path,
+) -> None:
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _copy_fixture(
+        SHELL_FIXTURE_ROOT,
+        workspace,
+        [".buckroot", "MODULE.bazel", "BUILD.bazel", "defs.bzl"],
+    )
+
+    nativelink_root = tmp_path / "nativelink"
+    nativelink_root.mkdir()
+    frontend_port = _free_port()
+    worker_port = _free_port()
+    config = nativelink_root / "nativelink.json5"
+    _write_nativelink_config(config, nativelink_root, frontend_port, worker_port)
+    endpoint = f"grpc://127.0.0.1:{frontend_port}"
+    isolation = "plan31-orphaned-remote-action-cache"
+
+    proc, nativelink_lines = _start_nativelink(
+        nativelink_bin, config, frontend_port
+    )
+    try:
+        first = _build_with_reapi(slug_bin, workspace, isolation, endpoint)
+        first_output = first.stdout + first.stderr
+        assert "BUILD SUCCEEDED" in first_output
+        assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in first_output
+
+        _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace)
+        _stop_nativelink(proc, nativelink_lines)
+        proc = None
+
+        _remove_local_action_cache_state(workspace, isolation)
+        _clear_nativelink_cas(nativelink_root)
+
+        proc, nativelink_lines = _start_nativelink(
+            nativelink_bin, config, frontend_port
+        )
+        second = _build_with_reapi(slug_bin, workspace, isolation, endpoint)
+        second_output = second.stdout + second.stderr
+        assert "BUILD SUCCEEDED" in second_output
+        assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in second_output
+
+        entries = _read_what_ran_with_cache_queries(slug_bin, workspace, isolation)
+        assert [
+            entry
+            for entry in entries
+            if entry["reproducer"]["executor"] in DIRECT_LOCAL_EXECUTORS
+        ] == []
+        assert any(
+            entry["reproducer"]["executor"] == "CacheQuery" for entry in entries
+        )
         assert any(entry["reproducer"]["executor"] == "Re" for entry in entries)
 
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace)

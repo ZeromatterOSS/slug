@@ -56,6 +56,7 @@ pub struct CommandExecutionManagerInner {
     pub liveliness_observer: Arc<dyn LivelinessObserver>,
     pub intend_to_fallback_on_failure: bool,
     pub execution_kind: Option<CommandExecutionKind>,
+    pub force_skip_remote_cache_lookup: bool,
     pub was_result_delayed: Arc<AtomicBool>,
     pub waiting_data: WaitingData,
 }
@@ -79,6 +80,7 @@ impl CommandExecutionManager {
                 liveliness_observer,
                 intend_to_fallback_on_failure: false,
                 execution_kind: None,
+                force_skip_remote_cache_lookup: false,
                 was_result_delayed: Arc::new(AtomicBool::new(false)),
                 waiting_data,
             }),
@@ -93,6 +95,7 @@ impl CommandExecutionManager {
             liveliness_observer,
             intend_to_fallback_on_failure: _,
             execution_kind,
+            force_skip_remote_cache_lookup: _,
             was_result_delayed: _,
             waiting_data,
         } = *self.inner;
@@ -146,6 +149,18 @@ impl CommandExecutionManager {
     pub fn with_execution_kind(mut self, execution_kind: CommandExecutionKind) -> Self {
         self.inner.execution_kind = Some(execution_kind);
         self
+    }
+
+    pub fn with_force_skip_remote_cache_lookup(
+        mut self,
+        force_skip_remote_cache_lookup: bool,
+    ) -> Self {
+        self.inner.force_skip_remote_cache_lookup = force_skip_remote_cache_lookup;
+        self
+    }
+
+    pub fn force_skip_remote_cache_lookup(&self) -> bool {
+        self.inner.force_skip_remote_cache_lookup
     }
 
     pub fn start_waiting_category(&mut self, waiting_category: WaitingCategory) {

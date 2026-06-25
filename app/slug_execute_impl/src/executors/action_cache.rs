@@ -239,7 +239,7 @@ async fn query_action_cache_and_download_result(
         false,
         None,
         output_trees_download_config,
-        local_action_cache_hit,
+        matches!(cache_type, CacheType::ActionCache),
     )
     .await;
 
@@ -249,11 +249,17 @@ async fn query_action_cache_and_download_result(
             if local_action_cache_hit && let Some(state) = action_cache_db_state {
                 state.delete(&digest);
             }
+            let stale_source = if local_action_cache_hit {
+                "local"
+            } else {
+                "remote"
+            };
             tracing::info!(
-                "Local action cache entry for `{}` referenced missing CAS data; falling through to execution",
+                "{} action cache entry for `{}` referenced missing CAS data; falling through to execution with remote cache lookup disabled",
+                stale_source,
                 digest,
             );
-            return ControlFlow::Continue(manager);
+            return ControlFlow::Continue(manager.with_force_skip_remote_cache_lookup(true));
         }
     };
     match &cache_type {

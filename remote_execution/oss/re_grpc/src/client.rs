@@ -688,14 +688,8 @@ impl REClient {
 
         let action_digest = tdigest_to(execute_request.action_digest.clone());
 
-        let request = GExecuteRequest {
-            instance_name: self.instance_name.as_str().to_owned(),
-            skip_cache_lookup: false,
-            execution_policy: None,
-            results_cache_policy: Some(ResultsCachePolicy { priority: 0 }),
-            action_digest: Some(action_digest.clone()),
-            ..Default::default()
-        };
+        let request =
+            grpc_execute_request(&self.instance_name, &execute_request, action_digest.clone());
 
         let stream = client
             .execute(with_re_metadata(request, metadata))
@@ -997,6 +991,21 @@ impl REClient {
 
     pub fn get_experiment_name(&self) -> anyhow::Result<Option<String>> {
         Ok(None)
+    }
+}
+
+fn grpc_execute_request(
+    instance_name: &InstanceName,
+    execute_request: &ExecuteRequest,
+    action_digest: Digest,
+) -> GExecuteRequest {
+    GExecuteRequest {
+        instance_name: instance_name.as_str().to_owned(),
+        skip_cache_lookup: execute_request.skip_cache_lookup,
+        execution_policy: None,
+        results_cache_policy: Some(ResultsCachePolicy { priority: 0 }),
+        action_digest: Some(action_digest),
+        ..Default::default()
     }
 }
 
@@ -1697,6 +1706,35 @@ mod tests {
     use re_grpc_proto::build::bazel::remote::execution::v2::batch_update_blobs_response;
 
     use super::*;
+
+    #[test]
+    fn execute_request_propagates_skip_cache_lookup_to_grpc() {
+        let action_digest = TDigest {
+            hash: "abc".to_owned(),
+            size_in_bytes: 123,
+            ..Default::default()
+        };
+        let grpc_digest = tdigest_to(action_digest.clone());
+
+        let request = ExecuteRequest {
+            action_digest,
+            skip_cache_lookup: true,
+            ..Default::default()
+        };
+
+        let grpc_request = grpc_execute_request(
+            &InstanceName(Some("main".to_owned())),
+            &request,
+            grpc_digest,
+        );
+
+        assert_eq!(grpc_request.instance_name, "main");
+        assert!(grpc_request.skip_cache_lookup);
+        assert_eq!(
+            grpc_request.action_digest,
+            Some(tdigest_to(request.action_digest))
+        );
+    }
 
     #[tokio::test]
     async fn test_download_named() -> anyhow::Result<()> {

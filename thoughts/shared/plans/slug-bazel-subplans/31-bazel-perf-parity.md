@@ -245,21 +245,28 @@ Slug daemon, then rebuilds from the local SQLite AC with `cached: 1`,
 `remote: 0`, `local: 0`, a `Cache` what-ran entry, and no `CacheQuery`, `Re`, or
 direct-local entry.
 
-Local SQLite AC hits whose pre-claim output-tree/CAS data is missing are now
-treated as misses: Slug deletes the stale durable row and falls through to the
-configured executor, so `executor_boundary=reapi` re-executes through REAPI
-with `direct-local` action count 0. The repo-owned NativeLink test proves this
-by seeding the local SQLite AC from one local REAPI server, restarting Slug
-against a clean NativeLink CAS/AC, and observing `remote: 1`, `local: 0`, no
-`CacheQuery`, and a subsequent `cached: 1` rebuild. Bazel parity grounding:
+ActionCache hits whose pre-claim output-tree/CAS data is missing are now
+treated as misses. For local SQLite hits, Slug deletes the stale durable row.
+For both local SQLite and remote AC hits, Slug falls through to the configured
+executor with the one-action REAPI `skip_cache_lookup` bit set, so
+`executor_boundary=reapi` re-executes through REAPI instead of re-consuming the
+same orphaned AC result. The OSS gRPC client now propagates
+`ExecuteRequest.skip_cache_lookup` into the REAPI Execute request.
+
+The repo-owned NativeLink tests prove both cases: one test seeds local SQLite
+AC from one local REAPI server, restarts Slug against a clean NativeLink CAS/AC,
+and observes `remote: 1`, `local: 0`, no `CacheQuery`, and a subsequent
+`cached: 1` rebuild. Another test removes Slug's local AC, preserves
+NativeLink's AC, clears NativeLink's CAS, and observes a remote `CacheQuery`
+followed by REAPI execution with `direct-local` action count 0. Bazel parity
+grounding:
 `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteSpawnRunner.java:200-260`
 treats orphaned cached results as misses before re-execution, and
 `/var/mnt/dev/bazel/src/test/java/com/google/devtools/build/lib/remote/RemoteSpawnRunnerWithGrpcRemoteExecutorTest.java:1216-1395`
 covers orphaned file and directory cached actions.
 
-Remaining 31.1 gaps are forcing `skipCacheLookup=true` on the fallback execute
-when the remote AC itself is orphaned, deferred file-output CAS misses that
-surface only after the command claim, and local-vs-RE AC hit accounting.
+Remaining 31.1 gaps are deferred file-output CAS misses that surface only after
+the command claim and local-vs-RE AC hit accounting.
 
 #### Changes Required
 
@@ -382,6 +389,9 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
       proves the RE executor and daemon wiring compile with durable AC state.
 - [x] `cargo check -p remote_execution` proves the now-public ActionResult
       conversion helpers compile.
+- [x] `TMPDIR=$PWD/target/tmp cargo test -p remote_execution execute_request_propagates_skip_cache_lookup_to_grpc --lib`
+      proves Slug's OSS gRPC REAPI client forwards the `skip_cache_lookup` bit
+      into Execute requests.
 - [x] `TMPDIR=$PWD/target/tmp cargo build -p slug` rebuilds the changed Slug
       binary path for Python/e2e validation.
 - [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan31/ -q`
@@ -391,6 +401,9 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
       proves a stale local SQLite AC hit against a clean NativeLink CAS/AC
       falls through to REAPI execution with `remote: 1`, `local: 0`, no
       `direct-local` action, and then refreshes the local durable row.
+- [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan31/ -q --tb=short --basetemp target/tmp/plan31-skip-lookup-verify`
+      proves orphaned remote AC results fall through to REAPI Execute with
+      cache lookup skipped, then refresh Slug's local durable row.
 - [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan34/ -q`
       proves the local NativeLink REAPI smoke still passes with the durable AC
       plumbing in the executor path.
@@ -411,9 +424,9 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
       (visible in console split + much faster `execute` phase).
 - [x] Local stale-CAS fallback proof: the NativeLink fixture swaps from a seeded
       CAS/AC to an empty CAS/AC, then re-runs successfully through REAPI.
-- [ ] Remote-orphan follow-up: when the remote AC itself returns an orphaned
-      result, force the fallback execute to skip remote cache lookup
-      (`skipCacheLookup=true`) the way Bazel does.
+- [x] Remote-orphan fallback proof: the NativeLink fixture preserves remote AC,
+      clears remote CAS, removes Slug's local AC, then re-runs successfully via
+      REAPI Execute with cache lookup skipped.
 
 ---
 
