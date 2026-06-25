@@ -488,6 +488,9 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
     // Strip leading "no" prefix for boolean flags
     let base = flag_name.strip_prefix("no").unwrap_or(flag_name);
     let normalized_base = base.replace('-', "_");
+    if is_bazel9_remote_old_name(&normalized_base) {
+        return false;
+    }
     if normalized_base == "experimental_cc_implementation_deps" {
         return false;
     }
@@ -507,6 +510,26 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
     // These are internal Bazel build/execution flags that control sandboxing, caching,
     // compilation modes, and other Bazel-specific behavior.
     is_bazel_specific_flag(&normalized)
+}
+
+fn is_bazel9_remote_old_name(normalized_base: &str) -> bool {
+    matches!(
+        normalized_base,
+        "remote_cache_proxy"
+            | "remote_http_cache"
+            | "experimental_remote_cache_async"
+            | "experimental_remote_downloader"
+            | "experimental_remote_downloader_local_fallback"
+            | "experimental_remote_downloader_propagate_credentials"
+            | "experimental_remote_build_event_upload"
+            | "experimental_remote_retry_max_attempts"
+            | "experimental_guard_against_concurrent_changes"
+            | "experimental_remote_grpc_log"
+            | "experimental_remote_cache_compression"
+            | "experimental_remote_download_outputs"
+            | "experimental_remote_download_minimal"
+            | "experimental_remote_download_toplevel"
+    )
 }
 
 /// Bazel-specific flags that slug should silently ignore from .bazelrc files.
@@ -1056,6 +1079,61 @@ mod tests {
                 "build",
                 "--experimental-cc-implementation-deps",
                 "--noexperimental-cc-implementation-deps",
+                "//..."
+            ]
+        );
+    }
+
+    #[test]
+    fn remote_old_name_flags_are_preserved_for_bazel9_rejection() {
+        for flag in [
+            "--remote_cache_proxy=unix:/tmp/proxy.sock",
+            "--remote_http_cache=grpc://cache.example.test",
+            "--experimental_remote_cache_async=false",
+            "--experimental_remote_cache_compression",
+            "--experimental_guard_against_concurrent_changes=off",
+            "--experimental_remote_downloader=grpc://remote-assets",
+            "--experimental_remote_downloader_local_fallback",
+            "--experimental_remote_downloader_propagate_credentials",
+            "--experimental_remote_build_event_upload=all",
+            "--experimental_remote_retry_max_attempts=3",
+            "--experimental_remote_grpc_log=/tmp/remote.log",
+            "--experimental_remote_download_outputs=minimal",
+            "--experimental_remote_download_minimal",
+            "--experimental_remote_download_toplevel",
+        ] {
+            assert!(!is_bazel_transitional_flag(flag), "{flag}");
+        }
+
+        let args = vec![
+            "slug".to_owned(),
+            "build".to_owned(),
+            "--remote_http_cache=grpc://cache.example.test".to_owned(),
+            "--experimental_remote_cache_async=false".to_owned(),
+            "--experimental_remote_cache_compression".to_owned(),
+            "--experimental_guard_against_concurrent_changes=off".to_owned(),
+            "--experimental_remote_downloader=grpc://remote-assets".to_owned(),
+            "--experimental_remote_downloader_local_fallback".to_owned(),
+            "--experimental_remote_downloader_propagate_credentials".to_owned(),
+            "--experimental_remote_retry_max_attempts=3".to_owned(),
+            "--experimental_remote_download_minimal".to_owned(),
+            "//...".to_owned(),
+        ];
+        let result = normalize_args(args);
+        assert_eq!(
+            result,
+            vec![
+                "slug",
+                "build",
+                "--remote-http-cache=grpc://cache.example.test",
+                "--experimental-remote-cache-async=false",
+                "--experimental-remote-cache-compression",
+                "--experimental-guard-against-concurrent-changes=off",
+                "--experimental-remote-downloader=grpc://remote-assets",
+                "--experimental-remote-downloader-local-fallback",
+                "--experimental-remote-downloader-propagate-credentials",
+                "--experimental-remote-retry-max-attempts=3",
+                "--experimental-remote-download-minimal",
                 "//..."
             ]
         );

@@ -55,6 +55,20 @@ remote, remote sandboxing options.
 
 ## Current State Analysis
 
+Accepted evidence (2026-06-25 Bazel 9 old-name remote options): Bazel
+`RemoteOptions` still records pre-9 `oldName` aliases for remote proxy/cache,
+remote cache async, remote downloader, remote build-event upload, retry count,
+concurrent-input guarding, remote gRPC log, remote cache compression, and remote
+download-output modes
+(`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/options/RemoteOptions.java:49-52`,
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/options/RemoteOptions.java:129-185`,
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/options/RemoteOptions.java:349-385`,
+`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/options/RemoteOptions.java:521-623`).
+Slug's `.bazelrc` normalization preserves those old names so the Bazel 9-only
+CLI rejects them as unsupported flags instead of silently stripping stale pre-9
+remote policy. Canonical Bazel 9 spellings remain the only remote transport
+flags Slug should carry into RE config.
+
 Verified at the protocol layer (smoke-tested via
 `cargo run -p slug_re_configuration --example probe_re -- grpcs://remote.buildbuddy.io "x-buildbuddy-api-key=…"`):
 
