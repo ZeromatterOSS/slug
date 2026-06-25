@@ -520,18 +520,30 @@ impl ExecutionStrategyExt for ExecutionStrategy {
 /// `re_configured` indicates whether the daemon has an RE backend
 /// address set (`[slug_re_client] address` or the equivalent
 /// `--remote_executor` overlay). When true, the open-source default
-/// (which would otherwise be local-only) is promoted to the same
-/// hybrid local/remote shape that the fbcode build uses, so a user
-/// who passes `--remote_executor=grpcs://X` actually dispatches
-/// actions remotely (Plan 25.2).
+/// (which would otherwise be local-only) is promoted to remote-only
+/// execution, so a user who passes `--remote_executor=grpcs://X`
+/// actually dispatches actions through REAPI without silent direct-local
+/// fallback (Plan 34).
 pub fn get_default_executor_config(
     host_platform: HostPlatformOverride,
     re_configured: bool,
     default_exec_properties: &[(String, String)],
 ) -> CommandExecutorConfig {
-    let use_remote_default = !slug_core::is_open_source() || re_configured;
-    let executor = if !use_remote_default {
+    let executor = if slug_core::is_open_source() && !re_configured {
         Executor::Local(LocalExecutorOptions::default())
+    } else if re_configured {
+        Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
+            executor: RemoteEnabledExecutor::Remote(RemoteExecutorOptions::default()),
+            re_properties: get_default_re_properties(host_platform, default_exec_properties),
+            re_use_case: RemoteExecutorUseCase::slug_default(),
+            re_action_key: None,
+            cache_upload_behavior: CacheUploadBehavior::Disabled,
+            remote_cache_enabled: true,
+            remote_dep_file_cache_enabled: false,
+            dependencies: vec![],
+            custom_image: None,
+            meta_internal_extra_params: MetaInternalExtraParams::default(),
+        })
     } else {
         Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
             executor: RemoteEnabledExecutor::Hybrid {
@@ -635,7 +647,7 @@ mod tests {
     }
 
     #[test]
-    fn oss_default_executor_promotes_to_hybrid_when_re_configured() {
+    fn oss_default_executor_uses_remote_only_when_re_configured() {
         if !slug_core::is_open_source() {
             return;
         }
@@ -658,10 +670,7 @@ mod tests {
 
         assert!(matches!(
             options.executor,
-            RemoteEnabledExecutor::Hybrid {
-                level: HybridExecutionLevel::Limited,
-                ..
-            }
+            RemoteEnabledExecutor::Remote(_)
         ));
         assert_eq!(options.cache_upload_behavior, CacheUploadBehavior::Disabled);
         assert!(options.remote_cache_enabled);

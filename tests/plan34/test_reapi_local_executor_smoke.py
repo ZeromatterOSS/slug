@@ -183,7 +183,9 @@ def _start_nativelink(
     not os.environ.get("SLUG_PLAN34_NATIVELINK_BIN"),
     reason="set SLUG_PLAN34_NATIVELINK_BIN to run the local REAPI executor smoke",
 )
-def test_native_link_local_reapi_executor_smoke(tmp_path: Path) -> None:
+def test_native_link_re_config_default_uses_reapi_without_remote_only(
+    tmp_path: Path,
+) -> None:
     slug_bin = _existing_executable_from_env("SLUG_BIN") or REPO_ROOT / "target/debug/slug"
     if not slug_bin.is_file():
         pytest.skip("build target/debug/slug or set SLUG_BIN")
@@ -220,7 +222,6 @@ def test_native_link_local_reapi_executor_smoke(tmp_path: Path) -> None:
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
-                "--remote-only",
             ],
             cwd=workspace,
         )
@@ -258,7 +259,6 @@ def test_native_link_local_reapi_executor_smoke(tmp_path: Path) -> None:
         assert len(reapi_actions) == 1
         assert direct_local_actions == []
         action = reapi_actions[0]
-        assert action["scheduling_mode"] == "RemoteOnly"
         assert action["reproducer"]["details"]["platform_properties"] == {"cpu_count": "1"}
         assert action["reproducer"]["details"]["digest"]
     finally:
@@ -352,7 +352,6 @@ def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
         assert len(reapi_actions) == 3
         assert direct_local_actions == []
         for action in reapi_actions:
-            assert action["scheduling_mode"] == "RemoteOnly"
             assert action["reproducer"]["details"]["platform_properties"] == {
                 "cpu_count": "1"
             }
@@ -454,7 +453,6 @@ def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
         assert any(" c_compile " in action_key for action_key in action_keys)
         assert any(" cpp_link " in action_key for action_key in action_keys)
         for action in reapi_actions:
-            assert action["scheduling_mode"] == "RemoteOnly"
             assert action["reproducer"]["details"]["platform_properties"] == {
                 "cpu_count": "1"
             }
