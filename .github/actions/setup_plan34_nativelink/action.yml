@@ -1,0 +1,44 @@
+name: setup_plan34_nativelink
+description: Build a public NativeLink binary for the Plan 34 local REAPI smoke
+inputs:
+  nativelink_ref:
+    description: Public TraceMachina/nativelink ref to build
+    required: false
+    default: v1.5.2
+  nativelink_expected_sha:
+    description: Expected commit for the default NativeLink ref
+    required: false
+    default: 6e63ef9a567ac49c77ab258f3af9331336868bb0
+runs:
+  using: composite
+  steps:
+  - name: Checkout public NativeLink
+    run: |-
+      set -euo pipefail
+      src="$RUNNER_TEMP/plan34-nativelink-src"
+      rm -rf "$src"
+      git clone --depth=1 --branch "$NATIVELINK_REF" https://github.com/TraceMachina/nativelink.git "$src"
+      actual_sha="$(git -C "$src" rev-parse HEAD)"
+      if [[ "$actual_sha" != "$NATIVELINK_EXPECTED_SHA" ]]; then
+        echo "NativeLink ref $NATIVELINK_REF resolved to $actual_sha; expected $NATIVELINK_EXPECTED_SHA" >&2
+        exit 1
+      fi
+      echo "NativeLink $actual_sha checked out for Plan 34 local REAPI smoke"
+    env:
+      NATIVELINK_REF: ${{ inputs.nativelink_ref }}
+      NATIVELINK_EXPECTED_SHA: ${{ inputs.nativelink_expected_sha }}
+    shell: bash
+  - uses: Swatinem/rust-cache@v2
+    with:
+      prefix-key: plan34-nativelink
+      workspaces: ${{ runner.temp }}/plan34-nativelink-src -> target
+  - name: Build NativeLink binary
+    run: |-
+      set -euo pipefail
+      rustup toolchain install stable --profile minimal
+      cargo +stable build --bin nativelink --profile=smol --locked
+      bin="$RUNNER_TEMP/plan34-nativelink-src/target/smol/nativelink"
+      test -x "$bin"
+      echo "SLUG_PLAN34_NATIVELINK_BIN=$bin" >> "$GITHUB_ENV"
+    working-directory: ${{ runner.temp }}/plan34-nativelink-src
+    shell: bash

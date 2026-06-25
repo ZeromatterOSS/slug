@@ -10,6 +10,7 @@ jobs:
     - uses: actions/checkout@v6
     - uses: ./.github/actions/setup_linux_env
     - uses: ./.github/actions/build_debug
+    - uses: ./.github/actions/setup_plan34_nativelink
     - uses: ./.github/actions/run_test_py
   macos-build-and-test:
     runs-on: macos-latest

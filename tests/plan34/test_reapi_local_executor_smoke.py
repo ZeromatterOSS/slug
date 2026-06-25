@@ -29,11 +29,11 @@ def _is_executable(path: Path) -> bool:
 
 def _executable_path(path: Path) -> Path | None:
     if _is_executable(path):
-        return path
+        return path.resolve()
     if os.name == "nt" and path.suffix != ".exe":
         exe_path = path.with_suffix(".exe")
         if _is_executable(exe_path):
-            return exe_path
+            return exe_path.resolve()
     return None
 
 

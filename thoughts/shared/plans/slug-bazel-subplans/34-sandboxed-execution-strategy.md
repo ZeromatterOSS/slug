@@ -48,7 +48,8 @@ shortcut.
   smoke. It uses `SLUG_PLAN34_NATIVELINK_BIN` when set, otherwise it discovers a
   sibling checkout's `../nativelink/target/debug/nativelink` binary. `test.py`
   now includes `tests/plan34/` in the normal Python integration entrypoint and
-  passes the built Slug binary through `TEST_EXECUTABLE`/`SLUG_BIN`; the
+  passes the built Slug binary through `TEST_EXECUTABLE`/`SLUG_BIN`; the smoke
+  resolves these executable paths before changing into fixture workspaces. The
   NativeLink smoke runs when a NativeLink binary is available and skips cleanly
   otherwise.
 - The smoke starts a local all-in-one NativeLink REAPI service with one worker
@@ -64,9 +65,12 @@ shortcut.
   Bazel-shaped `--action_env=PATH=/usr/bin:/bin` so the NativeLink-local host
   C++ toolchain can find its linker.
 - It is repeatable on checkouts with a sibling NativeLink build and is wired
-  into the CI test entrypoint, but effective CI REAPI execution still depends on
-  provisioning a NativeLink binary. NativeLink binary/bootstrap ownership is not
-  yet repo-owned or a CI gate.
+  into the CI test entrypoint. Linux CI now has a repo-owned bootstrap action:
+  `.github/actions/setup_plan34_nativelink` clones public NativeLink tag
+  `v1.5.2`, verifies commit `6e63ef9a567ac49c77ab258f3af9331336868bb0`,
+  builds only the `nativelink` binary with `cargo +stable --profile=smol`, and
+  exports `SLUG_PLAN34_NATIVELINK_BIN` before `run_test_py`. The hosted runtime
+  of that gate still needs to be observed.
 - Legacy explicit
   `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` hybrid
   configs are classified as test/example-only Buck/BXL diagnostic surfaces, not
@@ -98,15 +102,29 @@ shortcut.
 - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q` proves
   the Plan 34 guard and smoke are reachable through the same Slug-binary
   environment used by `test.py`/CI.
+- `.github/actions/setup_plan34_nativelink/action.yml` plus the Linux
+  `build-and-test.yml` job wire the Plan 34 smoke to a pinned public NativeLink
+  `v1.5.2` source build in CI without secrets or hosted RE endpoints.
+- `git ls-remote` and a shallow `git clone --depth=1 --branch v1.5.2
+  https://github.com/TraceMachina/nativelink.git ...` both resolve the public
+  NativeLink tag to `6e63ef9a567ac49c77ab258f3af9331336868bb0`.
+- `cargo +stable build --bin nativelink --profile=smol --locked` succeeds on a
+  local NativeLink `v1.5.2` checkout at that commit, validating the CI bootstrap
+  build command.
+- Python YAML parsing plus `bash -n` over
+  `.github/actions/setup_plan34_nativelink/action.yml` validates the local CI
+  bootstrap action shape.
 
 The NativeLink smoke is execution-boundary evidence, including a real
-`@rules_cc` compile/link proof, but it is not yet a routine gate.
+`@rules_cc` compile/link proof. It is now wired as a Linux CI gate; the first
+hosted run still needs to be recorded as accepted runtime evidence.
 
 ## Remaining Gaps
 
-- Provision a NativeLink binary/config bootstrap in Linux CI so the
-  already-wired `tests/plan34/` entrypoint executes the local REAPI smoke
-  instead of skipping it.
+- Observe the first hosted Linux CI run with
+  `.github/actions/setup_plan34_nativelink`. If source-building NativeLink makes
+  routine CI too slow, keep the same REAPI boundary but switch the bootstrap to a
+  faster pinned public artifact/cache path.
 - Decide whether the test-owned `--action_env=PATH=/usr/bin:/bin` belongs in
   routine validation or should move behind a hermetic local C++ toolchain setup.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
@@ -125,10 +143,19 @@ The NativeLink smoke is execution-boundary evidence, including a real
   - `SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   - Set `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink` when no sibling
     `../nativelink/target/debug/nativelink` binary is available.
+- CI bootstrap sanity:
+  - `git ls-remote --tags https://github.com/TraceMachina/nativelink.git refs/tags/v1.5.2`
+  - `git clone --depth=1 --branch v1.5.2 https://github.com/TraceMachina/nativelink.git ...`
+  - `cargo +stable build --bin nativelink --profile=smol --locked` from a
+    NativeLink `v1.5.2` checkout
+  - Python YAML parsing of `.github/workflows/build-and-test.yml`,
+    `.github/actions/setup_plan34_nativelink/action.yml`, and
+    `.github/actions/run_test_py/action.yml`
+  - `bash -n` over the shell blocks in
+    `.github/actions/setup_plan34_nativelink/action.yml`
 
 ## Next Owner
 
-Provision a NativeLink binary/config bootstrap in Linux CI so the `test.py`
-Plan 34 entrypoint becomes an effective local REAPI execution gate. Do not open
-new flag or target-language compatibility lanes until the local REAPI path is
-routine.
+Observe and record the first hosted Linux CI run of the
+`.github/actions/setup_plan34_nativelink` gate. Do not open new flag or
+target-language compatibility lanes until the local REAPI path is routine.
