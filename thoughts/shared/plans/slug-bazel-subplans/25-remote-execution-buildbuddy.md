@@ -62,9 +62,9 @@ proof.
 
 ## Remaining Gaps
 
-- Rebuild a fast repo-owned NativeLink/local-REAPI execution smoke with
-  `executor_boundary=reapi`, `direct_local_actions=0`, and useful what-ran
-  counts.
+- Plan 34 now has an opt-in NativeLink/local-REAPI execution smoke for one
+  repo-owned action. Keep transport changes pointed at making that path routine
+  rather than adding direct executor shortcuts.
 - Split `--remote_cache` without `--remote_executor` into a cache-only
   `RemoteEnabledExecutor::Local` path instead of treating cache-only config as
   proof of RE execution.
@@ -73,6 +73,5 @@ proof.
 
 ## Next Owner
 
-Plan 34 should take the next slice: rebuild the local REAPI execution proof on
-top of this transport config, preferably with NativeLink as the local REAPI
-service.
+Plan 34 should take the next slice: promote the local NativeLink REAPI smoke
+into a repeatable gate and broaden it beyond the one-action shell fixture.

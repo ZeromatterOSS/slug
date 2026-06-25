@@ -39,9 +39,14 @@ shortcut.
 - `get_default_executor_config(..., re_configured = true, ...)` promotes the OSS
   default to `RemoteEnabled(Hybrid, Limited)`, which avoids direct-local-only
   scheduling when an RE backend is configured.
-- The active tree does not currently contain a repo-owned NativeLink/local-REAPI
-  execution smoke that proves real actions crossed REAPI with
-  `direct_local_actions=0`.
+- `tests/plan34/test_reapi_local_executor_smoke.py` is an opt-in repo-owned
+  smoke. When `SLUG_PLAN34_NATIVELINK_BIN` points at a NativeLink binary, it
+  starts a local all-in-one NativeLink REAPI service with one worker, builds a
+  fast in-repo fixture through `--remote_executor`, `--remote_cache`, and
+  `--remote-only`, and asserts `Commands: 1 (cached: 0, remote: 1, local: 0)`.
+- That smoke proves one real action crosses REAPI with what-ran
+  `executor="Re"` and zero direct-local actions. It remains opt-in because
+  NativeLink binary/bootstrap availability is not yet repo-owned or a CI gate.
 - Hybrid/local fallback is still present below the promoted default. Until it is
   quarantined or made to point at a local REAPI service, direct-local success is
   not Plan 34 evidence.
@@ -54,17 +59,21 @@ shortcut.
   proves the daemon binds an REAPI executor snapshot into static RE metadata.
 - `cargo test -p slug_client_ctx cli_re_config_snapshot_projects_bazel_remote_flags --lib`
   proves Bazel-shaped RE flags reach the daemon startup snapshot.
+- `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
+  proves local NativeLink-backed REAPI execution for a repo-owned fixture with
+  `reapi_actions=1`, `direct_local_actions=0`, remote command count 1, and
+  local command count 0.
 
-These are boundary invariants, not the final execution proof.
+The NativeLink smoke is execution-boundary evidence, but it is not yet a
+routine gate or broad rule-language proof.
 
 ## Remaining Gaps
 
-- Add a fast repo-owned fixture that executes through a local or public REAPI
-  executor with:
-  - `executor_boundary=reapi`;
-  - `direct_local_actions=0`;
-  - nonzero `reapi_actions` or equivalent Execute-call evidence;
-  - what-ran output showing remote/cache/local counts.
+- Promote the NativeLink-local REAPI smoke from opt-in to routine gate once
+  NativeLink binary/config bootstrap is repo-owned or otherwise available in CI.
+- Broaden the proof from the one-action shell fixture to a fast cc/rules
+  fixture, keeping `executor_boundary=reapi`, `direct_local_actions=0`, nonzero
+  `reapi_actions`, and what-ran remote/cache/local counts.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
   REAPI surface if it is needed as the executor backend.
 - Quarantine direct-local fallback for RE-configured builds or make it explicit
@@ -78,12 +87,12 @@ These are boundary invariants, not the final execution proof.
   - `cargo test -p slug_client_ctx cli_re_config_snapshot_projects_bazel_remote_flags --lib`
   - `cargo test -p slug_server re_config_overlay_projects_reapi_executor_snapshot --lib`
   - `cargo test -p slug_server oss_default_executor_ --lib`
-- Execution proof still required:
-  - run the future NativeLink/local-REAPI fixture and record
-    `executor_boundary=reapi`, `direct_local_actions=0`, and what-ran counts.
+- NativeLink/local-REAPI execution proof:
+  - `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
 
 ## Next Owner
 
-Build the NativeLink-local REAPI smoke first. Do not open new flag or
-target-language compatibility lanes until at least one fast repo-owned action
-executes through REAPI with direct-local action count zero.
+Promote the NativeLink-local REAPI smoke into a repeatable gate, then broaden it
+to a fast cc/rules fixture. Do not open new flag or target-language
+compatibility lanes until the local REAPI path is routine and direct-local
+fallback is quarantined for RE-configured builds.
