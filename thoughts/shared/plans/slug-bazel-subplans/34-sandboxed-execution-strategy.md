@@ -60,10 +60,12 @@ shortcut.
   C++ toolchain can find its linker.
 - It remains opt-in because NativeLink binary/bootstrap availability is not yet
   repo-owned or a CI gate.
-- Hybrid/local fallback is still present for legacy explicit
-  `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` configs.
-  Until that lane is audited or made diagnostic, direct-local success is not
-  Plan 34 evidence.
+- Legacy explicit
+  `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` hybrid
+  configs are classified as test/example-only Buck/BXL diagnostic surfaces, not
+  Bazel 9 execution-platform compatibility. A Plan 34 guard fails if
+  `ExecutionPlatformInfo` or `CommandExecutorConfig` appears in production
+  Starlark/BUILD files.
 
 ## Accepted Evidence
 
@@ -77,6 +79,8 @@ shortcut.
   proves the daemon binds an REAPI executor snapshot into static RE metadata.
 - `cargo test -p slug_client_ctx cli_re_config_snapshot_projects_bazel_remote_flags --lib`
   proves Bazel-shaped RE flags reach the daemon startup snapshot.
+- `pytest -q tests/plan34/test_legacy_execution_platform_surface.py` proves
+  legacy explicit hybrid execution-platform APIs are confined to tests/examples.
 - `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   proves local NativeLink-backed REAPI execution for repo-owned fixtures with
   `reapi_actions=1` for the no-`--remote-only` shell fixture,
@@ -96,9 +100,6 @@ The NativeLink smoke is execution-boundary evidence, including a real
   routine validation or should move behind a hermetic local C++ toolchain setup.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
   REAPI surface if it is needed as the executor backend.
-- Audit legacy explicit hybrid `CommandExecutorConfig` users and either
-  quarantine their direct-local fallback for Bazel-shaped RE builds or document
-  them as non-Bazel diagnostic behavior.
 - Keep cache identity and ActionResult replay in Plan 31. Plan 34 only consumes
   cache evidence when it proves the action crossed REAPI.
 
@@ -113,7 +114,6 @@ The NativeLink smoke is execution-boundary evidence, including a real
 
 ## Next Owner
 
-Promote the NativeLink-local REAPI smoke into a repeatable gate, then audit
-legacy explicit hybrid `CommandExecutorConfig` users for remaining direct-local
-fallback. Do not open new flag or target-language compatibility lanes until the
-local REAPI path is routine.
+Promote the NativeLink-local REAPI smoke into a repeatable gate. Do not open new
+flag or target-language compatibility lanes until the local REAPI path is
+routine.
