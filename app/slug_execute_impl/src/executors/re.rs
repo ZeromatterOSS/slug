@@ -62,6 +62,7 @@ use crate::incremental_actions_helper::save_content_based_incremental_state;
 use crate::re::download::DownloadResult;
 use crate::re::download::download_action_results;
 use crate::re::paranoid_download::ParanoidDownloader;
+use crate::sqlite::action_cache_db::ActionCacheDbState;
 use crate::sqlite::incremental_state_db::IncrementalDbState;
 use crate::storage_resource_exhausted::is_storage_resource_exhausted;
 
@@ -77,6 +78,7 @@ pub struct ReExecutor {
     pub project_fs: ProjectRoot,
     pub materializer: Arc<dyn Materializer>,
     pub incremental_db_state: Arc<IncrementalDbState>,
+    pub action_cache_db_state: Arc<ActionCacheDbState>,
     pub re_client: ManagedRemoteExecutionClient,
     pub re_action_key: Option<String>,
     pub knobs: ExecutorGlobalKnobs,
@@ -464,6 +466,15 @@ impl PreparedCommandExecutor for ReExecutor {
         .await;
 
         let DownloadResult::Result(mut res) = res;
+        if !self.skip_cache_write {
+            self.action_cache_db_state.put(
+                &action_and_blobs.action,
+                &RE::ActionResultResponse {
+                    action_result: response.execute_response.action_result.clone(),
+                    ttl: 0,
+                },
+            );
+        }
         res.action_result = Some(response.execute_response.action_result);
 
         if let Some(run_action_key) = request.run_action_key()

@@ -470,6 +470,36 @@ def run_plan34_tests(slug_binary: str) -> None:
     )
 
 
+def run_plan31_tests(slug_binary: str) -> None:
+    """Run Plan 31 persistent RE action-cache tests."""
+    print_running("pytest tests/plan31/")
+    if is_windows():
+        slug_binary = _normalize_windows_path(slug_binary)
+    binary_path = Path(slug_binary)
+    if is_windows() and not binary_path.exists():
+        exe_path = binary_path.with_suffix(".exe")
+        if exe_path.exists():
+            slug_binary = str(exe_path)
+    env = os.environ.copy()
+    env["TEST_EXECUTABLE"] = slug_binary
+    env["SLUG_BIN"] = slug_binary
+    # The NativeLink-backed durable AC smoke is intentionally small and skips on
+    # hosts that have not provisioned a local REAPI binary.
+    timeout_sec = 5 * 60
+    run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/plan31/",
+            "-q",
+            "--tb=short",
+        ],
+        timeout=timeout_sec,
+        env=env,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -601,6 +631,8 @@ def main() -> None:
     ):
         with timing():
             run_python_tests(args.buck2)
+        with timing():
+            run_plan31_tests(args.buck2)
         with timing():
             run_plan34_tests(args.buck2)
 

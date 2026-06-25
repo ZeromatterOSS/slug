@@ -227,9 +227,11 @@ successful RE response.
 - `ActionCacheChecker` consults the local SQLite state for regular
   `ActionCache` lookups before issuing RE `GetActionResult`; remote dep-file
   cache lookups stay on the existing RE path.
-- Successful action-cache materialization refreshes the durable row. Successful
-  local cache uploads and remote execution results also seed the durable state
-  through `CacheUploader`.
+- Successful action-cache materialization refreshes the durable row. Remote
+  execution results now seed the durable state directly at the `ReExecutor`
+  boundary when cache writes are enabled, so REAPI execute responses do not
+  depend on Starlark cache-upload permission. Successful local cache uploads
+  still seed through `CacheUploader`.
 - The default TTL is six days, with Slug-local override
   `slug.local_action_cache_ttl_days`. Expired rows are ignored and replaced on
   the next remote hit or upload.
@@ -237,10 +239,12 @@ successful RE response.
   daemon startup cleanup.
 
 This is a real durable `ActionDigest -> ActionResult` lane, not copied-output
-bridge evidence. It is not yet full 31.1 acceptance: the repo still needs a
-small integration proof that a second cold daemon consumes SQLite without
-emitting an RE `CacheQuery`/`GetActionResult`, and stale-CAS fallback is still
-unimplemented.
+bridge evidence. `tests/plan31/test_persistent_re_action_cache.py` now proves a
+fast repo-owned shell fixture executes through local NativeLink REAPI, kills the
+Slug daemon, then rebuilds from the local SQLite AC with `cached: 1`,
+`remote: 0`, `local: 0`, a `Cache` what-ran entry, and no `CacheQuery`, `Re`, or
+direct-local entry. Remaining 31.1 gaps are stale-CAS fallback and local-vs-RE
+AC hit accounting.
 
 #### Changes Required
 
@@ -359,10 +363,15 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
       put/get/expire/identity-reset round-trips.
 - [x] `TMPDIR=$PWD/target/tmp cargo test -p slug_server action_cache_state --lib`
       proves daemon cache cleanup preserves `action_cache_state`.
+- [x] `TMPDIR=$PWD/target/tmp cargo check -p slug_execute_impl -p slug_server`
+      proves the RE executor and daemon wiring compile with durable AC state.
 - [x] `cargo check -p remote_execution` proves the now-public ActionResult
       conversion helpers compile.
 - [x] `TMPDIR=$PWD/target/tmp cargo build -p slug` rebuilds the changed Slug
       binary path for Python/e2e validation.
+- [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan31/ -q`
+      proves a second cold daemon consumes local SQLite AC without emitting an
+      RE cache query, RE execution, or direct-local action.
 - [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan34/ -q`
       proves the local NativeLink REAPI smoke still passes with the durable AC
       plumbing in the executor path.
