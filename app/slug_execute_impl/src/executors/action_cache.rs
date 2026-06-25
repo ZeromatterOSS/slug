@@ -42,12 +42,14 @@ use crate::incremental_actions_helper::save_content_based_incremental_state;
 use crate::re::download::DownloadResult;
 use crate::re::download::download_action_results;
 use crate::re::paranoid_download::ParanoidDownloader;
+use crate::sqlite::action_cache_db::ActionCacheDbState;
 use crate::sqlite::incremental_state_db::IncrementalDbState;
 
 pub struct ActionCacheChecker {
     pub artifact_fs: ArtifactFs,
     pub materializer: Arc<dyn Materializer>,
     pub incremental_db_state: Arc<IncrementalDbState>,
+    pub action_cache_db_state: Arc<ActionCacheDbState>,
     pub re_client: ManagedRemoteExecutionClient,
     pub re_action_key: Option<String>,
     pub upload_all_actions: bool,
@@ -77,6 +79,7 @@ async fn query_action_cache_and_download_result(
     artifact_fs: &ArtifactFs,
     materializer: &Arc<dyn Materializer>,
     incremental_db_state: &Arc<IncrementalDbState>,
+    action_cache_db_state: Option<&Arc<ActionCacheDbState>>,
     re_client: &ManagedRemoteExecutionClient,
     re_action_key: &Option<String>,
     paranoid: &Option<ParanoidDownloader>,
@@ -99,14 +102,24 @@ async fn query_action_cache_and_download_result(
         CacheType::ActionCache => action_digest.dupe(),
     };
 
-    let action_cache_response = executor_stage_async(
-        slug_data::CacheQuery {
-            action_digest: digest.to_string(),
-            cache_type: cache_type.to_proto().into(),
-        },
-        re_client.action_cache(digest.dupe()),
-    )
-    .await;
+    let local_action_cache_hit = match cache_type {
+        CacheType::ActionCache => action_cache_db_state.and_then(|state| state.get(&digest)),
+        CacheType::RemoteDepFileCache(_) => None,
+    };
+
+    let action_cache_response = match local_action_cache_hit {
+        Some(response) => Ok(Some(response)),
+        None => {
+            executor_stage_async(
+                slug_data::CacheQuery {
+                    action_digest: digest.to_string(),
+                    cache_type: cache_type.to_proto().into(),
+                },
+                re_client.action_cache(digest.dupe()),
+            )
+            .await
+        }
+    };
 
     // Diagnostic for BB cache miss investigation: log every action-cache
     // query with hit/miss/error outcome. Two builds with the same target
@@ -238,6 +251,9 @@ async fn query_action_cache_and_download_result(
             res.dep_file_metadata = dep_file_metadata;
         }
         CacheType::ActionCache => {
+            if let Some(state) = action_cache_db_state {
+                state.put(&digest, &response.0);
+            }
             tracing::info!(
                 "Action result is cached, skipping execution of:\n```\n$ {}\n```\n for action `{}`",
                 command.request.all_args_str(),
@@ -288,6 +304,7 @@ impl PreparedCommandOptionalExecutor for ActionCacheChecker {
             &self.artifact_fs,
             &self.materializer,
             &self.incremental_db_state,
+            Some(&self.action_cache_db_state),
             &self.re_client,
             &self.re_action_key,
             &self.paranoid,
@@ -354,6 +371,7 @@ impl PreparedCommandOptionalExecutor for RemoteDepFileCacheChecker {
             &self.artifact_fs,
             &self.materializer,
             &self.incremental_db_state,
+            None,
             &self.re_client,
             &self.re_action_key,
             &self.paranoid,

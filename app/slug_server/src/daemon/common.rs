@@ -65,6 +65,7 @@ use slug_execute_impl::executors::to_re_platform::RePlatformFieldsToRePlatform;
 use slug_execute_impl::executors::worker::WorkerPool;
 use slug_execute_impl::low_pass_filter::LowPassFilter;
 use slug_execute_impl::re::paranoid_download::ParanoidDownloader;
+use slug_execute_impl::sqlite::action_cache_db::ActionCacheDbState;
 use slug_execute_impl::sqlite::incremental_state_db::IncrementalDbState;
 use slug_resource_control::memory_tracker::MemoryTrackerHandle;
 
@@ -97,6 +98,7 @@ pub struct CommandExecutorFactory {
     re_use_case_override: Option<RemoteExecutorUseCase>,
     memory_tracker: Option<MemoryTrackerHandle>,
     incremental_db_state: Arc<IncrementalDbState>,
+    action_cache_db_state: Arc<ActionCacheDbState>,
     deduplicate_get_digests_ttl_calls: bool,
     output_trees_download_config: OutputTreesDownloadConfig,
     daemon_id: DaemonId,
@@ -123,6 +125,7 @@ impl CommandExecutorFactory {
         re_use_case_override: Option<RemoteExecutorUseCase>,
         memory_tracker: Option<MemoryTrackerHandle>,
         incremental_db_state: Arc<IncrementalDbState>,
+        action_cache_db_state: Arc<ActionCacheDbState>,
         deduplicate_get_digests_ttl_calls: bool,
         output_trees_download_config: OutputTreesDownloadConfig,
         daemon_id: DaemonId,
@@ -151,6 +154,7 @@ impl CommandExecutorFactory {
             re_use_case_override,
             memory_tracker,
             incremental_db_state,
+            action_cache_db_state,
             deduplicate_get_digests_ttl_calls,
             output_trees_download_config,
             daemon_id,
@@ -335,6 +339,7 @@ impl HasCommandExecutor for CommandExecutorFactory {
                                 artifact_fs: artifact_fs.clone(),
                                 materializer: self.materializer.dupe(),
                                 incremental_db_state: self.incremental_db_state.dupe(),
+                                action_cache_db_state: self.action_cache_db_state.dupe(),
                                 re_client: self.get_prepared_re_client(remote_options.re_use_case),
                                 re_action_key: remote_options.re_action_key.clone(),
                                 upload_all_actions: self.upload_all_actions,
@@ -437,6 +442,7 @@ impl HasCommandExecutor for CommandExecutorFactory {
                         remote_options.re_properties.clone(),
                         None,
                         self.cache_upload_permission_checker.dupe(),
+                        self.action_cache_db_state.dupe(),
                         self.deduplicate_get_digests_ttl_calls,
                     )) as _
                 } else if disable_caching {
@@ -451,6 +457,7 @@ impl HasCommandExecutor for CommandExecutorFactory {
                         remote_options.re_properties.clone(),
                         max_bytes,
                         self.cache_upload_permission_checker.dupe(),
+                        self.action_cache_db_state.dupe(),
                         self.deduplicate_get_digests_ttl_calls,
                     )) as _
                 } else {

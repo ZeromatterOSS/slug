@@ -67,6 +67,7 @@ use slug_execute_impl::materializers::deferred::DeferredMaterializerConfigs;
 use slug_execute_impl::materializers::deferred::TtlRefreshConfiguration;
 use slug_execute_impl::materializers::deferred::clean_stale::CleanStaleConfig;
 use slug_execute_impl::re::paranoid_download::ParanoidDownloader;
+use slug_execute_impl::sqlite::action_cache_db::ActionCacheDbState;
 use slug_execute_impl::sqlite::incremental_state_db::IncrementalDbState;
 use slug_execute_impl::sqlite::materializer_db::MaterializerState;
 use slug_execute_impl::sqlite::materializer_db::MaterializerStateSqliteDb;
@@ -90,6 +91,7 @@ use crate::ctx::BaseServerCommandContext;
 use crate::daemon::check_working_dir;
 use crate::daemon::disk_state::DiskStateOptions;
 use crate::daemon::disk_state::delete_unknown_disk_state;
+use crate::daemon::disk_state::maybe_initialize_action_cache_sqlite_db;
 use crate::daemon::disk_state::maybe_initialize_incremental_sqlite_db;
 use crate::daemon::disk_state::maybe_initialize_materializer_sqlite_db;
 use crate::daemon::forkserver::maybe_launch_forkserver;
@@ -203,6 +205,10 @@ pub struct DaemonStateData {
     /// State of the Incremental Action DB for content-based hash paths
     #[allocative(skip)]
     pub incremental_db_state: Arc<IncrementalDbState>,
+
+    /// State of the durable RE ActionDigest -> ActionResult cache.
+    #[allocative(skip)]
+    pub action_cache_db_state: Arc<ActionCacheDbState>,
 
     /// A unique identifier for this instance of the daemon
     pub daemon_id: DaemonId,
@@ -459,42 +465,51 @@ impl DaemonState {
 
             let use_eden_thrift_read = cfg!(any(target_os = "macos", target_os = "windows"));
 
-            let (io, _, (materializer_db, materializer_state), incremental_db_state) =
-                futures::future::try_join4(
-                    create_io_provider(
-                        fb,
-                        fs.dupe(),
-                        root_config,
-                        digest_config.cas_digest_config(),
-                        init_ctx.enable_trace_io,
-                        use_eden_thrift_read,
-                    ),
-                    (blocking_executor.dupe() as Arc<dyn BlockingExecutor>).execute_io_inline(
-                        || {
-                            // Using `execute_io_inline` is just out of convenience.
-                            // It doesn't really matter what's used here since there's no IO-heavy
-                            // operations on daemon startup
-                            delete_unknown_disk_state(&cache_dir_path, &valid_cache_dirs)
-                        },
-                    ),
-                    maybe_initialize_materializer_sqlite_db(
-                        &disk_state_options,
-                        paths.clone(),
-                        blocking_executor.dupe() as Arc<dyn BlockingExecutor>,
-                        root_config,
-                        &deferred_materializer_configs,
-                        digest_config,
-                        &init_ctx,
-                        &daemon_id,
-                    ),
-                    maybe_initialize_incremental_sqlite_db(
-                        paths.clone(),
-                        blocking_executor.dupe() as Arc<dyn BlockingExecutor>,
-                        root_config,
-                        &daemon_id,
-                    ),
-                )
-                .await?;
+            let (
+                io,
+                _,
+                (materializer_db, materializer_state),
+                incremental_db_state,
+                action_cache_db_state,
+            ) = futures::future::try_join5(
+                create_io_provider(
+                    fb,
+                    fs.dupe(),
+                    root_config,
+                    digest_config.cas_digest_config(),
+                    init_ctx.enable_trace_io,
+                    use_eden_thrift_read,
+                ),
+                (blocking_executor.dupe() as Arc<dyn BlockingExecutor>).execute_io_inline(|| {
+                    // Using `execute_io_inline` is just out of convenience.
+                    // It doesn't really matter what's used here since there's no IO-heavy
+                    // operations on daemon startup
+                    delete_unknown_disk_state(&cache_dir_path, &valid_cache_dirs)
+                }),
+                maybe_initialize_materializer_sqlite_db(
+                    &disk_state_options,
+                    paths.clone(),
+                    blocking_executor.dupe() as Arc<dyn BlockingExecutor>,
+                    root_config,
+                    &deferred_materializer_configs,
+                    digest_config,
+                    &init_ctx,
+                    &daemon_id,
+                ),
+                maybe_initialize_incremental_sqlite_db(
+                    paths.clone(),
+                    blocking_executor.dupe() as Arc<dyn BlockingExecutor>,
+                    root_config,
+                    &daemon_id,
+                ),
+                maybe_initialize_action_cache_sqlite_db(
+                    paths.clone(),
+                    blocking_executor.dupe() as Arc<dyn BlockingExecutor>,
+                    root_config,
+                    &daemon_id,
+                ),
+            )
+            .await?;
 
             let http_client = http_client_from_startup_config(&init_ctx.daemon_startup_config)
                 .await
@@ -502,6 +517,7 @@ impl DaemonState {
                 .build();
 
             let incremental_db_state = Arc::new(incremental_db_state);
+            let action_cache_db_state = Arc::new(action_cache_db_state);
 
             let materializer_state_identity =
                 materializer_db.as_ref().map(|d| d.identity().clone());
@@ -611,6 +627,7 @@ impl DaemonState {
                     "sqlite-materializer-state:{}",
                     disk_state_options.sqlite_materializer_state
                 ),
+                "sqlite-action-cache-state:true".to_owned(),
                 format!("paranoid:{}", paranoid.is_some()),
                 format!("remote-dep-files:{}", remote_dep_files_enabled),
                 #[cfg(fbcode_build)]
@@ -657,6 +674,7 @@ impl DaemonState {
                 memory_tracker,
                 previous_command_data: LockedPreviousCommandData::new(),
                 incremental_db_state,
+                action_cache_db_state,
                 daemon_id: daemon_id.dupe(),
             }))
         })

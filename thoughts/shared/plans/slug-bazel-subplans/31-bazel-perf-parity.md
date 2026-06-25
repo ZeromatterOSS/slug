@@ -219,6 +219,29 @@ Lookup runs before the RE call in
 `query_action_cache_and_download_result`; insert runs after a
 successful RE response.
 
+#### Current implementation state (2026-06-25)
+
+- `ActionCacheStateSqliteDb` now stores RE `ActionResult` proto bytes under
+  `buck-out/<isolation>/cache/action_cache_state/db.sqlite`, keyed by
+  structured `(ActionDigest.raw_digest, ActionDigest.size)`.
+- `ActionCacheChecker` consults the local SQLite state for regular
+  `ActionCache` lookups before issuing RE `GetActionResult`; remote dep-file
+  cache lookups stay on the existing RE path.
+- Successful action-cache materialization refreshes the durable row. Successful
+  local cache uploads and remote execution results also seed the durable state
+  through `CacheUploader`.
+- The default TTL is six days, with Slug-local override
+  `slug.local_action_cache_ttl_days`. Expired rows are ignored and replaced on
+  the next remote hit or upload.
+- `InvocationPaths::valid_cache_dirs()` preserves `action_cache_state` during
+  daemon startup cleanup.
+
+This is a real durable `ActionDigest -> ActionResult` lane, not copied-output
+bridge evidence. It is not yet full 31.1 acceptance: the repo still needs a
+small integration proof that a second cold daemon consumes SQLite without
+emitting an RE `CacheQuery`/`GetActionResult`, and stale-CAS fallback is still
+unimplemented.
+
 #### Changes Required
 
 **File**: `app/slug_execute_impl/src/sqlite/action_cache_db.rs` (new)
@@ -329,12 +352,24 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
 
 ##### Automated Verification:
 
-- [ ] `cargo build -p slug_execute_impl` clean.
-- [ ] New unit tests in `action_cache_db.rs`:
+- [x] `cargo test -p slug_execute_impl action_cache --lib`
+      compiles the owner crate and passes table/state tests.
+- [x] New unit tests in `action_cache_db.rs` and
+      `tables/action_cache_table.rs`:
       put/get/expire/identity-reset round-trips.
+- [x] `TMPDIR=$PWD/target/tmp cargo test -p slug_server action_cache_state --lib`
+      proves daemon cache cleanup preserves `action_cache_state`.
+- [x] `cargo check -p remote_execution` proves the now-public ActionResult
+      conversion helpers compile.
+- [x] `TMPDIR=$PWD/target/tmp cargo build -p slug` rebuilds the changed Slug
+      binary path for Python/e2e validation.
+- [x] `TEST_EXECUTABLE=$PWD/target/debug/slug TMPDIR=$PWD/target/tmp python -m pytest tests/plan34/ -q`
+      proves the local NativeLink REAPI smoke still passes with the durable AC
+      plumbing in the executor path.
 - [ ] Existing test suite passes:
       `slug test fbcode//slug/tests/core/build_command/...`.
-- [ ] BES events still report cache hits correctly: in a warm-RE run,
+- [ ] BES events report local-SQLite AC hits separately from remote AC hits:
+      in a warm-RE run,
       console shows `Cache hits: 100%` and the BES-side `CacheHit`
       events break down hits into `local` vs `remote`.
 
@@ -349,7 +384,7 @@ Phase 31.1 ships with TTL-only expiry. Add LRU + size cap (default
 - [ ] `rm -rf ~/.cache/buildbuddy_cache_test_namespace/` (or
       equivalently invalidate BB's cache for one specific action),
       then re-run: slug detects the CAS-evicted local hit, falls back
-      to RE, completes successfully.
+      to RE, completes successfully. This fallback remains open.
 
 ---
 

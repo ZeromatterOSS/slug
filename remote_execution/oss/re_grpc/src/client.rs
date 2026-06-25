@@ -645,7 +645,7 @@ impl REClient {
             .await?;
 
         Ok(ActionResultResponse {
-            action_result: convert_action_result(res.into_inner())?,
+            action_result: action_result_from_re_proto(res.into_inner())?,
             ttl: 0,
         })
     }
@@ -662,7 +662,7 @@ impl REClient {
                 UpdateActionResultRequest {
                     instance_name: self.instance_name.as_str().to_owned(),
                     action_digest: Some(tdigest_to(request.action_digest)),
-                    action_result: Some(convert_t_action_result2(request.action_result)?),
+                    action_result: Some(action_result_to_re_proto(request.action_result)?),
                     results_cache_policy: None,
                     ..Default::default()
                 },
@@ -671,7 +671,7 @@ impl REClient {
             .await?;
 
         Ok(WriteActionResultResponse {
-            actual_action_result: convert_action_result(res.into_inner())?,
+            actual_action_result: action_result_from_re_proto(res.into_inner())?,
             ttl_seconds: 0,
         })
     }
@@ -731,7 +731,7 @@ impl REClient {
                             .result
                             .with_context(|| "The action result is not defined.")?;
 
-                        let action_result = convert_action_result(action_result)?;
+                        let action_result = action_result_from_re_proto(action_result)?;
 
                         let execute_response = ExecuteResponse {
                             action_result,
@@ -1000,7 +1000,7 @@ impl REClient {
     }
 }
 
-fn convert_action_result(action_result: ActionResult) -> anyhow::Result<TActionResult2> {
+pub fn action_result_from_re_proto(action_result: ActionResult) -> anyhow::Result<TActionResult2> {
     let execution_metadata = action_result
         .execution_metadata
         .with_context(|| "The execution metadata are not defined.")?;
@@ -1088,6 +1088,13 @@ fn convert_action_result(action_result: ActionResult) -> anyhow::Result<TActionR
             execution_dir: "".to_owned(),
             execution_attempts: 0,
             last_queued_timestamp: Default::default(),
+            auxiliary_metadata: execution_metadata
+                .auxiliary_metadata
+                .into_map(|metadata| TAny {
+                    type_url: metadata.type_url,
+                    value: metadata.value,
+                    ..Default::default()
+                }),
             ..Default::default()
         },
         ..Default::default()
@@ -1096,7 +1103,7 @@ fn convert_action_result(action_result: ActionResult) -> anyhow::Result<TActionR
     Ok(action_result)
 }
 
-fn convert_t_action_result2(t_action_result: TActionResult2) -> anyhow::Result<ActionResult> {
+pub fn action_result_to_re_proto(t_action_result: TActionResult2) -> anyhow::Result<ActionResult> {
     let t_execution_metadata = t_action_result.execution_metadata;
     let virtual_execution_duration = prost_types::Duration::try_from(
         t_execution_metadata
@@ -1129,7 +1136,12 @@ fn convert_t_action_result2(t_action_result: TActionResult2) -> anyhow::Result<A
         output_upload_completed_timestamp: Some(ttimestamp_to(
             t_execution_metadata.output_upload_completed_timestamp,
         )),
-        auxiliary_metadata: Vec::new(),
+        auxiliary_metadata: t_execution_metadata
+            .auxiliary_metadata
+            .into_map(|metadata| prost_types::Any {
+                type_url: metadata.type_url,
+                value: metadata.value,
+            }),
     });
 
     let output_files = t_action_result
@@ -1168,9 +1180,9 @@ fn convert_t_action_result2(t_action_result: TActionResult2) -> anyhow::Result<A
         output_symlinks,
         output_directories,
         exit_code: t_action_result.exit_code,
-        stdout_raw: Vec::new(),
+        stdout_raw: t_action_result.stdout_raw.unwrap_or_default(),
         stdout_digest: t_action_result.stdout_digest.map(tdigest_to),
-        stderr_raw: Vec::new(),
+        stderr_raw: t_action_result.stderr_raw.unwrap_or_default(),
         stderr_digest: t_action_result.stderr_digest.map(tdigest_to),
         execution_metadata,
         ..Default::default()

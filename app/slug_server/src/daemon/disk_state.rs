@@ -14,12 +14,18 @@ use std::sync::Arc;
 use allocative::Allocative;
 use slug_common::invocation_paths::InvocationPaths;
 use slug_common::legacy_configs::configs::LegacyBuckConfig;
+use slug_common::legacy_configs::key::BuckconfigKeyRef;
 use slug_error::BuckErrorContext;
 use slug_events::daemon_id::DaemonId;
 use slug_execute::digest_config::DigestConfig;
 use slug_execute::execute::blocking::BlockingExecutor;
 use slug_execute::materialize::materializer::MaterializationMethod;
 use slug_execute_impl::materializers::deferred::DeferredMaterializerConfigs;
+use slug_execute_impl::sqlite::action_cache_db::ACTION_CACHE_DB_SCHEMA_VERSION;
+use slug_execute_impl::sqlite::action_cache_db::ActionCacheDbState;
+use slug_execute_impl::sqlite::action_cache_db::ActionCacheStateSqliteDb;
+use slug_execute_impl::sqlite::action_cache_db::DEFAULT_ACTION_CACHE_TTL_DAYS;
+use slug_execute_impl::sqlite::action_cache_db::action_cache_ttl_from_days;
 use slug_execute_impl::sqlite::incremental_state_db::INCREMENTAL_DB_SCHEMA_VERSION;
 use slug_execute_impl::sqlite::incremental_state_db::IncrementalDbState;
 use slug_execute_impl::sqlite::incremental_state_db::IncrementalStateSqliteDb;
@@ -152,6 +158,38 @@ pub(crate) async fn maybe_initialize_incremental_sqlite_db(
     Ok(incremental_db_state)
 }
 
+pub(crate) async fn maybe_initialize_action_cache_sqlite_db(
+    paths: InvocationPaths,
+    io_executor: Arc<dyn BlockingExecutor>,
+    root_config: &LegacyBuckConfig,
+    daemon_id: &DaemonId,
+) -> slug_error::Result<ActionCacheDbState> {
+    let (metadata, versions) = sqlite_db_setup_metadata_and_versions(
+        ACTION_CACHE_DB_SCHEMA_VERSION.to_string(),
+        None,
+        daemon_id,
+    )?;
+
+    let ttl_days = root_config
+        .parse::<u64>(BuckconfigKeyRef {
+            section: "slug",
+            property: "local_action_cache_ttl_days",
+        })?
+        .unwrap_or(DEFAULT_ACTION_CACHE_TTL_DAYS);
+    let ttl = action_cache_ttl_from_days(ttl_days).buck_error_context(
+        "parsing buckconfig `slug.local_action_cache_ttl_days` for action cache state",
+    )?;
+
+    ActionCacheStateSqliteDb::initialize(
+        paths.action_cache_state_path(),
+        versions,
+        metadata,
+        io_executor,
+        ttl,
+    )
+    .await
+}
+
 // Once we start storing disk state in the cache directory, we need to make sure
 // slug always deletes the cache directory if the cache is disabled.
 // Otherwise, buck-out state can diverge from the state of on-disk cache when
@@ -257,5 +295,34 @@ mod tests {
 
         assert!(materializer_state_db.exists());
         assert!(!command_hashes_db.exists());
+    }
+
+    #[test]
+    fn test_delete_from_cache_dir_preserves_action_cache_state() {
+        let fs_temp = ProjectRootTemp::new().unwrap();
+        let fs = fs_temp.path();
+        let cache_dir_path = fs.resolve(ProjectRelativePath::unchecked_new("buck-out/v2/cache"));
+        let paths = slug_common::invocation_paths::InvocationPaths {
+            roots: slug_common::invocation_roots::InvocationRoots {
+                project_root: fs.clone(),
+                cwd: ProjectRelativePath::empty().to_buf(),
+            },
+            isolation: slug_fs::paths::file_name::FileNameBuf::unchecked_new("v2"),
+        };
+        let action_cache_db = cache_dir_path.join(ForwardRelativePath::unchecked_new(
+            "action_cache_state/db.sqlite",
+        ));
+        let unknown_db = cache_dir_path.join(ForwardRelativePath::unchecked_new(
+            "unknown_cache/db.sqlite",
+        ));
+        fs_util::create_dir_all(action_cache_db.parent().unwrap()).unwrap();
+        fs_util::write(&action_cache_db, b"").unwrap();
+        fs_util::create_dir_all(unknown_db.parent().unwrap()).unwrap();
+        fs_util::write(&unknown_db, b"").unwrap();
+
+        delete_unknown_disk_state(&cache_dir_path, &paths.valid_cache_dirs()).unwrap();
+
+        assert!(action_cache_db.exists());
+        assert!(!unknown_db.exists());
     }
 }

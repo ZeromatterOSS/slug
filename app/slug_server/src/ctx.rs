@@ -882,6 +882,11 @@ impl DiceCommandUpdater<'_, '_> {
             override_use_case,
             self.cmd_ctx.base_context.daemon.memory_tracker.dupe(),
             self.cmd_ctx.base_context.daemon.incremental_db_state.dupe(),
+            self.cmd_ctx
+                .base_context
+                .daemon
+                .action_cache_db_state
+                .dupe(),
             run_action_knobs.deduplicate_get_digests_ttl_calls,
             output_trees_download_config.dupe(),
             self.cmd_ctx.base_context.daemon.daemon_id.dupe(),

@@ -55,6 +55,7 @@ use slug_execute::re::manager::ManagedRemoteExecutionClient;
 
 use crate::executors::action_cache_upload_permission_checker::ActionCacheUploadPermissionChecker;
 use crate::executors::to_re_platform::RePlatformFieldsToRePlatform;
+use crate::sqlite::action_cache_db::ActionCacheDbState;
 
 // Whether to throw errors when cache uploads fail (primarily for tests).
 fn error_on_cache_upload() -> slug_error::Result<bool> {
@@ -73,6 +74,7 @@ pub struct CacheUploader {
     platform: RePlatformFields,
     max_bytes: Option<u64>,
     cache_upload_permission_checker: Arc<ActionCacheUploadPermissionChecker>,
+    action_cache_db_state: Arc<ActionCacheDbState>,
     deduplicate_get_digests_ttl_calls: bool,
 }
 
@@ -84,6 +86,7 @@ impl CacheUploader {
         platform: RePlatformFields,
         max_bytes: Option<u64>,
         cache_upload_permission_checker: Arc<ActionCacheUploadPermissionChecker>,
+        action_cache_db_state: Arc<ActionCacheDbState>,
         deduplicate_get_digests_ttl_calls: bool,
     ) -> CacheUploader {
         CacheUploader {
@@ -93,6 +96,7 @@ impl CacheUploader {
             platform,
             max_bytes,
             cache_upload_permission_checker,
+            action_cache_db_state,
             deduplicate_get_digests_ttl_calls,
         }
     }
@@ -575,6 +579,7 @@ impl UploadCache for CacheUploader {
         action_digest_and_blobs: &ActionDigestAndBlobs,
     ) -> slug_error::Result<CacheUploadResult> {
         let error_on_cache_upload = error_on_cache_upload().buck_error_context("cache_upload")?;
+        let re_result_for_action_cache = re_result.clone();
 
         let (did_cache_upload, action_result) = if res.was_locally_executed() {
             tracing::debug!(
@@ -609,6 +614,19 @@ impl UploadCache for CacheUploader {
             );
             (false, None)
         };
+
+        if let Some(action_result) = action_result
+            .as_ref()
+            .or(re_result_for_action_cache.as_ref())
+        {
+            self.action_cache_db_state.put(
+                &action_digest_and_blobs.action,
+                &remote_execution::ActionResultResponse {
+                    action_result: action_result.clone(),
+                    ttl: 0,
+                },
+            );
+        }
 
         let should_upload_dep_file =
             res.was_locally_executed() || res.was_remotely_executed() || res.was_action_cache_hit();

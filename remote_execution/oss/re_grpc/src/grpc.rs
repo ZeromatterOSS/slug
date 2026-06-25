@@ -9,6 +9,7 @@
  */
 
 pub use re_grpc_proto::build::bazel::remote::execution::v2::Action;
+pub use re_grpc_proto::build::bazel::remote::execution::v2::ActionResult;
 pub use re_grpc_proto::build::bazel::remote::execution::v2::Command;
 pub use re_grpc_proto::build::bazel::remote::execution::v2::Digest;
 pub use re_grpc_proto::build::bazel::remote::execution::v2::Directory;
