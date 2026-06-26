@@ -93,8 +93,10 @@ shortcut.
   `.github/actions/setup_plan34_nativelink` clones public NativeLink tag
   `v1.5.2`, verifies commit `6e63ef9a567ac49c77ab258f3af9331336868bb0`,
   builds only the `nativelink` binary with `cargo +stable --profile=smol`, and
-  exports `SLUG_PLAN34_NATIVELINK_BIN` before `run_test_py`. The hosted runtime
-  of that gate still needs to be observed.
+  exports `SLUG_PLAN34_NATIVELINK_BIN` before `run_test_py`. A repo-owned CI
+  wiring guard now fails if the Linux job stops running that setup action before
+  the Python integration entrypoint. The hosted runtime of that gate still
+  needs to be observed.
 - Legacy explicit
   `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` hybrid
   configs are classified as test/example-only Buck/BXL diagnostic surfaces, not
@@ -167,6 +169,11 @@ shortcut.
 - Python YAML parsing plus `bash -n` over
   `.github/actions/setup_plan34_nativelink/action.yml` validates the local CI
   bootstrap action shape.
+- `python -m pytest -q tests/plan34/test_ci_gate.py --tb=short` proves the
+  Linux workflow step order keeps `.github/actions/setup_plan34_nativelink`
+  before `.github/actions/run_test_py`, and that the setup action still builds
+  the pinned `target/smol/nativelink` binary and exports
+  `SLUG_PLAN34_NATIVELINK_BIN`.
 
 The NativeLink smoke is execution-boundary evidence, including a real
 `@rules_cc` compile/link proof. It is now wired as a Linux CI gate; the first
@@ -198,6 +205,7 @@ hosted run still needs to be recorded as accepted runtime evidence.
 - Bazel default shell env:
   - `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/core/analysis/test_native_rules.py -q -k 'build_config_defaults or action_env_overrides'`
 - CI bootstrap sanity:
+  - `python -m pytest -q tests/plan34/test_ci_gate.py --tb=short`
   - `git ls-remote --tags https://github.com/TraceMachina/nativelink.git refs/tags/v1.5.2`
   - `git clone --depth=1 --branch v1.5.2 https://github.com/TraceMachina/nativelink.git ...`
   - `cargo +stable build --bin nativelink --profile=smol --locked` from a
