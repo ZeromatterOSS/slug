@@ -156,6 +156,7 @@ struct SelectedExtensionCacheIdentity {
     selected_key: String,
     repo_specs_digest: String,
     recorded_inputs: Vec<String>,
+    module_extension_metadata_digest: String,
     workspace_root: Option<PathBuf>,
     repo_env: Option<BTreeMap<String, String>>,
     repo_mappings: Option<RepoMappingSnapshot>,
@@ -355,6 +356,10 @@ fn selected_extension_cache_identity(
         selected_key: cache.selected_key.clone(),
         repo_specs_digest: selected_extension_cache_repo_specs_digest(cache),
         recorded_inputs: cache.recorded_inputs.clone(),
+        module_extension_metadata_digest: cache
+            .module_extension_metadata()
+            .map(facts_identity)
+            .unwrap_or_default(),
         workspace_root: cache.workspace_root.clone(),
         repo_env: cache.repo_env.clone(),
         repo_mappings: cache.repo_mappings.clone(),
@@ -394,6 +399,8 @@ fn selected_extension_cache_identity_digest(identity: &SelectedExtensionCacheIde
         hasher.update(input.as_bytes());
         hasher.update([0u8]);
     }
+    hasher.update(identity.module_extension_metadata_digest.as_bytes());
+    hasher.update([0u8]);
     if let Some(root) = &identity.workspace_root {
         hasher.update(root.to_string_lossy().as_bytes());
     }
@@ -499,8 +506,12 @@ impl Key for ModuleExtensionReplayInputsKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // Replay inputs are the first extension-execution value that observes
+        // lockfile-selected caches and module_ctx.facts. Poll them so a
+        // same-daemon lockfile edit reaches BzlmodLockfileInputsKey instead of
+        // reusing a stale replay identity.
+        false
     }
 }
 
@@ -853,8 +864,11 @@ impl Key for ExtensionSpokesByExtensionIdKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // Extension-id lookups must re-run extension_spokes_key_for_aggregation
+        // so lockfile-only changes update replay input identity before materialized
+        // repo specs are reused.
+        false
     }
 }
 
@@ -969,8 +983,11 @@ impl Key for ExtensionSpokesByCanonicalRepoKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // Canonical-repo lookups must re-run extension_spokes_key_for_aggregation
+        // so lockfile-only changes update replay input identity before materialized
+        // repo specs are reused.
+        false
     }
 }
 
@@ -1090,12 +1107,14 @@ impl Key for ExtensionSpokesKey {
                 self.extension_id
             )
         })?;
-        let lockfile_extension_data = LockfileExtensionData::from_repo_specs_with_recorded_inputs(
-            self.bzl_transitive_digest.to_string(),
-            usages_digest.clone(),
-            &result.generated_repo_specs,
-            result.recorded_inputs.clone(),
-        );
+        let lockfile_extension_data =
+            LockfileExtensionData::from_repo_specs_with_recorded_inputs_and_metadata(
+                self.bzl_transitive_digest.to_string(),
+                usages_digest.clone(),
+                &result.generated_repo_specs,
+                result.recorded_inputs.clone(),
+                Some(&result.metadata),
+            );
         let lockfile_facts = result.metadata.facts.clone();
 
         Ok(Arc::new(ExtensionSpokesValue {
@@ -2248,6 +2267,7 @@ impl Key for ModuleExtensionExecutionKey {
 
             let recorded_input_context =
                 ModuleExtensionRecordedInputContext::from_selected_cache(&selected_cache);
+            let reproducible = selected_cache.is_reproducible();
             let result = ModuleExtensionResult::new_with_metadata_and_recorded_input_context(
                 self.extension_id.clone(),
                 self.input_hash.to_string(),
@@ -2255,6 +2275,7 @@ impl Key for ModuleExtensionExecutionKey {
                 &self.root_module_name,
                 ModuleExtensionMetadata {
                     facts: prior_facts.clone(),
+                    reproducible,
                     root_module_direct_deps: Default::default(),
                     root_module_direct_dev_deps: Default::default(),
                 },
@@ -3253,8 +3274,9 @@ mod tests {
             slug_error::slug_error!(slug_error::ErrorTag::Tier0, "digest failed"),
         );
 
-        // With validity() -> x.is_ok(), Ok values are cached across transactions
-        // and Err values are not (retry on next request).
+        // Extension-spoke lookup values intentionally poll across transactions:
+        // they rebuild the ExtensionSpokesKey after refreshing lockfile-derived
+        // replay input identity. Err values are also retried on the next request.
         assert!(<BzlmodExtensionAggregationKey as Key>::validity(
             &missing_aggregation
         ));
@@ -3267,10 +3289,10 @@ mod tests {
         assert!(!<ExtensionIdByCanonicalRepoKey as Key>::validity(
             &failed_canonical_owner
         ));
-        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &missing_extension
         ));
-        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &missing_extension
         ));
         assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
@@ -3859,6 +3881,89 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn module_extension_replay_inputs_key_polls_hidden_lockfile_identity()
+    -> slug_error::Result<()> {
+        let project_root = PathBuf::from("/tmp/slug-plan61-hidden-replay-inputs-key");
+        let workspace_id = crate::WorkspaceId::for_project_root(project_root.clone());
+        let hidden_lockfile_path = project_root.join("buck-out/v2/MODULE.bazel.lock");
+        let aggregated = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+        let extension_id = aggregated.extension_id.clone();
+        let usages_digest = compute_extension_input_hash(&aggregated);
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+
+        let hidden_inputs = |digest: &str, lockfile: crate::lockfile::Lockfile| {
+            Arc::new(BzlmodLockfileInputsValue::from_values(
+                Some(hidden_lockfile_path.clone()),
+                None,
+                Some(Arc::new(LockfileContentValue {
+                    path: Arc::new(hidden_lockfile_path.clone()),
+                    digest: Some(digest.to_owned()),
+                    tracked_by_dice: true,
+                    lockfile: Some(Arc::new(lockfile)),
+                })),
+                LockfileMode::Update,
+            ))
+        };
+
+        let mut replay_lockfile = crate::lockfile::Lockfile::new();
+        replay_lockfile.set_extension_cache(
+            extension_id.clone(),
+            "bzl-digest".to_owned(),
+            usages_digest.clone(),
+            &repo_specs,
+        );
+
+        let dice = dice::testing::DiceBuilder::new()
+            .build(dice::UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            crate::BzlmodLockfileInputsDataKey,
+            Arc::new(crate::BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id.clone(),
+                hidden_inputs("hidden-replay-digest", replay_lockfile),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+
+        let key = ModuleExtensionReplayInputsKey {
+            workspace_id: workspace_id.clone(),
+            resolution_digest: Arc::from(crate::dice_graph::INJECTED_BZLMOD_PROJECTION_DIGEST),
+            extension_id: Arc::from(extension_id.as_str()),
+            bzl_transitive_digest: Arc::from("bzl-digest"),
+            usages_digest: Arc::from(usages_digest.as_str()),
+            project_root: Some(Arc::new(project_root)),
+            root_module_name: Arc::from("_main"),
+            repo_env: Arc::new(BTreeMap::new()),
+            repo_mappings: Arc::new(crate::RepoMappingSnapshot::new()),
+            repo_mapping_overrides: Arc::new(crate::RepoMappingOverrides::new()),
+        };
+        let first = dice.compute(&key).await??;
+        assert!(first.selected_cache.is_some());
+
+        let mut updater = dice.into_updater();
+        updater.changed_to(vec![(
+            crate::BzlmodLockfileInputsDataKey,
+            Arc::new(crate::BzlmodLockfileInputsDataValue::for_workspace(
+                workspace_id,
+                hidden_inputs("hidden-minimal-digest", crate::lockfile::Lockfile::new()),
+            )),
+        )])?;
+        let mut dice = updater.commit().await;
+        let second = dice.compute(&key).await??;
+
+        assert!(second.selected_cache.is_none());
+        assert_ne!(first.identity_digest(), second.identity_digest());
+        assert!(!<ModuleExtensionReplayInputsKey as Key>::validity(&Ok(
+            first
+        )));
+        Ok(())
+    }
+
     #[test]
     fn extension_execution_result_validity_does_not_poll_recorded_inputs() {
         let temp_dir = tempfile::TempDir::new().unwrap();
@@ -3929,20 +4034,21 @@ mod tests {
         let optional_value = Ok(Some(value.as_ref().unwrap().clone()));
 
         assert!(<ExtensionSpokesKey as Key>::validity(&value));
-        // With validity() -> x.is_ok(), Ok values are cached across transactions.
-        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        // Lookup keys rebuild ExtensionSpokesKey from current replay inputs
+        // before returning the cached materialization-facing value.
+        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &optional_value
         ));
-        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &optional_value
         ));
 
         std::fs::write(&watched, "second\n").unwrap();
         assert!(<ExtensionSpokesKey as Key>::validity(&value));
-        assert!(<ExtensionSpokesByExtensionIdKey as Key>::validity(
+        assert!(!<ExtensionSpokesByExtensionIdKey as Key>::validity(
             &optional_value
         ));
-        assert!(<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
+        assert!(!<ExtensionSpokesByCanonicalRepoKey as Key>::validity(
             &optional_value
         ));
     }
@@ -4238,6 +4344,7 @@ mod tests {
             "",
             ModuleExtensionMetadata {
                 facts: serde_json::json!({"resource": {"checksum": "abc"}}),
+                reproducible: false,
                 root_module_direct_deps: Default::default(),
                 root_module_direct_dev_deps: Default::default(),
             },
@@ -4946,6 +5053,7 @@ mod tests {
             selected_key: "key".to_owned(),
             repo_specs_digest: "abc123".to_owned(),
             recorded_inputs: vec!["input1".to_owned()],
+            module_extension_metadata_digest: String::new(),
             workspace_root: Some(PathBuf::from("/tmp/project")),
             repo_env: Some({
                 let mut m = BTreeMap::new();

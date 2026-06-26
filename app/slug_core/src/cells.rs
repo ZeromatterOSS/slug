@@ -2420,6 +2420,7 @@ impl PartialEq for CellResolver {
             && self.0.root_cell == other.0.root_cell
             && self.0.root_cell_alias_resolver == other.0.root_cell_alias_resolver
             && self.0.bzlmod_runtime_cell_snapshot == other.0.bzlmod_runtime_cell_snapshot
+            && self.0.bzlmod_semantic_token == other.0.bzlmod_semantic_token
     }
 }
 impl Eq for CellResolver {}
@@ -2433,6 +2434,10 @@ struct CellResolverInternals {
     /// state before falling back to the transitional process-global registry.
     #[allocative(skip)]
     bzlmod_runtime_cell_snapshot: Option<Arc<BzlmodRuntimeCellInstallSnapshot>>,
+    /// Semantic identity for the bzlmod cell graph that produced this resolver.
+    /// This lets DICE invalidate package/configured graph users when lockfile
+    /// replay identity changes without changing the concrete cell list.
+    bzlmod_semantic_token: Option<Arc<str>>,
     /// Dynamically-added cells from extension execution (spoke repos, etc.)
     #[allocative(skip)]
     dynamic_cells: RwLock<HashMap<CellName, DynamicCellInstance>>,
@@ -2503,14 +2508,28 @@ impl CellResolver {
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
     ) -> slug_error::Result<CellResolver> {
-        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, true, None, None)
+        Self::new_with_root_alias_cell_lookup(
+            cells,
+            root_cell_alias_resolver,
+            true,
+            None,
+            None,
+            None,
+        )
     }
 
     pub fn new_without_root_alias_cell_lookup(
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
     ) -> slug_error::Result<CellResolver> {
-        Self::new_with_root_alias_cell_lookup(cells, root_cell_alias_resolver, false, None, None)
+        Self::new_with_root_alias_cell_lookup(
+            cells,
+            root_cell_alias_resolver,
+            false,
+            None,
+            None,
+            None,
+        )
     }
 
     pub fn new_bzlmod_with_runtime_cell_snapshot(
@@ -2523,6 +2542,7 @@ impl CellResolver {
             root_cell_alias_resolver,
             false,
             Some(Arc::new(runtime_cell_snapshot)),
+            None,
             None,
         )
     }
@@ -2541,6 +2561,24 @@ impl CellResolver {
             root_cell_alias_resolver,
             false,
             Some(Arc::new(runtime_cell_snapshot)),
+            None,
+            project_root,
+        )
+    }
+
+    pub fn new_bzlmod_with_runtime_cell_snapshot_project_root_and_semantic_token(
+        cells: Vec<CellInstance>,
+        root_cell_alias_resolver: CellAliasResolver,
+        runtime_cell_snapshot: BzlmodRuntimeCellInstallSnapshot,
+        project_root: Option<std::path::PathBuf>,
+        semantic_token: Option<Arc<str>>,
+    ) -> slug_error::Result<CellResolver> {
+        Self::new_with_root_alias_cell_lookup(
+            cells,
+            root_cell_alias_resolver,
+            false,
+            Some(Arc::new(runtime_cell_snapshot)),
+            semantic_token,
             project_root,
         )
     }
@@ -2550,6 +2588,7 @@ impl CellResolver {
         root_cell_alias_resolver: CellAliasResolver,
         resolve_root_alias_cell_names: bool,
         bzlmod_runtime_cell_snapshot: Option<Arc<BzlmodRuntimeCellInstallSnapshot>>,
+        bzlmod_semantic_token: Option<Arc<str>>,
         project_root: Option<std::path::PathBuf>,
     ) -> slug_error::Result<CellResolver> {
         let input_cell_count = cells.len();
@@ -2596,6 +2635,7 @@ impl CellResolver {
         Ok(CellResolver(Arc::new(CellResolverInternals {
             cells: cells_map,
             bzlmod_runtime_cell_snapshot,
+            bzlmod_semantic_token,
             dynamic_cells: RwLock::new(HashMap::new()),
             root_cell,
             path_mappings,
@@ -3888,6 +3928,37 @@ mod tests {
             snapshot,
         )?;
         assert!(resolver.get(CellName::testing_new(wrong_global)).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn bzlmod_cell_resolver_equality_includes_semantic_token() -> slug_error::Result<()> {
+        fn make_resolver(token: &'static str) -> slug_error::Result<CellResolver> {
+            let root = CellName::testing_new("root");
+            let root_path = CellRootPathBuf::testing_new("");
+            let root_instance = CellInstance::new(
+                root,
+                root_path.clone(),
+                None,
+                NestedCells::from_cell_roots(&[(root, root_path.as_path())], &root_path),
+            )?;
+            let snapshot = BzlmodRuntimeCellInstallSnapshot::default();
+            let root_aliases = CellAliasResolver::new_bzlmod_with_runtime_cell_snapshot(
+                root,
+                HashMap::new(),
+                &snapshot,
+            )?;
+            CellResolver::new_bzlmod_with_runtime_cell_snapshot_project_root_and_semantic_token(
+                vec![root_instance],
+                root_aliases,
+                snapshot,
+                None,
+                Some(Arc::from(token)),
+            )
+        }
+
+        assert_ne!(make_resolver("first")?, make_resolver("second")?);
 
         Ok(())
     }

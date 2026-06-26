@@ -460,16 +460,11 @@ impl FileChangeTracker {
 
     pub fn project_file_contents_changed(&mut self, path: ProjectRelativePathBuf) {
         if is_bzlmod_config_project_file(&path) {
-            // The lockfile is an output of the build (written by
-            // persist_lockfile_post_build), not an input that triggers
-            // re-resolution.  Dirtying the ProjectReadFileKey below is
-            // sufficient — if the content actually changed, downstream keys
-            // will be recomputed.  But setting pre_config_commit forces a
-            // full bzlmod re-resolution on every warm build because the
-            // daemon's own lockfile write is observed by the file watcher.
-            if !is_lockfile(&path) {
-                self.project_files_requiring_pre_config_commit = true;
-            }
+            // Bazel's lockfile is a Skyframe input for module resolution and
+            // extension replay. In Slug, generated cells/packages can outlive
+            // the lockfile content key, so lockfile edits must also refresh
+            // pre-config bzlmod projection state.
+            self.project_files_requiring_pre_config_commit = true;
         }
         self.project_files_to_dirty
             .insert(ProjectReadFileKey(Arc::new(path.clone())));
@@ -566,19 +561,6 @@ fn is_bzlmod_config_project_file(path: &ProjectRelativePath) -> bool {
     BZLMOD_CONFIG_PROJECT_FILE_INPUTS
         .read()
         .is_ok_and(|paths| paths.iter().any(|registered| registered.as_str() == path))
-}
-
-/// Returns true if the path is `MODULE.bazel.lock` (or a nested copy).
-///
-/// The lockfile is an output of the build — the daemon writes it via
-/// `persist_lockfile_post_build` after resolution — so changes detected by
-/// the file watcher should NOT trigger `pre_config_commit` (which forces
-/// full bzlmod re-resolution).  The `ProjectReadFileKey` dirtying is still
-/// applied so that genuine user edits to the lockfile propagate correctly
-/// through DICE.
-fn is_lockfile(path: &ProjectRelativePath) -> bool {
-    let p = path.as_str();
-    p == "MODULE.bazel.lock" || p.ends_with("/MODULE.bazel.lock")
 }
 
 /// The return value of a `ReadFileKey` computation.
@@ -1455,6 +1437,19 @@ mod watched_abs_tests {
     use dice::testing::DiceBuilder;
 
     use super::*;
+
+    #[test]
+    fn lockfile_project_change_requires_pre_config_commit() {
+        let mut tracker = FileChangeTracker::new();
+        tracker.project_file_contents_changed(ProjectRelativePathBuf::unchecked_new(
+            "MODULE.bazel.lock".to_owned(),
+        ));
+
+        assert!(
+            tracker.requires_pre_config_commit(),
+            "lockfile edits must refresh bzlmod projection before generated repo reuse"
+        );
+    }
 
     #[tokio::test]
     async fn watched_abs_file_is_cacheable_and_dirtied_by_tracker() -> slug_error::Result<()> {

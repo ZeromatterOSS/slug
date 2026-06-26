@@ -59,6 +59,7 @@ use sha2::Sha256;
 
 use crate::dice_graph::BzlmodEventKind;
 use crate::dice_graph::record_bzlmod_event;
+use crate::module_extension_executor::ModuleExtensionMetadata;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::AttrValue;
 
@@ -270,6 +271,22 @@ impl LockfileExtensionData {
         generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
         recorded_inputs: Vec<String>,
     ) -> Self {
+        Self::from_repo_specs_with_recorded_inputs_and_metadata(
+            bzl_transitive_digest,
+            usages_digest,
+            generated_repo_specs,
+            recorded_inputs,
+            None,
+        )
+    }
+
+    pub fn from_repo_specs_with_recorded_inputs_and_metadata(
+        bzl_transitive_digest: String,
+        usages_digest: String,
+        generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
+        recorded_inputs: Vec<String>,
+        metadata: Option<&ModuleExtensionMetadata>,
+    ) -> Self {
         let mut entries: Vec<_> = generated_repo_specs.iter().collect();
         entries.sort_by(|a, b| a.0.cmp(b.0));
         let lockfile_specs: IndexMap<String, LockfileRepoSpec> = entries
@@ -280,8 +297,18 @@ impl LockfileExtensionData {
         let mut ext_data = Self::new(bzl_transitive_digest, usages_digest, lockfile_specs);
         if let Some(general) = ext_data.general.as_mut() {
             general.recorded_inputs = recorded_inputs;
+            general.module_extension_metadata =
+                metadata.and_then(ModuleExtensionMetadata::lockfile_module_extension_metadata);
         }
         ext_data
+    }
+
+    pub fn is_reproducible(&self) -> bool {
+        self.general.as_ref().is_some_and(|general| {
+            lockfile_module_extension_metadata_is_reproducible(
+                general.module_extension_metadata.as_ref(),
+            )
+        })
     }
 
     /// Check if the cached data is valid for the given digests.
@@ -410,6 +437,7 @@ pub struct SelectedExtensionCache {
     pub(crate) selected_key: String,
     pub(crate) repo_specs: fxhash::FxHashMap<String, RepoSpec>,
     pub(crate) recorded_inputs: Vec<String>,
+    pub(crate) module_extension_metadata: Option<serde_json::Value>,
     pub(crate) workspace_root: Option<PathBuf>,
     pub(crate) repo_env: Option<BTreeMap<String, String>>,
     pub(crate) repo_mappings: Option<crate::RepoMappingSnapshot>,
@@ -445,6 +473,14 @@ impl SelectedExtensionCache {
         &self.recorded_inputs
     }
 
+    pub fn module_extension_metadata(&self) -> Option<&serde_json::Value> {
+        self.module_extension_metadata.as_ref()
+    }
+
+    pub fn is_reproducible(&self) -> bool {
+        lockfile_module_extension_metadata_is_reproducible(self.module_extension_metadata.as_ref())
+    }
+
     pub fn workspace_root(&self) -> Option<&Path> {
         self.workspace_root.as_deref()
     }
@@ -456,6 +492,15 @@ impl SelectedExtensionCache {
     pub fn repo_mappings(&self) -> Option<&crate::RepoMappingSnapshot> {
         self.repo_mappings.as_ref()
     }
+}
+
+fn lockfile_module_extension_metadata_is_reproducible(
+    metadata: Option<&serde_json::Value>,
+) -> bool {
+    metadata
+        .and_then(|metadata| metadata.get("reproducible"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
 }
 
 impl LockfileRepoSpec {
@@ -1633,6 +1678,7 @@ impl Lockfile {
             selected_key: selected_key.to_owned(),
             repo_specs: result,
             recorded_inputs,
+            module_extension_metadata: general.module_extension_metadata.clone(),
             workspace_root: workspace_root.map(Path::to_path_buf),
             repo_env: repo_env.cloned(),
             repo_mappings: repo_mappings_for_validation.cloned(),
@@ -2596,6 +2642,53 @@ mod tests {
         assert_eq!(
             general.recorded_inputs,
             vec!["FILE:@@//watched.txt abc123".to_owned()]
+        );
+    }
+
+    #[test]
+    fn lockfile_extension_data_preserves_reproducible_metadata() {
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        let facts_only_metadata = ModuleExtensionMetadata {
+            facts: serde_json::json!({"resource": "ok"}),
+            ..Default::default()
+        };
+        let facts_only_ext_data =
+            LockfileExtensionData::from_repo_specs_with_recorded_inputs_and_metadata(
+                "bzl-digest".to_owned(),
+                "usages-digest".to_owned(),
+                &repo_specs,
+                Vec::new(),
+                Some(&facts_only_metadata),
+            );
+        assert_eq!(
+            facts_only_ext_data
+                .general
+                .as_ref()
+                .and_then(|general| general.module_extension_metadata.as_ref()),
+            None
+        );
+
+        let metadata = ModuleExtensionMetadata {
+            reproducible: true,
+            ..Default::default()
+        };
+
+        let ext_data = LockfileExtensionData::from_repo_specs_with_recorded_inputs_and_metadata(
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+            Vec::new(),
+            Some(&metadata),
+        );
+
+        assert!(ext_data.is_reproducible());
+        assert_eq!(
+            ext_data
+                .general
+                .as_ref()
+                .and_then(|general| general.module_extension_metadata.as_ref()),
+            Some(&serde_json::json!({"reproducible": true}))
         );
     }
 

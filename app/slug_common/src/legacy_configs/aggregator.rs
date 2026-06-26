@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use instance::CellInstance;
 use slug_core::cells::BzlmodRuntimeCellInstallSnapshot;
@@ -132,17 +133,19 @@ impl CellsAggregator {
     }
 
     pub(crate) fn make_cell_resolver(self) -> slug_error::Result<CellResolver> {
-        self.make_cell_resolver_with_root_alias_cell_lookup(true, None, None)
+        self.make_cell_resolver_with_root_alias_cell_lookup(true, None, None, None)
     }
 
     pub(crate) fn make_bzlmod_cell_resolver(
         self,
         runtime_cell_snapshot: BzlmodRuntimeCellInstallSnapshot,
         project_root: Option<std::path::PathBuf>,
+        semantic_token: Option<Arc<str>>,
     ) -> slug_error::Result<CellResolver> {
         self.make_cell_resolver_with_root_alias_cell_lookup(
             false,
             Some(runtime_cell_snapshot),
+            semantic_token,
             project_root,
         )
     }
@@ -151,6 +154,7 @@ impl CellsAggregator {
         self,
         resolve_root_alias_cell_names: bool,
         bzlmod_runtime_cell_snapshot: Option<BzlmodRuntimeCellInstallSnapshot>,
+        bzlmod_semantic_token: Option<Arc<str>>,
         project_root: Option<std::path::PathBuf>,
     ) -> slug_error::Result<CellResolver> {
         let all_cell_roots_for_nested_cells: Vec<_> = self
@@ -191,12 +195,15 @@ impl CellsAggregator {
         );
 
         match bzlmod_runtime_cell_snapshot {
-            Some(snapshot) => CellResolver::new_bzlmod_with_runtime_cell_snapshot_and_project_root(
-                instances,
-                root_cell_alias_resolver,
-                snapshot,
-                project_root,
-            ),
+            Some(snapshot) => {
+                CellResolver::new_bzlmod_with_runtime_cell_snapshot_project_root_and_semantic_token(
+                    instances,
+                    root_cell_alias_resolver,
+                    snapshot,
+                    project_root,
+                    bzlmod_semantic_token,
+                )
+            }
             None if resolve_root_alias_cell_names => {
                 CellResolver::new(instances, root_cell_alias_resolver)
             }

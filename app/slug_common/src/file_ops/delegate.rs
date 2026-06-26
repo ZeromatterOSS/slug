@@ -152,13 +152,26 @@ impl Key for FileOpsKey {
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         match (x, y) {
-            (Ok(x), Ok(y)) => x.delegate == y.delegate && x.semantic_token == y.semantic_token,
+            (Ok(x), Ok(y)) => match (&x.semantic_token, &y.semantic_token) {
+                (Some(x), Some(y)) => x == y,
+                _ => x.delegate == y.delegate && x.semantic_token == y.semantic_token,
+            },
             _ => false,
         }
     }
 
     fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+        match x {
+            Ok(value) => {
+                // Bzlmod extension-repo file ops have hidden lockfile and
+                // generated-repo setup dependencies outside the project file
+                // watcher. Poll the delegate boundary so warm package/file
+                // reads re-enter setup validation; equality cuts off unchanged
+                // semantic tokens.
+                value.semantic_token.is_none()
+            }
+            Err(_) => false,
+        }
     }
 }
 
@@ -315,4 +328,73 @@ impl FileOpsDelegateWithIgnores {
 pub(crate) mod testing {
     pub(crate) use super::keys::FileOpsKey;
     pub(crate) use super::keys::FileOpsValue;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct EqualityFalseDelegate;
+
+    #[async_trait]
+    impl FileOpsDelegate for EqualityFalseDelegate {
+        async fn read_file_if_exists(
+            &self,
+            _ctx: &mut DiceComputations<'_>,
+            _path: &'async_trait CellRelativePath,
+        ) -> slug_error::Result<ReadFileProxy> {
+            unreachable!()
+        }
+
+        async fn read_dir(
+            &self,
+            _ctx: &mut DiceComputations<'_>,
+            _path: &'async_trait CellRelativePath,
+        ) -> slug_error::Result<Arc<[RawDirEntry]>> {
+            unreachable!()
+        }
+
+        async fn read_path_metadata_if_exists(
+            &self,
+            _ctx: &mut DiceComputations<'_>,
+            _path: &'async_trait CellRelativePath,
+        ) -> slug_error::Result<Option<RawPathMetadata>> {
+            unreachable!()
+        }
+
+        fn eq_token(&self) -> PartialEqAny<'_> {
+            PartialEqAny::always_false()
+        }
+    }
+
+    fn file_ops_value(semantic_token: Option<&str>) -> slug_error::Result<FileOpsValue> {
+        Ok(FileOpsValue {
+            delegate: FileOpsDelegateWithIgnores::new(None, Arc::new(EqualityFalseDelegate)),
+            semantic_token: semantic_token.map(Arc::from),
+        })
+    }
+
+    #[test]
+    fn file_ops_key_polls_bzlmod_extension_repo_values() {
+        assert!(!<FileOpsKey as Key>::validity(&file_ops_value(Some(
+            "bzlmod-digest"
+        ))));
+        assert!(<FileOpsKey as Key>::validity(&file_ops_value(None)));
+    }
+
+    #[test]
+    fn file_ops_key_equality_uses_bzlmod_semantic_token() {
+        assert!(<FileOpsKey as Key>::equality(
+            &file_ops_value(Some("same")),
+            &file_ops_value(Some("same")),
+        ));
+        assert!(!<FileOpsKey as Key>::equality(
+            &file_ops_value(Some("first")),
+            &file_ops_value(Some("second")),
+        ));
+        assert!(!<FileOpsKey as Key>::equality(
+            &file_ops_value(None),
+            &file_ops_value(None),
+        ));
+    }
 }

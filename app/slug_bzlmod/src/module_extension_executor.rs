@@ -49,6 +49,10 @@ pub struct ModuleExtensionMetadata {
     /// JSON-like facts made available to future executions as `module_ctx.facts`.
     pub facts: serde_json::Value,
 
+    /// Whether the extension result is reproducible and should be kept out of
+    /// the workspace lockfile.
+    pub reproducible: bool,
+
     /// Names of repos the extension considers direct deps of the root module.
     /// `None` signals "not set" (different from empty list = no deps).
     /// `"all"` means all generated repos are direct deps.
@@ -79,9 +83,24 @@ impl Default for ModuleExtensionMetadata {
     fn default() -> Self {
         Self {
             facts: serde_json::Value::Object(serde_json::Map::new()),
+            reproducible: false,
             root_module_direct_deps: RootModuleDirectDeps::Unset,
             root_module_direct_dev_deps: RootModuleDirectDeps::Unset,
         }
+    }
+}
+
+impl ModuleExtensionMetadata {
+    pub fn lockfile_module_extension_metadata(&self) -> Option<serde_json::Value> {
+        if !self.reproducible {
+            return None;
+        }
+        let mut object = serde_json::Map::new();
+        object.insert(
+            "reproducible".to_owned(),
+            serde_json::Value::Bool(self.reproducible),
+        );
+        Some(serde_json::Value::Object(object))
     }
 }
 

@@ -659,7 +659,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         root_module_direct_deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         root_module_direct_dev_deps: Value<'v>,
-        #[starlark(require = named, default = false)] _reproducible: bool,
+        #[starlark(require = named, default = false)] reproducible: bool,
         #[starlark(require = named, default = starlark::values::none::NoneType)] facts: Value<'v>,
         #[starlark(kwargs)] _kwargs: Value<'v>,
         eval: &mut starlark::eval::Evaluator<'v, '_, '_>,
@@ -733,6 +733,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
 
         let metadata = slug_bzlmod::ModuleExtensionMetadata {
             facts: validate_facts_value(facts)?,
+            reproducible,
             root_module_direct_deps: validated_deps,
             root_module_direct_dev_deps: validated_dev_deps,
         };

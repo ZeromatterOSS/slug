@@ -748,7 +748,11 @@ impl Key for BzlmodResolvedModuleGraphKey {
     fn validity(x: &Self::Value) -> bool {
         match x {
             Ok(value) => {
-                if value.lockfile_inputs.lockfile_mode == crate::LockfileMode::Refresh {
+                if value.lockfile_inputs.lockfile_mode != crate::LockfileMode::Off {
+                    // Bazel's resolved bzlmod graph observes MODULE.bazel.lock
+                    // through lockfile FileValues. Poll the clean graph key in
+                    // lockfile-on modes so hidden/visible lockfile edits can
+                    // update the resolution digest before projections replay.
                     return false;
                 }
                 !value.lockfile_inputs.has_untracked_inputs()
@@ -2094,11 +2098,12 @@ impl Key for BzlmodCleanLockfileInputsKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => !value.has_untracked_inputs(),
-            Err(_) => false,
-        }
+    fn validity(_x: &Self::Value) -> bool {
+        // Bazel reads MODULE.bazel.lock through BazelLockFileFunction's
+        // FileValue dependency on each lockfile SkyValue. Slug mirrors that
+        // by polling the small lockfile aggregate and relying on digest-based
+        // equality to avoid cascading unchanged work.
+        false
     }
 }
 
@@ -3229,8 +3234,12 @@ impl Key for BzlmodCurrentCellGraphKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // This is the small adapter from injected bzlmod projection data to
+        // current-workspace helpers. Poll it each command so a changed
+        // lockfile-derived resolution digest is visible before cell graph,
+        // extension replay, or configured graph users can reuse old state.
+        false
     }
 }
 
@@ -3516,8 +3525,10 @@ impl Key for BzlmodExtensionCellDefinitionsKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // Extension cells are where lockfile-selected module extension replay
+        // becomes repository identities visible to the package/configured graph.
+        false
     }
 }
 
@@ -3894,8 +3905,10 @@ impl Key for BzlmodCellGraphKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        x.is_ok()
+    fn validity(_x: &Self::Value) -> bool {
+        // The cell graph embeds extension replay spokes. Poll the projection so
+        // lockfile-only replay input changes reach the extension cell definitions.
+        false
     }
 }
 
@@ -4938,11 +4951,12 @@ impl Key for BzlmodLockfileInputsKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => !value.has_untracked_inputs(),
-            Err(_) => false,
-        }
+    fn validity(_x: &Self::Value) -> bool {
+        // This key is consumed after bzlmod projection injection, including by
+        // extension replay. Re-read the clean lockfile inputs on demand so a
+        // same-daemon lockfile edit cannot leave stale selected-yanked data or
+        // module_ctx.facts in projected DICE keys.
+        false
     }
 }
 
@@ -6718,6 +6732,34 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn resolved_module_graph_key_polls_lockfile_modes() {
+        fn value(lockfile_mode: LockfileMode) -> <BzlmodResolvedModuleGraphKey as Key>::Value {
+            Ok(Arc::new(BzlmodResolvedModuleGraphValue {
+                lockfile_inputs: Arc::new(BzlmodLockfileInputsValue::from_values(
+                    None,
+                    None,
+                    None,
+                    lockfile_mode,
+                )),
+                outputs: Arc::new(None),
+            }))
+        }
+
+        assert!(!<BzlmodResolvedModuleGraphKey as Key>::validity(&value(
+            LockfileMode::Update
+        )));
+        assert!(!<BzlmodResolvedModuleGraphKey as Key>::validity(&value(
+            LockfileMode::Error
+        )));
+        assert!(!<BzlmodResolvedModuleGraphKey as Key>::validity(&value(
+            LockfileMode::Refresh
+        )));
+        assert!(<BzlmodResolvedModuleGraphKey as Key>::validity(&value(
+            LockfileMode::Off
+        )));
+    }
+
     #[derive(Hash)]
     struct TestSourceInputsKey {
         name: &'static str,
@@ -7600,6 +7642,37 @@ mod tests {
         assert!(<ModuleVersionsKey as Key>::equality(&first, &same));
         assert!(!<ModuleVersionsKey as Key>::equality(&first, &changed));
         assert!(!<ModuleVersionsKey as Key>::equality(&first, &invalidated));
+    }
+
+    #[test]
+    fn current_cell_graph_key_polls_injected_projection_identity() {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-current-cell-graph-validity"),
+            PathBuf::from("/tmp/slug-current-cell-graph-validity-out"),
+        );
+        let value = Ok(Arc::new(BzlmodCurrentCellGraphValue {
+            workspace_id,
+            resolution_digest: Arc::from("digest"),
+        }));
+
+        assert!(!<BzlmodCurrentCellGraphKey as Key>::validity(&value));
+    }
+
+    #[test]
+    fn cell_graph_projection_keys_poll_extension_replay_inputs() {
+        let workspace_id = WorkspaceId::new(
+            PathBuf::from("/tmp/slug-cell-graph-validity"),
+            PathBuf::from("/tmp/slug-cell-graph-validity-out"),
+        );
+        let cell_graph_value = Ok(Arc::new(BzlmodCellGraphValue::empty_for_workspace(
+            workspace_id,
+        )));
+        let extension_cells_value = Ok(Arc::new(Vec::new()));
+
+        assert!(!<BzlmodCellGraphKey as Key>::validity(&cell_graph_value));
+        assert!(!<BzlmodExtensionCellDefinitionsKey as Key>::validity(
+            &extension_cells_value
+        ));
     }
 
     fn module_versions_invalidation(

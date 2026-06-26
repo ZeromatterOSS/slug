@@ -341,6 +341,7 @@ fn replay_bzlmod_runtime_state(
 fn cell_resolver_from_bzlmod_cell_graph(
     project_fs: &ProjectRoot,
     cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
+    semantic_token: Option<Arc<str>>,
 ) -> slug_error::Result<CellResolver> {
     let root_path = CellRootPathBuf::new(ProjectRelativePath::empty().to_owned());
     let runtime_cell_snapshot = runtime_cell_install_snapshot(cell_graph);
@@ -419,6 +420,7 @@ fn cell_resolver_from_bzlmod_cell_graph(
     aggregator.make_bzlmod_cell_resolver(
         runtime_cell_snapshot,
         Some(project_fs.root().as_path().to_path_buf()),
+        semantic_token,
     )
 }
 
@@ -994,11 +996,12 @@ impl Key for TrackedLockfileContentKey {
         }
     }
 
-    fn validity(x: &Self::Value) -> bool {
-        match x {
-            Ok(value) => value.tracked_by_dice,
-            Err(_) => false,
-        }
+    fn validity(_x: &Self::Value) -> bool {
+        // Bazel's BazelLockFileFunction depends on the lockfile FileValue for
+        // every lockfile SkyValue. Slug keeps lockfiles tiny and compares by
+        // digest, so poll them on demand and let equality suppress unchanged
+        // downstream work.
+        false
     }
 }
 
@@ -2311,7 +2314,15 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
     ) -> slug_error::Result<CellResolver> {
-        cell_resolver_from_bzlmod_cell_graph(project_fs, cell_graph)
+        cell_resolver_from_bzlmod_cell_graph(project_fs, cell_graph, None)
+    }
+
+    pub fn cell_resolver_from_bzlmod_cell_graph_with_semantic_token(
+        project_fs: &ProjectRoot,
+        cell_graph: &slug_bzlmod::BzlmodCellGraphValue,
+        semantic_token: Arc<str>,
+    ) -> slug_error::Result<CellResolver> {
+        cell_resolver_from_bzlmod_cell_graph(project_fs, cell_graph, Some(semantic_token))
     }
 
     /// In the client and one place in the daemon, we need access to the alias resolver for the cwd
@@ -2966,6 +2977,7 @@ impl BuckConfigBasedCells {
             aggregator.make_bzlmod_cell_resolver(
                 bzlmod_runtime_cell_snapshot.unwrap_or_default(),
                 project_fs.map(|fs| fs.root().as_path().to_path_buf()),
+                None,
             )?
         } else {
             aggregator.make_cell_resolver()?
@@ -3156,7 +3168,7 @@ mod tests {
     }
 
     #[test]
-    fn tracked_lockfile_content_key_validity_follows_tracking_provenance() {
+    fn tracked_lockfile_content_key_polls_even_for_tracked_project_files() {
         let polled: slug_error::Result<Arc<slug_bzlmod::LockfileContentValue>> =
             Ok(lockfile_value("/tmp/hidden/MODULE.bazel.lock", "hidden"));
         assert!(!<TrackedLockfileContentKey as Key>::validity(&polled));
@@ -3166,7 +3178,7 @@ mod tests {
                 tracked_by_dice: true,
                 ..(*polled.unwrap()).clone()
             }));
-        assert!(<TrackedLockfileContentKey as Key>::validity(&tracked));
+        assert!(!<TrackedLockfileContentKey as Key>::validity(&tracked));
     }
 
     fn minimal_lockfile_json(marker: &str) -> String {
@@ -4897,6 +4909,79 @@ use_repo(ext, "generated")
                 .expect("edited visible lockfile should be read")
         );
         assert!(second.hidden_lockfile.is_none());
+
+        fs.write_file("MODULE.bazel.lock", &minimal_lockfile_json("third"));
+        let mut dice = dice.into_updater().commit().await;
+        let third = compute_bzlmod_clean_lockfile_inputs(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Update,
+            None,
+            true,
+        )
+        .await?;
+        assert_ne!(
+            second
+                .visible_lockfile_digest
+                .as_deref()
+                .expect("edited visible lockfile should be read"),
+            third
+                .visible_lockfile_digest
+                .as_deref()
+                .expect("polled visible lockfile edit should be read")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bzlmod_clean_lockfile_inputs_key_polls_hidden_lockfile_under_project_root()
+    -> slug_error::Result<()> {
+        let fs = ProjectRootTemp::new()?;
+        fs.write_file("MODULE.bazel", r#"module(name = "root")"#);
+        fs.write_file("MODULE.bazel.lock", &minimal_lockfile_json("hidden-first"));
+        let hidden_path = fs
+            .path()
+            .resolve(ProjectRelativePath::new("MODULE.bazel.lock")?);
+        let mut dice = DiceBuilder::new()
+            .set_data(|data| {
+                data.set_testing_io_provider(&fs);
+            })
+            .build(UserComputationData::new())
+            .unwrap()
+            .commit()
+            .await;
+
+        let first = compute_bzlmod_clean_lockfile_inputs(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Update,
+            Some(hidden_path.to_path_buf()),
+            true,
+        )
+        .await?;
+        let first_hidden_digest = first
+            .hidden_lockfile_digest
+            .clone()
+            .expect("hidden project-root lockfile should be read");
+
+        fs.write_file("MODULE.bazel.lock", &minimal_lockfile_json("hidden-second"));
+        let mut dice = dice.into_updater().commit().await;
+        let second = compute_bzlmod_clean_lockfile_inputs(
+            &mut dice,
+            fs.path(),
+            slug_bzlmod::LockfileMode::Update,
+            Some(hidden_path.to_path_buf()),
+            true,
+        )
+        .await?;
+
+        assert_ne!(
+            first_hidden_digest,
+            second
+                .hidden_lockfile_digest
+                .as_deref()
+                .expect("polled hidden lockfile edit should be read")
+        );
         Ok(())
     }
 

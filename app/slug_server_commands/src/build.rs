@@ -808,19 +808,10 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
     );
     let lockfile_inputs = ctx.compute(&lockfile_inputs_key).await??;
 
-    let lockfile_values: Vec<_> = [
-        lockfile_inputs
-            .visible_lockfile
-            .as_ref()
-            .and_then(|v| v.lockfile.as_ref()),
-        lockfile_inputs
-            .hidden_lockfile
-            .as_ref()
-            .and_then(|v| v.lockfile.as_ref()),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
+    let visible_lockfile = lockfile_inputs
+        .visible_lockfile
+        .as_ref()
+        .and_then(|v| v.lockfile.as_ref());
 
     // Extensions already recorded in the injected lockfile must stay active even
     // when nothing was re-aggregated this resolution (a cache-replayed build, in
@@ -829,8 +820,8 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
     // extension-generated repos unresolvable and breaking subsequent builds.
     let active_extension_ids = Lockfile::active_extension_ids_for_persist(
         aggregations.extension_aggregations.keys().cloned(),
-        lockfile_values
-            .iter()
+        visible_lockfile
+            .into_iter()
             .flat_map(|lf| lf.module_extensions.keys().cloned()),
     );
 
@@ -847,6 +838,9 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
             continue;
         };
         let (fresh_ext_id, fresh_ext_data) = spokes.lockfile_extension_entry();
+        if fresh_ext_data.is_reproducible() {
+            continue;
+        }
         if !new_extension_results
             .iter()
             .any(|(id, _)| id == &fresh_ext_id)
@@ -860,9 +854,12 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
         }
     }
 
-    for lockfile_value in lockfile_values {
+    if let Some(lockfile_value) = visible_lockfile {
         for ext_id in &active_extension_ids {
             if let Some(ext_data) = lockfile_value.get_extension_data(ext_id) {
+                if ext_data.is_reproducible() {
+                    continue;
+                }
                 if !new_extension_results.iter().any(|(id, _)| id == ext_id) {
                     new_extension_results.push((ext_id.clone(), ext_data.clone()));
                 }

@@ -802,47 +802,65 @@ Clean stale `slugd` processes before and after daemon-sensitive smokes.
 
 ## Current State (2026-06-26)
 
-Plan 64 remains **In Progress**. The latest slice closed systemic
-repository-materialization and registry-override guardrail failures without
-reopening Plan 61:
+Plan 64 remains **In Progress** pending a full guardrail rerun or explicit
+handoff of any residual failures, but the latest focused slice closed the
+lockfile/replay invalidation failures that were blocking selected-yanked and
+hidden-lockfile confidence:
 
-- external patch execution now treats `Skipped patch` output or unchanged
-  preimage state as a failed external patch path and falls back to the
-  in-process patcher;
-- repository-rule `file://` downloads read local files before HTTP fallback;
-- generated-repository `local_repository` paths resolve relative to the
-  workspace root even when execution happens in `.generations`;
-- bzlmod runtime cleanup preserves extension repository canonical symlinks in
-  `bazel-external`;
-- `multiple_version_override(..., registry = ...)` rediscovery uses the actual
-  module name, not the synthetic selected key like `name+version`.
+- visible and hidden `MODULE.bazel.lock` inputs now poll through Slug's bzlmod
+  DICE projection keys, including the resolved graph, current-workspace cell
+  graph adapter, composed bzlmod cell graph, extension cell definitions, replay
+  inputs, extension lookup keys, and extension-repo file-ops boundary;
+- bzlmod `CellResolver` equality includes the current resolution digest so a
+  lockfile-only replay identity change can invalidate package/configured graph
+  consumers;
+- extension replay identity includes selected lockfile metadata, and replay hits
+  retain the selected cache's reproducible metadata for subsequent persistence;
+- visible lockfile persistence uses only the visible lockfile as old visible
+  state and filters reproducible entries out of the workspace lockfile branch;
+- the hidden-facts create/edit/delete guardrail now runs in `--lockfile_mode=error`
+  to avoid a visible workspace facts entry masking hidden facts, matching Bazel's
+  source behavior rather than Slug's earlier test expectation.
+
+Bazel source anchors:
+
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java:67-88`
+  reads visible/hidden lockfiles through Skyframe file dependencies.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:139-180`
+  reads both lockfiles, prefers workspace facts when present, falls back to
+  hidden facts, and prefers visible module-extension entries before hidden.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:354-364`
+  intentionally does not diff-check facts when replaying a lockfile extension.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:120-123`
+  starts command-end facts from the workspace lockfile, and
+  `BazelLockFileModule.java:159-216` writes non-reproducible extension entries to
+  the visible workspace lockfile and reproducible entries to the hidden lockfile.
 
 Accepted validation:
 
 ```sh
-TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod
-TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_common bzlmod
-TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_external_cells
-TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_interpreter_for_build
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  current_cell_graph_key_polls_injected_projection_identity -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  cell_graph_projection_keys_poll_extension_replay_inputs -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  lockfile_extension_data_preserves_reproducible_metadata -- --nocapture
 TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
-  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_facts_create_edit_delete_are_observed -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_edit_invalidates_replay_in_same_daemon \
+  tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_selected_yanked_version_edit_invalidates_bzlmod_resolution -s --tb=short
 ```
 
-Latest full guardrail result: `174 passed, 11 failed`. The previous
-`multiple_version_override` registry/source-json failure cluster is closed.
-Remaining failures are still Plan 64 replay/lockfile invalidation work:
+Remaining gaps:
 
-- selected-yanked-version and missing-registry-checksum visible lockfile edits;
-- hidden lockfile replay/facts create-edit-delete observation;
-- `--lockfile_mode=error` changed extension facts error wording;
-- mapped external extension `.bzl` load edit/create/delete replay miss counters;
-- missing visible lockfile extension replay counter stability;
-- `inject_repo` keyword alias replay invalidation counter.
-
-Next owner: continue in Plan 64's lockfile/replay invalidation lane. Do not
-mark Plan 64 complete until the full guardrail matrix is green or the remaining
-failures are reclassified into a newer owner plan with evidence.
+- Full `tests/core/bzlmod/test_plan61_guardrails.py` was not rerun for this
+  slice; do that before declaring Plan 64 complete.
+- Hidden lockfile writing for reproducible extension results is still not wired
+  as a Slug command-end persistence path.
+- Once Plan 64's focused lockfile/replay lane is not blocking, return ownership
+  to Plan 34's REAPI executor proof instead of opening new compatibility lanes.
 
 ## Current Review Validation
 

@@ -753,11 +753,16 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
                 },
             )
             .await?;
+            let bzlmod_resolution_digest =
+                slug_bzlmod::bzlmod_resolution_digest_for_current_workspace(&mut precompute_ctx)
+                    .await?;
             ctx = precompute_ctx.into_updater();
-            let full_cell_resolver = BuckConfigBasedCells::cell_resolver_from_bzlmod_cell_graph(
-                &self.cmd_ctx.base_context.project_root,
-                full_cell_graph.as_ref(),
-            )?;
+            let full_cell_resolver =
+                BuckConfigBasedCells::cell_resolver_from_bzlmod_cell_graph_with_semantic_token(
+                    &self.cmd_ctx.base_context.project_root,
+                    full_cell_graph.as_ref(),
+                    bzlmod_resolution_digest,
+                )?;
             cells_and_configs.cell_resolver = full_cell_resolver.dupe();
             setup_interpreter(
                 &mut ctx,

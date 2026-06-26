@@ -618,6 +618,7 @@ def _write_replay_lockfile(
     recorded_inputs: list[str] | None = None,
     repo_paths: dict[str, Path] | None = None,
     facts: dict[str, object] | None = None,
+    reproducible: bool | None = None,
 ) -> None:
     generated_repo_specs = {
         repo_name: {
@@ -651,7 +652,11 @@ def _write_replay_lockfile(
                             ),
                             "recordedInputs": recorded_inputs or [],
                             "generatedRepoSpecs": generated_repo_specs,
-                            "moduleExtensionMetadata": None,
+                            "moduleExtensionMetadata": (
+                                {"reproducible": reproducible}
+                                if reproducible is not None
+                                else None
+                            ),
                         },
                     },
                 },
@@ -6574,6 +6579,7 @@ use_repo(replay, "replayed_repo")
         module_name=module_name,
         project_root=buck.cwd,
         repo_path=replayed_repo,
+        reproducible=True,
     )
 
     before = await _bzlmod_counters(buck)
@@ -6657,9 +6663,9 @@ use_repo(hidden_facts, "hidden_facts_repo")
         extension_id=extension_id,
         facts={"resource": "ok"},
     )
-    before = await _bzlmod_counters(buck)
-    await buck.build("//:uses_hidden_facts")
-    first = await _bzlmod_counters(buck)
+    before = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    await buck.build("//:uses_hidden_facts", "--lockfile_mode=error")
+    first = await _bzlmod_counters(buck, "--lockfile_mode=error")
     assert first["extension_eval"] > before["extension_eval"]
 
     _write_minimal_lockfile_with_facts(
@@ -6668,8 +6674,8 @@ use_repo(hidden_facts, "hidden_facts_repo")
         facts={"resource": "stale"},
     )
     with pytest.raises(BuckException) as edited_failure:
-        await buck.build("//:uses_hidden_facts")
-    edited = await _bzlmod_counters(buck)
+        await buck.build("//:uses_hidden_facts", "--lockfile_mode=error")
+    edited = await _bzlmod_counters(buck, "--lockfile_mode=error")
     assert "hidden facts missing or stale: stale" in edited_failure.value.stderr
     assert edited["extension_eval"] > first["extension_eval"]
 
@@ -6685,14 +6691,14 @@ use_repo(hidden_facts, "hidden_facts_repo")
     # facts value is a cache hit, not a re-eval -- so extension_eval need not increment
     # here. The build succeeding is the proof the lockfile change was observed; the
     # delete step below proves invalidation is still tracked.
-    await buck.build("//:uses_hidden_facts")
-    restored = await _bzlmod_counters(buck)
+    await buck.build("//:uses_hidden_facts", "--lockfile_mode=error")
+    restored = await _bzlmod_counters(buck, "--lockfile_mode=error")
     assert restored["extension_eval"] >= edited["extension_eval"]
 
     hidden_lockfile.unlink()
     with pytest.raises(BuckException) as deleted_failure:
-        await buck.build("//:uses_hidden_facts")
-    deleted = await _bzlmod_counters(buck)
+        await buck.build("//:uses_hidden_facts", "--lockfile_mode=error")
+    deleted = await _bzlmod_counters(buck, "--lockfile_mode=error")
     assert "hidden facts missing or stale" in deleted_failure.value.stderr
     assert deleted["extension_eval"] > restored["extension_eval"]
 
