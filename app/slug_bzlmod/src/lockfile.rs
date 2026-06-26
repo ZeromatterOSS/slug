@@ -1833,13 +1833,23 @@ pub enum LockfileMode {
 }
 
 impl LockfileMode {
+    /// Stable lower-case tag for persisted and DICE identity digests.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Update => "update",
+            Self::Refresh => "refresh",
+            Self::Error => "error",
+            Self::Off => "off",
+        }
+    }
+
     /// Parse from string (CLI argument).
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
-            "update" => Some(Self::Update),
-            "refresh" => Some(Self::Refresh),
-            "error" => Some(Self::Error),
-            "off" => Some(Self::Off),
+            value if value == Self::Update.as_str() => Some(Self::Update),
+            value if value == Self::Refresh.as_str() => Some(Self::Refresh),
+            value if value == Self::Error.as_str() => Some(Self::Error),
+            value if value == Self::Off.as_str() => Some(Self::Off),
             _ => None,
         }
     }

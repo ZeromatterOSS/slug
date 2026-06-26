@@ -469,6 +469,8 @@ TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
 
 ### Phase 64.6: Make Semantic Digests Stable and Honest
 
+**Completed:** 2026-06-25
+
 **Scope:** digest helpers that feed DICE identity, repo materialization identity,
 and Bazel-visible lockfile content.
 
@@ -490,6 +492,31 @@ and Bazel-visible lockfile content.
 - No semantic digest collapses distinct serialization failures.
 - Repo spec hash output is deterministic across Rust `Debug` formatting changes.
 - Extension digest interop status is explicit and tested.
+
+**Implementation evidence (2026-06-25):**
+
+- `stable_json_digest` is fallible and its repo-mapping callers propagate the
+  serialization error instead of hashing `"<json-error>"`.
+- `RepoSpec::compute_hash` and repository invocation hashing use
+  `AttrValue::stable_hash_bytes`, with type discriminators for strings, labels,
+  ints, bools, lists, dicts, and `None`.
+- The remaining bzlmod semantic digest paths no longer use Rust `Debug` output:
+  `LockfileMode::as_str()` owns policy tags, `LockfileContentKind::as_str()`
+  owns selected-cache source tags, and `bzlmod_resolved_graph_digest` hashes
+  `ModuleSource` variants field-by-field.
+- `extensions.rs::compute_extension_input_hash` is documented as
+  Slug-private. Bazel 9 computes extension usage digests from a Gson JSON
+  serialization of `SingleExtensionUsagesValue.trimForEvaluation()` in
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionUsagesValue.java:78-81`,
+  writes it in `SingleExtensionEvalFunction.java:284-288`, compares it in
+  `SingleExtensionEvalFunction.java:339-342`, and takes the `.bzl` transitive
+  digest from `RegularRunnableExtension.java:209-210`. Slug's current
+  field-wise binary tag encoding is therefore honest private cache identity,
+  not Bazel byte-for-byte lockfile interop.
+- Validation: `cargo test -p slug_bzlmod` -> 473 passed; doc tests -> 1 passed,
+  3 ignored.
+- Audit check: no `format!("{:?}", ...)` matches remain under
+  `app/slug_bzlmod/src`.
 
 **Suggested validation:**
 

@@ -379,20 +379,11 @@ fn facts_identity(value: &serde_json::Value) -> String {
     serde_json::to_string(value).expect("serde_json::Value serialization is infallible")
 }
 
-fn lockfile_mode_tag(mode: LockfileMode) -> &'static str {
-    match mode {
-        LockfileMode::Update => "update",
-        LockfileMode::Refresh => "refresh",
-        LockfileMode::Error => "error",
-        LockfileMode::Off => "off",
-    }
-}
-
 fn selected_extension_cache_identity_digest(identity: &SelectedExtensionCacheIdentity) -> String {
     use sha2::Digest;
     use sha2::Sha256;
     let mut hasher = Sha256::new();
-    hasher.update(format!("{:?}", identity.source).as_bytes());
+    hasher.update(identity.source.as_str().as_bytes());
     hasher.update([0u8]);
     hasher.update(identity.selected_key.as_bytes());
     hasher.update([0u8]);
@@ -437,7 +428,7 @@ fn module_extension_replay_inputs_identity_digest(
     use sha2::Digest;
     use sha2::Sha256;
     let mut hasher = Sha256::new();
-    hasher.update(lockfile_mode_tag(lockfile_mode).as_bytes());
+    hasher.update(lockfile_mode.as_str().as_bytes());
     hasher.update([0u8]);
     hasher.update(facts_identity(prior_facts).as_bytes());
     hasher.update([0u8]);
@@ -4919,14 +4910,14 @@ mod tests {
         );
     }
 
-    /// Phase 64.6: lockfile_mode_tag produces stable tags not
+    /// Phase 64.6: LockfileMode produces stable tags not
     /// dependent on Rust Debug formatting.
     #[test]
     fn test_lockfile_mode_tag_stable() {
-        assert_eq!(lockfile_mode_tag(LockfileMode::Update), "update");
-        assert_eq!(lockfile_mode_tag(LockfileMode::Refresh), "refresh");
-        assert_eq!(lockfile_mode_tag(LockfileMode::Error), "error");
-        assert_eq!(lockfile_mode_tag(LockfileMode::Off), "off");
+        assert_eq!(LockfileMode::Update.as_str(), "update");
+        assert_eq!(LockfileMode::Refresh.as_str(), "refresh");
+        assert_eq!(LockfileMode::Error.as_str(), "error");
+        assert_eq!(LockfileMode::Off.as_str(), "off");
     }
 
     /// Phase 64.6: selected_extension_cache_identity_digest uses
@@ -4950,5 +4941,15 @@ mod tests {
         let d1 = selected_extension_cache_identity_digest(&identity);
         let d2 = selected_extension_cache_identity_digest(&identity);
         assert_eq!(d1, d2, "Identity digest must be deterministic");
+
+        let hidden_source = SelectedExtensionCacheIdentity {
+            source: crate::dice_graph::LockfileContentKind::Hidden,
+            ..identity
+        };
+        assert_ne!(
+            d1,
+            selected_extension_cache_identity_digest(&hidden_source),
+            "Workspace and hidden lockfile cache identities must not collapse"
+        );
     }
 }

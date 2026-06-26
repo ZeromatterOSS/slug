@@ -162,7 +162,7 @@ const BZLMOD_DEFAULT_BAZEL_COMPATIBILITY_POLICY_DIGEST: &str = "default-bazel-co
 impl BzlmodResolutionOptions {
     pub fn policy_digest(&self) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(format!("{:?}", self.lockfile_mode).as_bytes());
+        hasher.update(self.lockfile_mode.as_str().as_bytes());
         hasher.update([0]);
         hasher.update([u8::from(self.ignore_dev_dependency)]);
         hasher.update([0]);
@@ -189,7 +189,7 @@ impl BzlmodResolutionOptions {
             bazel_release_id: Arc::from(BZLMOD_BAZEL_RELEASE_ID),
             starlark_semantics_digest: Arc::from(BZLMOD_STARLARK_SEMANTICS_DIGEST),
             bzlmod_flags_digest: Arc::from(self.policy_digest().as_str()),
-            lockfile_mode: Arc::from(format!("{:?}", self.lockfile_mode).as_str()),
+            lockfile_mode: Arc::from(self.lockfile_mode.as_str()),
             registry_config_digest: Arc::from(BZLMOD_DEFAULT_REGISTRY_CONFIG_DIGEST),
             repository_cache_config_digest: Arc::from(
                 BZLMOD_DEFAULT_REPOSITORY_CACHE_CONFIG_DIGEST,
@@ -213,67 +213,136 @@ impl BzlmodResolutionOptions {
     }
 }
 
-pub fn bzlmod_resolved_graph_digest(graph: &ResolvedGraph) -> String {
-    fn update(hasher: &mut Sha256, value: &str) {
-        hasher.update(value.as_bytes());
-        hasher.update([0]);
-    }
+fn update_bzlmod_digest_field(hasher: &mut Sha256, value: &str) {
+    hasher.update(value.as_bytes());
+    hasher.update([0]);
+}
 
+fn update_optional_bzlmod_digest_field(hasher: &mut Sha256, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            update_bzlmod_digest_field(hasher, "some");
+            update_bzlmod_digest_field(hasher, value);
+        }
+        None => update_bzlmod_digest_field(hasher, "none"),
+    }
+}
+
+fn update_optional_bzlmod_path_digest_field(hasher: &mut Sha256, value: Option<&PathBuf>) {
+    match value {
+        Some(value) => {
+            update_bzlmod_digest_field(hasher, "some");
+            update_bzlmod_digest_field(hasher, value.to_string_lossy().as_ref());
+        }
+        None => update_bzlmod_digest_field(hasher, "none"),
+    }
+}
+
+fn update_bzlmod_module_source_digest(hasher: &mut Sha256, source: &ModuleSource) {
+    match source {
+        ModuleSource::Registry { url } => {
+            update_bzlmod_digest_field(hasher, "registry");
+            update_bzlmod_digest_field(hasher, url);
+        }
+        ModuleSource::LocalPath { path } => {
+            update_bzlmod_digest_field(hasher, "local_path");
+            update_bzlmod_digest_field(hasher, path);
+        }
+        ModuleSource::Git {
+            remote,
+            commit,
+            shallow_since,
+            patches,
+            patch_strip,
+            fetched_path,
+        } => {
+            update_bzlmod_digest_field(hasher, "git");
+            update_bzlmod_digest_field(hasher, remote);
+            update_bzlmod_digest_field(hasher, commit);
+            update_optional_bzlmod_digest_field(hasher, shallow_since.as_deref());
+            for patch in patches {
+                update_bzlmod_digest_field(hasher, "patch");
+                update_bzlmod_digest_field(hasher, patch);
+            }
+            update_bzlmod_digest_field(hasher, &patch_strip.to_string());
+            update_optional_bzlmod_path_digest_field(hasher, fetched_path.as_ref());
+        }
+        ModuleSource::Archive {
+            urls,
+            integrity,
+            strip_prefix,
+            patches,
+            patch_strip,
+            fetched_path,
+        } => {
+            update_bzlmod_digest_field(hasher, "archive");
+            for url in urls {
+                update_bzlmod_digest_field(hasher, "url");
+                update_bzlmod_digest_field(hasher, url);
+            }
+            update_optional_bzlmod_digest_field(hasher, integrity.as_deref());
+            update_optional_bzlmod_digest_field(hasher, strip_prefix.as_deref());
+            for patch in patches {
+                update_bzlmod_digest_field(hasher, "patch");
+                update_bzlmod_digest_field(hasher, patch);
+            }
+            update_bzlmod_digest_field(hasher, &patch_strip.to_string());
+            update_optional_bzlmod_path_digest_field(hasher, fetched_path.as_ref());
+        }
+    }
+}
+
+pub fn bzlmod_resolved_graph_digest(graph: &ResolvedGraph) -> String {
     let mut hasher = Sha256::new();
-    update(&mut hasher, "bzlmod-resolved-module-graph-v1");
+    update_bzlmod_digest_field(&mut hasher, "bzlmod-resolved-module-graph-v1");
 
     let mut selected_versions: Vec<_> = graph.selected_versions.iter().collect();
     selected_versions.sort_by(|(left, _), (right, _)| left.cmp(right));
     for (name, version) in selected_versions {
-        update(&mut hasher, "selected");
-        update(&mut hasher, name);
-        update(&mut hasher, version);
+        update_bzlmod_digest_field(&mut hasher, "selected");
+        update_bzlmod_digest_field(&mut hasher, name);
+        update_bzlmod_digest_field(&mut hasher, version);
     }
 
     for module_name in &graph.resolution_order {
-        update(&mut hasher, "order");
-        update(&mut hasher, module_name);
+        update_bzlmod_digest_field(&mut hasher, "order");
+        update_bzlmod_digest_field(&mut hasher, module_name);
     }
 
     let mut modules: Vec<_> = graph.modules.iter().collect();
     modules.sort_by(|(left, _), (right, _)| left.cmp(right));
     for (name, info) in modules {
-        update(&mut hasher, "module");
-        update(&mut hasher, name);
-        update(&mut hasher, &info.name);
-        update(&mut hasher, &info.version);
+        update_bzlmod_digest_field(&mut hasher, "module");
+        update_bzlmod_digest_field(&mut hasher, name);
+        update_bzlmod_digest_field(&mut hasher, &info.name);
+        update_bzlmod_digest_field(&mut hasher, &info.version);
         let mut deps: Vec<_> = info.dependencies.iter().collect();
         deps.sort_by(|(left, _), (right, _)| left.cmp(right));
         for (dep, version) in deps {
-            update(&mut hasher, "dep");
-            update(&mut hasher, dep);
-            update(&mut hasher, version);
+            update_bzlmod_digest_field(&mut hasher, "dep");
+            update_bzlmod_digest_field(&mut hasher, dep);
+            update_bzlmod_digest_field(&mut hasher, version);
         }
-        update(&mut hasher, &format!("{:?}", info.source));
-        update(
-            &mut hasher,
-            info.source_path
-                .as_ref()
-                .map(|path| path.to_string_lossy())
-                .as_deref()
-                .unwrap_or(""),
-        );
+        update_bzlmod_digest_field(&mut hasher, "source");
+        update_bzlmod_module_source_digest(&mut hasher, &info.source);
+        update_bzlmod_digest_field(&mut hasher, "source_path");
+        update_optional_bzlmod_path_digest_field(&mut hasher, info.source_path.as_ref());
     }
 
     let mut registry_hashes: Vec<_> = graph.registry_file_hashes.iter().collect();
     registry_hashes.sort_by(|(left, _), (right, _)| left.cmp(right));
     for (url, digest) in registry_hashes {
-        update(&mut hasher, "registry");
-        update(&mut hasher, url);
-        update(&mut hasher, digest);
+        update_bzlmod_digest_field(&mut hasher, "registry");
+        update_bzlmod_digest_field(&mut hasher, url);
+        update_bzlmod_digest_field(&mut hasher, digest);
     }
 
     let mut yanked_versions: Vec<_> = graph.selected_yanked_versions.iter().collect();
     yanked_versions.sort_by(|(left, _), (right, _)| left.cmp(right));
     for (module, reason) in yanked_versions {
-        update(&mut hasher, "yanked");
-        update(&mut hasher, module);
-        update(&mut hasher, reason);
+        update_bzlmod_digest_field(&mut hasher, "yanked");
+        update_bzlmod_digest_field(&mut hasher, module);
+        update_bzlmod_digest_field(&mut hasher, reason);
     }
 
     hex::encode(hasher.finalize())
@@ -1871,6 +1940,15 @@ pub struct LocalOverrideSourceKey {
 pub enum LockfileContentKind {
     Workspace,
     Hidden,
+}
+
+impl LockfileContentKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Workspace => "workspace",
+            Self::Hidden => "hidden",
+        }
+    }
 }
 
 /// DICE-owned lockfile read result.
@@ -6307,6 +6385,33 @@ mod tests {
         assert_eq!(sentinel.output_base.as_ref(), &PathBuf::from("buck-out/v2"));
     }
 
+    #[test]
+    fn bzlmod_resolution_options_use_stable_lockfile_mode_tags() {
+        let workspace_id = WorkspaceId::no_project_sentinel();
+        let mut options = BzlmodResolutionOptions {
+            lockfile_mode: LockfileMode::Update,
+            ignore_dev_dependency: false,
+            allow_yanked_versions_env: None,
+            allow_yanked_versions_flags: Vec::new(),
+            hidden_lockfile_path: None,
+            repo_env: BTreeMap::new(),
+            repo_env_digest: "repo-env".to_owned(),
+        };
+
+        let update_policy_digest = options.policy_digest();
+        let update_key = options.command_policy_key(workspace_id.clone());
+        assert_eq!(update_key.lockfile_mode.as_ref(), "update");
+
+        options.lockfile_mode = LockfileMode::Error;
+        let error_key = options.command_policy_key(workspace_id);
+        assert_eq!(error_key.lockfile_mode.as_ref(), "error");
+        assert_ne!(
+            update_policy_digest,
+            options.policy_digest(),
+            "lockfile mode must participate in the bzlmod policy digest"
+        );
+    }
+
     fn parsed_module(name: &str) -> ParsedModuleFile {
         ParsedModuleFile {
             module: Module::new(name.to_owned(), Version::empty()),
@@ -7096,6 +7201,91 @@ mod tests {
             Some("1.0")
         );
         assert!(outputs.graph.modules.contains_key("dep"));
+    }
+
+    fn resolved_graph_with_source(
+        source: ModuleSource,
+        source_path: Option<PathBuf>,
+    ) -> ResolvedGraph {
+        let mut graph = ResolvedGraph::default();
+        graph.modules.insert(
+            "dep".to_owned(),
+            ResolvedModuleInfo {
+                name: "dep".to_owned(),
+                version: "1.0".to_owned(),
+                dependencies: HashMap::new(),
+                source,
+                source_path,
+            },
+        );
+        graph
+    }
+
+    #[test]
+    fn bzlmod_resolved_graph_digest_uses_explicit_module_source_tags() {
+        let registry = resolved_graph_with_source(
+            ModuleSource::Registry {
+                url: "same".to_owned(),
+            },
+            None,
+        );
+        let local = resolved_graph_with_source(
+            ModuleSource::LocalPath {
+                path: "same".to_owned(),
+            },
+            None,
+        );
+        assert_ne!(
+            bzlmod_resolved_graph_digest(&registry),
+            bzlmod_resolved_graph_digest(&local),
+            "ModuleSource variants with the same payload text must not collide"
+        );
+
+        let git_without_fetched_path = resolved_graph_with_source(
+            ModuleSource::Git {
+                remote: "https://example.invalid/repo.git".to_owned(),
+                commit: "abcdef".to_owned(),
+                shallow_since: None,
+                patches: vec!["//:fix.patch".to_owned()],
+                patch_strip: 1,
+                fetched_path: None,
+            },
+            None,
+        );
+        let git_with_fetched_path = resolved_graph_with_source(
+            ModuleSource::Git {
+                remote: "https://example.invalid/repo.git".to_owned(),
+                commit: "abcdef".to_owned(),
+                shallow_since: None,
+                patches: vec!["//:fix.patch".to_owned()],
+                patch_strip: 1,
+                fetched_path: Some(PathBuf::from("/tmp/fetched")),
+            },
+            None,
+        );
+        assert_ne!(
+            bzlmod_resolved_graph_digest(&git_without_fetched_path),
+            bzlmod_resolved_graph_digest(&git_with_fetched_path),
+            "ModuleSource optional fields must carry explicit none/some tags"
+        );
+
+        let without_source_path = resolved_graph_with_source(
+            ModuleSource::Registry {
+                url: "https://registry.example".to_owned(),
+            },
+            None,
+        );
+        let with_source_path = resolved_graph_with_source(
+            ModuleSource::Registry {
+                url: "https://registry.example".to_owned(),
+            },
+            Some(PathBuf::from("/tmp/dep")),
+        );
+        assert_ne!(
+            bzlmod_resolved_graph_digest(&without_source_path),
+            bzlmod_resolved_graph_digest(&with_source_path),
+            "source_path must remain part of the graph digest identity"
+        );
     }
 
     #[test]

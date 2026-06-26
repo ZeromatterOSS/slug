@@ -257,15 +257,11 @@ mod tests {
         assert_ne!(spec1.compute_hash(), spec3.compute_hash());
     }
 
-    /// Phase 64.6: verify compute_hash uses stable JSON serialization,
-    /// not Rust Debug formatting. Distinct AttrValue variants that might
-    /// coincidentally have the same Debug representation must produce
-    /// distinct hashes.
+    /// Phase 64.6: verify compute_hash uses explicit stable bytes,
+    /// not Rust Debug formatting. Distinct AttrValue variants must produce
+    /// distinct hashes even when their payload text is similar.
     #[test]
     fn test_compute_hash_stable_json_not_debug() {
-        // String "42" vs Int 42 — these have different Debug formats
-        // ("String(\"42\")" vs "Int(42)"), but the key test is that the
-        // hash is deterministic and not dependent on Rust compiler version.
         let spec_str = RepoSpec::new("test_rule".to_owned())
             .with_attr("val".to_owned(), AttrValue::String("42".to_owned()));
         let spec_int =

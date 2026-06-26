@@ -831,24 +831,30 @@ cross-tool reproducibility promise does not hold for the extension section.
    minimally and note it; do not build a full `mod` CLI in this phase.
 
 14b:
-5. Test first: a golden test that resolves a small extension and compares the
-   emitted `bzlTransitiveDigest`/`usagesDigest` against the value Bazel 9.0.1
-   produces for the same inputs (capture the Bazel value once and pin it).
-6. Reimplement both digests to match Bazel's algorithm exactly (transitive `.bzl`
-   hashing order and framing; usage serialization). Cite the Bazel computation in
-   the PR. This is the only way the cross-tool interop promise becomes real.
-7. If exact Bazel-digest parity is infeasible in one pass, explicitly document
-   the lockfile extension section as Slug-private (rename or namespace it) so it
-   is never mistaken for a Bazel-interoperable `MODULE.bazel.lock` — fail honest
-   rather than fail silent. Coordinate with Part A Phase 5 (lockfile shape).
+5. Decision (2026-06-25): keep Slug extension lockfile digests explicitly
+   Slug-private until byte-for-byte Bazel parity is implemented with a golden
+   test. Bazel 9 computes `usagesDigest` via
+   `SingleExtensionUsagesValue.hashForEvaluation`, which hashes Gson JSON for
+   `trimForEvaluation()`
+   (`/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionUsagesValue.java:78-81`),
+   writes it in
+   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:284-288`,
+   and compares it in
+   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:339-342`.
+   Bazel's `.bzl` transitive digest comes from
+   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegularRunnableExtension.java:209-210`.
+6. Slug now documents `compute_extension_input_hash` as private cache identity
+   and hashes extension inputs with field-wise binary tags. A future interop
+   slice must introduce a Bazel golden before claiming shared lockfile extension
+   digest compatibility.
 
 **Exit criteria:**
 
 - A build writes/refreshes `MODULE.bazel.lock` in update/default mode.
 - `error` mode fails on resolved-graph, registry-hash, and yanked drift, not just
   extension facts; dead lockfile-mode variants are either used or removed.
-- Extension digests either match Bazel 9.0.1 byte-for-byte, or the extension
-  section is clearly marked Slug-private (not advertised as Bazel-interop).
+- Extension digests are clearly marked Slug-private; byte-for-byte Bazel 9.0.1
+  parity remains a future golden-test-backed interop slice.
 
 **Test command:** `cargo test -p slug_bzlmod lockfile`
 
