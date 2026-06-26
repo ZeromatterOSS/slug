@@ -104,17 +104,27 @@ def _run(args: list[str], cwd: Path, check: bool = True) -> subprocess.Completed
     return result
 
 
-def _read_what_ran(slug_bin: Path, workspace: Path, isolation: str) -> list[dict]:
+def _read_what_ran(
+    slug_bin: Path,
+    workspace: Path,
+    isolation: str,
+    *,
+    emit_cache_queries: bool = False,
+) -> list[dict]:
+    args = [
+        str(slug_bin),
+        "--isolation-dir",
+        isolation,
+        "log",
+        "what-ran",
+        "--format",
+        "json",
+    ]
+    if emit_cache_queries:
+        args.append("--emit-cache-queries")
+
     what_ran = _run(
-        [
-            str(slug_bin),
-            "--isolation-dir",
-            isolation,
-            "log",
-            "what-ran",
-            "--format",
-            "json",
-        ],
+        args,
         cwd=workspace,
     )
     return [
@@ -182,6 +192,45 @@ def _assert_reapi_what_ran(
     return reapi_actions
 
 
+def _assert_remote_action_cache_hit(
+    slug_bin: Path,
+    workspace: Path,
+    isolation: str,
+    expected_count: int,
+) -> list[dict]:
+    entries = _read_what_ran(
+        slug_bin,
+        workspace,
+        isolation,
+        emit_cache_queries=True,
+    )
+    assert entries
+    assert [
+        entry
+        for entry in entries
+        if entry["reproducer"]["executor"] in DIRECT_LOCAL_EXECUTORS
+    ] == []
+    assert [
+        entry for entry in entries if entry["reproducer"]["executor"] == "Re"
+    ] == []
+
+    cache_queries = [
+        entry for entry in entries if entry["reproducer"]["executor"] == "CacheQuery"
+    ]
+    cache_hits = [entry for entry in entries if entry["reproducer"]["executor"] == "Cache"]
+    assert len(cache_queries) == expected_count
+    assert len(cache_hits) == expected_count
+    assert len(entries) == expected_count * 2
+
+    query_digests = {
+        entry["reproducer"]["details"]["digest"] for entry in cache_queries
+    }
+    hit_digests = {entry["reproducer"]["details"]["digest"] for entry in cache_hits}
+    assert query_digests == hit_digests
+    assert all(entry["reproducer"]["details"]["digest"] for entry in entries)
+    return cache_hits
+
+
 def _assert_reapi_uploads(
     slug_bin: Path,
     workspace: Path,
@@ -194,6 +243,13 @@ def _assert_reapi_uploads(
     assert sum(record["bytes_uploaded"] for record in records) > 0
     assert all(record["action"] for record in records)
     return records
+
+
+def _remove_local_action_cache_state(workspace: Path, isolation: str) -> None:
+    shutil.rmtree(
+        workspace / "buck-out" / isolation / "cache" / "action_cache_state",
+        ignore_errors=True,
+    )
 
 
 def _write_nativelink_config(path: Path, root: Path, frontend_port: int, worker_port: int) -> None:
@@ -363,6 +419,91 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
 
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
         _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
+    finally:
+        _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+            pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
+
+
+def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
+    tmp_path: Path,
+) -> None:
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _copy_fixture(
+        SHELL_FIXTURE_ROOT,
+        workspace,
+        [".buckroot", "MODULE.bazel", "BUILD.bazel", "defs.bzl"],
+    )
+
+    nativelink_root = tmp_path / "nativelink"
+    nativelink_root.mkdir()
+    frontend_port = _free_port()
+    worker_port = _free_port()
+    config = nativelink_root / "nativelink.json5"
+    _write_nativelink_config(config, nativelink_root, frontend_port, worker_port)
+
+    proc, nativelink_lines = _start_nativelink(nativelink_bin, config, frontend_port)
+    isolation = "plan34-reapi-remote-ac-hit-smoke"
+    remote_endpoint = f"grpc://127.0.0.1:{frontend_port}"
+
+    try:
+        first = _run(
+            [
+                str(slug_bin),
+                "--isolation-dir",
+                isolation,
+                "build",
+                "//:foo",
+                f"--remote_executor={remote_endpoint}",
+                f"--remote_cache={remote_endpoint}",
+                "--remote_default_exec_properties=cpu_count=1",
+                "--remote-only",
+            ],
+            cwd=workspace,
+        )
+        first_output = first.stdout + first.stderr
+        assert "BUILD SUCCEEDED" in first_output
+        assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in first_output
+        assert "RE Session:" in first_output
+        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
+        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
+
+        _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace)
+        _remove_local_action_cache_state(workspace, isolation)
+
+        second = _run(
+            [
+                str(slug_bin),
+                "--isolation-dir",
+                isolation,
+                "build",
+                "//:foo",
+                f"--remote_executor={remote_endpoint}",
+                f"--remote_cache={remote_endpoint}",
+                "--remote_default_exec_properties=cpu_count=1",
+                "--remote-only",
+            ],
+            cwd=workspace,
+        )
+        second_output = second.stdout + second.stderr
+        assert "BUILD SUCCEEDED" in second_output
+        assert "Commands: 1 (cached: 1, remote: 0, local: 0)" in second_output
+        assert "RE Session:" in second_output
+        _assert_remote_action_cache_hit(
+            slug_bin,
+            workspace,
+            isolation,
+            expected_count=1,
+        )
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()

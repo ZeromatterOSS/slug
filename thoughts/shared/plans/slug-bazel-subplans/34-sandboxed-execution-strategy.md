@@ -72,6 +72,11 @@ shortcut.
   record per executed action with nonzero aggregate uploaded digests/bytes,
   proving the fixture action inputs crossed the CAS/upload side of the REAPI
   boundary.
+- A dedicated NativeLink remote Action Cache smoke seeds the local REAPI AC with
+  a remote execution, kills the Slug daemon, removes Slug's local persistent AC
+  state, and rebuilds through the same NativeLink service. The replay proves
+  `CacheQuery` + `Cache` what-ran evidence with `cached=1`, `remote=0`,
+  `local=0`, and no direct-local fallback.
   The `rules_cc` fixture no longer needs a test-owned `--action_env=PATH=...`;
   Slug now applies Bazel 9's default shell action env when rules request
   `use_default_shell_env`.
@@ -112,6 +117,10 @@ shortcut.
   `executor_boundary="reapi"` on every RE row, `direct_local_actions=0`, and
   local command count 0. Each fixture also has `what-uploaded` evidence with
   `upload_records=reapi_actions` and nonzero uploaded digests/bytes.
+- `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py::test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback -q -s`
+  proves NativeLink REAPI Action Cache lookup/update evidence by forcing a
+  second build past Slug's local persistent AC and observing `CacheQuery` plus
+  `Cache` with zero remote executions and zero direct-local actions.
 - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q` proves
   the Plan 34 guard and smoke are reachable through the same Slug-binary
   environment used by `test.py`/CI.
